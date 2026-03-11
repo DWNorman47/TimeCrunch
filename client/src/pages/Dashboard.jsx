@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import TimeEntryForm from '../components/TimeEntryForm';
 import EntryList from '../components/EntryList';
+import ChangePassword from '../components/ChangePassword';
 import api from '../api';
 
 export default function Dashboard() {
@@ -9,6 +10,7 @@ export default function Dashboard() {
   const [entries, setEntries] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -32,9 +34,11 @@ export default function Dashboard() {
         <span style={styles.logo}>Time Crunch</span>
         <div style={styles.headerRight}>
           <span style={styles.userName}>{user.full_name}</span>
+          <button style={styles.logoutBtn} onClick={() => setShowChangePassword(true)}>Change Password</button>
           <button style={styles.logoutBtn} onClick={logout}>Logout</button>
         </div>
       </header>
+      {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} />}
       <main style={styles.main}>
         <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} />
         {loading ? <p>Loading entries...</p> : (

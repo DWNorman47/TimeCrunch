@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import WorkerMetrics from '../components/WorkerMetrics';
+import ChangePassword from '../components/ChangePassword';
 import api from '../api';
 
 export default function AdminDashboard() {
   const { logout } = useAuth();
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   useEffect(() => {
     api.get('/admin/workers')
@@ -18,8 +20,10 @@ export default function AdminDashboard() {
     <div style={styles.page}>
       <header style={styles.header}>
         <span style={styles.logo}>Time Crunch — Admin</span>
+        <button style={styles.logoutBtn} onClick={() => setShowChangePassword(true)}>Change Password</button>
         <button style={styles.logoutBtn} onClick={logout}>Logout</button>
       </header>
+      {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} />}
       <main style={styles.main}>
         <h2 style={styles.heading}>Workers</h2>
         {loading ? <p>Loading...</p> : (
