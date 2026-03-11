@@ -20,7 +20,7 @@ const s = StyleSheet.create({
 });
 
 function formatDate(d) {
-  const dt = new Date(d + 'T00:00:00');
+  const dt = new Date(d.substring(0, 10) + 'T00:00:00');
   return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
