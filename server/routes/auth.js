@@ -17,11 +17,11 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role, full_name: user.full_name },
+      { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
     );
-    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name } });
+    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -71,6 +71,19 @@ router.post('/change-password', requireAuth, async (req, res) => {
     const hash = await bcrypt.hash(new_password, 10);
     await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.id]);
     res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update language
+router.post('/update-language', requireAuth, async (req, res) => {
+  const { language } = req.body;
+  if (!language) return res.status(400).json({ error: 'language required' });
+  try {
+    await pool.query('UPDATE users SET language = $1 WHERE id = $2', [language, req.user.id]);
+    res.json({ success: true, language });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

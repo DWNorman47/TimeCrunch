@@ -8,7 +8,6 @@ export default function TimeEntryForm({ projects, onEntryAdded }) {
     work_date: today,
     start_time: '',
     end_time: '',
-    wage_type: 'regular',
     notes: '',
   });
   const [error, setError] = useState('');
@@ -16,6 +15,8 @@ export default function TimeEntryForm({ projects, onEntryAdded }) {
   const [success, setSuccess] = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const selectedProject = projects.find(p => p.id === parseInt(form.project_id));
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -27,8 +28,7 @@ export default function TimeEntryForm({ projects, onEntryAdded }) {
     setSaving(true);
     try {
       const r = await api.post('/time-entries', form);
-      const project = projects.find(p => p.id === parseInt(form.project_id));
-      onEntryAdded({ ...r.data, project_name: project?.name });
+      onEntryAdded({ ...r.data, project_name: selectedProject?.name });
       setForm(f => ({ ...f, start_time: '', end_time: '', notes: '' }));
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
@@ -48,7 +48,11 @@ export default function TimeEntryForm({ projects, onEntryAdded }) {
             <label style={styles.label}>Project</label>
             <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)} required>
               <option value="">Select project...</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.wage_type === 'prevailing' ? 'Prevailing' : 'Regular'})
+                </option>
+              ))}
             </select>
           </div>
           <div style={styles.field}>
@@ -66,17 +70,13 @@ export default function TimeEntryForm({ projects, onEntryAdded }) {
             <input style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required />
           </div>
         </div>
-        <div style={styles.field}>
-          <label style={styles.label}>Wage Type</label>
-          <div style={styles.radioGroup}>
-            {['regular', 'prevailing'].map(wt => (
-              <label key={wt} style={styles.radioLabel}>
-                <input type="radio" name="wage_type" value={wt} checked={form.wage_type === wt} onChange={() => set('wage_type', wt)} />
-                {wt.charAt(0).toUpperCase() + wt.slice(1)} Wages
-              </label>
-            ))}
+        {selectedProject && (
+          <div style={styles.wageIndicator}>
+            Wage type: <span style={{ color: selectedProject.wage_type === 'prevailing' ? '#d97706' : '#2563eb', fontWeight: 700 }}>
+              {selectedProject.wage_type === 'prevailing' ? 'Prevailing' : 'Regular'}
+            </span>
           </div>
-        </div>
+        )}
         <div style={styles.field}>
           <label style={styles.label}>Notes (optional)</label>
           <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any notes..." />
@@ -97,8 +97,7 @@ const styles = {
   field: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1 },
   label: { fontSize: 13, fontWeight: 600, color: '#555' },
   input: { padding: '9px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, width: '100%' },
-  radioGroup: { display: 'flex', gap: 24, alignItems: 'center', padding: '6px 0' },
-  radioLabel: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' },
+  wageIndicator: { fontSize: 13, color: '#555', padding: '6px 2px' },
   error: { color: '#e53e3e', fontSize: 13 },
   success: { color: '#38a169', fontSize: 13 },
   button: { padding: '11px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600 },

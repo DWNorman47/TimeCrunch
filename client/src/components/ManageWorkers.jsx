@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import api from '../api';
 
+const LANGUAGES = ['English', 'Spanish', 'French', 'Portuguese', 'Mandarin', 'Vietnamese', 'Tagalog', 'Other'];
+
 export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted }) {
-  const [form, setForm] = useState({ full_name: '', username: '', password: '' });
+  const [form, setForm] = useState({ full_name: '', username: '', password: '', role: 'worker', language: 'English' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -16,31 +18,31 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted 
     try {
       const r = await api.post('/admin/workers', form);
       onWorkerAdded(r.data);
-      setForm({ full_name: '', username: '', password: '' });
+      setForm({ full_name: '', username: '', password: '', role: 'worker', language: 'English' });
       setShowForm(false);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create worker');
+      setError(err.response?.data?.error || 'Failed to create user');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id, name) => {
-    if (!confirm(`Delete worker "${name}"? This will also delete all their time entries.`)) return;
+    if (!confirm(`Delete "${name}"? This will also delete all their time entries.`)) return;
     try {
       await api.delete(`/admin/workers/${id}`);
       onWorkerDeleted(id);
     } catch {
-      alert('Failed to delete worker');
+      alert('Failed to delete user');
     }
   };
 
   return (
     <div style={styles.card}>
       <div style={styles.cardHeader}>
-        <h3 style={styles.cardTitle}>Manage Workers</h3>
+        <h3 style={styles.cardTitle}>Manage Users</h3>
         <button style={styles.addBtn} onClick={() => setShowForm(s => !s)}>
-          {showForm ? 'Cancel' : '+ Add Worker'}
+          {showForm ? 'Cancel' : '+ Add User'}
         </button>
       </div>
 
@@ -49,19 +51,28 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted 
           <input style={styles.input} placeholder="Full name" value={form.full_name} onChange={e => set('full_name', e.target.value)} required />
           <input style={styles.input} placeholder="Username" value={form.username} onChange={e => set('username', e.target.value)} required />
           <input style={styles.input} type="password" placeholder="Temporary password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
+          <select style={styles.input} value={form.role} onChange={e => set('role', e.target.value)}>
+            <option value="worker">User</option>
+            <option value="admin">Admin</option>
+          </select>
+          <select style={styles.input} value={form.language} onChange={e => set('language', e.target.value)}>
+            {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
           {error && <p style={styles.error}>{error}</p>}
-          <button style={styles.saveBtn} type="submit" disabled={saving}>{saving ? 'Creating...' : 'Create Worker'}</button>
+          <button style={styles.saveBtn} type="submit" disabled={saving}>{saving ? 'Creating...' : 'Create User'}</button>
         </form>
       )}
 
       {workers.length === 0 ? (
-        <p style={styles.empty}>No workers yet.</p>
+        <p style={styles.empty}>No users yet.</p>
       ) : (
         <table style={styles.table}>
           <thead>
             <tr>
               <th style={styles.th}>Name</th>
               <th style={styles.th}>Username</th>
+              <th style={styles.th}>Type</th>
+              <th style={styles.th}>Language</th>
               <th style={styles.th}></th>
             </tr>
           </thead>
@@ -70,6 +81,12 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted 
               <tr key={w.id} style={styles.tr}>
                 <td style={styles.td}>{w.full_name}</td>
                 <td style={styles.td}>@{w.username}</td>
+                <td style={styles.td}>
+                  <span style={{ ...styles.roleBadge, background: w.role === 'admin' ? '#1a56db' : '#6b7280' }}>
+                    {w.role === 'admin' ? 'Admin' : 'User'}
+                  </span>
+                </td>
+                <td style={styles.td}>{w.language || '—'}</td>
                 <td style={styles.tdAction}>
                   <button style={styles.deleteBtn} onClick={() => handleDelete(w.id, w.full_name)}>Delete</button>
                 </td>
@@ -97,5 +114,6 @@ const styles = {
   tr: { borderBottom: '1px solid #f5f5f5' },
   td: { padding: '10px 8px', fontSize: 14 },
   tdAction: { padding: '10px 8px', textAlign: 'right' },
+  roleBadge: { color: '#fff', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700 },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
 };

@@ -20,16 +20,17 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-// Submit a time entry
+// Submit a time entry (wage_type inherited from project)
 router.post('/', requireAuth, async (req, res) => {
-  const { project_id, work_date, start_time, end_time, wage_type, notes } = req.body;
-  if (!project_id || !work_date || !start_time || !end_time || !wage_type) {
-    return res.status(400).json({ error: 'project_id, work_date, start_time, end_time, and wage_type are required' });
-  }
-  if (!['regular', 'prevailing'].includes(wage_type)) {
-    return res.status(400).json({ error: 'wage_type must be regular or prevailing' });
+  const { project_id, work_date, start_time, end_time, notes } = req.body;
+  if (!project_id || !work_date || !start_time || !end_time) {
+    return res.status(400).json({ error: 'project_id, work_date, start_time, and end_time are required' });
   }
   try {
+    const projectResult = await pool.query('SELECT wage_type FROM projects WHERE id = $1', [project_id]);
+    if (projectResult.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
+    const wage_type = projectResult.rows[0].wage_type;
+
     const result = await pool.query(
       `INSERT INTO time_entries (user_id, project_id, work_date, start_time, end_time, wage_type, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,

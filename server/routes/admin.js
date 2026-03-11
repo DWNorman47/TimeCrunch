@@ -14,7 +14,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         WHERE wage_type = 'regular'
         GROUP BY user_id, work_date
       )
-      SELECT u.id, u.full_name, u.username,
+      SELECT u.id, u.full_name, u.username, u.role, u.language,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600), 0) as total_hours,
         COALESCE((SELECT SUM(LEAST(day_hours, 8)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as regular_hours,
@@ -23,7 +23,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
       WHERE u.role = 'worker'
-      GROUP BY u.id, u.full_name, u.username
+      GROUP BY u.id, u.full_name, u.username, u.role, u.language
       ORDER BY u.full_name`
     );
     res.json(result.rows);
@@ -86,17 +86,19 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
   }
 });
 
-// Create a worker
+// Create a worker or admin
 router.post('/workers', requireAdmin, async (req, res) => {
-  const { username, password, full_name } = req.body;
+  const { username, password, full_name, role } = req.body;
   if (!username || !password || !full_name) {
     return res.status(400).json({ error: 'username, password, and full_name required' });
   }
+  const assignedRole = role === 'admin' ? 'admin' : 'worker';
+  const assignedLanguage = req.body.language || 'English';
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      'INSERT INTO users (username, password_hash, full_name, role) VALUES ($1, $2, $3, $4) RETURNING id, username, full_name, role',
-      [username, hash, full_name, 'worker']
+      'INSERT INTO users (username, password_hash, full_name, role, language) VALUES ($1, $2, $3, $4, $5) RETURNING id, username, full_name, role, language',
+      [username, hash, full_name, assignedRole, assignedLanguage]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -162,14 +164,34 @@ router.get('/projects', requireAdmin, async (req, res) => {
   }
 });
 
-// Create a project
-router.post('/projects', requireAdmin, async (req, res) => {
-  const { name } = req.body;
-  if (!name) return res.status(400).json({ error: 'Project name required' });
+// Update project wage_type
+router.patch('/projects/:id', requireAdmin, async (req, res) => {
+  const { wage_type } = req.body;
+  if (!['regular', 'prevailing'].includes(wage_type)) {
+    return res.status(400).json({ error: 'wage_type must be regular or prevailing' });
+  }
   try {
     const result = await pool.query(
-      'INSERT INTO projects (name) VALUES ($1) RETURNING *',
-      [name]
+      'UPDATE projects SET wage_type = $1 WHERE id = $2 RETURNING *',
+      [wage_type, req.params.id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Create a project
+router.post('/projects', requireAdmin, async (req, res) => {
+  const { name, wage_type } = req.body;
+  if (!name) return res.status(400).json({ error: 'Project name required' });
+  const wt = wage_type === 'prevailing' ? 'prevailing' : 'regular';
+  try {
+    const result = await pool.query(
+      'INSERT INTO projects (name, wage_type) VALUES ($1, $2) RETURNING *',
+      [name, wt]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

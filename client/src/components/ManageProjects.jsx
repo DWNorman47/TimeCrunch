@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import api from '../api';
 
-export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted }) {
+export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated }) {
   const [name, setName] = useState('');
+  const [wageType, setWageType] = useState('regular');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -11,13 +12,24 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     setError('');
     setSaving(true);
     try {
-      const r = await api.post('/admin/projects', { name });
+      const r = await api.post('/admin/projects', { name, wage_type: wageType });
       onProjectAdded(r.data);
       setName('');
+      setWageType('regular');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create project');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleWageType = async (id, currentType) => {
+    const newType = currentType === 'regular' ? 'prevailing' : 'regular';
+    try {
+      const r = await api.patch(`/admin/projects/${id}`, { wage_type: newType });
+      onProjectUpdated(r.data);
+    } catch {
+      alert('Failed to update project');
     }
   };
 
@@ -42,6 +54,10 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
           onChange={e => setName(e.target.value)}
           required
         />
+        <select style={styles.select} value={wageType} onChange={e => setWageType(e.target.value)}>
+          <option value="regular">Regular</option>
+          <option value="prevailing">Prevailing</option>
+        </select>
         <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? 'Adding...' : '+ Add'}</button>
       </form>
       {error && <p style={styles.error}>{error}</p>}
@@ -53,7 +69,16 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
           {projects.map(p => (
             <div key={p.id} style={styles.item}>
               <span style={styles.projectName}>{p.name}</span>
-              <button style={styles.deleteBtn} onClick={() => handleDelete(p.id, p.name)}>Delete</button>
+              <div style={styles.itemRight}>
+                <button
+                  style={{ ...styles.wageBtn, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}
+                  onClick={() => handleToggleWageType(p.id, p.wage_type)}
+                  title="Click to toggle wage type"
+                >
+                  {p.wage_type === 'prevailing' ? 'Prevailing' : 'Regular'}
+                </button>
+                <button style={styles.deleteBtn} onClick={() => handleDelete(p.id, p.name)}>Delete</button>
+              </div>
             </div>
           ))}
         </div>
@@ -67,11 +92,14 @@ const styles = {
   cardTitle: { fontSize: 17, fontWeight: 700, marginBottom: 14 },
   form: { display: 'flex', gap: 10, marginBottom: 12 },
   input: { flex: 1, padding: '8px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 },
+  select: { padding: '8px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 },
   addBtn: { padding: '8px 18px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14 },
   error: { color: '#e53e3e', fontSize: 13, marginBottom: 8 },
   empty: { color: '#888', fontSize: 14 },
   list: { display: 'flex', flexDirection: 'column', gap: 6 },
   item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#f8f9fb', borderRadius: 7 },
+  itemRight: { display: 'flex', gap: 8, alignItems: 'center' },
   projectName: { fontSize: 14, fontWeight: 500 },
+  wageBtn: { color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
 };
