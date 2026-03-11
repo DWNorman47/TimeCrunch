@@ -66,6 +66,10 @@ export default function BillPDF({ data }) {
               <Text style={s.summaryLabel}>Regular</Text>
             </View>
             <View style={s.summaryItem}>
+              <Text style={[s.summaryVal, { color: '#dc2626' }]}>{summary.overtime_hours.toFixed(2)}h</Text>
+              <Text style={s.summaryLabel}>Overtime</Text>
+            </View>
+            <View style={s.summaryItem}>
               <Text style={[s.summaryVal, { color: '#d97706' }]}>{summary.prevailing_hours.toFixed(2)}h</Text>
               <Text style={s.summaryLabel}>Prevailing</Text>
             </View>

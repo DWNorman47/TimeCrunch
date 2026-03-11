@@ -3,10 +3,18 @@ import api from '../api';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import BillPDF from './BillPDF';
 
+function defaultDates() {
+  const today = new Date();
+  const from = new Date(today);
+  from.setDate(today.getDate() - 10);
+  const fmt = d => d.toISOString().split('T')[0];
+  return { from: fmt(from), to: fmt(today) };
+}
+
 export default function WorkerMetrics({ worker }) {
   const [expanded, setExpanded] = useState(false);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [from, setFrom] = useState(defaultDates().from);
+  const [to, setTo] = useState(defaultDates().to);
   const [billData, setBillData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -33,6 +41,7 @@ export default function WorkerMetrics({ worker }) {
         <div style={styles.metrics}>
           <Metric label="Total" value={`${parseFloat(worker.total_hours).toFixed(2)}h`} />
           <Metric label="Regular" value={`${parseFloat(worker.regular_hours).toFixed(2)}h`} color="#2563eb" />
+          <Metric label="Overtime" value={`${parseFloat(worker.overtime_hours).toFixed(2)}h`} color="#dc2626" />
           <Metric label="Prevailing" value={`${parseFloat(worker.prevailing_hours).toFixed(2)}h`} color="#d97706" />
           <Metric label="Entries" value={worker.total_entries} />
         </div>
@@ -61,8 +70,9 @@ export default function WorkerMetrics({ worker }) {
               <div style={styles.billSummary}>
                 <span>Entries: <b>{billData.entries.length}</b></span>
                 <span>Total: <b>{billData.summary.total_hours.toFixed(2)}h</b></span>
-                <span>Regular: <b>{billData.summary.regular_hours.toFixed(2)}h</b></span>
-                <span>Prevailing: <b>{billData.summary.prevailing_hours.toFixed(2)}h</b></span>
+                <span style={{ color: '#2563eb' }}>Regular: <b>{billData.summary.regular_hours.toFixed(2)}h</b></span>
+                <span style={{ color: '#dc2626' }}>Overtime: <b>{billData.summary.overtime_hours.toFixed(2)}h</b></span>
+                <span style={{ color: '#d97706' }}>Prevailing: <b>{billData.summary.prevailing_hours.toFixed(2)}h</b></span>
               </div>
               <PDFDownloadLink
                 document={<BillPDF data={billData} />}

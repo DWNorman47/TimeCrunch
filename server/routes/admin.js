@@ -3,20 +3,28 @@ const bcrypt = require('bcryptjs');
 const pool = require('../db');
 const { requireAdmin } = require('../middleware/auth');
 
-// List all workers with summary metrics
+// List all workers with summary metrics (overtime = regular hours > 8/day)
 router.get('/workers', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT u.id, u.full_name, u.username,
+      `WITH daily_regular AS (
+        SELECT user_id, work_date,
+          SUM(EXTRACT(EPOCH FROM (end_time - start_time)) / 3600) as day_hours
+        FROM time_entries
+        WHERE wage_type = 'regular'
+        GROUP BY user_id, work_date
+      )
+      SELECT u.id, u.full_name, u.username,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600), 0) as total_hours,
-        COALESCE(SUM(CASE WHEN te.wage_type = 'regular' THEN EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600 ELSE 0 END), 0) as regular_hours,
+        COALESCE((SELECT SUM(LEAST(day_hours, 8)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as regular_hours,
+        COALESCE((SELECT SUM(GREATEST(day_hours - 8, 0)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as overtime_hours,
         COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600 ELSE 0 END), 0) as prevailing_hours
-       FROM users u
-       LEFT JOIN time_entries te ON te.user_id = u.id
-       WHERE u.role = 'worker'
-       GROUP BY u.id, u.full_name, u.username
-       ORDER BY u.full_name`
+      FROM users u
+      LEFT JOIN time_entries te ON te.user_id = u.id
+      WHERE u.role = 'worker'
+      GROUP BY u.id, u.full_name, u.username
+      ORDER BY u.full_name`
     );
     res.json(result.rows);
   } catch (err) {
@@ -47,26 +55,29 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
     );
 
     const entries = entriesResult.rows;
-    const totalHours = entries.reduce((sum, e) => {
+
+    // Calculate daily regular hours to determine overtime (>8h/day)
+    const dailyRegular = {};
+    entries.filter(e => e.wage_type === 'regular').forEach(e => {
+      const date = e.work_date.toString().substring(0, 10);
+      if (!dailyRegular[date]) dailyRegular[date] = 0;
       const start = new Date(`1970-01-01T${e.start_time}`);
       const end = new Date(`1970-01-01T${e.end_time}`);
-      return sum + (end - start) / 3600000;
-    }, 0);
-    const regularHours = entries.filter(e => e.wage_type === 'regular').reduce((sum, e) => {
-      const start = new Date(`1970-01-01T${e.start_time}`);
-      const end = new Date(`1970-01-01T${e.end_time}`);
-      return sum + (end - start) / 3600000;
-    }, 0);
+      dailyRegular[date] += (end - start) / 3600000;
+    });
+    const regularHours = Object.values(dailyRegular).reduce((sum, h) => sum + Math.min(h, 8), 0);
+    const overtimeHours = Object.values(dailyRegular).reduce((sum, h) => sum + Math.max(h - 8, 0), 0);
     const prevailingHours = entries.filter(e => e.wage_type === 'prevailing').reduce((sum, e) => {
       const start = new Date(`1970-01-01T${e.start_time}`);
       const end = new Date(`1970-01-01T${e.end_time}`);
       return sum + (end - start) / 3600000;
     }, 0);
+    const totalHours = regularHours + overtimeHours + prevailingHours;
 
     res.json({
       worker: userResult.rows[0],
       entries,
-      summary: { total_hours: totalHours, regular_hours: regularHours, prevailing_hours: prevailingHours },
+      summary: { total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours },
       period: { from: from || null, to: to || null },
     });
   } catch (err) {
