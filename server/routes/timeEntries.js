@@ -1,0 +1,60 @@
+const router = require('express').Router();
+const pool = require('../db');
+const { requireAuth } = require('../middleware/auth');
+
+// Get current user's entries
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT te.*, p.name as project_name
+       FROM time_entries te
+       LEFT JOIN projects p ON te.project_id = p.id
+       WHERE te.user_id = $1
+       ORDER BY te.work_date DESC, te.start_time DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Submit a time entry
+router.post('/', requireAuth, async (req, res) => {
+  const { project_id, work_date, start_time, end_time, wage_type, notes } = req.body;
+  if (!project_id || !work_date || !start_time || !end_time || !wage_type) {
+    return res.status(400).json({ error: 'project_id, work_date, start_time, end_time, and wage_type are required' });
+  }
+  if (!['regular', 'prevailing'].includes(wage_type)) {
+    return res.status(400).json({ error: 'wage_type must be regular or prevailing' });
+  }
+  try {
+    const result = await pool.query(
+      `INSERT INTO time_entries (user_id, project_id, work_date, start_time, end_time, wage_type, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [req.user.id, project_id, work_date, start_time, end_time, wage_type, notes || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete an entry (own entries only)
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM time_entries WHERE id = $1 AND user_id = $2 RETURNING id',
+      [req.params.id, req.user.id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+module.exports = router;
