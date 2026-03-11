@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import WorkerMetrics from '../components/WorkerMetrics';
 import ManageWorkers from '../components/ManageWorkers';
 import ManageProjects from '../components/ManageProjects';
+import ProjectReports from '../components/ProjectReports';
 import ChangePassword from '../components/ChangePassword';
 import api from '../api';
 
@@ -40,6 +41,7 @@ export default function AdminDashboard() {
       <main style={styles.main}>
         <div style={styles.tabs}>
           <button style={tab === 'metrics' ? styles.tabActive : styles.tab} onClick={() => setTab('metrics')}>Worker Reports</button>
+          <button style={tab === 'projects' ? styles.tabActive : styles.tab} onClick={() => setTab('projects')}>Project Reports</button>
           <button style={tab === 'manage' ? styles.tabActive : styles.tab} onClick={() => setTab('manage')}>Manage</button>
         </div>
 
@@ -50,6 +52,11 @@ export default function AdminDashboard() {
               ? <p style={{ color: '#666' }}>No workers yet. Add one in the Manage tab.</p>
               : workers.map(w => <WorkerMetrics key={w.id} worker={w} />)
             }
+          </>
+        ) : tab === 'projects' ? (
+          <>
+            <h2 style={styles.heading}>Project Reports</h2>
+            <ProjectReports />
           </>
         ) : (
           <>

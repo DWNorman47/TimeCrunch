@@ -121,6 +121,36 @@ router.delete('/workers/:id', requireAdmin, async (req, res) => {
   }
 });
 
+// Project metrics report
+router.get('/projects/metrics', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `WITH daily_regular AS (
+        SELECT project_id, work_date,
+          SUM(EXTRACT(EPOCH FROM (end_time - start_time)) / 3600) as day_hours
+        FROM time_entries
+        WHERE wage_type = 'regular'
+        GROUP BY project_id, work_date
+      )
+      SELECT p.id, p.name,
+        COUNT(te.id) as total_entries,
+        COUNT(DISTINCT te.user_id) as worker_count,
+        COALESCE(SUM(EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600), 0) as total_hours,
+        COALESCE((SELECT SUM(LEAST(day_hours, 8)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as regular_hours,
+        COALESCE((SELECT SUM(GREATEST(day_hours - 8, 0)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as overtime_hours,
+        COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600 ELSE 0 END), 0) as prevailing_hours
+      FROM projects p
+      LEFT JOIN time_entries te ON te.project_id = p.id
+      GROUP BY p.id, p.name
+      ORDER BY p.name`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // List projects
 router.get('/projects', requireAdmin, async (req, res) => {
   try {
