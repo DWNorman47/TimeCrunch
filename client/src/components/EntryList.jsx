@@ -42,7 +42,10 @@ export default function EntryList({ entries, onDeleted }) {
           <div key={e.id} style={styles.entry}>
             <div style={styles.entryMain}>
               <span style={styles.project}>{e.project_name}</span>
-              <span style={styles.date}>{formatDate(e.work_date)}</span>
+              <div style={styles.entryRight}>
+                <span style={styles.date}>{formatDate(e.work_date)}</span>
+                <button style={styles.deleteBtn} onClick={() => handleDelete(e.id)}>Delete</button>
+              </div>
             </div>
             <div style={styles.entryDetail}>
               <span>{formatTime(e.start_time)} – {formatTime(e.end_time)} ({formatHours(e.start_time, e.end_time)})</span>
@@ -51,7 +54,6 @@ export default function EntryList({ entries, onDeleted }) {
               </span>
             </div>
             {e.notes && <div style={styles.notes}>{e.notes}</div>}
-            <button style={styles.deleteBtn} onClick={() => handleDelete(e.id)}>Delete</button>
           </div>
         ))}
       </div>
@@ -64,12 +66,13 @@ const styles = {
   heading: { marginBottom: 16, fontSize: 18, fontWeight: 700 },
   empty: { textAlign: 'center', color: '#888', padding: 32 },
   list: { display: 'flex', flexDirection: 'column', gap: 12 },
-  entry: { border: '1px solid #eee', borderRadius: 8, padding: 14, position: 'relative' },
-  entryMain: { display: 'flex', justifyContent: 'space-between', marginBottom: 4 },
+  entry: { border: '1px solid #eee', borderRadius: 8, padding: 14 },
+  entryMain: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  entryRight: { display: 'flex', alignItems: 'center', gap: 10 },
   project: { fontWeight: 700, fontSize: 15 },
   date: { color: '#666', fontSize: 13 },
   entryDetail: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#555' },
   badge: { color: '#fff', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 },
   notes: { marginTop: 6, fontSize: 12, color: '#888', fontStyle: 'italic' },
-  deleteBtn: { position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', color: '#ccc', fontSize: 12, cursor: 'pointer' },
+  deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '3px 8px', borderRadius: 5, fontSize: 11, cursor: 'pointer' },
 };
