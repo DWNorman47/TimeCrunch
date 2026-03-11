@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const bcrypt = require('bcryptjs');
 const pool = require('../db');
 const { requireAdmin } = require('../middleware/auth');
 
@@ -68,6 +69,81 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
       summary: { total_hours: totalHours, regular_hours: regularHours, prevailing_hours: prevailingHours },
       period: { from: from || null, to: to || null },
     });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Create a worker
+router.post('/workers', requireAdmin, async (req, res) => {
+  const { username, password, full_name } = req.body;
+  if (!username || !password || !full_name) {
+    return res.status(400).json({ error: 'username, password, and full_name required' });
+  }
+  try {
+    const hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      'INSERT INTO users (username, password_hash, full_name, role) VALUES ($1, $2, $3, $4) RETURNING id, username, full_name, role',
+      [username, hash, full_name, 'worker']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Username already exists' });
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete a worker
+router.delete('/workers/:id', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM users WHERE id = $1 AND role = $2 RETURNING id',
+      [req.params.id, 'worker']
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// List projects
+router.get('/projects', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM projects ORDER BY name');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Create a project
+router.post('/projects', requireAdmin, async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'Project name required' });
+  try {
+    const result = await pool.query(
+      'INSERT INTO projects (name) VALUES ($1) RETURNING *',
+      [name]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Project already exists' });
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete a project
+router.delete('/projects/:id', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM projects WHERE id = $1 RETURNING id', [req.params.id]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
+    res.json({ deleted: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
