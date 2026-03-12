@@ -160,6 +160,70 @@ router.delete('/workers/:id', requireAdmin, async (req, res) => {
   }
 });
 
+// Get a project's entries for a date range (for bill generation)
+router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
+  const { from, to } = req.query;
+  try {
+    const projectResult = await pool.query('SELECT * FROM projects WHERE id = $1', [req.params.id]);
+    if (projectResult.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
+
+    const entriesResult = await pool.query(
+      `SELECT te.*, u.full_name as worker_name, u.username, u.hourly_rate
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       WHERE te.project_id = $1
+         AND ($2::date IS NULL OR te.work_date >= $2::date)
+         AND ($3::date IS NULL OR te.work_date <= $3::date)
+       ORDER BY te.work_date ASC, te.start_time ASC`,
+      [req.params.id, from || null, to || null]
+    );
+
+    const entries = entriesResult.rows;
+
+    // Calculate overtime per worker per day (>8h regular)
+    const workerDaily = {};
+    entries.filter(e => e.wage_type === 'regular').forEach(e => {
+      const key = `${e.user_id}:${e.work_date.toString().substring(0, 10)}`;
+      if (!workerDaily[key]) workerDaily[key] = { hours: 0, rate: parseFloat(e.hourly_rate) || 30 };
+      const start = new Date(`1970-01-01T${e.start_time}`);
+      const end = new Date(`1970-01-01T${e.end_time}`);
+      workerDaily[key].hours += (end - start) / 3600000;
+    });
+
+    let regularHours = 0, overtimeHours = 0, regularCost = 0, overtimeCost = 0;
+    Object.values(workerDaily).forEach(({ hours, rate }) => {
+      const reg = Math.min(hours, 8);
+      const ot = Math.max(hours - 8, 0);
+      regularHours += reg;
+      overtimeHours += ot;
+      regularCost += reg * rate;
+      overtimeCost += ot * rate * 1.5;
+    });
+
+    let prevailingHours = 0, prevailingCost = 0;
+    entries.filter(e => e.wage_type === 'prevailing').forEach(e => {
+      const start = new Date(`1970-01-01T${e.start_time}`);
+      const end = new Date(`1970-01-01T${e.end_time}`);
+      const h = (end - start) / 3600000;
+      prevailingHours += h;
+      prevailingCost += h * 45;
+    });
+
+    const totalHours = regularHours + overtimeHours + prevailingHours;
+    const totalCost = regularCost + overtimeCost + prevailingCost;
+
+    res.json({
+      project: projectResult.rows[0],
+      entries,
+      summary: { total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours, regular_cost: regularCost, overtime_cost: overtimeCost, prevailing_cost: prevailingCost, total_cost: totalCost },
+      period: { from: from || null, to: to || null },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Project metrics report
 router.get('/projects/metrics', requireAdmin, async (req, res) => {
   try {
