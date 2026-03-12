@@ -119,47 +119,53 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       {projects.length === 0 ? (
         <p style={styles.empty}>No projects yet.</p>
       ) : (
-        <div style={styles.list}>
-          {projects.map(p => (
-            <div key={p.id} style={styles.item}>
-              {editingId === p.id ? (
-                <>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>Name</th>
+              <th style={styles.th}>Wage Type</th>
+              <th style={styles.th}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {projects.map(p => editingId === p.id ? (
+              <tr key={p.id} style={{ ...styles.tr, background: '#f0f4ff' }}>
+                <td style={styles.td}>
                   <input
-                    style={{ ...styles.input, flex: 1, marginRight: 8 }}
+                    style={styles.editInput}
                     value={editName}
                     onChange={e => setEditName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Escape') setEditingId(null); }}
                     autoFocus
                   />
-                  <select style={{ ...styles.select, marginRight: 8 }} value={editWageType} onChange={e => setEditWageType(e.target.value)}>
+                </td>
+                <td style={styles.td}>
+                  <select style={styles.editInput} value={editWageType} onChange={e => setEditWageType(e.target.value)}>
                     <option value="regular">Regular Wages</option>
                     <option value="prevailing">Prevailing Wages</option>
                   </select>
-                </>
-              ) : (
-                <>
-                  <span style={styles.projectName}>{p.name}</span>
+                </td>
+                <td style={styles.tdAction}>
+                  <button style={styles.saveBtn} onClick={() => handleEditSave(p.id)}>Save</button>
+                  <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+                </td>
+              </tr>
+            ) : (
+              <tr key={p.id} style={styles.tr}>
+                <td style={styles.td}>{p.name}</td>
+                <td style={styles.td}>
                   <span style={{ ...styles.wageBadge, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                     {p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}
                   </span>
-                </>
-              )}
-              <div style={styles.itemRight}>
-                {editingId === p.id ? (
-                  <>
-                    <button style={styles.saveBtn} onClick={() => handleEditSave(p.id)}>Save</button>
-                    <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
-                  </>
-                ) : (
-                  <>
-                    <button style={styles.editBtn} onClick={() => { setEditingId(p.id); setEditName(p.name); setEditWageType(p.wage_type); }}>Edit</button>
-                    <button style={styles.removeBtn} onClick={() => handleRemove(p.id, p.name)}>Remove</button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+                </td>
+                <td style={styles.tdAction}>
+                  <button style={styles.editBtn} onClick={() => { setEditingId(p.id); setEditName(p.name); setEditWageType(p.wage_type); }}>Edit</button>
+                  <button style={styles.removeBtn} onClick={() => handleRemove(p.id, p.name)}>Remove</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
 
       <div style={styles.historyFooter}>
@@ -173,17 +179,26 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
             ) : archived.length === 0 ? (
               <p style={styles.empty}>No removed projects.</p>
             ) : (
-              archived.map(p => (
-                <div key={p.id} style={{ ...styles.item, color: '#888', marginTop: 6 }}>
-                  <span style={styles.projectName}>{p.name}</span>
-                  <div style={styles.itemRight}>
-                    <span style={{ fontSize: 11, color: '#aaa', marginRight: 8 }}>
-                      {p.wage_type === 'prevailing' ? 'Prevailing' : 'Regular'}
-                    </span>
-                    <button style={styles.restoreBtn} onClick={() => handleRestore(p.id)}>Restore</button>
-                  </div>
-                </div>
-              ))
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Name</th>
+                    <th style={styles.th}>Wage Type</th>
+                    <th style={styles.th}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {archived.map(p => (
+                    <tr key={p.id} style={{ ...styles.tr, color: '#888' }}>
+                      <td style={styles.td}>{p.name}</td>
+                      <td style={styles.td}>{p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}</td>
+                      <td style={styles.tdAction}>
+                        <button style={styles.restoreBtn} onClick={() => handleRestore(p.id)}>Restore</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         )}
@@ -203,11 +218,13 @@ const styles = {
   errorText: { color: '#e53e3e', fontSize: 13, margin: 0 },
   restoreInlineBtn: { background: '#059669', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   empty: { color: '#888', fontSize: 14 },
-  list: { display: 'flex', flexDirection: 'column', gap: 6 },
-  item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#f8f9fb', borderRadius: 7, gap: 8 },
-  itemRight: { display: 'flex', gap: 8, alignItems: 'center' },
-  projectName: { fontSize: 14, fontWeight: 500 },
-  wageBadge: { color: '#fff', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, marginLeft: 10, whiteSpace: 'nowrap' },
+  table: { width: '100%', borderCollapse: 'collapse' },
+  th: { textAlign: 'left', fontSize: 12, color: '#999', fontWeight: 600, textTransform: 'uppercase', padding: '6px 8px', borderBottom: '1px solid #eee' },
+  tr: { borderBottom: '1px solid #f5f5f5' },
+  td: { padding: '10px 8px', fontSize: 14 },
+  tdAction: { padding: '10px 8px', textAlign: 'right', whiteSpace: 'nowrap' },
+  editInput: { padding: '5px 8px', border: '1px solid #c7d2fe', borderRadius: 6, fontSize: 13, width: '100%' },
+  wageBadge: { color: '#fff', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' },
   removeBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   editBtn: { background: 'none', border: '1px solid #93c5fd', color: '#2563eb', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   saveBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
