@@ -14,7 +14,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         WHERE wage_type = 'regular'
         GROUP BY user_id, work_date
       )
-      SELECT u.id, u.full_name, u.username, u.role, u.language,
+      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600), 0) as total_hours,
         COALESCE((SELECT SUM(LEAST(day_hours, 8)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as regular_hours,
@@ -23,7 +23,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
       WHERE u.role = 'worker'
-      GROUP BY u.id, u.full_name, u.username, u.role, u.language
+      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate
       ORDER BY u.full_name`
     );
     res.json(result.rows);
@@ -38,7 +38,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
   const { from, to } = req.query;
   try {
     const userResult = await pool.query(
-      'SELECT id, full_name, username FROM users WHERE id = $1 AND role = $2',
+      'SELECT id, full_name, username, hourly_rate FROM users WHERE id = $1 AND role = $2',
       [req.params.id, 'worker']
     );
     if (userResult.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
@@ -73,11 +73,19 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
       return sum + (end - start) / 3600000;
     }, 0);
     const totalHours = regularHours + overtimeHours + prevailingHours;
+    const rate = parseFloat(userResult.rows[0].hourly_rate) || 30;
+    const regularCost = regularHours * rate;
+    const overtimeCost = overtimeHours * rate * 1.5;
+    const prevailingCost = prevailingHours * 45;
+    const totalCost = regularCost + overtimeCost + prevailingCost;
 
     res.json({
       worker: userResult.rows[0],
       entries,
-      summary: { total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours },
+      summary: {
+        total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours,
+        rate, regular_cost: regularCost, overtime_cost: overtimeCost, prevailing_cost: prevailingCost, total_cost: totalCost,
+      },
       period: { from: from || null, to: to || null },
     });
   } catch (err) {
@@ -94,11 +102,12 @@ router.post('/workers', requireAdmin, async (req, res) => {
   }
   const assignedRole = role === 'admin' ? 'admin' : 'worker';
   const assignedLanguage = req.body.language || 'English';
+  const assignedRate = parseFloat(req.body.hourly_rate) || 30;
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      'INSERT INTO users (username, password_hash, full_name, role, language) VALUES ($1, $2, $3, $4, $5) RETURNING id, username, full_name, role, language',
-      [username, hash, full_name, assignedRole, assignedLanguage]
+      'INSERT INTO users (username, password_hash, full_name, role, language, hourly_rate) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, username, full_name, role, language, hourly_rate',
+      [username, hash, full_name, assignedRole, assignedLanguage, assignedRate]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -110,8 +119,8 @@ router.post('/workers', requireAdmin, async (req, res) => {
 
 // Update a worker (full_name, role, language)
 router.patch('/workers/:id', requireAdmin, async (req, res) => {
-  const { full_name, role, language } = req.body;
-  if (!full_name && !role && !language) {
+  const { full_name, role, language, hourly_rate } = req.body;
+  if (!full_name && !role && !language && hourly_rate === undefined) {
     return res.status(400).json({ error: 'At least one field required' });
   }
   const assignedRole = role ? (role === 'admin' ? 'admin' : 'worker') : undefined;
@@ -122,9 +131,10 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
     if (full_name) { fields.push(`full_name = $${idx++}`); values.push(full_name); }
     if (assignedRole !== undefined) { fields.push(`role = $${idx++}`); values.push(assignedRole); }
     if (language) { fields.push(`language = $${idx++}`); values.push(language); }
+    if (hourly_rate !== undefined) { fields.push(`hourly_rate = $${idx++}`); values.push(parseFloat(hourly_rate) || 30); }
     values.push(req.params.id);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, username, full_name, role, language`,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, username, full_name, role, language, hourly_rate`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });

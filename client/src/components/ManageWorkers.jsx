@@ -4,7 +4,7 @@ import api from '../api';
 const LANGUAGES = ['English', 'Spanish'];
 
 export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated }) {
-  const [form, setForm] = useState({ full_name: '', username: '', password: '', role: 'worker', language: 'English' });
+  const [form, setForm] = useState({ full_name: '', username: '', password: '', role: 'worker', language: 'English', hourly_rate: '30' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -22,7 +22,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     try {
       const r = await api.post('/admin/workers', form);
       onWorkerAdded(r.data);
-      setForm({ full_name: '', username: '', password: '', role: 'worker', language: 'English' });
+      setForm({ full_name: '', username: '', password: '', role: 'worker', language: 'English', hourly_rate: '30' });
       setShowForm(false);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create user');
@@ -43,7 +43,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
   const startEdit = w => {
     setEditingId(w.id);
-    setEditForm({ full_name: w.full_name, role: w.role, language: w.language || 'English' });
+    setEditForm({ full_name: w.full_name, role: w.role, language: w.language || 'English', hourly_rate: String(w.hourly_rate ?? 30) });
   };
 
   const cancelEdit = () => {
@@ -85,6 +85,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
           <select style={styles.input} value={form.language} onChange={e => set('language', e.target.value)}>
             {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
           </select>
+          <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder="$/hr (30)" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />
           {error && <p style={styles.error}>{error}</p>}
           <button style={styles.saveBtn} type="submit" disabled={saving}>{saving ? 'Creating...' : 'Create User'}</button>
         </form>
@@ -100,6 +101,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
               <th style={styles.th}>Username</th>
               <th style={styles.th}>Type</th>
               <th style={styles.th}>Language</th>
+              <th style={styles.th}>Rate</th>
               <th style={styles.th}></th>
             </tr>
           </thead>
@@ -121,6 +123,9 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                     {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                   </select>
                 </td>
+                <td style={styles.td}>
+                  <input style={{ ...styles.editInput, width: 70 }} type="number" min="0" step="0.01" value={editForm.hourly_rate} onChange={e => setEdit('hourly_rate', e.target.value)} />
+                </td>
                 <td style={styles.tdAction}>
                   <button style={styles.saveEditBtn} onClick={() => handleSaveEdit(w.id)} disabled={editSaving}>
                     {editSaving ? '...' : 'Save'}
@@ -138,6 +143,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   </span>
                 </td>
                 <td style={styles.td}>{w.language || '—'}</td>
+                <td style={styles.td}>${parseFloat(w.hourly_rate ?? 30).toFixed(2)}/hr</td>
                 <td style={styles.tdAction}>
                   <button style={styles.editBtn} onClick={() => startEdit(w)}>Edit</button>
                   <button style={styles.deleteBtn} onClick={() => handleDelete(w.id, w.full_name)}>Delete</button>

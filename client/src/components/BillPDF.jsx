@@ -12,10 +12,12 @@ const s = StyleSheet.create({
   col: { flex: 1, paddingHorizontal: 4 },
   colWide: { flex: 2, paddingHorizontal: 4 },
   bold: { fontWeight: 'bold' },
-  summaryRow: { flexDirection: 'row', gap: 24, marginTop: 8 },
+  summaryRow: { flexDirection: 'row', gap: 24, marginTop: 8, flexWrap: 'wrap' },
   summaryItem: { alignItems: 'center' },
   summaryVal: { fontSize: 16, fontWeight: 'bold' },
   summaryLabel: { fontSize: 9, color: '#888' },
+  costRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, borderBottom: '0.5pt solid #eee' },
+  costTotal: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, marginTop: 2 },
   badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
 });
 
@@ -61,18 +63,50 @@ export default function BillPDF({ data }) {
               <Text style={s.summaryVal}>{summary.total_hours.toFixed(2)}h</Text>
               <Text style={s.summaryLabel}>Total Hours</Text>
             </View>
-            <View style={s.summaryItem}>
-              <Text style={[s.summaryVal, { color: '#2563eb' }]}>{summary.regular_hours.toFixed(2)}h</Text>
-              <Text style={s.summaryLabel}>Regular</Text>
+            {summary.regular_hours > 0 && (
+              <View style={s.summaryItem}>
+                <Text style={[s.summaryVal, { color: '#2563eb' }]}>{summary.regular_hours.toFixed(2)}h</Text>
+                <Text style={s.summaryLabel}>Regular</Text>
+              </View>
+            )}
+            {summary.overtime_hours > 0 && (
+              <View style={s.summaryItem}>
+                <Text style={[s.summaryVal, { color: '#dc2626' }]}>{summary.overtime_hours.toFixed(2)}h</Text>
+                <Text style={s.summaryLabel}>Overtime</Text>
+              </View>
+            )}
+            {summary.prevailing_hours > 0 && (
+              <View style={s.summaryItem}>
+                <Text style={[s.summaryVal, { color: '#d97706' }]}>{summary.prevailing_hours.toFixed(2)}h</Text>
+                <Text style={s.summaryLabel}>Prevailing</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>Cost Breakdown</Text>
+          {summary.regular_hours > 0 && (
+            <View style={s.costRow}>
+              <Text style={{ color: '#2563eb' }}>Regular ({summary.regular_hours.toFixed(2)}h × ${summary.rate.toFixed(2)}/hr)</Text>
+              <Text style={{ color: '#2563eb', fontWeight: 'bold' }}>${summary.regular_cost.toFixed(2)}</Text>
             </View>
-            <View style={s.summaryItem}>
-              <Text style={[s.summaryVal, { color: '#dc2626' }]}>{summary.overtime_hours.toFixed(2)}h</Text>
-              <Text style={s.summaryLabel}>Overtime</Text>
+          )}
+          {summary.overtime_hours > 0 && (
+            <View style={s.costRow}>
+              <Text style={{ color: '#dc2626' }}>Overtime ({summary.overtime_hours.toFixed(2)}h × ${(summary.rate * 1.5).toFixed(2)}/hr)</Text>
+              <Text style={{ color: '#dc2626', fontWeight: 'bold' }}>${summary.overtime_cost.toFixed(2)}</Text>
             </View>
-            <View style={s.summaryItem}>
-              <Text style={[s.summaryVal, { color: '#d97706' }]}>{summary.prevailing_hours.toFixed(2)}h</Text>
-              <Text style={s.summaryLabel}>Prevailing</Text>
+          )}
+          {summary.prevailing_hours > 0 && (
+            <View style={s.costRow}>
+              <Text style={{ color: '#d97706' }}>Prevailing ({summary.prevailing_hours.toFixed(2)}h × $45.00/hr)</Text>
+              <Text style={{ color: '#d97706', fontWeight: 'bold' }}>${summary.prevailing_cost.toFixed(2)}</Text>
             </View>
+          )}
+          <View style={s.costTotal}>
+            <Text style={{ fontWeight: 'bold', fontSize: 13 }}>Total Due</Text>
+            <Text style={{ fontWeight: 'bold', fontSize: 13 }}>${summary.total_cost.toFixed(2)}</Text>
           </View>
         </View>
 
