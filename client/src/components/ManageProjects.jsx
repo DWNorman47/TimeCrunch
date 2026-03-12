@@ -226,7 +226,7 @@ const styles = {
   editInput: { padding: '5px 8px', border: '1px solid #c7d2fe', borderRadius: 6, fontSize: 13, width: '100%' },
   wageBadge: { color: '#fff', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' },
   removeBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
-  editBtn: { background: 'none', border: '1px solid #93c5fd', color: '#2563eb', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  editBtn: { background: 'none', border: '1px solid #93c5fd', color: '#2563eb', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', marginRight: 6 },
   saveBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   cancelBtn: { background: 'none', border: '1px solid #ddd', color: '#666', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   historyFooter: { marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 12 },

@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import WorkerMetrics from '../components/WorkerMetrics';
 import ManageWorkers from '../components/ManageWorkers';
 import ManageProjects from '../components/ManageProjects';
+import ManageRates from '../components/ManageRates';
 import ProjectReports from '../components/ProjectReports';
 import ChangePassword from '../components/ChangePassword';
 import { getT } from '../i18n';
@@ -12,6 +13,7 @@ export default function AdminDashboard() {
   const { logout } = useAuth();
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const TABS = ['metrics', 'projects', 'manage'];
@@ -24,8 +26,8 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    Promise.all([api.get('/admin/workers'), api.get('/admin/projects')])
-      .then(([w, p]) => { setWorkers(w.data); setProjects(p.data); })
+    Promise.all([api.get('/admin/workers'), api.get('/admin/projects'), api.get('/admin/settings')])
+      .then(([w, p, s]) => { setWorkers(w.data); setProjects(p.data); setSettings(s.data); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -74,6 +76,7 @@ export default function AdminDashboard() {
           <>
             <ManageWorkers workers={workers} onWorkerAdded={handleWorkerAdded} onWorkerDeleted={handleWorkerDeleted} onWorkerUpdated={handleWorkerUpdated} onWorkerRestored={handleWorkerRestored} />
             <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} onProjectRestored={handleProjectRestored} />
+            <ManageRates settings={settings} onSettingsUpdated={setSettings} />
           </>
         )}
       </main>

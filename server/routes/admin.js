@@ -3,6 +3,46 @@ const bcrypt = require('bcryptjs');
 const pool = require('../db');
 const { requireAdmin } = require('../middleware/auth');
 
+async function getSettings() {
+  const result = await pool.query('SELECT key, value FROM settings');
+  const s = { prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5 };
+  result.rows.forEach(r => { s[r.key] = parseFloat(r.value); });
+  return s;
+}
+
+// Get settings
+router.get('/settings', requireAdmin, async (req, res) => {
+  try {
+    const s = await getSettings();
+    res.json(s);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update settings
+router.patch('/settings', requireAdmin, async (req, res) => {
+  const allowed = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
+  try {
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        const val = parseFloat(req.body[key]);
+        if (isNaN(val) || val <= 0) return res.status(400).json({ error: `Invalid value for ${key}` });
+        await pool.query(
+          'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
+          [key, val]
+        );
+      }
+    }
+    const s = await getSettings();
+    res.json(s);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // List all active workers with summary metrics (overtime = regular hours > 8/day)
 router.get('/workers', requireAdmin, async (req, res) => {
   try {
@@ -102,10 +142,11 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
       return sum + (end - start) / 3600000;
     }, 0);
     const totalHours = regularHours + overtimeHours + prevailingHours;
-    const rate = parseFloat(userResult.rows[0].hourly_rate) || 30;
+    const settings = await getSettings();
+    const rate = parseFloat(userResult.rows[0].hourly_rate) || settings.default_hourly_rate;
     const regularCost = regularHours * rate;
-    const overtimeCost = overtimeHours * rate * 1.5;
-    const prevailingCost = prevailingHours * 45;
+    const overtimeCost = overtimeHours * rate * settings.overtime_multiplier;
+    const prevailingCost = prevailingHours * settings.prevailing_wage_rate;
     const totalCost = regularCost + overtimeCost + prevailingCost;
 
     res.json({
@@ -114,6 +155,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
       summary: {
         total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours,
         rate, regular_cost: regularCost, overtime_cost: overtimeCost, prevailing_cost: prevailingCost, total_cost: totalCost,
+        overtime_multiplier: settings.overtime_multiplier, prevailing_wage_rate: settings.prevailing_wage_rate,
       },
       period: { from: from || null, to: to || null },
     });
@@ -218,10 +260,11 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
     const entries = entriesResult.rows;
 
     // Calculate overtime per worker per day (>8h regular)
+    const settings = await getSettings();
     const workerDaily = {};
     entries.filter(e => e.wage_type === 'regular').forEach(e => {
       const key = `${e.user_id}:${e.work_date.toString().substring(0, 10)}`;
-      if (!workerDaily[key]) workerDaily[key] = { hours: 0, rate: parseFloat(e.hourly_rate) || 30 };
+      if (!workerDaily[key]) workerDaily[key] = { hours: 0, rate: parseFloat(e.hourly_rate) || settings.default_hourly_rate };
       const start = new Date(`1970-01-01T${e.start_time}`);
       const end = new Date(`1970-01-01T${e.end_time}`);
       workerDaily[key].hours += (end - start) / 3600000;
@@ -234,7 +277,7 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
       regularHours += reg;
       overtimeHours += ot;
       regularCost += reg * rate;
-      overtimeCost += ot * rate * 1.5;
+      overtimeCost += ot * rate * settings.overtime_multiplier;
     });
 
     let prevailingHours = 0, prevailingCost = 0;
@@ -243,7 +286,7 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
       const end = new Date(`1970-01-01T${e.end_time}`);
       const h = (end - start) / 3600000;
       prevailingHours += h;
-      prevailingCost += h * 45;
+      prevailingCost += h * settings.prevailing_wage_rate;
     });
 
     const totalHours = regularHours + overtimeHours + prevailingHours;
@@ -252,7 +295,7 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
     res.json({
       project: projectResult.rows[0],
       entries,
-      summary: { total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours, regular_cost: regularCost, overtime_cost: overtimeCost, prevailing_cost: prevailingCost, total_cost: totalCost },
+      summary: { total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours, regular_cost: regularCost, overtime_cost: overtimeCost, prevailing_cost: prevailingCost, total_cost: totalCost, overtime_multiplier: settings.overtime_multiplier, prevailing_wage_rate: settings.prevailing_wage_rate },
       period: { from: from || null, to: to || null },
     });
   } catch (err) {
