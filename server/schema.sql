@@ -1,5 +1,13 @@
+CREATE TABLE IF NOT EXISTS companies (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  slug VARCHAR(100) UNIQUE NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
+  company_id INTEGER REFERENCES companies(id),
   username VARCHAR(100) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(20) NOT NULL DEFAULT 'worker',
@@ -9,17 +17,21 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS projects (
   id SERIAL PRIMARY KEY,
+  company_id INTEGER REFERENCES companies(id),
   name VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS settings (
-  key VARCHAR(50) PRIMARY KEY,
-  value NUMERIC(10,4) NOT NULL
+  company_id INTEGER NOT NULL REFERENCES companies(id),
+  key VARCHAR(50) NOT NULL,
+  value NUMERIC(10,4) NOT NULL,
+  PRIMARY KEY (company_id, key)
 );
 
 CREATE TABLE IF NOT EXISTS time_entries (
   id SERIAL PRIMARY KEY,
+  company_id INTEGER REFERENCES companies(id),
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
   work_date DATE NOT NULL,

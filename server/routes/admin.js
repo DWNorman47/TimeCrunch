@@ -3,8 +3,8 @@ const bcrypt = require('bcryptjs');
 const pool = require('../db');
 const { requireAdmin } = require('../middleware/auth');
 
-async function getSettings() {
-  const result = await pool.query('SELECT key, value FROM settings');
+async function getSettings(companyId) {
+  const result = await pool.query('SELECT key, value FROM settings WHERE company_id = $1', [companyId]);
   const s = { prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5 };
   result.rows.forEach(r => { s[r.key] = parseFloat(r.value); });
   return s;
@@ -13,7 +13,7 @@ async function getSettings() {
 // Get settings
 router.get('/settings', requireAdmin, async (req, res) => {
   try {
-    const s = await getSettings();
+    const s = await getSettings(req.user.company_id);
     res.json(s);
   } catch (err) {
     console.error(err);
@@ -24,18 +24,19 @@ router.get('/settings', requireAdmin, async (req, res) => {
 // Update settings
 router.patch('/settings', requireAdmin, async (req, res) => {
   const allowed = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
+  const companyId = req.user.company_id;
   try {
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         const val = parseFloat(req.body[key]);
         if (isNaN(val) || val <= 0) return res.status(400).json({ error: `Invalid value for ${key}` });
         await pool.query(
-          'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
-          [key, val]
+          'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
+          [companyId, key, val]
         );
       }
     }
-    const s = await getSettings();
+    const s = await getSettings(companyId);
     res.json(s);
   } catch (err) {
     console.error(err);
@@ -45,13 +46,14 @@ router.patch('/settings', requireAdmin, async (req, res) => {
 
 // List all active workers with summary metrics (overtime = regular hours > 8/day)
 router.get('/workers', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
   try {
     const result = await pool.query(
       `WITH daily_regular AS (
         SELECT user_id, work_date,
           SUM(EXTRACT(EPOCH FROM (end_time - start_time)) / 3600) as day_hours
         FROM time_entries
-        WHERE wage_type = 'regular'
+        WHERE wage_type = 'regular' AND company_id = $1
         GROUP BY user_id, work_date
       )
       SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate,
@@ -62,9 +64,10 @@ router.get('/workers', requireAdmin, async (req, res) => {
         COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600 ELSE 0 END), 0) as prevailing_hours
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
-      WHERE u.role = 'worker' AND u.active = true
+      WHERE u.role = 'worker' AND u.active = true AND u.company_id = $1
       GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate
-      ORDER BY u.full_name`
+      ORDER BY u.full_name`,
+      [companyId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -75,10 +78,12 @@ router.get('/workers', requireAdmin, async (req, res) => {
 
 // List archived (removed) workers
 router.get('/workers/archived', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
   try {
     const result = await pool.query(
       `SELECT id, full_name, username, role, language, hourly_rate
-       FROM users WHERE active = false ORDER BY full_name`
+       FROM users WHERE active = false AND company_id = $1 ORDER BY full_name`,
+      [companyId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -89,10 +94,11 @@ router.get('/workers/archived', requireAdmin, async (req, res) => {
 
 // Restore an archived worker
 router.patch('/workers/:id/restore', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
   try {
     const result = await pool.query(
-      'UPDATE users SET active = true WHERE id = $1 AND active = false RETURNING id, full_name, username, role, language, hourly_rate',
-      [req.params.id]
+      'UPDATE users SET active = true WHERE id = $1 AND active = false AND company_id = $2 RETURNING id, full_name, username, role, language, hourly_rate',
+      [req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Archived worker not found' });
     res.json(result.rows[0]);
@@ -105,10 +111,11 @@ router.patch('/workers/:id/restore', requireAdmin, async (req, res) => {
 // Get a worker's entries for a date range (for bill generation)
 router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
   const { from, to } = req.query;
+  const companyId = req.user.company_id;
   try {
     const userResult = await pool.query(
-      'SELECT id, full_name, username, hourly_rate FROM users WHERE id = $1 AND role = $2',
-      [req.params.id, 'worker']
+      'SELECT id, full_name, username, hourly_rate FROM users WHERE id = $1 AND role = $2 AND company_id = $3',
+      [req.params.id, 'worker', companyId]
     );
     if (userResult.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
 
@@ -125,7 +132,6 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
 
     const entries = entriesResult.rows;
 
-    // Calculate daily regular hours to determine overtime (>8h/day)
     const dailyRegular = {};
     entries.filter(e => e.wage_type === 'regular').forEach(e => {
       const date = e.work_date.toString().substring(0, 10);
@@ -142,7 +148,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
       return sum + (end - start) / 3600000;
     }, 0);
     const totalHours = regularHours + overtimeHours + prevailingHours;
-    const settings = await getSettings();
+    const settings = await getSettings(companyId);
     const rate = parseFloat(userResult.rows[0].hourly_rate) || settings.default_hourly_rate;
     const regularCost = regularHours * rate;
     const overtimeCost = overtimeHours * rate * settings.overtime_multiplier;
@@ -171,20 +177,20 @@ router.post('/workers', requireAdmin, async (req, res) => {
   if (!username || !password || !full_name) {
     return res.status(400).json({ error: 'username, password, and full_name required' });
   }
+  const companyId = req.user.company_id;
   const assignedRole = role === 'admin' ? 'admin' : 'worker';
   const assignedLanguage = req.body.language || 'English';
   const assignedRate = parseFloat(req.body.hourly_rate) || 30;
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      'INSERT INTO users (username, password_hash, full_name, role, language, hourly_rate) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, username, full_name, role, language, hourly_rate',
-      [username, hash, full_name, assignedRole, assignedLanguage, assignedRate]
+      'INSERT INTO users (company_id, username, password_hash, full_name, role, language, hourly_rate) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, username, full_name, role, language, hourly_rate',
+      [companyId, username, hash, full_name, assignedRole, assignedLanguage, assignedRate]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') {
-      // Check if the conflict is with an archived user
-      const existing = await pool.query('SELECT id, full_name, active FROM users WHERE username = $1', [username]);
+      const existing = await pool.query('SELECT id, full_name, active FROM users WHERE username = $1 AND company_id = $2', [username, companyId]);
       const u = existing.rows[0];
       if (u && !u.active) {
         return res.status(409).json({ error: `Username "${username}" belongs to a removed user (${u.full_name}). Restore them instead?`, archived_id: u.id, archived_name: u.full_name });
@@ -202,6 +208,7 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
   if (!full_name && !role && !language && hourly_rate === undefined) {
     return res.status(400).json({ error: 'At least one field required' });
   }
+  const companyId = req.user.company_id;
   const assignedRole = role ? (role === 'admin' ? 'admin' : 'worker') : undefined;
   try {
     const fields = [];
@@ -212,8 +219,9 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
     if (language) { fields.push(`language = $${idx++}`); values.push(language); }
     if (hourly_rate !== undefined) { fields.push(`hourly_rate = $${idx++}`); values.push(parseFloat(hourly_rate) || 30); }
     values.push(req.params.id);
+    values.push(companyId);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, username, full_name, role, language, hourly_rate`,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, role, language, hourly_rate`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
@@ -226,10 +234,11 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
 
 // Remove (soft-delete) a worker
 router.delete('/workers/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
   try {
     const result = await pool.query(
-      'UPDATE users SET active = false WHERE id = $1 AND active = true RETURNING id',
-      [req.params.id]
+      'UPDATE users SET active = false WHERE id = $1 AND active = true AND company_id = $2 RETURNING id',
+      [req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
     res.json({ removed: true });
@@ -242,8 +251,9 @@ router.delete('/workers/:id', requireAdmin, async (req, res) => {
 // Get a project's entries for a date range (for bill generation)
 router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
   const { from, to } = req.query;
+  const companyId = req.user.company_id;
   try {
-    const projectResult = await pool.query('SELECT * FROM projects WHERE id = $1', [req.params.id]);
+    const projectResult = await pool.query('SELECT * FROM projects WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
     if (projectResult.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
 
     const entriesResult = await pool.query(
@@ -259,8 +269,7 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
 
     const entries = entriesResult.rows;
 
-    // Calculate overtime per worker per day (>8h regular)
-    const settings = await getSettings();
+    const settings = await getSettings(companyId);
     const workerDaily = {};
     entries.filter(e => e.wage_type === 'regular').forEach(e => {
       const key = `${e.user_id}:${e.work_date.toString().substring(0, 10)}`;
@@ -306,13 +315,14 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
 
 // Project metrics report (active projects only)
 router.get('/projects/metrics', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
   try {
     const result = await pool.query(
       `WITH daily_regular AS (
         SELECT project_id, work_date,
           SUM(EXTRACT(EPOCH FROM (end_time - start_time)) / 3600) as day_hours
         FROM time_entries
-        WHERE wage_type = 'regular'
+        WHERE wage_type = 'regular' AND company_id = $1
         GROUP BY project_id, work_date
       )
       SELECT p.id, p.name,
@@ -324,9 +334,10 @@ router.get('/projects/metrics', requireAdmin, async (req, res) => {
         COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600 ELSE 0 END), 0) as prevailing_hours
       FROM projects p
       LEFT JOIN time_entries te ON te.project_id = p.id
-      WHERE p.active = true
+      WHERE p.active = true AND p.company_id = $1
       GROUP BY p.id, p.name
-      ORDER BY p.name`
+      ORDER BY p.name`,
+      [companyId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -337,8 +348,9 @@ router.get('/projects/metrics', requireAdmin, async (req, res) => {
 
 // List active projects
 router.get('/projects', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
   try {
-    const result = await pool.query('SELECT * FROM projects WHERE active = true ORDER BY name');
+    const result = await pool.query('SELECT * FROM projects WHERE active = true AND company_id = $1 ORDER BY name', [companyId]);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -348,8 +360,9 @@ router.get('/projects', requireAdmin, async (req, res) => {
 
 // List archived (removed) projects
 router.get('/projects/archived', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
   try {
-    const result = await pool.query('SELECT * FROM projects WHERE active = false ORDER BY name');
+    const result = await pool.query('SELECT * FROM projects WHERE active = false AND company_id = $1 ORDER BY name', [companyId]);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -359,10 +372,11 @@ router.get('/projects/archived', requireAdmin, async (req, res) => {
 
 // Restore an archived project
 router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
   try {
     const result = await pool.query(
-      'UPDATE projects SET active = true WHERE id = $1 AND active = false RETURNING *',
-      [req.params.id]
+      'UPDATE projects SET active = true WHERE id = $1 AND active = false AND company_id = $2 RETURNING *',
+      [req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Archived project not found' });
     res.json(result.rows[0]);
@@ -381,6 +395,7 @@ router.patch('/projects/:id', requireAdmin, async (req, res) => {
   if (name !== undefined && !name.trim()) {
     return res.status(400).json({ error: 'Project name cannot be empty' });
   }
+  const companyId = req.user.company_id;
   try {
     const fields = [];
     const values = [];
@@ -389,8 +404,9 @@ router.patch('/projects/:id', requireAdmin, async (req, res) => {
     if (wage_type !== undefined) { fields.push(`wage_type = $${idx++}`); values.push(wage_type); }
     if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
     values.push(req.params.id);
+    values.push(companyId);
     const result = await pool.query(
-      `UPDATE projects SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+      `UPDATE projects SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING *`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
@@ -405,17 +421,17 @@ router.patch('/projects/:id', requireAdmin, async (req, res) => {
 router.post('/projects', requireAdmin, async (req, res) => {
   const { name, wage_type } = req.body;
   if (!name) return res.status(400).json({ error: 'Project name required' });
+  const companyId = req.user.company_id;
   const wt = wage_type === 'prevailing' ? 'prevailing' : 'regular';
   try {
     const result = await pool.query(
-      'INSERT INTO projects (name, wage_type) VALUES ($1, $2) RETURNING *',
-      [name, wt]
+      'INSERT INTO projects (company_id, name, wage_type) VALUES ($1, $2, $3) RETURNING *',
+      [companyId, name, wt]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') {
-      // Check if the conflict is with an archived project
-      const existing = await pool.query('SELECT id, name, active FROM projects WHERE name = $1', [name]);
+      const existing = await pool.query('SELECT id, name, active FROM projects WHERE name = $1 AND company_id = $2', [name, companyId]);
       const p = existing.rows[0];
       if (p && !p.active) {
         return res.status(409).json({ error: `A removed project named "${name}" already exists. Restore it instead?`, archived_id: p.id, archived_name: p.name });
@@ -429,10 +445,11 @@ router.post('/projects', requireAdmin, async (req, res) => {
 
 // Remove (soft-delete) a project
 router.delete('/projects/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
   try {
     const result = await pool.query(
-      'UPDATE projects SET active = false WHERE id = $1 AND active = true RETURNING id',
-      [req.params.id]
+      'UPDATE projects SET active = false WHERE id = $1 AND active = true AND company_id = $2 RETURNING id',
+      [req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
     res.json({ removed: true });

@@ -4,6 +4,14 @@ const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
+function signToken(user) {
+  return jwt.sign(
+    { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id },
+    process.env.JWT_SECRET,
+    { expiresIn: '8h' }
+  );
+}
+
 // Login
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
@@ -16,12 +24,8 @@ router.post('/login', async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language },
-      process.env.JWT_SECRET,
-      { expiresIn: '8h' }
-    );
-    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language } });
+    const token = signToken(user);
+    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -33,23 +37,45 @@ router.get('/me', requireAuth, (req, res) => {
   res.json({ user: req.user });
 });
 
-// Register (admin-only in production; open for setup)
+// Register — creates a new company and its first admin user
 router.post('/register', async (req, res) => {
-  const { username, password, full_name, role } = req.body;
-  if (!username || !password || !full_name) {
-    return res.status(400).json({ error: 'username, password, and full_name required' });
+  const { company_name, full_name, username, password } = req.body;
+  if (!company_name || !full_name || !username || !password) {
+    return res.status(400).json({ error: 'company_name, full_name, username, and password are required' });
   }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+  const slug = company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
+  const client = await pool.connect();
   try {
-    const hash = await bcrypt.hash(password, 10);
-    const result = await pool.query(
-      'INSERT INTO users (username, password_hash, full_name, role) VALUES ($1, $2, $3, $4) RETURNING id, username, full_name, role',
-      [username, hash, full_name, role || 'worker']
+    await client.query('BEGIN');
+    const companyResult = await client.query(
+      'INSERT INTO companies (name, slug) VALUES ($1, $2) RETURNING id',
+      [company_name, slug]
     );
-    res.status(201).json({ user: result.rows[0] });
+    const companyId = companyResult.rows[0].id;
+    // Seed default settings for this company
+    const defaults = [['prevailing_wage_rate', 45], ['default_hourly_rate', 30], ['overtime_multiplier', 1.5]];
+    for (const [key, value] of defaults) {
+      await client.query('INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3)', [companyId, key, value]);
+    }
+    const hash = await bcrypt.hash(password, 10);
+    const userResult = await client.query(
+      'INSERT INTO users (company_id, username, password_hash, full_name, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, username, full_name, role, company_id',
+      [companyId, username, hash, full_name, 'admin']
+    );
+    await client.query('COMMIT');
+    const user = { ...userResult.rows[0], language: 'English' };
+    const token = signToken(user);
+    res.status(201).json({ token, user });
   } catch (err) {
+    await client.query('ROLLBACK');
     if (err.code === '23505') return res.status(409).json({ error: 'Username already exists' });
     console.error(err);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 });
 

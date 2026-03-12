@@ -26,15 +26,19 @@ router.post('/', requireAuth, async (req, res) => {
   if (!project_id || !work_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'project_id, work_date, start_time, and end_time are required' });
   }
+  const companyId = req.user.company_id;
   try {
-    const projectResult = await pool.query('SELECT wage_type FROM projects WHERE id = $1', [project_id]);
+    const projectResult = await pool.query(
+      'SELECT wage_type FROM projects WHERE id = $1 AND company_id = $2',
+      [project_id, companyId]
+    );
     if (projectResult.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
     const wage_type = projectResult.rows[0].wage_type;
 
     const result = await pool.query(
-      `INSERT INTO time_entries (user_id, project_id, work_date, start_time, end_time, wage_type, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [req.user.id, project_id, work_date, start_time, end_time, wage_type, notes || null]
+      `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notes || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

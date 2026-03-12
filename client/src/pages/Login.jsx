@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Login() {
@@ -51,6 +51,9 @@ export default function Login() {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+        <p style={styles.registerLink}>
+          New to Time Crunch? <Link to="/register" style={styles.link}>Create an account</Link>
+        </p>
       </div>
     </div>
   );
@@ -66,4 +69,6 @@ const styles = {
   input: { padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 15, outline: 'none' },
   error: { color: '#e53e3e', fontSize: 14 },
   button: { marginTop: 8, padding: '12px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 600 },
+  registerLink: { marginTop: 20, textAlign: 'center', fontSize: 13, color: '#666' },
+  link: { color: '#1a56db', fontWeight: 600, textDecoration: 'none' },
 };

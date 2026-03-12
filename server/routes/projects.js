@@ -4,23 +4,11 @@ const { requireAuth } = require('../middleware/auth');
 
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM projects ORDER BY name');
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-router.post('/', requireAuth, async (req, res) => {
-  const { name } = req.body;
-  if (!name) return res.status(400).json({ error: 'Project name required' });
-  try {
     const result = await pool.query(
-      'INSERT INTO projects (name) VALUES ($1) RETURNING *',
-      [name]
+      'SELECT * FROM projects WHERE active = true AND company_id = $1 ORDER BY name',
+      [req.user.company_id]
     );
-    res.status(201).json(result.rows[0]);
+    res.json(result.rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
