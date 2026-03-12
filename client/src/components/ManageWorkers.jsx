@@ -3,8 +3,8 @@ import api from '../api';
 
 const LANGUAGES = ['English', 'Spanish'];
 
-export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored }) {
-  const [form, setForm] = useState({ full_name: '', username: '', password: '', role: 'worker', language: 'English', hourly_rate: '30' });
+export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 30 }) {
+  const [form, setForm] = useState({ full_name: '', username: '', password: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
   const [error, setError] = useState('');
   const [archivedConflict, setArchivedConflict] = useState(null); // { id, name }
   const [saving, setSaving] = useState(false);
@@ -39,7 +39,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     try {
       const r = await api.post('/admin/workers', form);
       onWorkerAdded(r.data);
-      setForm({ full_name: '', username: '', password: '', role: 'worker', language: 'English', hourly_rate: '30' });
+      setForm({ full_name: '', username: '', password: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
       setShowForm(false);
     } catch (err) {
       const data = err.response?.data;
