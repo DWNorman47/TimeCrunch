@@ -1,17 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api';
 
-export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated }) {
+export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored }) {
   const [name, setName] = useState('');
   const [wageType, setWageType] = useState('regular');
   const [error, setError] = useState('');
+  const [archivedConflict, setArchivedConflict] = useState(null); // { id, name }
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
+  const [archived, setArchived] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [loadingArchived, setLoadingArchived] = useState(false);
+
+  const loadArchived = async () => {
+    setLoadingArchived(true);
+    try {
+      const r = await api.get('/admin/projects/archived');
+      setArchived(r.data);
+    } finally {
+      setLoadingArchived(false);
+    }
+  };
+
+  useEffect(() => { loadArchived(); }, []);
 
   const handleAdd = async e => {
     e.preventDefault();
     setError('');
+    setArchivedConflict(null);
     setSaving(true);
     try {
       const r = await api.post('/admin/projects', { name, wage_type: wageType });
@@ -19,7 +36,13 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       setName('');
       setWageType('regular');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create project');
+      const data = err.response?.data;
+      if (data?.archived_id) {
+        setArchivedConflict({ id: data.archived_id, name: data.archived_name });
+        setError(data.error);
+      } else {
+        setError(data?.error || 'Failed to create project');
+      }
     } finally {
       setSaving(false);
     }
@@ -46,14 +69,32 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     }
   };
 
-  const handleDelete = async (id, projectName) => {
-    if (!confirm(`Delete project "${projectName}"?`)) return;
+  const handleRemove = async (id, projectName) => {
+    if (!confirm(`Remove project "${projectName}"? Its time entries will be kept. You can restore it from History.`)) return;
     try {
       await api.delete(`/admin/projects/${id}`);
       onProjectDeleted(id);
+      loadArchived();
     } catch {
-      alert('Failed to delete project');
+      alert('Failed to remove project');
     }
+  };
+
+  const handleRestore = async (id) => {
+    try {
+      const r = await api.patch(`/admin/projects/${id}/restore`);
+      onProjectRestored(r.data);
+      setArchived(prev => prev.filter(p => p.id !== id));
+    } catch {
+      alert('Failed to restore project');
+    }
+  };
+
+  const handleRestoreConflict = async () => {
+    if (!archivedConflict) return;
+    await handleRestore(archivedConflict.id);
+    setArchivedConflict(null);
+    setError('');
   };
 
   return (
@@ -64,7 +105,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
           style={styles.input}
           placeholder="Project name..."
           value={name}
-          onChange={e => setName(e.target.value)}
+          onChange={e => { setName(e.target.value); setError(''); setArchivedConflict(null); }}
           required
         />
         <select style={styles.select} value={wageType} onChange={e => setWageType(e.target.value)}>
@@ -73,7 +114,16 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
         </select>
         <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? 'Adding...' : '+ Add'}</button>
       </form>
-      {error && <p style={styles.error}>{error}</p>}
+      {error && (
+        <div style={styles.errorBox}>
+          <p style={styles.errorText}>{error}</p>
+          {archivedConflict && (
+            <button type="button" style={styles.restoreInlineBtn} onClick={handleRestoreConflict}>
+              Restore "{archivedConflict.name}"
+            </button>
+          )}
+        </div>
+      )}
 
       {projects.length === 0 ? (
         <p style={styles.empty}>No projects yet.</p>
@@ -108,7 +158,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                     >
                       {p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}
                     </button>
-                    <button style={styles.deleteBtn} onClick={() => handleDelete(p.id, p.name)}>Delete</button>
+                    <button style={styles.removeBtn} onClick={() => handleRemove(p.id, p.name)}>Remove</button>
                   </>
                 )}
               </div>
@@ -116,6 +166,33 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
           ))}
         </div>
       )}
+
+      <div style={styles.historyFooter}>
+        <button style={styles.historyToggle} onClick={() => setShowHistory(s => !s)}>
+          {showHistory ? '▾' : '▸'} History {archived.length > 0 ? `(${archived.length})` : ''}
+        </button>
+        {showHistory && (
+          <div style={styles.historySection}>
+            {loadingArchived ? (
+              <p style={styles.empty}>Loading...</p>
+            ) : archived.length === 0 ? (
+              <p style={styles.empty}>No removed projects.</p>
+            ) : (
+              archived.map(p => (
+                <div key={p.id} style={{ ...styles.item, color: '#888', marginTop: 6 }}>
+                  <span style={styles.projectName}>{p.name}</span>
+                  <div style={styles.itemRight}>
+                    <span style={{ fontSize: 11, color: '#aaa', marginRight: 8 }}>
+                      {p.wage_type === 'prevailing' ? 'Prevailing' : 'Regular'}
+                    </span>
+                    <button style={styles.restoreBtn} onClick={() => handleRestore(p.id)}>Restore</button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -127,15 +204,21 @@ const styles = {
   input: { flex: 1, padding: '8px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 },
   select: { padding: '8px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 },
   addBtn: { padding: '8px 18px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14 },
-  error: { color: '#e53e3e', fontSize: 13, marginBottom: 8 },
+  errorBox: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 },
+  errorText: { color: '#e53e3e', fontSize: 13, margin: 0 },
+  restoreInlineBtn: { background: '#059669', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   empty: { color: '#888', fontSize: 14 },
   list: { display: 'flex', flexDirection: 'column', gap: 6 },
   item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#f8f9fb', borderRadius: 7 },
   itemRight: { display: 'flex', gap: 8, alignItems: 'center' },
   projectName: { fontSize: 14, fontWeight: 500 },
   wageBtn: { color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer' },
-  deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  removeBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   editBtn: { background: 'none', border: '1px solid #93c5fd', color: '#2563eb', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   saveBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   cancelBtn: { background: 'none', border: '1px solid #ddd', color: '#666', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  historyFooter: { marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 12 },
+  historyToggle: { background: 'none', border: 'none', color: '#666', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '2px 0' },
+  historySection: { marginTop: 10 },
+  restoreBtn: { background: 'none', border: '1px solid #6ee7b7', color: '#059669', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 },
 };

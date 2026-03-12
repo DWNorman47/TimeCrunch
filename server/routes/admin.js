@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const pool = require('../db');
 const { requireAdmin } = require('../middleware/auth');
 
-// List all workers with summary metrics (overtime = regular hours > 8/day)
+// List all active workers with summary metrics (overtime = regular hours > 8/day)
 router.get('/workers', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
@@ -22,11 +22,40 @@ router.get('/workers', requireAdmin, async (req, res) => {
         COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600 ELSE 0 END), 0) as prevailing_hours
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
-      WHERE u.role = 'worker'
+      WHERE u.role = 'worker' AND u.active = true
       GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate
       ORDER BY u.full_name`
     );
     res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// List archived (removed) workers
+router.get('/workers/archived', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, full_name, username, role, language, hourly_rate
+       FROM users WHERE active = false ORDER BY full_name`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Restore an archived worker
+router.patch('/workers/:id/restore', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'UPDATE users SET active = true WHERE id = $1 AND active = false RETURNING id, full_name, username, role, language, hourly_rate',
+      [req.params.id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Archived worker not found' });
+    res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -111,13 +140,21 @@ router.post('/workers', requireAdmin, async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'Username already exists' });
+    if (err.code === '23505') {
+      // Check if the conflict is with an archived user
+      const existing = await pool.query('SELECT id, full_name, active FROM users WHERE username = $1', [username]);
+      const u = existing.rows[0];
+      if (u && !u.active) {
+        return res.status(409).json({ error: `Username "${username}" belongs to a removed user (${u.full_name}). Restore them instead?`, archived_id: u.id, archived_name: u.full_name });
+      }
+      return res.status(409).json({ error: 'Username already exists' });
+    }
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Update a worker (full_name, role, language)
+// Update a worker (full_name, role, language, hourly_rate)
 router.patch('/workers/:id', requireAdmin, async (req, res) => {
   const { full_name, role, language, hourly_rate } = req.body;
   if (!full_name && !role && !language && hourly_rate === undefined) {
@@ -145,15 +182,15 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// Delete a worker
+// Remove (soft-delete) a worker
 router.delete('/workers/:id', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      'DELETE FROM users WHERE id = $1 AND role = $2 RETURNING id',
-      [req.params.id, 'worker']
+      'UPDATE users SET active = false WHERE id = $1 AND active = true RETURNING id',
+      [req.params.id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
-    res.json({ deleted: true });
+    res.json({ removed: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -224,7 +261,7 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
   }
 });
 
-// Project metrics report
+// Project metrics report (active projects only)
 router.get('/projects/metrics', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
@@ -244,6 +281,7 @@ router.get('/projects/metrics', requireAdmin, async (req, res) => {
         COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600 ELSE 0 END), 0) as prevailing_hours
       FROM projects p
       LEFT JOIN time_entries te ON te.project_id = p.id
+      WHERE p.active = true
       GROUP BY p.id, p.name
       ORDER BY p.name`
     );
@@ -254,11 +292,37 @@ router.get('/projects/metrics', requireAdmin, async (req, res) => {
   }
 });
 
-// List projects
+// List active projects
 router.get('/projects', requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM projects ORDER BY name');
+    const result = await pool.query('SELECT * FROM projects WHERE active = true ORDER BY name');
     res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// List archived (removed) projects
+router.get('/projects/archived', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM projects WHERE active = false ORDER BY name');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Restore an archived project
+router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'UPDATE projects SET active = true WHERE id = $1 AND active = false RETURNING *',
+      [req.params.id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Archived project not found' });
+    res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -306,18 +370,29 @@ router.post('/projects', requireAdmin, async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'Project already exists' });
+    if (err.code === '23505') {
+      // Check if the conflict is with an archived project
+      const existing = await pool.query('SELECT id, name, active FROM projects WHERE name = $1', [name]);
+      const p = existing.rows[0];
+      if (p && !p.active) {
+        return res.status(409).json({ error: `A removed project named "${name}" already exists. Restore it instead?`, archived_id: p.id, archived_name: p.name });
+      }
+      return res.status(409).json({ error: 'Project already exists' });
+    }
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Delete a project
+// Remove (soft-delete) a project
 router.delete('/projects/:id', requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query('DELETE FROM projects WHERE id = $1 RETURNING id', [req.params.id]);
+    const result = await pool.query(
+      'UPDATE projects SET active = false WHERE id = $1 AND active = true RETURNING id',
+      [req.params.id]
+    );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
-    res.json({ deleted: true });
+    res.json({ removed: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

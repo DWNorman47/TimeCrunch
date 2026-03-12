@@ -32,9 +32,11 @@ export default function AdminDashboard() {
   const handleWorkerAdded = w => setWorkers(prev => [...prev, { ...w, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 }]);
   const handleWorkerDeleted = id => setWorkers(prev => prev.filter(w => w.id !== id));
   const handleWorkerUpdated = w => setWorkers(prev => prev.map(x => x.id === w.id ? { ...x, ...w } : x));
+  const handleWorkerRestored = w => setWorkers(prev => [...prev, w]);
   const handleProjectAdded = p => setProjects(prev => [...prev, p]);
   const handleProjectDeleted = id => setProjects(prev => prev.filter(p => p.id !== id));
   const handleProjectUpdated = p => setProjects(prev => prev.map(x => x.id === p.id ? p : x));
+  const handleProjectRestored = p => setProjects(prev => [...prev, p]);
 
   return (
     <div style={styles.page}>
@@ -70,8 +72,8 @@ export default function AdminDashboard() {
           </>
         ) : (
           <>
-            <ManageWorkers workers={workers} onWorkerAdded={handleWorkerAdded} onWorkerDeleted={handleWorkerDeleted} onWorkerUpdated={handleWorkerUpdated} />
-            <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} />
+            <ManageWorkers workers={workers} onWorkerAdded={handleWorkerAdded} onWorkerDeleted={handleWorkerDeleted} onWorkerUpdated={handleWorkerUpdated} onWorkerRestored={handleWorkerRestored} />
+            <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} onProjectRestored={handleProjectRestored} />
           </>
         )}
       </main>
