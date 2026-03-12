@@ -54,8 +54,8 @@ const translations = {
     regular: 'Regular',
     prevailing: 'Prevailing',
     date: 'Fecha',
-    startTime: 'Hora de Inicio',
-    endTime: 'Hora de Fin',
+    startTime: 'Hora de Entrada',
+    endTime: 'Hora de Salida',
     wageType: 'Tipo de salario',
     notesOptional: 'Notas (opcional)',
     notesPlaceholder: 'Cualquier nota...',
@@ -63,7 +63,7 @@ const translations = {
     failedSaveEntry: 'Error al guardar la entrada',
     entrySaved: '¡Entrada guardada!',
     saving: 'Guardando...',
-    logEntry: 'Registrar Entrada',
+    logEntry: 'Registrar',
 
     // EntryList
     yourEntries: 'Tus Entradas',

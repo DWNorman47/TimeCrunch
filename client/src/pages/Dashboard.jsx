@@ -50,8 +50,8 @@ export default function Dashboard() {
             value={user?.language || 'English'}
             onChange={e => handleLanguageChange(e.target.value)}
           >
-            <option value="English">🇺🇸 EN</option>
-            <option value="Spanish">🇲🇽 ES</option>
+            <option value="English">EN</option>
+            <option value="Spanish">ES</option>
           </select>
           <button style={styles.logoutBtn} onClick={() => setShowChangePassword(true)}>{t.changePassword}</button>
           <button style={styles.logoutBtn} onClick={logout}>{t.logout}</button>
