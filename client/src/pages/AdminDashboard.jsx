@@ -13,7 +13,14 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [tab, setTab] = useState('metrics');
+  const TABS = ['metrics', 'projects', 'manage'];
+  const hashTab = window.location.hash.replace('#', '');
+  const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'metrics');
+
+  const switchTab = t => {
+    setTab(t);
+    window.location.hash = t;
+  };
 
   useEffect(() => {
     Promise.all([api.get('/admin/workers'), api.get('/admin/projects')])
@@ -42,9 +49,9 @@ export default function AdminDashboard() {
 
       <main style={styles.main}>
         <div style={styles.tabs}>
-          <button style={tab === 'metrics' ? styles.tabActive : styles.tab} onClick={() => setTab('metrics')}>Worker Reports</button>
-          <button style={tab === 'projects' ? styles.tabActive : styles.tab} onClick={() => setTab('projects')}>Project Reports</button>
-          <button style={tab === 'manage' ? styles.tabActive : styles.tab} onClick={() => setTab('manage')}>Manage</button>
+          <button style={tab === 'metrics' ? styles.tabActive : styles.tab} onClick={() => switchTab('metrics')}>Worker Reports</button>
+          <button style={tab === 'projects' ? styles.tabActive : styles.tab} onClick={() => switchTab('projects')}>Project Reports</button>
+          <button style={tab === 'manage' ? styles.tabActive : styles.tab} onClick={() => switchTab('manage')}>Manage</button>
         </div>
 
         {loading ? <p>Loading...</p> : tab === 'metrics' ? (
