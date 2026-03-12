@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 
-export default function TimeEntryForm({ projects, onEntryAdded }) {
+export default function TimeEntryForm({ projects, onEntryAdded, t }) {
   const today = new Date().toISOString().split('T')[0];
   const [form, setForm] = useState({
     project_id: '',
@@ -22,7 +22,7 @@ export default function TimeEntryForm({ projects, onEntryAdded }) {
     e.preventDefault();
     setError('');
     if (form.start_time >= form.end_time) {
-      setError('End time must be after start time');
+      setError(t.endAfterStart);
       return;
     }
     setSaving(true);
@@ -33,7 +33,7 @@ export default function TimeEntryForm({ projects, onEntryAdded }) {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save entry');
+      setError(err.response?.data?.error || t.failedSaveEntry);
     } finally {
       setSaving(false);
     }
@@ -41,49 +41,49 @@ export default function TimeEntryForm({ projects, onEntryAdded }) {
 
   return (
     <div style={styles.card}>
-      <h2 style={styles.heading}>Log Time</h2>
+      <h2 style={styles.heading}>{t.logTime}</h2>
       <form onSubmit={handleSubmit} style={styles.form}>
         <div style={styles.row}>
           <div style={styles.field}>
-            <label style={styles.label}>Project</label>
+            <label style={styles.label}>{t.project}</label>
             <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)} required>
-              <option value="">Select project...</option>
+              <option value="">{t.selectProject}</option>
               {projects.map(p => (
                 <option key={p.id} value={p.id}>
-                  {p.name} ({p.wage_type === 'prevailing' ? 'Prevailing' : 'Regular'})
+                  {p.name} ({p.wage_type === 'prevailing' ? t.prevailing : t.regular})
                 </option>
               ))}
             </select>
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>Date</label>
+            <label style={styles.label}>{t.date}</label>
             <input style={styles.input} type="date" value={form.work_date} onChange={e => set('work_date', e.target.value)} required />
           </div>
         </div>
         <div style={styles.row}>
           <div style={styles.field}>
-            <label style={styles.label}>Start Time</label>
+            <label style={styles.label}>{t.startTime}</label>
             <input style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>End Time</label>
+            <label style={styles.label}>{t.endTime}</label>
             <input style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required />
           </div>
         </div>
         {selectedProject && (
           <div style={styles.wageIndicator}>
-            Wage type: <span style={{ color: selectedProject.wage_type === 'prevailing' ? '#d97706' : '#2563eb', fontWeight: 700 }}>
-              {selectedProject.wage_type === 'prevailing' ? 'Prevailing' : 'Regular'}
+            {t.wageType}: <span style={{ color: selectedProject.wage_type === 'prevailing' ? '#d97706' : '#2563eb', fontWeight: 700 }}>
+              {selectedProject.wage_type === 'prevailing' ? t.prevailing : t.regular}
             </span>
           </div>
         )}
         <div style={styles.field}>
-          <label style={styles.label}>Notes (optional)</label>
-          <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any notes..." />
+          <label style={styles.label}>{t.notesOptional}</label>
+          <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.notesPlaceholder} />
         </div>
         {error && <p style={styles.error}>{error}</p>}
-        {success && <p style={styles.success}>Entry saved!</p>}
-        <button style={styles.button} type="submit" disabled={saving}>{saving ? 'Saving...' : 'Log Entry'}</button>
+        {success && <p style={styles.success}>{t.entrySaved}</p>}
+        <button style={styles.button} type="submit" disabled={saving}>{saving ? t.saving : t.logEntry}</button>
       </form>
     </div>
   );

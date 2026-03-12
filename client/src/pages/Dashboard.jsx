@@ -3,10 +3,12 @@ import { useAuth } from '../contexts/AuthContext';
 import TimeEntryForm from '../components/TimeEntryForm';
 import EntryList from '../components/EntryList';
 import ChangePassword from '../components/ChangePassword';
+import { getT } from '../i18n';
 import api from '../api';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
+  const t = getT(user?.language);
   const [entries, setEntries] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,15 +36,15 @@ export default function Dashboard() {
         <span style={styles.logo}>Time Crunch</span>
         <div style={styles.headerRight}>
           <span style={styles.userName}>{user.full_name}</span>
-          <button style={styles.logoutBtn} onClick={() => setShowChangePassword(true)}>Change Password</button>
-          <button style={styles.logoutBtn} onClick={logout}>Logout</button>
+          <button style={styles.logoutBtn} onClick={() => setShowChangePassword(true)}>{t.changePassword}</button>
+          <button style={styles.logoutBtn} onClick={logout}>{t.logout}</button>
         </div>
       </header>
-      {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} />}
+      {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
       <main style={styles.main}>
-        <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} />
-        {loading ? <p>Loading entries...</p> : (
-          <EntryList entries={entries} onDeleted={handleEntryDeleted} />
+        <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} />
+        {loading ? <p>{t.loadingEntries}</p> : (
+          <EntryList entries={entries} onDeleted={handleEntryDeleted} t={t} language={user?.language} />
         )}
       </main>
     </div>

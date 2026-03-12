@@ -5,6 +5,7 @@ import ManageWorkers from '../components/ManageWorkers';
 import ManageProjects from '../components/ManageProjects';
 import ProjectReports from '../components/ProjectReports';
 import ChangePassword from '../components/ChangePassword';
+import { getT } from '../i18n';
 import api from '../api';
 
 export default function AdminDashboard() {
@@ -45,7 +46,7 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} />}
+      {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={getT('English')} />}
 
       <main style={styles.main}>
         <div style={styles.tabs}>

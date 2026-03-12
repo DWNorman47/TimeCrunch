@@ -8,9 +8,10 @@ function formatHours(start, end) {
   return h.toFixed(2) + 'h';
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr, language) {
   const d = new Date(dateStr.substring(0, 10) + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  const locale = language === 'Spanish' ? 'es-MX' : 'en-US';
+  return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function formatTime(t) {
@@ -19,38 +20,38 @@ function formatTime(t) {
   return `${hour % 12 || 12}:${m} ${hour < 12 ? 'AM' : 'PM'}`;
 }
 
-export default function EntryList({ entries, onDeleted }) {
+export default function EntryList({ entries, onDeleted, t, language }) {
   const handleDelete = async id => {
-    if (!confirm('Delete this entry?')) return;
+    if (!confirm(t.confirmDelete)) return;
     try {
       await api.delete(`/time-entries/${id}`);
       onDeleted(id);
     } catch {
-      alert('Failed to delete entry');
+      alert(t.failedDeleteEntry);
     }
   };
 
   if (entries.length === 0) {
-    return <div style={styles.empty}>No entries yet. Log your first time entry above.</div>;
+    return <div style={styles.empty}>{t.noEntries}</div>;
   }
 
   return (
     <div style={styles.card}>
-      <h2 style={styles.heading}>Your Entries</h2>
+      <h2 style={styles.heading}>{t.yourEntries}</h2>
       <div style={styles.list}>
         {entries.map(e => (
           <div key={e.id} style={styles.entry}>
             <div style={styles.entryMain}>
               <span style={styles.project}>{e.project_name}</span>
               <div style={styles.entryRight}>
-                <span style={styles.date}>{formatDate(e.work_date)}</span>
-                <button style={styles.deleteBtn} onClick={() => handleDelete(e.id)}>Delete</button>
+                <span style={styles.date}>{formatDate(e.work_date, language)}</span>
+                <button style={styles.deleteBtn} onClick={() => handleDelete(e.id)}>{t.delete}</button>
               </div>
             </div>
             <div style={styles.entryDetail}>
               <span>{formatTime(e.start_time)} – {formatTime(e.end_time)} ({formatHours(e.start_time, e.end_time)})</span>
               <span style={{ ...styles.badge, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
-                {e.wage_type}
+                {e.wage_type === 'prevailing' ? t.prevailing : t.regular}
               </span>
             </div>
             {e.notes && <div style={styles.notes}>{e.notes}</div>}

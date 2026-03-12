@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 
-export default function ChangePassword({ onClose }) {
+export default function ChangePassword({ onClose, t }) {
   const [form, setForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -13,7 +13,7 @@ export default function ChangePassword({ onClose }) {
     e.preventDefault();
     setError('');
     if (form.new_password !== form.confirm_password) {
-      setError('New passwords do not match');
+      setError(t.passwordsMustMatch);
       return;
     }
     setSaving(true);
@@ -25,7 +25,7 @@ export default function ChangePassword({ onClose }) {
       setSuccess(true);
       setTimeout(() => { setSuccess(false); onClose(); }, 1500);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to change password');
+      setError(err.response?.data?.error || t.failedChangePassword);
     } finally {
       setSaving(false);
     }
@@ -34,19 +34,19 @@ export default function ChangePassword({ onClose }) {
   return (
     <div style={styles.overlay}>
       <div style={styles.modal}>
-        <h3 style={styles.title}>Change Password</h3>
+        <h3 style={styles.title}>{t.changePasswordTitle}</h3>
         <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>Current Password</label>
+          <label style={styles.label}>{t.currentPassword}</label>
           <input style={styles.input} type="password" value={form.current_password} onChange={e => set('current_password', e.target.value)} required autoFocus />
-          <label style={styles.label}>New Password</label>
+          <label style={styles.label}>{t.newPassword}</label>
           <input style={styles.input} type="password" value={form.new_password} onChange={e => set('new_password', e.target.value)} required minLength={6} />
-          <label style={styles.label}>Confirm New Password</label>
+          <label style={styles.label}>{t.confirmNewPassword}</label>
           <input style={styles.input} type="password" value={form.confirm_password} onChange={e => set('confirm_password', e.target.value)} required />
           {error && <p style={styles.error}>{error}</p>}
-          {success && <p style={styles.success}>Password changed!</p>}
+          {success && <p style={styles.success}>{t.passwordChanged}</p>}
           <div style={styles.buttons}>
-            <button type="button" style={styles.cancelBtn} onClick={onClose}>Cancel</button>
-            <button type="submit" style={styles.saveBtn} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+            <button type="button" style={styles.cancelBtn} onClick={onClose}>{t.cancel}</button>
+            <button type="submit" style={styles.saveBtn} disabled={saving}>{saving ? t.saving : t.save}</button>
           </div>
         </form>
       </div>
