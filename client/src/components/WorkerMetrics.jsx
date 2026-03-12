@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import api from '../api';
-import { PDFDownloadLink } from '@react-pdf/renderer';
+import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import BillPDF from './BillPDF';
 
 function defaultDates() {
@@ -17,6 +17,7 @@ export default function WorkerMetrics({ worker }) {
   const [to, setTo] = useState(defaultDates().to);
   const [billData, setBillData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const fetchBill = async () => {
     setLoading(true);
@@ -75,13 +76,23 @@ export default function WorkerMetrics({ worker }) {
                 {billData.summary.prevailing_hours > 0 && <span style={{ color: '#d97706' }}>Prevailing: <b>{billData.summary.prevailing_hours.toFixed(2)}h · ${billData.summary.prevailing_cost.toFixed(2)}</b></span>}
                 <span style={{ fontWeight: 700 }}>Total Cost: <b>${billData.summary.total_cost.toFixed(2)}</b></span>
               </div>
-              <PDFDownloadLink
-                document={<BillPDF data={billData} />}
-                fileName={`bill-${worker.username}-${from || 'all'}-to-${to || 'all'}.pdf`}
-                style={styles.pdfBtn}
-              >
-                {({ loading: l }) => l ? 'Preparing PDF...' : 'Download PDF Bill'}
-              </PDFDownloadLink>
+              <div style={styles.btnRow}>
+                <button style={styles.previewBtn} onClick={() => setShowPreview(p => !p)}>
+                  {showPreview ? 'Hide Preview' : 'Preview Bill'}
+                </button>
+                <PDFDownloadLink
+                  document={<BillPDF data={billData} />}
+                  fileName={`bill-${worker.username}-${from || 'all'}-to-${to || 'all'}.pdf`}
+                  style={styles.pdfBtn}
+                >
+                  {({ loading: l }) => l ? 'Preparing PDF...' : 'Download PDF'}
+                </PDFDownloadLink>
+              </div>
+              {showPreview && (
+                <PDFViewer style={styles.pdfViewer}>
+                  <BillPDF data={billData} />
+                </PDFViewer>
+              )}
             </div>
           )}
         </div>
@@ -117,5 +128,8 @@ const styles = {
   input: { padding: '8px 10px', border: '1px solid #ddd', borderRadius: 7, fontSize: 14 },
   fetchBtn: { padding: '8px 18px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14 },
   billSummary: { display: 'flex', gap: 20, fontSize: 14, flexWrap: 'wrap', marginBottom: 12 },
+  btnRow: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
+  previewBtn: { padding: '10px 20px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
   pdfBtn: { display: 'inline-block', padding: '10px 20px', background: '#059669', color: '#fff', borderRadius: 8, fontWeight: 600, fontSize: 14, textDecoration: 'none' },
+  pdfViewer: { width: '100%', height: 600, marginTop: 16, borderRadius: 8, border: '1px solid #e5e7eb' },
 };
