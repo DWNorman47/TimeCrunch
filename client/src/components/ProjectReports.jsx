@@ -57,7 +57,10 @@ function ProjectCard({ project: p }) {
       <div style={styles.cardTop} onClick={() => setExpanded(e => !e)}>
         <div style={styles.cardHeader}>
           <span style={styles.name}>{p.name}</span>
-          <span style={styles.sub}>{p.worker_count} worker{p.worker_count !== 1 ? 's' : ''} · {p.total_entries} entr{p.total_entries !== 1 ? 'ies' : 'y'}</span>
+          <div style={styles.headerRight}>
+            <span style={styles.sub}>{p.worker_count} worker{p.worker_count !== 1 ? 's' : ''} · {p.total_entries} entr{p.total_entries !== 1 ? 'ies' : 'y'}</span>
+            <span style={styles.expandBtn}>{expanded ? '▲' : '▼'}</span>
+          </div>
         </div>
         <div style={styles.metrics}>
           <Metric label="Total" value={`${parseFloat(p.total_hours).toFixed(2)}h`} />
@@ -68,7 +71,6 @@ function ProjectCard({ project: p }) {
         <div style={styles.barContainer}>
           <HoursBar regular={parseFloat(p.regular_hours)} overtime={parseFloat(p.overtime_hours)} prevailing={parseFloat(p.prevailing_hours)} />
         </div>
-        <button style={styles.expandBtn}>{expanded ? '▲' : '▼'}</button>
       </div>
 
       {expanded && (
@@ -148,8 +150,9 @@ function HoursBar({ regular, overtime, prevailing }) {
 const styles = {
   list: { display: 'flex', flexDirection: 'column', gap: 16 },
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', overflow: 'hidden' },
-  cardTop: { padding: '18px 20px', cursor: 'pointer', position: 'relative' },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 },
+  cardTop: { padding: '18px 20px', cursor: 'pointer' },
+  cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  headerRight: { display: 'flex', alignItems: 'center', gap: 10 },
   name: { fontWeight: 700, fontSize: 17 },
   sub: { color: '#888', fontSize: 13 },
   metrics: { display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 12 },
@@ -159,7 +162,7 @@ const styles = {
   barContainer: { marginTop: 4 },
   bar: { display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', background: '#f0f0f0' },
   barSegment: { height: '100%', transition: 'width 0.3s' },
-  expandBtn: { position: 'absolute', top: 18, right: 20, background: 'none', border: 'none', fontSize: 14, color: '#888', cursor: 'pointer' },
+  expandBtn: { color: '#aaa', fontSize: 12 },
   billSection: { padding: '16px 20px', borderTop: '1px solid #f0f0f0', background: '#fafafa' },
   billHeading: { marginBottom: 12, fontSize: 15, fontWeight: 600 },
   dateRow: { display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' },
