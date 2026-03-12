@@ -207,7 +207,7 @@ const styles = {
   item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#f8f9fb', borderRadius: 7, gap: 8 },
   itemRight: { display: 'flex', gap: 8, alignItems: 'center' },
   projectName: { fontSize: 14, fontWeight: 500 },
-  wageBadge: { color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, marginLeft: 10 },
+  wageBadge: { color: '#fff', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, marginLeft: 10, whiteSpace: 'nowrap' },
   removeBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   editBtn: { background: 'none', border: '1px solid #93c5fd', color: '#2563eb', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   saveBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
