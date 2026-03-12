@@ -42,7 +42,10 @@ export default function Dashboard() {
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <span style={styles.logo}>Time Crunch</span>
+        <div style={styles.logoGroup}>
+          <span style={styles.logo}>Time Crunch</span>
+          {user?.company_name && <span style={styles.companyName}>{user.company_name}</span>}
+        </div>
         <div style={styles.headerRight}>
           <span style={styles.userName}>{user.full_name}</span>
           <select
@@ -71,7 +74,9 @@ export default function Dashboard() {
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9' },
   header: { background: '#1a56db', color: '#fff', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  logoGroup: { display: 'flex', alignItems: 'baseline', gap: 10 },
   logo: { fontWeight: 700, fontSize: 20 },
+  companyName: { fontSize: 14, fontWeight: 400, opacity: 0.75 },
   headerRight: { display: 'flex', alignItems: 'center', gap: 12 },
   userName: { fontSize: 14 },
   langSelect: { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', padding: '5px 8px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },

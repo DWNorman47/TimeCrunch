@@ -6,7 +6,7 @@ const { requireAuth } = require('../middleware/auth');
 
 function signToken(user) {
   return jwt.sign(
-    { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id },
+    { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name },
     process.env.JWT_SECRET,
     { expiresIn: '8h' }
   );
@@ -19,13 +19,18 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Username and password required' });
   }
   try {
-    const result = await pool.query('SELECT * FROM users WHERE username = $1 AND active = true', [username]);
+    const result = await pool.query(
+      `SELECT u.*, c.name as company_name FROM users u
+       LEFT JOIN companies c ON c.id = u.company_id
+       WHERE u.username = $1 AND u.active = true`,
+      [username]
+    );
     const user = result.rows[0];
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     const token = signToken(user);
-    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id } });
+    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -66,7 +71,7 @@ router.post('/register', async (req, res) => {
       [companyId, username, hash, full_name, 'admin']
     );
     await client.query('COMMIT');
-    const user = { ...userResult.rows[0], language: 'English' };
+    const user = { ...userResult.rows[0], language: 'English', company_name: company_name };
     const token = signToken(user);
     res.status(201).json({ token, user });
   } catch (err) {

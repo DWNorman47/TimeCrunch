@@ -10,7 +10,7 @@ import { getT } from '../i18n';
 import api from '../api';
 
 export default function AdminDashboard() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
@@ -43,7 +43,10 @@ export default function AdminDashboard() {
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <span style={styles.logo}>Time Crunch — Admin</span>
+        <div style={styles.logoGroup}>
+          <span style={styles.logo}>Time Crunch</span>
+          {user?.company_name && <span style={styles.companyName}>{user.company_name}</span>}
+        </div>
         <div style={styles.headerRight}>
           <button style={styles.headerBtn} onClick={() => setShowChangePassword(true)}>Change Password</button>
           <button style={styles.headerBtn} onClick={logout}>Logout</button>
@@ -87,7 +90,9 @@ export default function AdminDashboard() {
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9' },
   header: { background: '#1a56db', color: '#fff', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  logoGroup: { display: 'flex', alignItems: 'baseline', gap: 10 },
   logo: { fontWeight: 700, fontSize: 20 },
+  companyName: { fontSize: 14, fontWeight: 400, opacity: 0.75 },
   headerRight: { display: 'flex', gap: 10 },
   headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' },
   main: { maxWidth: 900, margin: '32px auto', padding: '0 16px' },
