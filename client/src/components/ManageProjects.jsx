@@ -6,6 +6,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   const [wageType, setWageType] = useState('regular');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState('');
 
   const handleAdd = async e => {
     e.preventDefault();
@@ -30,6 +32,17 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       onProjectUpdated(r.data);
     } catch {
       alert('Failed to update project');
+    }
+  };
+
+  const handleRenameSave = async (id) => {
+    if (!editName.trim()) return;
+    try {
+      const r = await api.patch(`/admin/projects/${id}`, { name: editName.trim() });
+      onProjectUpdated(r.data);
+      setEditingId(null);
+    } catch {
+      alert('Failed to rename project');
     }
   };
 
@@ -68,16 +81,36 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
         <div style={styles.list}>
           {projects.map(p => (
             <div key={p.id} style={styles.item}>
-              <span style={styles.projectName}>{p.name}</span>
+              {editingId === p.id ? (
+                <input
+                  style={{ ...styles.input, flex: 1, marginRight: 8 }}
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleRenameSave(p.id); if (e.key === 'Escape') setEditingId(null); }}
+                  autoFocus
+                />
+              ) : (
+                <span style={styles.projectName}>{p.name}</span>
+              )}
               <div style={styles.itemRight}>
-                <button
-                  style={{ ...styles.wageBtn, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}
-                  onClick={() => handleToggleWageType(p.id, p.wage_type)}
-                  title="Click to toggle wage type"
-                >
-                  {p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}
-                </button>
-                <button style={styles.deleteBtn} onClick={() => handleDelete(p.id, p.name)}>Delete</button>
+                {editingId === p.id ? (
+                  <>
+                    <button style={styles.saveBtn} onClick={() => handleRenameSave(p.id)}>Save</button>
+                    <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+                  </>
+                ) : (
+                  <>
+                    <button style={styles.editBtn} onClick={() => { setEditingId(p.id); setEditName(p.name); }}>Rename</button>
+                    <button
+                      style={{ ...styles.wageBtn, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}
+                      onClick={() => handleToggleWageType(p.id, p.wage_type)}
+                      title="Click to toggle wage type"
+                    >
+                      {p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}
+                    </button>
+                    <button style={styles.deleteBtn} onClick={() => handleDelete(p.id, p.name)}>Delete</button>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -102,4 +135,7 @@ const styles = {
   projectName: { fontSize: 14, fontWeight: 500 },
   wageBtn: { color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  editBtn: { background: 'none', border: '1px solid #93c5fd', color: '#2563eb', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  saveBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  cancelBtn: { background: 'none', border: '1px solid #ddd', color: '#666', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
 };

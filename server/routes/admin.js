@@ -265,16 +265,26 @@ router.get('/projects', requireAdmin, async (req, res) => {
   }
 });
 
-// Update project wage_type
+// Update project (name and/or wage_type)
 router.patch('/projects/:id', requireAdmin, async (req, res) => {
-  const { wage_type } = req.body;
-  if (!['regular', 'prevailing'].includes(wage_type)) {
+  const { wage_type, name } = req.body;
+  if (wage_type !== undefined && !['regular', 'prevailing'].includes(wage_type)) {
     return res.status(400).json({ error: 'wage_type must be regular or prevailing' });
   }
+  if (name !== undefined && !name.trim()) {
+    return res.status(400).json({ error: 'Project name cannot be empty' });
+  }
   try {
+    const fields = [];
+    const values = [];
+    let idx = 1;
+    if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name.trim()); }
+    if (wage_type !== undefined) { fields.push(`wage_type = $${idx++}`); values.push(wage_type); }
+    if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+    values.push(req.params.id);
     const result = await pool.query(
-      'UPDATE projects SET wage_type = $1 WHERE id = $2 RETURNING *',
-      [wage_type, req.params.id]
+      `UPDATE projects SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+      values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
     res.json(result.rows[0]);
