@@ -40,9 +40,9 @@ export default function WorkerMetrics({ worker }) {
         </div>
         <div style={styles.metrics}>
           <Metric label="Total" value={`${parseFloat(worker.total_hours).toFixed(2)}h`} />
-          <Metric label="Regular" value={`${parseFloat(worker.regular_hours).toFixed(2)}h`} color="#2563eb" />
-          <Metric label="Overtime" value={`${parseFloat(worker.overtime_hours).toFixed(2)}h`} color="#dc2626" />
-          <Metric label="Prevailing" value={`${parseFloat(worker.prevailing_hours).toFixed(2)}h`} color="#d97706" />
+          {parseFloat(worker.regular_hours) > 0 && <Metric label="Regular" value={`${parseFloat(worker.regular_hours).toFixed(2)}h`} color="#2563eb" />}
+          {parseFloat(worker.overtime_hours) > 0 && <Metric label="Overtime" value={`${parseFloat(worker.overtime_hours).toFixed(2)}h`} color="#dc2626" />}
+          {parseFloat(worker.prevailing_hours) > 0 && <Metric label="Prevailing" value={`${parseFloat(worker.prevailing_hours).toFixed(2)}h`} color="#d97706" />}
           <Metric label="Entries" value={worker.total_entries} />
         </div>
         <button style={styles.expandBtn}>{expanded ? '▲' : '▼'}</button>

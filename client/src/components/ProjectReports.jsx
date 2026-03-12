@@ -27,9 +27,9 @@ export default function ProjectReports() {
           </div>
           <div style={styles.metrics}>
             <Metric label="Total" value={`${parseFloat(p.total_hours).toFixed(2)}h`} />
-            <Metric label="Regular" value={`${parseFloat(p.regular_hours).toFixed(2)}h`} color="#2563eb" />
-            <Metric label="Overtime" value={`${parseFloat(p.overtime_hours).toFixed(2)}h`} color="#dc2626" />
-            <Metric label="Prevailing" value={`${parseFloat(p.prevailing_hours).toFixed(2)}h`} color="#d97706" />
+            {parseFloat(p.regular_hours) > 0 && <Metric label="Regular" value={`${parseFloat(p.regular_hours).toFixed(2)}h`} color="#2563eb" />}
+            {parseFloat(p.overtime_hours) > 0 && <Metric label="Overtime" value={`${parseFloat(p.overtime_hours).toFixed(2)}h`} color="#dc2626" />}
+            {parseFloat(p.prevailing_hours) > 0 && <Metric label="Prevailing" value={`${parseFloat(p.prevailing_hours).toFixed(2)}h`} color="#d97706" />}
           </div>
           <div style={styles.barContainer}>
             <HoursBar regular={parseFloat(p.regular_hours)} overtime={parseFloat(p.overtime_hours)} prevailing={parseFloat(p.prevailing_hours)} />

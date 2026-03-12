@@ -3,13 +3,17 @@ import api from '../api';
 
 const LANGUAGES = ['English', 'Spanish', 'French', 'Portuguese', 'Mandarin', 'Vietnamese', 'Tagalog', 'Other'];
 
-export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted }) {
+export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated }) {
   const [form, setForm] = useState({ full_name: '', username: '', password: '', role: 'worker', language: 'English' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const setEdit = (k, v) => setEditForm(f => ({ ...f, [k]: v }));
 
   const handleAdd = async e => {
     e.preventDefault();
@@ -34,6 +38,29 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted 
       onWorkerDeleted(id);
     } catch {
       alert('Failed to delete user');
+    }
+  };
+
+  const startEdit = w => {
+    setEditingId(w.id);
+    setEditForm({ full_name: w.full_name, role: w.role, language: w.language || 'English' });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm({});
+  };
+
+  const handleSaveEdit = async id => {
+    setEditSaving(true);
+    try {
+      const r = await api.patch(`/admin/workers/${id}`, editForm);
+      onWorkerUpdated(r.data);
+      cancelEdit();
+    } catch {
+      alert('Failed to update user');
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -77,7 +104,31 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted 
             </tr>
           </thead>
           <tbody>
-            {workers.map(w => (
+            {workers.map(w => editingId === w.id ? (
+              <tr key={w.id} style={{ ...styles.tr, background: '#f0f4ff' }}>
+                <td style={styles.td}>
+                  <input style={styles.editInput} value={editForm.full_name} onChange={e => setEdit('full_name', e.target.value)} />
+                </td>
+                <td style={styles.td}>@{w.username}</td>
+                <td style={styles.td}>
+                  <select style={styles.editInput} value={editForm.role} onChange={e => setEdit('role', e.target.value)}>
+                    <option value="worker">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </td>
+                <td style={styles.td}>
+                  <select style={styles.editInput} value={editForm.language} onChange={e => setEdit('language', e.target.value)}>
+                    {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </td>
+                <td style={styles.tdAction}>
+                  <button style={styles.saveEditBtn} onClick={() => handleSaveEdit(w.id)} disabled={editSaving}>
+                    {editSaving ? '...' : 'Save'}
+                  </button>
+                  <button style={styles.cancelBtn} onClick={cancelEdit}>Cancel</button>
+                </td>
+              </tr>
+            ) : (
               <tr key={w.id} style={styles.tr}>
                 <td style={styles.td}>{w.full_name}</td>
                 <td style={styles.td}>@{w.username}</td>
@@ -88,6 +139,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted 
                 </td>
                 <td style={styles.td}>{w.language || '—'}</td>
                 <td style={styles.tdAction}>
+                  <button style={styles.editBtn} onClick={() => startEdit(w)}>Edit</button>
                   <button style={styles.deleteBtn} onClick={() => handleDelete(w.id, w.full_name)}>Delete</button>
                 </td>
               </tr>
@@ -106,6 +158,7 @@ const styles = {
   addBtn: { padding: '7px 16px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13 },
   form: { display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'flex-start' },
   input: { padding: '8px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, flex: 1, minWidth: 140 },
+  editInput: { padding: '5px 8px', border: '1px solid #c7d2fe', borderRadius: 6, fontSize: 13, width: '100%' },
   error: { color: '#e53e3e', fontSize: 13, width: '100%' },
   saveBtn: { padding: '8px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14 },
   empty: { color: '#888', fontSize: 14 },
@@ -113,7 +166,10 @@ const styles = {
   th: { textAlign: 'left', fontSize: 12, color: '#999', fontWeight: 600, textTransform: 'uppercase', padding: '6px 8px', borderBottom: '1px solid #eee' },
   tr: { borderBottom: '1px solid #f5f5f5' },
   td: { padding: '10px 8px', fontSize: 14 },
-  tdAction: { padding: '10px 8px', textAlign: 'right' },
+  tdAction: { padding: '10px 8px', textAlign: 'right', whiteSpace: 'nowrap' },
   roleBadge: { color: '#fff', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700 },
+  editBtn: { background: 'none', border: '1px solid #93c5fd', color: '#2563eb', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', marginRight: 6 },
+  saveEditBtn: { background: '#059669', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', marginRight: 6, fontWeight: 600 },
+  cancelBtn: { background: 'none', border: '1px solid #ddd', color: '#666', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
 };

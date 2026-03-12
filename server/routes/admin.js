@@ -108,6 +108,33 @@ router.post('/workers', requireAdmin, async (req, res) => {
   }
 });
 
+// Update a worker (full_name, role, language)
+router.patch('/workers/:id', requireAdmin, async (req, res) => {
+  const { full_name, role, language } = req.body;
+  if (!full_name && !role && !language) {
+    return res.status(400).json({ error: 'At least one field required' });
+  }
+  const assignedRole = role ? (role === 'admin' ? 'admin' : 'worker') : undefined;
+  try {
+    const fields = [];
+    const values = [];
+    let idx = 1;
+    if (full_name) { fields.push(`full_name = $${idx++}`); values.push(full_name); }
+    if (assignedRole !== undefined) { fields.push(`role = $${idx++}`); values.push(assignedRole); }
+    if (language) { fields.push(`language = $${idx++}`); values.push(language); }
+    values.push(req.params.id);
+    const result = await pool.query(
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, username, full_name, role, language`,
+      values
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Delete a worker
 router.delete('/workers/:id', requireAdmin, async (req, res) => {
   try {

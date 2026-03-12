@@ -75,7 +75,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                   onClick={() => handleToggleWageType(p.id, p.wage_type)}
                   title="Click to toggle wage type"
                 >
-                  {p.wage_type === 'prevailing' ? 'Prevailing' : 'Regular'}
+                  {p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}
                 </button>
                 <button style={styles.deleteBtn} onClick={() => handleDelete(p.id, p.name)}>Delete</button>
               </div>
