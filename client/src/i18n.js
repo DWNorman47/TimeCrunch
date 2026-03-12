@@ -52,7 +52,7 @@ const translations = {
     project: 'Proyecto',
     selectProject: 'Seleccionar proyecto...',
     regular: 'Regular',
-    prevailing: 'Salario Prevaleciente',
+    prevailing: 'Prevailing',
     date: 'Fecha',
     startTime: 'Hora de Inicio',
     endTime: 'Hora de Fin',
