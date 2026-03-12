@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 
-const LANGUAGES = ['English', 'Spanish', 'French', 'Portuguese', 'Mandarin', 'Vietnamese', 'Tagalog', 'Other'];
+const LANGUAGES = ['English', 'Spanish'];
 
 export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated }) {
   const [form, setForm] = useState({ full_name: '', username: '', password: '', role: 'worker', language: 'English' });

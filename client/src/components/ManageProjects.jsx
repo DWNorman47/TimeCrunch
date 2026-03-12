@@ -55,8 +55,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
           required
         />
         <select style={styles.select} value={wageType} onChange={e => setWageType(e.target.value)}>
-          <option value="regular">Regular</option>
-          <option value="prevailing">Prevailing</option>
+          <option value="regular">Regular Wages</option>
+          <option value="prevailing">Prevailing Wages</option>
         </select>
         <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? 'Adding...' : '+ Add'}</button>
       </form>
