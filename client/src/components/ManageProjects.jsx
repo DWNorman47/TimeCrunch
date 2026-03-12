@@ -9,6 +9,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
+  const [editWageType, setEditWageType] = useState('regular');
   const [archived, setArchived] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loadingArchived, setLoadingArchived] = useState(false);
@@ -48,24 +49,14 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     }
   };
 
-  const handleToggleWageType = async (id, currentType) => {
-    const newType = currentType === 'regular' ? 'prevailing' : 'regular';
-    try {
-      const r = await api.patch(`/admin/projects/${id}`, { wage_type: newType });
-      onProjectUpdated(r.data);
-    } catch {
-      alert('Failed to update project');
-    }
-  };
-
-  const handleRenameSave = async (id) => {
+  const handleEditSave = async (id) => {
     if (!editName.trim()) return;
     try {
-      const r = await api.patch(`/admin/projects/${id}`, { name: editName.trim() });
+      const r = await api.patch(`/admin/projects/${id}`, { name: editName.trim(), wage_type: editWageType });
       onProjectUpdated(r.data);
       setEditingId(null);
     } catch {
-      alert('Failed to rename project');
+      alert('Failed to update project');
     }
   };
 
@@ -132,32 +123,36 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
           {projects.map(p => (
             <div key={p.id} style={styles.item}>
               {editingId === p.id ? (
-                <input
-                  style={{ ...styles.input, flex: 1, marginRight: 8 }}
-                  value={editName}
-                  onChange={e => setEditName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleRenameSave(p.id); if (e.key === 'Escape') setEditingId(null); }}
-                  autoFocus
-                />
+                <>
+                  <input
+                    style={{ ...styles.input, flex: 1, marginRight: 8 }}
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Escape') setEditingId(null); }}
+                    autoFocus
+                  />
+                  <select style={{ ...styles.select, marginRight: 8 }} value={editWageType} onChange={e => setEditWageType(e.target.value)}>
+                    <option value="regular">Regular Wages</option>
+                    <option value="prevailing">Prevailing Wages</option>
+                  </select>
+                </>
               ) : (
-                <span style={styles.projectName}>{p.name}</span>
+                <>
+                  <span style={styles.projectName}>{p.name}</span>
+                  <span style={{ ...styles.wageBadge, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
+                    {p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}
+                  </span>
+                </>
               )}
               <div style={styles.itemRight}>
                 {editingId === p.id ? (
                   <>
-                    <button style={styles.saveBtn} onClick={() => handleRenameSave(p.id)}>Save</button>
+                    <button style={styles.saveBtn} onClick={() => handleEditSave(p.id)}>Save</button>
                     <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
                   </>
                 ) : (
                   <>
-                    <button style={styles.editBtn} onClick={() => { setEditingId(p.id); setEditName(p.name); }}>Rename</button>
-                    <button
-                      style={{ ...styles.wageBtn, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}
-                      onClick={() => handleToggleWageType(p.id, p.wage_type)}
-                      title="Click to toggle wage type"
-                    >
-                      {p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}
-                    </button>
+                    <button style={styles.editBtn} onClick={() => { setEditingId(p.id); setEditName(p.name); setEditWageType(p.wage_type); }}>Edit</button>
                     <button style={styles.removeBtn} onClick={() => handleRemove(p.id, p.name)}>Remove</button>
                   </>
                 )}
@@ -209,10 +204,10 @@ const styles = {
   restoreInlineBtn: { background: '#059669', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   empty: { color: '#888', fontSize: 14 },
   list: { display: 'flex', flexDirection: 'column', gap: 6 },
-  item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#f8f9fb', borderRadius: 7 },
+  item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#f8f9fb', borderRadius: 7, gap: 8 },
   itemRight: { display: 'flex', gap: 8, alignItems: 'center' },
   projectName: { fontSize: 14, fontWeight: 500 },
-  wageBtn: { color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer' },
+  wageBadge: { color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, marginLeft: 10 },
   removeBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   editBtn: { background: 'none', border: '1px solid #93c5fd', color: '#2563eb', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   saveBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
