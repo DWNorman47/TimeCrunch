@@ -182,7 +182,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   <button style={styles.cancelBtn} onClick={cancelEdit}>Cancel</button>
                 </td>
               </tr>
-              <tr key={`${w.id}-email`} style={{ ...styles.tr, background: '#f0f4ff' }}>
+              <tr key={w.id + '-email'} style={{ ...styles.tr, background: '#f0f4ff' }}>
                 <td style={styles.td} colSpan={5}>
                   <input style={{ ...styles.editInput, maxWidth: 280 }} type="email" placeholder="Email (optional)" value={editForm.email} onChange={e => setEdit('email', e.target.value)} />
                 </td>
