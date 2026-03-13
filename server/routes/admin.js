@@ -181,11 +181,12 @@ router.post('/workers', requireAdmin, async (req, res) => {
   const assignedRole = role === 'admin' ? 'admin' : 'worker';
   const assignedLanguage = req.body.language || 'English';
   const assignedRate = parseFloat(req.body.hourly_rate) || 30;
+  const assignedEmail = req.body.email || null;
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      'INSERT INTO users (company_id, username, password_hash, full_name, role, language, hourly_rate) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, username, full_name, role, language, hourly_rate',
-      [companyId, username, hash, full_name, assignedRole, assignedLanguage, assignedRate]
+      'INSERT INTO users (company_id, username, password_hash, full_name, role, language, hourly_rate, email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, username, full_name, role, language, hourly_rate, email',
+      [companyId, username, hash, full_name, assignedRole, assignedLanguage, assignedRate, assignedEmail]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -202,10 +203,10 @@ router.post('/workers', requireAdmin, async (req, res) => {
   }
 });
 
-// Update a worker (full_name, role, language, hourly_rate)
+// Update a worker (full_name, role, language, hourly_rate, email)
 router.patch('/workers/:id', requireAdmin, async (req, res) => {
-  const { full_name, role, language, hourly_rate } = req.body;
-  if (!full_name && !role && !language && hourly_rate === undefined) {
+  const { full_name, role, language, hourly_rate, email } = req.body;
+  if (!full_name && !role && !language && hourly_rate === undefined && email === undefined) {
     return res.status(400).json({ error: 'At least one field required' });
   }
   const companyId = req.user.company_id;
@@ -218,10 +219,11 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
     if (assignedRole !== undefined) { fields.push(`role = $${idx++}`); values.push(assignedRole); }
     if (language) { fields.push(`language = $${idx++}`); values.push(language); }
     if (hourly_rate !== undefined) { fields.push(`hourly_rate = $${idx++}`); values.push(parseFloat(hourly_rate) || 30); }
+    if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email || null); }
     values.push(req.params.id);
     values.push(companyId);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, role, language, hourly_rate`,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, role, language, hourly_rate, email`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });

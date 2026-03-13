@@ -6,7 +6,7 @@ import api from '../api';
 export default function Register() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ company_name: '', full_name: '', username: '', password: '' });
+  const [form, setForm] = useState({ company_name: '', full_name: '', email: '', username: '', password: '' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -48,6 +48,14 @@ export default function Register() {
             value={form.full_name}
             onChange={e => set('full_name', e.target.value)}
             required
+          />
+          <label style={styles.label}>Email <span style={styles.hint}>(for password reset)</span></label>
+          <input
+            style={styles.input}
+            type="email"
+            placeholder="you@example.com"
+            value={form.email}
+            onChange={e => set('email', e.target.value)}
           />
           <label style={styles.label}>Username</label>
           <input
@@ -92,4 +100,5 @@ const styles = {
   btn: { marginTop: 16, padding: '11px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 9, fontWeight: 700, fontSize: 15, cursor: 'pointer' },
   loginLink: { marginTop: 20, textAlign: 'center', fontSize: 13, color: '#666' },
   link: { color: '#1a56db', fontWeight: 600, textDecoration: 'none' },
+  hint: { fontWeight: 400, color: '#9ca3af', fontSize: 12 },
 };

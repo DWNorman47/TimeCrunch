@@ -1,0 +1,79 @@
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import api from '../api';
+
+export default function ForgotPassword() {
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async e => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await api.post('/auth/forgot-password', { email });
+      setSent(true);
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.page}>
+      <div style={styles.card}>
+        <h1 style={styles.logo}>Time Crunch</h1>
+        {sent ? (
+          <>
+            <h2 style={styles.title}>Check your email</h2>
+            <p style={styles.body}>If an account with that email exists, we sent a password reset link. It expires in 1 hour.</p>
+            <Link to="/login" style={styles.backLink}>Back to login</Link>
+          </>
+        ) : (
+          <>
+            <h2 style={styles.title}>Forgot your password?</h2>
+            <p style={styles.body}>Enter your email and we'll send you a reset link.</p>
+            <form onSubmit={handleSubmit} style={styles.form}>
+              <label style={styles.label}>Email</label>
+              <input
+                style={styles.input}
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                autoFocus
+              />
+              {error && <p style={styles.error}>{error}</p>}
+              <button style={styles.btn} type="submit" disabled={loading}>
+                {loading ? 'Sending...' : 'Send reset link'}
+              </button>
+            </form>
+            <p style={styles.footer}>
+              <Link to="/login" style={styles.link}>Back to login</Link>
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const styles = {
+  page: { minHeight: '100vh', background: '#f4f6f9', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  card: { background: '#fff', borderRadius: 14, padding: '40px 36px', boxShadow: '0 4px 24px rgba(0,0,0,0.09)', width: '100%', maxWidth: 380 },
+  logo: { fontSize: 22, fontWeight: 800, color: '#1a56db', marginBottom: 4, textAlign: 'center' },
+  title: { fontSize: 18, fontWeight: 700, color: '#1a202c', marginBottom: 8, textAlign: 'center' },
+  body: { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24, lineHeight: 1.6 },
+  form: { display: 'flex', flexDirection: 'column', gap: 8 },
+  label: { fontSize: 13, fontWeight: 600, color: '#374151' },
+  input: { padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 },
+  error: { color: '#e53e3e', fontSize: 13 },
+  btn: { marginTop: 8, padding: '11px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 9, fontWeight: 700, fontSize: 15, cursor: 'pointer' },
+  footer: { marginTop: 20, textAlign: 'center', fontSize: 13 },
+  link: { color: '#1a56db', fontWeight: 600, textDecoration: 'none' },
+  backLink: { display: 'block', marginTop: 20, textAlign: 'center', fontSize: 13, color: '#1a56db', fontWeight: 600, textDecoration: 'none' },
+};

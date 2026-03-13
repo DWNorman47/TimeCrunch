@@ -50,6 +50,7 @@ export default function Login() {
           <button style={styles.button} type="submit" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
+          <Link to="/forgot-password" style={styles.forgotLink}>Forgot password?</Link>
         </form>
         <p style={styles.registerLink}>
           New to Time Crunch? <Link to="/register" style={styles.link}>Create an account</Link>
@@ -71,4 +72,5 @@ const styles = {
   button: { marginTop: 8, padding: '12px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 600 },
   registerLink: { marginTop: 20, textAlign: 'center', fontSize: 13, color: '#666' },
   link: { color: '#1a56db', fontWeight: 600, textDecoration: 'none' },
+  forgotLink: { display: 'block', textAlign: 'right', fontSize: 13, color: '#6b7280', textDecoration: 'none', marginTop: 4 },
 };

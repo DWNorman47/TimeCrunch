@@ -1,8 +1,12 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { Resend } = require('resend');
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 function signToken(user) {
   return jwt.sign(
@@ -44,7 +48,7 @@ router.get('/me', requireAuth, (req, res) => {
 
 // Register — creates a new company and its first admin user
 router.post('/register', async (req, res) => {
-  const { company_name, full_name, username, password } = req.body;
+  const { company_name, full_name, username, password, email } = req.body;
   if (!company_name || !full_name || !username || !password) {
     return res.status(400).json({ error: 'company_name, full_name, username, and password are required' });
   }
@@ -60,15 +64,14 @@ router.post('/register', async (req, res) => {
       [company_name, slug]
     );
     const companyId = companyResult.rows[0].id;
-    // Seed default settings for this company
     const defaults = [['prevailing_wage_rate', 45], ['default_hourly_rate', 30], ['overtime_multiplier', 1.5]];
     for (const [key, value] of defaults) {
       await client.query('INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3)', [companyId, key, value]);
     }
     const hash = await bcrypt.hash(password, 10);
     const userResult = await client.query(
-      'INSERT INTO users (company_id, username, password_hash, full_name, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, username, full_name, role, company_id',
-      [companyId, username, hash, full_name, 'admin']
+      'INSERT INTO users (company_id, username, password_hash, full_name, role, email) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, username, full_name, role, company_id, email',
+      [companyId, username, hash, full_name, 'admin', email || null]
     );
     await client.query('COMMIT');
     const user = { ...userResult.rows[0], language: 'English', company_name: company_name };
@@ -81,6 +84,72 @@ router.post('/register', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   } finally {
     client.release();
+  }
+});
+
+// Forgot password — sends reset email
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required' });
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1 AND active = true', [email]);
+    // Always return success to avoid leaking whether the email exists
+    if (result.rowCount === 0) return res.json({ success: true });
+
+    const user = result.rows[0];
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await pool.query(
+      'UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3',
+      [token, expires, user.id]
+    );
+
+    const resetUrl = `${process.env.APP_URL}/reset-password?token=${token}`;
+
+    await resend.emails.send({
+      from: process.env.FROM_EMAIL || 'Time Crunch <noreply@timecrunch.app>',
+      to: email,
+      subject: 'Reset your Time Crunch password',
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+          <h2 style="color:#1a56db;margin-bottom:8px">Reset your password</h2>
+          <p style="color:#444;margin-bottom:24px">Hi ${user.full_name}, click the button below to reset your password. This link expires in 1 hour.</p>
+          <a href="${resetUrl}" style="display:inline-block;background:#1a56db;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700">Reset password</a>
+          <p style="color:#999;font-size:13px;margin-top:24px">If you didn't request this, you can ignore this email.</p>
+          <p style="color:#ccc;font-size:12px;margin-top:4px">${resetUrl}</p>
+        </div>
+      `,
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Reset password — validates token, sets new password
+router.post('/reset-password', async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'token and password required' });
+  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  try {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()',
+      [token]
+    );
+    if (result.rowCount === 0) return res.status(400).json({ error: 'Reset link is invalid or has expired' });
+
+    const hash = await bcrypt.hash(password, 10);
+    await pool.query(
+      'UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2',
+      [hash, result.rows[0].id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

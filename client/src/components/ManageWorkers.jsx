@@ -4,7 +4,7 @@ import api from '../api';
 const LANGUAGES = ['English', 'Spanish'];
 
 export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 30 }) {
-  const [form, setForm] = useState({ full_name: '', username: '', password: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+  const [form, setForm] = useState({ full_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
   const [error, setError] = useState('');
   const [archivedConflict, setArchivedConflict] = useState(null); // { id, name }
   const [saving, setSaving] = useState(false);
@@ -39,7 +39,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     try {
       const r = await api.post('/admin/workers', form);
       onWorkerAdded(r.data);
-      setForm({ full_name: '', username: '', password: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+      setForm({ full_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
       setShowForm(false);
     } catch (err) {
       const data = err.response?.data;
@@ -85,7 +85,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
   const startEdit = w => {
     setEditingId(w.id);
-    setEditForm({ full_name: w.full_name, role: w.role, language: w.language || 'English', hourly_rate: String(w.hourly_rate ?? 30) });
+    setEditForm({ full_name: w.full_name, role: w.role, language: w.language || 'English', hourly_rate: String(w.hourly_rate ?? 30), email: w.email || '' });
   };
 
   const cancelEdit = () => { setEditingId(null); setEditForm({}); };
@@ -117,6 +117,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
           <input style={styles.input} placeholder="Full name" value={form.full_name} onChange={e => set('full_name', e.target.value)} required />
           <input style={styles.input} placeholder="Username" value={form.username} onChange={e => set('username', e.target.value)} required />
           <input style={styles.input} type="password" placeholder="Temporary password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
+          <input style={styles.input} type="email" placeholder="Email (optional, for password reset)" value={form.email} onChange={e => set('email', e.target.value)} />
           <select style={styles.input} value={form.role} onChange={e => set('role', e.target.value)}>
             <option value="worker">User</option>
             <option value="admin">Admin</option>
@@ -180,6 +181,12 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   </button>
                   <button style={styles.cancelBtn} onClick={cancelEdit}>Cancel</button>
                 </td>
+              </tr>
+              <tr key={`${w.id}-email`} style={{ ...styles.tr, background: '#f0f4ff' }}>
+                <td style={styles.td} colSpan={5}>
+                  <input style={{ ...styles.editInput, maxWidth: 280 }} type="email" placeholder="Email (optional)" value={editForm.email} onChange={e => setEdit('email', e.target.value)} />
+                </td>
+                <td style={styles.tdAction} />
               </tr>
             ) : (
               <tr key={w.id} style={styles.tr}>
