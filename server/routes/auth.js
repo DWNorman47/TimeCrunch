@@ -2,11 +2,14 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+});
 
 function signToken(user) {
   return jwt.sign(
@@ -107,8 +110,8 @@ router.post('/forgot-password', async (req, res) => {
 
     const resetUrl = `${process.env.APP_URL}/reset-password?token=${token}`;
 
-    await resend.emails.send({
-      from: process.env.FROM_EMAIL || 'Time Crunch <noreply@timecrunch.app>',
+    await transporter.sendMail({
+      from: `"Time Crunch" <${process.env.GMAIL_USER}>`,
       to: email,
       subject: 'Reset your Time Crunch password',
       html: `
