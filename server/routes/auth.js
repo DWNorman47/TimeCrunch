@@ -2,14 +2,11 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-});
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 function signToken(user) {
   return jwt.sign(
@@ -110,8 +107,8 @@ router.post('/forgot-password', async (req, res) => {
 
     const resetUrl = `${process.env.APP_URL}/reset-password?token=${token}`;
 
-    await transporter.sendMail({
-      from: `"Time Crunch" <${process.env.GMAIL_USER}>`,
+    await sgMail.send({
+      from: { name: 'Time Crunch', email: process.env.SENDGRID_FROM_EMAIL },
       to: email,
       subject: 'Reset your Time Crunch password',
       html: `
