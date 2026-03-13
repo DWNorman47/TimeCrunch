@@ -156,38 +156,40 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
           </thead>
           <tbody>
             {workers.map(w => editingId === w.id ? (
-              <tr key={w.id} style={{ ...styles.tr, background: '#f0f4ff' }}>
-                <td style={styles.td}>
-                  <input style={styles.editInput} value={editForm.full_name} onChange={e => setEdit('full_name', e.target.value)} />
-                </td>
-                <td style={styles.td}>@{w.username}</td>
-                <td style={styles.td}>
-                  <select style={styles.editInput} value={editForm.role} onChange={e => setEdit('role', e.target.value)}>
-                    <option value="worker">User</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </td>
-                <td style={styles.td}>
-                  <select style={styles.editInput} value={editForm.language} onChange={e => setEdit('language', e.target.value)}>
-                    {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </td>
-                <td style={styles.td}>
-                  <input style={{ ...styles.editInput, width: 70 }} type="number" min="0" step="0.01" value={editForm.hourly_rate} onChange={e => setEdit('hourly_rate', e.target.value)} />
-                </td>
-                <td style={styles.tdAction}>
-                  <button style={styles.saveEditBtn} onClick={() => handleSaveEdit(w.id)} disabled={editSaving}>
-                    {editSaving ? '...' : 'Save'}
-                  </button>
-                  <button style={styles.cancelBtn} onClick={cancelEdit}>Cancel</button>
-                </td>
-              </tr>
-              <tr key={w.id + '-email'} style={{ ...styles.tr, background: '#f0f4ff' }}>
-                <td style={styles.td} colSpan={5}>
-                  <input style={{ ...styles.editInput, maxWidth: 280 }} type="email" placeholder="Email (optional)" value={editForm.email} onChange={e => setEdit('email', e.target.value)} />
-                </td>
-                <td style={styles.tdAction} />
-              </tr>
+              <React.Fragment key={w.id}>
+                <tr style={{ ...styles.tr, background: '#f0f4ff' }}>
+                  <td style={styles.td}>
+                    <input style={styles.editInput} value={editForm.full_name} onChange={e => setEdit('full_name', e.target.value)} />
+                  </td>
+                  <td style={styles.td}>@{w.username}</td>
+                  <td style={styles.td}>
+                    <select style={styles.editInput} value={editForm.role} onChange={e => setEdit('role', e.target.value)}>
+                      <option value="worker">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </td>
+                  <td style={styles.td}>
+                    <select style={styles.editInput} value={editForm.language} onChange={e => setEdit('language', e.target.value)}>
+                      {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </td>
+                  <td style={styles.td}>
+                    <input style={{ ...styles.editInput, width: 70 }} type="number" min="0" step="0.01" value={editForm.hourly_rate} onChange={e => setEdit('hourly_rate', e.target.value)} />
+                  </td>
+                  <td style={styles.tdAction}>
+                    <button style={styles.saveEditBtn} onClick={() => handleSaveEdit(w.id)} disabled={editSaving}>
+                      {editSaving ? '...' : 'Save'}
+                    </button>
+                    <button style={styles.cancelBtn} onClick={cancelEdit}>Cancel</button>
+                  </td>
+                </tr>
+                <tr style={{ ...styles.tr, background: '#f0f4ff' }}>
+                  <td style={styles.td} colSpan={5}>
+                    <input style={{ ...styles.editInput, maxWidth: 280 }} type="email" placeholder="Email (optional)" value={editForm.email} onChange={e => setEdit('email', e.target.value)} />
+                  </td>
+                  <td style={styles.tdAction} />
+                </tr>
+              </React.Fragment>
             ) : (
               <tr key={w.id} style={styles.tr}>
                 <td style={styles.td}>{w.full_name}</td>
