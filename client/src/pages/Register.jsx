@@ -6,18 +6,34 @@ import api from '../api';
 export default function Register() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ company_name: '', full_name: '', email: '', username: '', password: '' });
+  const [form, setForm] = useState({ company_name: '', first_name: '', middle_name: '', last_name: '', email: '', username: '', password: '' });
+  const [usernameEdited, setUsernameEdited] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const handleNameChange = (k, v) => {
+    const updated = { ...form, [k]: v };
+    setForm(f => {
+      const next = { ...f, [k]: v };
+      if (!usernameEdited) {
+        const first = k === 'first_name' ? v : f.first_name;
+        const last = k === 'last_name' ? v : f.last_name;
+        const suggested = (first.charAt(0) + last).toLowerCase().replace(/[^a-z0-9]/g, '');
+        next.username = suggested;
+      }
+      return next;
+    });
+  };
+
   const handleSubmit = async e => {
     e.preventDefault();
     setError('');
     setSaving(true);
+    const full_name = [form.first_name, form.middle_name, form.last_name].filter(Boolean).join(' ');
     try {
-      const r = await api.post('/auth/register', form);
+      const r = await api.post('/auth/register', { ...form, full_name });
       login(r.data.token, r.data.user);
       navigate('/admin');
     } catch (err) {
@@ -41,12 +57,27 @@ export default function Register() {
             onChange={e => set('company_name', e.target.value)}
             required
           />
-          <label style={styles.label}>Your name</label>
+          <label style={styles.label}>First name</label>
           <input
             style={styles.input}
-            placeholder="Jane Smith"
-            value={form.full_name}
-            onChange={e => set('full_name', e.target.value)}
+            placeholder="Jane"
+            value={form.first_name}
+            onChange={e => handleNameChange('first_name', e.target.value)}
+            required
+          />
+          <label style={styles.label}>Middle name <span style={styles.hint}>(optional)</span></label>
+          <input
+            style={styles.input}
+            placeholder="Lee"
+            value={form.middle_name}
+            onChange={e => set('middle_name', e.target.value)}
+          />
+          <label style={styles.label}>Last name</label>
+          <input
+            style={styles.input}
+            placeholder="Smith"
+            value={form.last_name}
+            onChange={e => handleNameChange('last_name', e.target.value)}
             required
           />
           <label style={styles.label}>Email <span style={styles.hint}>(for password reset)</span></label>
@@ -62,7 +93,7 @@ export default function Register() {
             style={styles.input}
             placeholder="jsmith"
             value={form.username}
-            onChange={e => set('username', e.target.value)}
+            onChange={e => { setUsernameEdited(true); set('username', e.target.value); }}
             required
           />
           <label style={styles.label}>Password</label>
