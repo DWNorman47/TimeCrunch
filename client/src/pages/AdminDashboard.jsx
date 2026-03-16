@@ -6,6 +6,7 @@ import ManageProjects from '../components/ManageProjects';
 import ManageRates from '../components/ManageRates';
 import ProjectReports from '../components/ProjectReports';
 import ChangePassword from '../components/ChangePassword';
+import QuickBooks from '../components/QuickBooks';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -16,7 +17,7 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const TABS = ['metrics', 'projects', 'manage'];
+  const TABS = ['metrics', 'projects', 'manage', 'quickbooks'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'metrics');
 
@@ -60,6 +61,7 @@ export default function AdminDashboard() {
           <button style={tab === 'metrics' ? styles.tabActive : styles.tab} onClick={() => switchTab('metrics')}>Worker Reports</button>
           <button style={tab === 'projects' ? styles.tabActive : styles.tab} onClick={() => switchTab('projects')}>Project Reports</button>
           <button style={tab === 'manage' ? styles.tabActive : styles.tab} onClick={() => switchTab('manage')}>Manage</button>
+          <button style={tab === 'quickbooks' ? styles.tabActive : styles.tab} onClick={() => switchTab('quickbooks')}>QuickBooks</button>
         </div>
 
         {loading ? <p>Loading...</p> : tab === 'metrics' ? (
@@ -74,6 +76,11 @@ export default function AdminDashboard() {
           <>
             <h2 style={styles.heading}>Project Reports</h2>
             <ProjectReports />
+          </>
+        ) : tab === 'quickbooks' ? (
+          <>
+            <h2 style={styles.heading}>QuickBooks Integration</h2>
+            <QuickBooks workers={workers} projects={projects} />
           </>
         ) : (
           <>

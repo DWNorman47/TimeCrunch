@@ -10,6 +10,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/time-entries', require('./routes/timeEntries'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/qbo', require('./routes/qbo'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
