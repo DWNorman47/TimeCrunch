@@ -33,6 +33,8 @@ function ElapsedTimer({ clockInTime }) {
 export default function LiveWorkers() {
   const [workers, setWorkers] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedWorker, setSelectedWorker] = useState('');
   const intervalRef = useRef(null);
 
   const fetchActive = () => {
@@ -47,10 +49,33 @@ export default function LiveWorkers() {
     return () => clearInterval(intervalRef.current);
   }, []);
 
-  const mapped = workers.filter(w => w.clock_in_lat && w.clock_in_lng);
+  // Unique projects from currently clocked-in workers
+  const activeProjects = [...new Map(
+    workers.filter(w => w.project_name).map(w => [w.project_name, w.project_name])
+  ).values()].sort();
+
+  const handleWorkerSelect = e => {
+    const userId = e.target.value;
+    setSelectedWorker(userId);
+    if (userId) {
+      const w = workers.find(w => String(w.user_id) === userId);
+      setSelectedProject(w?.project_name || '');
+    }
+  };
+
+  const handleProjectSelect = e => {
+    setSelectedProject(e.target.value);
+    setSelectedWorker('');
+  };
+
+  const filtered = selectedProject
+    ? workers.filter(w => w.project_name === selectedProject)
+    : workers;
+
+  const mapped = filtered.filter(w => w.clock_in_lat && w.clock_in_lng);
   const center = mapped.length > 0
     ? [mapped[0].clock_in_lat, mapped[0].clock_in_lng]
-    : [39.5, -98.35]; // US center fallback
+    : [39.5, -98.35];
 
   return (
     <div style={styles.wrap}>
@@ -66,12 +91,33 @@ export default function LiveWorkers() {
         </div>
       </div>
 
+      {workers.length > 0 && (
+        <div style={styles.filters}>
+          <select style={styles.filterSelect} value={selectedProject} onChange={handleProjectSelect}>
+            <option value="">All Projects ({workers.length})</option>
+            {activeProjects.map(p => (
+              <option key={p} value={p}>
+                {p} ({workers.filter(w => w.project_name === p).length})
+              </option>
+            ))}
+          </select>
+          <select style={styles.filterSelect} value={selectedWorker} onChange={handleWorkerSelect}>
+            <option value="">Find worker...</option>
+            {workers.map(w => (
+              <option key={w.user_id} value={w.user_id}>{w.full_name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {workers.length === 0 ? (
         <div style={styles.empty}>No workers currently clocked in.</div>
+      ) : filtered.length === 0 ? (
+        <div style={styles.empty}>No workers on this project right now.</div>
       ) : (
         <>
           <div style={styles.workerList}>
-            {workers.map(w => (
+            {filtered.map(w => (
               <div key={w.user_id} style={styles.workerCard}>
                 <div style={styles.workerTop}>
                   <div>
@@ -127,6 +173,8 @@ const styles = {
   liveText: { fontWeight: 700, color: '#16a34a', fontSize: 14 },
   updated: { fontSize: 12, color: '#9ca3af' },
   refreshBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: '#6b7280', cursor: 'pointer' },
+  filters: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  filterSelect: { padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#374151', background: '#fff', cursor: 'pointer', minWidth: 200 },
   empty: { background: '#fff', borderRadius: 12, padding: 32, textAlign: 'center', color: '#888', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
   workerList: { display: 'flex', flexDirection: 'column', gap: 12 },
   workerCard: { background: '#fff', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', borderLeft: '4px solid #1a56db' },
