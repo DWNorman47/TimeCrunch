@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ company_name: '', username: '', password: '' });
+  const [form, setForm] = useState({ company_name: localStorage.getItem('tc_company') || '', username: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -15,6 +15,7 @@ export default function Login() {
     setLoading(true);
     try {
       const user = await login(form.username, form.password, form.company_name);
+      localStorage.setItem('tc_company', form.company_name);
       navigate(user.role === 'admin' ? '/admin' : '/dashboard');
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed');
