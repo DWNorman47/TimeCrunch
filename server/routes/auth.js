@@ -18,16 +18,16 @@ function signToken(user) {
 
 // Login
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password required' });
+  const { username, password, company_name } = req.body;
+  if (!username || !password || !company_name) {
+    return res.status(400).json({ error: 'Company name, username, and password required' });
   }
   try {
     const result = await pool.query(
       `SELECT u.*, c.name as company_name FROM users u
-       LEFT JOIN companies c ON c.id = u.company_id
-       WHERE u.username = $1 AND u.active = true`,
-      [username]
+       JOIN companies c ON c.id = u.company_id
+       WHERE u.username = $1 AND u.active = true AND LOWER(c.name) = LOWER($2)`,
+      [username, company_name]
     );
     const user = result.rows[0];
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {

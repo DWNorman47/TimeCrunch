@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ username: '', password: '' });
+  const [form, setForm] = useState({ company_name: '', username: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -14,7 +14,7 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const user = await login(form.username, form.password);
+      const user = await login(form.username, form.password, form.company_name);
       navigate(user.role === 'admin' ? '/admin' : '/dashboard');
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed');
@@ -29,13 +29,21 @@ export default function Login() {
         <h1 style={styles.title}>Time Crunch</h1>
         <p style={styles.subtitle}>Track your time, simply.</p>
         <form onSubmit={handleSubmit} style={styles.form}>
+          <label style={styles.label}>Company name</label>
+          <input
+            style={styles.input}
+            type="text"
+            value={form.company_name}
+            onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))}
+            autoFocus
+            required
+          />
           <label style={styles.label}>Username</label>
           <input
             style={styles.input}
             type="text"
             value={form.username}
             onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-            autoFocus
             required
           />
           <label style={styles.label}>Password</label>
