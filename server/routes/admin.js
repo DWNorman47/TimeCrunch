@@ -173,7 +173,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
 
 // Create a worker or admin
 router.post('/workers', requireAdmin, async (req, res) => {
-  const { username, password, full_name, role } = req.body;
+  const { username, password, full_name, first_name, middle_name, last_name, role } = req.body;
   if (!username || !password || !full_name) {
     return res.status(400).json({ error: 'username, password, and full_name required' });
   }
@@ -185,8 +185,8 @@ router.post('/workers', requireAdmin, async (req, res) => {
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      'INSERT INTO users (company_id, username, password_hash, full_name, role, language, hourly_rate, email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, username, full_name, role, language, hourly_rate, email',
-      [companyId, username, hash, full_name, assignedRole, assignedLanguage, assignedRate, assignedEmail]
+      'INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, language, hourly_rate, email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id, username, full_name, first_name, middle_name, last_name, role, language, hourly_rate, email',
+      [companyId, username, hash, full_name, first_name || null, middle_name || null, last_name || null, assignedRole, assignedLanguage, assignedRate, assignedEmail]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -203,10 +203,10 @@ router.post('/workers', requireAdmin, async (req, res) => {
   }
 });
 
-// Update a worker (full_name, role, language, hourly_rate, email)
+// Update a worker (full_name, first_name, middle_name, last_name, role, language, hourly_rate, email)
 router.patch('/workers/:id', requireAdmin, async (req, res) => {
-  const { full_name, role, language, hourly_rate, email } = req.body;
-  if (!full_name && !role && !language && hourly_rate === undefined && email === undefined) {
+  const { full_name, first_name, middle_name, last_name, role, language, hourly_rate, email } = req.body;
+  if (!full_name && !first_name && !last_name && !role && !language && hourly_rate === undefined && email === undefined) {
     return res.status(400).json({ error: 'At least one field required' });
   }
   const companyId = req.user.company_id;
@@ -216,6 +216,9 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
     const values = [];
     let idx = 1;
     if (full_name) { fields.push(`full_name = $${idx++}`); values.push(full_name); }
+    if (first_name !== undefined) { fields.push(`first_name = $${idx++}`); values.push(first_name || null); }
+    if (middle_name !== undefined) { fields.push(`middle_name = $${idx++}`); values.push(middle_name || null); }
+    if (last_name !== undefined) { fields.push(`last_name = $${idx++}`); values.push(last_name || null); }
     if (assignedRole !== undefined) { fields.push(`role = $${idx++}`); values.push(assignedRole); }
     if (language) { fields.push(`language = $${idx++}`); values.push(language); }
     if (hourly_rate !== undefined) { fields.push(`hourly_rate = $${idx++}`); values.push(parseFloat(hourly_rate) || 30); }

@@ -48,7 +48,7 @@ router.get('/me', requireAuth, (req, res) => {
 
 // Register — creates a new company and its first admin user
 router.post('/register', async (req, res) => {
-  const { company_name, full_name, username, password, email } = req.body;
+  const { company_name, full_name, first_name, middle_name, last_name, username, password, email } = req.body;
   if (!company_name || !full_name || !username || !password) {
     return res.status(400).json({ error: 'company_name, full_name, username, and password are required' });
   }
@@ -70,8 +70,8 @@ router.post('/register', async (req, res) => {
     }
     const hash = await bcrypt.hash(password, 10);
     const userResult = await client.query(
-      'INSERT INTO users (company_id, username, password_hash, full_name, role, email) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, username, full_name, role, company_id, email',
-      [companyId, username, hash, full_name, 'admin', email || null]
+      'INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, username, full_name, first_name, middle_name, last_name, role, company_id, email',
+      [companyId, username, hash, full_name, first_name || null, middle_name || null, last_name || null, 'admin', email || null]
     );
     await client.query('COMMIT');
     const user = { ...userResult.rows[0], language: 'English', company_name: company_name };
