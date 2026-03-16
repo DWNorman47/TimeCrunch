@@ -14,6 +14,12 @@ button {
   font-family: inherit;
 }
 
+/* ── Animations ── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* ── Mobile responsive ── */
 @media (max-width: 600px) {
   /* Header */

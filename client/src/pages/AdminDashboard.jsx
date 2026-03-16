@@ -7,6 +7,7 @@ import ManageRates from '../components/ManageRates';
 import ProjectReports from '../components/ProjectReports';
 import ChangePassword from '../components/ChangePassword';
 import QuickBooks from '../components/QuickBooks';
+import LiveWorkers from '../components/LiveWorkers';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -17,9 +18,9 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const TABS = ['metrics', 'projects', 'manage', 'quickbooks'];
+  const TABS = ['live', 'metrics', 'projects', 'manage', 'quickbooks'];
   const hashTab = window.location.hash.replace('#', '');
-  const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'metrics');
+  const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'live');
 
   const switchTab = t => {
     setTab(t);
@@ -58,13 +59,16 @@ export default function AdminDashboard() {
 
       <main style={styles.main}>
         <div style={styles.tabs} className="tab-bar">
+          <button style={tab === 'live' ? styles.tabActive : styles.tab} onClick={() => switchTab('live')}>🟢 Live</button>
           <button style={tab === 'metrics' ? styles.tabActive : styles.tab} onClick={() => switchTab('metrics')}>Worker Reports</button>
           <button style={tab === 'projects' ? styles.tabActive : styles.tab} onClick={() => switchTab('projects')}>Project Reports</button>
           <button style={tab === 'manage' ? styles.tabActive : styles.tab} onClick={() => switchTab('manage')}>Manage</button>
           <button style={tab === 'quickbooks' ? styles.tabActive : styles.tab} onClick={() => switchTab('quickbooks')}>QuickBooks</button>
         </div>
 
-        {loading ? <p>Loading...</p> : tab === 'metrics' ? (
+        {loading ? <p>Loading...</p> : tab === 'live' ? (
+          <LiveWorkers />
+        ) : tab === 'metrics' ? (
           <>
             <h2 style={styles.heading}>Worker Reports</h2>
             {workers.length === 0

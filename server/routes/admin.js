@@ -44,6 +44,27 @@ router.patch('/settings', requireAdmin, async (req, res) => {
   }
 });
 
+// GET /admin/active-clocks — currently clocked-in workers with location
+router.get('/active-clocks', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT ac.user_id, ac.clock_in_time, ac.clock_in_lat, ac.clock_in_lng,
+              ac.notes, u.full_name, p.name as project_name, p.wage_type
+       FROM active_clock ac
+       JOIN users u ON ac.user_id = u.id
+       LEFT JOIN projects p ON ac.project_id = p.id
+       WHERE ac.company_id = $1
+       ORDER BY ac.clock_in_time ASC`,
+      [companyId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // List all active workers with summary metrics (overtime = regular hours > 8/day)
 router.get('/workers', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
