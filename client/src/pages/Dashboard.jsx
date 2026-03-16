@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import ClockInOut from '../components/ClockInOut';
 import TimeEntryForm from '../components/TimeEntryForm';
 import EntryList from '../components/EntryList';
 import ChangePassword from '../components/ChangePassword';
@@ -62,6 +63,7 @@ export default function Dashboard() {
       </header>
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
       <main style={styles.main} className="mobile-main">
+        <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} />
         <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} />
         {loading ? <p>{t.loadingEntries}</p> : (
           <EntryList entries={entries} onDeleted={handleEntryDeleted} t={t} language={user?.language} />
