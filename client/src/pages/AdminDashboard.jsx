@@ -18,7 +18,7 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const TABS = ['live', 'metrics', 'projects', 'manage', 'quickbooks'];
+  const TABS = ['live', 'metrics', 'projects', 'manage', 'integrations'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'live');
 
@@ -63,7 +63,7 @@ export default function AdminDashboard() {
           <button style={tab === 'metrics' ? styles.tabActive : styles.tab} onClick={() => switchTab('metrics')}>Worker Reports</button>
           <button style={tab === 'projects' ? styles.tabActive : styles.tab} onClick={() => switchTab('projects')}>Project Reports</button>
           <button style={tab === 'manage' ? styles.tabActive : styles.tab} onClick={() => switchTab('manage')}>Manage</button>
-          <button style={tab === 'quickbooks' ? styles.tabActive : styles.tab} onClick={() => switchTab('quickbooks')}>QuickBooks</button>
+          <button style={tab === 'integrations' ? styles.tabActive : styles.tab} onClick={() => switchTab('integrations')}>Integrations</button>
         </div>
 
         {loading ? <p>Loading...</p> : tab === 'live' ? (
@@ -81,9 +81,9 @@ export default function AdminDashboard() {
             <h2 style={styles.heading}>Project Reports</h2>
             <ProjectReports />
           </>
-        ) : tab === 'quickbooks' ? (
+        ) : tab === 'integrations' ? (
           <>
-            <h2 style={styles.heading}>QuickBooks Integration</h2>
+            <h2 style={styles.heading}>Integrations</h2>
             <QuickBooks workers={workers} projects={projects} />
           </>
         ) : (
