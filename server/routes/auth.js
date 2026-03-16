@@ -79,7 +79,7 @@ router.post('/register', async (req, res) => {
     res.status(201).json({ token, user });
   } catch (err) {
     await client.query('ROLLBACK');
-    if (err.code === '23505') return res.status(409).json({ error: 'Username already exists' });
+    if (err.code === '23505') return res.status(409).json({ error: 'Username already taken at this company' });
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   } finally {
