@@ -49,15 +49,15 @@ export default function AdminDashboard() {
           {user?.company_name && <span style={styles.companyName}>{user.company_name}</span>}
         </div>
         <div style={styles.headerRight}>
-          <button style={styles.headerBtn} onClick={() => setShowChangePassword(true)}>Change Password</button>
-          <button style={styles.headerBtn} onClick={logout}>Logout</button>
+          <button style={styles.headerBtn} className="header-btn" onClick={() => setShowChangePassword(true)}>Change Password</button>
+          <button style={styles.headerBtn} className="header-btn" onClick={logout}>Logout</button>
         </div>
       </header>
 
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={getT('English')} />}
 
       <main style={styles.main}>
-        <div style={styles.tabs}>
+        <div style={styles.tabs} className="tab-bar">
           <button style={tab === 'metrics' ? styles.tabActive : styles.tab} onClick={() => switchTab('metrics')}>Worker Reports</button>
           <button style={tab === 'projects' ? styles.tabActive : styles.tab} onClick={() => switchTab('projects')}>Project Reports</button>
           <button style={tab === 'manage' ? styles.tabActive : styles.tab} onClick={() => switchTab('manage')}>Manage</button>

@@ -46,8 +46,8 @@ export default function Dashboard() {
           <span style={styles.logo}>Time Crunch</span>
           {user?.company_name && <span style={styles.companyName}>{user.company_name}</span>}
         </div>
-        <div style={styles.headerRight}>
-          <span style={styles.userName}>{user.full_name}</span>
+        <div style={styles.headerRight} className="header-right">
+          <span style={styles.userName} className="header-username">{user.full_name}</span>
           <select
             style={styles.langSelect}
             value={user?.language || 'English'}
@@ -56,12 +56,12 @@ export default function Dashboard() {
             <option value="English">EN</option>
             <option value="Spanish">ES</option>
           </select>
-          <button style={styles.logoutBtn} onClick={() => setShowChangePassword(true)}>{t.changePassword}</button>
-          <button style={styles.logoutBtn} onClick={logout}>{t.logout}</button>
+          <button style={styles.logoutBtn} className="header-btn" onClick={() => setShowChangePassword(true)}>{t.changePassword}</button>
+          <button style={styles.logoutBtn} className="header-btn" onClick={logout}>{t.logout}</button>
         </div>
       </header>
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
-      <main style={styles.main}>
+      <main style={styles.main} className="mobile-main">
         <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} />
         {loading ? <p>{t.loadingEntries}</p> : (
           <EntryList entries={entries} onDeleted={handleEntryDeleted} t={t} language={user?.language} />

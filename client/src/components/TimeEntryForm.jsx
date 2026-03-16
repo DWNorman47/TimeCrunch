@@ -40,10 +40,10 @@ export default function TimeEntryForm({ projects, onEntryAdded, t }) {
   };
 
   return (
-    <div style={styles.card}>
+    <div style={styles.card} className="mobile-card">
       <h2 style={styles.heading}>{t.logTime}</h2>
       <form onSubmit={handleSubmit} style={styles.form}>
-        <div style={styles.row}>
+        <div style={styles.row} className="form-row">
           <div style={styles.field}>
             <label style={styles.label}>{t.project}</label>
             <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)} required>
@@ -60,7 +60,7 @@ export default function TimeEntryForm({ projects, onEntryAdded, t }) {
             <input style={styles.input} type="date" value={form.work_date} onChange={e => set('work_date', e.target.value)} required />
           </div>
         </div>
-        <div style={styles.row}>
+        <div style={styles.row} className="form-row">
           <div style={styles.field}>
             <label style={styles.label}>{t.startTime}</label>
             <input style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required />

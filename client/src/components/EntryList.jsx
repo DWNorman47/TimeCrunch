@@ -36,19 +36,19 @@ export default function EntryList({ entries, onDeleted, t, language }) {
   }
 
   return (
-    <div style={styles.card}>
+    <div style={styles.card} className="mobile-card">
       <h2 style={styles.heading}>{t.yourEntries}</h2>
       <div style={styles.list}>
         {entries.map(e => (
           <div key={e.id} style={styles.entry}>
-            <div style={styles.entryMain}>
+            <div style={styles.entryMain} className="entry-main">
               <span style={styles.project}>{e.project_name}</span>
               <div style={styles.entryRight}>
                 <span style={styles.date}>{formatDate(e.work_date, language)}</span>
                 <button style={styles.deleteBtn} onClick={() => handleDelete(e.id)}>{t.delete}</button>
               </div>
             </div>
-            <div style={styles.entryDetail}>
+            <div style={styles.entryDetail} className="entry-detail">
               <span>{formatTime(e.start_time)} – {formatTime(e.end_time)} ({formatHours(e.start_time, e.end_time)})</span>
               <span style={{ ...styles.badge, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                 {e.wage_type === 'prevailing' ? t.prevailing : t.regular}

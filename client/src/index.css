@@ -13,3 +13,51 @@ button {
   cursor: pointer;
   font-family: inherit;
 }
+
+/* ── Mobile responsive ── */
+@media (max-width: 600px) {
+  /* Header */
+  .header-right {
+    gap: 6px !important;
+  }
+  .header-username {
+    display: none !important;
+  }
+  .header-btn {
+    padding: 5px 10px !important;
+    font-size: 12px !important;
+  }
+
+  /* Tab bar — scrollable on small screens */
+  .tab-bar {
+    overflow-x: auto !important;
+    width: 100% !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tab-bar::-webkit-scrollbar { display: none; }
+
+  /* Form rows stack vertically */
+  .form-row {
+    flex-direction: column !important;
+  }
+
+  /* Entry list items wrap */
+  .entry-main {
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+  }
+  .entry-detail {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  /* General padding reductions */
+  .mobile-card {
+    padding: 16px !important;
+  }
+  .mobile-main {
+    margin-top: 16px !important;
+    padding: 0 10px !important;
+  }
+}
