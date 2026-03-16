@@ -2,20 +2,37 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
+function getSavedCompanies() {
+  try { return JSON.parse(localStorage.getItem('tc_companies') || '[]'); } catch { return []; }
+}
+
+function saveCompany(name) {
+  const list = getSavedCompanies().filter(c => c.toLowerCase() !== name.toLowerCase());
+  localStorage.setItem('tc_companies', JSON.stringify([name, ...list]));
+}
+
+const OTHER = '__other__';
+
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ company_name: localStorage.getItem('tc_company') || '', username: '', password: '' });
+  const savedCompanies = getSavedCompanies();
+  const [selected, setSelected] = useState(savedCompanies[0] || OTHER);
+  const [otherText, setOtherText] = useState('');
+  const [form, setForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const companyName = selected === OTHER ? otherText : selected;
+
   const handleSubmit = async e => {
     e.preventDefault();
+    if (!companyName.trim()) return;
     setError('');
     setLoading(true);
     try {
-      const user = await login(form.username, form.password, form.company_name);
-      localStorage.setItem('tc_company', form.company_name);
+      const user = await login(form.username, form.password, companyName.trim());
+      saveCompany(companyName.trim());
       navigate(user.role === 'admin' ? '/admin' : '/dashboard');
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed');
@@ -31,14 +48,38 @@ export default function Login() {
         <p style={styles.subtitle}>Track your time, simply.</p>
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>Company name</label>
-          <input
-            style={styles.input}
-            type="text"
-            value={form.company_name}
-            onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))}
-            autoFocus
-            required
-          />
+          {savedCompanies.length > 0 ? (
+            <>
+              <select
+                style={styles.input}
+                value={selected}
+                onChange={e => setSelected(e.target.value)}
+              >
+                {savedCompanies.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value={OTHER}>— Other company —</option>
+              </select>
+              {selected === OTHER && (
+                <input
+                  style={styles.input}
+                  type="text"
+                  placeholder="Enter company name"
+                  value={otherText}
+                  onChange={e => setOtherText(e.target.value)}
+                  autoFocus
+                  required
+                />
+              )}
+            </>
+          ) : (
+            <input
+              style={styles.input}
+              type="text"
+              value={otherText}
+              onChange={e => setOtherText(e.target.value)}
+              autoFocus
+              required
+            />
+          )}
           <label style={styles.label}>Username</label>
           <input
             style={styles.input}
