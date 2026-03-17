@@ -1,0 +1,37 @@
+const router = require('express').Router();
+const pool = require('../db');
+const { requireAuth } = require('../middleware/auth');
+
+// GET /push/vapid-public-key
+router.get('/vapid-public-key', (req, res) => {
+  const key = process.env.VAPID_PUBLIC_KEY;
+  if (!key) return res.status(503).json({ error: 'Push notifications not configured' });
+  res.json({ publicKey: key });
+});
+
+// POST /push/subscribe
+router.post('/subscribe', requireAuth, async (req, res) => {
+  const { endpoint, p256dh, auth } = req.body;
+  if (!endpoint || !p256dh || !auth) return res.status(400).json({ error: 'endpoint, p256dh, auth required' });
+  try {
+    await pool.query(
+      `INSERT INTO push_subscriptions (user_id, company_id, endpoint, p256dh, auth)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (user_id, endpoint) DO UPDATE SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth`,
+      [req.user.id, req.user.company_id, endpoint, p256dh, auth]
+    );
+    res.json({ ok: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /push/subscribe
+router.delete('/subscribe', requireAuth, async (req, res) => {
+  const { endpoint } = req.body;
+  if (!endpoint) return res.status(400).json({ error: 'endpoint required' });
+  try {
+    await pool.query('DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2', [req.user.id, endpoint]);
+    res.json({ ok: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+module.exports = router;

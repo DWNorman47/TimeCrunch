@@ -7,6 +7,8 @@ import TimesheetView from '../components/TimesheetView';
 import UpcomingShifts from '../components/UpcomingShifts';
 import WorkerSummary from '../components/WorkerSummary';
 import ChangePassword from '../components/ChangePassword';
+import PayStubView from '../components/PayStubView';
+import NotificationSetup from '../components/NotificationSetup';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -80,6 +82,8 @@ export default function Dashboard() {
             <button style={entryView === 'list' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('list')}>☰ List</button>
           </div>
         )}
+        <NotificationSetup />
+        {!loading && <PayStubView />}
         {loading ? <p>{t.loadingEntries}</p> : entryView === 'timesheet' ? (
           <TimesheetView entries={entries} language={user?.language} />
         ) : (

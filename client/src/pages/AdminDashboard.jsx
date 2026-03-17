@@ -13,6 +13,7 @@ import ApprovalQueue from '../components/ApprovalQueue';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import ManagePayPeriods from '../components/ManagePayPeriods';
 import ManageSchedule from '../components/ManageSchedule';
+import ExportPanel from '../components/ExportPanel';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -23,7 +24,7 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const TABS = ['live', 'analytics', 'approvals', 'metrics', 'projects', 'manage', 'integrations'];
+  const TABS = ['live', 'analytics', 'approvals', 'metrics', 'projects', 'export', 'manage', 'integrations'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'live');
 
@@ -69,6 +70,7 @@ export default function AdminDashboard() {
           <button style={tab === 'approvals' ? styles.tabActive : styles.tab} onClick={() => switchTab('approvals')}>Approvals</button>
           <button style={tab === 'metrics' ? styles.tabActive : styles.tab} onClick={() => switchTab('metrics')}>Worker Reports</button>
           <button style={tab === 'projects' ? styles.tabActive : styles.tab} onClick={() => switchTab('projects')}>Project Reports</button>
+          <button style={tab === 'export' ? styles.tabActive : styles.tab} onClick={() => switchTab('export')}>Export</button>
           <button style={tab === 'manage' ? styles.tabActive : styles.tab} onClick={() => switchTab('manage')}>Manage</button>
           <button style={tab === 'integrations' ? styles.tabActive : styles.tab} onClick={() => switchTab('integrations')}>Integrations</button>
         </div>
@@ -97,6 +99,11 @@ export default function AdminDashboard() {
           <>
             <h2 style={styles.heading}>Project Reports</h2>
             <ProjectReports />
+          </>
+        ) : tab === 'export' ? (
+          <>
+            <h2 style={styles.heading}>Export</h2>
+            <ExportPanel workers={workers} projects={projects} />
           </>
         ) : tab === 'integrations' ? (
           <>

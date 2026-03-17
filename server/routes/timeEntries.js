@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { sendPushToUser } = require('../push');
 
 // Get current user's entries
 router.get('/', requireAuth, async (req, res) => {
@@ -114,7 +115,17 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [req.params.id, req.user.company_id, req.user.id, body.trim()]
     );
-    res.status(201).json({ ...result.rows[0], sender_name: req.user.full_name });
+    const msg = { ...result.rows[0], sender_name: req.user.full_name };
+    // Notify entry owner if someone else messaged them
+    const entryOwner = await pool.query('SELECT user_id FROM time_entries WHERE id = $1', [req.params.id]);
+    if (entryOwner.rowCount > 0 && entryOwner.rows[0].user_id !== req.user.id) {
+      sendPushToUser(entryOwner.rows[0].user_id, {
+        title: `Message from ${req.user.full_name}`,
+        body: body.trim().substring(0, 100),
+        url: '/dashboard',
+      });
+    }
+    res.status(201).json(msg);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -152,6 +163,54 @@ router.delete('/:id', requireAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// GET /time-entries/pay-stubs — worker's pay periods with aggregated hours
+router.get('/pay-stubs', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const companyId = req.user.company_id;
+  try {
+    const periods = await pool.query(
+      'SELECT * FROM pay_periods WHERE company_id = $1 ORDER BY period_start DESC',
+      [companyId]
+    );
+
+    const result = [];
+    for (const period of periods.rows) {
+      const entries = await pool.query(
+        `SELECT te.*, p.name as project_name,
+                to_char(te.work_date, 'YYYY-MM-DD') as work_date_str
+         FROM time_entries te LEFT JOIN projects p ON te.project_id = p.id
+         WHERE te.user_id = $1 AND te.work_date >= $2 AND te.work_date <= $3
+         ORDER BY te.work_date, te.start_time`,
+        [userId, period.period_start, period.period_end]
+      );
+      if (entries.rowCount === 0) continue;
+
+      let regularHours = 0, overtimeHours = 0, prevailingHours = 0, totalMileage = 0;
+      for (const e of entries.rows) {
+        const gross = (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60;
+        if (e.wage_type === 'prevailing') prevailingHours += gross;
+        else regularHours += gross;
+        if (e.mileage) totalMileage += parseFloat(e.mileage);
+      }
+
+      result.push({
+        id: period.id,
+        period_start: period.period_start,
+        period_end: period.period_end,
+        label: period.label,
+        entries: entries.rows,
+        summary: {
+          regular_hours: +regularHours.toFixed(2),
+          overtime_hours: +overtimeHours.toFixed(2),
+          prevailing_hours: +prevailingHours.toFixed(2),
+          total_mileage: +totalMileage.toFixed(1),
+        },
+      });
+    }
+    res.json(result);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

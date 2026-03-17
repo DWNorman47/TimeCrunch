@@ -17,6 +17,30 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
+self.addEventListener('push', event => {
+  const data = event.data?.json() ?? {};
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Time Crunch', {
+      body: data.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { url: data.url || '/' },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then(list => {
+      for (const c of list) {
+        if (c.url && 'focus' in c) return c.focus();
+      }
+      return clients.openWindow(event.notification.data?.url || '/');
+    })
+  );
+});
+
 self.addEventListener('fetch', event => {
   // Only cache GET requests; pass API calls through
   if (event.request.method !== 'GET') return;

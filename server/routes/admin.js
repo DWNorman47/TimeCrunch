@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const pool = require('../db');
 const { requireAdmin } = require('../middleware/auth');
+const { sendPushToUser } = require('../push');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -758,6 +759,11 @@ router.patch('/entries/:id/reject', requireAdmin, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.rejected', 'time_entry', parseInt(req.params.id), null, { note });
+    sendPushToUser(result.rows[0].user_id, {
+      title: 'Time entry rejected',
+      body: note ? `Reason: ${note}` : 'An admin rejected your time entry.',
+      url: '/dashboard',
+    });
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -807,6 +813,48 @@ router.delete('/pay-periods/:id', requireAdmin, async (req, res) => {
     if (result.rowCount === 0) return res.status(404).json({ error: 'Pay period not found' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'pay_period.unlocked', 'pay_period', parseInt(req.params.id), result.rows[0].label);
     res.json({ deleted: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// CSV Export
+router.get('/export', requireAdmin, async (req, res) => {
+  const { from, to, worker_id, project_id, status } = req.query;
+  if (!from || !to) return res.status(400).json({ error: 'from and to required' });
+  const companyId = req.user.company_id;
+  const conditions = ['te.company_id = $1', 'te.work_date >= $2', 'te.work_date <= $3'];
+  const values = [companyId, from, to];
+  let idx = 4;
+  if (worker_id) { conditions.push(`te.user_id = $${idx++}`); values.push(parseInt(worker_id)); }
+  if (project_id) { conditions.push(`te.project_id = $${idx++}`); values.push(parseInt(project_id)); }
+  if (status) { conditions.push(`te.status = $${idx++}`); values.push(status); }
+  try {
+    const result = await pool.query(
+      `SELECT te.*, u.full_name as worker_name, p.name as project_name,
+              to_char(te.work_date, 'YYYY-MM-DD') as work_date_str
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       LEFT JOIN projects p ON te.project_id = p.id
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY te.work_date, u.full_name, te.start_time`,
+      values
+    );
+    const esc = v => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`;
+    const fmtTime = t => { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`; };
+    const netHours = (s, e, brk) => { const ms = new Date(`1970-01-01T${s}`) - new Date(`1970-01-01T${e}`); return (Math.abs(ms) / 3600000 - (brk || 0) / 60).toFixed(2); };
+    const headers = ['Worker', 'Project', 'Date', 'Start', 'End', 'Break (min)', 'Net Hours', 'Wage Type', 'Mileage (mi)', 'Status', 'Notes'];
+    const lines = [
+      headers.join(','),
+      ...result.rows.map(r => [
+        esc(r.worker_name), esc(r.project_name), esc(r.work_date_str),
+        esc(fmtTime(r.start_time)), esc(fmtTime(r.end_time)),
+        r.break_minutes || 0, netHours(r.start_time, r.end_time, r.break_minutes),
+        esc(r.wage_type), r.mileage != null ? parseFloat(r.mileage).toFixed(1) : '',
+        esc(r.status || 'pending'), esc(r.notes),
+      ].join(',')),
+    ];
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="timecrunch-${from}-to-${to}.csv"`);
+    res.send(lines.join('\r\n'));
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

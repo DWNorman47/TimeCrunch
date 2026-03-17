@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { sendPushToUser } = require('../push');
 
 // GET /admin/shifts?from=&to= — all company shifts in range
 router.get('/admin', requireAdmin, async (req, res) => {
@@ -40,7 +41,13 @@ router.post('/admin', requireAdmin, async (req, res) => {
        FROM shifts s JOIN users u ON s.user_id = u.id LEFT JOIN projects p ON s.project_id = p.id
        WHERE s.id = $1`, [result.rows[0].id]
     );
-    res.status(201).json(full.rows[0]);
+    const shift = full.rows[0];
+    sendPushToUser(user_id, {
+      title: 'New shift assigned',
+      body: `${shift.shift_date} · ${shift.start_time.substring(0, 5)}–${shift.end_time.substring(0, 5)}${shift.project_name ? ' · ' + shift.project_name : ''}`,
+      url: '/dashboard',
+    });
+    res.status(201).json(shift);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
