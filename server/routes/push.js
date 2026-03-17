@@ -1,6 +1,22 @@
 const router = require('express').Router();
+const webpush = require('web-push');
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
+
+// GET /push/generate-vapid-keys
+// One-time setup helper — only works when VAPID keys are NOT yet configured.
+// Visit this URL in a browser, copy the two values into your environment variables, then remove or ignore this route.
+router.get('/generate-vapid-keys', (req, res) => {
+  if (process.env.VAPID_PUBLIC_KEY) {
+    return res.json({ message: 'VAPID keys already configured. Remove this endpoint once set up.' });
+  }
+  const keys = webpush.generateVAPIDKeys();
+  res.json({
+    instructions: 'Add these two values to your environment variables (Vercel → Settings → Environment Variables), then redeploy.',
+    VAPID_PUBLIC_KEY: keys.publicKey,
+    VAPID_PRIVATE_KEY: keys.privateKey,
+  });
+});
 
 // GET /push/vapid-public-key
 router.get('/vapid-public-key', (req, res) => {
