@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import ClockInOut from '../components/ClockInOut';
 import TimeEntryForm from '../components/TimeEntryForm';
 import EntryList from '../components/EntryList';
+import TimesheetView from '../components/TimesheetView';
 import WorkerSummary from '../components/WorkerSummary';
 import ChangePassword from '../components/ChangePassword';
 import { getT } from '../i18n';
@@ -16,6 +17,7 @@ export default function Dashboard() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [entryView, setEntryView] = useState('timesheet'); // 'list' | 'timesheet'
 
   const fetchData = async () => {
     setLoading(true);
@@ -70,7 +72,15 @@ export default function Dashboard() {
         <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} />
         {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 45} />}
         <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} />
-        {loading ? <p>{t.loadingEntries}</p> : (
+        {!loading && (
+          <div style={styles.viewToggle}>
+            <button style={entryView === 'timesheet' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('timesheet')}>📅 Timesheet</button>
+            <button style={entryView === 'list' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('list')}>☰ List</button>
+          </div>
+        )}
+        {loading ? <p>{t.loadingEntries}</p> : entryView === 'timesheet' ? (
+          <TimesheetView entries={entries} language={user?.language} />
+        ) : (
           <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} />
         )}
       </main>
@@ -89,4 +99,7 @@ const styles = {
   langSelect: { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', padding: '5px 8px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   logoutBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600 },
   main: { maxWidth: 700, margin: '32px auto', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 24 },
+  viewToggle: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 8, padding: 3, width: 'fit-content' },
+  toggleBtn: { padding: '6px 14px', background: 'none', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#666', cursor: 'pointer' },
+  toggleActive: { padding: '6px 14px', background: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
 };

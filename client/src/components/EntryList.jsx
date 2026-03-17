@@ -8,10 +8,10 @@ function isEditable(dateStr) {
   return Date.now() - d.getTime() <= SEVEN_DAYS_MS;
 }
 
-function formatHours(start, end) {
+function formatHours(start, end, breakMinutes) {
   const s = new Date(`1970-01-01T${start}`);
   const e = new Date(`1970-01-01T${end}`);
-  const h = (e - s) / 3600000;
+  const h = (e - s) / 3600000 - (breakMinutes || 0) / 60;
   return h.toFixed(2) + 'h';
 }
 
@@ -45,7 +45,13 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language }
 
   const startEdit = e => {
     setEditingId(e.id);
-    setEditForm({ start_time: e.start_time.substring(0, 5), end_time: e.end_time.substring(0, 5), notes: e.notes || '' });
+    setEditForm({
+      start_time: e.start_time.substring(0, 5),
+      end_time: e.end_time.substring(0, 5),
+      notes: e.notes || '',
+      break_minutes: e.break_minutes || 0,
+      mileage: e.mileage || '',
+    });
     setEditError('');
   };
 
@@ -83,6 +89,14 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language }
                     <label style={styles.editLabel}>End</label>
                     <input style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
                   </div>
+                  <div style={styles.editField}>
+                    <label style={styles.editLabel}>Break (min)</label>
+                    <input style={styles.editInput} type="number" min="0" max="480" value={editForm.break_minutes} onChange={ev => setEditForm(f => ({ ...f, break_minutes: ev.target.value }))} />
+                  </div>
+                  <div style={styles.editField}>
+                    <label style={styles.editLabel}>Mileage (mi)</label>
+                    <input style={styles.editInput} type="number" min="0" step="0.1" value={editForm.mileage} onChange={ev => setEditForm(f => ({ ...f, mileage: ev.target.value }))} placeholder="Optional" />
+                  </div>
                   <div style={{ ...styles.editField, flex: 2 }}>
                     <label style={styles.editLabel}>Notes</label>
                     <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder="Optional notes" />
@@ -108,7 +122,9 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language }
                   </div>
                 </div>
                 <div style={styles.entryDetail} className="entry-detail">
-                  <span>{formatTime(e.start_time)} – {formatTime(e.end_time)} ({formatHours(e.start_time, e.end_time)})</span>
+                  <span>{formatTime(e.start_time)} – {formatTime(e.end_time)} ({formatHours(e.start_time, e.end_time, e.break_minutes)})</span>
+                  {e.break_minutes > 0 && <span style={styles.breakTag}>☕ {e.break_minutes}m break</span>}
+                  {e.mileage > 0 && <span style={styles.mileageTag}>🚗 {parseFloat(e.mileage).toFixed(1)} mi</span>}
                   <span style={{ ...styles.badge, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                     {e.wage_type === 'prevailing' ? t.prevailing : t.regular}
                   </span>
@@ -154,4 +170,6 @@ const styles = {
   statusApproved: { fontSize: 11, fontWeight: 700, color: '#059669', background: '#d1fae5', padding: '1px 7px', borderRadius: 10 },
   statusRejected: { fontSize: 11, fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '1px 7px', borderRadius: 10 },
   statusPending: { fontSize: 11, color: '#92400e', background: '#fef3c7', padding: '1px 7px', borderRadius: 10 },
+  breakTag: { fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
+  mileageTag: { fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
 };

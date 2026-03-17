@@ -22,7 +22,7 @@ router.get('/', requireAuth, async (req, res) => {
 
 // Submit a time entry (wage_type inherited from project)
 router.post('/', requireAuth, async (req, res) => {
-  const { project_id, work_date, start_time, end_time, notes } = req.body;
+  const { project_id, work_date, start_time, end_time, notes, break_minutes, mileage } = req.body;
   if (!project_id || !work_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'project_id, work_date, start_time, and end_time are required' });
   }
@@ -36,9 +36,10 @@ router.post('/', requireAuth, async (req, res) => {
     const wage_type = projectResult.rows[0].wage_type;
 
     const result = await pool.query(
-      `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notes || null]
+      `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes, break_minutes, mileage)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notes || null,
+       parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -49,7 +50,7 @@ router.post('/', requireAuth, async (req, res) => {
 
 // Edit an entry (own entries only, within 7 days)
 router.patch('/:id', requireAuth, async (req, res) => {
-  const { start_time, end_time, notes } = req.body;
+  const { start_time, end_time, notes, break_minutes, mileage } = req.body;
   if (!start_time || !end_time) return res.status(400).json({ error: 'start_time and end_time required' });
   if (start_time >= end_time) return res.status(400).json({ error: 'End time must be after start time' });
   try {
@@ -63,9 +64,10 @@ router.patch('/:id', requireAuth, async (req, res) => {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
     if (entryDate < cutoff) return res.status(403).json({ error: 'Entries older than 7 days cannot be edited' });
     const result = await pool.query(
-      `UPDATE time_entries SET start_time = $1, end_time = $2, notes = $3, status = 'pending', approval_note = NULL
-       WHERE id = $4 RETURNING *`,
-      [start_time, end_time, notes || null, req.params.id]
+      `UPDATE time_entries SET start_time = $1, end_time = $2, notes = $3, break_minutes = $4, mileage = $5,
+       status = 'pending', approval_note = NULL WHERE id = $6 RETURNING *`,
+      [start_time, end_time, notes || null, parseInt(break_minutes) || 0,
+       mileage != null ? parseFloat(mileage) : null, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) {

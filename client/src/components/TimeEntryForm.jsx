@@ -9,6 +9,8 @@ export default function TimeEntryForm({ projects, onEntryAdded, t }) {
     start_time: '',
     end_time: '',
     notes: '',
+    break_minutes: '',
+    mileage: '',
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -29,7 +31,7 @@ export default function TimeEntryForm({ projects, onEntryAdded, t }) {
     try {
       const r = await api.post('/time-entries', form);
       onEntryAdded({ ...r.data, project_name: selectedProject?.name });
-      setForm(f => ({ ...f, start_time: '', end_time: '', notes: '' }));
+      setForm(f => ({ ...f, start_time: '', end_time: '', notes: '', break_minutes: '', mileage: '' }));
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (err) {
@@ -77,6 +79,16 @@ export default function TimeEntryForm({ projects, onEntryAdded, t }) {
             </span>
           </div>
         )}
+        <div style={styles.row} className="form-row">
+          <div style={styles.field}>
+            <label style={styles.label}>Break (minutes)</label>
+            <input style={styles.input} type="number" min="0" max="480" step="1" value={form.break_minutes} onChange={e => set('break_minutes', e.target.value)} placeholder="0" />
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>Mileage (mi)</label>
+            <input style={styles.input} type="number" min="0" step="0.1" value={form.mileage} onChange={e => set('mileage', e.target.value)} placeholder="Optional" />
+          </div>
+        </div>
         <div style={styles.field}>
           <label style={styles.label}>{t.notesOptional}</label>
           <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.notesPlaceholder} />

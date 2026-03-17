@@ -27,6 +27,9 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
   const [elapsed, setElapsed] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [clockingOut, setClockingOut] = useState(false); // show break/mileage step
+  const [breakMinutes, setBreakMinutes] = useState('');
+  const [mileage, setMileage] = useState('');
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -69,10 +72,17 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
     setLoading(true);
     const { lat, lng } = await getLocation();
     try {
-      const r = await api.post('/clock/out', { lat, lng });
+      const r = await api.post('/clock/out', {
+        lat, lng,
+        break_minutes: breakMinutes ? parseInt(breakMinutes) : 0,
+        mileage: mileage ? parseFloat(mileage) : null,
+      });
       onEntryAdded({ ...r.data, project_name: status.project_name });
       setStatus(false);
       setSelectedProject('');
+      setClockingOut(false);
+      setBreakMinutes('');
+      setMileage('');
     } catch (err) {
       setError(err.response?.data?.error || 'Clock-out failed');
     } finally {
@@ -92,10 +102,49 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
           </div>
           <div style={styles.timer}>{formatElapsed(elapsed)}</div>
         </div>
-        {error && <p style={styles.error}>{error}</p>}
-        <button style={styles.clockOutBtn} className="clock-btn" onClick={handleClockOut} disabled={loading}>
-          {loading ? 'Clocking out...' : 'Clock Out'}
-        </button>
+        {clockingOut ? (
+          <div style={styles.clockOutStep}>
+            <div style={styles.clockOutFields}>
+              <div style={styles.clockOutField}>
+                <label style={styles.clockOutLabel}>Break (min)</label>
+                <input
+                  style={styles.clockOutInput}
+                  type="number" min="0" max="480" step="1"
+                  placeholder="0"
+                  value={breakMinutes}
+                  onChange={e => setBreakMinutes(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div style={styles.clockOutField}>
+                <label style={styles.clockOutLabel}>Mileage (mi)</label>
+                <input
+                  style={styles.clockOutInput}
+                  type="number" min="0" step="0.1"
+                  placeholder="Optional"
+                  value={mileage}
+                  onChange={e => setMileage(e.target.value)}
+                />
+              </div>
+            </div>
+            {error && <p style={styles.error}>{error}</p>}
+            <div style={styles.clockOutActions}>
+              <button style={styles.clockOutBtn} className="clock-btn" onClick={handleClockOut} disabled={loading}>
+                {loading ? 'Clocking out...' : 'Confirm Clock Out'}
+              </button>
+              <button style={styles.cancelClockOutBtn} onClick={() => { setClockingOut(false); setError(''); }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {error && <p style={styles.error}>{error}</p>}
+            <button style={styles.clockOutBtn} className="clock-btn" onClick={() => setClockingOut(true)} disabled={loading}>
+              Clock Out
+            </button>
+          </>
+        )}
       </div>
     );
   }
@@ -152,4 +201,11 @@ const styles = {
   error: { color: '#fca5a5', fontSize: 13, margin: 0 },
   clockInBtn: { padding: '13px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 700 },
   clockOutBtn: { width: '100%', padding: '13px', background: 'rgba(255,255,255,0.2)', color: '#fff', border: '2px solid rgba(255,255,255,0.5)', borderRadius: 8, fontSize: 16, fontWeight: 700 },
+  clockOutStep: { display: 'flex', flexDirection: 'column', gap: 12 },
+  clockOutFields: { display: 'flex', gap: 12 },
+  clockOutField: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1 },
+  clockOutLabel: { fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.8)' },
+  clockOutInput: { padding: '8px 10px', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 7, fontSize: 14, background: 'rgba(255,255,255,0.15)', color: '#fff', width: '100%' },
+  clockOutActions: { display: 'flex', flexDirection: 'column', gap: 8 },
+  cancelClockOutBtn: { width: '100%', padding: '10px', background: 'transparent', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, fontSize: 14, cursor: 'pointer' },
 };

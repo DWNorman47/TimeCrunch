@@ -93,7 +93,7 @@ router.post('/in', requireAuth, async (req, res) => {
 
 // POST /api/clock/out
 router.post('/out', requireAuth, async (req, res) => {
-  const { lat, lng } = req.body;
+  const { lat, lng, break_minutes, mileage } = req.body;
   const companyId = req.user.company_id;
   try {
     const clockResult = await pool.query(
@@ -122,13 +122,14 @@ router.post('/out', requireAuth, async (req, res) => {
     const entryResult = await pool.query(
       `INSERT INTO time_entries
          (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
-          clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, break_minutes, mileage)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         companyId, req.user.id, clock.project_id, clock.work_date,
         start_time, end_time, wage_type, clock.notes || null,
         clock.clock_in_lat, clock.clock_in_lng, lat || null, lng || null,
+        parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
       ]
     );
 
