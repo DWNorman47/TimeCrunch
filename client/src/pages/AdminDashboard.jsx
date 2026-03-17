@@ -11,6 +11,8 @@ import LiveWorkers from '../components/LiveWorkers';
 import AuditLog from '../components/AuditLog';
 import ApprovalQueue from '../components/ApprovalQueue';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
+import ManagePayPeriods from '../components/ManagePayPeriods';
+import ManageSchedule from '../components/ManageSchedule';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -103,9 +105,11 @@ export default function AdminDashboard() {
           </>
         ) : (
           <>
+            <ManageSchedule workers={workers} projects={projects} />
             <ManageWorkers workers={workers} onWorkerAdded={handleWorkerAdded} onWorkerDeleted={handleWorkerDeleted} onWorkerUpdated={handleWorkerUpdated} onWorkerRestored={handleWorkerRestored} defaultRate={settings?.default_hourly_rate ?? 30} />
             <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} onProjectRestored={handleProjectRestored} />
             <ManageRates settings={settings} onSettingsUpdated={setSettings} />
+            <ManagePayPeriods />
             <AuditLog />
           </>
         )}

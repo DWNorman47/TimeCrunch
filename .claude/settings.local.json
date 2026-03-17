@@ -2,7 +2,17 @@
   "permissions": {
     "allow": [
       "Bash(git --version)",
-      "Bash(gh --version)"
+      "Bash(gh --version)",
+      "Bash(git pull:*)",
+      "Bash(git push:*)",
+      "Bash(npm install:*)",
+      "Bash(npm.cmd install:*)",
+      "Bash(cmd.exe /c \"cd c:\\\\Users\\\\v-normand\\\\Workspaces\\\\TimeCrunch_Claude\\\\server && npm install resend\")",
+      "Bash(cmd.exe /c \"cd /d c:\\\\Users\\\\v-normand\\\\Workspaces\\\\TimeCrunch_Claude\\\\server && npm install resend 2>&1\")",
+      "Bash(cmd.exe /c \"cd /d c:\\\\Users\\\\v-normand\\\\Workspaces\\\\TimeCrunch_Claude\\\\server && npm install resend\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

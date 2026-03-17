@@ -6,6 +6,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     prevailing_wage_rate: String(settings?.prevailing_wage_rate ?? 45),
     default_hourly_rate: String(settings?.default_hourly_rate ?? 30),
     overtime_multiplier: String(settings?.overtime_multiplier ?? 1.5),
+    overtime_rule: settings?.overtime_rule ?? 'daily',
+    overtime_threshold: String(settings?.overtime_threshold ?? 8),
     notification_inactive_days: String(settings?.notification_inactive_days ?? 3),
     notification_start_hour: String(settings?.notification_start_hour ?? 6),
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
@@ -25,6 +27,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         prevailing_wage_rate: parseFloat(form.prevailing_wage_rate),
         default_hourly_rate: parseFloat(form.default_hourly_rate),
         overtime_multiplier: parseFloat(form.overtime_multiplier),
+        overtime_rule: form.overtime_rule,
+        overtime_threshold: parseFloat(form.overtime_threshold),
         notification_inactive_days: parseFloat(form.notification_inactive_days),
         notification_start_hour: parseFloat(form.notification_start_hour),
         notification_end_hour: parseFloat(form.notification_end_hour),
@@ -81,6 +85,24 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               required
             />
             <span style={styles.suffix}>× regular pay</span>
+          </div>
+        </div>
+        <div style={styles.divider} />
+        <h4 style={styles.sectionTitle}>Overtime Rules</h4>
+        <div style={styles.row}>
+          <label style={styles.label}>Overtime method</label>
+          <div style={styles.inputGroup}>
+            <select style={{ ...styles.input, width: 'auto' }} value={form.overtime_rule} onChange={e => set('overtime_rule', e.target.value)}>
+              <option value="daily">Daily (over X hrs/day)</option>
+              <option value="weekly">Weekly (over X hrs/week)</option>
+            </select>
+          </div>
+        </div>
+        <div style={styles.row}>
+          <label style={styles.label}>{form.overtime_rule === 'weekly' ? 'Weekly threshold' : 'Daily threshold'}</label>
+          <div style={styles.inputGroup}>
+            <input style={styles.input} type="number" min="1" step="0.5" value={form.overtime_threshold} onChange={e => set('overtime_threshold', e.target.value)} required />
+            <span style={styles.suffix}>hrs</span>
           </div>
         </div>
         <div style={styles.divider} />

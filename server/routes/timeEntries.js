@@ -63,6 +63,11 @@ router.patch('/:id', requireAuth, async (req, res) => {
     const entryDate = new Date(entry.work_date);
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
     if (entryDate < cutoff) return res.status(403).json({ error: 'Entries older than 7 days cannot be edited' });
+    const locked = await pool.query(
+      'SELECT id FROM pay_periods WHERE company_id = $1 AND period_start <= $2 AND period_end >= $2',
+      [req.user.company_id, entry.work_date]
+    );
+    if (locked.rowCount > 0) return res.status(403).json({ error: 'This entry is in a locked pay period' });
     const result = await pool.query(
       `UPDATE time_entries SET start_time = $1, end_time = $2, notes = $3, break_minutes = $4, mileage = $5,
        status = 'pending', approval_note = NULL WHERE id = $6 RETURNING *`,
@@ -79,6 +84,13 @@ router.patch('/:id', requireAuth, async (req, res) => {
 // Delete an entry (own entries only)
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
+    const existing = await pool.query('SELECT work_date FROM time_entries WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    const locked = await pool.query(
+      'SELECT id FROM pay_periods WHERE company_id = $1 AND period_start <= $2 AND period_end >= $2',
+      [req.user.company_id, existing.rows[0].work_date]
+    );
+    if (locked.rowCount > 0) return res.status(403).json({ error: 'This entry is in a locked pay period' });
     const result = await pool.query(
       'DELETE FROM time_entries WHERE id = $1 AND user_id = $2 RETURNING id',
       [req.params.id, req.user.id]

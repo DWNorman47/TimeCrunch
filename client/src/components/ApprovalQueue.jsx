@@ -24,6 +24,7 @@ export default function ApprovalQueue() {
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectNote, setRejectNote] = useState('');
   const [working, setWorking] = useState(null);
+  const [approvingAll, setApprovingAll] = useState(false);
 
   const fetch = () => {
     setLoading(true);
@@ -53,6 +54,14 @@ export default function ApprovalQueue() {
     } finally { setWorking(null); }
   };
 
+  const approveAll = async () => {
+    setApprovingAll(true);
+    try {
+      await api.post('/admin/entries/approve-all');
+      setEntries([]);
+    } finally { setApprovingAll(false); }
+  };
+
   if (loading) return <div style={styles.card}><p style={{ color: '#888' }}>Loading...</p></div>;
 
   return (
@@ -60,7 +69,12 @@ export default function ApprovalQueue() {
       <div style={styles.header}>
         <h3 style={styles.title}>Approval Queue</h3>
         {entries.length > 0 && (
-          <span style={styles.badge}>{entries.length} pending</span>
+          <>
+            <span style={styles.badge}>{entries.length} pending</span>
+            <button style={styles.approveAllBtn} onClick={approveAll} disabled={approvingAll}>
+              {approvingAll ? 'Approving...' : '✓ Approve All'}
+            </button>
+          </>
         )}
       </div>
 
@@ -139,4 +153,5 @@ const styles = {
   rejectInput: { padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, minWidth: 160 },
   confirmRejectBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   cancelBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
+  approveAllBtn: { background: '#059669', color: '#fff', border: 'none', padding: '5px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', marginLeft: 'auto' },
 };

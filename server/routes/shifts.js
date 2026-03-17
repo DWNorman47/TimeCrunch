@@ -1,0 +1,74 @@
+const router = require('express').Router();
+const pool = require('../db');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
+
+// GET /admin/shifts?from=&to= — all company shifts in range
+router.get('/admin', requireAdmin, async (req, res) => {
+  const { from, to } = req.query;
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT s.*, u.full_name as worker_name, p.name as project_name
+       FROM shifts s
+       JOIN users u ON s.user_id = u.id
+       LEFT JOIN projects p ON s.project_id = p.id
+       WHERE s.company_id = $1
+         AND ($2::date IS NULL OR s.shift_date >= $2::date)
+         AND ($3::date IS NULL OR s.shift_date <= $3::date)
+       ORDER BY s.shift_date ASC, s.start_time ASC`,
+      [companyId, from || null, to || null]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /admin/shifts — create a shift
+router.post('/admin', requireAdmin, async (req, res) => {
+  const { user_id, project_id, shift_date, start_time, end_time, notes } = req.body;
+  if (!user_id || !shift_date || !start_time || !end_time) {
+    return res.status(400).json({ error: 'user_id, shift_date, start_time, end_time required' });
+  }
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `INSERT INTO shifts (company_id, user_id, project_id, shift_date, start_time, end_time, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [companyId, user_id, project_id || null, shift_date, start_time, end_time, notes || null]
+    );
+    const full = await pool.query(
+      `SELECT s.*, u.full_name as worker_name, p.name as project_name
+       FROM shifts s JOIN users u ON s.user_id = u.id LEFT JOIN projects p ON s.project_id = p.id
+       WHERE s.id = $1`, [result.rows[0].id]
+    );
+    res.status(201).json(full.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /admin/shifts/:id
+router.delete('/admin/:id', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM shifts WHERE id = $1 AND company_id = $2 RETURNING id',
+      [req.params.id, req.user.company_id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Shift not found' });
+    res.json({ deleted: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /shifts/mine — worker's upcoming shifts
+router.get('/mine', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT s.*, p.name as project_name
+       FROM shifts s LEFT JOIN projects p ON s.project_id = p.id
+       WHERE s.user_id = $1 AND s.shift_date >= CURRENT_DATE
+       ORDER BY s.shift_date ASC, s.start_time ASC
+       LIMIT 14`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+module.exports = router;

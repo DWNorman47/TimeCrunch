@@ -15,13 +15,17 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/qbo', require('./routes/qbo'));
 app.use('/api/clock', require('./routes/clock'));
 app.use('/api/superadmin', require('./routes/superadmin'));
+app.use('/api/shifts', require('./routes/shifts'));
 
 // Read-only company settings — available to all authenticated users
 app.get('/api/settings', requireAuth, async (req, res) => {
   try {
     const result = await pool.query('SELECT key, value FROM settings WHERE company_id = $1', [req.user.company_id]);
-    const s = { prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5 };
-    result.rows.forEach(r => { s[r.key] = parseFloat(r.value); });
+    const s = { prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5, overtime_rule: 'daily', overtime_threshold: 8 };
+    result.rows.forEach(r => {
+      if (r.key === 'overtime_rule') s.overtime_rule = r.value;
+      else s[r.key] = parseFloat(r.value);
+    });
     res.json(s);
   } catch (err) {
     console.error(err);

@@ -21,9 +21,42 @@ async function getSettings(companyId) {
   const s = {
     prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5,
     notification_inactive_days: 3, notification_start_hour: 6, notification_end_hour: 20,
+    overtime_rule: 'daily', overtime_threshold: 8,
   };
-  result.rows.forEach(r => { s[r.key] = parseFloat(r.value); });
+  result.rows.forEach(r => {
+    if (r.key === 'overtime_rule') { s.overtime_rule = r.value; }
+    else { s[r.key] = parseFloat(r.value); }
+  });
   return s;
+}
+
+// Shared overtime calculation: accepts array of {wage_type, start_time, end_time, work_date, break_minutes}
+function computeOT(entries, rule, threshold) {
+  const regular = entries.filter(e => e.wage_type === 'regular');
+  if (rule === 'weekly') {
+    const weekly = {};
+    regular.forEach(e => {
+      const d = new Date(e.work_date.toString().substring(0, 10) + 'T00:00:00');
+      const jan4 = new Date(d.getFullYear(), 0, 4);
+      const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7);
+      const key = `${d.getFullYear()}-W${week}`;
+      const h = (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60;
+      weekly[key] = (weekly[key] || 0) + h;
+    });
+    const reg = Object.values(weekly).reduce((s, h) => s + Math.min(h, threshold), 0);
+    const ot = Object.values(weekly).reduce((s, h) => s + Math.max(h - threshold, 0), 0);
+    return { regularHours: reg, overtimeHours: ot };
+  }
+  // daily (default)
+  const daily = {};
+  regular.forEach(e => {
+    const key = e.work_date.toString().substring(0, 10);
+    const h = (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60;
+    daily[key] = (daily[key] || 0) + h;
+  });
+  const reg = Object.values(daily).reduce((s, h) => s + Math.min(h, threshold), 0);
+  const ot = Object.values(daily).reduce((s, h) => s + Math.max(h - threshold, 0), 0);
+  return { regularHours: reg, overtimeHours: ot };
 }
 
 // Get settings
@@ -41,21 +74,34 @@ router.get('/settings', requireAdmin, async (req, res) => {
 router.patch('/settings', requireAdmin, async (req, res) => {
   const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
   const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour'];
-  const allowed = [...rateKeys, ...notifKeys];
+  const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold'];
+  const stringKeys = ['overtime_rule'];
+  const allowed = [...numericKeys, ...stringKeys];
   const companyId = req.user.company_id;
   try {
     const changed = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
-        const val = parseFloat(req.body[key]);
-        if (isNaN(val)) return res.status(400).json({ error: `Invalid value for ${key}` });
-        if (rateKeys.includes(key) && val <= 0) return res.status(400).json({ error: `Invalid value for ${key}` });
-        if (notifKeys.includes(key) && val < 0) return res.status(400).json({ error: `Invalid value for ${key}` });
-        await pool.query(
-          'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
-          [companyId, key, val]
-        );
-        changed[key] = val;
+        if (stringKeys.includes(key)) {
+          const val = req.body[key];
+          if (key === 'overtime_rule' && !['daily', 'weekly'].includes(val))
+            return res.status(400).json({ error: 'overtime_rule must be daily or weekly' });
+          await pool.query(
+            'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
+            [companyId, key, val]
+          );
+          changed[key] = val;
+        } else {
+          const val = parseFloat(req.body[key]);
+          if (isNaN(val)) return res.status(400).json({ error: `Invalid value for ${key}` });
+          if (rateKeys.includes(key) && val <= 0) return res.status(400).json({ error: `Invalid value for ${key}` });
+          if ([...notifKeys, 'overtime_threshold'].includes(key) && val < 0) return res.status(400).json({ error: `Invalid value for ${key}` });
+          await pool.query(
+            'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
+            [companyId, key, val]
+          );
+          changed[key] = val;
+        }
       }
     }
     await logAudit(companyId, req.user.id, req.user.full_name, 'settings.updated', 'settings', null, 'Settings', changed);
@@ -199,24 +245,13 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
     );
 
     const entries = entriesResult.rows;
-
-    const dailyRegular = {};
-    entries.filter(e => e.wage_type === 'regular').forEach(e => {
-      const date = e.work_date.toString().substring(0, 10);
-      if (!dailyRegular[date]) dailyRegular[date] = 0;
-      const start = new Date(`1970-01-01T${e.start_time}`);
-      const end = new Date(`1970-01-01T${e.end_time}`);
-      dailyRegular[date] += (end - start) / 3600000;
-    });
-    const regularHours = Object.values(dailyRegular).reduce((sum, h) => sum + Math.min(h, 8), 0);
-    const overtimeHours = Object.values(dailyRegular).reduce((sum, h) => sum + Math.max(h - 8, 0), 0);
+    const settings = await getSettings(companyId);
+    const { regularHours, overtimeHours } = computeOT(entries, settings.overtime_rule, settings.overtime_threshold);
     const prevailingHours = entries.filter(e => e.wage_type === 'prevailing').reduce((sum, e) => {
-      const start = new Date(`1970-01-01T${e.start_time}`);
-      const end = new Date(`1970-01-01T${e.end_time}`);
-      return sum + (end - start) / 3600000;
+      const h = (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60;
+      return sum + h;
     }, 0);
     const totalHours = regularHours + overtimeHours + prevailingHours;
-    const settings = await getSettings(companyId);
     const rate = parseFloat(userResult.rows[0].hourly_rate) || settings.default_hourly_rate;
     const regularCost = regularHours * rate;
     const overtimeCost = overtimeHours * rate * settings.overtime_multiplier;
@@ -398,32 +433,25 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
     );
 
     const entries = entriesResult.rows;
-
     const settings = await getSettings(companyId);
-    const workerDaily = {};
-    entries.filter(e => e.wage_type === 'regular').forEach(e => {
-      const key = `${e.user_id}:${e.work_date.toString().substring(0, 10)}`;
-      if (!workerDaily[key]) workerDaily[key] = { hours: 0, rate: parseFloat(e.hourly_rate) || settings.default_hourly_rate };
-      const start = new Date(`1970-01-01T${e.start_time}`);
-      const end = new Date(`1970-01-01T${e.end_time}`);
-      workerDaily[key].hours += (end - start) / 3600000;
-    });
 
+    // Per-worker OT using configured rule
+    const workerEntries = {};
+    entries.filter(e => e.wage_type === 'regular').forEach(e => {
+      if (!workerEntries[e.user_id]) workerEntries[e.user_id] = { items: [], rate: parseFloat(e.hourly_rate) || settings.default_hourly_rate };
+      workerEntries[e.user_id].items.push(e);
+    });
     let regularHours = 0, overtimeHours = 0, regularCost = 0, overtimeCost = 0;
-    Object.values(workerDaily).forEach(({ hours, rate }) => {
-      const reg = Math.min(hours, 8);
-      const ot = Math.max(hours - 8, 0);
-      regularHours += reg;
-      overtimeHours += ot;
+    Object.values(workerEntries).forEach(({ items, rate }) => {
+      const { regularHours: reg, overtimeHours: ot } = computeOT(items, settings.overtime_rule, settings.overtime_threshold);
+      regularHours += reg; overtimeHours += ot;
       regularCost += reg * rate;
       overtimeCost += ot * rate * settings.overtime_multiplier;
     });
 
     let prevailingHours = 0, prevailingCost = 0;
     entries.filter(e => e.wage_type === 'prevailing').forEach(e => {
-      const start = new Date(`1970-01-01T${e.start_time}`);
-      const end = new Date(`1970-01-01T${e.end_time}`);
-      const h = (end - start) / 3600000;
+      const h = (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60;
       prevailingHours += h;
       prevailingCost += h * settings.prevailing_wage_rate;
     });
@@ -675,6 +703,23 @@ router.get('/entries/pending', requireAdmin, async (req, res) => {
   }
 });
 
+// POST /admin/entries/approve-all — approve every pending entry for this company
+router.post('/entries/approve-all', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `UPDATE time_entries SET status = 'approved', approved_by = $1, approved_at = NOW()
+       WHERE company_id = $2 AND status = 'pending' RETURNING id`,
+      [req.user.id, companyId]
+    );
+    await logAudit(companyId, req.user.id, req.user.full_name, 'entries.approved_all', 'time_entry', null, null, { count: result.rowCount });
+    res.json({ approved: result.rowCount });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // PATCH /admin/entries/:id/approve
 router.patch('/entries/:id/approve', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
@@ -711,6 +756,51 @@ router.patch('/entries/:id/reject', requireAdmin, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// Pay periods
+router.get('/pay-periods', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT pp.*, u.full_name as locked_by_name
+       FROM pay_periods pp LEFT JOIN users u ON pp.locked_by = u.id
+       WHERE pp.company_id = $1 ORDER BY pp.period_start DESC`,
+      [req.user.company_id]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.post('/pay-periods', requireAdmin, async (req, res) => {
+  const { period_start, period_end, label } = req.body;
+  if (!period_start || !period_end) return res.status(400).json({ error: 'period_start and period_end required' });
+  if (period_start >= period_end) return res.status(400).json({ error: 'period_end must be after period_start' });
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `INSERT INTO pay_periods (company_id, period_start, period_end, label, locked_by)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [companyId, period_start, period_end, label || null, req.user.id]
+    );
+    await logAudit(companyId, req.user.id, req.user.full_name, 'pay_period.locked', 'pay_period', result.rows[0].id, label || `${period_start} – ${period_end}`);
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'A pay period overlapping those dates already exists' });
+    console.error(err); res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.delete('/pay-periods/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      'DELETE FROM pay_periods WHERE id = $1 AND company_id = $2 RETURNING *',
+      [req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Pay period not found' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'pay_period.unlocked', 'pay_period', parseInt(req.params.id), result.rows[0].label);
+    res.json({ deleted: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 // Audit log

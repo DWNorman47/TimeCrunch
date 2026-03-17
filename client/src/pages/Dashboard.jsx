@@ -4,6 +4,7 @@ import ClockInOut from '../components/ClockInOut';
 import TimeEntryForm from '../components/TimeEntryForm';
 import EntryList from '../components/EntryList';
 import TimesheetView from '../components/TimesheetView';
+import UpcomingShifts from '../components/UpcomingShifts';
 import WorkerSummary from '../components/WorkerSummary';
 import ChangePassword from '../components/ChangePassword';
 import { getT } from '../i18n';
@@ -69,8 +70,9 @@ export default function Dashboard() {
       </header>
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
       <main style={styles.main} className="mobile-main">
+        <UpcomingShifts />
         <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} />
-        {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 45} />}
+        {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 45} overtimeRule={settings?.overtime_rule ?? 'daily'} overtimeThreshold={settings?.overtime_threshold ?? 8} />}
         <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} />
         {!loading && (
           <div style={styles.viewToggle}>

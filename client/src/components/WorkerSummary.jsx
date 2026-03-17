@@ -37,10 +37,34 @@ function getDateRange(key) {
 function entryHours(e) {
   const s = new Date(`1970-01-01T${e.start_time}`);
   const en = new Date(`1970-01-01T${e.end_time}`);
-  return (en - s) / 3600000;
+  return (en - s) / 3600000 - (e.break_minutes || 0) / 60;
 }
 
-export default function WorkerSummary({ entries, hourlyRate, overtimeMultiplier = 1.5, prevailingRate = 45 }) {
+function computeOT(entries, rule, threshold) {
+  const regular = entries.filter(e => e.wage_type === 'regular');
+  if (rule === 'weekly') {
+    const weekly = {};
+    regular.forEach(e => {
+      const d = new Date(e.work_date.substring(0, 10) + 'T00:00:00');
+      const jan4 = new Date(d.getFullYear(), 0, 4);
+      const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7);
+      const key = `${d.getFullYear()}-W${week}`;
+      weekly[key] = (weekly[key] || 0) + entryHours(e);
+    });
+    return {
+      regularHours: Object.values(weekly).reduce((s, h) => s + Math.min(h, threshold), 0),
+      overtimeHours: Object.values(weekly).reduce((s, h) => s + Math.max(h - threshold, 0), 0),
+    };
+  }
+  const daily = {};
+  regular.forEach(e => { daily[e.work_date.substring(0, 10)] = (daily[e.work_date.substring(0, 10)] || 0) + entryHours(e); });
+  return {
+    regularHours: Object.values(daily).reduce((s, h) => s + Math.min(h, threshold), 0),
+    overtimeHours: Object.values(daily).reduce((s, h) => s + Math.max(h - threshold, 0), 0),
+  };
+}
+
+export default function WorkerSummary({ entries, hourlyRate, overtimeMultiplier = 1.5, prevailingRate = 45, overtimeRule = 'daily', overtimeThreshold = 8 }) {
   const [range, setRange] = useState('this_week');
   const { from, to } = getDateRange(range);
 
@@ -54,22 +78,7 @@ export default function WorkerSummary({ entries, hourlyRate, overtimeMultiplier 
   }, [entries, from, to]);
 
   const totalHours = filtered.reduce((sum, e) => sum + entryHours(e), 0);
-  const regularHours = (() => {
-    const daily = {};
-    filtered.filter(e => e.wage_type === 'regular').forEach(e => {
-      const d = e.work_date.substring(0, 10);
-      daily[d] = (daily[d] || 0) + entryHours(e);
-    });
-    return Object.values(daily).reduce((s, h) => s + Math.min(h, 8), 0);
-  })();
-  const overtimeHours = (() => {
-    const daily = {};
-    filtered.filter(e => e.wage_type === 'regular').forEach(e => {
-      const d = e.work_date.substring(0, 10);
-      daily[d] = (daily[d] || 0) + entryHours(e);
-    });
-    return Object.values(daily).reduce((s, h) => s + Math.max(h - 8, 0), 0);
-  })();
+  const { regularHours, overtimeHours } = computeOT(filtered, overtimeRule, overtimeThreshold);
   const prevailingHours = filtered.filter(e => e.wage_type === 'prevailing').reduce((s, e) => s + entryHours(e), 0);
 
   const rate = parseFloat(hourlyRate) || 30;

@@ -1,0 +1,176 @@
+import React, { useState, useEffect } from 'react';
+import api from '../api';
+
+function startOfWeek(date) {
+  const d = new Date(date);
+  d.setDate(d.getDate() - d.getDay());
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+function toISO(d) { return d.toISOString().substring(0, 10); }
+function fmtDay(d) { return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
+function fmtTime(t) { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m}${hr < 12 ? 'a' : 'p'}`; }
+
+export default function ManageSchedule({ workers, projects }) {
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [shifts, setShifts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ user_id: '', project_id: '', shift_date: toISO(new Date()), start_time: '08:00', end_time: '17:00', notes: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(null);
+
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const from = toISO(days[0]);
+  const to = toISO(days[6]);
+
+  useEffect(() => {
+    setLoading(true);
+    api.get('/shifts/admin', { params: { from, to } })
+      .then(r => setShifts(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [from, to]);
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const addShift = async e => {
+    e.preventDefault();
+    if (!form.user_id) { setError('Select a worker'); return; }
+    setSaving(true); setError('');
+    try {
+      const r = await api.post('/shifts/admin', form);
+      setShifts(prev => [...prev, r.data].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
+      setForm(f => ({ ...f, notes: '' }));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save shift');
+    } finally { setSaving(false); }
+  };
+
+  const deleteShift = async id => {
+    setDeleting(id);
+    try {
+      await api.delete(`/shifts/admin/${id}`);
+      setShifts(prev => prev.filter(s => s.id !== id));
+    } finally { setDeleting(null); }
+  };
+
+  const shiftsByDay = {};
+  days.forEach(d => { shiftsByDay[toISO(d)] = []; });
+  shifts.forEach(s => {
+    const key = s.shift_date.substring(0, 10);
+    if (shiftsByDay[key]) shiftsByDay[key].push(s);
+  });
+
+  return (
+    <div style={styles.card}>
+      <h3 style={styles.title}>Schedule</h3>
+
+      {/* Add shift form */}
+      <form onSubmit={addShift} style={styles.form}>
+        <div style={styles.formRow}>
+          <div style={styles.field}>
+            <label style={styles.label}>Worker</label>
+            <select style={styles.input} value={form.user_id} onChange={e => set('user_id', e.target.value)} required>
+              <option value="">Select worker</option>
+              {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
+            </select>
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>Project</label>
+            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+              <option value="">No project</option>
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>Date</label>
+            <input style={styles.input} type="date" value={form.shift_date} onChange={e => set('shift_date', e.target.value)} required />
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>Start</label>
+            <input style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required />
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>End</label>
+            <input style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required />
+          </div>
+          <div style={{ ...styles.field, flex: 2 }}>
+            <label style={styles.label}>Notes</label>
+            <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Optional" />
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>&nbsp;</label>
+            <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? '...' : '+ Add Shift'}</button>
+          </div>
+        </div>
+        {error && <p style={styles.error}>{error}</p>}
+      </form>
+
+      {/* Week navigation */}
+      <div style={styles.weekNav}>
+        <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, -7))}>‹ Prev</button>
+        <span style={styles.weekLabel}>{fmtDay(days[0])} – {fmtDay(days[6])}</span>
+        <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>Next ›</button>
+        <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>Today</button>
+      </div>
+
+      {loading ? <p style={{ color: '#888', fontSize: 13 }}>Loading...</p> : (
+        <div style={styles.grid}>
+          {days.map(day => {
+            const key = toISO(day);
+            const dayShifts = shiftsByDay[key] || [];
+            const isToday = key === toISO(new Date());
+            return (
+              <div key={key} style={{ ...styles.dayCol, borderTop: `3px solid ${isToday ? '#1a56db' : '#e5e7eb'}` }}>
+                <div style={{ ...styles.dayHead, color: isToday ? '#1a56db' : '#374151' }}>
+                  {day.toLocaleDateString('en-US', { weekday: 'short' })} {day.getDate()}
+                </div>
+                {dayShifts.length === 0 ? (
+                  <div style={styles.emptyDay} />
+                ) : dayShifts.map(s => (
+                  <div key={s.id} style={styles.shiftPill}>
+                    <div style={styles.pillWorker}>{s.worker_name}</div>
+                    {s.project_name && <div style={styles.pillProject}>{s.project_name}</div>}
+                    <div style={styles.pillTime}>{fmtTime(s.start_time)}–{fmtTime(s.end_time)}</div>
+                    {s.notes && <div style={styles.pillNotes}>{s.notes}</div>}
+                    <button style={styles.deleteBtn} onClick={() => deleteShift(s.id)} disabled={deleting === s.id}>
+                      {deleting === s.id ? '...' : '✕'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const styles = {
+  card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 24 },
+  title: { fontSize: 17, fontWeight: 700, marginBottom: 16 },
+  form: { marginBottom: 16 },
+  formRow: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' },
+  field: { display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 100 },
+  label: { fontSize: 11, fontWeight: 600, color: '#555', textTransform: 'uppercase' },
+  input: { padding: '7px 9px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13 },
+  addBtn: { padding: '7px 14px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' },
+  error: { color: '#e53e3e', fontSize: 13, marginTop: 4 },
+  weekNav: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' },
+  navBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 10px', fontSize: 13, cursor: 'pointer', color: '#374151' },
+  weekLabel: { fontWeight: 600, fontSize: 14, color: '#111827', flex: 1 },
+  todayBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: '#6b7280' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, overflowX: 'auto' },
+  dayCol: { padding: '8px 6px', minHeight: 80, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 90 },
+  dayHead: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 },
+  emptyDay: { flex: 1, background: '#f9fafb', borderRadius: 4, minHeight: 40 },
+  shiftPill: { background: '#eff6ff', borderLeft: '3px solid #1a56db', borderRadius: 5, padding: '5px 7px', fontSize: 11, position: 'relative' },
+  pillWorker: { fontWeight: 700, color: '#1e3a5f', marginBottom: 1 },
+  pillProject: { color: '#6b7280', fontSize: 10 },
+  pillTime: { fontWeight: 600, color: '#1a56db', marginTop: 2 },
+  pillNotes: { color: '#9ca3af', fontSize: 10, fontStyle: 'italic' },
+  deleteBtn: { position: 'absolute', top: 3, right: 4, background: 'none', border: 'none', color: '#fca5a5', fontSize: 11, cursor: 'pointer', padding: 0, lineHeight: 1 },
+};
