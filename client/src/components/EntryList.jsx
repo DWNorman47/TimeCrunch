@@ -112,6 +112,9 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language }
                   <span style={{ ...styles.badge, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                     {e.wage_type === 'prevailing' ? t.prevailing : t.regular}
                   </span>
+                  {e.status === 'approved' && <span style={styles.statusApproved}>✓ Approved</span>}
+                  {e.status === 'rejected' && <span style={styles.statusRejected}>✕ Rejected{e.approval_note ? `: ${e.approval_note}` : ''}</span>}
+                  {(!e.status || e.status === 'pending') && <span style={styles.statusPending}>Pending</span>}
                 </div>
                 {e.notes && <div style={styles.notes}>{e.notes}</div>}
               </>
@@ -148,4 +151,7 @@ const styles = {
   editActions: { display: 'flex', gap: 8 },
   saveEditBtn: { background: '#059669', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   cancelEditBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  statusApproved: { fontSize: 11, fontWeight: 700, color: '#059669', background: '#d1fae5', padding: '1px 7px', borderRadius: 10 },
+  statusRejected: { fontSize: 11, fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '1px 7px', borderRadius: 10 },
+  statusPending: { fontSize: 11, color: '#92400e', background: '#fef3c7', padding: '1px 7px', borderRadius: 10 },
 };

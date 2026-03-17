@@ -83,7 +83,7 @@ router.get('/notifications', requireAdmin, async (req, res) => {
        ORDER BY last_entry_date ASC NULLS FIRST`,
       [companyId, days]
     );
-    res.json({ inactive: result.rows, threshold_days: days });
+    res.json(result.rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -588,6 +588,64 @@ router.delete('/projects/:id', requireAdmin, async (req, res) => {
     if (result.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.deleted', 'project', parseInt(req.params.id), project.rows[0]?.name);
     res.json({ removed: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /admin/entries/pending — all pending time entries for this company
+router.get('/entries/pending', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT te.*, u.full_name as worker_name, p.name as project_name
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       LEFT JOIN projects p ON te.project_id = p.id
+       WHERE te.company_id = $1 AND te.status = 'pending'
+       ORDER BY te.work_date DESC, te.start_time DESC`,
+      [companyId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /admin/entries/:id/approve
+router.patch('/entries/:id/approve', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { note } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE time_entries SET status = 'approved', approval_note = $1, approved_by = $2, approved_at = NOW()
+       WHERE id = $3 AND company_id = $4 RETURNING *`,
+      [note || null, req.user.id, req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'entry.approved', 'time_entry', parseInt(req.params.id), null);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /admin/entries/:id/reject
+router.patch('/entries/:id/reject', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { note } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE time_entries SET status = 'rejected', approval_note = $1, approved_by = $2, approved_at = NOW()
+       WHERE id = $3 AND company_id = $4 RETURNING *`,
+      [note || null, req.user.id, req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'entry.rejected', 'time_entry', parseInt(req.params.id), null, { note });
+    res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

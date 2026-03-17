@@ -9,6 +9,7 @@ import ChangePassword from '../components/ChangePassword';
 import QuickBooks from '../components/QuickBooks';
 import LiveWorkers from '../components/LiveWorkers';
 import AuditLog from '../components/AuditLog';
+import ApprovalQueue from '../components/ApprovalQueue';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -19,7 +20,7 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const TABS = ['live', 'metrics', 'projects', 'manage', 'integrations'];
+  const TABS = ['live', 'approvals', 'metrics', 'projects', 'manage', 'integrations'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'live');
 
@@ -61,6 +62,7 @@ export default function AdminDashboard() {
       <main style={styles.main}>
         <div style={styles.tabs} className="tab-bar">
           <button style={tab === 'live' ? styles.tabActive : styles.tab} onClick={() => switchTab('live')}>🟢 Live</button>
+          <button style={tab === 'approvals' ? styles.tabActive : styles.tab} onClick={() => switchTab('approvals')}>Approvals</button>
           <button style={tab === 'metrics' ? styles.tabActive : styles.tab} onClick={() => switchTab('metrics')}>Worker Reports</button>
           <button style={tab === 'projects' ? styles.tabActive : styles.tab} onClick={() => switchTab('projects')}>Project Reports</button>
           <button style={tab === 'manage' ? styles.tabActive : styles.tab} onClick={() => switchTab('manage')}>Manage</button>
@@ -69,6 +71,11 @@ export default function AdminDashboard() {
 
         {loading ? <p>Loading...</p> : tab === 'live' ? (
           <LiveWorkers />
+        ) : tab === 'approvals' ? (
+          <>
+            <h2 style={styles.heading}>Entry Approvals</h2>
+            <ApprovalQueue />
+          </>
         ) : tab === 'metrics' ? (
           <>
             <h2 style={styles.heading}>Worker Reports</h2>

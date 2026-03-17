@@ -14,6 +14,7 @@ app.use('/api/time-entries', require('./routes/timeEntries'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/qbo', require('./routes/qbo'));
 app.use('/api/clock', require('./routes/clock'));
+app.use('/api/superadmin', require('./routes/superadmin'));
 
 // Read-only company settings — available to all authenticated users
 app.get('/api/settings', requireAuth, async (req, res) => {

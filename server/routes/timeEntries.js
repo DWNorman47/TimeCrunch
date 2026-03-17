@@ -63,7 +63,8 @@ router.patch('/:id', requireAuth, async (req, res) => {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
     if (entryDate < cutoff) return res.status(403).json({ error: 'Entries older than 7 days cannot be edited' });
     const result = await pool.query(
-      'UPDATE time_entries SET start_time = $1, end_time = $2, notes = $3 WHERE id = $4 RETURNING *',
+      `UPDATE time_entries SET start_time = $1, end_time = $2, notes = $3, status = 'pending', approval_note = NULL
+       WHERE id = $4 RETURNING *`,
       [start_time, end_time, notes || null, req.params.id]
     );
     res.json(result.rows[0]);
