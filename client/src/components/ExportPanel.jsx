@@ -46,7 +46,7 @@ export default function ExportPanel({ workers, projects }) {
       <h3 style={styles.title}>Export Time Entries</h3>
       <p style={styles.sub}>Download a CSV of time entries for any date range. Open in Excel, Google Sheets, or import into your payroll system.</p>
 
-      <div style={styles.filters}>
+      <div style={styles.filters} className="export-filters">
         <div style={styles.filterGroup}>
           <label style={styles.label}>From</label>
           <input style={styles.input} type="date" value={from} onChange={e => setFrom(e.target.value)} />

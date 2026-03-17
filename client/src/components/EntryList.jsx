@@ -84,30 +84,30 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
               <div style={styles.editForm}>
                 <div style={styles.editRow}>
                   <div style={styles.editField}>
-                    <label style={styles.editLabel}>Start</label>
+                    <label style={styles.editLabel}>{t.start}</label>
                     <input style={styles.editInput} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} />
                   </div>
                   <div style={styles.editField}>
-                    <label style={styles.editLabel}>End</label>
+                    <label style={styles.editLabel}>{t.end}</label>
                     <input style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
                   </div>
                   <div style={styles.editField}>
-                    <label style={styles.editLabel}>Break (min)</label>
+                    <label style={styles.editLabel}>{t.breakMin}</label>
                     <input style={styles.editInput} type="number" min="0" max="480" value={editForm.break_minutes} onChange={ev => setEditForm(f => ({ ...f, break_minutes: ev.target.value }))} />
                   </div>
                   <div style={styles.editField}>
-                    <label style={styles.editLabel}>Mileage (mi)</label>
-                    <input style={styles.editInput} type="number" min="0" step="0.1" value={editForm.mileage} onChange={ev => setEditForm(f => ({ ...f, mileage: ev.target.value }))} placeholder="Optional" />
+                    <label style={styles.editLabel}>{t.mileageMi}</label>
+                    <input style={styles.editInput} type="number" min="0" step="0.1" value={editForm.mileage} onChange={ev => setEditForm(f => ({ ...f, mileage: ev.target.value }))} placeholder={t.optional} />
                   </div>
                   <div style={{ ...styles.editField, flex: 2 }}>
-                    <label style={styles.editLabel}>Notes</label>
-                    <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder="Optional notes" />
+                    <label style={styles.editLabel}>{t.notes}</label>
+                    <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optionalNotes} />
                   </div>
                 </div>
                 {editError && <p style={styles.editError}>{editError}</p>}
                 <div style={styles.editActions}>
-                  <button style={styles.saveEditBtn} onClick={handleSaveEdit} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save'}</button>
-                  <button style={styles.cancelEditBtn} onClick={() => setEditingId(null)}>Cancel</button>
+                  <button style={styles.saveEditBtn} onClick={handleSaveEdit} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
+                  <button style={styles.cancelEditBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
                 </div>
               </div>
             ) : (
@@ -117,7 +117,7 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                   <div style={styles.entryRight}>
                     <span style={styles.date}>{formatDate(e.work_date, language)}</span>
                     {isEditable(e.work_date)
-                      ? <button style={styles.editBtn} onClick={() => startEdit(e)}>Edit</button>
+                      ? <button style={styles.editBtn} onClick={() => startEdit(e)}>{t.edit}</button>
                       : <span style={styles.lockIcon} title="Entries older than 7 days cannot be edited">🔒</span>
                     }
                     <button style={styles.deleteBtn} onClick={() => handleDelete(e.id)}>{t.delete}</button>
@@ -130,16 +130,16 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                   <span style={{ ...styles.badge, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                     {e.wage_type === 'prevailing' ? t.prevailing : t.regular}
                   </span>
-                  {e.status === 'approved' && <span style={styles.statusApproved}>✓ Approved</span>}
-                  {e.status === 'rejected' && <span style={styles.statusRejected}>✕ Rejected{e.approval_note ? `: ${e.approval_note}` : ''}</span>}
-                  {(!e.status || e.status === 'pending') && <span style={styles.statusPending}>Pending</span>}
+                  {e.status === 'approved' && <span style={styles.statusApproved}>{t.approved}</span>}
+                  {e.status === 'rejected' && <span style={styles.statusRejected}>{t.rejected}{e.approval_note ? `: ${e.approval_note}` : ''}</span>}
+                  {(!e.status || e.status === 'pending') && <span style={styles.statusPending}>{t.pending}</span>}
                 </div>
                 {e.notes && <div style={styles.notes}>{e.notes}</div>}
                 <button
                   style={styles.msgBtn}
                   onClick={() => setOpenMessageId(openMessageId === e.id ? null : e.id)}
                 >
-                  💬 {openMessageId === e.id ? 'Hide' : 'Messages'}
+                  💬 {openMessageId === e.id ? t.hide : t.messages}
                 </button>
                 {openMessageId === e.id && (
                   <MessageThread entryId={e.id} currentUserId={currentUserId} />

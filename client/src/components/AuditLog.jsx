@@ -1,44 +1,68 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 
-const ACTION_LABELS = {
-  'worker.created': 'Added worker',
-  'worker.updated': 'Updated worker',
-  'worker.deleted': 'Removed worker',
-  'worker.restored': 'Restored worker',
-  'worker.invited': 'Invited worker',
-  'project.created': 'Created project',
-  'project.updated': 'Updated project',
-  'project.deleted': 'Removed project',
-  'project.restored': 'Restored project',
-  'settings.updated': 'Updated settings',
+const ACTION_META = {
+  'worker.created':       { label: 'Worker added',        color: '#059669', bg: '#d1fae5' },
+  'worker.invited':       { label: 'Worker invited',       color: '#7c3aed', bg: '#ede9fe' },
+  'worker.updated':       { label: 'Worker updated',       color: '#1a56db', bg: '#dbeafe' },
+  'worker.deleted':       { label: 'Worker removed',       color: '#ef4444', bg: '#fee2e2' },
+  'worker.restored':      { label: 'Worker restored',      color: '#059669', bg: '#d1fae5' },
+  'project.created':      { label: 'Project created',      color: '#059669', bg: '#d1fae5' },
+  'project.updated':      { label: 'Project updated',      color: '#1a56db', bg: '#dbeafe' },
+  'project.deleted':      { label: 'Project removed',      color: '#ef4444', bg: '#fee2e2' },
+  'project.restored':     { label: 'Project restored',     color: '#059669', bg: '#d1fae5' },
+  'entry.approved':       { label: 'Entry approved',       color: '#059669', bg: '#d1fae5' },
+  'entry.rejected':       { label: 'Entry rejected',       color: '#dc2626', bg: '#fee2e2' },
+  'pay_period.locked':    { label: 'Pay period locked',    color: '#d97706', bg: '#fef3c7' },
+  'pay_period.unlocked':  { label: 'Pay period unlocked',  color: '#6b7280', bg: '#f3f4f6' },
+  'settings.updated':     { label: 'Settings updated',     color: '#d97706', bg: '#fef3c7' },
 };
 
-const ACTION_COLORS = {
-  'worker.created': '#059669',
-  'worker.invited': '#7c3aed',
-  'worker.updated': '#1a56db',
-  'worker.deleted': '#ef4444',
-  'worker.restored': '#059669',
-  'project.created': '#059669',
-  'project.updated': '#1a56db',
-  'project.deleted': '#ef4444',
-  'project.restored': '#059669',
-  'settings.updated': '#d97706',
+const ACTION_GROUPS = {
+  '': 'All actions',
+  worker: 'Workers',
+  project: 'Projects',
+  entry: 'Entries',
+  pay_period: 'Pay periods',
+  settings: 'Settings',
 };
+
+function formatDt(str) {
+  const d = new Date(str);
+  return {
+    date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+  };
+}
+
+function ActionBadge({ action }) {
+  const meta = ACTION_META[action] || { label: action, color: '#6b7280', bg: '#f3f4f6' };
+  return (
+    <span style={{ display: 'inline-block', padding: '2px 9px', borderRadius: 6, fontSize: 12, fontWeight: 600, color: meta.color, background: meta.bg }}>
+      {meta.label}
+    </span>
+  );
+}
 
 export default function AuditLog() {
   const [entries, setEntries] = useState([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
-  const LIMIT = 25;
+  const [group, setGroup] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const LIMIT = 30;
 
-  const load = async (off = 0) => {
+  const load = async (off = 0, reset = false) => {
     setLoading(true);
     try {
-      const r = await api.get(`/admin/audit-log?limit=${LIMIT}&offset=${off}`);
-      setEntries(off === 0 ? r.data.entries : prev => [...prev, ...r.data.entries]);
+      const params = new URLSearchParams({ limit: LIMIT, offset: off });
+      if (group) params.set('group', group);
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const r = await api.get(`/admin/audit-log?${params}`);
+      setEntries(prev => off === 0 || reset ? r.data.entries : [...prev, ...r.data.entries]);
       setTotal(r.data.total);
       setOffset(off);
     } finally {
@@ -46,44 +70,62 @@ export default function AuditLog() {
     }
   };
 
-  useEffect(() => { load(0); }, []);
+  useEffect(() => { load(0, true); }, [group, from, to]);
 
   return (
     <div style={styles.card}>
-      <h3 style={styles.title}>Audit Log</h3>
+      <div style={styles.header}>
+        <h3 style={styles.title}>Audit Log</h3>
+        <span style={styles.totalBadge}>{total} events</span>
+      </div>
+
+      <div style={styles.filters}>
+        <select style={styles.filterSelect} value={group} onChange={e => setGroup(e.target.value)}>
+          {Object.entries(ACTION_GROUPS).map(([val, label]) => (
+            <option key={val} value={val}>{label}</option>
+          ))}
+        </select>
+        <input style={styles.filterDate} type="date" value={from} onChange={e => setFrom(e.target.value)} placeholder="From" title="From date" />
+        <input style={styles.filterDate} type="date" value={to} onChange={e => setTo(e.target.value)} placeholder="To" title="To date" />
+        {(group || from || to) && (
+          <button style={styles.clearBtn} onClick={() => { setGroup(''); setFrom(''); setTo(''); }}>Clear</button>
+        )}
+      </div>
+
       {loading && entries.length === 0 ? (
         <p style={styles.empty}>Loading...</p>
       ) : entries.length === 0 ? (
-        <p style={styles.empty}>No activity recorded yet.</p>
+        <p style={styles.empty}>No matching activity.</p>
       ) : (
         <>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>When</th>
-                <th style={styles.th}>Who</th>
-                <th style={styles.th}>Action</th>
-                <th style={styles.th}>Target</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map(e => (
-                <tr key={e.id} style={styles.tr}>
-                  <td style={styles.td}>
-                    <span style={styles.time}>{new Date(e.created_at).toLocaleDateString()}</span>
-                    <span style={styles.timeSmall}>{new Date(e.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  </td>
-                  <td style={styles.td}>{e.actor_name}</td>
-                  <td style={styles.td}>
-                    <span style={{ ...styles.badge, background: (ACTION_COLORS[e.action] || '#6b7280') + '18', color: ACTION_COLORS[e.action] || '#6b7280' }}>
-                      {ACTION_LABELS[e.action] || e.action}
-                    </span>
-                  </td>
-                  <td style={styles.td}>{e.entity_name || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div style={styles.list}>
+            {entries.map(e => {
+              const dt = formatDt(e.created_at);
+              return (
+                <div key={e.id} style={styles.row}>
+                  <div style={styles.rowTime}>
+                    <span style={styles.rowDate}>{dt.date}</span>
+                    <span style={styles.rowClock}>{dt.time}</span>
+                  </div>
+                  <div style={styles.rowBody}>
+                    <div style={styles.rowTop}>
+                      <ActionBadge action={e.action} />
+                      {e.entity_name && <span style={styles.entityName}>{e.entity_name}</span>}
+                    </div>
+                    <div style={styles.rowActor}>by {e.actor_name}</div>
+                    {e.details && Object.keys(e.details).length > 0 && (
+                      <div style={styles.details}>
+                        {Object.entries(e.details).map(([k, v]) => (
+                          <span key={k} style={styles.detailChip}>{k}: {String(v)}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
           {entries.length < total && (
             <button style={styles.loadMore} onClick={() => load(offset + LIMIT)} disabled={loading}>
               {loading ? 'Loading...' : `Load more (${total - entries.length} remaining)`}
@@ -96,15 +138,25 @@ export default function AuditLog() {
 }
 
 const styles = {
-  card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginTop: 24 },
-  title: { fontSize: 17, fontWeight: 700, marginBottom: 16 },
-  empty: { color: '#888', fontSize: 14 },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', fontSize: 12, color: '#999', fontWeight: 600, textTransform: 'uppercase', padding: '6px 8px', borderBottom: '1px solid #eee' },
-  tr: { borderBottom: '1px solid #f5f5f5' },
-  td: { padding: '10px 8px', fontSize: 14, verticalAlign: 'top' },
-  time: { display: 'block', fontWeight: 500 },
-  timeSmall: { display: 'block', fontSize: 12, color: '#9ca3af' },
-  badge: { display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600 },
+  card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' },
+  header: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 },
+  title: { fontSize: 17, fontWeight: 700, margin: 0 },
+  totalBadge: { fontSize: 12, background: '#f3f4f6', color: '#6b7280', padding: '2px 10px', borderRadius: 20, fontWeight: 600 },
+  filters: { display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' },
+  filterSelect: { padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, background: '#fff' },
+  filterDate: { padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 },
+  clearBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '5px 12px', borderRadius: 7, fontSize: 12, cursor: 'pointer' },
+  empty: { color: '#9ca3af', fontSize: 14, padding: '16px 0' },
+  list: { display: 'flex', flexDirection: 'column', gap: 1 },
+  row: { display: 'flex', gap: 16, padding: '12px 4px', borderBottom: '1px solid #f3f4f6', alignItems: 'flex-start' },
+  rowTime: { display: 'flex', flexDirection: 'column', minWidth: 90, flexShrink: 0 },
+  rowDate: { fontSize: 13, fontWeight: 500, color: '#374151' },
+  rowClock: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  rowBody: { flex: 1, minWidth: 0 },
+  rowTop: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 },
+  entityName: { fontSize: 13, fontWeight: 600, color: '#111827' },
+  rowActor: { fontSize: 12, color: '#9ca3af' },
+  details: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 },
+  detailChip: { fontSize: 11, background: '#f9fafb', border: '1px solid #e5e7eb', color: '#6b7280', padding: '1px 7px', borderRadius: 4 },
   loadMore: { marginTop: 16, background: 'none', border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 16px', fontSize: 13, color: '#374151', cursor: 'pointer', width: '100%' },
 };

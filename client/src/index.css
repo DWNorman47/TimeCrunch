@@ -120,6 +120,46 @@ input, select, textarea, button {
     display: none !important;
   }
 
+  /* Admin dashboard main area */
+  .admin-main {
+    margin-top: 16px !important;
+    padding: 0 10px !important;
+  }
+
+  /* Admin cards: reduce padding on mobile */
+  .admin-card {
+    padding: 16px !important;
+    border-radius: 10px !important;
+  }
+
+  /* Approval queue rows stack vertically */
+  .approval-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  /* Analytics stat grid: 2 columns on mobile */
+  .analytics-stats {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Export panel filters stack */
+  .export-filters {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  /* Audit log: hide date column, show inline */
+  .audit-time-col {
+    min-width: 70px !important;
+    font-size: 11px !important;
+  }
+
+  /* Manage forms: stack on mobile */
+  .manage-form {
+    flex-direction: column !important;
+  }
+
   /* History range selector */
   .range-tabs {
     overflow-x: auto !important;

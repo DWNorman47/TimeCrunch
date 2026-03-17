@@ -52,7 +52,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
   }, [status]);
 
   const handleClockIn = async () => {
-    if (!selectedProject) { setError('Select a project first'); return; }
+    if (!selectedProject) { setError(t.selectProjectFirst); return; }
     setError('');
     setLoading(true);
     const { lat, lng } = await getLocation();
@@ -65,7 +65,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
       if (data?.geofence) {
         setError(data.error);
       } else {
-        setError(data?.error || 'Clock-in failed');
+        setError(data?.error || t.clockInFailed);
       }
     } finally {
       setLoading(false);
@@ -89,7 +89,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
       setBreakMinutes('');
       setMileage('');
     } catch (err) {
-      setError(err.response?.data?.error || 'Clock-out failed');
+      setError(err.response?.data?.error || t.clockOutFailed);
     } finally {
       setLoading(false);
     }
@@ -102,7 +102,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
       <div style={styles.clockedInCard}>
         <div style={styles.clockedInTop}>
           <div>
-            <div style={styles.clockedInLabel}>Currently clocked in</div>
+            <div style={styles.clockedInLabel}>{t.currentlyClockedIn}</div>
             <div style={styles.projectName}>{status.project_name}</div>
           </div>
           <div style={styles.timer}>{formatElapsed(elapsed)}</div>
@@ -111,7 +111,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
           <div style={styles.clockOutStep}>
             <div style={styles.clockOutFields}>
               <div style={styles.clockOutField}>
-                <label style={styles.clockOutLabel}>Break (min)</label>
+                <label style={styles.clockOutLabel}>{t.breakMin}</label>
                 <input
                   style={styles.clockOutInput}
                   type="number" min="0" max="480" step="1"
@@ -122,11 +122,11 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
                 />
               </div>
               <div style={styles.clockOutField}>
-                <label style={styles.clockOutLabel}>Mileage (mi)</label>
+                <label style={styles.clockOutLabel}>{t.mileageMi}</label>
                 <input
                   style={styles.clockOutInput}
                   type="number" min="0" step="0.1"
-                  placeholder="Optional"
+                  placeholder={t.optional}
                   value={mileage}
                   onChange={e => setMileage(e.target.value)}
                 />
@@ -135,10 +135,10 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
             {error && <p style={styles.error}>{error}</p>}
             <div style={styles.clockOutActions}>
               <button style={styles.clockOutBtn} className="clock-btn" onClick={handleClockOut} disabled={loading}>
-                {loading ? 'Clocking out...' : 'Confirm Clock Out'}
+                {loading ? t.clockingOut : t.confirmClockOut}
               </button>
               <button style={styles.cancelClockOutBtn} onClick={() => { setClockingOut(false); setError(''); }}>
-                Cancel
+                {t.cancel}
               </button>
             </div>
           </div>
@@ -146,7 +146,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
           <>
             {error && <p style={styles.error}>{error}</p>}
             <button style={styles.clockOutBtn} className="clock-btn" onClick={() => setClockingOut(true)} disabled={loading}>
-              Clock Out
+              {t.clockOut}
             </button>
           </>
         )}
@@ -156,7 +156,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
 
   return (
     <div style={styles.card}>
-      <h2 style={styles.heading}>Clock In</h2>
+      <h2 style={styles.heading}>{t.clockIn}</h2>
       <div style={styles.form}>
         <div>
           <label style={styles.label}>{t.project}</label>
@@ -185,7 +185,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
         </div>
         {error && <p style={styles.error}>{error}</p>}
         <button style={styles.clockInBtn} className="clock-btn" onClick={handleClockIn} disabled={loading}>
-          {loading ? 'Clocking in...' : 'Clock In'}
+          {loading ? t.clockingIn : t.clockIn}
         </button>
       </div>
     </div>

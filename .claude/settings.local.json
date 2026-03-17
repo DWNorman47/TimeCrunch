@@ -12,7 +12,14 @@
       "Bash(cmd.exe /c \"cd /d c:\\\\Users\\\\v-normand\\\\Workspaces\\\\TimeCrunch_Claude\\\\server && npm install resend\")",
       "Bash(echo \"EXIT: $?\")",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(node -e \":*)",
+      "Bash(cmd.exe /c \"where node 2>&1\")",
+      "Bash(cmd.exe /c \"where node\")",
+      "Bash(cmd.exe /c \"node --version\")",
+      "Bash(cmd.exe /c \"node --version 2>&1 && echo found\")",
+      "Bash(cmd.exe /c \"python --version 2>&1\")",
+      "Bash(cmd.exe /c \"python3 --version 2>&1\")"
     ]
   }
 }

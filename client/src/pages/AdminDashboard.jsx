@@ -24,7 +24,7 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const TABS = ['live', 'analytics', 'approvals', 'metrics', 'projects', 'export', 'manage', 'integrations'];
+  const TABS = ['live', 'analytics', 'approvals', 'metrics', 'projects', 'export', 'manage', 'audit', 'integrations'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'live');
 
@@ -63,7 +63,7 @@ export default function AdminDashboard() {
 
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={getT('English')} />}
 
-      <main style={styles.main}>
+      <main style={styles.main} className="admin-main">
         <div style={styles.tabs} className="tab-bar">
           <button style={tab === 'live' ? styles.tabActive : styles.tab} onClick={() => switchTab('live')}>🟢 Live</button>
           <button style={tab === 'analytics' ? styles.tabActive : styles.tab} onClick={() => switchTab('analytics')}>Analytics</button>
@@ -72,6 +72,7 @@ export default function AdminDashboard() {
           <button style={tab === 'projects' ? styles.tabActive : styles.tab} onClick={() => switchTab('projects')}>Project Reports</button>
           <button style={tab === 'export' ? styles.tabActive : styles.tab} onClick={() => switchTab('export')}>Export</button>
           <button style={tab === 'manage' ? styles.tabActive : styles.tab} onClick={() => switchTab('manage')}>Manage</button>
+          <button style={tab === 'audit' ? styles.tabActive : styles.tab} onClick={() => switchTab('audit')}>Audit Log</button>
           <button style={tab === 'integrations' ? styles.tabActive : styles.tab} onClick={() => switchTab('integrations')}>Integrations</button>
         </div>
 
@@ -105,6 +106,11 @@ export default function AdminDashboard() {
             <h2 style={styles.heading}>Export</h2>
             <ExportPanel workers={workers} projects={projects} />
           </>
+        ) : tab === 'audit' ? (
+          <>
+            <h2 style={styles.heading}>Audit Log</h2>
+            <AuditLog />
+          </>
         ) : tab === 'integrations' ? (
           <>
             <h2 style={styles.heading}>Integrations</h2>
@@ -117,7 +123,6 @@ export default function AdminDashboard() {
             <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} onProjectRestored={handleProjectRestored} />
             <ManageRates settings={settings} onSettingsUpdated={setSettings} />
             <ManagePayPeriods />
-            <AuditLog />
           </>
         )}
       </main>

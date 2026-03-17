@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Generate VAPID Keys</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 60px auto; padding: 0 24px; background: #f4f6f9; }
+    h1 { font-size: 22px; color: #1a56db; }
+    p { color: #555; font-size: 14px; line-height: 1.6; }
+    button { background: #1a56db; color: #fff; border: none; padding: 12px 28px; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; }
+    button:hover { background: #1e40af; }
+    .output { margin-top: 28px; display: none; }
+    .key-block { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 18px; margin-bottom: 14px; }
+    .key-label { font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; margin-bottom: 6px; }
+    .key-value { font-family: monospace; font-size: 13px; word-break: break-all; color: #111; }
+    .copy-btn { margin-top: 8px; background: none; border: 1px solid #d1d5db; color: #374151; padding: 4px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .copy-btn:hover { background: #f3f4f6; }
+    .steps { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px 18px; margin-top: 20px; }
+    .steps ol { margin: 8px 0 0 0; padding-left: 20px; color: #1e40af; font-size: 13px; line-height: 2; }
+  </style>
+</head>
+<body>
+  <h1>VAPID Key Generator</h1>
+  <p>Generates a one-time key pair for Web Push notifications using your browser's built-in crypto. Keys are never sent anywhere.</p>
+  <button onclick="generate()">Generate VAPID Keys</button>
+
+  <div class="output" id="output">
+    <div class="key-block">
+      <div class="key-label">VAPID_PUBLIC_KEY</div>
+      <div class="key-value" id="pubKey"></div>
+      <button class="copy-btn" onclick="copy('pubKey', this)">Copy</button>
+    </div>
+    <div class="key-block">
+      <div class="key-label">VAPID_PRIVATE_KEY</div>
+      <div class="key-value" id="privKey"></div>
+      <button class="copy-btn" onclick="copy('privKey', this)">Copy</button>
+    </div>
+    <div class="steps">
+      <strong style="color:#1e40af">Next steps:</strong>
+      <ol>
+        <li>Go to Vercel → your project → Settings → Environment Variables</li>
+        <li>Add <code>VAPID_PUBLIC_KEY</code> and <code>VAPID_PRIVATE_KEY</code></li>
+        <li>Redeploy the project</li>
+        <li>You can delete this HTML file — these keys are already generated</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
+    async function generate() {
+      const keyPair = await crypto.subtle.generateKey(
+        { name: 'ECDH', namedCurve: 'P-256' },
+        true,
+        ['deriveKey']
+      );
+      const pubRaw = await crypto.subtle.exportKey('raw', keyPair.publicKey);
+      const privPkcs8 = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+      // Raw private scalar is the last 32 bytes of the PKCS#8 DER encoding
+      const privRaw = privPkcs8.slice(-32);
+
+      document.getElementById('pubKey').textContent = b64url(pubRaw);
+      document.getElementById('privKey').textContent = b64url(privRaw);
+      document.getElementById('output').style.display = 'block';
+    }
+
+    function copy(id, btn) {
+      navigator.clipboard.writeText(document.getElementById(id).textContent);
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1500);
+    }
+  </script>
+</body>
+</html>

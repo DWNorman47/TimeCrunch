@@ -151,7 +151,7 @@ const styles = {
   badge: { background: '#fef3c7', color: '#b45309', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 700 },
   empty: { color: '#059669', fontSize: 14, fontWeight: 500 },
   list: { display: 'flex', flexDirection: 'column', gap: 12 },
-  row: { border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' },
+  row: { border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
   rowMain: { flex: 1, minWidth: 200 },
   worker: { fontWeight: 700, fontSize: 15, marginBottom: 4 },
   detail: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#555', flexWrap: 'wrap' },

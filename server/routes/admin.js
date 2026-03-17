@@ -861,16 +861,24 @@ router.get('/export', requireAdmin, async (req, res) => {
 // Audit log
 router.get('/audit-log', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
-  const limit = parseInt(req.query.limit) || 50;
+  const limit = parseInt(req.query.limit) || 30;
   const offset = parseInt(req.query.offset) || 0;
+  const { group, from, to } = req.query;
+  const conditions = ['company_id = $1'];
+  const values = [companyId];
+  let idx = 2;
+  if (group) { conditions.push(`action LIKE $${idx++}`); values.push(`${group}.%`); }
+  if (from) { conditions.push(`created_at >= $${idx++}`); values.push(from); }
+  if (to) { conditions.push(`created_at < ($${idx++}::date + interval '1 day')`); values.push(to); }
+  const where = conditions.join(' AND ');
   try {
     const result = await pool.query(
       `SELECT id, actor_name, action, entity_type, entity_id, entity_name, details, created_at
-       FROM audit_log WHERE company_id = $1
-       ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-      [companyId, limit, offset]
+       FROM audit_log WHERE ${where}
+       ORDER BY created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...values, limit, offset]
     );
-    const total = await pool.query('SELECT COUNT(*) FROM audit_log WHERE company_id = $1', [companyId]);
+    const total = await pool.query(`SELECT COUNT(*) FROM audit_log WHERE ${where}`, values);
     res.json({ entries: result.rows, total: parseInt(total.rows[0].count) });
   } catch (err) {
     console.error(err);

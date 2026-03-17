@@ -78,8 +78,8 @@ export default function Dashboard() {
         <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} />
         {!loading && (
           <div style={styles.viewToggle}>
-            <button style={entryView === 'timesheet' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('timesheet')}>📅 Timesheet</button>
-            <button style={entryView === 'list' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('list')}>☰ List</button>
+            <button style={entryView === 'timesheet' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('timesheet')}>{t.timesheetView}</button>
+            <button style={entryView === 'list' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('list')}>{t.listView}</button>
           </div>
         )}
         <NotificationSetup />
