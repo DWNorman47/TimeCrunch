@@ -81,6 +81,57 @@ router.patch('/:id', requireAuth, async (req, res) => {
   }
 });
 
+// GET /time-entries/:id/messages
+router.get('/:id/messages', requireAuth, async (req, res) => {
+  try {
+    const entry = await pool.query('SELECT id FROM time_entries WHERE id = $1 AND company_id = $2', [req.params.id, req.user.company_id]);
+    if (entry.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    const result = await pool.query(
+      `SELECT m.*, u.full_name as sender_name FROM entry_messages m
+       JOIN users u ON m.sender_id = u.id
+       WHERE m.time_entry_id = $1 ORDER BY m.created_at ASC`,
+      [req.params.id]
+    );
+    // Mark unread messages as read for this user
+    await pool.query(
+      `UPDATE entry_messages SET read_at = NOW()
+       WHERE time_entry_id = $1 AND sender_id != $2 AND read_at IS NULL`,
+      [req.params.id, req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /time-entries/:id/messages
+router.post('/:id/messages', requireAuth, async (req, res) => {
+  const { body } = req.body;
+  if (!body?.trim()) return res.status(400).json({ error: 'Message body required' });
+  try {
+    const entry = await pool.query('SELECT id FROM time_entries WHERE id = $1 AND company_id = $2', [req.params.id, req.user.company_id]);
+    if (entry.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    const result = await pool.query(
+      `INSERT INTO entry_messages (time_entry_id, company_id, sender_id, body)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [req.params.id, req.user.company_id, req.user.id, body.trim()]
+    );
+    res.status(201).json({ ...result.rows[0], sender_name: req.user.full_name });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET unread message count for current user
+router.get('/messages/unread-count', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*) FROM entry_messages m
+       JOIN time_entries te ON m.time_entry_id = te.id
+       WHERE te.company_id = $1 AND m.sender_id != $2 AND m.read_at IS NULL
+         AND (te.user_id = $2 OR $3 = 'admin' OR $3 = 'super_admin')`,
+      [req.user.company_id, req.user.id, req.user.role]
+    );
+    res.json({ count: parseInt(result.rows[0].count) });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // Delete an entry (own entries only)
 router.delete('/:id', requireAuth, async (req, res) => {
   try {

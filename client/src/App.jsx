@@ -11,6 +11,7 @@ import ConfirmEmail from './pages/ConfirmEmail';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import SuperAdmin from './pages/SuperAdmin';
+import InstallPrompt from './components/InstallPrompt';
 
 function PrivateRoute({ children, adminOnly = false, superAdminOnly = false }) {
   const { user, loading } = useAuth();
@@ -46,6 +47,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <AppRoutes />
+        <InstallPrompt />
       </BrowserRouter>
     </AuthProvider>
   );

@@ -83,7 +83,7 @@ export default function Dashboard() {
         {loading ? <p>{t.loadingEntries}</p> : entryView === 'timesheet' ? (
           <TimesheetView entries={entries} language={user?.language} />
         ) : (
-          <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} />
+          <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} currentUserId={user?.id} />
         )}
       </main>
     </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import api from '../api';
+import MessageThread from './MessageThread';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -27,11 +28,12 @@ function formatTime(t) {
   return `${hour % 12 || 12}:${m} ${hour < 12 ? 'AM' : 'PM'}`;
 }
 
-export default function EntryList({ entries, onDeleted, onUpdated, t, language }) {
+export default function EntryList({ entries, onDeleted, onUpdated, t, language, currentUserId }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
+  const [openMessageId, setOpenMessageId] = useState(null);
 
   const handleDelete = async id => {
     if (!confirm(t.confirmDelete)) return;
@@ -133,6 +135,15 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language }
                   {(!e.status || e.status === 'pending') && <span style={styles.statusPending}>Pending</span>}
                 </div>
                 {e.notes && <div style={styles.notes}>{e.notes}</div>}
+                <button
+                  style={styles.msgBtn}
+                  onClick={() => setOpenMessageId(openMessageId === e.id ? null : e.id)}
+                >
+                  💬 {openMessageId === e.id ? 'Hide' : 'Messages'}
+                </button>
+                {openMessageId === e.id && (
+                  <MessageThread entryId={e.id} currentUserId={currentUserId} />
+                )}
               </>
             )}
           </div>
@@ -172,4 +183,5 @@ const styles = {
   statusPending: { fontSize: 11, color: '#92400e', background: '#fef3c7', padding: '1px 7px', borderRadius: 10 },
   breakTag: { fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
   mileageTag: { fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
+  msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 6 },
 };

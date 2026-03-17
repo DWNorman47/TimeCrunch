@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import MessageThread from './MessageThread';
+import { useAuth } from '../contexts/AuthContext';
 
 function formatDate(dateStr) {
   const d = new Date(dateStr.substring(0, 10) + 'T00:00:00');
@@ -19,12 +21,14 @@ function formatHours(start, end) {
 }
 
 export default function ApprovalQueue() {
+  const { user } = useAuth();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectNote, setRejectNote] = useState('');
   const [working, setWorking] = useState(null);
   const [approvingAll, setApprovingAll] = useState(false);
+  const [openMessageId, setOpenMessageId] = useState(null);
 
   const fetch = () => {
     setLoading(true);
@@ -97,6 +101,15 @@ export default function ApprovalQueue() {
                   </span>
                 </div>
                 {e.notes && <div style={styles.notes}>{e.notes}</div>}
+                <button
+                  style={styles.msgBtn}
+                  onClick={() => setOpenMessageId(openMessageId === e.id ? null : e.id)}
+                >
+                  💬 {openMessageId === e.id ? 'Hide messages' : 'Messages'}
+                </button>
+                {openMessageId === e.id && (
+                  <MessageThread entryId={e.id} currentUserId={user?.id} />
+                )}
               </div>
 
               {rejectingId === e.id ? (
@@ -154,4 +167,5 @@ const styles = {
   confirmRejectBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   cancelBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   approveAllBtn: { background: '#059669', color: '#fff', border: 'none', padding: '5px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', marginLeft: 'auto' },
+  msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 6 },
 };
