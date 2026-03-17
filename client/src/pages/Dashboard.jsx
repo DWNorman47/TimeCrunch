@@ -13,15 +13,17 @@ export default function Dashboard() {
   const t = getT(user?.language);
   const [entries, setEntries] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [e, p] = await Promise.all([api.get('/time-entries'), api.get('/projects')]);
+      const [e, p, s] = await Promise.all([api.get('/time-entries'), api.get('/projects'), api.get('/settings')]);
       setEntries(e.data);
       setProjects(p.data);
+      setSettings(s.data);
     } finally {
       setLoading(false);
     }
@@ -65,7 +67,7 @@ export default function Dashboard() {
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
       <main style={styles.main} className="mobile-main">
         <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} />
-        {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} />}
+        {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 45} />}
         <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} />
         {loading ? <p>{t.loadingEntries}</p> : (
           <EntryList entries={entries} onDeleted={handleEntryDeleted} t={t} language={user?.language} />

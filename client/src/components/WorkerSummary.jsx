@@ -40,7 +40,7 @@ function entryHours(e) {
   return (en - s) / 3600000;
 }
 
-export default function WorkerSummary({ entries, hourlyRate }) {
+export default function WorkerSummary({ entries, hourlyRate, overtimeMultiplier = 1.5, prevailingRate = 45 }) {
   const [range, setRange] = useState('this_week');
   const { from, to } = getDateRange(range);
 
@@ -73,7 +73,7 @@ export default function WorkerSummary({ entries, hourlyRate }) {
   const prevailingHours = filtered.filter(e => e.wage_type === 'prevailing').reduce((s, e) => s + entryHours(e), 0);
 
   const rate = parseFloat(hourlyRate) || 30;
-  const estimatedPay = (regularHours * rate) + (overtimeHours * rate * 1.5) + (prevailingHours * rate);
+  const estimatedPay = (regularHours * rate) + (overtimeHours * rate * overtimeMultiplier) + (prevailingHours * prevailingRate);
 
   const byProject = {};
   filtered.forEach(e => {
