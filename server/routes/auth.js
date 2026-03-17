@@ -51,7 +51,8 @@ router.get('/me', requireAuth, (req, res) => {
 
 // Register — creates a new company and its first admin user
 router.post('/register', async (req, res) => {
-  const { company_name, full_name, first_name, middle_name, last_name, username, password, email } = req.body;
+  const { full_name, first_name, middle_name, last_name, username, password, email } = req.body;
+  const company_name = req.body.company_name?.trim();
   if (!company_name || !full_name || !username || !password || !email) {
     return res.status(400).json({ error: 'company_name, full_name, email, username, and password are required' });
   }
