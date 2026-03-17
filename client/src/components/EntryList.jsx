@@ -1,5 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import api from '../api';
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+function isEditable(dateStr) {
+  const d = new Date(dateStr.substring(0, 10) + 'T00:00:00');
+  return Date.now() - d.getTime() <= SEVEN_DAYS_MS;
+}
 
 function formatHours(start, end) {
   const s = new Date(`1970-01-01T${start}`);
@@ -20,7 +27,12 @@ function formatTime(t) {
   return `${hour % 12 || 12}:${m} ${hour < 12 ? 'AM' : 'PM'}`;
 }
 
-export default function EntryList({ entries, onDeleted, t, language }) {
+export default function EntryList({ entries, onDeleted, onUpdated, t, language }) {
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+
   const handleDelete = async id => {
     if (!confirm(t.confirmDelete)) return;
     try {
@@ -28,6 +40,25 @@ export default function EntryList({ entries, onDeleted, t, language }) {
       onDeleted(id);
     } catch {
       alert(t.failedDeleteEntry);
+    }
+  };
+
+  const startEdit = e => {
+    setEditingId(e.id);
+    setEditForm({ start_time: e.start_time.substring(0, 5), end_time: e.end_time.substring(0, 5), notes: e.notes || '' });
+    setEditError('');
+  };
+
+  const handleSaveEdit = async () => {
+    setEditSaving(true); setEditError('');
+    try {
+      const r = await api.patch(`/time-entries/${editingId}`, editForm);
+      if (onUpdated) onUpdated(r.data);
+      setEditingId(null);
+    } catch (err) {
+      setEditError(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -41,20 +72,50 @@ export default function EntryList({ entries, onDeleted, t, language }) {
       <div style={styles.list}>
         {entries.map(e => (
           <div key={e.id} style={styles.entry}>
-            <div style={styles.entryMain} className="entry-main">
-              <span style={styles.project}>{e.project_name}</span>
-              <div style={styles.entryRight}>
-                <span style={styles.date}>{formatDate(e.work_date, language)}</span>
-                <button style={styles.deleteBtn} onClick={() => handleDelete(e.id)}>{t.delete}</button>
+            {editingId === e.id ? (
+              <div style={styles.editForm}>
+                <div style={styles.editRow}>
+                  <div style={styles.editField}>
+                    <label style={styles.editLabel}>Start</label>
+                    <input style={styles.editInput} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} />
+                  </div>
+                  <div style={styles.editField}>
+                    <label style={styles.editLabel}>End</label>
+                    <input style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
+                  </div>
+                  <div style={{ ...styles.editField, flex: 2 }}>
+                    <label style={styles.editLabel}>Notes</label>
+                    <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder="Optional notes" />
+                  </div>
+                </div>
+                {editError && <p style={styles.editError}>{editError}</p>}
+                <div style={styles.editActions}>
+                  <button style={styles.saveEditBtn} onClick={handleSaveEdit} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save'}</button>
+                  <button style={styles.cancelEditBtn} onClick={() => setEditingId(null)}>Cancel</button>
+                </div>
               </div>
-            </div>
-            <div style={styles.entryDetail} className="entry-detail">
-              <span>{formatTime(e.start_time)} – {formatTime(e.end_time)} ({formatHours(e.start_time, e.end_time)})</span>
-              <span style={{ ...styles.badge, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
-                {e.wage_type === 'prevailing' ? t.prevailing : t.regular}
-              </span>
-            </div>
-            {e.notes && <div style={styles.notes}>{e.notes}</div>}
+            ) : (
+              <>
+                <div style={styles.entryMain} className="entry-main">
+                  <span style={styles.project}>{e.project_name}</span>
+                  <div style={styles.entryRight}>
+                    <span style={styles.date}>{formatDate(e.work_date, language)}</span>
+                    {isEditable(e.work_date)
+                      ? <button style={styles.editBtn} onClick={() => startEdit(e)}>Edit</button>
+                      : <span style={styles.lockIcon} title="Entries older than 7 days cannot be edited">🔒</span>
+                    }
+                    <button style={styles.deleteBtn} onClick={() => handleDelete(e.id)}>{t.delete}</button>
+                  </div>
+                </div>
+                <div style={styles.entryDetail} className="entry-detail">
+                  <span>{formatTime(e.start_time)} – {formatTime(e.end_time)} ({formatHours(e.start_time, e.end_time)})</span>
+                  <span style={{ ...styles.badge, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
+                    {e.wage_type === 'prevailing' ? t.prevailing : t.regular}
+                  </span>
+                </div>
+                {e.notes && <div style={styles.notes}>{e.notes}</div>}
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -76,4 +137,15 @@ const styles = {
   badge: { color: '#fff', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 },
   notes: { marginTop: 6, fontSize: 12, color: '#888', fontStyle: 'italic' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '3px 8px', borderRadius: 5, fontSize: 11, cursor: 'pointer' },
+  editBtn: { background: 'none', border: '1px solid #93c5fd', color: '#2563eb', padding: '3px 8px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginRight: 4 },
+  lockIcon: { fontSize: 12, marginRight: 4, opacity: 0.5, cursor: 'default' },
+  editForm: { padding: '8px 0' },
+  editRow: { display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 },
+  editField: { display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 100 },
+  editLabel: { fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
+  editInput: { padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 },
+  editError: { color: '#ef4444', fontSize: 12, margin: '4px 0' },
+  editActions: { display: 'flex', gap: 8 },
+  saveEditBtn: { background: '#059669', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  cancelEditBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
 };

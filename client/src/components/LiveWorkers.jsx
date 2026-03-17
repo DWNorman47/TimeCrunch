@@ -32,9 +32,11 @@ function ElapsedTimer({ clockInTime }) {
 
 export default function LiveWorkers() {
   const [workers, setWorkers] = useState([]);
+  const [inactiveWorkers, setInactiveWorkers] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedWorker, setSelectedWorker] = useState('');
+  const [dismissedInactive, setDismissedInactive] = useState(false);
   const intervalRef = useRef(null);
 
   const fetchActive = () => {
@@ -43,8 +45,15 @@ export default function LiveWorkers() {
       .catch(() => {});
   };
 
+  const fetchInactive = () => {
+    api.get('/admin/notifications')
+      .then(r => { setInactiveWorkers(r.data); setDismissedInactive(false); })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     fetchActive();
+    fetchInactive();
     intervalRef.current = setInterval(fetchActive, 30000);
     return () => clearInterval(intervalRef.current);
   }, []);
@@ -79,6 +88,24 @@ export default function LiveWorkers() {
 
   return (
     <div style={styles.wrap}>
+      {inactiveWorkers.length > 0 && !dismissedInactive && (
+        <div style={styles.inactiveBanner}>
+          <div style={styles.inactiveBannerLeft}>
+            <span style={styles.inactiveIcon}>⚠️</span>
+            <div>
+              <div style={styles.inactiveBannerTitle}>Inactive workers</div>
+              <div style={styles.inactiveBannerList}>
+                {inactiveWorkers.map(w => (
+                  <span key={w.id} style={styles.inactivePill}>
+                    {w.full_name} <span style={styles.inactiveDays}>({w.days_inactive}d)</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+          <button style={styles.dismissBtn} onClick={() => setDismissedInactive(true)}>✕</button>
+        </div>
+      )}
       <div style={styles.header}>
         <h2 style={styles.title}>Live Workers</h2>
         <div style={styles.liveIndicator}>
@@ -189,4 +216,12 @@ const styles = {
   mapWrap: { background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
   mapTitle: { fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#374151' },
   map: { height: 380, width: '100%', borderRadius: 8 },
+  inactiveBanner: { background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  inactiveBannerLeft: { display: 'flex', alignItems: 'flex-start', gap: 10 },
+  inactiveIcon: { fontSize: 18, lineHeight: 1.4 },
+  inactiveBannerTitle: { fontWeight: 700, fontSize: 14, color: '#92400e', marginBottom: 6 },
+  inactiveBannerList: { display: 'flex', flexWrap: 'wrap', gap: 6 },
+  inactivePill: { background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 13, color: '#78350f', fontWeight: 500 },
+  inactiveDays: { color: '#b45309', fontWeight: 700 },
+  dismissBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 16, cursor: 'pointer', padding: '0 4px', lineHeight: 1 },
 };

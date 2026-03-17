@@ -47,6 +47,32 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
+// Edit an entry (own entries only, within 7 days)
+router.patch('/:id', requireAuth, async (req, res) => {
+  const { start_time, end_time, notes } = req.body;
+  if (!start_time || !end_time) return res.status(400).json({ error: 'start_time and end_time required' });
+  if (start_time >= end_time) return res.status(400).json({ error: 'End time must be after start time' });
+  try {
+    const existing = await pool.query(
+      'SELECT * FROM time_entries WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    const entry = existing.rows[0];
+    const entryDate = new Date(entry.work_date);
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
+    if (entryDate < cutoff) return res.status(403).json({ error: 'Entries older than 7 days cannot be edited' });
+    const result = await pool.query(
+      'UPDATE time_entries SET start_time = $1, end_time = $2, notes = $3 WHERE id = $4 RETURNING *',
+      [start_time, end_time, notes || null, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Delete an entry (own entries only)
 router.delete('/:id', requireAuth, async (req, res) => {
   try {

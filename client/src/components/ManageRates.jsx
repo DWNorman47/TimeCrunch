@@ -6,6 +6,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     prevailing_wage_rate: String(settings?.prevailing_wage_rate ?? 45),
     default_hourly_rate: String(settings?.default_hourly_rate ?? 30),
     overtime_multiplier: String(settings?.overtime_multiplier ?? 1.5),
+    notification_inactive_days: String(settings?.notification_inactive_days ?? 3),
+    notification_start_hour: String(settings?.notification_start_hour ?? 6),
+    notification_end_hour: String(settings?.notification_end_hour ?? 20),
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -22,6 +25,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         prevailing_wage_rate: parseFloat(form.prevailing_wage_rate),
         default_hourly_rate: parseFloat(form.default_hourly_rate),
         overtime_multiplier: parseFloat(form.overtime_multiplier),
+        notification_inactive_days: parseFloat(form.notification_inactive_days),
+        notification_start_hour: parseFloat(form.notification_start_hour),
+        notification_end_hour: parseFloat(form.notification_end_hour),
       });
       onSettingsUpdated(r.data);
       setSaved(true);
@@ -77,11 +83,34 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <span style={styles.suffix}>× regular pay</span>
           </div>
         </div>
+        <div style={styles.divider} />
+        <h4 style={styles.sectionTitle}>Notifications</h4>
+        <div style={styles.row}>
+          <label style={styles.label}>Alert if inactive for</label>
+          <div style={styles.inputGroup}>
+            <input style={styles.input} type="number" min="1" max="30" step="1" value={form.notification_inactive_days} onChange={e => set('notification_inactive_days', e.target.value)} required />
+            <span style={styles.suffix}>days</span>
+          </div>
+        </div>
+        <div style={styles.row}>
+          <label style={styles.label}>Work hours start</label>
+          <div style={styles.inputGroup}>
+            <input style={styles.input} type="number" min="0" max="23" step="1" value={form.notification_start_hour} onChange={e => set('notification_start_hour', e.target.value)} required />
+            <span style={styles.suffix}>:00</span>
+          </div>
+        </div>
+        <div style={styles.row}>
+          <label style={styles.label}>Work hours end</label>
+          <div style={styles.inputGroup}>
+            <input style={styles.input} type="number" min="0" max="23" step="1" value={form.notification_end_hour} onChange={e => set('notification_end_hour', e.target.value)} required />
+            <span style={styles.suffix}>:00</span>
+          </div>
+        </div>
         {error && <p style={styles.error}>{error}</p>}
         <div style={styles.footer}>
           {saved && <span style={styles.savedMsg}>Saved!</span>}
           <button style={styles.saveBtn} type="submit" disabled={saving}>
-            {saving ? 'Saving...' : 'Save Rates'}
+            {saving ? 'Saving...' : 'Save Settings'}
           </button>
         </div>
       </form>
@@ -103,4 +132,6 @@ const styles = {
   footer: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginTop: 4 },
   savedMsg: { color: '#059669', fontSize: 13, fontWeight: 600 },
   saveBtn: { padding: '8px 20px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
+  divider: { borderTop: '1px solid #f0f0f0', margin: '4px 0' },
+  sectionTitle: { fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 4 },
 };

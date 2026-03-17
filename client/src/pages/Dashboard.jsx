@@ -33,6 +33,7 @@ export default function Dashboard() {
 
   const handleEntryAdded = entry => setEntries(prev => [entry, ...prev]);
   const handleEntryDeleted = id => setEntries(prev => prev.filter(e => e.id !== id));
+  const handleEntryUpdated = entry => setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, ...entry } : e));
 
   const handleLanguageChange = async lang => {
     try {
@@ -70,7 +71,7 @@ export default function Dashboard() {
         {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 45} />}
         <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} />
         {loading ? <p>{t.loadingEntries}</p> : (
-          <EntryList entries={entries} onDeleted={handleEntryDeleted} t={t} language={user?.language} />
+          <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} />
         )}
       </main>
     </div>

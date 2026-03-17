@@ -18,7 +18,10 @@ async function logAudit(companyId, actorId, actorName, action, entityType, entit
 
 async function getSettings(companyId) {
   const result = await pool.query('SELECT key, value FROM settings WHERE company_id = $1', [companyId]);
-  const s = { prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5 };
+  const s = {
+    prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5,
+    notification_inactive_days: 3, notification_start_hour: 6, notification_end_hour: 20,
+  };
   result.rows.forEach(r => { s[r.key] = parseFloat(r.value); });
   return s;
 }
@@ -36,14 +39,18 @@ router.get('/settings', requireAdmin, async (req, res) => {
 
 // Update settings
 router.patch('/settings', requireAdmin, async (req, res) => {
-  const allowed = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
+  const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
+  const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour'];
+  const allowed = [...rateKeys, ...notifKeys];
   const companyId = req.user.company_id;
   try {
     const changed = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         const val = parseFloat(req.body[key]);
-        if (isNaN(val) || val <= 0) return res.status(400).json({ error: `Invalid value for ${key}` });
+        if (isNaN(val)) return res.status(400).json({ error: `Invalid value for ${key}` });
+        if (rateKeys.includes(key) && val <= 0) return res.status(400).json({ error: `Invalid value for ${key}` });
+        if (notifKeys.includes(key) && val < 0) return res.status(400).json({ error: `Invalid value for ${key}` });
         await pool.query(
           'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
           [companyId, key, val]
@@ -54,6 +61,29 @@ router.patch('/settings', requireAdmin, async (req, res) => {
     await logAudit(companyId, req.user.id, req.user.full_name, 'settings.updated', 'settings', null, 'Settings', changed);
     const s = await getSettings(companyId);
     res.json(s);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Notifications — inactive workers
+router.get('/notifications', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const s = await getSettings(companyId);
+    const days = s.notification_inactive_days || 3;
+    const result = await pool.query(
+      `SELECT u.id, u.full_name, u.email, MAX(te.work_date) as last_entry_date
+       FROM users u
+       LEFT JOIN time_entries te ON te.user_id = u.id AND te.company_id = $1
+       WHERE u.company_id = $1 AND u.active = true AND u.role = 'worker'
+       GROUP BY u.id, u.full_name, u.email
+       HAVING MAX(te.work_date) IS NULL OR MAX(te.work_date) < CURRENT_DATE - $2
+       ORDER BY last_entry_date ASC NULLS FIRST`,
+      [companyId, days]
+    );
+    res.json({ inactive: result.rows, threshold_days: days });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
