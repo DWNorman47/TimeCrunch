@@ -14,6 +14,11 @@ button {
   font-family: inherit;
 }
 
+/* Touch-friendly inputs and buttons */
+input, select, textarea, button {
+  min-height: 40px;
+}
+
 /* ── Animations ── */
 @keyframes pulse {
   0%, 100% { opacity: 1; }
@@ -22,6 +27,7 @@ button {
 
 /* ── Mobile responsive ── */
 @media (max-width: 600px) {
+
   /* Header */
   .header-right {
     gap: 6px !important;
@@ -33,6 +39,9 @@ button {
     padding: 5px 10px !important;
     font-size: 12px !important;
   }
+  .company-name {
+    display: none !important;
+  }
 
   /* Tab bar — scrollable on small screens */
   .tab-bar {
@@ -42,6 +51,12 @@ button {
     scrollbar-width: none;
   }
   .tab-bar::-webkit-scrollbar { display: none; }
+  .tab-bar button {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    padding: 8px 14px !important;
+    font-size: 13px !important;
+  }
 
   /* Form rows stack vertically */
   .form-row {
@@ -61,9 +76,60 @@ button {
   /* General padding reductions */
   .mobile-card {
     padding: 16px !important;
+    border-radius: 10px !important;
   }
   .mobile-main {
-    margin-top: 16px !important;
+    margin-top: 12px !important;
     padding: 0 10px !important;
+    gap: 14px !important;
+  }
+
+  /* Tables scroll horizontally */
+  .table-scroll {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table-scroll table {
+    min-width: 500px;
+  }
+
+  /* Filter/summary rows stack */
+  .filter-row {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  /* Summary stats grid goes 2-col on mobile */
+  .stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Larger clock buttons on mobile */
+  .clock-btn {
+    font-size: 18px !important;
+    padding: 16px !important;
+  }
+
+  /* Live workers map */
+  .live-map {
+    height: 250px !important;
+  }
+
+  /* Admin manage workers — hide less-critical columns */
+  .col-hide-mobile {
+    display: none !important;
+  }
+
+  /* History range selector */
+  .range-tabs {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .range-tabs::-webkit-scrollbar { display: none; }
+  .range-tabs button {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
   }
 }

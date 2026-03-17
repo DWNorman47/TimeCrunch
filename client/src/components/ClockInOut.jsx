@@ -93,7 +93,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
           <div style={styles.timer}>{formatElapsed(elapsed)}</div>
         </div>
         {error && <p style={styles.error}>{error}</p>}
-        <button style={styles.clockOutBtn} onClick={handleClockOut} disabled={loading}>
+        <button style={styles.clockOutBtn} className="clock-btn" onClick={handleClockOut} disabled={loading}>
           {loading ? 'Clocking out...' : 'Clock Out'}
         </button>
       </div>
@@ -130,7 +130,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
           />
         </div>
         {error && <p style={styles.error}>{error}</p>}
-        <button style={styles.clockInBtn} onClick={handleClockIn} disabled={loading}>
+        <button style={styles.clockInBtn} className="clock-btn" onClick={handleClockIn} disabled={loading}>
           {loading ? 'Clocking in...' : 'Clock In'}
         </button>
       </div>

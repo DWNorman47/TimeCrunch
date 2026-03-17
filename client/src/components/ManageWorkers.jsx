@@ -198,14 +198,15 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       {workers.length === 0 ? (
         <p style={styles.empty}>No users yet.</p>
       ) : (
+        <div className="table-scroll">
         <table style={styles.table}>
           <thead>
             <tr>
               <th style={styles.th}>Name</th>
-              <th style={styles.th}>Username</th>
+              <th style={styles.th} className="col-hide-mobile">Username</th>
               <th style={styles.th}>Type</th>
-              <th style={styles.th}>Language</th>
-              <th style={styles.th}>Rate</th>
+              <th style={styles.th} className="col-hide-mobile">Language</th>
+              <th style={styles.th} className="col-hide-mobile">Rate</th>
               <th style={styles.th}></th>
             </tr>
           </thead>
@@ -269,6 +270,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
             })}
           </tbody>
         </table>
+        </div>
       )}
 
       <div style={styles.historyFooter}>

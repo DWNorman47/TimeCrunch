@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import ClockInOut from '../components/ClockInOut';
 import TimeEntryForm from '../components/TimeEntryForm';
 import EntryList from '../components/EntryList';
+import WorkerSummary from '../components/WorkerSummary';
 import ChangePassword from '../components/ChangePassword';
 import { getT } from '../i18n';
 import api from '../api';
@@ -45,7 +46,7 @@ export default function Dashboard() {
       <header style={styles.header}>
         <div style={styles.logoGroup}>
           <span style={styles.logo}>Time Crunch</span>
-          {user?.company_name && <span style={styles.companyName}>{user.company_name}</span>}
+          {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         </div>
         <div style={styles.headerRight} className="header-right">
           <span style={styles.userName} className="header-username">{user.full_name}</span>
@@ -64,6 +65,7 @@ export default function Dashboard() {
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
       <main style={styles.main} className="mobile-main">
         <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} />
+        {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} />}
         <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} />
         {loading ? <p>{t.loadingEntries}</p> : (
           <EntryList entries={entries} onDeleted={handleEntryDeleted} t={t} language={user?.language} />

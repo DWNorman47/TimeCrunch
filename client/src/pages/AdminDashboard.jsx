@@ -48,7 +48,7 @@ export default function AdminDashboard() {
       <header style={styles.header}>
         <div style={styles.logoGroup}>
           <span style={styles.logo}>Time Crunch</span>
-          {user?.company_name && <span style={styles.companyName}>{user.company_name}</span>}
+          {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         </div>
         <div style={styles.headerRight}>
           <button style={styles.headerBtn} className="header-btn" onClick={() => setShowChangePassword(true)}>Change Password</button>
