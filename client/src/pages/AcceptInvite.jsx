@@ -1,0 +1,76 @@
+import React, { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import api from '../api';
+
+export default function AcceptInvite() {
+  const [params] = useSearchParams();
+  const token = params.get('token');
+  const navigate = useNavigate();
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+  const [username, setUsername] = useState('');
+
+  const handleSubmit = async e => {
+    e.preventDefault();
+    setError('');
+    if (password !== confirm) return setError('Passwords do not match');
+    if (password.length < 6) return setError('Password must be at least 6 characters');
+    setLoading(true);
+    try {
+      const r = await api.post('/auth/accept-invite', { token, password });
+      setUsername(r.data.username);
+      setDone(true);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!token) return (
+    <div style={styles.page}>
+      <div style={styles.card}>
+        <p style={styles.error}>Invalid invite link.</p>
+      </div>
+    </div>
+  );
+
+  if (done) return (
+    <div style={styles.page}>
+      <div style={styles.card}>
+        <h2 style={styles.title}>You're all set!</h2>
+        <p style={styles.sub}>Your password has been set. Your username is <strong>{username}</strong>.</p>
+        <button style={styles.btn} onClick={() => navigate('/login')}>Go to login</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={styles.page}>
+      <div style={styles.card}>
+        <h2 style={styles.title}>Set your password</h2>
+        <p style={styles.sub}>Welcome to Time Crunch. Create a password to activate your account.</p>
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <input style={styles.input} type="password" placeholder="New password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+          <input style={styles.input} type="password" placeholder="Confirm password" value={confirm} onChange={e => setConfirm(e.target.value)} required />
+          {error && <p style={styles.error}>{error}</p>}
+          <button style={styles.btn} type="submit" disabled={loading}>{loading ? 'Saving...' : 'Set password'}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+const styles = {
+  page: { minHeight: '100vh', background: '#f4f6f9', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  card: { background: '#fff', borderRadius: 12, padding: '40px 36px', boxShadow: '0 4px 24px rgba(0,0,0,0.10)', width: '100%', maxWidth: 400 },
+  title: { fontSize: 22, fontWeight: 700, marginBottom: 8, color: '#1a1a1a' },
+  sub: { color: '#666', fontSize: 14, marginBottom: 24 },
+  form: { display: 'flex', flexDirection: 'column', gap: 14 },
+  input: { padding: '11px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 15 },
+  error: { color: '#e53e3e', fontSize: 13 },
+  btn: { padding: '12px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: 'pointer' },
+};

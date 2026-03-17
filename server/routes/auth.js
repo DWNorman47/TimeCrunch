@@ -153,6 +153,30 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+// Accept invite — set password from invite link
+router.post('/accept-invite', async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'token and password required' });
+  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  try {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE invite_token = $1 AND invite_token_expires > NOW() AND invite_pending = true',
+      [token]
+    );
+    if (result.rowCount === 0) return res.status(400).json({ error: 'Invite link is invalid or has expired' });
+    const user = result.rows[0];
+    const hash = await bcrypt.hash(password, 10);
+    await pool.query(
+      'UPDATE users SET password_hash = $1, invite_token = NULL, invite_token_expires = NULL, invite_pending = false WHERE id = $2',
+      [hash, user.id]
+    );
+    res.json({ success: true, username: user.username });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Change password
 router.post('/change-password', requireAuth, async (req, res) => {
   const { current_password, new_password } = req.body;

@@ -8,6 +8,7 @@ import ProjectReports from '../components/ProjectReports';
 import ChangePassword from '../components/ChangePassword';
 import QuickBooks from '../components/QuickBooks';
 import LiveWorkers from '../components/LiveWorkers';
+import AuditLog from '../components/AuditLog';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -91,6 +92,7 @@ export default function AdminDashboard() {
             <ManageWorkers workers={workers} onWorkerAdded={handleWorkerAdded} onWorkerDeleted={handleWorkerDeleted} onWorkerUpdated={handleWorkerUpdated} onWorkerRestored={handleWorkerRestored} defaultRate={settings?.default_hourly_rate ?? 30} />
             <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} onProjectRestored={handleProjectRestored} />
             <ManageRates settings={settings} onSettingsUpdated={setSettings} />
+            <AuditLog />
           </>
         )}
       </main>

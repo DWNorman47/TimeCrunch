@@ -5,6 +5,11 @@ const LANGUAGES = ['English', 'Spanish'];
 
 export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 30 }) {
   const [form, setForm] = useState({ full_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+  const [addMode, setAddMode] = useState('manual'); // 'manual' | 'invite'
+  const [inviteForm, setInviteForm] = useState({ full_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+  const [inviteError, setInviteError] = useState('');
+  const [inviteSaving, setInviteSaving] = useState(false);
+  const [inviteSent, setInviteSent] = useState('');
   const [error, setError] = useState('');
   const [archivedConflict, setArchivedConflict] = useState(null); // { id, name }
   const [saving, setSaving] = useState(false);
@@ -29,7 +34,24 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   useEffect(() => { loadArchived(); }, []);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const setInvite = (k, v) => setInviteForm(f => ({ ...f, [k]: v }));
   const setEdit = (k, v) => setEditForm(f => ({ ...f, [k]: v }));
+
+  const handleInvite = async e => {
+    e.preventDefault();
+    setInviteError('');
+    setInviteSaving(true);
+    try {
+      const r = await api.post('/admin/workers/invite', inviteForm);
+      onWorkerAdded(r.data);
+      setInviteSent(inviteForm.email);
+      setInviteForm({ full_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+    } catch (err) {
+      setInviteError(err.response?.data?.error || 'Failed to send invite');
+    } finally {
+      setInviteSaving(false);
+    }
+  };
 
   const handleAdd = async e => {
     e.preventDefault();
@@ -107,37 +129,70 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     <div style={styles.card}>
       <div style={styles.cardHeader}>
         <h3 style={styles.cardTitle}>Manage Users</h3>
-        <button style={styles.addBtn} onClick={() => { setShowForm(s => !s); setError(''); setArchivedConflict(null); }}>
+        <button style={styles.addBtn} onClick={() => { setShowForm(s => !s); setError(''); setArchivedConflict(null); setInviteError(''); setInviteSent(''); }}>
           {showForm ? 'Cancel' : '+ Add User'}
         </button>
       </div>
 
       {showForm && (
-        <form onSubmit={handleAdd} style={styles.form}>
-          <input style={styles.input} placeholder="Full name" value={form.full_name} onChange={e => set('full_name', e.target.value)} required />
-          <input style={styles.input} placeholder="Username" value={form.username} onChange={e => set('username', e.target.value)} required />
-          <input style={styles.input} type="password" placeholder="Temporary password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
-          <input style={styles.input} type="email" placeholder="Email (optional, for password reset)" value={form.email} onChange={e => set('email', e.target.value)} />
-          <select style={styles.input} value={form.role} onChange={e => set('role', e.target.value)}>
-            <option value="worker">User</option>
-            <option value="admin">Admin</option>
-          </select>
-          <select style={styles.input} value={form.language} onChange={e => set('language', e.target.value)}>
-            {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
-          </select>
-          <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder="$/hr (30)" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />
-          {error && (
-            <div style={styles.errorBox}>
-              <p style={styles.errorText}>{error}</p>
-              {archivedConflict && (
-                <button type="button" style={styles.restoreInlineBtn} onClick={handleRestoreConflict}>
-                  Restore {archivedConflict.name}
-                </button>
+        <div>
+          <div style={styles.modeTabs}>
+            <button style={addMode === 'manual' ? styles.modeTabActive : styles.modeTab} onClick={() => setAddMode('manual')}>Add manually</button>
+            <button style={addMode === 'invite' ? styles.modeTabActive : styles.modeTab} onClick={() => setAddMode('invite')}>Invite by email</button>
+          </div>
+
+          {addMode === 'manual' ? (
+            <form onSubmit={handleAdd} style={styles.form}>
+              <input style={styles.input} placeholder="Full name" value={form.full_name} onChange={e => set('full_name', e.target.value)} required />
+              <input style={styles.input} placeholder="Username" value={form.username} onChange={e => set('username', e.target.value)} required />
+              <input style={styles.input} type="password" placeholder="Temporary password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
+              <input style={styles.input} type="email" placeholder="Email (optional, for password reset)" value={form.email} onChange={e => set('email', e.target.value)} />
+              <select style={styles.input} value={form.role} onChange={e => set('role', e.target.value)}>
+                <option value="worker">User</option>
+                <option value="admin">Admin</option>
+              </select>
+              <select style={styles.input} value={form.language} onChange={e => set('language', e.target.value)}>
+                {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+              <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder="$/hr (30)" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />
+              {error && (
+                <div style={styles.errorBox}>
+                  <p style={styles.errorText}>{error}</p>
+                  {archivedConflict && (
+                    <button type="button" style={styles.restoreInlineBtn} onClick={handleRestoreConflict}>
+                      Restore {archivedConflict.name}
+                    </button>
+                  )}
+                </div>
               )}
-            </div>
+              <button style={styles.saveBtn} type="submit" disabled={saving}>{saving ? 'Creating...' : 'Create User'}</button>
+            </form>
+          ) : (
+            <form onSubmit={handleInvite} style={styles.form}>
+              {inviteSent ? (
+                <div style={styles.inviteSuccess}>
+                  Invite sent to <strong>{inviteSent}</strong>. They'll receive an email to set their password.
+                  <button type="button" style={{ ...styles.restoreInlineBtn, marginLeft: 12 }} onClick={() => setInviteSent('')}>Send another</button>
+                </div>
+              ) : (
+                <>
+                  <input style={styles.input} placeholder="Full name" value={inviteForm.full_name} onChange={e => setInvite('full_name', e.target.value)} required />
+                  <input style={styles.input} type="email" placeholder="Email address (required)" value={inviteForm.email} onChange={e => setInvite('email', e.target.value)} required />
+                  <select style={styles.input} value={inviteForm.role} onChange={e => setInvite('role', e.target.value)}>
+                    <option value="worker">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <select style={styles.input} value={inviteForm.language} onChange={e => setInvite('language', e.target.value)}>
+                    {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                  <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder="$/hr (30)" value={inviteForm.hourly_rate} onChange={e => setInvite('hourly_rate', e.target.value)} />
+                  {inviteError && <p style={styles.errorText}>{inviteError}</p>}
+                  <button style={styles.saveBtn} type="submit" disabled={inviteSaving}>{inviteSaving ? 'Sending...' : 'Send Invite'}</button>
+                </>
+              )}
+            </form>
           )}
-          <button style={styles.saveBtn} type="submit" disabled={saving}>{saving ? 'Creating...' : 'Create User'}</button>
-        </form>
+        </div>
       )}
 
       {workers.length === 0 ? (
@@ -262,6 +317,10 @@ const styles = {
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   cardTitle: { fontSize: 17, fontWeight: 700 },
   addBtn: { padding: '7px 16px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13 },
+  modeTabs: { display: 'flex', gap: 4, marginBottom: 14, background: '#f0f4ff', borderRadius: 8, padding: 3, width: 'fit-content' },
+  modeTab: { padding: '5px 14px', background: 'none', border: 'none', borderRadius: 6, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 },
+  modeTabActive: { padding: '5px 14px', background: '#fff', border: 'none', borderRadius: 6, fontSize: 13, color: '#1a56db', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+  inviteSuccess: { background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: '#166534' },
   form: { display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'flex-start' },
   input: { padding: '8px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, flex: 1, minWidth: 140 },
   editInput: { padding: '5px 8px', border: '1px solid #c7d2fe', borderRadius: 6, fontSize: 13, width: '100%' },

@@ -1,7 +1,20 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const sgMail = require('@sendgrid/mail');
 const pool = require('../db');
 const { requireAdmin } = require('../middleware/auth');
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+async function logAudit(companyId, actorId, actorName, action, entityType, entityId, entityName, details) {
+  try {
+    await pool.query(
+      'INSERT INTO audit_log (company_id, actor_id, actor_name, action, entity_type, entity_id, entity_name, details) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [companyId, actorId, actorName, action, entityType || null, entityId || null, entityName || null, details ? JSON.stringify(details) : null]
+    );
+  } catch (e) { console.error('Audit log error:', e); }
+}
 
 async function getSettings(companyId) {
   const result = await pool.query('SELECT key, value FROM settings WHERE company_id = $1', [companyId]);
@@ -26,6 +39,7 @@ router.patch('/settings', requireAdmin, async (req, res) => {
   const allowed = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
   const companyId = req.user.company_id;
   try {
+    const changed = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         const val = parseFloat(req.body[key]);
@@ -34,8 +48,10 @@ router.patch('/settings', requireAdmin, async (req, res) => {
           'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
           [companyId, key, val]
         );
+        changed[key] = val;
       }
     }
+    await logAudit(companyId, req.user.id, req.user.full_name, 'settings.updated', 'settings', null, 'Settings', changed);
     const s = await getSettings(companyId);
     res.json(s);
   } catch (err) {
@@ -122,6 +138,7 @@ router.patch('/workers/:id/restore', requireAdmin, async (req, res) => {
       [req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Archived worker not found' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'worker.restored', 'worker', result.rows[0].id, result.rows[0].full_name);
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -192,6 +209,59 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
   }
 });
 
+// Invite a worker by email
+router.post('/workers/invite', requireAdmin, async (req, res) => {
+  const { full_name, email, role, language, hourly_rate } = req.body;
+  if (!full_name || !email) return res.status(400).json({ error: 'full_name and email required' });
+  const companyId = req.user.company_id;
+  const assignedRole = role === 'admin' ? 'admin' : 'worker';
+  const assignedLanguage = language || 'English';
+  const assignedRate = parseFloat(hourly_rate) || 30;
+
+  // Auto-generate username from name
+  const parts = full_name.trim().toLowerCase().split(/\s+/);
+  const base = parts.length > 1 ? parts[0][0] + parts[parts.length - 1] : parts[0];
+  const baseUsername = base.replace(/[^a-z0-9]/g, '');
+  let username = baseUsername;
+  let suffix = 2;
+  while (true) {
+    const exists = await pool.query('SELECT id FROM users WHERE username = $1 AND company_id = $2', [username, companyId]);
+    if (exists.rowCount === 0) break;
+    username = baseUsername + suffix++;
+  }
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  try {
+    const result = await pool.query(
+      `INSERT INTO users (company_id, username, password_hash, full_name, role, language, hourly_rate, email, invite_token, invite_token_expires, invite_pending)
+       VALUES ($1, $2, '', $3, $4, $5, $6, $7, $8, $9, true)
+       RETURNING id, username, full_name, role, language, hourly_rate, email`,
+      [companyId, username, full_name, assignedRole, assignedLanguage, assignedRate, email, token, expires]
+    );
+    const inviteUrl = `${process.env.APP_URL}/accept-invite?token=${token}`;
+    await sgMail.send({
+      from: { name: 'Time Crunch', email: process.env.SENDGRID_FROM_EMAIL },
+      to: email,
+      subject: `You've been invited to Time Crunch`,
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+          <h2 style="color:#1a56db;margin-bottom:8px">You're invited!</h2>
+          <p style="color:#444;margin-bottom:8px">Hi ${full_name}, ${req.user.full_name} has invited you to join Time Crunch.</p>
+          <p style="color:#444;margin-bottom:24px">Your username is: <strong>${username}</strong></p>
+          <a href="${inviteUrl}" style="display:inline-block;background:#1a56db;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700">Set your password</a>
+          <p style="color:#999;font-size:13px;margin-top:24px">This invite expires in 7 days.</p>
+        </div>
+      `,
+    });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'worker.invited', 'worker', result.rows[0].id, full_name, { email });
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Create a worker or admin
 router.post('/workers', requireAdmin, async (req, res) => {
   const { username, password, full_name, first_name, middle_name, last_name, role } = req.body;
@@ -209,6 +279,7 @@ router.post('/workers', requireAdmin, async (req, res) => {
       'INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, language, hourly_rate, email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id, username, full_name, first_name, middle_name, last_name, role, language, hourly_rate, email',
       [companyId, username, hash, full_name, first_name || null, middle_name || null, last_name || null, assignedRole, assignedLanguage, assignedRate, assignedEmail]
     );
+    await logAudit(companyId, req.user.id, req.user.full_name, 'worker.created', 'worker', result.rows[0].id, full_name, { role: assignedRole });
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') {
@@ -251,6 +322,7 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'worker.updated', 'worker', result.rows[0].id, result.rows[0].full_name);
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -262,11 +334,13 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
 router.delete('/workers/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
+    const worker = await pool.query('SELECT full_name FROM users WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
     const result = await pool.query(
       'UPDATE users SET active = false WHERE id = $1 AND active = true AND company_id = $2 RETURNING id',
       [req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'worker.deleted', 'worker', parseInt(req.params.id), worker.rows[0]?.full_name);
     res.json({ removed: true });
   } catch (err) {
     console.error(err);
@@ -405,6 +479,7 @@ router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
       [req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Archived project not found' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'project.restored', 'project', result.rows[0].id, result.rows[0].name);
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -436,6 +511,7 @@ router.patch('/projects/:id', requireAdmin, async (req, res) => {
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'project.updated', 'project', result.rows[0].id, result.rows[0].name);
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -454,6 +530,7 @@ router.post('/projects', requireAdmin, async (req, res) => {
       'INSERT INTO projects (company_id, name, wage_type) VALUES ($1, $2, $3) RETURNING *',
       [companyId, name, wt]
     );
+    await logAudit(companyId, req.user.id, req.user.full_name, 'project.created', 'project', result.rows[0].id, name, { wage_type: wt });
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') {
@@ -473,12 +550,34 @@ router.post('/projects', requireAdmin, async (req, res) => {
 router.delete('/projects/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
+    const project = await pool.query('SELECT name FROM projects WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
     const result = await pool.query(
       'UPDATE projects SET active = false WHERE id = $1 AND active = true AND company_id = $2 RETURNING id',
       [req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'project.deleted', 'project', parseInt(req.params.id), project.rows[0]?.name);
     res.json({ removed: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Audit log
+router.get('/audit-log', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const limit = parseInt(req.query.limit) || 50;
+  const offset = parseInt(req.query.offset) || 0;
+  try {
+    const result = await pool.query(
+      `SELECT id, actor_name, action, entity_type, entity_id, entity_name, details, created_at
+       FROM audit_log WHERE company_id = $1
+       ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+      [companyId, limit, offset]
+    );
+    const total = await pool.query('SELECT COUNT(*) FROM audit_log WHERE company_id = $1', [companyId]);
+    res.json({ entries: result.rows, total: parseInt(total.rows[0].count) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

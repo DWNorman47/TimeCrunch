@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import Landing from './pages/Landing';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import AcceptInvite from './pages/AcceptInvite';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 
@@ -26,6 +27,7 @@ function AppRoutes() {
       <Route path="/register" element={user ? <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/admin" element={<PrivateRoute adminOnly><AdminDashboard /></PrivateRoute>} />
       <Route path="/" element={user ? <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Landing />} />
