@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import api from '../api';
 
 function getSavedCompanies() {
   try { return JSON.parse(localStorage.getItem('tc_companies') || '[]'); } catch { return []; }
@@ -21,6 +22,8 @@ export default function Login() {
   const [otherText, setOtherText] = useState('');
   const [form, setForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState('');
+  const [resentConfirmation, setResentConfirmation] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const companyName = selected === OTHER ? otherText : selected;
@@ -35,7 +38,14 @@ export default function Login() {
       saveCompany(companyName.trim());
       navigate(user.role === 'admin' ? '/admin' : '/dashboard');
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
+      const data = err.response?.data;
+      if (data?.error === 'email_not_confirmed') {
+        setUnconfirmedEmail(data.email || '');
+        setError('Please confirm your email before signing in.');
+      } else {
+        setUnconfirmedEmail('');
+        setError(data?.error || 'Login failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -96,7 +106,23 @@ export default function Login() {
             onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
             required
           />
-          {error && <p style={styles.error}>{error}</p>}
+          {error && (
+            <div>
+              <p style={styles.error}>{error}</p>
+              {unconfirmedEmail && (
+                <button
+                  type="button"
+                  style={styles.resendBtn}
+                  onClick={() => {
+                    api.post('/auth/resend-confirmation', { email: unconfirmedEmail })
+                      .then(() => setResentConfirmation(true));
+                  }}
+                >
+                  {resentConfirmation ? 'Sent! Check your inbox.' : 'Resend confirmation email'}
+                </button>
+              )}
+            </div>
+          )}
           <button style={styles.button} type="submit" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
@@ -123,4 +149,5 @@ const styles = {
   registerLink: { marginTop: 20, textAlign: 'center', fontSize: 13, color: '#666' },
   link: { color: '#1a56db', fontWeight: 600, textDecoration: 'none' },
   forgotLink: { display: 'block', textAlign: 'right', fontSize: 13, color: '#6b7280', textDecoration: 'none', marginTop: 4 },
+  resendBtn: { background: 'none', border: 'none', color: '#1a56db', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '4px 0', textDecoration: 'underline' },
 };

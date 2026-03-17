@@ -3,6 +3,14 @@ import api from '../api';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import BillPDF from './BillPDF';
 
+function downloadCSV(rows, filename) {
+  const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 function defaultDates() {
   const today = new Date();
   const from = new Date(today);
@@ -80,6 +88,14 @@ export default function WorkerMetrics({ worker }) {
                 <button style={styles.previewBtn} onClick={() => setShowPreview(p => !p)}>
                   {showPreview ? 'Hide Preview' : 'Preview Bill'}
                 </button>
+                <button style={styles.csvBtn} onClick={() => {
+                  const headers = ['Date', 'Project', 'Wage Type', 'Start', 'End', 'Hours'];
+                  const rows = billData.entries.map(e => {
+                    const h = ((new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000).toFixed(2);
+                    return [e.work_date?.toString().substring(0,10), e.project_name, e.wage_type, e.start_time, e.end_time, h];
+                  });
+                  downloadCSV([headers, ...rows], `${worker.username}-${from||'all'}-to-${to||'all'}.csv`);
+                }}>Export CSV</button>
                 <PDFDownloadLink
                   document={<BillPDF data={billData} />}
                   fileName={`bill-${worker.username}-${from || 'all'}-to-${to || 'all'}.pdf`}
@@ -130,6 +146,7 @@ const styles = {
   billSummary: { display: 'flex', gap: 20, fontSize: 14, flexWrap: 'wrap', marginBottom: 12 },
   btnRow: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
   previewBtn: { padding: '10px 20px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
+  csvBtn: { padding: '10px 20px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
   pdfBtn: { display: 'inline-block', padding: '10px 20px', background: '#059669', color: '#fff', borderRadius: 8, fontWeight: 600, fontSize: 14, textDecoration: 'none' },
   pdfViewer: { width: '100%', height: 600, marginTop: 16, borderRadius: 8, border: '1px solid #e5e7eb' },
 };

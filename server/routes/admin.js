@@ -276,7 +276,7 @@ router.post('/workers', requireAdmin, async (req, res) => {
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      'INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, language, hourly_rate, email) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id, username, full_name, first_name, middle_name, last_name, role, language, hourly_rate, email',
+      'INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, language, hourly_rate, email, email_confirmed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true) RETURNING id, username, full_name, first_name, middle_name, last_name, role, language, hourly_rate, email',
       [companyId, username, hash, full_name, first_name || null, middle_name || null, last_name || null, assignedRole, assignedLanguage, assignedRate, assignedEmail]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.created', 'worker', result.rows[0].id, full_name, { role: assignedRole });

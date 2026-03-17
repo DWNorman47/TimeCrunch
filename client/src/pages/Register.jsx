@@ -10,6 +10,7 @@ export default function Register() {
   const [usernameEdited, setUsernameEdited] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(null); // email address waiting for confirmation
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -34,6 +35,7 @@ export default function Register() {
     const full_name = [form.first_name, form.middle_name, form.last_name].filter(Boolean).join(' ');
     try {
       const r = await api.post('/auth/register', { ...form, full_name });
+      if (r.data.pending_confirmation) { setConfirming(r.data.email); return; }
       login(r.data.token, r.data.user);
       navigate('/admin');
     } catch (err) {
@@ -42,6 +44,26 @@ export default function Register() {
       setSaving(false);
     }
   };
+
+  if (confirming) return (
+    <div style={styles.page}>
+      <div style={styles.card}>
+        <h1 style={styles.logo}>Time Crunch</h1>
+        <div style={{ fontSize: 48, textAlign: 'center', marginBottom: 12 }}>📧</div>
+        <h2 style={styles.title}>Check your email</h2>
+        <p style={{ color: '#666', fontSize: 14, textAlign: 'center', marginBottom: 16 }}>
+          We sent a confirmation link to <strong>{confirming}</strong>. Click it to activate your account.
+        </p>
+        <p style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center' }}>
+          Didn't get it? Check your spam folder or{' '}
+          <button style={{ background: 'none', border: 'none', color: '#1a56db', fontWeight: 600, cursor: 'pointer', fontSize: 13, padding: 0 }}
+            onClick={() => api.post('/auth/resend-confirmation', { email: confirming })}>
+            resend
+          </button>.
+        </p>
+      </div>
+    </div>
+  );
 
   return (
     <div style={styles.page}>
@@ -80,13 +102,14 @@ export default function Register() {
             onChange={e => handleNameChange('last_name', e.target.value)}
             required
           />
-          <label style={styles.label}>Email <span style={styles.hint}>(for password reset)</span></label>
+          <label style={styles.label}>Email</label>
           <input
             style={styles.input}
             type="email"
             placeholder="you@example.com"
             value={form.email}
             onChange={e => set('email', e.target.value)}
+            required
           />
           <label style={styles.label}>Username</label>
           <input
