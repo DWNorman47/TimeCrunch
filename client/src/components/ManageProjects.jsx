@@ -10,6 +10,10 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editWageType, setEditWageType] = useState('regular');
+  const [editGeoLat, setEditGeoLat] = useState('');
+  const [editGeoLng, setEditGeoLng] = useState('');
+  const [editGeoRadius, setEditGeoRadius] = useState('');
+  const [geoLocating, setGeoLocating] = useState(false);
   const [archived, setArchived] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loadingArchived, setLoadingArchived] = useState(false);
@@ -51,13 +55,43 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
 
   const handleEditSave = async (id) => {
     if (!editName.trim()) return;
+    const payload = { name: editName.trim(), wage_type: editWageType };
+    if (editGeoLat && editGeoLng && editGeoRadius) {
+      payload.geo_lat = editGeoLat;
+      payload.geo_lng = editGeoLng;
+      payload.geo_radius_ft = editGeoRadius;
+    }
     try {
-      const r = await api.patch(`/admin/projects/${id}`, { name: editName.trim(), wage_type: editWageType });
+      const r = await api.patch(`/admin/projects/${id}`, payload);
       onProjectUpdated(r.data);
       setEditingId(null);
     } catch {
       alert('Failed to update project');
     }
+  };
+
+  const handleClearGeofence = async (id) => {
+    if (!confirm('Remove geofence from this project?')) return;
+    try {
+      const r = await api.patch(`/admin/projects/${id}`, { clear_geofence: true });
+      onProjectUpdated(r.data);
+    } catch {
+      alert('Failed to remove geofence');
+    }
+  };
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) return;
+    setGeoLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setEditGeoLat(pos.coords.latitude.toFixed(6));
+        setEditGeoLng(pos.coords.longitude.toFixed(6));
+        setGeoLocating(false);
+      },
+      () => setGeoLocating(false),
+      { timeout: 8000 }
+    );
   };
 
   const handleRemove = async (id, projectName) => {
@@ -130,36 +164,60 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
           <tbody>
             {projects.map(p => editingId === p.id ? (
               <tr key={p.id} style={{ ...styles.tr, background: '#f0f4ff' }}>
-                <td style={styles.td}>
-                  <input
-                    style={styles.editInput}
-                    value={editName}
-                    onChange={e => setEditName(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Escape') setEditingId(null); }}
-                    autoFocus
-                  />
-                </td>
-                <td style={styles.td}>
-                  <select style={styles.editInput} value={editWageType} onChange={e => setEditWageType(e.target.value)}>
-                    <option value="regular">Regular Wages</option>
-                    <option value="prevailing">Prevailing Wages</option>
-                  </select>
-                </td>
-                <td style={styles.tdAction}>
-                  <button style={styles.saveBtn} onClick={() => handleEditSave(p.id)}>Save</button>
-                  <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+                <td style={styles.td} colSpan={3}>
+                  <div style={styles.editBlock}>
+                    <div style={styles.editRow}>
+                      <input
+                        style={{ ...styles.editInput, flex: 2 }}
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Escape') setEditingId(null); }}
+                        autoFocus
+                        placeholder="Project name"
+                      />
+                      <select style={styles.editInput} value={editWageType} onChange={e => setEditWageType(e.target.value)}>
+                        <option value="regular">Regular Wages</option>
+                        <option value="prevailing">Prevailing Wages</option>
+                      </select>
+                      <button style={styles.saveBtn} onClick={() => handleEditSave(p.id)}>Save</button>
+                      <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+                    </div>
+                    <div style={styles.geoSection}>
+                      <span style={styles.geoLabel}>📍 Geofence (optional)</span>
+                      <div style={styles.geoFields}>
+                        <input style={styles.geoInput} type="number" step="0.000001" placeholder="Latitude" value={editGeoLat} onChange={e => setEditGeoLat(e.target.value)} />
+                        <input style={styles.geoInput} type="number" step="0.000001" placeholder="Longitude" value={editGeoLng} onChange={e => setEditGeoLng(e.target.value)} />
+                        <input style={styles.geoInput} type="number" min="50" step="50" placeholder="Radius (ft)" value={editGeoRadius} onChange={e => setEditGeoRadius(e.target.value)} />
+                        <button style={styles.geoLocBtn} type="button" onClick={useMyLocation} disabled={geoLocating}>
+                          {geoLocating ? '...' : '📡 My location'}
+                        </button>
+                      </div>
+                      <p style={styles.geoHint}>Workers outside the radius will be blocked from clocking in. Leave blank to remove.</p>
+                    </div>
+                  </div>
                 </td>
               </tr>
             ) : (
               <tr key={p.id} style={styles.tr}>
-                <td style={styles.td}>{p.name}</td>
+                <td style={styles.td}>
+                  {p.name}
+                  {p.geo_radius_ft && <span style={styles.geoBadge}>📍 {p.geo_radius_ft.toLocaleString()} ft</span>}
+                </td>
                 <td style={styles.td}>
                   <span style={{ ...styles.wageBadge, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                     {p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}
                   </span>
                 </td>
                 <td style={styles.tdAction}>
-                  <button style={styles.editBtn} onClick={() => { setEditingId(p.id); setEditName(p.name); setEditWageType(p.wage_type); }}>Edit</button>
+                  <button style={styles.editBtn} onClick={() => {
+                    setEditingId(p.id);
+                    setEditName(p.name);
+                    setEditWageType(p.wage_type);
+                    setEditGeoLat(p.geo_lat || '');
+                    setEditGeoLng(p.geo_lng || '');
+                    setEditGeoRadius(p.geo_radius_ft || '');
+                  }}>Edit</button>
+                  {p.geo_radius_ft && <button style={styles.clearGeoBtn} onClick={() => handleClearGeofence(p.id)}>✕ Fence</button>}
                   <button style={styles.removeBtn} onClick={() => handleRemove(p.id, p.name)}>Remove</button>
                 </td>
               </tr>
@@ -233,4 +291,14 @@ const styles = {
   historyToggle: { background: 'none', border: 'none', color: '#666', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '2px 0' },
   historySection: { marginTop: 10 },
   restoreBtn: { background: 'none', border: '1px solid #6ee7b7', color: '#059669', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 },
+  editBlock: { display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' },
+  editRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
+  geoSection: { background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 },
+  geoLabel: { fontSize: 12, fontWeight: 700, color: '#0369a1' },
+  geoFields: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
+  geoInput: { padding: '5px 8px', border: '1px solid #bae6fd', borderRadius: 6, fontSize: 13, width: 130 },
+  geoLocBtn: { padding: '5px 10px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
+  geoHint: { fontSize: 11, color: '#0369a1', margin: 0, opacity: 0.8 },
+  geoBadge: { display: 'inline-block', marginLeft: 8, fontSize: 11, background: '#e0f2fe', color: '#0369a1', padding: '1px 7px', borderRadius: 10, fontWeight: 600 },
+  clearGeoBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#9ca3af', padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', marginRight: 4 },
 };

@@ -3,6 +3,15 @@ const pool = require('../db');
 const sgMail = require('@sendgrid/mail');
 const { requireAuth } = require('../middleware/auth');
 
+function haversineDistanceFt(lat1, lng1, lat2, lng2) {
+  const R = 20902231; // Earth radius in feet
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // GET /api/clock/status — returns active clock-in for this user, if any
@@ -28,12 +37,29 @@ router.post('/in', requireAuth, async (req, res) => {
   if (!project_id) return res.status(400).json({ error: 'project_id required' });
   const companyId = req.user.company_id;
   try {
-    // Verify project belongs to this company
+    // Verify project belongs to this company and fetch geofence
     const proj = await pool.query(
-      'SELECT id FROM projects WHERE id = $1 AND company_id = $2 AND active = true',
+      'SELECT id, geo_lat, geo_lng, geo_radius_ft FROM projects WHERE id = $1 AND company_id = $2 AND active = true',
       [project_id, companyId]
     );
     if (proj.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
+
+    // Geofence check
+    const { geo_lat, geo_lng, geo_radius_ft } = proj.rows[0];
+    if (geo_lat && geo_lng && geo_radius_ft) {
+      if (!lat || !lng) {
+        return res.status(403).json({ error: 'This job site requires location access to clock in. Please enable GPS and try again.', geofence: true });
+      }
+      const distanceFt = Math.round(haversineDistanceFt(lat, lng, parseFloat(geo_lat), parseFloat(geo_lng)));
+      if (distanceFt > geo_radius_ft) {
+        return res.status(403).json({
+          error: `You are ${distanceFt.toLocaleString()} ft from the job site. Must be within ${geo_radius_ft.toLocaleString()} ft to clock in.`,
+          geofence: true,
+          distance_ft: distanceFt,
+          radius_ft: geo_radius_ft,
+        });
+      }
+    }
 
     // Upsert — replace any existing clock-in (safety valve)
     const result = await pool.query(

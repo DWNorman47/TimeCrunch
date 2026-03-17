@@ -61,7 +61,12 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
       setStatus(r.data);
       setNotes('');
     } catch (err) {
-      setError(err.response?.data?.error || 'Clock-in failed');
+      const data = err.response?.data;
+      if (data?.geofence) {
+        setError(data.error);
+      } else {
+        setError(data?.error || 'Clock-in failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -198,7 +203,7 @@ const styles = {
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   label: { fontSize: 13, fontWeight: 600, color: '#555', display: 'block', marginBottom: 4 },
   input: { padding: '9px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, width: '100%' },
-  error: { color: '#fca5a5', fontSize: 13, margin: 0 },
+  error: { color: '#ef4444', fontSize: 13, margin: 0, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px' },
   clockInBtn: { padding: '13px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 700 },
   clockOutBtn: { width: '100%', padding: '13px', background: 'rgba(255,255,255,0.2)', color: '#fff', border: '2px solid rgba(255,255,255,0.5)', borderRadius: 8, fontSize: 16, fontWeight: 700 },
   clockOutStep: { display: 'flex', flexDirection: 'column', gap: 12 },

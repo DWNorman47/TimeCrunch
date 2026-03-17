@@ -545,9 +545,9 @@ router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
   }
 });
 
-// Update project (name and/or wage_type)
+// Update project (name and/or wage_type and/or geofence)
 router.patch('/projects/:id', requireAdmin, async (req, res) => {
-  const { wage_type, name } = req.body;
+  const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence } = req.body;
   if (wage_type !== undefined && !['regular', 'prevailing'].includes(wage_type)) {
     return res.status(400).json({ error: 'wage_type must be regular or prevailing' });
   }
@@ -561,6 +561,13 @@ router.patch('/projects/:id', requireAdmin, async (req, res) => {
     let idx = 1;
     if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name.trim()); }
     if (wage_type !== undefined) { fields.push(`wage_type = $${idx++}`); values.push(wage_type); }
+    if (clear_geofence) {
+      fields.push(`geo_lat = NULL`, `geo_lng = NULL`, `geo_radius_ft = NULL`);
+    } else {
+      if (geo_lat !== undefined) { fields.push(`geo_lat = $${idx++}`); values.push(parseFloat(geo_lat)); }
+      if (geo_lng !== undefined) { fields.push(`geo_lng = $${idx++}`); values.push(parseFloat(geo_lng)); }
+      if (geo_radius_ft !== undefined) { fields.push(`geo_radius_ft = $${idx++}`); values.push(parseInt(geo_radius_ft)); }
+    }
     if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
     values.push(req.params.id);
     values.push(companyId);
