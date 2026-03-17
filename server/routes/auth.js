@@ -62,6 +62,11 @@ router.post('/register', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const existing = await client.query('SELECT id FROM companies WHERE lower(name) = lower($1)', [company_name]);
+    if (existing.rowCount > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'A company with that name already exists' });
+    }
     const companyResult = await client.query(
       'INSERT INTO companies (name, slug) VALUES ($1, $2) RETURNING id',
       [company_name, slug]
