@@ -594,6 +594,67 @@ router.delete('/projects/:id', requireAdmin, async (req, res) => {
   }
 });
 
+// GET /admin/analytics
+router.get('/analytics', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const [daily, projects, workers, summary] = await Promise.all([
+      // Hours per day for the last 14 days
+      pool.query(
+        `SELECT work_date::text as date,
+                ROUND(SUM(EXTRACT(EPOCH FROM (end_time - start_time)) / 3600)::numeric, 2) as hours
+         FROM time_entries
+         WHERE company_id = $1 AND work_date >= CURRENT_DATE - 13
+         GROUP BY work_date ORDER BY work_date ASC`,
+        [companyId]
+      ),
+      // Top projects by hours, last 30 days
+      pool.query(
+        `SELECT p.name,
+                ROUND(SUM(EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600)::numeric, 2) as hours
+         FROM time_entries te
+         JOIN projects p ON te.project_id = p.id
+         WHERE te.company_id = $1 AND te.work_date >= CURRENT_DATE - 29
+         GROUP BY p.name ORDER BY hours DESC LIMIT 10`,
+        [companyId]
+      ),
+      // Top workers by hours, last 30 days
+      pool.query(
+        `SELECT u.full_name as name,
+                ROUND(SUM(EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600)::numeric, 2) as hours
+         FROM time_entries te
+         JOIN users u ON te.user_id = u.id
+         WHERE te.company_id = $1 AND te.work_date >= CURRENT_DATE - 29
+         GROUP BY u.full_name ORDER BY hours DESC LIMIT 10`,
+        [companyId]
+      ),
+      // Summary stats
+      pool.query(
+        `SELECT
+           ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('week', CURRENT_DATE)
+             THEN EXTRACT(EPOCH FROM (end_time - start_time)) / 3600 END), 0)::numeric, 1) as hours_this_week,
+           COUNT(DISTINCT CASE WHEN work_date >= date_trunc('week', CURRENT_DATE) THEN user_id END) as active_workers_this_week,
+           COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN user_id END) as active_workers_this_month,
+           ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE)
+             THEN EXTRACT(EPOCH FROM (end_time - start_time)) / 3600 END), 0)::numeric, 1) as hours_this_month,
+           COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_approvals
+         FROM time_entries WHERE company_id = $1`,
+        [companyId]
+      ),
+    ]);
+
+    res.json({
+      daily_hours: daily.rows,
+      project_hours: projects.rows,
+      worker_hours: workers.rows,
+      summary: summary.rows[0],
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET /admin/entries/pending — all pending time entries for this company
 router.get('/entries/pending', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;

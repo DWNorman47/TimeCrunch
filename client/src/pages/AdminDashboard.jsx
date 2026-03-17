@@ -10,6 +10,7 @@ import QuickBooks from '../components/QuickBooks';
 import LiveWorkers from '../components/LiveWorkers';
 import AuditLog from '../components/AuditLog';
 import ApprovalQueue from '../components/ApprovalQueue';
+import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -20,7 +21,7 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const TABS = ['live', 'approvals', 'metrics', 'projects', 'manage', 'integrations'];
+  const TABS = ['live', 'analytics', 'approvals', 'metrics', 'projects', 'manage', 'integrations'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'live');
 
@@ -62,6 +63,7 @@ export default function AdminDashboard() {
       <main style={styles.main}>
         <div style={styles.tabs} className="tab-bar">
           <button style={tab === 'live' ? styles.tabActive : styles.tab} onClick={() => switchTab('live')}>🟢 Live</button>
+          <button style={tab === 'analytics' ? styles.tabActive : styles.tab} onClick={() => switchTab('analytics')}>Analytics</button>
           <button style={tab === 'approvals' ? styles.tabActive : styles.tab} onClick={() => switchTab('approvals')}>Approvals</button>
           <button style={tab === 'metrics' ? styles.tabActive : styles.tab} onClick={() => switchTab('metrics')}>Worker Reports</button>
           <button style={tab === 'projects' ? styles.tabActive : styles.tab} onClick={() => switchTab('projects')}>Project Reports</button>
@@ -71,6 +73,11 @@ export default function AdminDashboard() {
 
         {loading ? <p>Loading...</p> : tab === 'live' ? (
           <LiveWorkers />
+        ) : tab === 'analytics' ? (
+          <>
+            <h2 style={styles.heading}>Analytics</h2>
+            <AnalyticsDashboard />
+          </>
         ) : tab === 'approvals' ? (
           <>
             <h2 style={styles.heading}>Entry Approvals</h2>
