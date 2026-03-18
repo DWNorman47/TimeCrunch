@@ -13,6 +13,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   const [editGeoLat, setEditGeoLat] = useState('');
   const [editGeoLng, setEditGeoLng] = useState('');
   const [editGeoRadius, setEditGeoRadius] = useState('');
+  const [editBudgetHours, setEditBudgetHours] = useState('');
+  const [editBudgetDollars, setEditBudgetDollars] = useState('');
   const [geoLocating, setGeoLocating] = useState(false);
   const [archived, setArchived] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -61,6 +63,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       payload.geo_lng = editGeoLng;
       payload.geo_radius_ft = editGeoRadius;
     }
+    if (editBudgetHours !== '') payload.budget_hours = editBudgetHours || null;
+    if (editBudgetDollars !== '') payload.budget_dollars = editBudgetDollars || null;
     try {
       const r = await api.patch(`/admin/projects/${id}`, payload);
       onProjectUpdated(r.data);
@@ -194,6 +198,20 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       </div>
                       <p style={styles.geoHint}>Workers outside the radius will be blocked from clocking in. Leave blank to remove.</p>
                     </div>
+                    <div style={styles.budgetSection}>
+                      <span style={styles.budgetLabel}>💰 Budget (optional)</span>
+                      <div style={styles.budgetFields}>
+                        <div style={styles.budgetField}>
+                          <label style={styles.budgetFieldLabel}>Hours</label>
+                          <input style={styles.geoInput} type="number" min="0" step="0.5" placeholder="e.g. 200" value={editBudgetHours} onChange={e => setEditBudgetHours(e.target.value)} />
+                        </div>
+                        <div style={styles.budgetField}>
+                          <label style={styles.budgetFieldLabel}>Dollars ($)</label>
+                          <input style={styles.geoInput} type="number" min="0" step="100" placeholder="e.g. 15000" value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
+                        </div>
+                      </div>
+                      <p style={styles.geoHint}>Shows a burn bar in Project Reports. Leave blank for no budget.</p>
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -216,6 +234,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                     setEditGeoLat(p.geo_lat || '');
                     setEditGeoLng(p.geo_lng || '');
                     setEditGeoRadius(p.geo_radius_ft || '');
+                    setEditBudgetHours(p.budget_hours || '');
+                    setEditBudgetDollars(p.budget_dollars || '');
                   }}>Edit</button>
                   {p.geo_radius_ft && <button style={styles.clearGeoBtn} onClick={() => handleClearGeofence(p.id)}>✕ Fence</button>}
                   <button style={styles.removeBtn} onClick={() => handleRemove(p.id, p.name)}>Remove</button>
@@ -301,4 +321,9 @@ const styles = {
   geoHint: { fontSize: 11, color: '#0369a1', margin: 0, opacity: 0.8 },
   geoBadge: { display: 'inline-block', marginLeft: 8, fontSize: 11, background: '#e0f2fe', color: '#0369a1', padding: '1px 7px', borderRadius: 10, fontWeight: 600 },
   clearGeoBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#9ca3af', padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', marginRight: 4 },
+  budgetSection: { background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 },
+  budgetLabel: { fontSize: 12, fontWeight: 700, color: '#92400e' },
+  budgetFields: { display: 'flex', gap: 12, flexWrap: 'wrap' },
+  budgetField: { display: 'flex', flexDirection: 'column', gap: 3 },
+  budgetFieldLabel: { fontSize: 11, color: '#92400e', fontWeight: 600 },
 };

@@ -5,6 +5,7 @@ const sgMail = require('@sendgrid/mail');
 const pool = require('../db');
 const { requireAdmin } = require('../middleware/auth');
 const { sendPushToUser } = require('../push');
+const { sendEmail } = require('../email');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -484,7 +485,7 @@ router.get('/projects/metrics', requireAdmin, async (req, res) => {
         WHERE wage_type = 'regular' AND company_id = $1
         GROUP BY project_id, work_date
       )
-      SELECT p.id, p.name,
+      SELECT p.id, p.name, p.budget_hours, p.budget_dollars,
         COUNT(te.id) as total_entries,
         COUNT(DISTINCT te.user_id) as worker_count,
         COALESCE(SUM(EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600), 0) as total_hours,
@@ -548,7 +549,7 @@ router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
 
 // Update project (name and/or wage_type and/or geofence)
 router.patch('/projects/:id', requireAdmin, async (req, res) => {
-  const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence } = req.body;
+  const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence, budget_hours, budget_dollars } = req.body;
   if (wage_type !== undefined && !['regular', 'prevailing'].includes(wage_type)) {
     return res.status(400).json({ error: 'wage_type must be regular or prevailing' });
   }
@@ -569,6 +570,8 @@ router.patch('/projects/:id', requireAdmin, async (req, res) => {
       if (geo_lng !== undefined) { fields.push(`geo_lng = $${idx++}`); values.push(parseFloat(geo_lng)); }
       if (geo_radius_ft !== undefined) { fields.push(`geo_radius_ft = $${idx++}`); values.push(parseInt(geo_radius_ft)); }
     }
+    if (budget_hours !== undefined) { fields.push(`budget_hours = $${idx++}`); values.push(budget_hours === null ? null : parseFloat(budget_hours)); }
+    if (budget_dollars !== undefined) { fields.push(`budget_dollars = $${idx++}`); values.push(budget_dollars === null ? null : parseFloat(budget_dollars)); }
     if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
     values.push(req.params.id);
     values.push(companyId);
@@ -696,12 +699,12 @@ router.get('/entries/pending', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
-      `SELECT te.*, u.full_name as worker_name, p.name as project_name
+      `SELECT te.*, u.full_name as worker_name, u.email as worker_email, p.name as project_name
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
        LEFT JOIN projects p ON te.project_id = p.id
        WHERE te.company_id = $1 AND te.status = 'pending'
-       ORDER BY te.work_date DESC, te.start_time DESC`,
+       ORDER BY te.worker_signed_at DESC NULLS LAST, te.work_date DESC, te.start_time DESC`,
       [companyId]
     );
     res.json(result.rows);
@@ -740,6 +743,13 @@ router.patch('/entries/:id/approve', requireAdmin, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.approved', 'time_entry', parseInt(req.params.id), null);
+    const worker = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [result.rows[0].user_id]);
+    if (worker.rows[0]?.email) {
+      const { work_date, start_time, end_time } = result.rows[0];
+      sendEmail(worker.rows[0].email, 'Time entry approved ✓',
+        `<p>Hi ${worker.rows[0].full_name},</p><p>Your time entry for <b>${work_date?.toString().substring(0,10)}</b> (${start_time}–${end_time}) has been <b style="color:#059669">approved</b>.</p><p>— Time Crunch</p>`);
+    }
+    sendPushToUser(result.rows[0].user_id, { title: 'Time entry approved', body: 'An admin approved your time entry.', url: '/dashboard' });
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -759,6 +769,12 @@ router.patch('/entries/:id/reject', requireAdmin, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.rejected', 'time_entry', parseInt(req.params.id), null, { note });
+    const rejWorker = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [result.rows[0].user_id]);
+    if (rejWorker.rows[0]?.email) {
+      const { work_date, start_time, end_time } = result.rows[0];
+      sendEmail(rejWorker.rows[0].email, 'Time entry rejected',
+        `<p>Hi ${rejWorker.rows[0].full_name},</p><p>Your time entry for <b>${work_date?.toString().substring(0,10)}</b> (${start_time}–${end_time}) was <b style="color:#ef4444">rejected</b>${note ? ` with the note: <i>${note}</i>` : ''}.</p><p>Please log in to review and resubmit.</p><p>— Time Crunch</p>`);
+    }
     sendPushToUser(result.rows[0].user_id, {
       title: 'Time entry rejected',
       body: note ? `Reason: ${note}` : 'An admin rejected your time entry.',
@@ -854,6 +870,129 @@ router.get('/export', requireAdmin, async (req, res) => {
     ];
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="timecrunch-${from}-to-${to}.csv"`);
+    res.send(lines.join('\r\n'));
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Overtime report
+router.get('/overtime-report', requireAdmin, async (req, res) => {
+  const { from, to } = req.query;
+  if (!from || !to) return res.status(400).json({ error: 'from and to required' });
+  const companyId = req.user.company_id;
+  try {
+    const s = await getSettings(companyId);
+    const rule = s.overtime_rule || 'daily';
+    const threshold = parseFloat(s.overtime_threshold) || 8;
+    const otMult = parseFloat(s.overtime_multiplier) || 1.5;
+    const defaultRate = parseFloat(s.default_hourly_rate) || 30;
+    const prevRate = parseFloat(s.prevailing_wage_rate) || 45;
+
+    const workers = await pool.query(
+      `SELECT u.id, u.full_name, u.hourly_rate FROM users u
+       WHERE u.company_id = $1 AND u.role = 'worker' AND u.active = true
+       ORDER BY u.full_name`,
+      [companyId]
+    );
+    const entries = await pool.query(
+      `SELECT te.user_id, te.wage_type, te.start_time, te.end_time, te.work_date, te.break_minutes, te.mileage
+       FROM time_entries te
+       WHERE te.company_id = $1 AND te.work_date >= $2 AND te.work_date <= $3 AND te.status = 'approved'`,
+      [companyId, from, to]
+    );
+
+    const byWorker = {};
+    entries.rows.forEach(e => {
+      if (!byWorker[e.user_id]) byWorker[e.user_id] = [];
+      byWorker[e.user_id].push(e);
+    });
+
+    const rows = workers.rows.map(w => {
+      const wEntries = byWorker[w.id] || [];
+      const { regularHours, overtimeHours } = computeOT(wEntries, rule, threshold);
+      const prevHours = wEntries
+        .filter(e => e.wage_type === 'prevailing')
+        .reduce((s, e) => s + (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60, 0);
+      const totalHours = regularHours + overtimeHours + prevHours;
+      const rate = parseFloat(w.hourly_rate) || defaultRate;
+      const regularCost = regularHours * rate;
+      const overtimeCost = overtimeHours * rate * otMult;
+      const prevailingCost = prevHours * prevRate;
+      const totalCost = regularCost + overtimeCost + prevailingCost;
+      const mileage = wEntries.reduce((s, e) => s + (parseFloat(e.mileage) || 0), 0);
+      return {
+        worker_id: w.id, worker_name: w.full_name, rate,
+        regular_hours: parseFloat(regularHours.toFixed(2)),
+        overtime_hours: parseFloat(overtimeHours.toFixed(2)),
+        prevailing_hours: parseFloat(prevHours.toFixed(2)),
+        total_hours: parseFloat(totalHours.toFixed(2)),
+        mileage: parseFloat(mileage.toFixed(1)),
+        regular_cost: parseFloat(regularCost.toFixed(2)),
+        overtime_cost: parseFloat(overtimeCost.toFixed(2)),
+        prevailing_cost: parseFloat(prevailingCost.toFixed(2)),
+        total_cost: parseFloat(totalCost.toFixed(2)),
+      };
+    });
+    res.json(rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Payroll export CSV
+router.get('/payroll-export', requireAdmin, async (req, res) => {
+  const { from, to } = req.query;
+  if (!from || !to) return res.status(400).json({ error: 'from and to required' });
+  const companyId = req.user.company_id;
+  try {
+    const s = await getSettings(companyId);
+    const rule = s.overtime_rule || 'daily';
+    const threshold = parseFloat(s.overtime_threshold) || 8;
+    const otMult = parseFloat(s.overtime_multiplier) || 1.5;
+    const defaultRate = parseFloat(s.default_hourly_rate) || 30;
+    const prevRate = parseFloat(s.prevailing_wage_rate) || 45;
+
+    const workers = await pool.query(
+      `SELECT u.id, u.full_name, u.hourly_rate FROM users u
+       WHERE u.company_id = $1 AND u.role = 'worker' AND u.active = true
+       ORDER BY u.full_name`,
+      [companyId]
+    );
+    const entries = await pool.query(
+      `SELECT te.user_id, te.wage_type, te.start_time, te.end_time, te.work_date, te.break_minutes, te.mileage
+       FROM time_entries te
+       WHERE te.company_id = $1 AND te.work_date >= $2 AND te.work_date <= $3 AND te.status = 'approved'`,
+      [companyId, from, to]
+    );
+    const byWorker = {};
+    entries.rows.forEach(e => {
+      if (!byWorker[e.user_id]) byWorker[e.user_id] = [];
+      byWorker[e.user_id].push(e);
+    });
+
+    const esc = v => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`;
+    const headers = ['Worker', 'Rate ($/hr)', 'Regular Hrs', 'OT Hrs', 'Prevailing Hrs', 'Total Hrs', 'Mileage (mi)', 'Regular Pay', 'OT Pay', 'Prevailing Pay', 'Total Pay'];
+    const lines = [headers.join(',')];
+
+    workers.rows.forEach(w => {
+      const wEntries = byWorker[w.id] || [];
+      const { regularHours, overtimeHours } = computeOT(wEntries, rule, threshold);
+      const prevHours = wEntries
+        .filter(e => e.wage_type === 'prevailing')
+        .reduce((s, e) => s + (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60, 0);
+      const rate = parseFloat(w.hourly_rate) || defaultRate;
+      const mileage = wEntries.reduce((s, e) => s + (parseFloat(e.mileage) || 0), 0);
+      lines.push([
+        esc(w.full_name), rate.toFixed(2),
+        regularHours.toFixed(2), overtimeHours.toFixed(2), prevHours.toFixed(2),
+        (regularHours + overtimeHours + prevHours).toFixed(2),
+        mileage.toFixed(1),
+        (regularHours * rate).toFixed(2),
+        (overtimeHours * rate * otMult).toFixed(2),
+        (prevHours * prevRate).toFixed(2),
+        (regularHours * rate + overtimeHours * rate * otMult + prevHours * prevRate).toFixed(2),
+      ].join(','));
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="payroll-${from}-to-${to}.csv"`);
     res.send(lines.join('\r\n'));
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });

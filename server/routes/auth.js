@@ -69,7 +69,8 @@ router.post('/register', async (req, res) => {
       return res.status(409).json({ error: 'A company with that name already exists' });
     }
     const companyResult = await client.query(
-      'INSERT INTO companies (name, slug) VALUES ($1, $2) RETURNING id',
+      `INSERT INTO companies (name, slug, subscription_status, trial_ends_at)
+       VALUES ($1, $2, 'trial', NOW() + INTERVAL '14 days') RETURNING id`,
       [company_name, slug]
     );
     const companyId = companyResult.rows[0].id;

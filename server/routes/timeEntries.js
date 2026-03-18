@@ -213,4 +213,32 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// POST /time-entries/sign-off — worker signs off on their entries for a date range
+router.post('/sign-off', requireAuth, async (req, res) => {
+  const { from, to } = req.body;
+  if (!from || !to) return res.status(400).json({ error: 'from and to required' });
+  try {
+    const result = await pool.query(
+      `UPDATE time_entries SET worker_signed_at = NOW()
+       WHERE user_id = $1 AND work_date >= $2 AND work_date <= $3
+         AND status = 'pending' AND worker_signed_at IS NULL
+       RETURNING id`,
+      [req.user.id, from, to]
+    );
+    // Notify admin that worker signed off
+    const admin = await pool.query(
+      `SELECT u.id FROM users u WHERE u.company_id = $1 AND u.role = 'admin' AND u.active = true LIMIT 1`,
+      [req.user.company_id]
+    );
+    if (admin.rowCount > 0) {
+      sendPushToUser(admin.rows[0].id, {
+        title: `${req.user.full_name} signed their timesheet`,
+        body: `${result.rowCount} entr${result.rowCount === 1 ? 'y' : 'ies'} ready for review`,
+        url: '/admin#approvals',
+      });
+    }
+    res.json({ signed: result.rowCount });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 module.exports = router;

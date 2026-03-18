@@ -14,6 +14,8 @@ import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import ManagePayPeriods from '../components/ManagePayPeriods';
 import ManageSchedule from '../components/ManageSchedule';
 import ExportPanel from '../components/ExportPanel';
+import OvertimeReport from '../components/OvertimeReport';
+import BillingPanel from '../components/BillingPanel';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -24,7 +26,12 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const TABS = ['live', 'analytics', 'approvals', 'metrics', 'projects', 'export', 'manage', 'audit', 'integrations'];
+  const [billing, setBilling] = useState(null);
+
+  useEffect(() => {
+    api.get('/stripe/status').then(r => setBilling(r.data)).catch(() => {});
+  }, []);
+  const TABS = ['live', 'analytics', 'approvals', 'metrics', 'projects', 'export', 'manage', 'audit', 'integrations', 'billing'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'live');
 
@@ -63,6 +70,17 @@ export default function AdminDashboard() {
 
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={getT('English')} />}
 
+      {billing?.subscription_status === 'trial' && (() => {
+        const days = Math.max(0, Math.ceil((new Date(billing.trial_ends_at) - new Date()) / 86400000));
+        if (days > 7) return null;
+        return (
+          <div style={{ ...styles.trialBanner, background: days <= 2 ? '#fef2f2' : '#fffbeb', borderColor: days <= 2 ? '#fecaca' : '#fcd34d', color: days <= 2 ? '#991b1b' : '#92400e' }}>
+            {days === 0 ? '⚠ Your trial has expired.' : `⏳ ${days} day${days !== 1 ? 's' : ''} left in your trial.`}
+            {' '}<button style={styles.trialUpgradeBtn} onClick={() => switchTab('billing')}>Subscribe now →</button>
+          </div>
+        );
+      })()}
+
       <main style={styles.main} className="admin-main">
         <div style={styles.tabs} className="tab-bar">
           <button style={tab === 'live' ? styles.tabActive : styles.tab} onClick={() => switchTab('live')}>🟢 Live</button>
@@ -74,6 +92,7 @@ export default function AdminDashboard() {
           <button style={tab === 'manage' ? styles.tabActive : styles.tab} onClick={() => switchTab('manage')}>Manage</button>
           <button style={tab === 'audit' ? styles.tabActive : styles.tab} onClick={() => switchTab('audit')}>Audit Log</button>
           <button style={tab === 'integrations' ? styles.tabActive : styles.tab} onClick={() => switchTab('integrations')}>Integrations</button>
+          <button style={tab === 'billing' ? styles.tabActive : styles.tab} onClick={() => switchTab('billing')}>💳 Billing</button>
         </div>
 
         {loading ? <p>Loading...</p> : tab === 'live' ? (
@@ -91,6 +110,7 @@ export default function AdminDashboard() {
         ) : tab === 'metrics' ? (
           <>
             <h2 style={styles.heading}>Worker Reports</h2>
+            <OvertimeReport />
             {workers.length === 0
               ? <p style={{ color: '#666' }}>No workers yet. Add one in the Manage tab.</p>
               : workers.map(w => <WorkerMetrics key={w.id} worker={w} />)
@@ -116,6 +136,11 @@ export default function AdminDashboard() {
             <h2 style={styles.heading}>Integrations</h2>
             <QuickBooks workers={workers} projects={projects} />
           </>
+        ) : tab === 'billing' ? (
+          <>
+            <h2 style={styles.heading}>Billing</h2>
+            <BillingPanel />
+          </>
         ) : (
           <>
             <ManageSchedule workers={workers} projects={projects} />
@@ -139,8 +164,10 @@ const styles = {
   headerRight: { display: 'flex', gap: 10 },
   headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' },
   main: { maxWidth: 900, margin: '32px auto', padding: '0 16px' },
-  tabs: { display: 'flex', gap: 4, marginBottom: 24, background: '#e8edf5', borderRadius: 10, padding: 4, width: 'fit-content' },
-  tab: { padding: '8px 20px', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#666', cursor: 'pointer' },
-  tabActive: { padding: '8px 20px', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' },
+  tabs: { display: 'flex', gap: 4, marginBottom: 24, background: '#e8edf5', borderRadius: 10, padding: 4, width: '100%', overflowX: 'auto', flexWrap: 'nowrap', scrollbarWidth: 'none' },
+  tab: { padding: '8px 16px', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#666', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 },
+  tabActive: { padding: '8px 16px', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', whiteSpace: 'nowrap', flexShrink: 0 },
   heading: { marginBottom: 20, fontSize: 22 },
+  trialBanner: { padding: '10px 24px', border: '1px solid', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 },
+  trialUpgradeBtn: { background: 'none', border: 'none', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', fontSize: 14, color: 'inherit', padding: 0 },
 };

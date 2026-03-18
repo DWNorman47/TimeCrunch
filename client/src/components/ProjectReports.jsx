@@ -79,6 +79,12 @@ function ProjectCard({ project: p }) {
         <div style={styles.barContainer}>
           <HoursBar regular={parseFloat(p.regular_hours)} overtime={parseFloat(p.overtime_hours)} prevailing={parseFloat(p.prevailing_hours)} />
         </div>
+        {p.budget_hours && (
+          <BudgetBar used={parseFloat(p.total_hours)} budget={parseFloat(p.budget_hours)} label="hrs" />
+        )}
+        {p.budget_dollars && (
+          <BudgetBar used={parseFloat(p.total_hours) * 30} budget={parseFloat(p.budget_dollars)} label="$" money />
+        )}
       </div>
 
       {expanded && (
@@ -146,6 +152,26 @@ function Metric({ label, value, color }) {
     <div style={styles.metric}>
       <span style={{ ...styles.metricVal, color: color || '#222' }}>{value}</span>
       <span style={styles.metricLabel}>{label}</span>
+    </div>
+  );
+}
+
+function BudgetBar({ used, budget, label, money }) {
+  const pct = Math.min((used / budget) * 100, 100);
+  const over = used > budget;
+  const color = pct >= 90 ? '#dc2626' : pct >= 70 ? '#d97706' : '#059669';
+  const fmt = v => money ? `$${v.toFixed(0)}` : `${v.toFixed(1)}`;
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6b7280', marginBottom: 3 }}>
+        <span>Budget ({label})</span>
+        <span style={{ color: over ? '#dc2626' : '#374151', fontWeight: 600 }}>
+          {fmt(used)} / {fmt(budget)}{over ? ' — OVER BUDGET' : ''}
+        </span>
+      </div>
+      <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width 0.3s' }} />
+      </div>
     </div>
   );
 }

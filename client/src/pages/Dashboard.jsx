@@ -9,6 +9,7 @@ import WorkerSummary from '../components/WorkerSummary';
 import ChangePassword from '../components/ChangePassword';
 import PayStubView from '../components/PayStubView';
 import NotificationSetup from '../components/NotificationSetup';
+import TimesheetSignOff from '../components/TimesheetSignOff';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -83,6 +84,7 @@ export default function Dashboard() {
           </div>
         )}
         <NotificationSetup />
+        <TimesheetSignOff t={t} />
         {!loading && <PayStubView />}
         {loading ? <p>{t.loadingEntries}</p> : entryView === 'timesheet' ? (
           <TimesheetView entries={entries} language={user?.language} />

@@ -100,6 +100,9 @@ export default function ApprovalQueue() {
                     {e.wage_type === 'prevailing' ? 'Prevailing' : 'Regular'}
                   </span>
                 </div>
+                {e.worker_signed_at && (
+                  <span style={styles.signedTag}>✍ Worker signed</span>
+                )}
                 {e.notes && <div style={styles.notes}>{e.notes}</div>}
                 <button
                   style={styles.msgBtn}
@@ -168,4 +171,5 @@ const styles = {
   cancelBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   approveAllBtn: { background: '#059669', color: '#fff', border: 'none', padding: '5px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', marginLeft: 'auto' },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 6 },
+  signedTag: { display: 'inline-block', marginTop: 4, background: '#ede9fe', color: '#5b21b6', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
 };
