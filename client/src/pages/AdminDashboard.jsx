@@ -27,17 +27,47 @@ const FEATURE_DEFS = [
   { key: 'feature_prevailing_wage', label: 'Prevailing Wage', desc: 'Show prevailing wage type on projects and entries' },
 ];
 
-function FeatureToggles({ settings, onSettingsUpdated }) {
-  const [saving, setSaving] = useState(null);
+function FeatureToggle({ name, desc, serverEnabled, onToggle }) {
+  const [enabled, setEnabled] = useState(serverEnabled);
+  const [saving, setSaving] = useState(false);
 
-  const toggle = async (key, current) => {
-    setSaving(key);
+  // Sync if server value changes from outside (e.g. initial load)
+  useEffect(() => { setEnabled(serverEnabled); }, [serverEnabled]);
+
+  const handleClick = async () => {
+    const newVal = !enabled;
+    setEnabled(newVal);         // optimistic: update immediately
+    setSaving(true);
     try {
-      const r = await api.patch('/admin/settings', { [key]: !current });
-      onSettingsUpdated(r.data);
+      await onToggle(newVal);
+    } catch {
+      setEnabled(!newVal);      // revert on failure
     } finally {
-      setSaving(null);
+      setSaving(false);
     }
+  };
+
+  return (
+    <div style={ftStyles.row}>
+      <div style={ftStyles.info}>
+        <span style={ftStyles.label}>{name}</span>
+        <span style={ftStyles.desc}>{desc}</span>
+      </div>
+      <button
+        style={{ ...ftStyles.toggle, background: enabled ? '#1a56db' : '#d1d5db', opacity: saving ? 0.6 : 1 }}
+        onClick={handleClick}
+        aria-pressed={enabled}
+      >
+        <span style={{ ...ftStyles.knob, transform: enabled ? 'translateX(46px)' : 'translateX(0)' }} />
+      </button>
+    </div>
+  );
+}
+
+function FeatureToggles({ settings, onSettingsUpdated }) {
+  const handleToggle = async (key, newVal) => {
+    const r = await api.patch('/admin/settings', { [key]: newVal });
+    onSettingsUpdated(r.data);
   };
 
   return (
@@ -45,26 +75,15 @@ function FeatureToggles({ settings, onSettingsUpdated }) {
       <h3 style={ftStyles.title}>Features</h3>
       <p style={ftStyles.subtitle}>Turn off sections your company doesn't use to keep the interface clean.</p>
       <div style={ftStyles.list}>
-        {FEATURE_DEFS.map(({ key, label, desc }) => {
-          const enabled = settings?.[key] !== false;
-          const isSaving = saving === key;
-          return (
-            <div key={key} style={ftStyles.row}>
-              <div style={ftStyles.info}>
-                <span style={ftStyles.label}>{label}</span>
-                <span style={ftStyles.desc}>{desc}</span>
-              </div>
-              <button
-                style={{ ...ftStyles.toggle, background: enabled ? '#1a56db' : '#d1d5db' }}
-                onClick={() => toggle(key, enabled)}
-                disabled={isSaving}
-                aria-pressed={enabled}
-              >
-                <span style={{ ...ftStyles.knob, transform: enabled ? 'translateX(46px)' : 'translateX(0)' }} />
-              </button>
-            </div>
-          );
-        })}
+        {FEATURE_DEFS.map(({ key, label, desc }) => (
+          <FeatureToggle
+            key={key}
+            name={label}
+            desc={desc}
+            serverEnabled={settings?.[key] !== false}
+            onToggle={newVal => handleToggle(key, newVal)}
+          />
+        ))}
       </div>
     </div>
   );
