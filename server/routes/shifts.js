@@ -51,6 +51,35 @@ router.post('/admin', requireAdmin, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// PATCH /admin/shifts/:id — edit a shift
+router.patch('/admin/:id', requireAdmin, async (req, res) => {
+  const { project_id, shift_date, start_time, end_time, notes } = req.body;
+  if (!shift_date || !start_time || !end_time) {
+    return res.status(400).json({ error: 'shift_date, start_time, end_time required' });
+  }
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `UPDATE shifts SET project_id = $1, shift_date = $2, start_time = $3, end_time = $4, notes = $5
+       WHERE id = $6 AND company_id = $7 RETURNING *`,
+      [project_id || null, shift_date, start_time, end_time, notes || null, req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Shift not found' });
+    const full = await pool.query(
+      `SELECT s.*, u.full_name as worker_name, p.name as project_name
+       FROM shifts s JOIN users u ON s.user_id = u.id LEFT JOIN projects p ON s.project_id = p.id
+       WHERE s.id = $1`, [req.params.id]
+    );
+    const shift = full.rows[0];
+    sendPushToUser(shift.user_id, {
+      title: 'Shift updated',
+      body: `${shift.shift_date?.toString().substring(0,10)} · ${start_time.substring(0,5)}–${end_time.substring(0,5)}`,
+      url: '/dashboard',
+    });
+    res.json(shift);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // DELETE /admin/shifts/:id
 router.delete('/admin/:id', requireAdmin, async (req, res) => {
   try {

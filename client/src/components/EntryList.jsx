@@ -117,11 +117,13 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                   <span style={styles.project}>{e.project_name}</span>
                   <div style={styles.entryRight}>
                     <span style={styles.date}>{formatDate(e.work_date, language)}</span>
-                    {isEditable(e.work_date)
-                      ? <button style={styles.editBtn} onClick={() => startEdit(e)}>{t.edit}</button>
-                      : <span style={styles.lockIcon} title="Entries older than 7 days cannot be edited">🔒</span>
+                    {e.locked
+                      ? <span style={styles.lockIcon} title="Approved and locked by admin">🔒</span>
+                      : isEditable(e.work_date)
+                        ? <button style={styles.editBtn} onClick={() => startEdit(e)}>{t.edit}</button>
+                        : <span style={styles.lockIcon} title="Entries older than 7 days cannot be edited">🔒</span>
                     }
-                    <button style={styles.deleteBtn} onClick={() => handleDelete(e.id)}>{t.delete}</button>
+                    {!e.locked && <button style={styles.deleteBtn} onClick={() => handleDelete(e.id)}>{t.delete}</button>}
                   </div>
                 </div>
                 <div style={styles.entryDetail} className="entry-detail">
@@ -132,6 +134,7 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                     {e.wage_type === 'prevailing' ? t.prevailing : t.regular}
                   </span>
                   {e.status === 'approved' && <span style={styles.statusApproved}>{t.approved}</span>}
+                  {e.locked && <span style={styles.lockedBadge}>🔒 Locked</span>}
                   {e.status === 'rejected' && <span style={styles.statusRejected}>{t.rejected}{e.approval_note ? `: ${e.approval_note}` : ''}</span>}
                   {(!e.status || e.status === 'pending') && <span style={styles.statusPending}>{t.pending}</span>}
                 </div>
@@ -185,4 +188,5 @@ const styles = {
   breakTag: { fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
   mileageTag: { fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 6 },
+  lockedBadge: { fontSize: 11, fontWeight: 700, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
 };

@@ -84,6 +84,11 @@ input, select, textarea {
     scroll-margin-top: calc(104px + env(safe-area-inset-top));
   }
 
+  /* KPI cards: 2x2 grid on mobile instead of 1x4 */
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
   /* App header */
   .header-right {
     gap: 6px !important;

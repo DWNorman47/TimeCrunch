@@ -20,6 +20,9 @@ export default function ManageSchedule({ workers, projects }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const from = toISO(days[0]);
@@ -53,7 +56,30 @@ export default function ManageSchedule({ workers, projects }) {
     try {
       await api.delete(`/shifts/admin/${id}`);
       setShifts(prev => prev.filter(s => s.id !== id));
+      if (editingId === id) setEditingId(null);
     } finally { setDeleting(null); }
+  };
+
+  const startEdit = s => {
+    setEditingId(s.id);
+    setEditForm({
+      project_id: s.project_id || '',
+      shift_date: s.shift_date.substring(0, 10),
+      start_time: s.start_time.substring(0, 5),
+      end_time: s.end_time.substring(0, 5),
+      notes: s.notes || '',
+    });
+  };
+
+  const saveEdit = async id => {
+    setEditSaving(true);
+    try {
+      const r = await api.patch(`/shifts/admin/${id}`, editForm);
+      setShifts(prev => prev.map(s => s.id === id ? r.data : s));
+      setEditingId(null);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to update shift');
+    } finally { setEditSaving(false); }
   };
 
   const shiftsByDay = {};
@@ -130,14 +156,52 @@ export default function ManageSchedule({ workers, projects }) {
                 {dayShifts.length === 0 ? (
                   <div style={styles.emptyDay} />
                 ) : dayShifts.map(s => (
-                  <div key={s.id} style={styles.shiftPill}>
-                    <div style={styles.pillWorker}>{s.worker_name}</div>
-                    {s.project_name && <div style={styles.pillProject}>{s.project_name}</div>}
-                    <div style={styles.pillTime}>{fmtTime(s.start_time)}–{fmtTime(s.end_time)}</div>
-                    {s.notes && <div style={styles.pillNotes}>{s.notes}</div>}
-                    <button style={styles.deleteBtn} onClick={() => deleteShift(s.id)} disabled={deleting === s.id}>
-                      {deleting === s.id ? '...' : '✕'}
-                    </button>
+                  <div key={s.id}>
+                    <div style={styles.shiftPill}>
+                      <div style={styles.pillWorker}>{s.worker_name}</div>
+                      {s.project_name && <div style={styles.pillProject}>{s.project_name}</div>}
+                      <div style={styles.pillTime}>{fmtTime(s.start_time)}–{fmtTime(s.end_time)}</div>
+                      {s.notes && <div style={styles.pillNotes}>{s.notes}</div>}
+                      <div style={styles.pillActions}>
+                        <button style={styles.editPillBtn} onClick={() => editingId === s.id ? setEditingId(null) : startEdit(s)} title="Edit shift">✎</button>
+                        <button style={styles.deleteBtn} onClick={() => deleteShift(s.id)} disabled={deleting === s.id}>
+                          {deleting === s.id ? '...' : '✕'}
+                        </button>
+                      </div>
+                    </div>
+                    {editingId === s.id && (
+                      <div style={styles.editPanel}>
+                        <div style={styles.editGrid}>
+                          <div style={styles.editField}>
+                            <label style={styles.editLabel}>Date</label>
+                            <input style={styles.editInput} type="date" value={editForm.shift_date} onChange={ev => setEditForm(f => ({ ...f, shift_date: ev.target.value }))} />
+                          </div>
+                          <div style={styles.editField}>
+                            <label style={styles.editLabel}>Start</label>
+                            <input style={styles.editInput} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} />
+                          </div>
+                          <div style={styles.editField}>
+                            <label style={styles.editLabel}>End</label>
+                            <input style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
+                          </div>
+                          <div style={styles.editField}>
+                            <label style={styles.editLabel}>Project</label>
+                            <select style={styles.editInput} value={editForm.project_id} onChange={ev => setEditForm(f => ({ ...f, project_id: ev.target.value }))}>
+                              <option value="">None</option>
+                              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                          </div>
+                          <div style={{ ...styles.editField, flex: 2 }}>
+                            <label style={styles.editLabel}>Notes</label>
+                            <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder="Optional" />
+                          </div>
+                        </div>
+                        <div style={styles.editActions}>
+                          <button style={styles.saveBtn} onClick={() => saveEdit(s.id)} disabled={editSaving}>{editSaving ? '...' : 'Save'}</button>
+                          <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -167,10 +231,20 @@ const styles = {
   dayCol: { padding: '8px 6px', minHeight: 80, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 90 },
   dayHead: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 },
   emptyDay: { flex: 1, background: '#f9fafb', borderRadius: 4, minHeight: 40 },
-  shiftPill: { background: '#eff6ff', borderLeft: '3px solid #1a56db', borderRadius: 5, padding: '5px 7px', fontSize: 11, position: 'relative' },
+  shiftPill: { background: '#eff6ff', borderLeft: '3px solid #1a56db', borderRadius: 5, padding: '5px 7px', fontSize: 11 },
   pillWorker: { fontWeight: 700, color: '#1e3a5f', marginBottom: 1 },
   pillProject: { color: '#6b7280', fontSize: 10 },
   pillTime: { fontWeight: 600, color: '#1a56db', marginTop: 2 },
   pillNotes: { color: '#9ca3af', fontSize: 10, fontStyle: 'italic' },
-  deleteBtn: { position: 'absolute', top: 3, right: 4, background: 'none', border: 'none', color: '#fca5a5', fontSize: 11, cursor: 'pointer', padding: 0, lineHeight: 1 },
+  pillActions: { display: 'flex', gap: 4, marginTop: 4 },
+  editPillBtn: { background: 'none', border: 'none', color: '#1a56db', fontSize: 12, cursor: 'pointer', padding: 0, lineHeight: 1 },
+  deleteBtn: { background: 'none', border: 'none', color: '#fca5a5', fontSize: 11, cursor: 'pointer', padding: 0, lineHeight: 1 },
+  editPanel: { background: '#f8faff', border: '1px solid #dbeafe', borderRadius: 6, padding: 10, marginTop: 4 },
+  editGrid: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 },
+  editField: { display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 80 },
+  editLabel: { fontSize: 10, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
+  editInput: { padding: '5px 7px', border: '1px solid #ddd', borderRadius: 5, fontSize: 12 },
+  editActions: { display: 'flex', gap: 6 },
+  saveBtn: { background: '#059669', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  cancelBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '5px 12px', borderRadius: 5, fontSize: 11, cursor: 'pointer' },
 };

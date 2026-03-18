@@ -17,6 +17,7 @@ import ExportPanel from '../components/ExportPanel';
 import OvertimeReport from '../components/OvertimeReport';
 import BillingPanel from '../components/BillingPanel';
 import CompanyChat from '../components/CompanyChat';
+import LiveKPIs from '../components/LiveKPIs';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -92,10 +93,13 @@ export default function AdminDashboard() {
         </div>
 
         {loading ? <p>Loading...</p> : tab === 'live' ? (
-          <div style={styles.liveLayout}>
-            <div style={styles.liveMain}><LiveWorkers /></div>
-            <div style={styles.liveChat}><CompanyChat workers={workers} /></div>
-          </div>
+          <>
+            <LiveKPIs />
+            <div style={styles.liveLayout} className="live-layout">
+              <div style={styles.liveMain}><LiveWorkers /></div>
+              <div style={styles.liveChat}><CompanyChat workers={workers} /></div>
+            </div>
+          </>
         ) : tab === 'analytics' ? (
           <>
             <h2 style={styles.heading}>Analytics</h2>

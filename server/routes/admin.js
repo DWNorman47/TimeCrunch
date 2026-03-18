@@ -68,6 +68,92 @@ function computeOT(entries, rule, threshold) {
   return { regularHours: reg, overtimeHours: ot };
 }
 
+// GET /admin/kpis — live summary cards for the Live tab
+router.get('/kpis', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const [pending, clockedIn, weekHours, settings] = await Promise.all([
+      pool.query(`SELECT COUNT(*) FROM time_entries WHERE company_id = $1 AND status = 'pending'`, [companyId]),
+      pool.query(`SELECT COUNT(*) FROM active_clock WHERE company_id = $1`, [companyId]),
+      pool.query(
+        `SELECT COALESCE(SUM(
+           EXTRACT(EPOCH FROM (
+             CASE WHEN end_time < start_time
+               THEN (end_time + INTERVAL '1 day') - start_time
+               ELSE end_time - start_time
+             END
+           )) / 3600 - (break_minutes::float / 60)
+         ), 0) as hours
+         FROM time_entries
+         WHERE company_id = $1
+           AND work_date >= date_trunc('week', CURRENT_DATE)
+           AND work_date <= CURRENT_DATE
+           AND status != 'rejected'`,
+        [companyId]
+      ),
+      getSettings(companyId),
+    ]);
+
+    // Workers who've exceeded the OT threshold this week
+    const { overtime_rule, overtime_threshold } = settings;
+    let otWorkers = 0;
+    if (overtime_rule === 'weekly') {
+      const r = await pool.query(
+        `SELECT COUNT(*) FROM (
+           SELECT user_id, SUM(
+             EXTRACT(EPOCH FROM (
+               CASE WHEN end_time < start_time THEN (end_time + INTERVAL '1 day') - start_time ELSE end_time - start_time END
+             )) / 3600 - (break_minutes::float / 60)
+           ) as total_hours
+           FROM time_entries
+           WHERE company_id = $1 AND work_date >= date_trunc('week', CURRENT_DATE)
+             AND wage_type = 'regular' AND status != 'rejected'
+           GROUP BY user_id
+           HAVING SUM(
+             EXTRACT(EPOCH FROM (
+               CASE WHEN end_time < start_time THEN (end_time + INTERVAL '1 day') - start_time ELSE end_time - start_time END
+             )) / 3600 - (break_minutes::float / 60)
+           ) > $2
+         ) sub`,
+        [companyId, overtime_threshold]
+      );
+      otWorkers = parseInt(r.rows[0].count);
+    } else {
+      // daily: any worker with a single day > threshold this week
+      const r = await pool.query(
+        `SELECT COUNT(DISTINCT user_id) FROM (
+           SELECT user_id, work_date, SUM(
+             EXTRACT(EPOCH FROM (
+               CASE WHEN end_time < start_time THEN (end_time + INTERVAL '1 day') - start_time ELSE end_time - start_time END
+             )) / 3600 - (break_minutes::float / 60)
+           ) as day_hours
+           FROM time_entries
+           WHERE company_id = $1 AND work_date >= date_trunc('week', CURRENT_DATE)
+             AND wage_type = 'regular' AND status != 'rejected'
+           GROUP BY user_id, work_date
+           HAVING SUM(
+             EXTRACT(EPOCH FROM (
+               CASE WHEN end_time < start_time THEN (end_time + INTERVAL '1 day') - start_time ELSE end_time - start_time END
+             )) / 3600 - (break_minutes::float / 60)
+           ) > $2
+         ) sub`,
+        [companyId, overtime_threshold]
+      );
+      otWorkers = parseInt(r.rows[0].count);
+    }
+
+    res.json({
+      pending_approvals: parseInt(pending.rows[0].count),
+      clocked_in_count: parseInt(clockedIn.rows[0].count),
+      company_hours_this_week: +parseFloat(weekHours.rows[0].hours).toFixed(1),
+      overtime_workers_this_week: otWorkers,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Get settings
 router.get('/settings', requireAdmin, async (req, res) => {
   try {
@@ -726,7 +812,7 @@ router.post('/entries/approve-all', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
-      `UPDATE time_entries SET status = 'approved', approved_by = $1, approved_at = NOW()
+      `UPDATE time_entries SET status = 'approved', locked = true, approved_by = $1, approved_at = NOW()
        WHERE company_id = $2 AND status = 'pending' RETURNING id`,
       [req.user.id, companyId]
     );
@@ -744,7 +830,7 @@ router.patch('/entries/:id/approve', requireAdmin, async (req, res) => {
   const { note } = req.body;
   try {
     const result = await pool.query(
-      `UPDATE time_entries SET status = 'approved', approval_note = $1, approved_by = $2, approved_at = NOW()
+      `UPDATE time_entries SET status = 'approved', locked = true, approval_note = $1, approved_by = $2, approved_at = NOW()
        WHERE id = $3 AND company_id = $4 RETURNING *`,
       [note || null, req.user.id, req.params.id, companyId]
     );
@@ -787,6 +873,23 @@ router.patch('/entries/:id/reject', requireAdmin, async (req, res) => {
       body: note ? `Reason: ${note}` : 'An admin rejected your time entry.',
       url: '/dashboard',
     });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /admin/entries/:id/unlock
+router.patch('/entries/:id/unlock', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `UPDATE time_entries SET locked = false WHERE id = $1 AND company_id = $2 RETURNING *`,
+      [req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'entry.unlocked', 'time_entry', parseInt(req.params.id), null);
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
