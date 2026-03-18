@@ -35,7 +35,8 @@ function formatTime(t) {
 
 function netHours(start, end, breakMinutes) {
   const s = new Date(`1970-01-01T${start}`);
-  const e = new Date(`1970-01-01T${end}`);
+  let e = new Date(`1970-01-01T${end}`);
+  if (e <= s) e = new Date(`1970-01-02T${end}`); // midnight-crossing
   return (e - s) / 3600000 - (breakMinutes || 0) / 60;
 }
 

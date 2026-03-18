@@ -31,13 +31,16 @@ router.get('/', requireAuth, async (req, res) => {
     if (!workerId) {
       // Admin: return list of workers who have messages, with latest message preview
       const result = await pool.query(
-        `SELECT DISTINCT ON (m.worker_id)
-                m.worker_id, u.full_name as worker_name,
-                m.body as last_message, m.created_at as last_at
-         FROM company_chat m
-         JOIN users u ON m.worker_id = u.id
-         WHERE m.company_id = $1
-         ORDER BY m.worker_id, m.created_at DESC`,
+        `SELECT * FROM (
+           SELECT DISTINCT ON (m.worker_id)
+                  m.worker_id, u.full_name as worker_name,
+                  m.body as last_message, m.created_at as last_at
+           FROM company_chat m
+           JOIN users u ON m.worker_id = u.id
+           WHERE m.company_id = $1
+           ORDER BY m.worker_id, m.created_at DESC
+         ) sub
+         ORDER BY last_at DESC`,
         [companyId]
       );
       return res.json(result.rows);
