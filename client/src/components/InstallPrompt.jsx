@@ -1,10 +1,61 @@
 import React, { useState, useEffect } from 'react';
 
+function getPlatform() {
+  if (typeof window === 'undefined') return null;
+
+  // Already installed as PWA — don't show
+  if (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true
+  ) return 'installed';
+
+  // User already dismissed
+  if (localStorage.getItem('install_prompt_dismissed') === '1') return 'dismissed';
+
+  const ua = navigator.userAgent;
+  const isIOS = /iphone|ipad|ipod/i.test(ua);
+  const isAndroid = /android/i.test(ua);
+
+  if (isIOS) {
+    // Chrome/Firefox on iOS can't install — need Safari
+    const isNonSafariBrowser = /crios|fxios|opios|mercury/i.test(ua);
+    return isNonSafariBrowser ? 'ios-wrong-browser' : 'ios';
+  }
+  if (isAndroid) return 'android';
+
+  return null; // Desktop — don't show
+}
+
+function ShareIcon() {
+  return (
+    <svg style={{ display: 'inline', verticalAlign: 'middle', margin: '0 2px' }}
+      width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <polyline points="16 6 12 2 8 6" />
+      <line x1="12" y1="2" x2="12" y2="15" />
+    </svg>
+  );
+}
+
+function Step({ n, children }) {
+  return (
+    <div style={styles.step}>
+      <span style={styles.stepNum}>{n}</span>
+      <span style={styles.stepText}>{children}</span>
+    </div>
+  );
+}
+
 export default function InstallPrompt() {
+  const [platform, setPlatform] = useState(null);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [dismissed, setDismissed] = useState(false);
+  const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
+    setPlatform(getPlatform());
+
+    // Android Chrome fires this when installable
     const handler = e => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -13,38 +64,103 @@ export default function InstallPrompt() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  if (!deferredPrompt || dismissed) return null;
+  const dismiss = () => {
+    localStorage.setItem('install_prompt_dismissed', '1');
+    setPlatform('dismissed');
+  };
 
-  const install = async () => {
+  const androidInstall = async () => {
+    if (!deferredPrompt) return;
+    setInstalling(true);
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') setDeferredPrompt(null);
-    else setDismissed(true);
+    if (outcome === 'accepted') {
+      setPlatform('installed');
+    } else {
+      setInstalling(false);
+    }
+    setDeferredPrompt(null);
   };
+
+  if (!platform || platform === 'installed' || platform === 'dismissed') return null;
 
   return (
     <div style={styles.banner}>
-      <span style={styles.text}>Install Time Crunch for quick clock-in access</span>
-      <button style={styles.installBtn} onClick={install}>Install</button>
-      <button style={styles.dismissBtn} onClick={() => setDismissed(true)}>✕</button>
+      <button style={styles.closeBtn} onClick={dismiss} aria-label="Dismiss">✕</button>
+      <div style={styles.icon}>📲</div>
+
+      {platform === 'ios' && (
+        <>
+          <div style={styles.heading}>Install Time Crunch</div>
+          <div style={styles.steps}>
+            <Step n={1}>Tap the <strong>Share</strong> button <ShareIcon /> at the bottom of Safari</Step>
+            <Step n={2}>Scroll down and tap <strong>"Add to Home Screen"</strong></Step>
+            <Step n={3}>Tap <strong>"Add"</strong> in the top right — done!</Step>
+          </div>
+          <div style={styles.note}>Opens full-screen like a native app. No browser bars.</div>
+        </>
+      )}
+
+      {platform === 'ios-wrong-browser' && (
+        <>
+          <div style={styles.heading}>Open in Safari to Install</div>
+          <div style={styles.body}>
+            iPhone only supports installing apps from <strong>Safari</strong>. Copy this URL, open Safari, paste it, then tap Share <ShareIcon /> → <strong>Add to Home Screen</strong>.
+          </div>
+        </>
+      )}
+
+      {platform === 'android' && (
+        <>
+          <div style={styles.heading}>Install Time Crunch</div>
+          {deferredPrompt ? (
+            <>
+              <div style={styles.body}>Add Time Crunch to your home screen for quick clock-in access.</div>
+              <button style={styles.installBtn} onClick={androidInstall} disabled={installing}>
+                {installing ? 'Installing...' : 'Add to Home Screen'}
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={styles.steps}>
+                <Step n={1}>Tap the <strong>⋮ menu</strong> in the top-right of Chrome</Step>
+                <Step n={2}>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong></Step>
+                <Step n={3}>Tap <strong>"Add"</strong> — done!</Step>
+              </div>
+              <div style={styles.note}>Opens full-screen like a native app. No browser bars.</div>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
 const styles = {
   banner: {
-    position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-    background: '#1a56db', color: '#fff', borderRadius: 12, padding: '12px 18px',
-    display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-    zIndex: 9999, maxWidth: 420, width: 'calc(100vw - 32px)',
+    position: 'relative', background: '#eff6ff', border: '1px solid #bfdbfe',
+    borderRadius: 12, padding: '16px 40px 14px 16px',
+    boxShadow: '0 2px 12px rgba(26,86,219,0.10)',
+    display: 'flex', flexDirection: 'column', gap: 8,
   },
-  text: { flex: 1, fontSize: 14, fontWeight: 500 },
+  closeBtn: {
+    position: 'absolute', top: 10, right: 12, background: 'none', border: 'none',
+    color: '#9ca3af', fontSize: 16, cursor: 'pointer', lineHeight: 1, padding: 2,
+  },
+  icon: { fontSize: 22, lineHeight: 1 },
+  heading: { fontWeight: 700, fontSize: 15, color: '#1e3a8a' },
+  body: { fontSize: 13, color: '#374151', lineHeight: 1.5 },
+  steps: { display: 'flex', flexDirection: 'column', gap: 7 },
+  step: { display: 'flex', alignItems: 'flex-start', gap: 10 },
+  stepNum: {
+    background: '#1a56db', color: '#fff', borderRadius: '50%',
+    width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 1,
+  },
+  stepText: { fontSize: 13, color: '#374151', lineHeight: 1.5 },
+  note: { fontSize: 11, color: '#6b7280', fontStyle: 'italic' },
   installBtn: {
-    background: '#fff', color: '#1a56db', border: 'none', padding: '7px 16px',
-    borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
-  },
-  dismissBtn: {
-    background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff',
-    width: 28, height: 28, borderRadius: '50%', fontSize: 12, cursor: 'pointer', flexShrink: 0,
+    alignSelf: 'flex-start', background: '#1a56db', color: '#fff', border: 'none',
+    padding: '9px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer',
   },
 };
