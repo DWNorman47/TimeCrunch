@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 
-export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true }) {
+export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true, showGeofenceBudget = true }) {
   const toast = useToast();
   const [name, setName] = useState('');
   const [wageType, setWageType] = useState('regular');
@@ -207,41 +207,48 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       <button style={styles.saveBtn} onClick={() => handleEditSave(p.id)}>Save</button>
                       <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
                     </div>
-                    <div style={styles.geoSection}>
-                      <span style={styles.geoLabel}>📍 Geofence (optional)</span>
-                      <div style={styles.geoFields}>
-                        <input style={styles.geoInput} type="number" step="0.000001" placeholder="Latitude" value={editGeoLat} onChange={e => setEditGeoLat(e.target.value)} />
-                        <input style={styles.geoInput} type="number" step="0.000001" placeholder="Longitude" value={editGeoLng} onChange={e => setEditGeoLng(e.target.value)} />
-                        <input style={styles.geoInput} type="number" min="50" step="50" placeholder="Radius (ft)" value={editGeoRadius} onChange={e => setEditGeoRadius(e.target.value)} />
-                        <button style={styles.geoLocBtn} type="button" onClick={useMyLocation} disabled={geoLocating}>
-                          {geoLocating ? '...' : '📡 My location'}
-                        </button>
-                      </div>
-                      {geoError && <p style={styles.geoErrorText}>{geoError}</p>}
-                      <p style={styles.geoHint}>Workers outside the radius will be blocked from clocking in. Leave blank to remove.</p>
-                    </div>
-                    <div style={styles.budgetSection}>
-                      <span style={styles.budgetLabel}>💰 Budget (optional)</span>
-                      <div style={styles.budgetFields}>
-                        <div style={styles.budgetField}>
-                          <label style={styles.budgetFieldLabel}>Hours</label>
-                          <input style={styles.geoInput} type="number" min="0" step="0.5" placeholder="e.g. 200" value={editBudgetHours} onChange={e => setEditBudgetHours(e.target.value)} />
+                    {showGeofenceBudget && (
+                      <div style={styles.geoSection}>
+                        <span style={styles.geoLabel}>📍 Geofence (optional)</span>
+                        <div style={styles.geoFields}>
+                          <input style={styles.geoInput} type="number" step="0.000001" placeholder="Latitude" value={editGeoLat} onChange={e => setEditGeoLat(e.target.value)} />
+                          <input style={styles.geoInput} type="number" step="0.000001" placeholder="Longitude" value={editGeoLng} onChange={e => setEditGeoLng(e.target.value)} />
+                          <input style={styles.geoInput} type="number" min="50" step="50" placeholder="Radius (ft)" value={editGeoRadius} onChange={e => setEditGeoRadius(e.target.value)} />
+                          <button style={styles.geoLocBtn} type="button" onClick={useMyLocation} disabled={geoLocating}>
+                            {geoLocating ? '...' : '📡 My location'}
+                          </button>
                         </div>
-                        <div style={styles.budgetField}>
-                          <label style={styles.budgetFieldLabel}>Dollars ($)</label>
-                          <input style={styles.geoInput} type="number" min="0" step="100" placeholder="e.g. 15000" value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
-                        </div>
+                        {geoError && <p style={styles.geoErrorText}>{geoError}</p>}
+                        <p style={styles.geoHint}>Workers outside the radius will be blocked from clocking in. Leave blank to remove.</p>
                       </div>
-                      <p style={styles.geoHint}>Shows a burn bar in Project Reports. Leave blank for no budget.</p>
-                    </div>
+                    )}
+                    {showGeofenceBudget && (
+                      <div style={styles.budgetSection}>
+                        <span style={styles.budgetLabel}>💰 Budget (optional)</span>
+                        <div style={styles.budgetFields}>
+                          <div style={styles.budgetField}>
+                            <label style={styles.budgetFieldLabel}>Hours</label>
+                            <input style={styles.geoInput} type="number" min="0" step="0.5" placeholder="e.g. 200" value={editBudgetHours} onChange={e => setEditBudgetHours(e.target.value)} />
+                          </div>
+                          <div style={styles.budgetField}>
+                            <label style={styles.budgetFieldLabel}>Dollars ($)</label>
+                            <input style={styles.geoInput} type="number" min="0" step="100" placeholder="e.g. 15000" value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
+                          </div>
+                        </div>
+                        <p style={styles.geoHint}>Shows a burn bar in Project Reports. Leave blank for no budget.</p>
+                      </div>
+                    )}
                   </div>
                 </td>
               </tr>
             ) : (
               <tr key={p.id} style={styles.tr}>
                 <td style={styles.td}>
-                  {p.name}
-                  {p.geo_radius_ft && <span style={styles.geoBadge}>📍 {p.geo_radius_ft.toLocaleString()} ft</span>}
+                  <span style={styles.projectName}>{p.name}</span>
+                  <span style={styles.projectIndicators}>
+                    {p.geo_radius_ft && <span style={styles.indicatorBadge} title={`Geofence: ${p.geo_radius_ft.toLocaleString()} ft radius`}>📍</span>}
+                    {(p.budget_hours || p.budget_dollars) && <span style={styles.indicatorBadge} title={[p.budget_hours && `${p.budget_hours} hrs`, p.budget_dollars && `$${Number(p.budget_dollars).toLocaleString()}`].filter(Boolean).join(' / ')}>💰</span>}
+                  </span>
                 </td>
                 {showWageType && (
                   <td style={styles.td}>
@@ -344,7 +351,9 @@ const styles = {
   geoLocBtn: { padding: '5px 10px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
   geoHint: { fontSize: 11, color: '#0369a1', margin: 0, opacity: 0.8 },
   geoErrorText: { fontSize: 11, color: '#dc2626', margin: 0, fontWeight: 600 },
-  geoBadge: { display: 'inline-block', marginLeft: 8, fontSize: 11, background: '#e0f2fe', color: '#0369a1', padding: '1px 7px', borderRadius: 10, fontWeight: 600 },
+  projectName: { verticalAlign: 'middle' },
+  projectIndicators: { display: 'inline-flex', gap: 4, marginLeft: 6, verticalAlign: 'middle' },
+  indicatorBadge: { fontSize: 13, lineHeight: 1, cursor: 'default' },
   clearGeoBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#9ca3af', padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', marginRight: 4 },
   budgetSection: { background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 },
   budgetLabel: { fontSize: 12, fontWeight: 700, color: '#92400e' },
