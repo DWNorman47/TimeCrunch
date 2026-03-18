@@ -33,7 +33,7 @@ router.get('/status', requireAuth, async (req, res) => {
 
 // POST /api/clock/in
 router.post('/in', requireAuth, async (req, res) => {
-  const { project_id, notes, lat, lng } = req.body;
+  const { project_id, notes, lat, lng, local_work_date } = req.body;
   if (!project_id) return res.status(400).json({ error: 'project_id required' });
   const companyId = req.user.company_id;
   try {
@@ -64,7 +64,7 @@ router.post('/in', requireAuth, async (req, res) => {
     // Upsert — replace any existing clock-in (safety valve)
     const result = await pool.query(
       `INSERT INTO active_clock (user_id, company_id, project_id, clock_in_time, clock_in_lat, clock_in_lng, work_date, notes)
-       VALUES ($1, $2, $3, NOW(), $4, $5, CURRENT_DATE, $6)
+       VALUES ($1, $2, $3, NOW(), $4, $5, COALESCE($6::date, CURRENT_DATE), $7)
        ON CONFLICT (user_id) DO UPDATE
          SET project_id = EXCLUDED.project_id,
              clock_in_time = EXCLUDED.clock_in_time,
@@ -73,7 +73,7 @@ router.post('/in', requireAuth, async (req, res) => {
              work_date = EXCLUDED.work_date,
              notes = EXCLUDED.notes
        RETURNING *`,
-      [req.user.id, companyId, project_id, lat || null, lng || null, notes || null]
+      [req.user.id, companyId, project_id, lat || null, lng || null, local_work_date || null, notes || null]
     );
 
     const row = result.rows[0];
@@ -119,7 +119,7 @@ router.post('/in', requireAuth, async (req, res) => {
 
 // POST /api/clock/out
 router.post('/out', requireAuth, async (req, res) => {
-  const { lat, lng, break_minutes, mileage } = req.body;
+  const { lat, lng, break_minutes, mileage, local_clock_in, local_clock_out } = req.body;
   const companyId = req.user.company_id;
   try {
     const clockResult = await pool.query(
@@ -137,12 +137,13 @@ router.post('/out', requireAuth, async (req, res) => {
     if (projResult.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
     const { wage_type, name: project_name } = projResult.rows[0];
 
-    // Extract start/end times as HH:MM:SS
+    // Use client-supplied local times if available (avoids UTC offset issues on server)
+    // Fallback to UTC extraction for backwards compatibility
     const clockInTime = new Date(clock.clock_in_time);
     const clockOutTime = new Date();
     const pad = n => String(n).padStart(2, '0');
-    const start_time = `${pad(clockInTime.getHours())}:${pad(clockInTime.getMinutes())}:${pad(clockInTime.getSeconds())}`;
-    const end_time = `${pad(clockOutTime.getHours())}:${pad(clockOutTime.getMinutes())}:${pad(clockOutTime.getSeconds())}`;
+    const start_time = local_clock_in || `${pad(clockInTime.getUTCHours())}:${pad(clockInTime.getUTCMinutes())}:${pad(clockInTime.getUTCSeconds())}`;
+    const end_time = local_clock_out || `${pad(clockOutTime.getUTCHours())}:${pad(clockOutTime.getUTCMinutes())}:${pad(clockOutTime.getUTCSeconds())}`;
 
     // Create the time entry
     const entryResult = await pool.query(

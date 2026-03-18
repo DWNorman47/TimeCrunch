@@ -51,13 +51,19 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
     return () => clearInterval(timerRef.current);
   }, [status]);
 
+  const toLocalTime = d => {
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+
   const handleClockIn = async () => {
     if (!selectedProject) { setError(t.selectProjectFirst); return; }
     setError('');
     setLoading(true);
     const { lat, lng } = await getLocation();
+    const local_work_date = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
     try {
-      const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng });
+      const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date });
       setStatus(r.data);
       setNotes('');
     } catch (err) {
@@ -76,11 +82,15 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
     setError('');
     setLoading(true);
     const { lat, lng } = await getLocation();
+    const local_clock_in = toLocalTime(new Date(status.clock_in_time));
+    const local_clock_out = toLocalTime(new Date());
     try {
       const r = await api.post('/clock/out', {
         lat, lng,
         break_minutes: breakMinutes ? parseInt(breakMinutes) : 0,
         mileage: mileage ? parseFloat(mileage) : null,
+        local_clock_in,
+        local_clock_out,
       });
       onEntryAdded({ ...r.data, project_name: status.project_name });
       setStatus(false);
