@@ -11,6 +11,7 @@ import PayStubView from '../components/PayStubView';
 import NotificationSetup from '../components/NotificationSetup';
 import TimesheetSignOff from '../components/TimesheetSignOff';
 import CompanyChat from '../components/CompanyChat';
+import AppSwitcher from '../components/AppSwitcher';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -57,7 +58,7 @@ export default function Dashboard() {
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.logoGroup}>
-          <span style={styles.logo}>Time Crunch</span>
+          <AppSwitcher currentApp="timeclock" />
           {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         </div>
         <div style={styles.headerRight} className="header-right">
@@ -129,7 +130,7 @@ export default function Dashboard() {
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9' },
   header: { background: '#1a56db', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', height: 'calc(56px + env(safe-area-inset-top))', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  logoGroup: { display: 'flex', alignItems: 'baseline', gap: 10 },
+  logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
   logo: { fontWeight: 700, fontSize: 20 },
   companyName: { fontSize: 14, fontWeight: 400, opacity: 0.75 },
   headerRight: { display: 'flex', alignItems: 'center', gap: 12 },

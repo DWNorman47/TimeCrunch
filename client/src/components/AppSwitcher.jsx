@@ -1,0 +1,132 @@
+import React, { useState, useEffect, useRef } from 'react';
+
+const APPS = [
+  {
+    id: 'timeclock',
+    name: 'Time Clock',
+    bg: '#1a56db',
+    icon: (
+      <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+        <circle cx="10" cy="10" r="7.5" />
+        <polyline points="10,5.5 10,10 13,12" />
+      </svg>
+    ),
+    path: '/',
+  },
+  {
+    id: 'projects',
+    name: 'Projects',
+    bg: '#7c3aed',
+    icon: (
+      <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+        <rect x="2.5" y="2.5" width="6" height="6" rx="1" />
+        <rect x="11.5" y="2.5" width="6" height="6" rx="1" />
+        <rect x="2.5" y="11.5" width="6" height="6" rx="1" />
+        <rect x="11.5" y="11.5" width="6" height="6" rx="1" />
+      </svg>
+    ),
+    path: '/projects',
+    soon: true,
+  },
+  {
+    id: 'inventory',
+    name: 'Inventory',
+    bg: '#d97706',
+    icon: (
+      <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+        <polyline points="2,6 10,11 18,6" />
+        <path d="M2 6l8-4 8 4v8l-8 4-8-4V6z" />
+        <line x1="10" y1="11" x2="10" y2="19" />
+      </svg>
+    ),
+    path: '/inventory',
+    soon: true,
+  },
+];
+
+export default function AppSwitcher({ currentApp = 'timeclock' }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const current = APPS.find(a => a.id === currentApp) || APPS[0];
+
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const navigate = app => {
+    setOpen(false);
+    if (!app.soon) window.location.href = app.path;
+  };
+
+  return (
+    <div ref={ref} style={styles.wrap}>
+      <button style={styles.trigger} onClick={() => setOpen(o => !o)}>
+        <div style={{ ...styles.appIcon, background: current.bg }}>{current.icon}</div>
+        <span style={styles.appName}>{current.name}</span>
+        <svg style={{ ...styles.chevron, transform: open ? 'rotate(180deg)' : 'none' }}
+          viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="12" height="12">
+          <polyline points="2,4 6,8 10,4" />
+        </svg>
+      </button>
+
+      {open && (
+        <div style={styles.dropdown}>
+          {APPS.map(app => (
+            <button
+              key={app.id}
+              style={{
+                ...styles.item,
+                ...(app.id === currentApp ? styles.itemActive : {}),
+                ...(app.soon ? styles.itemSoon : {}),
+              }}
+              onClick={() => navigate(app)}
+            >
+              <div style={{ ...styles.itemIcon, background: app.bg, opacity: app.soon ? 0.65 : 1 }}>
+                {app.icon}
+              </div>
+              <span style={styles.itemName}>{app.name}</span>
+              {app.soon && <span style={styles.soonBadge}>Soon</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const styles = {
+  wrap: { position: 'relative' },
+  trigger: {
+    display: 'flex', alignItems: 'center', gap: 8,
+    background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: 20, padding: '5px 12px 5px 6px',
+    color: '#fff', cursor: 'pointer', transition: 'background 0.15s',
+  },
+  appIcon: {
+    width: 28, height: 28, borderRadius: 8,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  appName: { fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' },
+  chevron: { opacity: 0.8, transition: 'transform 0.2s', color: '#fff' },
+  dropdown: {
+    position: 'absolute', top: 'calc(100% + 8px)', left: 0,
+    background: '#fff', borderRadius: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+    padding: 6, minWidth: 200, zIndex: 1000,
+  },
+  item: {
+    display: 'flex', alignItems: 'center', gap: 12,
+    width: '100%', padding: '10px 12px', border: 'none',
+    background: 'none', borderRadius: 9, cursor: 'pointer',
+    textAlign: 'left', transition: 'background 0.1s',
+  },
+  itemActive: { background: '#f0f4ff' },
+  itemSoon: { cursor: 'default' },
+  itemIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  itemName: { fontWeight: 600, fontSize: 15, color: '#111827', flex: 1 },
+  soonBadge: { fontSize: 10, fontWeight: 700, color: '#6b7280', background: '#f3f4f6', padding: '2px 7px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em' },
+};

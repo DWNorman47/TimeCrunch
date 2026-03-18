@@ -18,6 +18,7 @@ import OvertimeReport from '../components/OvertimeReport';
 import BillingPanel from '../components/BillingPanel';
 import CompanyChat from '../components/CompanyChat';
 import LiveKPIs from '../components/LiveKPIs';
+import AppSwitcher from '../components/AppSwitcher';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -61,7 +62,7 @@ export default function AdminDashboard() {
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.logoGroup}>
-          <span style={styles.logo}>Time Crunch</span>
+          <AppSwitcher currentApp="timeclock" />
           {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         </div>
         <div style={styles.headerRight}>
@@ -160,7 +161,7 @@ export default function AdminDashboard() {
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9' },
   header: { background: '#1a56db', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', height: 'calc(56px + env(safe-area-inset-top))', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  logoGroup: { display: 'flex', alignItems: 'baseline', gap: 10 },
+  logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
   logo: { fontWeight: 700, fontSize: 20 },
   companyName: { fontSize: 14, fontWeight: 400, opacity: 0.75 },
   headerRight: { display: 'flex', gap: 10 },
