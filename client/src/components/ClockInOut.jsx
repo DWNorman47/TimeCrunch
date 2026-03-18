@@ -33,7 +33,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
   const timerRef = useRef(null);
 
   useEffect(() => {
-    api.get('/clock/status').then(r => setStatus(r.data)).catch(() => setStatus(false));
+    api.get('/clock/status').then(r => setStatus(r.data || false)).catch(() => setStatus(false));
   }, []);
 
   useEffect(() => {
