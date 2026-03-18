@@ -16,6 +16,7 @@ import ManageSchedule from '../components/ManageSchedule';
 import ExportPanel from '../components/ExportPanel';
 import OvertimeReport from '../components/OvertimeReport';
 import BillingPanel from '../components/BillingPanel';
+import CompanyChat from '../components/CompanyChat';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -92,7 +93,10 @@ export default function AdminDashboard() {
         </div>
 
         {loading ? <p>Loading...</p> : tab === 'live' ? (
-          <LiveWorkers />
+          <div style={styles.liveLayout}>
+            <div style={styles.liveMain}><LiveWorkers /></div>
+            <div style={styles.liveChat}><CompanyChat /></div>
+          </div>
         ) : tab === 'analytics' ? (
           <>
             <h2 style={styles.heading}>Analytics</h2>
@@ -157,4 +161,7 @@ const styles = {
   subheading: { fontSize: 18, fontWeight: 600, margin: '32px 0 16px' },
   trialBanner: { padding: '10px 24px', border: '1px solid', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 },
   trialUpgradeBtn: { background: 'none', border: 'none', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', fontSize: 14, color: 'inherit', padding: 0 },
+  liveLayout: { display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' },
+  liveMain: {},
+  liveChat: {},
 };

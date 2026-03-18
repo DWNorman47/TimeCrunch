@@ -10,6 +10,7 @@ import ChangePassword from '../components/ChangePassword';
 import PayStubView from '../components/PayStubView';
 import NotificationSetup from '../components/NotificationSetup';
 import TimesheetSignOff from '../components/TimesheetSignOff';
+import CompanyChat from '../components/CompanyChat';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -75,9 +76,12 @@ export default function Dashboard() {
       <main style={styles.main} className="mobile-main">
         <div style={styles.tabs} className="tab-bar">
           <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => setTab('clock')}>🕐 Clock</button>
+          <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => setTab('messages')}>💬 Messages</button>
           <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => setTab('timesheet')}>📋 Timesheet</button>
           <button style={tab === 'account' ? styles.tabActive : styles.tab} onClick={() => setTab('account')}>👤 Account</button>
         </div>
+
+        {tab === 'messages' && <CompanyChat />}
 
         {tab === 'clock' && (
           <>

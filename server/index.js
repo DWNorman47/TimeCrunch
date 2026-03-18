@@ -20,6 +20,7 @@ app.use('/api/superadmin', require('./routes/superadmin'));
 app.use('/api/shifts', require('./routes/shifts'));
 app.use('/api/push', require('./routes/push'));
 app.use('/api/stripe', require('./routes/stripe'));
+app.use('/api/chat', require('./routes/chat'));
 
 // Read-only company settings — available to all authenticated users
 app.get('/api/settings', requireAuth, async (req, res) => {
