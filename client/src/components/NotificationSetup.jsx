@@ -9,8 +9,9 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 export default function NotificationSetup() {
-  const [state, setState] = useState('idle'); // idle | subscribed | denied | unsupported | loading
+  const [state, setState] = useState('idle'); // idle | subscribed | denied | unsupported | loading | error
   const [subscription, setSubscription] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -25,20 +26,27 @@ export default function NotificationSetup() {
 
   const subscribe = async () => {
     setState('loading');
+    setErrorMsg('');
     try {
-      const { data } = await api.get('/push/vapid-public-key');
+      const keyRes = await api.get('/push/vapid-public-key');
+      if (!keyRes.data?.publicKey) throw new Error('Push notifications are not configured on the server yet.');
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(data.publicKey),
+        applicationServerKey: urlBase64ToUint8Array(keyRes.data.publicKey),
       });
       const { endpoint, keys } = sub.toJSON();
       await api.post('/push/subscribe', { endpoint, p256dh: keys.p256dh, auth: keys.auth });
       setSubscription(sub);
       setState('subscribed');
     } catch (err) {
-      if (Notification.permission === 'denied') setState('denied');
-      else setState('idle');
+      if (Notification.permission === 'denied') {
+        setState('denied');
+      } else {
+        const msg = err.response?.data?.error || err.message || 'Failed to enable notifications.';
+        setErrorMsg(msg);
+        setState('error');
+      }
     }
   };
 
@@ -75,6 +83,9 @@ export default function NotificationSetup() {
           {state === 'loading' ? 'Enabling...' : 'Enable'}
         </button>
       )}
+      {state === 'error' && (
+        <div style={styles.errorMsg}>{errorMsg}</div>
+      )}
     </div>
   );
 }
@@ -88,4 +99,5 @@ const styles = {
   onBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 },
   offBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '7px 16px', borderRadius: 7, fontSize: 13, cursor: 'pointer', flexShrink: 0 },
   denied: { fontSize: 12, color: '#9ca3af', fontStyle: 'italic' },
+  errorMsg: { width: '100%', marginTop: 6, fontSize: 12, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '6px 10px' },
 };
