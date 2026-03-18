@@ -89,6 +89,18 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     }
   };
 
+  const handleClearBudget = async (id) => {
+    if (!confirm('Remove budget from this project?')) return;
+    try {
+      const r = await api.patch(`/admin/projects/${id}`, { budget_hours: null, budget_dollars: null });
+      onProjectUpdated(r.data);
+    } catch {
+      toast('Failed to remove budget', 'error');
+    }
+  };
+
+  const hasBudget = p => parseFloat(p.budget_hours) > 0 || parseFloat(p.budget_dollars) > 0;
+
   const useMyLocation = () => {
     if (!navigator.geolocation) {
       setGeoError('Geolocation is not supported by this browser.');
@@ -247,7 +259,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                   <span style={styles.projectName}>{p.name}</span>
                   <span style={styles.projectIndicators}>
                     {p.geo_radius_ft && <span style={styles.indicatorBadge} title={`Geofence: ${p.geo_radius_ft.toLocaleString()} ft radius`}>📍</span>}
-                    {(p.budget_hours || p.budget_dollars) && <span style={styles.indicatorBadge} title={[p.budget_hours && `${p.budget_hours} hrs`, p.budget_dollars && `$${Number(p.budget_dollars).toLocaleString()}`].filter(Boolean).join(' / ')}>💰</span>}
+                    {hasBudget(p) && <span style={styles.indicatorBadge} title={[parseFloat(p.budget_hours) > 0 && `${p.budget_hours} hrs`, parseFloat(p.budget_dollars) > 0 && `$${Number(p.budget_dollars).toLocaleString()}`].filter(Boolean).join(' / ')}>💰</span>}
                   </span>
                 </td>
                 {showWageType && (
@@ -269,6 +281,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                     setEditBudgetDollars(p.budget_dollars || '');
                   }}>Edit</button>
                   {p.geo_radius_ft && <button style={styles.clearGeoBtn} onClick={() => handleClearGeofence(p.id)}>✕ Fence</button>}
+                  {hasBudget(p) && <button style={styles.clearGeoBtn} onClick={() => handleClearBudget(p.id)}>✕ Budget</button>}
                   <button style={styles.removeBtn} onClick={() => handleRemove(p.id, p.name)}>Remove</button>
                 </td>
               </tr>
