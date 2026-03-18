@@ -21,7 +21,8 @@ export default function Dashboard() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [entryView, setEntryView] = useState('timesheet'); // 'list' | 'timesheet'
+  const [tab, setTab] = useState('clock');
+  const [entryView, setEntryView] = useState('timesheet');
 
   const fetchData = async () => {
     setLoading(true);
@@ -37,7 +38,10 @@ export default function Dashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleEntryAdded = entry => setEntries(prev => [entry, ...prev]);
+  const handleEntryAdded = entry => {
+    setEntries(prev => [entry, ...prev]);
+    setTab('timesheet');
+  };
   const handleEntryDeleted = id => setEntries(prev => prev.filter(e => e.id !== id));
   const handleEntryUpdated = entry => setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, ...entry } : e));
 
@@ -45,9 +49,7 @@ export default function Dashboard() {
     try {
       await api.post('/auth/update-language', { language: lang });
       updateUser({ language: lang });
-    } catch {
-      // silently ignore
-    }
+    } catch {}
   };
 
   return (
@@ -59,37 +61,53 @@ export default function Dashboard() {
         </div>
         <div style={styles.headerRight} className="header-right">
           <span style={styles.userName} className="header-username">{user.full_name}</span>
-          <select
-            style={styles.langSelect}
-            value={user?.language || 'English'}
-            onChange={e => handleLanguageChange(e.target.value)}
-          >
+          <select style={styles.langSelect} value={user?.language || 'English'} onChange={e => handleLanguageChange(e.target.value)}>
             <option value="English">EN</option>
             <option value="Spanish">ES</option>
           </select>
-          <button style={styles.logoutBtn} className="header-btn" onClick={() => setShowChangePassword(true)}>{t.changePassword}</button>
-          <button style={styles.logoutBtn} className="header-btn" onClick={logout}>{t.logout}</button>
+          <button style={styles.headerBtn} className="header-btn" onClick={() => setShowChangePassword(true)}>{t.changePassword}</button>
+          <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
         </div>
       </header>
+
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
+
       <main style={styles.main} className="mobile-main">
-        <UpcomingShifts />
-        <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} />
-        {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 45} overtimeRule={settings?.overtime_rule ?? 'daily'} overtimeThreshold={settings?.overtime_threshold ?? 8} />}
-        <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} />
-        {!loading && (
-          <div style={styles.viewToggle}>
-            <button style={entryView === 'timesheet' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('timesheet')}>{t.timesheetView}</button>
-            <button style={entryView === 'list' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('list')}>{t.listView}</button>
-          </div>
+        <div style={styles.tabs} className="tab-bar">
+          <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => setTab('clock')}>🕐 Clock</button>
+          <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => setTab('timesheet')}>📋 Timesheet</button>
+          <button style={tab === 'account' ? styles.tabActive : styles.tab} onClick={() => setTab('account')}>👤 Account</button>
+        </div>
+
+        {tab === 'clock' && (
+          <>
+            <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} />
+            <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} />
+          </>
         )}
-        <NotificationSetup />
-        <TimesheetSignOff t={t} />
-        {!loading && <PayStubView />}
-        {loading ? <p>{t.loadingEntries}</p> : entryView === 'timesheet' ? (
-          <TimesheetView entries={entries} language={user?.language} />
-        ) : (
-          <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} currentUserId={user?.id} />
+
+        {tab === 'timesheet' && (
+          <>
+            <UpcomingShifts />
+            {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 45} overtimeRule={settings?.overtime_rule ?? 'daily'} overtimeThreshold={settings?.overtime_threshold ?? 8} />}
+            <TimesheetSignOff t={t} />
+            <div style={styles.viewToggle}>
+              <button style={entryView === 'timesheet' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('timesheet')}>{t.timesheetView}</button>
+              <button style={entryView === 'list' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('list')}>{t.listView}</button>
+            </div>
+            {loading ? <p>{t.loadingEntries}</p> : entryView === 'timesheet' ? (
+              <TimesheetView entries={entries} language={user?.language} />
+            ) : (
+              <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} currentUserId={user?.id} />
+            )}
+          </>
+        )}
+
+        {tab === 'account' && (
+          <>
+            <NotificationSetup />
+            {!loading && <PayStubView />}
+          </>
         )}
       </main>
     </div>
@@ -105,8 +123,11 @@ const styles = {
   headerRight: { display: 'flex', alignItems: 'center', gap: 12 },
   userName: { fontSize: 14 },
   langSelect: { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', padding: '5px 8px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  logoutBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600 },
-  main: { maxWidth: 700, margin: '32px auto', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 24 },
+  headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600 },
+  main: { maxWidth: 700, margin: '24px auto', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 20 },
+  tabs: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 10, padding: 4, width: '100%' },
+  tab: { flex: 1, padding: '9px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#666', cursor: 'pointer', textAlign: 'center' },
+  tabActive: { flex: 1, padding: '9px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', textAlign: 'center' },
   viewToggle: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 8, padding: 3, width: 'fit-content' },
   toggleBtn: { padding: '6px 14px', background: 'none', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#666', cursor: 'pointer' },
   toggleActive: { padding: '6px 14px', background: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
