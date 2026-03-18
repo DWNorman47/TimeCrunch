@@ -73,10 +73,10 @@ function FeatureToggles({ settings, onSettingsUpdated }) {
 const ftStyles = {
   card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 24 },
   title: { fontSize: 17, fontWeight: 700, margin: '0 0 4px' },
-  subtitle: { fontSize: 13, color: '#6b7280', margin: '0 0 20px' },
+  subtitle: { fontSize: 13, color: '#6b7280', margin: '0 0 12px' },
   list: { display: 'flex', flexDirection: 'column', gap: 0 },
-  row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0', borderTop: '1px solid #f3f4f6' },
-  info: { display: 'flex', flexDirection: 'column', gap: 2 },
+  row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '10px 0', borderTop: '1px solid #f3f4f6' },
+  info: { display: 'flex', flexDirection: 'column', gap: 1 },
   label: { fontSize: 14, fontWeight: 600, color: '#111827' },
   desc: { fontSize: 12, color: '#9ca3af' },
   toggle: { position: 'relative', width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, padding: 0, overflow: 'hidden' },
