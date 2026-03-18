@@ -53,7 +53,7 @@ router.post('/', requireAuth, async (req, res) => {
 router.patch('/:id', requireAuth, async (req, res) => {
   const { start_time, end_time, notes, break_minutes, mileage } = req.body;
   if (!start_time || !end_time) return res.status(400).json({ error: 'start_time and end_time required' });
-  if (start_time >= end_time) return res.status(400).json({ error: 'End time must be after start time' });
+  // Allow midnight-crossing shifts (end_time < start_time is valid, e.g. 23:00–00:30)
   try {
     const existing = await pool.query(
       'SELECT * FROM time_entries WHERE id = $1 AND user_id = $2',
@@ -198,7 +198,9 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
 
       let regularHours = 0, overtimeHours = 0, prevailingHours = 0, totalMileage = 0;
       for (const e of entries.rows) {
-        const gross = (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60;
+        let ms = new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`);
+        if (ms < 0) ms += 86400000;
+        const gross = ms / 3600000 - (e.break_minutes || 0) / 60;
         if (e.wage_type === 'prevailing') prevailingHours += gross;
         else regularHours += gross;
         if (e.mileage) totalMileage += parseFloat(e.mileage);

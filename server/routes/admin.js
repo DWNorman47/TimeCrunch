@@ -32,6 +32,13 @@ async function getSettings(companyId) {
   return s;
 }
 
+// Hours worked between two HH:MM:SS strings, handles midnight-crossing shifts
+function hoursWorked(start, end) {
+  let ms = new Date(`1970-01-01T${end}`) - new Date(`1970-01-01T${start}`);
+  if (ms < 0) ms += 86400000;
+  return ms / 3600000;
+}
+
 // Shared overtime calculation: accepts array of {wage_type, start_time, end_time, work_date, break_minutes}
 function computeOT(entries, rule, threshold) {
   const regular = entries.filter(e => e.wage_type === 'regular');
@@ -42,7 +49,7 @@ function computeOT(entries, rule, threshold) {
       const jan4 = new Date(d.getFullYear(), 0, 4);
       const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7);
       const key = `${d.getFullYear()}-W${week}`;
-      const h = (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60;
+      const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
       weekly[key] = (weekly[key] || 0) + h;
     });
     const reg = Object.values(weekly).reduce((s, h) => s + Math.min(h, threshold), 0);
@@ -53,7 +60,7 @@ function computeOT(entries, rule, threshold) {
   const daily = {};
   regular.forEach(e => {
     const key = e.work_date.toString().substring(0, 10);
-    const h = (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60;
+    const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
     daily[key] = (daily[key] || 0) + h;
   });
   const reg = Object.values(daily).reduce((s, h) => s + Math.min(h, threshold), 0);
@@ -166,17 +173,17 @@ router.get('/workers', requireAdmin, async (req, res) => {
     const result = await pool.query(
       `WITH daily_regular AS (
         SELECT user_id, work_date,
-          SUM(EXTRACT(EPOCH FROM (end_time - start_time)) / 3600) as day_hours
+          SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600) as day_hours
         FROM time_entries
         WHERE wage_type = 'regular' AND company_id = $1
         GROUP BY user_id, work_date
       )
       SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate,
         COUNT(te.id) as total_entries,
-        COALESCE(SUM(EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600), 0) as total_hours,
+        COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE((SELECT SUM(LEAST(day_hours, 8)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as regular_hours,
         COALESCE((SELECT SUM(GREATEST(day_hours - 8, 0)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as overtime_hours,
-        COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600 ELSE 0 END), 0) as prevailing_hours
+        COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600 ELSE 0 END), 0) as prevailing_hours
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
       WHERE u.role = 'worker' AND u.active = true AND u.company_id = $1
@@ -250,7 +257,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
     const settings = await getSettings(companyId);
     const { regularHours, overtimeHours } = computeOT(entries, settings.overtime_rule, settings.overtime_threshold);
     const prevailingHours = entries.filter(e => e.wage_type === 'prevailing').reduce((sum, e) => {
-      const h = (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60;
+      const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
       return sum + h;
     }, 0);
     const totalHours = regularHours + overtimeHours + prevailingHours;
@@ -453,7 +460,7 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
 
     let prevailingHours = 0, prevailingCost = 0;
     entries.filter(e => e.wage_type === 'prevailing').forEach(e => {
-      const h = (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60;
+      const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
       prevailingHours += h;
       prevailingCost += h * settings.prevailing_wage_rate;
     });
@@ -480,7 +487,7 @@ router.get('/projects/metrics', requireAdmin, async (req, res) => {
     const result = await pool.query(
       `WITH daily_regular AS (
         SELECT project_id, work_date,
-          SUM(EXTRACT(EPOCH FROM (end_time - start_time)) / 3600) as day_hours
+          SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600) as day_hours
         FROM time_entries
         WHERE wage_type = 'regular' AND company_id = $1
         GROUP BY project_id, work_date
@@ -488,10 +495,10 @@ router.get('/projects/metrics', requireAdmin, async (req, res) => {
       SELECT p.id, p.name, p.budget_hours, p.budget_dollars,
         COUNT(te.id) as total_entries,
         COUNT(DISTINCT te.user_id) as worker_count,
-        COALESCE(SUM(EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600), 0) as total_hours,
+        COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE((SELECT SUM(LEAST(day_hours, 8)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as regular_hours,
         COALESCE((SELECT SUM(GREATEST(day_hours - 8, 0)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as overtime_hours,
-        COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600 ELSE 0 END), 0) as prevailing_hours
+        COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600 ELSE 0 END), 0) as prevailing_hours
       FROM projects p
       LEFT JOIN time_entries te ON te.project_id = p.id
       WHERE p.active = true AND p.company_id = $1
@@ -641,7 +648,7 @@ router.get('/analytics', requireAdmin, async (req, res) => {
       // Hours per day for the last 14 days
       pool.query(
         `SELECT work_date::text as date,
-                ROUND(SUM(EXTRACT(EPOCH FROM (end_time - start_time)) / 3600)::numeric, 2) as hours
+                ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600)::numeric, 2) as hours
          FROM time_entries
          WHERE company_id = $1 AND work_date >= CURRENT_DATE - 13
          GROUP BY work_date ORDER BY work_date ASC`,
@@ -650,7 +657,7 @@ router.get('/analytics', requireAdmin, async (req, res) => {
       // Top projects by hours, last 30 days
       pool.query(
         `SELECT p.name,
-                ROUND(SUM(EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600)::numeric, 2) as hours
+                ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600)::numeric, 2) as hours
          FROM time_entries te
          JOIN projects p ON te.project_id = p.id
          WHERE te.company_id = $1 AND te.work_date >= CURRENT_DATE - 29
@@ -660,7 +667,7 @@ router.get('/analytics', requireAdmin, async (req, res) => {
       // Top workers by hours, last 30 days
       pool.query(
         `SELECT u.full_name as name,
-                ROUND(SUM(EXTRACT(EPOCH FROM (te.end_time - te.start_time)) / 3600)::numeric, 2) as hours
+                ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600)::numeric, 2) as hours
          FROM time_entries te
          JOIN users u ON te.user_id = u.id
          WHERE te.company_id = $1 AND te.work_date >= CURRENT_DATE - 29
@@ -671,11 +678,11 @@ router.get('/analytics', requireAdmin, async (req, res) => {
       pool.query(
         `SELECT
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('week', CURRENT_DATE)
-             THEN EXTRACT(EPOCH FROM (end_time - start_time)) / 3600 END), 0)::numeric, 1) as hours_this_week,
+             THEN EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600 END), 0)::numeric, 1) as hours_this_week,
            COUNT(DISTINCT CASE WHEN work_date >= date_trunc('week', CURRENT_DATE) THEN user_id END) as active_workers_this_week,
            COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN user_id END) as active_workers_this_month,
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE)
-             THEN EXTRACT(EPOCH FROM (end_time - start_time)) / 3600 END), 0)::numeric, 1) as hours_this_month,
+             THEN EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600 END), 0)::numeric, 1) as hours_this_month,
            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_approvals
          FROM time_entries WHERE company_id = $1`,
         [companyId]
@@ -856,7 +863,7 @@ router.get('/export', requireAdmin, async (req, res) => {
     );
     const esc = v => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`;
     const fmtTime = t => { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`; };
-    const netHours = (s, e, brk) => { const ms = new Date(`1970-01-01T${s}`) - new Date(`1970-01-01T${e}`); return (Math.abs(ms) / 3600000 - (brk || 0) / 60).toFixed(2); };
+    const netHours = (s, e, brk) => (hoursWorked(s, e) - (brk || 0) / 60).toFixed(2);
     const headers = ['Worker', 'Project', 'Date', 'Start', 'End', 'Break (min)', 'Net Hours', 'Wage Type', 'Mileage (mi)', 'Status', 'Notes'];
     const lines = [
       headers.join(','),
@@ -911,7 +918,7 @@ router.get('/overtime-report', requireAdmin, async (req, res) => {
       const { regularHours, overtimeHours } = computeOT(wEntries, rule, threshold);
       const prevHours = wEntries
         .filter(e => e.wage_type === 'prevailing')
-        .reduce((s, e) => s + (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60, 0);
+        .reduce((s, e) => s + hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60, 0);
       const totalHours = regularHours + overtimeHours + prevHours;
       const rate = parseFloat(w.hourly_rate) || defaultRate;
       const regularCost = regularHours * rate;
@@ -976,7 +983,7 @@ router.get('/payroll-export', requireAdmin, async (req, res) => {
       const { regularHours, overtimeHours } = computeOT(wEntries, rule, threshold);
       const prevHours = wEntries
         .filter(e => e.wage_type === 'prevailing')
-        .reduce((s, e) => s + (new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000 - (e.break_minutes || 0) / 60, 0);
+        .reduce((s, e) => s + hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60, 0);
       const rate = parseFloat(w.hourly_rate) || defaultRate;
       const mileage = wEntries.reduce((s, e) => s + (parseFloat(e.mileage) || 0), 0);
       lines.push([
