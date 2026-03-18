@@ -52,16 +52,16 @@ export default function Landing() {
   return (
     <div style={styles.page}>
       {/* Header */}
-      <header style={styles.header}>
+      <header style={styles.header} className="landing-header">
         <span style={styles.logo}>Time Crunch</span>
-        <nav style={styles.nav}>
+        <nav style={styles.nav} className="landing-nav">
           <a href="#features" style={styles.navLink}>Features</a>
           <a href="#how-it-works" style={styles.navLink}>How it works</a>
           <a href="#pricing" style={styles.navLink}>Pricing</a>
         </nav>
         <div style={styles.headerRight}>
           <Link to="/login" style={styles.loginLink}>Log in</Link>
-          <Link to="/register" style={styles.ctaBtn}>Get started free</Link>
+          <Link to="/register" style={styles.ctaBtn} className="landing-cta">Get started free</Link>
         </div>
       </header>
 
@@ -177,7 +177,7 @@ const styles = {
   page: { minHeight: '100vh', background: '#fff', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#1a202c' },
 
   // Header
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', height: 64, borderBottom: '1px solid #f0f0f0', position: 'sticky', top: 0, background: '#fff', zIndex: 100 },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', paddingTop: 'env(safe-area-inset-top)', height: 'calc(64px + env(safe-area-inset-top))', borderBottom: '1px solid #f0f0f0', position: 'sticky', top: 0, background: '#fff', zIndex: 100 },
   logo: { fontWeight: 800, fontSize: 20, color: '#1a56db', letterSpacing: '-0.5px' },
   nav: { display: 'flex', gap: 28 },
   navLink: { color: '#6b7280', fontWeight: 500, fontSize: 14, textDecoration: 'none' },

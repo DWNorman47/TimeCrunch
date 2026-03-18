@@ -33,7 +33,20 @@ input, select, textarea {
 /* ── Mobile responsive ── */
 @media (max-width: 600px) {
 
-  /* Header */
+  /* Landing page header: hide nav links, reduce padding, shrink CTA */
+  .landing-nav {
+    display: none !important;
+  }
+  .landing-header {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  .landing-cta {
+    padding: 7px 12px !important;
+    font-size: 13px !important;
+  }
+
+  /* App header */
   .header-right {
     gap: 6px !important;
   }
