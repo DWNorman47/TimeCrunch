@@ -105,6 +105,24 @@ export default function ApprovalQueue() {
                   <span style={styles.signedTag}>✍ Worker signed</span>
                 )}
                 {e.notes && <div style={styles.notes}>{e.notes}</div>}
+                {(e.clock_in_lat || e.clock_out_lat) && (
+                  <div style={styles.locationRow}>
+                    {e.clock_in_lat && (
+                      <a
+                        href={`https://www.google.com/maps?q=${e.clock_in_lat},${e.clock_in_lng}`}
+                        target="_blank" rel="noopener noreferrer"
+                        style={styles.locationLink}
+                      >📍 Clock-in location</a>
+                    )}
+                    {e.clock_out_lat && (
+                      <a
+                        href={`https://www.google.com/maps?q=${e.clock_out_lat},${e.clock_out_lng}`}
+                        target="_blank" rel="noopener noreferrer"
+                        style={styles.locationLink}
+                      >📍 Clock-out location</a>
+                    )}
+                  </div>
+                )}
                 <button
                   style={styles.msgBtn}
                   onClick={() => setOpenMessageId(openMessageId === e.id ? null : e.id)}
@@ -173,4 +191,6 @@ const styles = {
   approveAllBtn: { background: '#059669', color: '#fff', border: 'none', padding: '5px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', marginLeft: 'auto' },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 6 },
   signedTag: { display: 'inline-block', marginTop: 4, background: '#ede9fe', color: '#5b21b6', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
+  locationRow: { display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap' },
+  locationLink: { fontSize: 11, color: '#2563eb', textDecoration: 'none', fontWeight: 600 },
 };

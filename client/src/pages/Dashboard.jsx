@@ -22,7 +22,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [tab, setTab] = useState('clock');
-  const [entryView, setEntryView] = useState('timesheet');
+  const [entryView, setEntryView] = useState('list');
 
   const fetchData = async () => {
     setLoading(true);

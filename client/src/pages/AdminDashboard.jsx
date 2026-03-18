@@ -106,14 +106,15 @@ export default function AdminDashboard() {
         ) : tab === 'reports' ? (
           <>
             <h2 style={styles.heading}>Reports</h2>
-            <OvertimeReport />
-            <h3 style={styles.subheading}>Project Reports</h3>
-            <ProjectReports />
             <h3 style={styles.subheading}>Worker Reports</h3>
             {workers.length === 0
               ? <p style={{ color: '#666' }}>No workers yet. Add one in the Manage tab.</p>
               : workers.map(w => <WorkerMetrics key={w.id} worker={w} />)
             }
+            <h3 style={styles.subheading}>Project Reports</h3>
+            <ProjectReports />
+            <h3 style={styles.subheading}>Overtime Report</h3>
+            <OvertimeReport />
             <h3 style={styles.subheading}>Export</h3>
             <ExportPanel workers={workers} projects={projects} />
           </>
