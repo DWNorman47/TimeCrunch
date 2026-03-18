@@ -35,9 +35,6 @@ button {
 input, select, textarea, button {
   min-height: 40px;
 }
-button.toggle-switch {
-  min-height: unset;
-}
 
 /* Prevent iOS Safari from auto-zooming on input focus (requires font-size >= 16px) */
 input, select, textarea {

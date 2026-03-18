@@ -55,13 +55,12 @@ function FeatureToggles({ settings, onSettingsUpdated }) {
                 <span style={ftStyles.desc}>{desc}</span>
               </div>
               <button
-                className="toggle-switch"
                 style={{ ...ftStyles.toggle, background: enabled ? '#1a56db' : '#d1d5db' }}
                 onClick={() => toggle(key, enabled)}
                 disabled={isSaving}
                 aria-pressed={enabled}
               >
-                <span style={{ ...ftStyles.knob, transform: enabled ? 'translateX(20px)' : 'translateX(0)' }} />
+                <span style={{ ...ftStyles.knob, transform: enabled ? 'translateX(30px)' : 'translateX(0)' }} />
               </button>
             </div>
           );
@@ -80,8 +79,8 @@ const ftStyles = {
   info: { display: 'flex', flexDirection: 'column', gap: 1 },
   label: { fontSize: 14, fontWeight: 600, color: '#111827' },
   desc: { fontSize: 12, color: '#9ca3af' },
-  toggle: { display: 'flex', alignItems: 'center', width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, padding: 2 },
-  knob: { display: 'block', width: 20, height: 20, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s', flexShrink: 0 },
+  toggle: { display: 'flex', alignItems: 'center', width: 70, height: 40, borderRadius: 20, border: 'none', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, padding: 4 },
+  knob: { display: 'block', width: 32, height: 32, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s', flexShrink: 0 },
 };
 
 export default function AdminDashboard() {
