@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import AppSwitcher from '../components/AppSwitcher';
+import BillingPanel from '../components/BillingPanel';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -276,123 +277,10 @@ function TeamTab() {
 // ── Billing Tab ───────────────────────────────────────────────────────────────
 
 function BillingTab() {
-  const [status, setStatus] = useState(null);
-  const [plans, setPlans] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [checkingOut, setCheckingOut] = useState(null);
-  const [portaling, setPortaling] = useState(false);
-
-  useEffect(() => {
-    Promise.all([
-      api.get('/stripe/status'),
-      api.get('/stripe/plans'),
-    ]).then(([s, p]) => {
-      setStatus(s.data);
-      setPlans(p.data);
-    }).finally(() => setLoading(false));
-  }, []);
-
-  const checkout = async priceId => {
-    setCheckingOut(priceId);
-    try {
-      const r = await api.post('/stripe/checkout', { price_id: priceId });
-      window.location.href = r.data.url;
-    } catch (err) {
-      alert(err.response?.data?.error || 'Could not start checkout');
-      setCheckingOut(null);
-    }
-  };
-
-  const portal = async () => {
-    setPortaling(true);
-    try {
-      const r = await api.post('/stripe/portal');
-      window.location.href = r.data.url;
-    } catch (err) {
-      alert(err.response?.data?.error || 'Could not open billing portal');
-      setPortaling(false);
-    }
-  };
-
-  const trialDaysLeft = status?.trial_ends_at
-    ? Math.max(0, Math.ceil((new Date(status.trial_ends_at) - new Date()) / 86400000))
-    : null;
-
-  if (loading) return <div style={styles.tabContent}><p style={styles.hint}>Loading...</p></div>;
-
   return (
     <div style={styles.tabContent}>
       <h2 style={styles.tabTitle}>Billing</h2>
-
-      {/* Current status */}
-      <div style={styles.card}>
-        <div style={styles.billingStatus}>
-          <div>
-            <div style={styles.cardLabel}>Current Plan</div>
-            <div style={styles.currentPlan}>
-              {status?.subscription_status === 'active'
-                ? `${(status.plan || 'starter').charAt(0).toUpperCase() + (status.plan || 'starter').slice(1)} Plan`
-                : status?.subscription_status === 'trial'
-                ? 'Free Trial'
-                : status?.subscription_status === 'past_due'
-                ? 'Past Due'
-                : 'Canceled'}
-            </div>
-            {status?.subscription_status === 'trial' && trialDaysLeft !== null && (
-              <div style={{ ...styles.trialCountdown, color: trialDaysLeft <= 3 ? '#dc2626' : '#d97706' }}>
-                {trialDaysLeft > 0 ? `${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''} left in trial` : 'Trial expired'}
-              </div>
-            )}
-          </div>
-          {status?.subscription_status === 'active' && (
-            <button style={styles.manageBtn} onClick={portal} disabled={portaling}>
-              {portaling ? '...' : 'Manage Billing →'}
-            </button>
-          )}
-          {status?.subscription_status === 'past_due' && (
-            <div>
-              <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 8 }}>Payment failed — update your payment method to keep access.</p>
-              <button style={styles.manageBtn} onClick={portal} disabled={portaling}>
-                {portaling ? '...' : 'Update Payment →'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Plan cards — show when on trial or no subscription */}
-      {(status?.subscription_status === 'trial' || status?.subscription_status === 'canceled' || !status?.subscription_status) && (
-        <>
-          <h3 style={styles.plansHeading}>Choose a Plan</h3>
-          {plans.length === 0 ? (
-            <div style={styles.card}>
-              <p style={styles.hint}>Billing not yet configured. Set STRIPE_PRICE_STARTER and STRIPE_PRICE_PRO in your environment.</p>
-            </div>
-          ) : (
-            <div style={styles.plansGrid}>
-              {plans.map(plan => (
-                <div key={plan.id} style={{ ...styles.planCard, ...(plan.id === 'pro' ? styles.planCardPro : {}) }}>
-                  <div style={styles.planHeader}>
-                    <div style={styles.planName}>{plan.name}</div>
-                    <div style={styles.planPrice}>${plan.monthly}<span style={styles.planPer}>/mo</span></div>
-                  </div>
-                  <p style={styles.planDesc}>{plan.description}</p>
-                  <button
-                    style={{ ...styles.checkoutBtn, ...(plan.id === 'pro' ? styles.checkoutBtnPro : {}) }}
-                    onClick={() => checkout(plan.price_id)}
-                    disabled={!!checkingOut}
-                  >
-                    {checkingOut === plan.price_id ? 'Redirecting...' : `Subscribe to ${plan.name}`}
-                  </button>
-                  {trialDaysLeft > 0 && (
-                    <p style={styles.trialNote}>Your {trialDaysLeft} remaining trial days carry over.</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
+      <BillingPanel />
     </div>
   );
 }

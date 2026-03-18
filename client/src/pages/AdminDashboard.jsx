@@ -5,7 +5,6 @@ import ManageWorkers from '../components/ManageWorkers';
 import ManageProjects from '../components/ManageProjects';
 import ManageRates from '../components/ManageRates';
 import ProjectReports from '../components/ProjectReports';
-import ChangePassword from '../components/ChangePassword';
 import QuickBooks from '../components/QuickBooks';
 import LiveWorkers from '../components/LiveWorkers';
 import AuditLog from '../components/AuditLog';
@@ -15,7 +14,6 @@ import ManagePayPeriods from '../components/ManagePayPeriods';
 import ManageSchedule from '../components/ManageSchedule';
 import ExportPanel from '../components/ExportPanel';
 import OvertimeReport from '../components/OvertimeReport';
-import BillingPanel from '../components/BillingPanel';
 import CompanyChat from '../components/CompanyChat';
 import LiveKPIs from '../components/LiveKPIs';
 import AppSwitcher from '../components/AppSwitcher';
@@ -28,7 +26,6 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showChangePassword, setShowChangePassword] = useState(false);
   const [billing, setBilling] = useState(null);
 
   useEffect(() => {
@@ -70,15 +67,13 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={getT('English')} />}
-
       {billing?.subscription_status === 'trial' && (() => {
         const days = Math.max(0, Math.ceil((new Date(billing.trial_ends_at) - new Date()) / 86400000));
         if (days > 7) return null;
         return (
           <div style={{ ...styles.trialBanner, background: days <= 2 ? '#fef2f2' : '#fffbeb', borderColor: days <= 2 ? '#fecaca' : '#fcd34d', color: days <= 2 ? '#991b1b' : '#92400e' }}>
             {days === 0 ? '⚠ Your trial has expired.' : `⏳ ${days} day${days !== 1 ? 's' : ''} left in your trial.`}
-            {' '}<button style={styles.trialUpgradeBtn} onClick={() => switchTab('billing')}>Subscribe now →</button>
+            {' '}<button style={styles.trialUpgradeBtn} onClick={() => window.location.href = '/administration#billing'}>Subscribe now →</button>
           </div>
         );
       })()}
@@ -90,7 +85,7 @@ export default function AdminDashboard() {
           <button style={tab === 'approvals' ? styles.tabActive : styles.tab} onClick={() => switchTab('approvals')}>Approvals</button>
           <button style={tab === 'reports' ? styles.tabActive : styles.tab} onClick={() => switchTab('reports')}>Reports</button>
           <button style={tab === 'manage' ? styles.tabActive : styles.tab} onClick={() => switchTab('manage')}>Manage</button>
-          <button style={tab === 'settings' ? styles.tabActive : styles.tab} onClick={() => switchTab('settings')}>Settings</button>
+          <button style={tab === 'settings' ? styles.tabActive : styles.tab} onClick={() => switchTab('settings')}>Integrations</button>
         </div>
 
         {loading ? <p>Loading...</p> : tab === 'live' ? (
@@ -138,18 +133,7 @@ export default function AdminDashboard() {
           </>
         ) : (
           <>
-            <h2 style={styles.heading}>Settings</h2>
-            <div style={styles.accountCard}>
-              <div style={styles.accountRow}>
-                <div>
-                  <div style={styles.accountLabel}>Password</div>
-                  <div style={styles.accountSub}>Change your login password</div>
-                </div>
-                <button style={styles.accountBtn} onClick={() => setShowChangePassword(true)}>Change Password</button>
-              </div>
-            </div>
-            <BillingPanel />
-            <h3 style={styles.subheading}>Integrations</h3>
+            <h2 style={styles.heading}>Integrations</h2>
             <QuickBooks workers={workers} projects={projects} />
           </>
         )}
