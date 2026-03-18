@@ -79,7 +79,7 @@ const ftStyles = {
   info: { display: 'flex', flexDirection: 'column', gap: 1 },
   label: { fontSize: 14, fontWeight: 600, color: '#111827' },
   desc: { fontSize: 12, color: '#9ca3af' },
-  toggle: { position: 'relative', width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, padding: 0, overflow: 'hidden' },
+  toggle: { display: 'block', position: 'relative', width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, padding: 0, overflow: 'hidden' },
   toggleOn: { background: '#1a56db' },
   toggleOff: { background: '#d1d5db' },
   knob: { position: 'absolute', top: 2, left: 0, width: 20, height: 20, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s', display: 'block' },
