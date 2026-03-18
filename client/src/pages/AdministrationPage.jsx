@@ -4,17 +4,8 @@ import api from '../api';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
 import BillingPanel from '../components/BillingPanel';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function Avatar({ name, size = 36, bg = '#1a56db' }) {
-  const initials = name?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
-  return (
-    <div style={{ width: size, height: size, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <span style={{ color: '#fff', fontWeight: 700, fontSize: size * 0.38 }}>{initials}</span>
-    </div>
-  );
-}
+import ManageWorkers from '../components/ManageWorkers';
+import ManageProjects from '../components/ManageProjects';
 
 function RoleBadge({ role }) {
   const isAdmin = role === 'admin' || role === 'super_admin';
@@ -107,174 +98,6 @@ function CompanyTab() {
   );
 }
 
-// ── Team Tab ──────────────────────────────────────────────────────────────────
-
-function InviteForm({ onInvited, onClose }) {
-  const [form, setForm] = useState({ full_name: '', email: '', role: 'worker', hourly_rate: '' });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  const submit = async e => {
-    e.preventDefault();
-    if (!form.full_name.trim() || !form.email.trim()) { setError('Name and email are required'); return; }
-    setSaving(true); setError('');
-    try {
-      const r = await api.post('/admin/workers/invite', form);
-      onInvited(r.data);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to send invite');
-    } finally { setSaving(false); }
-  };
-
-  return (
-    <div style={styles.inviteForm}>
-      <h4 style={styles.inviteTitle}>Invite Team Member</h4>
-      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={styles.inviteGrid}>
-          <div style={styles.fieldGroup}>
-            <label style={styles.label}>Full Name *</label>
-            <input style={styles.input} type="text" placeholder="Jane Smith" value={form.full_name} onChange={e => set('full_name', e.target.value)} />
-          </div>
-          <div style={styles.fieldGroup}>
-            <label style={styles.label}>Email *</label>
-            <input style={styles.input} type="email" placeholder="jane@company.com" value={form.email} onChange={e => set('email', e.target.value)} />
-          </div>
-          <div style={styles.fieldGroup}>
-            <label style={styles.label}>Role</label>
-            <select style={styles.input} value={form.role} onChange={e => set('role', e.target.value)}>
-              <option value="worker">Worker</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-          <div style={styles.fieldGroup}>
-            <label style={styles.label}>Hourly Rate</label>
-            <input style={styles.input} type="number" placeholder="30" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />
-          </div>
-        </div>
-        {error && <p style={styles.error}>{error}</p>}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={styles.saveBtn} type="submit" disabled={saving}>{saving ? 'Sending...' : 'Send Invite'}</button>
-          <button style={styles.ghostBtn} type="button" onClick={onClose}>Cancel</button>
-        </div>
-      </form>
-      <p style={styles.inviteNote}>An email will be sent with a link to set their password.</p>
-    </div>
-  );
-}
-
-function TeamTab() {
-  const { user } = useAuth();
-  const [workers, setWorkers] = useState([]);
-  const [archived, setArchived] = useState([]);
-  const [showArchived, setShowArchived] = useState(false);
-  const [showInvite, setShowInvite] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [removing, setRemoving] = useState(null);
-  const [restoring, setRestoring] = useState(null);
-
-  const load = async () => {
-    const [w, a] = await Promise.all([
-      api.get('/admin/workers', { params: { all_roles: true } }),
-      api.get('/admin/workers/archived'),
-    ]);
-    setWorkers(w.data);
-    setArchived(a.data);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const remove = async id => {
-    if (!confirm('Remove this team member? They can be restored later.')) return;
-    setRemoving(id);
-    try {
-      await api.delete(`/admin/workers/${id}`);
-      setWorkers(prev => prev.filter(w => w.id !== id));
-      load(); // refresh archived list
-    } finally { setRemoving(null); }
-  };
-
-  const restore = async id => {
-    setRestoring(id);
-    try {
-      await api.patch(`/admin/workers/${id}/restore`);
-      load();
-    } finally { setRestoring(null); }
-  };
-
-  const bgColors = ['#1a56db', '#059669', '#7c3aed', '#d97706', '#dc2626', '#0891b2'];
-
-  return (
-    <div style={styles.tabContent}>
-      <div style={styles.teamHeader}>
-        <div>
-          <h2 style={styles.tabTitle}>Team</h2>
-          <p style={styles.tabSub}>{workers.length} active member{workers.length !== 1 ? 's' : ''} ({workers.filter(w => w.role === 'admin').length} admin{workers.filter(w => w.role === 'admin').length !== 1 ? 's' : ''}, {workers.filter(w => w.role === 'worker').length} worker{workers.filter(w => w.role === 'worker').length !== 1 ? 's' : ''})</p>
-        </div>
-        <button style={styles.primaryBtn} onClick={() => setShowInvite(true)}>+ Invite</button>
-      </div>
-
-      {showInvite && (
-        <InviteForm
-          onInvited={w => { setWorkers(prev => [w, ...prev]); setShowInvite(false); }}
-          onClose={() => setShowInvite(false)}
-        />
-      )}
-
-      {loading ? <p style={styles.hint}>Loading...</p> : (
-        <div style={styles.card}>
-          {workers.map((w, i) => (
-            <div key={w.id} style={{ ...styles.memberRow, borderBottom: i < workers.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
-              <Avatar name={w.full_name} bg={bgColors[i % bgColors.length]} />
-              <div style={styles.memberInfo}>
-                <span style={styles.memberName}>{w.full_name}</span>
-                <span style={styles.memberUsername}>@{w.username}</span>
-              </div>
-              <RoleBadge role={w.role} />
-              {w.id !== user?.id && (
-                <button
-                  style={styles.removeBtn}
-                  onClick={() => remove(w.id)}
-                  disabled={removing === w.id}
-                >
-                  {removing === w.id ? '...' : 'Remove'}
-                </button>
-              )}
-            </div>
-          ))}
-          {workers.length === 0 && <p style={styles.hint}>No active team members.</p>}
-        </div>
-      )}
-
-      {archived.length > 0 && (
-        <div style={{ marginTop: 20 }}>
-          <button style={styles.expandBtn} onClick={() => setShowArchived(a => !a)}>
-            {showArchived ? '▲' : '▼'} Archived ({archived.length})
-          </button>
-          {showArchived && (
-            <div style={{ ...styles.card, marginTop: 8, opacity: 0.8 }}>
-              {archived.map((w, i) => (
-                <div key={w.id} style={{ ...styles.memberRow, borderBottom: i < archived.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
-                  <Avatar name={w.full_name} bg="#9ca3af" />
-                  <div style={styles.memberInfo}>
-                    <span style={{ ...styles.memberName, color: '#6b7280' }}>{w.full_name}</span>
-                    <span style={styles.memberUsername}>@{w.username}</span>
-                  </div>
-                  <RoleBadge role={w.role} />
-                  <button style={styles.restoreBtn} onClick={() => restore(w.id)} disabled={restoring === w.id}>
-                    {restoring === w.id ? '...' : 'Restore'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Billing Tab ───────────────────────────────────────────────────────────────
 
 function BillingTab() {
@@ -330,7 +153,6 @@ function AccountTab() {
         </div>
       </div>
 
-      {/* Change password — accordion */}
       <div style={styles.card}>
         <button
           style={styles.accordionTrigger}
@@ -374,19 +196,46 @@ function AccountTab() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+const ADMIN_TABS = ['company', 'team', 'projects', 'billing', 'account'];
 const TABS = [
-  { id: 'company', label: '🏢 Company' },
-  { id: 'team', label: '👥 Team' },
-  { id: 'billing', label: '💳 Billing' },
-  { id: 'account', label: '👤 Account' },
+  { id: 'company',  label: '🏢 Company'  },
+  { id: 'team',     label: '👥 Team'     },
+  { id: 'projects', label: '📋 Projects' },
+  { id: 'billing',  label: '💳 Billing'  },
+  { id: 'account',  label: '👤 Account'  },
 ];
 
 export default function AdministrationPage() {
   const { user, logout } = useAuth();
-  const ADMIN_TABS = ['company', 'team', 'billing', 'account'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ADMIN_TABS.includes(hashTab) ? hashTab : 'company');
   const switchTab = t => { setTab(t); window.location.hash = t; };
+
+  // Shared state for ManageWorkers and ManageProjects
+  const [workers, setWorkers] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [settings, setSettings] = useState(null);
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/admin/workers', { params: { all_roles: true } }),
+      api.get('/admin/projects'),
+      api.get('/admin/settings'),
+    ]).then(([w, p, s]) => {
+      setWorkers(w.data);
+      setProjects(p.data);
+      setSettings(s.data);
+    }).catch(() => {});
+  }, []);
+
+  const handleWorkerAdded    = w  => setWorkers(prev => [...prev, { ...w, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 }]);
+  const handleWorkerDeleted  = id => setWorkers(prev => prev.filter(w => w.id !== id));
+  const handleWorkerUpdated  = w  => setWorkers(prev => prev.map(x => x.id === w.id ? { ...x, ...w } : x));
+  const handleWorkerRestored = w  => setWorkers(prev => [...prev, w]);
+  const handleProjectAdded   = p  => setProjects(prev => [...prev, p]);
+  const handleProjectDeleted = id => setProjects(prev => prev.filter(p => p.id !== id));
+  const handleProjectUpdated = p  => setProjects(prev => prev.map(x => x.id === p.id ? p : x));
+  const handleProjectRestored= p  => setProjects(prev => [...prev, p]);
 
   return (
     <div style={styles.page}>
@@ -403,10 +252,34 @@ export default function AdministrationPage() {
       <main style={styles.main}>
         <TabBar active={tab} onChange={switchTab} tabs={TABS} />
 
-        {tab === 'company' && <CompanyTab />}
-        {tab === 'team' && <TeamTab />}
-        {tab === 'billing' && <BillingTab />}
-        {tab === 'account' && <AccountTab />}
+        {tab === 'company'  && <CompanyTab />}
+        {tab === 'team'     && (
+          <div style={styles.tabContent}>
+            <h2 style={styles.tabTitle}>Team</h2>
+            <ManageWorkers
+              workers={workers}
+              onWorkerAdded={handleWorkerAdded}
+              onWorkerDeleted={handleWorkerDeleted}
+              onWorkerUpdated={handleWorkerUpdated}
+              onWorkerRestored={handleWorkerRestored}
+              defaultRate={settings?.default_hourly_rate ?? 30}
+            />
+          </div>
+        )}
+        {tab === 'projects' && (
+          <div style={styles.tabContent}>
+            <h2 style={styles.tabTitle}>Projects</h2>
+            <ManageProjects
+              projects={projects}
+              onProjectAdded={handleProjectAdded}
+              onProjectDeleted={handleProjectDeleted}
+              onProjectUpdated={handleProjectUpdated}
+              onProjectRestored={handleProjectRestored}
+            />
+          </div>
+        )}
+        {tab === 'billing'  && <BillingTab />}
+        {tab === 'account'  && <AccountTab />}
       </main>
     </div>
   );
@@ -426,12 +299,10 @@ const styles = {
   companyName: { fontSize: 14, fontWeight: 400, opacity: 0.6 },
   headerRight: { display: 'flex', alignItems: 'center', gap: 10 },
   headerBtn: { background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' },
-  main: { maxWidth: 760, margin: '0 auto', padding: '24px 16px' },
+  main: { maxWidth: 900, margin: '0 auto', padding: '24px 16px' },
   // Content sections
   tabContent: { display: 'flex', flexDirection: 'column', gap: 16 },
-  tabTitle: { fontSize: 22, fontWeight: 800, color: '#111827', margin: '0 0 2px' },
-  tabSub: { fontSize: 13, color: '#6b7280', margin: 0 },
-  teamHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4, gap: 12 },
+  tabTitle: { fontSize: 22, fontWeight: 800, color: '#111827', margin: '0 0 4px' },
   // Cards
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
   cardRow: { display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px', borderBottom: '1px solid #f3f4f6' },
@@ -441,45 +312,16 @@ const styles = {
   planName: { fontSize: 13, color: '#374151', fontWeight: 500 },
   editLink: { fontSize: 12, color: '#1a56db', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 },
   feedback: { fontSize: 13, margin: '4px 0 0', padding: '6px 0' },
-  // Team
-  inviteForm: { background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', marginBottom: 4 },
-  inviteTitle: { fontSize: 15, fontWeight: 700, margin: '0 0 14px', color: '#111827' },
-  inviteGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10, marginBottom: 10 },
-  inviteNote: { fontSize: 12, color: '#9ca3af', margin: '10px 0 0' },
-  memberRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px' },
-  memberInfo: { flex: 1, minWidth: 0 },
-  memberName: { display: 'block', fontWeight: 600, fontSize: 14, color: '#111827' },
-  memberUsername: { fontSize: 12, color: '#9ca3af' },
-  removeBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', flexShrink: 0 },
-  restoreBtn: { background: '#eff6ff', border: 'none', color: '#1a56db', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600, flexShrink: 0 },
-  expandBtn: { background: 'none', border: 'none', color: '#6b7280', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '4px 0' },
-  // Billing
-  billingStatus: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '16px 20px' },
+  // Account
   accordionTrigger: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '16px 20px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' },
   accordionLabel: { fontSize: 14, fontWeight: 600, color: '#374151' },
   accordionChevron: { fontSize: 16, color: '#9ca3af', transition: 'transform 0.2s', display: 'inline-block' },
   accordionBody: { display: 'flex', flexDirection: 'column', gap: 12, padding: '0 20px 20px', borderTop: '1px solid #f3f4f6' },
-  currentPlan: { fontSize: 20, fontWeight: 800, color: '#111827', marginTop: 4, marginBottom: 2 },
-  trialCountdown: { fontSize: 13, fontWeight: 600 },
-  manageBtn: { background: '#64748b', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
-  plansHeading: { fontSize: 16, fontWeight: 700, color: '#111827', margin: '8px 0 12px' },
-  plansGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 },
-  planCard: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', border: '2px solid transparent' },
-  planCardPro: { border: '2px solid #1a56db', background: '#fafcff' },
-  planHeader: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 },
-  planName: { fontWeight: 800, fontSize: 18, color: '#111827' },
-  planPrice: { fontWeight: 800, fontSize: 28, color: '#1a56db' },
-  planPer: { fontSize: 14, fontWeight: 400, color: '#6b7280' },
-  planDesc: { fontSize: 13, color: '#6b7280', lineHeight: 1.6, margin: '0 0 20px' },
-  checkoutBtn: { width: '100%', background: '#f3f4f6', color: '#374151', border: 'none', padding: '12px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' },
-  checkoutBtnPro: { background: '#1a56db', color: '#fff' },
-  trialNote: { fontSize: 11, color: '#9ca3af', margin: '10px 0 0', textAlign: 'center' },
-  // Account / shared form
+  // Shared form
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 4 },
   label: { fontSize: 12, fontWeight: 600, color: '#6b7280' },
   input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, width: '100%' },
   // Buttons
-  primaryBtn: { background: '#64748b', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
   saveBtn: { background: '#64748b', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0 },
   ghostBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '9px 14px', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
   error: { color: '#ef4444', fontSize: 13, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', margin: 0 },

@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import WorkerMetrics from '../components/WorkerMetrics';
-import ManageWorkers from '../components/ManageWorkers';
-import ManageProjects from '../components/ManageProjects';
 import ManageRates from '../components/ManageRates';
 import ProjectReports from '../components/ProjectReports';
 import QuickBooks from '../components/QuickBooks';
@@ -18,7 +16,6 @@ import CompanyChat from '../components/CompanyChat';
 import LiveKPIs from '../components/LiveKPIs';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
-import { getT } from '../i18n';
 import api from '../api';
 
 export default function AdminDashboard() {
@@ -59,14 +56,6 @@ export default function AdminDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleWorkerAdded = w => setWorkers(prev => [...prev, { ...w, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 }]);
-  const handleWorkerDeleted = id => setWorkers(prev => prev.filter(w => w.id !== id));
-  const handleWorkerUpdated = w => setWorkers(prev => prev.map(x => x.id === w.id ? { ...x, ...w } : x));
-  const handleWorkerRestored = w => setWorkers(prev => [...prev, w]);
-  const handleProjectAdded = p => setProjects(prev => [...prev, p]);
-  const handleProjectDeleted = id => setProjects(prev => prev.filter(p => p.id !== id));
-  const handleProjectUpdated = p => setProjects(prev => prev.map(x => x.id === p.id ? p : x));
-  const handleProjectRestored = p => setProjects(prev => [...prev, p]);
 
   return (
     <div style={styles.page}>
@@ -147,8 +136,6 @@ export default function AdminDashboard() {
         ) : tab === 'manage' ? (
           <>
             <ManageSchedule workers={workers} projects={projects} />
-            <ManageWorkers workers={workers} onWorkerAdded={handleWorkerAdded} onWorkerDeleted={handleWorkerDeleted} onWorkerUpdated={handleWorkerUpdated} onWorkerRestored={handleWorkerRestored} defaultRate={settings?.default_hourly_rate ?? 30} />
-            <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} onProjectRestored={handleProjectRestored} />
             <ManageRates settings={settings} onSettingsUpdated={setSettings} />
             <ManagePayPeriods />
             <h3 style={styles.subheading}>Audit Log</h3>
