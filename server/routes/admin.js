@@ -255,6 +255,8 @@ router.get('/active-clocks', requireAdmin, async (req, res) => {
 // List all active workers with summary metrics (overtime = regular hours > 8/day)
 router.get('/workers', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
+  const allRoles = req.query.all_roles === 'true';
+  const roleFilter = allRoles ? `u.role IN ('worker', 'admin')` : `u.role = 'worker'`;
   try {
     const result = await pool.query(
       `WITH daily_regular AS (
@@ -272,9 +274,9 @@ router.get('/workers', requireAdmin, async (req, res) => {
         COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600 ELSE 0 END), 0) as prevailing_hours
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
-      WHERE u.role = 'worker' AND u.active = true AND u.company_id = $1
+      WHERE ${roleFilter} AND u.active = true AND u.company_id = $1
       GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate
-      ORDER BY u.full_name`,
+      ORDER BY u.role DESC, u.full_name`,
       [companyId]
     );
     res.json(result.rows);

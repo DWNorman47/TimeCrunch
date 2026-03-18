@@ -174,7 +174,7 @@ function TeamTab() {
 
   const load = async () => {
     const [w, a] = await Promise.all([
-      api.get('/admin/workers'),
+      api.get('/admin/workers', { params: { all_roles: true } }),
       api.get('/admin/workers/archived'),
     ]);
     setWorkers(w.data);
@@ -209,7 +209,7 @@ function TeamTab() {
       <div style={styles.teamHeader}>
         <div>
           <h2 style={styles.tabTitle}>Team</h2>
-          <p style={styles.tabSub}>{workers.length} active member{workers.length !== 1 ? 's' : ''}</p>
+          <p style={styles.tabSub}>{workers.length} active member{workers.length !== 1 ? 's' : ''} ({workers.filter(w => w.role === 'admin').length} admin{workers.filter(w => w.role === 'admin').length !== 1 ? 's' : ''}, {workers.filter(w => w.role === 'worker').length} worker{workers.filter(w => w.role === 'worker').length !== 1 ? 's' : ''})</p>
         </div>
         <button style={styles.primaryBtn} onClick={() => setShowInvite(true)}>+ Invite</button>
       </div>
