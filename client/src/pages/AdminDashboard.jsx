@@ -27,6 +27,7 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [billing, setBilling] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -54,6 +55,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     Promise.all([api.get('/admin/workers'), api.get('/admin/projects'), api.get('/admin/settings')])
       .then(([w, p, s]) => { setWorkers(w.data); setProjects(p.data); setSettings(s.data); })
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -104,7 +106,12 @@ export default function AdminDashboard() {
           ]}
         />
 
-        {loading ? <p>Loading...</p> : tab === 'live' ? (
+        {loading ? <p>Loading...</p> : loadError ? (
+          <div style={styles.errorBanner}>
+            <strong>Failed to load dashboard data.</strong> Check your connection and{' '}
+            <button style={styles.retryBtn} onClick={() => window.location.reload()}>try again</button>.
+          </div>
+        ) : tab === 'live' ? (
           <>
             <LiveKPIs />
             <div style={styles.liveLayout} className="live-layout">
@@ -177,6 +184,8 @@ const styles = {
   liveLayout: { display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' },
   liveMain: {},
   liveChat: {},
+  errorBanner: { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 8, padding: '16px 20px', fontSize: 14 },
+  retryBtn: { background: 'none', border: 'none', color: '#991b1b', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: 14 },
   accountCard: { background: '#fff', borderRadius: 12, padding: '14px 18px', boxShadow: '0 1px 6px rgba(0,0,0,0.06)', marginBottom: 24 },
   accountRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
   accountLabel: { fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 2 },

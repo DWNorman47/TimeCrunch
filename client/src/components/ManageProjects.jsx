@@ -16,6 +16,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   const [editBudgetHours, setEditBudgetHours] = useState('');
   const [editBudgetDollars, setEditBudgetDollars] = useState('');
   const [geoLocating, setGeoLocating] = useState(false);
+  const [geoError, setGeoError] = useState('');
   const [archived, setArchived] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loadingArchived, setLoadingArchived] = useState(false);
@@ -85,15 +86,24 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   };
 
   const useMyLocation = () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setGeoError('Geolocation is not supported by this browser.');
+      return;
+    }
     setGeoLocating(true);
+    setGeoError('');
     navigator.geolocation.getCurrentPosition(
       pos => {
         setEditGeoLat(pos.coords.latitude.toFixed(6));
         setEditGeoLng(pos.coords.longitude.toFixed(6));
         setGeoLocating(false);
       },
-      () => setGeoLocating(false),
+      err => {
+        setGeoLocating(false);
+        if (err.code === 1) setGeoError('Location access denied. Please allow location in your browser settings.');
+        else if (err.code === 2) setGeoError('Location unavailable. Try entering coordinates manually.');
+        else setGeoError('Location request timed out. Try again or enter coordinates manually.');
+      },
       { timeout: 8000 }
     );
   };
@@ -196,6 +206,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                           {geoLocating ? '...' : '📡 My location'}
                         </button>
                       </div>
+                      {geoError && <p style={styles.geoErrorText}>{geoError}</p>}
                       <p style={styles.geoHint}>Workers outside the radius will be blocked from clocking in. Leave blank to remove.</p>
                     </div>
                     <div style={styles.budgetSection}>
@@ -319,6 +330,7 @@ const styles = {
   geoInput: { padding: '5px 8px', border: '1px solid #bae6fd', borderRadius: 6, fontSize: 13, width: 130 },
   geoLocBtn: { padding: '5px 10px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
   geoHint: { fontSize: 11, color: '#0369a1', margin: 0, opacity: 0.8 },
+  geoErrorText: { fontSize: 11, color: '#dc2626', margin: 0, fontWeight: 600 },
   geoBadge: { display: 'inline-block', marginLeft: 8, fontSize: 11, background: '#e0f2fe', color: '#0369a1', padding: '1px 7px', borderRadius: 10, fontWeight: 600 },
   clearGeoBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#9ca3af', padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', marginRight: 4 },
   budgetSection: { background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 },

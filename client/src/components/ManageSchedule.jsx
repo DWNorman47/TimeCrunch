@@ -36,6 +36,13 @@ export default function ManageSchedule({ workers, projects }) {
       .finally(() => setLoading(false));
   }, [from, to]);
 
+  // Keep the add-shift date in sync with the viewed week
+  useEffect(() => {
+    const today = toISO(new Date());
+    const dateInView = today >= from && today <= to ? today : from;
+    setForm(f => ({ ...f, shift_date: dateInView }));
+  }, [from, to]);
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const addShift = async e => {

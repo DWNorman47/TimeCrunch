@@ -60,6 +60,7 @@ export default function ApprovalQueue() {
   };
 
   const approveAll = async () => {
+    if (!confirm(`Approve all ${entries.length} pending entr${entries.length === 1 ? 'y' : 'ies'}? This cannot be undone.`)) return;
     setApprovingAll(true);
     try {
       await api.post('/admin/entries/approve-all');
