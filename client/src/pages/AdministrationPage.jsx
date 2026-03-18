@@ -519,7 +519,7 @@ export default function AdministrationPage() {
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9' },
   header: {
-    background: '#1e293b', color: '#fff', padding: '0 24px',
+    background: '#64748b', color: '#fff', padding: '0 24px',
     paddingTop: 'env(safe-area-inset-top)',
     height: 'calc(56px + env(safe-area-inset-top))',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -532,7 +532,7 @@ const styles = {
   // Tabs
   tabs: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 12, padding: 4, marginBottom: 24 },
   tab: { flex: 1, padding: '9px 0', background: 'none', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, color: '#6b7280', cursor: 'pointer', whiteSpace: 'nowrap' },
-  tabActive: { flex: 1, padding: '9px 0', background: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, color: '#1e293b', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', whiteSpace: 'nowrap' },
+  tabActive: { flex: 1, padding: '9px 0', background: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, color: '#64748b', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', whiteSpace: 'nowrap' },
   // Content sections
   tabContent: { display: 'flex', flexDirection: 'column', gap: 16 },
   tabTitle: { fontSize: 22, fontWeight: 800, color: '#111827', margin: '0 0 2px' },
@@ -563,7 +563,7 @@ const styles = {
   billingStatus: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '16px 0' },
   currentPlan: { fontSize: 20, fontWeight: 800, color: '#111827', marginTop: 4, marginBottom: 2 },
   trialCountdown: { fontSize: 13, fontWeight: 600 },
-  manageBtn: { background: '#1e293b', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
+  manageBtn: { background: '#64748b', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
   plansHeading: { fontSize: 16, fontWeight: 700, color: '#111827', margin: '8px 0 12px' },
   plansGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 },
   planCard: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', border: '2px solid transparent' },
@@ -581,8 +581,8 @@ const styles = {
   label: { fontSize: 12, fontWeight: 600, color: '#6b7280' },
   input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, width: '100%' },
   // Buttons
-  primaryBtn: { background: '#1e293b', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
-  saveBtn: { background: '#1e293b', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0 },
+  primaryBtn: { background: '#64748b', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
+  saveBtn: { background: '#64748b', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0 },
   ghostBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '9px 14px', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
   error: { color: '#ef4444', fontSize: 13, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', margin: 0 },
   hint: { color: '#9ca3af', fontSize: 14, padding: '16px 0' },

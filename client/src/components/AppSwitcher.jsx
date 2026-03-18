@@ -58,12 +58,11 @@ const APPS = [
   {
     id: 'administration',
     name: 'Administration',
-    bg: '#1e293b',
+    bg: '#64748b',
     adminOnly: true,
     icon: (
       <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-        <circle cx="10" cy="10" r="2.5" />
-        <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42" />
+        <path d="M10 2L3 5.5v4.5c0 4.2 3 7.9 7 9 4-1.1 7-4.8 7-9V5.5L10 2z" />
       </svg>
     ),
     path: '/administration',
