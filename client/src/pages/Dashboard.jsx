@@ -120,7 +120,7 @@ export default function Dashboard() {
 
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9' },
-  header: { background: '#1a56db', color: '#fff', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  header: { background: '#1a56db', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', height: 'calc(56px + env(safe-area-inset-top))', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   logoGroup: { display: 'flex', alignItems: 'baseline', gap: 10 },
   logo: { fontWeight: 700, fontSize: 20 },
   companyName: { fontSize: 14, fontWeight: 400, opacity: 0.75 },
