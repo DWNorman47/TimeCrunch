@@ -23,7 +23,7 @@ async function getSettings(companyId) {
   const s = {
     prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5,
     notification_inactive_days: 3, notification_start_hour: 6, notification_end_hour: 20,
-    overtime_rule: 'daily', overtime_threshold: 8,
+    overtime_rule: 'daily', overtime_threshold: 8, chat_retention_days: 3,
   };
   result.rows.forEach(r => {
     if (r.key === 'overtime_rule') { s.overtime_rule = r.value; }
@@ -75,7 +75,7 @@ router.get('/settings', requireAdmin, async (req, res) => {
 // Update settings
 router.patch('/settings', requireAdmin, async (req, res) => {
   const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
-  const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour'];
+  const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour', 'chat_retention_days'];
   const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold'];
   const stringKeys = ['overtime_rule'];
   const allowed = [...numericKeys, ...stringKeys];

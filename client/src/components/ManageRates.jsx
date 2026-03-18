@@ -11,6 +11,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     notification_inactive_days: String(settings?.notification_inactive_days ?? 3),
     notification_start_hour: String(settings?.notification_start_hour ?? 6),
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
+    chat_retention_days: String(settings?.chat_retention_days ?? 3),
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -32,6 +33,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         notification_inactive_days: parseFloat(form.notification_inactive_days),
         notification_start_hour: parseFloat(form.notification_start_hour),
         notification_end_hour: parseFloat(form.notification_end_hour),
+        chat_retention_days: parseFloat(form.chat_retention_days),
       });
       onSettingsUpdated(r.data);
       setSaved(true);
@@ -126,6 +128,13 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <div style={styles.inputGroup}>
             <input style={styles.input} type="number" min="0" max="23" step="1" value={form.notification_end_hour} onChange={e => set('notification_end_hour', e.target.value)} required />
             <span style={styles.suffix}>:00</span>
+          </div>
+        </div>
+        <div style={styles.row}>
+          <label style={styles.label}>Clear chat messages after</label>
+          <div style={styles.inputGroup}>
+            <input style={styles.input} type="number" min="1" max="90" step="1" value={form.chat_retention_days} onChange={e => set('chat_retention_days', e.target.value)} required />
+            <span style={styles.suffix}>days</span>
           </div>
         </div>
         {error && <p style={styles.error}>{error}</p>}

@@ -78,6 +78,18 @@ router.post('/', requireAuth, async (req, res) => {
        RETURNING id, sender_id, worker_id, body, created_at`,
       [req.user.company_id, req.user.id, targetWorkerId, body.trim()]
     );
+
+    // Prune old messages based on chat_retention_days setting
+    const settingResult = await pool.query(
+      `SELECT value FROM settings WHERE company_id = $1 AND key = 'chat_retention_days'`,
+      [req.user.company_id]
+    );
+    const retentionDays = settingResult.rowCount > 0 ? parseFloat(settingResult.rows[0].value) : 3;
+    await pool.query(
+      `DELETE FROM company_chat WHERE company_id = $1 AND created_at < NOW() - ($2 || ' days')::INTERVAL`,
+      [req.user.company_id, retentionDays]
+    );
+
     res.status(201).json({
       ...result.rows[0],
       sender_name: req.user.full_name,
