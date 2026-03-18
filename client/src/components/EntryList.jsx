@@ -140,7 +140,7 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                   style={styles.msgBtn}
                   onClick={() => setOpenMessageId(openMessageId === e.id ? null : e.id)}
                 >
-                  💬 {openMessageId === e.id ? t.hide : t.messages}
+                  💬 {openMessageId === e.id ? t.hideComments : t.comments}
                 </button>
                 {openMessageId === e.id && (
                   <MessageThread entryId={e.id} currentUserId={currentUserId} />

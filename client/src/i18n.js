@@ -58,8 +58,8 @@ const translations = {
     approved: 'Approved',
     rejected: 'Rejected',
     pending: 'Pending',
-    messages: 'Messages',
-    hide: 'Hide',
+    comments: 'Comments',
+    hideComments: 'Hide comments',
 
     // ChangePassword
     changePasswordTitle: 'Change Password',
@@ -130,8 +130,8 @@ const translations = {
     approved: '✓ Aprobado',
     rejected: '✕ Rechazado',
     pending: 'Pendiente',
-    messages: 'Mensajes',
-    hide: 'Ocultar',
+    comments: 'Comentarios',
+    hideComments: 'Ocultar comentarios',
 
     // ChangePassword
     changePasswordTitle: 'Cambiar Contraseña',

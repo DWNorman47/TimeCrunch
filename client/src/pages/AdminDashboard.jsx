@@ -95,7 +95,7 @@ export default function AdminDashboard() {
         {loading ? <p>Loading...</p> : tab === 'live' ? (
           <div style={styles.liveLayout}>
             <div style={styles.liveMain}><LiveWorkers /></div>
-            <div style={styles.liveChat}><CompanyChat /></div>
+            <div style={styles.liveChat}><CompanyChat workers={workers} /></div>
           </div>
         ) : tab === 'analytics' ? (
           <>

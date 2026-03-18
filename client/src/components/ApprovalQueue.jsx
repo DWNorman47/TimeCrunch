@@ -127,7 +127,7 @@ export default function ApprovalQueue() {
                   style={styles.msgBtn}
                   onClick={() => setOpenMessageId(openMessageId === e.id ? null : e.id)}
                 >
-                  💬 {openMessageId === e.id ? 'Hide messages' : 'Messages'}
+                  💬 {openMessageId === e.id ? 'Hide comments' : 'Comments'}
                 </button>
                 {openMessageId === e.id && (
                   <MessageThread entryId={e.id} currentUserId={user?.id} />
