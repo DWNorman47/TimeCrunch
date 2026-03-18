@@ -55,6 +55,7 @@ function FeatureToggles({ settings, onSettingsUpdated }) {
                 <span style={ftStyles.desc}>{desc}</span>
               </div>
               <button
+                className="toggle-switch"
                 style={{ ...ftStyles.toggle, background: enabled ? '#1a56db' : '#d1d5db' }}
                 onClick={() => toggle(key, enabled)}
                 disabled={isSaving}
