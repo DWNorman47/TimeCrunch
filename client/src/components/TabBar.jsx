@@ -35,6 +35,9 @@ export default function TabBar({ tabs, active, onChange, breakpoint = 600 }) {
           style={t.id === active ? styles.tabActive : styles.tab}
           onClick={() => onChange(t.id)}
         >
+          {t.dot && (
+            <span style={{ ...styles.dot, background: t.dot }} />
+          )}
           {t.label}
         </button>
       ))}
@@ -70,5 +73,9 @@ const styles = {
   dropdownChevron: {
     position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
     fontSize: 16, color: '#6b7280', pointerEvents: 'none',
+  },
+  dot: {
+    display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+    marginRight: 5, flexShrink: 0,
   },
 };

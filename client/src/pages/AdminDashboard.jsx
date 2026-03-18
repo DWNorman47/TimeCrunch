@@ -28,9 +28,19 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [billing, setBilling] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     api.get('/stripe/status').then(r => setBilling(r.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const fetchPending = () => {
+      api.get('/admin/kpis').then(r => setPendingCount(r.data.pending_approvals ?? 0)).catch(() => {});
+    };
+    fetchPending();
+    const interval = setInterval(fetchPending, 60000);
+    return () => clearInterval(interval);
   }, []);
   const TABS = ['live', 'analytics', 'approvals', 'reports', 'manage', 'settings'];
   const hashTab = window.location.hash.replace('#', '');
@@ -87,7 +97,7 @@ export default function AdminDashboard() {
           tabs={[
             { id: 'live', label: '🟢 Live' },
             { id: 'analytics', label: 'Analytics' },
-            { id: 'approvals', label: 'Approvals' },
+            { id: 'approvals', label: 'Approvals', dot: pendingCount > 0 ? '#f59e0b' : null },
             { id: 'reports', label: 'Reports' },
             { id: 'manage', label: 'Manage' },
             { id: 'settings', label: 'Integrations' },
