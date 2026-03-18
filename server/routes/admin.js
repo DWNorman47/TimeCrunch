@@ -18,15 +18,19 @@ async function logAudit(companyId, actorId, actorName, action, entityType, entit
   } catch (e) { console.error('Audit log error:', e); }
 }
 
+const FEATURE_KEYS = ['feature_scheduling', 'feature_analytics', 'feature_chat', 'feature_prevailing_wage'];
+
 async function getSettings(companyId) {
   const result = await pool.query('SELECT key, value FROM settings WHERE company_id = $1', [companyId]);
   const s = {
     prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5,
     notification_inactive_days: 3, notification_start_hour: 6, notification_end_hour: 20,
     overtime_rule: 'daily', overtime_threshold: 8, chat_retention_days: 3,
+    feature_scheduling: true, feature_analytics: true, feature_chat: true, feature_prevailing_wage: true,
   };
   result.rows.forEach(r => {
     if (r.key === 'overtime_rule') { s.overtime_rule = r.value; }
+    else if (FEATURE_KEYS.includes(r.key)) { s[r.key] = r.value === '1'; }
     else { s[r.key] = parseFloat(r.value); }
   });
   return s;
@@ -171,13 +175,20 @@ router.patch('/settings', requireAdmin, async (req, res) => {
   const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour', 'chat_retention_days'];
   const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold'];
   const stringKeys = ['overtime_rule'];
-  const allowed = [...numericKeys, ...stringKeys];
+  const allowed = [...numericKeys, ...stringKeys, ...FEATURE_KEYS];
   const companyId = req.user.company_id;
   try {
     const changed = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
-        if (stringKeys.includes(key)) {
+        if (FEATURE_KEYS.includes(key)) {
+          const val = req.body[key] ? '1' : '0';
+          await pool.query(
+            'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
+            [companyId, key, val]
+          );
+          changed[key] = val === '1';
+        } else if (stringKeys.includes(key)) {
           const val = req.body[key];
           if (key === 'overtime_rule' && !['daily', 'weekly'].includes(val))
             return res.status(400).json({ error: 'overtime_rule must be daily or weekly' });

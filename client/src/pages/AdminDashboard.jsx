@@ -20,6 +20,71 @@ import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
 import api from '../api';
 
+const FEATURE_DEFS = [
+  { key: 'feature_scheduling',      label: 'Scheduling',      desc: 'Show the shift scheduling tool in the Manage tab' },
+  { key: 'feature_analytics',       label: 'Analytics',       desc: 'Show the Analytics tab with charts and trends' },
+  { key: 'feature_chat',            label: 'Company Chat',    desc: 'Show the company chat panel on the Live tab' },
+  { key: 'feature_prevailing_wage', label: 'Prevailing Wage', desc: 'Show prevailing wage type on projects and entries' },
+];
+
+function FeatureToggles({ settings, onSettingsUpdated }) {
+  const [saving, setSaving] = useState(null);
+
+  const toggle = async (key, current) => {
+    setSaving(key);
+    try {
+      const r = await api.patch('/admin/settings', { [key]: !current });
+      onSettingsUpdated(r.data);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  return (
+    <div style={ftStyles.card}>
+      <h3 style={ftStyles.title}>Features</h3>
+      <p style={ftStyles.subtitle}>Turn off sections your company doesn't use to keep the interface clean.</p>
+      <div style={ftStyles.list}>
+        {FEATURE_DEFS.map(({ key, label, desc }) => {
+          const enabled = settings?.[key] !== false;
+          const isSaving = saving === key;
+          return (
+            <div key={key} style={ftStyles.row}>
+              <div style={ftStyles.info}>
+                <span style={ftStyles.label}>{label}</span>
+                <span style={ftStyles.desc}>{desc}</span>
+              </div>
+              <button
+                style={{ ...ftStyles.toggle, ...(enabled ? ftStyles.toggleOn : ftStyles.toggleOff) }}
+                onClick={() => toggle(key, enabled)}
+                disabled={isSaving}
+                aria-pressed={enabled}
+              >
+                <span style={{ ...ftStyles.knob, transform: enabled ? 'translateX(20px)' : 'translateX(2px)' }} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const ftStyles = {
+  card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 24 },
+  title: { fontSize: 17, fontWeight: 700, margin: '0 0 4px' },
+  subtitle: { fontSize: 13, color: '#6b7280', margin: '0 0 20px' },
+  list: { display: 'flex', flexDirection: 'column', gap: 0 },
+  row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0', borderTop: '1px solid #f3f4f6' },
+  info: { display: 'flex', flexDirection: 'column', gap: 2 },
+  label: { fontSize: 14, fontWeight: 600, color: '#111827' },
+  desc: { fontSize: 12, color: '#9ca3af' },
+  toggle: { position: 'relative', width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, padding: 0 },
+  toggleOn: { background: '#1a56db' },
+  toggleOff: { background: '#d1d5db' },
+  knob: { position: 'absolute', top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s', display: 'block' },
+};
+
 export default function AdminDashboard() {
   const { logout, user } = useAuth();
   const [workers, setWorkers] = useState([]);
@@ -42,9 +107,9 @@ export default function AdminDashboard() {
     const interval = setInterval(fetchPending, 60000);
     return () => clearInterval(interval);
   }, []);
-  const TABS = ['live', 'analytics', 'approvals', 'reports', 'manage', 'settings'];
+  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'manage', 'settings'];
   const hashTab = window.location.hash.replace('#', '');
-  const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'live');
+  const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
 
   const switchTab = t => {
     setTab(t);
@@ -98,11 +163,11 @@ export default function AdminDashboard() {
           onChange={switchTab}
           tabs={[
             { id: 'live', label: '🟢 Live' },
-            { id: 'analytics', label: 'Analytics' },
+            ...(settings?.feature_analytics !== false ? [{ id: 'analytics', label: 'Analytics' }] : []),
             { id: 'approvals', label: 'Approvals', dot: pendingCount > 0 ? '#f59e0b' : null },
             { id: 'reports', label: 'Reports' },
             { id: 'manage', label: 'Manage' },
-            { id: 'settings', label: 'Integrations' },
+            { id: 'settings', label: 'Settings' },
           ]}
         />
 
@@ -114,10 +179,14 @@ export default function AdminDashboard() {
         ) : tab === 'live' ? (
           <>
             <LiveKPIs />
-            <div style={styles.liveLayout} className="live-layout">
-              <div style={styles.liveMain}><LiveWorkers /></div>
-              <div style={styles.liveChat}><CompanyChat workers={workers} /></div>
-            </div>
+            {settings?.feature_chat !== false ? (
+              <div style={styles.liveLayout} className="live-layout">
+                <div style={styles.liveMain}><LiveWorkers /></div>
+                <div style={styles.liveChat}><CompanyChat workers={workers} /></div>
+              </div>
+            ) : (
+              <LiveWorkers />
+            )}
           </>
         ) : tab === 'analytics' ? (
           <>
@@ -146,9 +215,9 @@ export default function AdminDashboard() {
           </>
         ) : tab === 'manage' ? (
           <>
-            <ManageSchedule workers={workers} projects={projects} />
+            {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
             <ManageWorkers workers={workers} onWorkerAdded={handleWorkerAdded} onWorkerDeleted={handleWorkerDeleted} onWorkerUpdated={handleWorkerUpdated} onWorkerRestored={handleWorkerRestored} defaultRate={settings?.default_hourly_rate ?? 30} showRate={true} identityEditable={false} />
-            <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} onProjectRestored={handleProjectRestored} showWageType={true} nameEditable={false} showGeofenceBudget={false} />
+            <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} onProjectRestored={handleProjectRestored} showWageType={settings?.feature_prevailing_wage !== false} nameEditable={false} showGeofenceBudget={false} />
             <ManageRates settings={settings} onSettingsUpdated={setSettings} />
             <ManagePayPeriods />
             <h3 style={styles.subheading}>Audit Log</h3>
@@ -156,7 +225,8 @@ export default function AdminDashboard() {
           </>
         ) : (
           <>
-            <h2 style={styles.heading}>Integrations</h2>
+            <h2 style={styles.heading}>Settings</h2>
+            <FeatureToggles settings={settings} onSettingsUpdated={setSettings} />
             <QuickBooks workers={workers} projects={projects} />
           </>
         )}
