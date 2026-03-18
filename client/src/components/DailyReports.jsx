@@ -1,0 +1,492 @@
+import React, { useState, useEffect } from 'react';
+import api from '../api';
+import { useAuth } from '../contexts/AuthContext';
+import { PDFButton } from './DailyReportPDF';
+
+const WEATHER_OPTIONS = [
+  { value: 'sunny', label: '☀️ Sunny' },
+  { value: 'partly_cloudy', label: '🌤️ Partly Cloudy' },
+  { value: 'cloudy', label: '☁️ Cloudy' },
+  { value: 'rainy', label: '🌧️ Rainy' },
+  { value: 'stormy', label: '⛈️ Stormy' },
+  { value: 'snow', label: '🌨️ Snow' },
+  { value: 'windy', label: '🌬️ Windy' },
+];
+
+const WEATHER_LABELS = Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label]));
+
+function fmtDate(str) {
+  return new Date(str + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function emptyRow(type) {
+  if (type === 'manpower') return { trade: '', worker_count: 1, hours: '', notes: '' };
+  if (type === 'equipment') return { name: '', quantity: 1, hours: '' };
+  return { description: '', quantity: '' };
+}
+
+// ── Editable table row ─────────────────────────────────────────────────────────
+
+function RowInput({ value, onChange, type = 'text', placeholder, style, min }) {
+  return (
+    <input
+      style={{ ...styles.cellInput, ...style }}
+      type={type} value={value} placeholder={placeholder}
+      min={min}
+      onChange={e => onChange(e.target.value)}
+    />
+  );
+}
+
+// ── Report Editor ──────────────────────────────────────────────────────────────
+
+function ReportEditor({ report: initial, projects, onSaved, onCancel, companyName, fieldPhotos }) {
+  const isNew = !initial?.id;
+  const today = new Date().toLocaleDateString('en-CA');
+
+  const [form, setForm] = useState({
+    project_id: initial?.project_id || '',
+    report_date: initial?.report_date?.substring(0, 10) || today,
+    superintendent: initial?.superintendent || '',
+    weather_condition: initial?.weather_condition || '',
+    weather_temp: initial?.weather_temp ?? '',
+    work_performed: initial?.work_performed || '',
+    delays_issues: initial?.delays_issues || '',
+    visitor_log: initial?.visitor_log || '',
+    status: initial?.status || 'draft',
+  });
+  const [manpower, setManpower] = useState(initial?.manpower?.length ? initial.manpower : [emptyRow('manpower')]);
+  const [equipment, setEquipment] = useState(initial?.equipment?.length ? initial.equipment : []);
+  const [materials, setMaterials] = useState(initial?.materials?.length ? initial.materials : []);
+  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [suggesting, setSuggesting] = useState(false);
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const autoFillManpower = async () => {
+    if (!form.report_date) return;
+    setSuggesting(true);
+    try {
+      const r = await api.get('/daily-reports/suggest', {
+        params: { project_id: form.project_id || undefined, report_date: form.report_date }
+      });
+      if (r.data.length > 0) {
+        setManpower(r.data.map(w => ({
+          trade: w.full_name,
+          worker_count: 1,
+          hours: parseFloat(w.total_hours).toFixed(1),
+          notes: w.project_name || '',
+        })));
+      }
+    } finally { setSuggesting(false); }
+  };
+
+  const updateRow = (list, setList, i, key, value) => {
+    const next = list.map((r, idx) => idx === i ? { ...r, [key]: value } : r);
+    setList(next);
+  };
+  const addRow = (list, setList, type) => setList([...list, emptyRow(type)]);
+  const removeRow = (list, setList, i) => setList(list.filter((_, idx) => idx !== i));
+
+  const save = async (status) => {
+    const isSub = status === 'submitted';
+    isSub ? setSubmitting(true) : setSaving(true);
+    setError('');
+    try {
+      const payload = { ...form, status, manpower, equipment, materials };
+      payload.weather_temp = form.weather_temp !== '' ? parseInt(form.weather_temp) : null;
+      let r;
+      if (isNew) {
+        r = await api.post('/daily-reports', payload);
+      } else {
+        r = await api.patch(`/daily-reports/${initial.id}`, payload);
+      }
+      onSaved(r.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save');
+    } finally { setSaving(false); setSubmitting(false); }
+  };
+
+  return (
+    <div style={styles.editor}>
+      <div style={styles.editorHeader}>
+        <h3 style={styles.editorTitle}>{isNew ? 'New Daily Report' : 'Edit Daily Report'}</h3>
+        {!isNew && initial.status === 'submitted' && (
+          <PDFButton
+            report={{ ...initial, ...form, manpower, equipment, materials }}
+            companyName={companyName}
+            fieldPhotos={fieldPhotos}
+            style={styles.pdfBtn}
+          />
+        )}
+      </div>
+
+      {/* Header fields */}
+      <div style={styles.fieldGrid}>
+        <div style={styles.fieldGroup}>
+          <label style={styles.label}>Date</label>
+          <input style={styles.input} type="date" value={form.report_date} onChange={e => set('report_date', e.target.value)} />
+        </div>
+        <div style={styles.fieldGroup}>
+          <label style={styles.label}>Project</label>
+          <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+            <option value="">No project</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        <div style={styles.fieldGroup}>
+          <label style={styles.label}>Superintendent</label>
+          <input style={styles.input} type="text" placeholder="Name" value={form.superintendent} onChange={e => set('superintendent', e.target.value)} />
+        </div>
+        <div style={styles.fieldGroup}>
+          <label style={styles.label}>Weather</label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <select style={{ ...styles.input, flex: 1 }} value={form.weather_condition} onChange={e => set('weather_condition', e.target.value)}>
+              <option value="">Select</option>
+              {WEATHER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <input style={{ ...styles.input, width: 70 }} type="number" placeholder="°F" value={form.weather_temp} onChange={e => set('weather_temp', e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      {/* Manpower */}
+      <div style={styles.section}>
+        <div style={styles.sectionHead}>
+          <span style={styles.sectionTitle}>Manpower</span>
+          <button style={styles.autofillBtn} onClick={autoFillManpower} disabled={suggesting}>
+            {suggesting ? '...' : '⚡ Auto-fill from time entries'}
+          </button>
+        </div>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>Trade / Name</th>
+              <th style={{ ...styles.th, width: 70 }}>Workers</th>
+              <th style={{ ...styles.th, width: 70 }}>Hours</th>
+              <th style={{ ...styles.th, flex: 2 }}>Notes</th>
+              <th style={{ ...styles.th, width: 30 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {manpower.map((m, i) => (
+              <tr key={i}>
+                <td style={styles.td}><RowInput value={m.trade} onChange={v => updateRow(manpower, setManpower, i, 'trade', v)} placeholder="e.g. Carpenters" /></td>
+                <td style={styles.td}><RowInput value={m.worker_count} onChange={v => updateRow(manpower, setManpower, i, 'worker_count', v)} type="number" min="1" style={{ width: 55 }} /></td>
+                <td style={styles.td}><RowInput value={m.hours} onChange={v => updateRow(manpower, setManpower, i, 'hours', v)} type="number" min="0" placeholder="0" style={{ width: 55 }} /></td>
+                <td style={styles.td}><RowInput value={m.notes} onChange={v => updateRow(manpower, setManpower, i, 'notes', v)} placeholder="Optional" /></td>
+                <td style={styles.td}><button style={styles.removeRowBtn} onClick={() => removeRow(manpower, setManpower, i)}>✕</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button style={styles.addRowBtn} onClick={() => addRow(manpower, setManpower, 'manpower')}>+ Add row</button>
+      </div>
+
+      {/* Work Performed */}
+      <div style={styles.section}>
+        <div style={styles.sectionHead}><span style={styles.sectionTitle}>Work Performed</span></div>
+        <textarea style={styles.textarea} rows={4} placeholder="Describe work completed today..." value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
+      </div>
+
+      {/* Equipment */}
+      <div style={styles.section}>
+        <div style={styles.sectionHead}>
+          <span style={styles.sectionTitle}>Equipment on Site</span>
+          <button style={styles.addRowBtn} onClick={() => addRow(equipment, setEquipment, 'equipment')}>+ Add</button>
+        </div>
+        {equipment.length > 0 && (
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Equipment</th>
+                <th style={{ ...styles.th, width: 70 }}>Qty</th>
+                <th style={{ ...styles.th, width: 70 }}>Hours</th>
+                <th style={{ ...styles.th, width: 30 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {equipment.map((e, i) => (
+                <tr key={i}>
+                  <td style={styles.td}><RowInput value={e.name} onChange={v => updateRow(equipment, setEquipment, i, 'name', v)} placeholder="e.g. Excavator" /></td>
+                  <td style={styles.td}><RowInput value={e.quantity} onChange={v => updateRow(equipment, setEquipment, i, 'quantity', v)} type="number" min="1" style={{ width: 55 }} /></td>
+                  <td style={styles.td}><RowInput value={e.hours} onChange={v => updateRow(equipment, setEquipment, i, 'hours', v)} type="number" min="0" placeholder="0" style={{ width: 55 }} /></td>
+                  <td style={styles.td}><button style={styles.removeRowBtn} onClick={() => removeRow(equipment, setEquipment, i)}>✕</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Materials */}
+      <div style={styles.section}>
+        <div style={styles.sectionHead}>
+          <span style={styles.sectionTitle}>Materials Delivered</span>
+          <button style={styles.addRowBtn} onClick={() => addRow(materials, setMaterials, 'materials')}>+ Add</button>
+        </div>
+        {materials.length > 0 && (
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Description</th>
+                <th style={{ ...styles.th, width: 110 }}>Quantity</th>
+                <th style={{ ...styles.th, width: 30 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {materials.map((m, i) => (
+                <tr key={i}>
+                  <td style={styles.td}><RowInput value={m.description} onChange={v => updateRow(materials, setMaterials, i, 'description', v)} placeholder="e.g. Lumber 2x4" /></td>
+                  <td style={styles.td}><RowInput value={m.quantity} onChange={v => updateRow(materials, setMaterials, i, 'quantity', v)} placeholder="e.g. 200 boards" /></td>
+                  <td style={styles.td}><button style={styles.removeRowBtn} onClick={() => removeRow(materials, setMaterials, i)}>✕</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Delays */}
+      <div style={styles.section}>
+        <div style={styles.sectionHead}><span style={styles.sectionTitle}>Delays / Issues</span></div>
+        <textarea style={styles.textarea} rows={3} placeholder="Any delays, issues, or safety observations..." value={form.delays_issues} onChange={e => set('delays_issues', e.target.value)} />
+      </div>
+
+      {/* Visitor log */}
+      <div style={styles.section}>
+        <div style={styles.sectionHead}><span style={styles.sectionTitle}>Visitor Log</span></div>
+        <textarea style={styles.textarea} rows={2} placeholder="Inspectors, clients, or other visitors on site..." value={form.visitor_log} onChange={e => set('visitor_log', e.target.value)} />
+      </div>
+
+      {fieldPhotos.length > 0 && (
+        <div style={styles.section}>
+          <div style={styles.sectionHead}><span style={styles.sectionTitle}>Photos ({fieldPhotos.length} from Field Reports)</span></div>
+          <div style={styles.photoStrip}>
+            {fieldPhotos.map((p, i) => (
+              <img key={i} src={p.url} style={styles.photoThumb} alt={p.caption || `photo ${i + 1}`} title={p.caption} />
+            ))}
+          </div>
+          <p style={styles.photoNote}>Photos are pulled from Field Reports submitted for this project on this date.</p>
+        </div>
+      )}
+
+      {error && <p style={styles.error}>{error}</p>}
+
+      <div style={styles.editorActions}>
+        <button style={styles.saveDraftBtn} onClick={() => save('draft')} disabled={saving || submitting}>
+          {saving ? 'Saving...' : 'Save Draft'}
+        </button>
+        <button style={styles.submitBtn} onClick={() => save('submitted')} disabled={saving || submitting}>
+          {submitting ? 'Submitting...' : 'Submit Report'}
+        </button>
+        <button style={styles.cancelBtn} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Report list row ────────────────────────────────────────────────────────────
+
+function ReportRow({ report, onEdit, onDelete, companyName, fieldPhotos }) {
+  const [deleting, setDeleting] = useState(false);
+  const weather = report.weather_condition ? WEATHER_LABELS[report.weather_condition] : null;
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this daily report?')) return;
+    setDeleting(true);
+    try { await api.delete(`/daily-reports/${report.id}`); onDelete(report.id); }
+    catch { alert('Failed to delete'); }
+    finally { setDeleting(false); }
+  };
+
+  return (
+    <div style={styles.reportRow}>
+      <div style={styles.rowLeft} onClick={() => onEdit(report)}>
+        <div style={styles.rowDate}>{fmtDate(report.report_date)}</div>
+        <div style={styles.rowProject}>{report.project_name || 'No project'}</div>
+        {weather && <div style={styles.rowMeta}>{weather}{report.weather_temp != null ? ` · ${report.weather_temp}°F` : ''}</div>}
+        {report.manpower_count > 0 && <div style={styles.rowMeta}>{report.manpower_count} crew entr{report.manpower_count !== 1 ? 'ies' : 'y'}</div>}
+      </div>
+      <div style={styles.rowRight}>
+        <span style={report.status === 'submitted' ? styles.badgeSubmitted : styles.badgeDraft}>
+          {report.status === 'submitted' ? 'Submitted' : 'Draft'}
+        </span>
+        {report.status === 'submitted' && (
+          <PDFButton
+            report={report}
+            companyName={companyName}
+            fieldPhotos={fieldPhotos}
+            style={styles.pdfBtnSmall}
+          />
+        )}
+        <button style={styles.editRowBtn} onClick={() => onEdit(report)}>Edit</button>
+        <button style={styles.deleteRowBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : '✕'}</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Main DailyReports component ────────────────────────────────────────────────
+
+export default function DailyReports({ projects }) {
+  const { user } = useAuth();
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(null); // null=list, 'new'=new form, report=edit form
+  const [filterProject, setFilterProject] = useState('');
+  const [fieldPhotos, setFieldPhotos] = useState({});
+
+  const loadReports = async () => {
+    try {
+      const params = {};
+      if (filterProject) params.project_id = filterProject;
+      const r = await api.get('/daily-reports', { params });
+      setReports(r.data);
+    } finally { setLoading(false); }
+  };
+
+  // Load field photos for a given project+date to include in PDF
+  const loadFieldPhotos = async (projectId, date) => {
+    const key = `${projectId}-${date}`;
+    if (fieldPhotos[key]) return fieldPhotos[key];
+    try {
+      const params = { from: date, to: date };
+      if (projectId) params.project_id = projectId;
+      const r = await api.get('/field-reports', { params });
+      const photos = r.data.flatMap(fr => fr.photos || []);
+      setFieldPhotos(prev => ({ ...prev, [key]: photos }));
+      return photos;
+    } catch { return []; }
+  };
+
+  useEffect(() => { loadReports(); }, [filterProject]);
+
+  const handleSaved = report => {
+    setReports(prev => {
+      const idx = prev.findIndex(r => r.id === report.id);
+      if (idx >= 0) return prev.map(r => r.id === report.id ? report : r);
+      return [report, ...prev];
+    });
+    setEditing(null);
+    // Pre-load photos for PDF
+    loadFieldPhotos(report.project_id, report.report_date?.substring(0, 10));
+  };
+
+  const handleEdit = async report => {
+    // Fetch full report if coming from list (may not have manpower/equipment/materials)
+    if (!report.manpower) {
+      try { const r = await api.get(`/daily-reports/${report.id}`); setEditing(r.data); return; }
+      catch { return; }
+    }
+    setEditing(report);
+    loadFieldPhotos(report.project_id, report.report_date?.substring(0, 10));
+  };
+
+  const getPhotos = report => {
+    const key = `${report.project_id}-${report.report_date?.substring(0, 10)}`;
+    return fieldPhotos[key] || [];
+  };
+
+  if (editing !== null) {
+    return (
+      <ReportEditor
+        report={editing === 'new' ? null : editing}
+        projects={projects}
+        onSaved={handleSaved}
+        onCancel={() => setEditing(null)}
+        companyName={user?.company_name}
+        fieldPhotos={editing && editing !== 'new' ? getPhotos(editing) : []}
+      />
+    );
+  }
+
+  return (
+    <div>
+      <div style={styles.listHeader}>
+        <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
+          <option value="">All projects</option>
+          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <button style={styles.newBtn} onClick={() => setEditing('new')}>+ New Report</button>
+      </div>
+
+      {loading ? <p style={styles.hint}>Loading...</p> :
+        reports.length === 0 ? (
+          <div style={styles.empty}>
+            <div style={styles.emptyIcon}>📋</div>
+            <p style={styles.emptyText}>No daily reports yet. Create one to start tracking.</p>
+          </div>
+        ) : (
+          <div style={styles.reportList}>
+            {reports.map(r => (
+              <ReportRow
+                key={r.id}
+                report={r}
+                onEdit={handleEdit}
+                onDelete={id => setReports(prev => prev.filter(r => r.id !== id))}
+                companyName={user?.company_name}
+                fieldPhotos={getPhotos(r)}
+              />
+            ))}
+          </div>
+        )
+      }
+    </div>
+  );
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+const styles = {
+  // List
+  listHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 10 },
+  filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', flex: 1, maxWidth: 220 },
+  newBtn: { background: '#059669', color: '#fff', border: 'none', padding: '9px 16px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0 },
+  reportList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  reportRow: { background: '#fff', borderRadius: 10, padding: '12px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  rowLeft: { flex: 1, cursor: 'pointer', minWidth: 0 },
+  rowDate: { fontWeight: 700, fontSize: 14, color: '#111827', marginBottom: 2 },
+  rowProject: { fontSize: 13, color: '#059669', fontWeight: 600, marginBottom: 2 },
+  rowMeta: { fontSize: 12, color: '#6b7280' },
+  rowRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  badgeDraft: { fontSize: 11, fontWeight: 700, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 10 },
+  badgeSubmitted: { fontSize: 11, fontWeight: 700, color: '#065f46', background: '#d1fae5', padding: '2px 8px', borderRadius: 10 },
+  editRowBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#374151', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  deleteRowBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' },
+  pdfBtnSmall: { fontSize: 11, fontWeight: 600, color: '#1a56db', background: '#eff6ff', border: 'none', padding: '4px 10px', borderRadius: 6, textDecoration: 'none', cursor: 'pointer' },
+  hint: { color: '#9ca3af', fontSize: 14 },
+  empty: { textAlign: 'center', padding: '40px 20px' },
+  emptyIcon: { fontSize: 36, marginBottom: 10 },
+  emptyText: { color: '#9ca3af', fontSize: 14 },
+  // Editor
+  editor: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' },
+  editorHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 12 },
+  editorTitle: { fontSize: 18, fontWeight: 800, color: '#111827', margin: 0 },
+  pdfBtn: { fontSize: 13, fontWeight: 600, color: '#fff', background: '#1a56db', border: 'none', padding: '8px 16px', borderRadius: 7, textDecoration: 'none', cursor: 'pointer' },
+  fieldGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 20 },
+  fieldGroup: { display: 'flex', flexDirection: 'column', gap: 4 },
+  label: { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  input: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, width: '100%' },
+  section: { marginBottom: 20 },
+  sectionHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 },
+  sectionTitle: { fontWeight: 700, fontSize: 13, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  autofillBtn: { fontSize: 12, color: '#1a56db', background: '#eff6ff', border: 'none', padding: '5px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600, flexShrink: 0 },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 6 },
+  th: { textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', padding: '6px 8px', borderBottom: '2px solid #e5e7eb' },
+  td: { padding: '4px 8px', borderBottom: '1px solid #f3f4f6' },
+  cellInput: { padding: '5px 7px', border: '1px solid #e5e7eb', borderRadius: 5, fontSize: 13, width: '100%' },
+  removeRowBtn: { background: 'none', border: 'none', color: '#fca5a5', fontSize: 14, cursor: 'pointer', padding: '2px 4px' },
+  addRowBtn: { fontSize: 12, color: '#6b7280', background: 'none', border: '1px dashed #d1d5db', padding: '5px 12px', borderRadius: 6, cursor: 'pointer', marginTop: 4 },
+  textarea: { width: '100%', padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 },
+  photoStrip: { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  photoThumb: { width: 80, height: 60, objectFit: 'cover', borderRadius: 6 },
+  photoNote: { fontSize: 11, color: '#9ca3af', margin: '6px 0 0' },
+  error: { color: '#ef4444', fontSize: 13, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', margin: '0 0 12px' },
+  editorActions: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  saveDraftBtn: { background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb', padding: '10px 20px', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
+  submitBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' },
+  cancelBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '10px 20px', borderRadius: 8, fontSize: 14, cursor: 'pointer' },
+};

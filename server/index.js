@@ -22,6 +22,7 @@ app.use('/api/push', require('./routes/push'));
 app.use('/api/stripe', require('./routes/stripe'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/field-reports', require('./routes/fieldReports'));
+app.use('/api/daily-reports', require('./routes/dailyReports'));
 
 // Read-only company settings — available to all authenticated users
 app.get('/api/settings', requireAuth, async (req, res) => {
