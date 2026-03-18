@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 
 // GET /api/chat?worker_id=X
 // Workers: always see their own thread
@@ -90,11 +91,27 @@ router.post('/', requireAuth, async (req, res) => {
       [req.user.company_id, retentionDays]
     );
 
-    res.status(201).json({
-      ...result.rows[0],
-      sender_name: req.user.full_name,
-      sender_role: req.user.role,
-    });
+    const msg = { ...result.rows[0], sender_name: req.user.full_name, sender_role: req.user.role };
+
+    // Push notification to recipient(s)
+    const snippet = body.trim().substring(0, 100);
+    if (req.user.role === 'admin') {
+      // Admin messaging a worker — notify that worker
+      sendPushToUser(parseInt(targetWorkerId), {
+        title: `Message from ${req.user.full_name}`,
+        body: snippet,
+        url: '/dashboard',
+      });
+    } else {
+      // Worker sending — notify all company admins
+      sendPushToCompanyAdmins(req.user.company_id, {
+        title: `Message from ${req.user.full_name}`,
+        body: snippet,
+        url: '/admin#live',
+      });
+    }
+
+    res.status(201).json(msg);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

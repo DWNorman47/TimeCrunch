@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { sendPushToUser } = require('../push');
+const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 
 // Get current user's entries
 router.get('/', requireAuth, async (req, res) => {
@@ -116,11 +116,20 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
       [req.params.id, req.user.company_id, req.user.id, body.trim()]
     );
     const msg = { ...result.rows[0], sender_name: req.user.full_name };
-    // Notify entry owner if someone else messaged them
     const entryOwner = await pool.query('SELECT user_id FROM time_entries WHERE id = $1', [req.params.id]);
-    if (entryOwner.rowCount > 0 && entryOwner.rows[0].user_id !== req.user.id) {
-      sendPushToUser(entryOwner.rows[0].user_id, {
-        title: `Message from ${req.user.full_name}`,
+    const ownerId = entryOwner.rows[0]?.user_id;
+    const isWorker = req.user.role === 'worker';
+    if (isWorker) {
+      // Worker commented — notify all company admins
+      sendPushToCompanyAdmins(req.user.company_id, {
+        title: `Comment from ${req.user.full_name}`,
+        body: body.trim().substring(0, 100),
+        url: '/admin#approvals',
+      });
+    } else if (ownerId && ownerId !== req.user.id) {
+      // Admin commented — notify the entry's worker
+      sendPushToUser(ownerId, {
+        title: `Comment from ${req.user.full_name}`,
         body: body.trim().substring(0, 100),
         url: '/dashboard',
       });
