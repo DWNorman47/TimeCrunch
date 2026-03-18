@@ -31,10 +31,18 @@ router.get('/status', requireAuth, async (req, res) => {
   }
 });
 
+function validCoords(lat, lng) {
+  const la = parseFloat(lat), lo = parseFloat(lng);
+  return !isNaN(la) && !isNaN(lo) && la >= -90 && la <= 90 && lo >= -180 && lo <= 180;
+}
+
 // POST /api/clock/in
 router.post('/in', requireAuth, async (req, res) => {
   const { project_id, notes, lat, lng, local_work_date } = req.body;
   if (!project_id) return res.status(400).json({ error: 'project_id required' });
+  if ((lat != null || lng != null) && !validCoords(lat, lng)) {
+    return res.status(400).json({ error: 'Invalid coordinates' });
+  }
   const companyId = req.user.company_id;
   try {
     // Verify project belongs to this company and fetch geofence
@@ -120,6 +128,9 @@ router.post('/in', requireAuth, async (req, res) => {
 // POST /api/clock/out
 router.post('/out', requireAuth, async (req, res) => {
   const { lat, lng, break_minutes, mileage, local_clock_in, local_clock_out } = req.body;
+  if ((lat != null || lng != null) && !validCoords(lat, lng)) {
+    return res.status(400).json({ error: 'Invalid coordinates' });
+  }
   const companyId = req.user.company_id;
   try {
     const clockResult = await pool.query(

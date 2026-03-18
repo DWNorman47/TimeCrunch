@@ -3,8 +3,25 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
+const rateLimit = require('express-rate-limit');
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15,
+  message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  message: { error: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -17,7 +34,7 @@ function signToken(user) {
 }
 
 // Login
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const { username, password, company_name } = req.body;
   if (!username || !password || !company_name) {
     return res.status(400).json({ error: 'Company name, username, and password required' });
@@ -50,7 +67,7 @@ router.get('/me', requireAuth, (req, res) => {
 });
 
 // Register — creates a new company and its first admin user
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   const { full_name, first_name, middle_name, last_name, username, password, email } = req.body;
   const company_name = req.body.company_name?.trim();
   if (!company_name || !full_name || !username || !password || !email) {
@@ -177,7 +194,7 @@ router.post('/resend-confirmation', async (req, res) => {
 });
 
 // Forgot password — sends reset email
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', authLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
   try {
@@ -219,7 +236,7 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // Reset password — validates token, sets new password
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', authLimiter, async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'token and password required' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
@@ -243,7 +260,7 @@ router.post('/reset-password', async (req, res) => {
 });
 
 // Accept invite — set password from invite link
-router.post('/accept-invite', async (req, res) => {
+router.post('/accept-invite', authLimiter, async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'token and password required' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });

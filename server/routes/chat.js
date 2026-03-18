@@ -46,6 +46,13 @@ router.get('/', requireAuth, async (req, res) => {
       return res.json(result.rows);
     }
 
+    // Validate worker belongs to this company before fetching their thread
+    const workerCheck = await pool.query(
+      'SELECT id FROM users WHERE id = $1 AND company_id = $2',
+      [workerId, companyId]
+    );
+    if (workerCheck.rowCount === 0) return res.status(403).json({ error: 'Worker not found' });
+
     // Admin fetching a specific worker's thread
     const result = await pool.query(
       `SELECT m.id, m.sender_id, m.body, m.created_at,
@@ -76,6 +83,15 @@ router.post('/', requireAuth, async (req, res) => {
   if (!targetWorkerId) return res.status(400).json({ error: 'worker_id required' });
 
   try {
+    // Validate target worker belongs to this company
+    if (isAdmin) {
+      const workerCheck = await pool.query(
+        'SELECT id FROM users WHERE id = $1 AND company_id = $2',
+        [targetWorkerId, req.user.company_id]
+      );
+      if (workerCheck.rowCount === 0) return res.status(403).json({ error: 'Worker not found' });
+    }
+
     const result = await pool.query(
       `INSERT INTO company_chat (company_id, sender_id, worker_id, body)
        VALUES ($1, $2, $3, $4)

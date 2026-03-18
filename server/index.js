@@ -1,10 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const { requireAuth } = require('./middleware/auth');
 const pool = require('./db');
 
 const app = express();
+app.use(helmet());
 app.use(cors());
 // Stripe webhook needs raw body before express.json parses it
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
