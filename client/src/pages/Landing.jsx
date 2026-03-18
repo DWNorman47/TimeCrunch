@@ -94,7 +94,7 @@ export default function Landing() {
       </div>
 
       {/* Features */}
-      <section id="features" style={styles.section}>
+      <section id="features" style={styles.section} className="landing-section">
         <div style={styles.sectionInner}>
           <h2 style={styles.sectionTitle}>Everything your crew needs</h2>
           <p style={styles.sectionSub}>From clock-in to payroll, every step is covered.</p>
@@ -111,7 +111,7 @@ export default function Landing() {
       </section>
 
       {/* How it works */}
-      <section id="how-it-works" style={styles.howSection}>
+      <section id="how-it-works" style={styles.howSection} className="landing-section">
         <div style={styles.sectionInner}>
           <h2 style={styles.sectionTitle}>Up and running in minutes</h2>
           <p style={styles.sectionSub}>No training. No onboarding call. Just sign up and go.</p>
@@ -128,7 +128,7 @@ export default function Landing() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" style={styles.section}>
+      <section id="pricing" style={styles.section} className="landing-section">
         <div style={styles.sectionInner}>
           <h2 style={styles.sectionTitle}>Simple, honest pricing</h2>
           <p style={styles.sectionSub}>Start free. Upgrade when you're ready. Cancel any time.</p>
