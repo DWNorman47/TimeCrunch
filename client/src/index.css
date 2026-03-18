@@ -46,6 +46,27 @@ input, select, textarea {
     font-size: 13px !important;
   }
 
+  /* Landing sub-nav: scrollable pill bar below header on mobile */
+  .landing-subnav {
+    display: flex !important;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 8px 16px;
+    background: #fff;
+    border-bottom: 1px solid #f0f0f0;
+    position: sticky;
+    top: calc(64px + env(safe-area-inset-top));
+  }
+  .landing-subnav::-webkit-scrollbar { display: none; }
+  .landing-subnav a {
+    background: #f3f4f6;
+    border-radius: 20px;
+    padding: 5px 14px;
+    flex-shrink: 0;
+  }
+
   /* App header */
   .header-right {
     gap: 6px !important;

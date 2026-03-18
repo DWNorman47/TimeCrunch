@@ -65,6 +65,13 @@ export default function Landing() {
         </div>
       </header>
 
+      {/* Mobile sub-nav */}
+      <nav style={styles.mobileSubnav} className="landing-subnav">
+        <a href="#features" style={styles.subnavLink}>Features</a>
+        <a href="#how-it-works" style={styles.subnavLink}>How it works</a>
+        <a href="#pricing" style={styles.subnavLink}>Pricing</a>
+      </nav>
+
       {/* Hero */}
       <section style={styles.hero}>
         <div style={styles.heroBadge}>Built for contractors &amp; field crews</div>
@@ -181,6 +188,8 @@ const styles = {
   logo: { fontWeight: 800, fontSize: 20, color: '#1a56db', letterSpacing: '-0.5px' },
   nav: { display: 'flex', gap: 28 },
   navLink: { color: '#6b7280', fontWeight: 500, fontSize: 14, textDecoration: 'none' },
+  mobileSubnav: { display: 'none' },
+  subnavLink: { color: '#374151', fontWeight: 500, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap' },
   headerRight: { display: 'flex', alignItems: 'center', gap: 12 },
   loginLink: { color: '#374151', fontWeight: 600, fontSize: 14, textDecoration: 'none' },
   ctaBtn: { background: '#1a56db', color: '#fff', padding: '8px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14, textDecoration: 'none' },
