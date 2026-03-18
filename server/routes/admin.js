@@ -389,7 +389,11 @@ router.post('/workers/invite', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const assignedRole = role === 'admin' ? 'admin' : 'worker';
   const assignedLanguage = language || 'English';
-  const assignedRate = parseFloat(hourly_rate) || 30;
+  const rateVal = parseFloat(hourly_rate);
+  if (hourly_rate !== undefined && (isNaN(rateVal) || rateVal < 0)) {
+    return res.status(400).json({ error: 'hourly_rate must be a non-negative number' });
+  }
+  const assignedRate = (!isNaN(rateVal) && rateVal >= 0) ? rateVal : 30;
 
   // Auto-generate username from name
   const parts = full_name.trim().toLowerCase().split(/\s+/);
@@ -444,7 +448,11 @@ router.post('/workers', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const assignedRole = role === 'admin' ? 'admin' : 'worker';
   const assignedLanguage = req.body.language || 'English';
-  const assignedRate = parseFloat(req.body.hourly_rate) || 30;
+  const rateVal = parseFloat(req.body.hourly_rate);
+  if (req.body.hourly_rate !== undefined && (isNaN(rateVal) || rateVal < 0)) {
+    return res.status(400).json({ error: 'hourly_rate must be a non-negative number' });
+  }
+  const assignedRate = (!isNaN(rateVal) && rateVal >= 0) ? rateVal : 30;
   const assignedEmail = req.body.email || null;
   try {
     const hash = await bcrypt.hash(password, 10);
@@ -486,7 +494,11 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
     if (last_name !== undefined) { fields.push(`last_name = $${idx++}`); values.push(last_name || null); }
     if (assignedRole !== undefined) { fields.push(`role = $${idx++}`); values.push(assignedRole); }
     if (language) { fields.push(`language = $${idx++}`); values.push(language); }
-    if (hourly_rate !== undefined) { fields.push(`hourly_rate = $${idx++}`); values.push(parseFloat(hourly_rate) || 30); }
+    if (hourly_rate !== undefined) {
+      const rv = parseFloat(hourly_rate);
+      if (isNaN(rv) || rv < 0) return res.status(400).json({ error: 'hourly_rate must be a non-negative number' });
+      fields.push(`hourly_rate = $${idx++}`); values.push(rv);
+    }
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email || null); }
     values.push(req.params.id);
     values.push(companyId);
@@ -674,10 +686,22 @@ router.patch('/projects/:id', requireAdmin, async (req, res) => {
     } else {
       if (geo_lat !== undefined) { fields.push(`geo_lat = $${idx++}`); values.push(parseFloat(geo_lat)); }
       if (geo_lng !== undefined) { fields.push(`geo_lng = $${idx++}`); values.push(parseFloat(geo_lng)); }
-      if (geo_radius_ft !== undefined) { fields.push(`geo_radius_ft = $${idx++}`); values.push(parseInt(geo_radius_ft)); }
+      if (geo_radius_ft !== undefined) {
+        const radius = parseInt(geo_radius_ft);
+        if (isNaN(radius) || radius <= 0) return res.status(400).json({ error: 'geo_radius_ft must be a positive number' });
+        fields.push(`geo_radius_ft = $${idx++}`); values.push(radius);
+      }
     }
-    if (budget_hours !== undefined) { fields.push(`budget_hours = $${idx++}`); values.push(budget_hours === null ? null : parseFloat(budget_hours)); }
-    if (budget_dollars !== undefined) { fields.push(`budget_dollars = $${idx++}`); values.push(budget_dollars === null ? null : parseFloat(budget_dollars)); }
+    if (budget_hours !== undefined) {
+      const bh = budget_hours === null ? null : parseFloat(budget_hours);
+      if (bh !== null && (isNaN(bh) || bh < 0)) return res.status(400).json({ error: 'budget_hours must be non-negative' });
+      fields.push(`budget_hours = $${idx++}`); values.push(bh);
+    }
+    if (budget_dollars !== undefined) {
+      const bd = budget_dollars === null ? null : parseFloat(budget_dollars);
+      if (bd !== null && (isNaN(bd) || bd < 0)) return res.status(400).json({ error: 'budget_dollars must be non-negative' });
+      fields.push(`budget_dollars = $${idx++}`); values.push(bd);
+    }
     if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
     values.push(req.params.id);
     values.push(companyId);

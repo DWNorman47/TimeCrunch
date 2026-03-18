@@ -78,7 +78,7 @@ router.post('/checkout', requireAdmin, async (req, res) => {
       },
     });
     res.json({ url: session.url });
-  } catch (err) { console.error(err); res.status(500).json({ error: err.message || 'Server error' }); }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to create checkout session' }); }
 });
 
 // POST /stripe/portal — customer billing portal
@@ -94,7 +94,7 @@ router.post('/portal', requireAdmin, async (req, res) => {
       return_url: `${process.env.APP_URL}/admin#billing`,
     });
     res.json({ url: session.url });
-  } catch (err) { console.error(err); res.status(500).json({ error: err.message || 'Server error' }); }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to open billing portal' }); }
 });
 
 // POST /stripe/webhook — Stripe sends events here
