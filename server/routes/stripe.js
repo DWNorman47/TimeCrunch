@@ -14,6 +14,18 @@ function planFromPrice(priceId) {
   return 'starter';
 }
 
+// GET /stripe/plans — available pricing plans (price IDs from env)
+router.get('/plans', requireAdmin, (req, res) => {
+  const plans = [];
+  if (process.env.STRIPE_PRICE_STARTER) {
+    plans.push({ id: 'starter', name: 'Starter', price_id: process.env.STRIPE_PRICE_STARTER, monthly: 49, description: 'Up to 10 workers, all core features' });
+  }
+  if (process.env.STRIPE_PRICE_PRO) {
+    plans.push({ id: 'pro', name: 'Pro', price_id: process.env.STRIPE_PRICE_PRO, monthly: 99, description: 'Unlimited workers, priority support, advanced reports' });
+  }
+  res.json(plans);
+});
+
 // GET /stripe/status
 router.get('/status', requireAdmin, async (req, res) => {
   try {

@@ -11,6 +11,7 @@ import ConfirmEmail from './pages/ConfirmEmail';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import FieldPage from './pages/FieldPage';
+import AdministrationPage from './pages/AdministrationPage';
 import SuperAdmin from './pages/SuperAdmin';
 import InstallPrompt from './components/InstallPrompt';
 
@@ -37,6 +38,7 @@ function AppRoutes() {
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/admin" element={<PrivateRoute adminOnly><AdminDashboard /></PrivateRoute>} />
       <Route path="/field" element={<PrivateRoute><FieldPage /></PrivateRoute>} />
+      <Route path="/administration" element={<PrivateRoute adminOnly><AdministrationPage /></PrivateRoute>} />
       <Route path="/superadmin" element={<PrivateRoute superAdminOnly><SuperAdmin /></PrivateRoute>} />
       <Route path="/" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Landing />} />
       <Route path="*" element={<Navigate to={user ? (user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/admin' : '/dashboard') : '/'} replace />} />

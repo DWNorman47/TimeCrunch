@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+// Administration is admin-only; filtered at render time based on userRole
 const APPS = [
   {
     id: 'timeclock',
@@ -54,11 +55,26 @@ const APPS = [
     path: '/inventory',
     soon: true,
   },
+  {
+    id: 'administration',
+    name: 'Administration',
+    bg: '#1e293b',
+    adminOnly: true,
+    icon: (
+      <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+        <circle cx="10" cy="10" r="2.5" />
+        <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42" />
+      </svg>
+    ),
+    path: '/administration',
+  },
 ];
 
 export default function AppSwitcher({ currentApp = 'timeclock', userRole }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const visibleApps = APPS.filter(a => !a.adminOnly || isAdmin);
   const current = APPS.find(a => a.id === currentApp) || APPS[0];
 
   useEffect(() => {
@@ -91,7 +107,7 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole }) {
 
       {open && (
         <div style={styles.dropdown}>
-          {APPS.map(app => (
+          {visibleApps.map(app => (
             <button
               key={app.id}
               style={{

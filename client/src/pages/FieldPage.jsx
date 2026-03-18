@@ -259,7 +259,7 @@ export default function FieldPage() {
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.logoGroup}>
-          <AppSwitcher currentApp="field" />
+          <AppSwitcher currentApp="field" userRole={user?.role} />
           {user?.company_name && <span style={styles.companyName}>{user.company_name}</span>}
         </div>
         <div style={styles.headerRight}>

@@ -1107,6 +1107,33 @@ router.get('/payroll-export', requireAdmin, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// GET /admin/company — company name and subscription status
+router.get('/company', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, subscription_status, trial_ends_at, plan FROM companies WHERE id = $1',
+      [req.user.company_id]
+    );
+    res.json(result.rows[0] || {});
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// PATCH /admin/company — update company name
+router.patch('/company', requireAdmin, async (req, res) => {
+  const { name } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  try {
+    const existing = await pool.query('SELECT id FROM companies WHERE lower(name) = lower($1) AND id != $2', [name.trim(), req.user.company_id]);
+    if (existing.rowCount > 0) return res.status(409).json({ error: 'That company name is already taken' });
+    const result = await pool.query(
+      'UPDATE companies SET name = $1 WHERE id = $2 RETURNING id, name',
+      [name.trim(), req.user.company_id]
+    );
+    await logAudit(req.user.company_id, req.user.id, req.user.full_name, 'company.updated', 'company', req.user.company_id, name.trim());
+    res.json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // Audit log
 router.get('/audit-log', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
