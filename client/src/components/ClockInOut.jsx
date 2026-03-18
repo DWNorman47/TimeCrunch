@@ -27,7 +27,8 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
   const [elapsed, setElapsed] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [clockingOut, setClockingOut] = useState(false); // show break/mileage step
+  const [breakAdded, setBreakAdded] = useState(false);
+  const [mileageAdded, setMileageAdded] = useState(false);
   const [breakMinutes, setBreakMinutes] = useState('');
   const [mileage, setMileage] = useState('');
   const timerRef = useRef(null);
@@ -61,18 +62,14 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
     setError('');
     setLoading(true);
     const { lat, lng } = await getLocation();
-    const local_work_date = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
+    const local_work_date = new Date().toLocaleDateString('en-CA');
     try {
       const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date });
       setStatus(r.data);
       setNotes('');
     } catch (err) {
       const data = err.response?.data;
-      if (data?.geofence) {
-        setError(data.error);
-      } else {
-        setError(data?.error || t.clockInFailed);
-      }
+      setError(data?.geofence ? data.error : (data?.error || t.clockInFailed));
     } finally {
       setLoading(false);
     }
@@ -95,7 +92,8 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
       onEntryAdded({ ...r.data, project_name: status.project_name });
       setStatus(false);
       setSelectedProject('');
-      setClockingOut(false);
+      setBreakAdded(false);
+      setMileageAdded(false);
       setBreakMinutes('');
       setMileage('');
     } catch (err) {
@@ -121,49 +119,56 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
           </div>
           <div style={styles.timer}>{formatElapsed(elapsed)}</div>
         </div>
-        {clockingOut ? (
-          <div style={styles.clockOutStep}>
-            <div style={styles.clockOutFields}>
-              <div style={styles.clockOutField}>
-                <label style={styles.clockOutLabel}>{t.breakMin}</label>
-                <input
-                  style={styles.clockOutInput}
-                  type="number" min="0" max="480" step="1"
-                  placeholder="0"
-                  value={breakMinutes}
-                  onChange={e => setBreakMinutes(e.target.value)}
-                  autoFocus
-                />
-              </div>
-              <div style={styles.clockOutField}>
-                <label style={styles.clockOutLabel}>{t.mileageMi}</label>
-                <input
-                  style={styles.clockOutInput}
-                  type="number" min="0" step="0.1"
-                  placeholder={t.optional}
-                  value={mileage}
-                  onChange={e => setMileage(e.target.value)}
-                />
-              </div>
-            </div>
-            {error && <p style={styles.error}>{error}</p>}
-            <div style={styles.clockOutActions}>
-              <button style={styles.clockOutBtn} className="clock-btn" onClick={handleClockOut} disabled={loading}>
-                {loading ? t.clockingOut : t.confirmClockOut}
-              </button>
-              <button style={styles.cancelClockOutBtn} onClick={() => { setClockingOut(false); setError(''); }}>
-                {t.cancel}
-              </button>
-            </div>
+
+        {/* Added rows */}
+        {breakAdded && (
+          <div style={styles.addedRow}>
+            <span style={styles.addedIcon}>☕</span>
+            <span style={styles.addedLabel}>Break</span>
+            <input
+              style={styles.addedInput}
+              type="number" min="0" max="480" step="1"
+              placeholder="0"
+              value={breakMinutes}
+              onChange={e => setBreakMinutes(e.target.value)}
+              autoFocus
+            />
+            <span style={styles.addedUnit}>min</span>
+            <button style={styles.removeBtn} onClick={() => { setBreakAdded(false); setBreakMinutes(''); }}>✕</button>
           </div>
-        ) : (
-          <>
-            {error && <p style={styles.error}>{error}</p>}
-            <button style={styles.clockOutBtn} className="clock-btn" onClick={() => setClockingOut(true)} disabled={loading}>
-              {t.clockOut}
-            </button>
-          </>
         )}
+        {mileageAdded && (
+          <div style={styles.addedRow}>
+            <span style={styles.addedIcon}>🚗</span>
+            <span style={styles.addedLabel}>Mileage</span>
+            <input
+              style={styles.addedInput}
+              type="number" min="0" step="0.1"
+              placeholder="0.0"
+              value={mileage}
+              onChange={e => setMileage(e.target.value)}
+            />
+            <span style={styles.addedUnit}>mi</span>
+            <button style={styles.removeBtn} onClick={() => { setMileageAdded(false); setMileage(''); }}>✕</button>
+          </div>
+        )}
+
+        {/* Add buttons */}
+        {(!breakAdded || !mileageAdded) && (
+          <div style={styles.addBtns}>
+            {!breakAdded && (
+              <button style={styles.addBtn} onClick={() => setBreakAdded(true)}>+ Break</button>
+            )}
+            {!mileageAdded && (
+              <button style={styles.addBtn} onClick={() => setMileageAdded(true)}>+ Mileage</button>
+            )}
+          </div>
+        )}
+
+        {error && <p style={styles.error}>{error}</p>}
+        <button style={styles.clockOutBtn} className="clock-btn" onClick={handleClockOut} disabled={loading}>
+          {loading ? t.clockingOut : t.clockOut}
+        </button>
       </div>
     );
   }
@@ -208,23 +213,24 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
 
 const styles = {
   card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' },
-  clockedInCard: { background: '#1a56db', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.15)', color: '#fff' },
-  clockedInTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  clockedInCard: { background: '#1a56db', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.15)', color: '#fff', display: 'flex', flexDirection: 'column', gap: 10 },
+  clockedInTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   clockedInLabel: { fontSize: 13, opacity: 0.8, marginBottom: 4 },
   projectName: { fontSize: 18, fontWeight: 700 },
   timer: { fontSize: 36, fontWeight: 800, fontVariantNumeric: 'tabular-nums', letterSpacing: 1 },
+  addedRow: { display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px' },
+  addedIcon: { fontSize: 16 },
+  addedLabel: { fontSize: 13, fontWeight: 600, flex: 1 },
+  addedInput: { width: 70, padding: '5px 8px', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 6, fontSize: 14, background: 'rgba(255,255,255,0.15)', color: '#fff', textAlign: 'right' },
+  addedUnit: { fontSize: 12, opacity: 0.8, minWidth: 20 },
+  removeBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: 14, cursor: 'pointer', padding: '0 2px', lineHeight: 1 },
+  addBtns: { display: 'flex', gap: 8 },
+  addBtn: { padding: '7px 14px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   heading: { marginBottom: 16, fontSize: 18, fontWeight: 700 },
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   label: { fontSize: 13, fontWeight: 600, color: '#555', display: 'block', marginBottom: 4 },
   input: { padding: '9px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, width: '100%' },
   error: { color: '#ef4444', fontSize: 13, margin: 0, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px' },
   clockInBtn: { padding: '13px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 700 },
-  clockOutBtn: { width: '100%', padding: '13px', background: 'rgba(255,255,255,0.2)', color: '#fff', border: '2px solid rgba(255,255,255,0.5)', borderRadius: 8, fontSize: 16, fontWeight: 700 },
-  clockOutStep: { display: 'flex', flexDirection: 'column', gap: 12 },
-  clockOutFields: { display: 'flex', gap: 12 },
-  clockOutField: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1 },
-  clockOutLabel: { fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.8)' },
-  clockOutInput: { padding: '8px 10px', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 7, fontSize: 14, background: 'rgba(255,255,255,0.15)', color: '#fff', width: '100%' },
-  clockOutActions: { display: 'flex', flexDirection: 'column', gap: 8 },
-  cancelClockOutBtn: { width: '100%', padding: '10px', background: 'transparent', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, fontSize: 14, cursor: 'pointer' },
+  clockOutBtn: { width: '100%', padding: '13px', background: 'rgba(255,255,255,0.2)', color: '#fff', border: '2px solid rgba(255,255,255,0.5)', borderRadius: 8, fontSize: 16, fontWeight: 700, cursor: 'pointer' },
 };
