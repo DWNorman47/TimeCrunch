@@ -99,7 +99,7 @@ function CompanyTab() {
             </span>
           </div>
         )}
-        {msg && <p style={{ ...styles.feedback, color: msg.includes('Failed') || msg.includes('taken') ? '#dc2626' : '#059669' }}>{msg}</p>}
+        {msg && <p style={{ ...styles.feedback, padding: '6px 20px', color: msg.includes('Failed') || msg.includes('taken') ? '#dc2626' : '#059669' }}>{msg}</p>}
       </div>
     </div>
   );
@@ -401,6 +401,7 @@ function BillingTab() {
 
 function AccountTab() {
   const { user } = useAuth();
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [form, setForm] = useState({ current_password: '', new_password: '', confirm: '' });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -415,6 +416,7 @@ function AccountTab() {
       await api.post('/auth/change-password', { current_password: form.current_password, new_password: form.new_password });
       setMsg('Password changed successfully.');
       setForm({ current_password: '', new_password: '', confirm: '' });
+      setTimeout(() => { setShowPasswordForm(false); setMsg(''); }, 2000);
     } catch (err) {
       setMsg(err.response?.data?.error || 'Failed to change password');
     } finally { setSaving(false); }
@@ -433,34 +435,49 @@ function AccountTab() {
           <div style={styles.cardLabel}>Username</div>
           <div style={styles.cardValue}>@{user?.username}</div>
         </div>
-        <div style={styles.cardRow}>
+        <div style={{ ...styles.cardRow, borderBottom: 'none' }}>
           <div style={styles.cardLabel}>Role</div>
           <RoleBadge role={user?.role} />
         </div>
       </div>
 
-      <h3 style={{ ...styles.plansHeading, marginTop: 24 }}>Change Password</h3>
+      {/* Change password — accordion */}
       <div style={styles.card}>
-        <form onSubmit={changePassword} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={styles.fieldGroup}>
-            <label style={styles.label}>Current Password</label>
-            <input style={styles.input} type="password" value={form.current_password} onChange={e => set('current_password', e.target.value)} />
-          </div>
-          <div style={styles.fieldGroup}>
-            <label style={styles.label}>New Password</label>
-            <input style={styles.input} type="password" value={form.new_password} onChange={e => set('new_password', e.target.value)} />
-          </div>
-          <div style={styles.fieldGroup}>
-            <label style={styles.label}>Confirm New Password</label>
-            <input style={styles.input} type="password" value={form.confirm} onChange={e => set('confirm', e.target.value)} />
-          </div>
-          {msg && (
-            <p style={{ ...styles.feedback, color: msg.includes('success') ? '#059669' : '#dc2626' }}>{msg}</p>
-          )}
-          <button style={{ ...styles.saveBtn, alignSelf: 'flex-start' }} type="submit" disabled={saving}>
-            {saving ? 'Saving...' : 'Change Password'}
-          </button>
-        </form>
+        <button
+          style={styles.accordionTrigger}
+          onClick={() => { setShowPasswordForm(o => !o); setMsg(''); }}
+        >
+          <span style={styles.accordionLabel}>Change Password</span>
+          <span style={{ ...styles.accordionChevron, transform: showPasswordForm ? 'rotate(180deg)' : 'none' }}>▾</span>
+        </button>
+
+        {showPasswordForm && (
+          <form onSubmit={changePassword} style={styles.accordionBody}>
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Current Password</label>
+              <input style={styles.input} type="password" value={form.current_password} onChange={e => set('current_password', e.target.value)} autoFocus />
+            </div>
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>New Password</label>
+              <input style={styles.input} type="password" value={form.new_password} onChange={e => set('new_password', e.target.value)} />
+            </div>
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Confirm New Password</label>
+              <input style={styles.input} type="password" value={form.confirm} onChange={e => set('confirm', e.target.value)} />
+            </div>
+            {msg && (
+              <p style={{ ...styles.feedback, color: msg.includes('success') ? '#059669' : '#dc2626' }}>{msg}</p>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={styles.saveBtn} type="submit" disabled={saving}>
+                {saving ? 'Saving...' : 'Change Password'}
+              </button>
+              <button style={styles.ghostBtn} type="button" onClick={() => { setShowPasswordForm(false); setMsg(''); setForm({ current_password: '', new_password: '', confirm: '' }); }}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -539,20 +556,20 @@ const styles = {
   tabSub: { fontSize: 13, color: '#6b7280', margin: 0 },
   teamHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4, gap: 12 },
   // Cards
-  card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', padding: '0 20px', overflow: 'hidden' },
-  cardRow: { display: 'flex', alignItems: 'center', gap: 16, padding: '14px 0', borderBottom: '1px solid #f3f4f6' },
+  card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
+  cardRow: { display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px', borderBottom: '1px solid #f3f4f6' },
   cardLabel: { fontSize: 13, color: '#6b7280', fontWeight: 600, minWidth: 120 },
   cardValue: { fontSize: 14, color: '#111827', fontWeight: 500 },
   planBadge: { fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 10 },
   planName: { fontSize: 13, color: '#374151', fontWeight: 500 },
   editLink: { fontSize: 12, color: '#1a56db', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 },
-  feedback: { fontSize: 13, margin: '4px 0 0', padding: '8px 0' },
+  feedback: { fontSize: 13, margin: '4px 0 0', padding: '6px 0' },
   // Team
   inviteForm: { background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', marginBottom: 4 },
   inviteTitle: { fontSize: 15, fontWeight: 700, margin: '0 0 14px', color: '#111827' },
   inviteGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10, marginBottom: 10 },
   inviteNote: { fontSize: 12, color: '#9ca3af', margin: '10px 0 0' },
-  memberRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0' },
+  memberRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px' },
   memberInfo: { flex: 1, minWidth: 0 },
   memberName: { display: 'block', fontWeight: 600, fontSize: 14, color: '#111827' },
   memberUsername: { fontSize: 12, color: '#9ca3af' },
@@ -560,7 +577,11 @@ const styles = {
   restoreBtn: { background: '#eff6ff', border: 'none', color: '#1a56db', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600, flexShrink: 0 },
   expandBtn: { background: 'none', border: 'none', color: '#6b7280', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '4px 0' },
   // Billing
-  billingStatus: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '16px 0' },
+  billingStatus: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '16px 20px' },
+  accordionTrigger: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '16px 20px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' },
+  accordionLabel: { fontSize: 14, fontWeight: 600, color: '#374151' },
+  accordionChevron: { fontSize: 16, color: '#9ca3af', transition: 'transform 0.2s', display: 'inline-block' },
+  accordionBody: { display: 'flex', flexDirection: 'column', gap: 12, padding: '0 20px 20px', borderTop: '1px solid #f3f4f6' },
   currentPlan: { fontSize: 20, fontWeight: 800, color: '#111827', marginTop: 4, marginBottom: 2 },
   trialCountdown: { fontSize: 13, fontWeight: 600 },
   manageBtn: { background: '#64748b', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
