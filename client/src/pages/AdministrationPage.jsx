@@ -494,7 +494,10 @@ const TABS = [
 
 export default function AdministrationPage() {
   const { user, logout } = useAuth();
-  const [tab, setTab] = useState('company');
+  const ADMIN_TABS = ['company', 'team', 'billing', 'account'];
+  const hashTab = window.location.hash.replace('#', '');
+  const [tab, setTab] = useState(ADMIN_TABS.includes(hashTab) ? hashTab : 'company');
+  const switchTab = t => { setTab(t); window.location.hash = t; };
 
   return (
     <div style={styles.page}>
@@ -515,7 +518,7 @@ export default function AdministrationPage() {
             <button
               key={t.id}
               style={tab === t.id ? styles.tabActive : styles.tab}
-              onClick={() => setTab(t.id)}
+              onClick={() => switchTab(t.id)}
             >
               {t.label}
             </button>

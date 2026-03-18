@@ -218,7 +218,10 @@ export default function FieldPage() {
   const [projects, setProjects] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [fieldTab, setFieldTab] = useState('notes'); // 'notes' | 'daily' | 'punchlist' | 'safety'
+  const FIELD_TABS = ['notes', 'daily', 'punchlist', 'safety'];
+  const hashTab = window.location.hash.replace('#', '');
+  const [fieldTab, setFieldTab] = useState(FIELD_TABS.includes(hashTab) ? hashTab : 'notes');
+  const switchTab = t => { setFieldTab(t); window.location.hash = t; };
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState({});
 
@@ -271,16 +274,16 @@ export default function FieldPage() {
       <main style={styles.main}>
         {/* Module tabs */}
         <div style={styles.moduleTabs}>
-          <button style={fieldTab === 'notes' ? styles.moduleTabActive : styles.moduleTab} onClick={() => setFieldTab('notes')}>
+          <button style={fieldTab === 'notes' ? styles.moduleTabActive : styles.moduleTab} onClick={() => switchTab('notes')}>
             📷 Notes
           </button>
-          <button style={fieldTab === 'daily' ? styles.moduleTabActive : styles.moduleTab} onClick={() => setFieldTab('daily')}>
+          <button style={fieldTab === 'daily' ? styles.moduleTabActive : styles.moduleTab} onClick={() => switchTab('daily')}>
             📋 Daily
           </button>
-          <button style={fieldTab === 'punchlist' ? styles.moduleTabActive : styles.moduleTab} onClick={() => setFieldTab('punchlist')}>
+          <button style={fieldTab === 'punchlist' ? styles.moduleTabActive : styles.moduleTab} onClick={() => switchTab('punchlist')}>
             ✅ Punch
           </button>
-          <button style={fieldTab === 'safety' ? styles.moduleTabActive : styles.moduleTab} onClick={() => setFieldTab('safety')}>
+          <button style={fieldTab === 'safety' ? styles.moduleTabActive : styles.moduleTab} onClick={() => switchTab('safety')}>
             🦺 Safety
           </button>
         </div>
