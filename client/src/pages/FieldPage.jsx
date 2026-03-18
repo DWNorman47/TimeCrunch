@@ -4,6 +4,8 @@ import api from '../api';
 import AppSwitcher from '../components/AppSwitcher';
 import PhotoCapture from '../components/PhotoCapture';
 import DailyReports from '../components/DailyReports';
+import Punchlist from '../components/Punchlist';
+import SafetyTalks from '../components/SafetyTalks';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -216,7 +218,7 @@ export default function FieldPage() {
   const [projects, setProjects] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [fieldTab, setFieldTab] = useState('notes'); // 'notes' | 'daily'
+  const [fieldTab, setFieldTab] = useState('notes'); // 'notes' | 'daily' | 'punchlist' | 'safety'
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState({});
 
@@ -270,15 +272,25 @@ export default function FieldPage() {
         {/* Module tabs */}
         <div style={styles.moduleTabs}>
           <button style={fieldTab === 'notes' ? styles.moduleTabActive : styles.moduleTab} onClick={() => setFieldTab('notes')}>
-            📷 Field Notes
+            📷 Notes
           </button>
           <button style={fieldTab === 'daily' ? styles.moduleTabActive : styles.moduleTab} onClick={() => setFieldTab('daily')}>
-            📋 Daily Reports
+            📋 Daily
+          </button>
+          <button style={fieldTab === 'punchlist' ? styles.moduleTabActive : styles.moduleTab} onClick={() => setFieldTab('punchlist')}>
+            ✅ Punch
+          </button>
+          <button style={fieldTab === 'safety' ? styles.moduleTabActive : styles.moduleTab} onClick={() => setFieldTab('safety')}>
+            🦺 Safety
           </button>
         </div>
 
         {fieldTab === 'daily' ? (
           <DailyReports projects={projects} />
+        ) : fieldTab === 'punchlist' ? (
+          <Punchlist projects={projects} />
+        ) : fieldTab === 'safety' ? (
+          <SafetyTalks projects={projects} />
         ) : (
         <>
         <div style={styles.topRow}>
@@ -335,7 +347,7 @@ const styles = {
   userName: { fontSize: 14, opacity: 0.85 },
   headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' },
   main: { maxWidth: 860, margin: '0 auto', padding: '24px 16px' },
-  moduleTabs: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 10, padding: 4, marginBottom: 20, width: '100%', maxWidth: 320 },
+  moduleTabs: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 10, padding: 4, marginBottom: 20, width: '100%', maxWidth: 440 },
   moduleTab: { flex: 1, padding: '8px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, color: '#666', cursor: 'pointer', whiteSpace: 'nowrap' },
   moduleTabActive: { flex: 1, padding: '8px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, color: '#059669', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', whiteSpace: 'nowrap' },
   topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 12 },

@@ -62,8 +62,41 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [suggesting, setSuggesting] = useState(false);
+  const [gettingWeather, setGettingWeather] = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const weatherCodeToCondition = code => {
+    if (code === 0) return 'sunny';
+    if (code <= 2) return 'partly_cloudy';
+    if (code <= 48) return 'cloudy';
+    if (code <= 67) return 'rainy';
+    if (code <= 77) return 'snow';
+    if (code <= 82) return 'rainy';
+    if (code <= 86) return 'snow';
+    if (code >= 95) return 'stormy';
+    return 'cloudy';
+  };
+
+  const autoFillWeather = async () => {
+    setGettingWeather(true);
+    try {
+      const pos = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 })
+      );
+      const { latitude, longitude } = pos.coords;
+      const r = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weathercode&temperature_unit=fahrenheit&forecast_days=1`
+      );
+      const data = await r.json();
+      const code = data.current?.weathercode;
+      const temp = Math.round(data.current?.temperature_2m);
+      set('weather_temp', temp);
+      set('weather_condition', weatherCodeToCondition(code));
+    } catch {
+      // geolocation denied or offline — silently ignore
+    } finally { setGettingWeather(false); }
+  };
 
   const autoFillManpower = async () => {
     if (!form.report_date) return;
@@ -141,7 +174,12 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
           <input style={styles.input} type="text" placeholder="Name" value={form.superintendent} onChange={e => set('superintendent', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Weather</label>
+          <label style={styles.label}>
+            Weather
+            <button type="button" style={styles.weatherBtn} onClick={autoFillWeather} disabled={gettingWeather} title="Auto-fill from current location">
+              {gettingWeather ? '...' : '🌤 Auto'}
+            </button>
+          </label>
           <div style={{ display: 'flex', gap: 6 }}>
             <select style={{ ...styles.input, flex: 1 }} value={form.weather_condition} onChange={e => set('weather_condition', e.target.value)}>
               <option value="">Select</option>
@@ -468,7 +506,8 @@ const styles = {
   pdfBtn: { fontSize: 13, fontWeight: 600, color: '#fff', background: '#1a56db', border: 'none', padding: '8px 16px', borderRadius: 7, textDecoration: 'none', cursor: 'pointer' },
   fieldGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 20 },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 4 },
-  label: { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  label: { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 6 },
+  weatherBtn: { fontSize: 11, fontWeight: 600, color: '#1a56db', background: '#eff6ff', border: 'none', padding: '2px 7px', borderRadius: 5, cursor: 'pointer', textTransform: 'none', letterSpacing: 0 },
   input: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, width: '100%' },
   section: { marginBottom: 20 },
   sectionHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 },
