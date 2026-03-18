@@ -62,7 +62,7 @@ export default function AdminDashboard() {
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.logoGroup}>
-          <AppSwitcher currentApp="timeclock" />
+          <AppSwitcher currentApp="timeclock" userRole={user?.role} />
           {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         </div>
         <div style={styles.headerRight}>

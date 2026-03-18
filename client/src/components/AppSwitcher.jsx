@@ -14,6 +14,18 @@ const APPS = [
     path: '/',
   },
   {
+    id: 'field',
+    name: 'Field',
+    bg: '#059669',
+    icon: (
+      <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+        <path d="M19 15a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h3l2-2.5h4L14 5h3a2 2 0 0 1 2 2z" />
+        <circle cx="10" cy="11" r="3" />
+      </svg>
+    ),
+    path: '/field',
+  },
+  {
     id: 'projects',
     name: 'Projects',
     bg: '#7c3aed',
@@ -44,7 +56,7 @@ const APPS = [
   },
 ];
 
-export default function AppSwitcher({ currentApp = 'timeclock' }) {
+export default function AppSwitcher({ currentApp = 'timeclock', userRole }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const current = APPS.find(a => a.id === currentApp) || APPS[0];
@@ -57,7 +69,13 @@ export default function AppSwitcher({ currentApp = 'timeclock' }) {
 
   const navigate = app => {
     setOpen(false);
-    if (!app.soon) window.location.href = app.path;
+    if (app.soon) return;
+    // Time Clock routes differently for admin vs worker
+    if (app.id === 'timeclock') {
+      window.location.href = userRole === 'admin' || userRole === 'super_admin' ? '/admin' : '/dashboard';
+    } else {
+      window.location.href = app.path;
+    }
   };
 
   return (
