@@ -4,7 +4,7 @@ import { useToast } from '../contexts/ToastContext';
 
 const LANGUAGES = ['English', 'Spanish'];
 
-export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 30 }) {
+export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 30, showRate = true, identityEditable = true }) {
   const toast = useToast();
   const [form, setForm] = useState({ full_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
   const [addMode, setAddMode] = useState('manual'); // 'manual' | 'invite'
@@ -117,7 +117,10 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const handleSaveEdit = async id => {
     setEditSaving(true);
     try {
-      const r = await api.patch(`/admin/workers/${id}`, editForm);
+      const patch = identityEditable && showRate ? editForm
+        : identityEditable ? { full_name: editForm.full_name, role: editForm.role, language: editForm.language, email: editForm.email }
+        : { hourly_rate: editForm.hourly_rate };
+      const r = await api.patch(`/admin/workers/${id}`, patch);
       onWorkerUpdated(r.data);
       cancelEdit();
     } catch {
@@ -156,7 +159,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
               <select style={styles.input} value={form.language} onChange={e => set('language', e.target.value)}>
                 {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
-              <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder="$/hr (30)" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />
+              {showRate && <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder="$/hr (30)" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />}
               {error && (
                 <div style={styles.errorBox}>
                   <p style={styles.errorText}>{error}</p>
@@ -187,7 +190,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   <select style={styles.input} value={inviteForm.language} onChange={e => setInvite('language', e.target.value)}>
                     {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                   </select>
-                  <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder="$/hr (30)" value={inviteForm.hourly_rate} onChange={e => setInvite('hourly_rate', e.target.value)} />
+                  {showRate && <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder="$/hr (30)" value={inviteForm.hourly_rate} onChange={e => setInvite('hourly_rate', e.target.value)} />}
                   {inviteError && <p style={styles.errorText}>{inviteError}</p>}
                   <button style={styles.saveBtn} type="submit" disabled={inviteSaving}>{inviteSaving ? 'Sending...' : 'Send Invite'}</button>
                 </>
@@ -206,9 +209,9 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
             <tr>
               <th style={styles.th}>Name</th>
               <th style={styles.th} className="col-hide-mobile">Username</th>
-              <th style={styles.th}>Type</th>
-              <th style={styles.th} className="col-hide-mobile">Language</th>
-              <th style={styles.th} className="col-hide-mobile">Rate</th>
+              {identityEditable && <th style={styles.th}>Type</th>}
+              {identityEditable && <th style={styles.th} className="col-hide-mobile">Language</th>}
+              {showRate && <th style={styles.th} className="col-hide-mobile">Rate</th>}
               <th style={styles.th}></th>
             </tr>
           </thead>
@@ -219,23 +222,31 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   <React.Fragment key={w.id}>
                     <tr style={{ ...styles.tr, background: '#f0f4ff' }}>
                       <td style={styles.td}>
-                        <input style={styles.editInput} value={editForm.full_name} onChange={e => setEdit('full_name', e.target.value)} />
+                        {identityEditable
+                          ? <input style={styles.editInput} value={editForm.full_name} onChange={e => setEdit('full_name', e.target.value)} />
+                          : w.full_name}
                       </td>
                       <td style={styles.td}>@{w.username}</td>
-                      <td style={styles.td}>
-                        <select style={styles.editInput} value={editForm.role} onChange={e => setEdit('role', e.target.value)}>
-                          <option value="worker">User</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                      </td>
-                      <td style={styles.td}>
-                        <select style={styles.editInput} value={editForm.language} onChange={e => setEdit('language', e.target.value)}>
-                          {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
-                        </select>
-                      </td>
-                      <td style={styles.td}>
-                        <input style={{ ...styles.editInput, width: 70 }} type="number" min="0" step="0.01" value={editForm.hourly_rate} onChange={e => setEdit('hourly_rate', e.target.value)} />
-                      </td>
+                      {identityEditable && (
+                        <td style={styles.td}>
+                          <select style={styles.editInput} value={editForm.role} onChange={e => setEdit('role', e.target.value)}>
+                            <option value="worker">User</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </td>
+                      )}
+                      {identityEditable && (
+                        <td style={styles.td}>
+                          <select style={styles.editInput} value={editForm.language} onChange={e => setEdit('language', e.target.value)}>
+                            {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                          </select>
+                        </td>
+                      )}
+                      {showRate && (
+                        <td style={styles.td}>
+                          <input style={{ ...styles.editInput, width: 70 }} type="number" min="0" step="0.01" value={editForm.hourly_rate} onChange={e => setEdit('hourly_rate', e.target.value)} />
+                        </td>
+                      )}
                       <td style={styles.tdAction}>
                         <button style={styles.saveEditBtn} onClick={() => handleSaveEdit(w.id)} disabled={editSaving}>
                           {editSaving ? '...' : 'Save'}
@@ -243,12 +254,14 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                         <button style={styles.cancelBtn} onClick={cancelEdit}>Cancel</button>
                       </td>
                     </tr>
-                    <tr style={{ ...styles.tr, background: '#f0f4ff' }}>
-                      <td style={styles.td} colSpan={5}>
-                        <input style={{ ...styles.editInput, maxWidth: 280 }} type="email" placeholder="Email (optional)" value={editForm.email} onChange={e => setEdit('email', e.target.value)} />
-                      </td>
-                      <td style={styles.tdAction} />
-                    </tr>
+                    {identityEditable && (
+                      <tr style={{ ...styles.tr, background: '#f0f4ff' }}>
+                        <td style={styles.td} colSpan={showRate ? 5 : 4}>
+                          <input style={{ ...styles.editInput, maxWidth: 280 }} type="email" placeholder="Email (optional)" value={editForm.email} onChange={e => setEdit('email', e.target.value)} />
+                        </td>
+                        <td style={styles.tdAction} />
+                      </tr>
+                    )}
                   </React.Fragment>
                 );
               }
@@ -256,16 +269,18 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 <tr key={w.id} style={styles.tr}>
                   <td style={styles.td}>{w.full_name}</td>
                   <td style={styles.td}>@{w.username}</td>
-                  <td style={styles.td}>
-                    <span style={{ ...styles.roleBadge, background: w.role === 'admin' ? '#1a56db' : '#6b7280' }}>
-                      {w.role === 'admin' ? 'Admin' : 'User'}
-                    </span>
-                  </td>
-                  <td style={styles.td}>{w.language || '—'}</td>
-                  <td style={styles.td}>${parseFloat(w.hourly_rate ?? 30).toFixed(2)}/hr</td>
+                  {identityEditable && (
+                    <td style={styles.td}>
+                      <span style={{ ...styles.roleBadge, background: w.role === 'admin' ? '#1a56db' : '#6b7280' }}>
+                        {w.role === 'admin' ? 'Admin' : 'User'}
+                      </span>
+                    </td>
+                  )}
+                  {identityEditable && <td style={styles.td}>{w.language || '—'}</td>}
+                  {showRate && <td style={styles.td}>${parseFloat(w.hourly_rate ?? 30).toFixed(2)}/hr</td>}
                   <td style={styles.tdAction}>
                     <button style={styles.editBtn} onClick={() => startEdit(w)}>Edit</button>
-                    <button style={styles.removeBtn} onClick={() => handleRemove(w.id, w.full_name)}>Remove</button>
+                    {identityEditable && <button style={styles.removeBtn} onClick={() => handleRemove(w.id, w.full_name)}>Remove</button>}
                   </td>
                 </tr>
               );

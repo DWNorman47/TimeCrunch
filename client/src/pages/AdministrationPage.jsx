@@ -263,6 +263,8 @@ export default function AdministrationPage() {
               onWorkerUpdated={handleWorkerUpdated}
               onWorkerRestored={handleWorkerRestored}
               defaultRate={settings?.default_hourly_rate ?? 30}
+              showRate={false}
+              identityEditable={true}
             />
           </div>
         )}
@@ -275,6 +277,8 @@ export default function AdministrationPage() {
               onProjectDeleted={handleProjectDeleted}
               onProjectUpdated={handleProjectUpdated}
               onProjectRestored={handleProjectRestored}
+              showWageType={false}
+              nameEditable={true}
             />
           </div>
         )}

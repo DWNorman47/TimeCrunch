@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 
-export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored }) {
+export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true }) {
   const toast = useToast();
   const [name, setName] = useState('');
   const [wageType, setWageType] = useState('regular');
@@ -59,8 +59,10 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   };
 
   const handleEditSave = async (id) => {
-    if (!editName.trim()) return;
-    const payload = { name: editName.trim(), wage_type: editWageType };
+    if (nameEditable && !editName.trim()) return;
+    const payload = {};
+    if (nameEditable) payload.name = editName.trim();
+    if (showWageType) payload.wage_type = editWageType;
     if (editGeoLat && editGeoLng && editGeoRadius) {
       payload.geo_lat = editGeoLat;
       payload.geo_lng = editGeoLng;
@@ -149,10 +151,12 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
           onChange={e => { setName(e.target.value); setError(''); setArchivedConflict(null); }}
           required
         />
-        <select style={styles.select} value={wageType} onChange={e => setWageType(e.target.value)}>
-          <option value="regular">Regular Wages</option>
-          <option value="prevailing">Prevailing Wages</option>
-        </select>
+        {showWageType && (
+          <select style={styles.select} value={wageType} onChange={e => setWageType(e.target.value)}>
+            <option value="regular">Regular Wages</option>
+            <option value="prevailing">Prevailing Wages</option>
+          </select>
+        )}
         <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? 'Adding...' : '+ Add'}</button>
       </form>
       {error && (
@@ -173,7 +177,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
           <thead>
             <tr>
               <th style={styles.th}>Name</th>
-              <th style={styles.th}>Wage Type</th>
+              {showWageType && <th style={styles.th}>Wage Type</th>}
               <th style={styles.th}></th>
             </tr>
           </thead>
@@ -183,18 +187,23 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                 <td style={styles.td} colSpan={3}>
                   <div style={styles.editBlock}>
                     <div style={styles.editRow}>
-                      <input
-                        style={{ ...styles.editInput, flex: 2 }}
-                        value={editName}
-                        onChange={e => setEditName(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Escape') setEditingId(null); }}
-                        autoFocus
-                        placeholder="Project name"
-                      />
-                      <select style={styles.editInput} value={editWageType} onChange={e => setEditWageType(e.target.value)}>
-                        <option value="regular">Regular Wages</option>
-                        <option value="prevailing">Prevailing Wages</option>
-                      </select>
+                      {nameEditable
+                        ? <input
+                            style={{ ...styles.editInput, flex: 2 }}
+                            value={editName}
+                            onChange={e => setEditName(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Escape') setEditingId(null); }}
+                            autoFocus
+                            placeholder="Project name"
+                          />
+                        : <span style={{ flex: 2, fontWeight: 600, fontSize: 13 }}>{editName}</span>
+                      }
+                      {showWageType && (
+                        <select style={styles.editInput} value={editWageType} onChange={e => setEditWageType(e.target.value)}>
+                          <option value="regular">Regular Wages</option>
+                          <option value="prevailing">Prevailing Wages</option>
+                        </select>
+                      )}
                       <button style={styles.saveBtn} onClick={() => handleEditSave(p.id)}>Save</button>
                       <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
                     </div>
@@ -234,11 +243,13 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                   {p.name}
                   {p.geo_radius_ft && <span style={styles.geoBadge}>📍 {p.geo_radius_ft.toLocaleString()} ft</span>}
                 </td>
-                <td style={styles.td}>
-                  <span style={{ ...styles.wageBadge, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
-                    {p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}
-                  </span>
-                </td>
+                {showWageType && (
+                  <td style={styles.td}>
+                    <span style={{ ...styles.wageBadge, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
+                      {p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}
+                    </span>
+                  </td>
+                )}
                 <td style={styles.tdAction}>
                   <button style={styles.editBtn} onClick={() => {
                     setEditingId(p.id);
@@ -274,7 +285,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                 <thead>
                   <tr>
                     <th style={styles.th}>Name</th>
-                    <th style={styles.th}>Wage Type</th>
+                    {showWageType && <th style={styles.th}>Wage Type</th>}
                     <th style={styles.th}></th>
                   </tr>
                 </thead>
@@ -282,7 +293,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                   {archived.map(p => (
                     <tr key={p.id} style={{ ...styles.tr, color: '#888' }}>
                       <td style={styles.td}>{p.name}</td>
-                      <td style={styles.td}>{p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}</td>
+                      {showWageType && <td style={styles.td}>{p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}</td>}
                       <td style={styles.tdAction}>
                         <button style={styles.restoreBtn} onClick={() => handleRestore(p.id)}>Restore</button>
                       </td>

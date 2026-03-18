@@ -147,8 +147,8 @@ export default function AdminDashboard() {
         ) : tab === 'manage' ? (
           <>
             <ManageSchedule workers={workers} projects={projects} />
-            <ManageWorkers workers={workers} onWorkerAdded={handleWorkerAdded} onWorkerDeleted={handleWorkerDeleted} onWorkerUpdated={handleWorkerUpdated} onWorkerRestored={handleWorkerRestored} defaultRate={settings?.default_hourly_rate ?? 30} />
-            <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} onProjectRestored={handleProjectRestored} />
+            <ManageWorkers workers={workers} onWorkerAdded={handleWorkerAdded} onWorkerDeleted={handleWorkerDeleted} onWorkerUpdated={handleWorkerUpdated} onWorkerRestored={handleWorkerRestored} defaultRate={settings?.default_hourly_rate ?? 30} showRate={true} identityEditable={false} />
+            <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} onProjectRestored={handleProjectRestored} showWageType={true} nameEditable={false} />
             <ManageRates settings={settings} onSettingsUpdated={setSettings} />
             <ManagePayPeriods />
             <h3 style={styles.subheading}>Audit Log</h3>
