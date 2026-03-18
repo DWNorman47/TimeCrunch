@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useToast } from '../contexts/ToastContext';
 
 export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored }) {
+  const toast = useToast();
   const [name, setName] = useState('');
   const [wageType, setWageType] = useState('regular');
   const [error, setError] = useState('');
@@ -71,7 +73,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       onProjectUpdated(r.data);
       setEditingId(null);
     } catch {
-      alert('Failed to update project');
+      toast('Failed to update project', 'error');
     }
   };
 
@@ -81,7 +83,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       const r = await api.patch(`/admin/projects/${id}`, { clear_geofence: true });
       onProjectUpdated(r.data);
     } catch {
-      alert('Failed to remove geofence');
+      toast('Failed to remove geofence', 'error');
     }
   };
 
@@ -115,7 +117,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       onProjectDeleted(id);
       loadArchived();
     } catch {
-      alert('Failed to remove project');
+      toast('Failed to remove project', 'error');
     }
   };
 
@@ -125,7 +127,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       onProjectRestored(r.data);
       setArchived(prev => prev.filter(p => p.id !== id));
     } catch {
-      alert('Failed to restore project');
+      toast('Failed to restore project', 'error');
     }
   };
 

@@ -13,7 +13,16 @@ export default function LiveKPIs() {
     return () => clearInterval(timer);
   }, []);
 
-  if (!kpis) return null;
+  if (!kpis) return (
+    <div style={styles.grid} className="kpi-grid">
+      {['Pending Approvals', 'Clocked In Now', 'Hours This Week', 'Workers with OT'].map(label => (
+        <div key={label} style={styles.card}>
+          <div style={styles.skelValue} />
+          <div style={styles.label}>{label}</div>
+        </div>
+      ))}
+    </div>
+  );
 
   const cards = [
     { label: 'Pending Approvals', value: kpis.pending_approvals, color: kpis.pending_approvals > 0 ? '#d97706' : '#059669' },
@@ -38,5 +47,6 @@ const styles = {
   grid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 },
   card: { background: '#fff', borderRadius: 10, padding: '14px 16px', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', textAlign: 'center' },
   value: { fontSize: 28, fontWeight: 800, lineHeight: 1.1, marginBottom: 4 },
+  skelValue: { height: 34, width: 48, background: '#e5e7eb', borderRadius: 6, margin: '0 auto 6px', animation: 'pulse 1.5s ease-in-out infinite' },
   label: { fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.03em' },
 };

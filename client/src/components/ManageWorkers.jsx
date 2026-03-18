@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useToast } from '../contexts/ToastContext';
 
 const LANGUAGES = ['English', 'Spanish'];
 
 export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 30 }) {
+  const toast = useToast();
   const [form, setForm] = useState({ full_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
   const [addMode, setAddMode] = useState('manual'); // 'manual' | 'invite'
   const [inviteForm, setInviteForm] = useState({ full_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
@@ -83,7 +85,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       onWorkerDeleted(id);
       loadArchived();
     } catch {
-      alert('Failed to remove user');
+      toast('Failed to remove user', 'error');
     }
   };
 
@@ -93,7 +95,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       onWorkerRestored({ ...r.data, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 });
       setArchived(prev => prev.filter(w => w.id !== id));
     } catch {
-      alert('Failed to restore user');
+      toast('Failed to restore user', 'error');
     }
   };
 
@@ -119,7 +121,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       onWorkerUpdated(r.data);
       cancelEdit();
     } catch {
-      alert('Failed to update user');
+      toast('Failed to update user', 'error');
     } finally {
       setEditSaving(false);
     }

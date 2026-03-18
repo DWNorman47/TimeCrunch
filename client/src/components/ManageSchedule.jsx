@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useToast } from '../contexts/ToastContext';
 
 function startOfWeek(date) {
   const d = new Date(date);
@@ -13,6 +14,7 @@ function fmtDay(d) { return d.toLocaleDateString('en-US', { weekday: 'short', mo
 function fmtTime(t) { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m}${hr < 12 ? 'a' : 'p'}`; }
 
 export default function ManageSchedule({ workers, projects }) {
+  const toast = useToast();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,7 +87,7 @@ export default function ManageSchedule({ workers, projects }) {
       setShifts(prev => prev.map(s => s.id === id ? r.data : s));
       setEditingId(null);
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to update shift');
+      toast(err.response?.data?.error || 'Failed to update shift', 'error');
     } finally { setEditSaving(false); }
   };
 

@@ -30,12 +30,14 @@ export default function ApprovalQueue() {
   const [working, setWorking] = useState(null);
   const [approvingAll, setApprovingAll] = useState(false);
   const [openMessageId, setOpenMessageId] = useState(null);
+  const [fetchError, setFetchError] = useState(false);
 
   const fetch = () => {
     setLoading(true);
+    setFetchError(false);
     api.get('/admin/entries/pending')
       .then(r => setEntries(r.data))
-      .catch(() => {})
+      .catch(() => setFetchError(true))
       .finally(() => setLoading(false));
   };
 
@@ -84,7 +86,9 @@ export default function ApprovalQueue() {
         )}
       </div>
 
-      {entries.length === 0 ? (
+      {fetchError ? (
+        <p style={styles.fetchError}>Failed to load pending entries. <button style={styles.retryBtn} onClick={fetch}>Retry</button></p>
+      ) : entries.length === 0 ? (
         <p style={styles.empty}>All caught up — no pending entries.</p>
       ) : (
         <div style={styles.list}>
@@ -173,6 +177,8 @@ const styles = {
   title: { fontSize: 17, fontWeight: 700, margin: 0 },
   badge: { background: '#fef3c7', color: '#b45309', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 700 },
   empty: { color: '#059669', fontSize: 14, fontWeight: 500 },
+  fetchError: { color: '#991b1b', fontSize: 14 },
+  retryBtn: { background: 'none', border: 'none', color: '#1a56db', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: 14 },
   list: { display: 'flex', flexDirection: 'column', gap: 12 },
   row: { border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
   rowMain: { flex: 1, minWidth: 200 },

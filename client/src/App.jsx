@@ -14,6 +14,7 @@ import FieldPage from './pages/FieldPage';
 import AdministrationPage from './pages/AdministrationPage';
 import SuperAdmin from './pages/SuperAdmin';
 import InstallPrompt from './components/InstallPrompt';
+import { ToastProvider } from './contexts/ToastContext';
 
 function PrivateRoute({ children, adminOnly = false, superAdminOnly = false }) {
   const { user, loading } = useAuth();
@@ -50,8 +51,10 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <AppRoutes />
-        <InstallPrompt />
+        <ToastProvider>
+          <AppRoutes />
+          <InstallPrompt />
+        </ToastProvider>
       </BrowserRouter>
     </AuthProvider>
   );
