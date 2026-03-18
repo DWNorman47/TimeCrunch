@@ -66,7 +66,6 @@ export default function Dashboard() {
             <option value="English">EN</option>
             <option value="Spanish">ES</option>
           </select>
-          <button style={styles.headerBtn} className="header-btn" onClick={() => setShowChangePassword(true)}>{t.changePassword}</button>
           <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
         </div>
       </header>
@@ -110,6 +109,15 @@ export default function Dashboard() {
         {tab === 'account' && (
           <>
             <NotificationSetup />
+            <div style={styles.accountCard} className="mobile-card">
+              <div style={styles.accountRow}>
+                <div>
+                  <div style={styles.accountLabel}>Password</div>
+                  <div style={styles.accountSub}>Change your login password</div>
+                </div>
+                <button style={styles.accountBtn} onClick={() => setShowChangePassword(true)}>Change Password</button>
+              </div>
+            </div>
             {!loading && <PayStubView />}
           </>
         )}
@@ -135,4 +143,9 @@ const styles = {
   viewToggle: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 8, padding: 3, width: 'fit-content' },
   toggleBtn: { padding: '6px 14px', background: 'none', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#666', cursor: 'pointer' },
   toggleActive: { padding: '6px 14px', background: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+  accountCard: { background: '#fff', borderRadius: 12, padding: '14px 18px', boxShadow: '0 1px 6px rgba(0,0,0,0.06)' },
+  accountRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
+  accountLabel: { fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 2 },
+  accountSub: { fontSize: 12, color: '#6b7280' },
+  accountBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '7px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
 };

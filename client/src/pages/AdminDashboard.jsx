@@ -64,7 +64,6 @@ export default function AdminDashboard() {
           {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         </div>
         <div style={styles.headerRight}>
-          <button style={styles.headerBtn} className="header-btn" onClick={() => setShowChangePassword(true)}>Change Password</button>
           <button style={styles.headerBtn} className="header-btn" onClick={logout}>Logout</button>
         </div>
       </header>
@@ -135,6 +134,15 @@ export default function AdminDashboard() {
         ) : (
           <>
             <h2 style={styles.heading}>Settings</h2>
+            <div style={styles.accountCard}>
+              <div style={styles.accountRow}>
+                <div>
+                  <div style={styles.accountLabel}>Password</div>
+                  <div style={styles.accountSub}>Change your login password</div>
+                </div>
+                <button style={styles.accountBtn} onClick={() => setShowChangePassword(true)}>Change Password</button>
+              </div>
+            </div>
             <BillingPanel />
             <h3 style={styles.subheading}>Integrations</h3>
             <QuickBooks workers={workers} projects={projects} />
@@ -164,4 +172,9 @@ const styles = {
   liveLayout: { display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' },
   liveMain: {},
   liveChat: {},
+  accountCard: { background: '#fff', borderRadius: 12, padding: '14px 18px', boxShadow: '0 1px 6px rgba(0,0,0,0.06)', marginBottom: 24 },
+  accountRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
+  accountLabel: { fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 2 },
+  accountSub: { fontSize: 12, color: '#6b7280' },
+  accountBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '7px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
 };
