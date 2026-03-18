@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { fmtHours } from '../utils';
 
 function formatDate(str) {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
@@ -13,8 +14,7 @@ function formatTime(t) {
 }
 
 function netHours(start, end, brk) {
-  const h = (new Date(`1970-01-01T${end}`) - new Date(`1970-01-01T${start}`)) / 3600000 - (brk || 0) / 60;
-  return h.toFixed(2);
+  return (new Date(`1970-01-01T${end}`) - new Date(`1970-01-01T${start}`)) / 3600000 - (brk || 0) / 60;
 }
 
 export default function PayStubView() {
@@ -45,7 +45,7 @@ export default function PayStubView() {
           const label = stub.label || `${formatDate(stub.period_start)} – ${formatDate(stub.period_end)}`;
           const isOpen = openId === stub.id;
           const { regular_hours, prevailing_hours, total_mileage } = stub.summary;
-          const total = (regular_hours + prevailing_hours).toFixed(2);
+          const total = fmtHours(regular_hours + prevailing_hours);
 
           return (
             <div key={stub.id} style={styles.stub}>
@@ -53,8 +53,8 @@ export default function PayStubView() {
                 <div style={styles.stubLeft}>
                   <span style={styles.stubLabel}>{label}</span>
                   <div style={styles.stubMeta}>
-                    <span style={styles.metaChip}>{total}h total</span>
-                    {prevailing_hours > 0 && <span style={{ ...styles.metaChip, background: '#fef3c7', color: '#b45309' }}>{prevailing_hours}h prevailing</span>}
+                    <span style={styles.metaChip}>{total} total</span>
+                    {prevailing_hours > 0 && <span style={{ ...styles.metaChip, background: '#fef3c7', color: '#b45309' }}>{fmtHours(prevailing_hours)} prevailing</span>}
                     {total_mileage > 0 && <span style={styles.metaChip}>{total_mileage} mi</span>}
                   </div>
                 </div>
@@ -65,15 +65,15 @@ export default function PayStubView() {
                 <div style={styles.stubBody}>
                   <div style={styles.statRow}>
                     <div style={styles.stat}>
-                      <div style={styles.statVal}>{regular_hours}h</div>
+                      <div style={styles.statVal}>{fmtHours(regular_hours)}</div>
                       <div style={styles.statLabel}>Regular</div>
                     </div>
                     <div style={styles.stat}>
-                      <div style={{ ...styles.statVal, color: '#d97706' }}>{prevailing_hours}h</div>
+                      <div style={{ ...styles.statVal, color: '#d97706' }}>{fmtHours(prevailing_hours)}</div>
                       <div style={styles.statLabel}>Prevailing Wage</div>
                     </div>
                     <div style={styles.stat}>
-                      <div style={styles.statVal}>{total}h</div>
+                      <div style={styles.statVal}>{total}</div>
                       <div style={styles.statLabel}>Total Hours</div>
                     </div>
                     {total_mileage > 0 && (
@@ -101,7 +101,7 @@ export default function PayStubView() {
                           <td style={styles.td}>{formatDate(e.work_date_str || e.work_date)}</td>
                           <td style={styles.td}>{e.project_name}</td>
                           <td style={styles.td}>{formatTime(e.start_time)} – {formatTime(e.end_time)}</td>
-                          <td style={styles.td}>{netHours(e.start_time, e.end_time, e.break_minutes)}h</td>
+                          <td style={styles.td}>{fmtHours(netHours(e.start_time, e.end_time, e.break_minutes))}</td>
                           <td style={styles.td}>
                             <span style={{ ...styles.wageBadge, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                               {e.wage_type === 'prevailing' ? 'PW' : 'Reg'}

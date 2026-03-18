@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 import MessageThread from './MessageThread';
+import { fmtHours } from '../utils';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -13,7 +14,7 @@ function formatHours(start, end, breakMinutes) {
   const s = new Date(`1970-01-01T${start}`);
   const e = new Date(`1970-01-01T${end}`);
   const h = (e - s) / 3600000 - (breakMinutes || 0) / 60;
-  return h.toFixed(2) + 'h';
+  return fmtHours(h);
 }
 
 function formatDate(dateStr, language) {

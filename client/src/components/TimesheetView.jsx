@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { fmtHours } from '../utils';
 
 function startOfWeek(date) {
   const d = new Date(date);
@@ -79,7 +80,7 @@ export default function TimesheetView({ entries, language }) {
           <button style={styles.navBtn} onClick={nextWeek}>›</button>
         </div>
         <div style={styles.headerRight}>
-          <span style={styles.weekTotal}>{weekTotalHours.toFixed(1)}h</span>
+          <span style={styles.weekTotal}>{fmtHours(weekTotalHours)}</span>
           {weekTotalMiles > 0 && <span style={styles.weekMiles}>🚗 {weekTotalMiles.toFixed(1)} mi</span>}
           <button style={styles.todayBtn} onClick={goToday}>Today</button>
         </div>
@@ -120,7 +121,7 @@ export default function TimesheetView({ entries, language }) {
                     <div key={e.id} style={{ ...styles.entryPill, borderLeft: `3px solid ${e.wage_type === 'prevailing' ? '#d97706' : '#1a56db'}` }}>
                       <div style={styles.pillProject}>{e.project_name}</div>
                       <div style={styles.pillTimes}>{formatTime(e.start_time)}–{formatTime(e.end_time)}</div>
-                      <div style={styles.pillHours}>{netHours(e.start_time, e.end_time, e.break_minutes).toFixed(2)}h</div>
+                      <div style={styles.pillHours}>{fmtHours(netHours(e.start_time, e.end_time, e.break_minutes))}</div>
                       {e.break_minutes > 0 && <div style={styles.pillBreak}>☕ {e.break_minutes}m</div>}
                       {e.mileage > 0 && <div style={styles.pillMileage}>🚗 {parseFloat(e.mileage).toFixed(1)} mi</div>}
                     </div>
@@ -130,7 +131,7 @@ export default function TimesheetView({ entries, language }) {
 
               {dayEntries.length > 0 && (
                 <div style={styles.dayFooter}>
-                  <span style={styles.dayTotal}>{dayHours.toFixed(1)}h</span>
+                  <span style={styles.dayTotal}>{fmtHours(dayHours)}</span>
                   {dayMiles > 0 && <span style={styles.dayMiles}>{dayMiles.toFixed(1)} mi</span>}
                 </div>
               )}

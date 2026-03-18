@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import api from '../api';
+import { fmtHours } from '../utils';
 
 function monthStart() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
 }
 function today() { return new Date().toISOString().substring(0, 10); }
-function fmt(n) { return n == null ? '—' : n.toFixed(2); }
+function fmt(n) { return n == null ? '—' : fmtHours(n); }
 function money(n) { return n == null ? '—' : `$${n.toFixed(2)}`; }
 
 export default function OvertimeReport() {

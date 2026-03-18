@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { fmtHours } from '../utils';
 
 function weekBounds() {
   const today = new Date();
@@ -49,7 +50,7 @@ export default function TimesheetSignOff({ t }) {
 
   const fmtDate = s => new Date(s.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const fmtTime = t => { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`; };
-  const fmtHours = (s, e, brk) => ((new Date(`1970-01-01T${e}`) - new Date(`1970-01-01T${s}`)) / 3600000 - (brk || 0) / 60).toFixed(2);
+  const calcHours = (s, e, brk) => fmtHours((new Date(`1970-01-01T${e}`) - new Date(`1970-01-01T${s}`)) / 3600000 - (brk || 0) / 60);
 
   return (
     <div style={styles.card}>
@@ -82,7 +83,7 @@ export default function TimesheetSignOff({ t }) {
                 <div style={styles.rowLeft}>
                   <span style={styles.date}>{fmtDate(e.work_date.toString())}</span>
                   <span style={styles.project}>{e.project_name || '—'}</span>
-                  <span style={styles.hours}>{fmtTime(e.start_time)} – {fmtTime(e.end_time)} · {fmtHours(e.start_time, e.end_time, e.break_minutes)}h</span>
+                  <span style={styles.hours}>{fmtTime(e.start_time)} – {fmtTime(e.end_time)} · {calcHours(e.start_time, e.end_time, e.break_minutes)}</span>
                 </div>
                 <div style={styles.rowRight}>
                   {e.worker_signed_at

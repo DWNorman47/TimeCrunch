@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import MessageThread from './MessageThread';
 import { useAuth } from '../contexts/AuthContext';
+import { fmtHours } from '../utils';
 
 function formatDate(dateStr) {
   const d = new Date(dateStr.substring(0, 10) + 'T00:00:00');
@@ -17,7 +18,7 @@ function formatTime(t) {
 function formatHours(start, end) {
   const s = new Date(`1970-01-01T${start}`);
   const e = new Date(`1970-01-01T${end}`);
-  return ((e - s) / 3600000).toFixed(2) + 'h';
+  return fmtHours((e - s) / 3600000);
 }
 
 export default function ApprovalQueue() {

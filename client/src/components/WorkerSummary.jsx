@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { fmtHours } from '../utils';
 
 const RANGES = [
   { label: 'This week', key: 'this_week' },
@@ -113,22 +114,22 @@ export default function WorkerSummary({ entries, hourlyRate, overtimeMultiplier 
         <>
           <div style={styles.statsGrid} className="stats-grid">
             <div style={styles.stat}>
-              <div style={styles.statValue}>{totalHours.toFixed(1)}h</div>
+              <div style={styles.statValue}>{fmtHours(totalHours)}</div>
               <div style={styles.statLabel}>Total hours</div>
             </div>
             <div style={styles.stat}>
-              <div style={styles.statValue}>{regularHours.toFixed(1)}h</div>
+              <div style={styles.statValue}>{fmtHours(regularHours)}</div>
               <div style={styles.statLabel}>Regular</div>
             </div>
             {overtimeHours > 0 && (
               <div style={{ ...styles.stat, borderColor: '#fbbf24' }}>
-                <div style={{ ...styles.statValue, color: '#d97706' }}>{overtimeHours.toFixed(1)}h</div>
+                <div style={{ ...styles.statValue, color: '#d97706' }}>{fmtHours(overtimeHours)}</div>
                 <div style={styles.statLabel}>Overtime</div>
               </div>
             )}
             {prevailingHours > 0 && (
               <div style={{ ...styles.stat, borderColor: '#a78bfa' }}>
-                <div style={{ ...styles.statValue, color: '#7c3aed' }}>{prevailingHours.toFixed(1)}h</div>
+                <div style={{ ...styles.statValue, color: '#7c3aed' }}>{fmtHours(prevailingHours)}</div>
                 <div style={styles.statLabel}>Prevailing</div>
               </div>
             )}
@@ -147,7 +148,7 @@ export default function WorkerSummary({ entries, hourlyRate, overtimeMultiplier 
                   <div style={styles.barWrap}>
                     <div style={{ ...styles.bar, width: `${(hours / totalHours) * 100}%` }} />
                   </div>
-                  <span style={styles.projectHours}>{hours.toFixed(1)}h</span>
+                  <span style={styles.projectHours}>{fmtHours(hours)}</span>
                 </div>
               ))}
             </div>

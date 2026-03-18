@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import ProjectBillPDF from './ProjectBillPDF';
+import { fmtHours } from '../utils';
 
 function downloadCSV(rows, filename) {
   const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -71,10 +72,10 @@ function ProjectCard({ project: p }) {
           </div>
         </div>
         <div style={styles.metrics}>
-          <Metric label="Total" value={`${parseFloat(p.total_hours).toFixed(2)}h`} />
-          {parseFloat(p.regular_hours) > 0 && <Metric label="Regular" value={`${parseFloat(p.regular_hours).toFixed(2)}h`} color="#2563eb" />}
-          {parseFloat(p.overtime_hours) > 0 && <Metric label="Overtime" value={`${parseFloat(p.overtime_hours).toFixed(2)}h`} color="#dc2626" />}
-          {parseFloat(p.prevailing_hours) > 0 && <Metric label="Prevailing" value={`${parseFloat(p.prevailing_hours).toFixed(2)}h`} color="#d97706" />}
+          <Metric label="Total" value={fmtHours(parseFloat(p.total_hours))} />
+          {parseFloat(p.regular_hours) > 0 && <Metric label="Regular" value={fmtHours(parseFloat(p.regular_hours))} color="#2563eb" />}
+          {parseFloat(p.overtime_hours) > 0 && <Metric label="Overtime" value={fmtHours(parseFloat(p.overtime_hours))} color="#dc2626" />}
+          {parseFloat(p.prevailing_hours) > 0 && <Metric label="Prevailing" value={fmtHours(parseFloat(p.prevailing_hours))} color="#d97706" />}
         </div>
         <div style={styles.barContainer}>
           <HoursBar regular={parseFloat(p.regular_hours)} overtime={parseFloat(p.overtime_hours)} prevailing={parseFloat(p.prevailing_hours)} />
@@ -108,10 +109,10 @@ function ProjectCard({ project: p }) {
             <div style={{ marginTop: 16 }}>
               <div style={styles.billSummary}>
                 <span>Entries: <b>{billData.entries.length}</b></span>
-                <span>Total: <b>{billData.summary.total_hours.toFixed(2)}h</b></span>
-                {billData.summary.regular_hours > 0 && <span style={{ color: '#2563eb' }}>Regular: <b>{billData.summary.regular_hours.toFixed(2)}h · ${billData.summary.regular_cost.toFixed(2)}</b></span>}
-                {billData.summary.overtime_hours > 0 && <span style={{ color: '#dc2626' }}>Overtime: <b>{billData.summary.overtime_hours.toFixed(2)}h · ${billData.summary.overtime_cost.toFixed(2)}</b></span>}
-                {billData.summary.prevailing_hours > 0 && <span style={{ color: '#d97706' }}>Prevailing: <b>{billData.summary.prevailing_hours.toFixed(2)}h · ${billData.summary.prevailing_cost.toFixed(2)}</b></span>}
+                <span>Total: <b>{fmtHours(billData.summary.total_hours)}</b></span>
+                {billData.summary.regular_hours > 0 && <span style={{ color: '#2563eb' }}>Regular: <b>{fmtHours(billData.summary.regular_hours)} · ${billData.summary.regular_cost.toFixed(2)}</b></span>}
+                {billData.summary.overtime_hours > 0 && <span style={{ color: '#dc2626' }}>Overtime: <b>{fmtHours(billData.summary.overtime_hours)} · ${billData.summary.overtime_cost.toFixed(2)}</b></span>}
+                {billData.summary.prevailing_hours > 0 && <span style={{ color: '#d97706' }}>Prevailing: <b>{fmtHours(billData.summary.prevailing_hours)} · ${billData.summary.prevailing_cost.toFixed(2)}</b></span>}
                 <span style={{ fontWeight: 700 }}>Total Cost: <b>${billData.summary.total_cost.toFixed(2)}</b></span>
               </div>
               <div style={styles.btnRow}>
@@ -182,9 +183,9 @@ function HoursBar({ regular, overtime, prevailing }) {
   const pct = v => `${((v / total) * 100).toFixed(1)}%`;
   return (
     <div style={styles.bar}>
-      {regular > 0 && <div style={{ ...styles.barSegment, width: pct(regular), background: '#2563eb' }} title={`Regular: ${regular.toFixed(2)}h`} />}
-      {overtime > 0 && <div style={{ ...styles.barSegment, width: pct(overtime), background: '#dc2626' }} title={`Overtime: ${overtime.toFixed(2)}h`} />}
-      {prevailing > 0 && <div style={{ ...styles.barSegment, width: pct(prevailing), background: '#d97706' }} title={`Prevailing: ${prevailing.toFixed(2)}h`} />}
+      {regular > 0 && <div style={{ ...styles.barSegment, width: pct(regular), background: '#2563eb' }} title={`Regular: ${fmtHours(regular)}`} />}
+      {overtime > 0 && <div style={{ ...styles.barSegment, width: pct(overtime), background: '#dc2626' }} title={`Overtime: ${fmtHours(overtime)}`} />}
+      {prevailing > 0 && <div style={{ ...styles.barSegment, width: pct(prevailing), background: '#d97706' }} title={`Prevailing: ${fmtHours(prevailing)}`} />}
     </div>
   );
 }

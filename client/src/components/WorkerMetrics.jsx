@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import api from '../api';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import BillPDF from './BillPDF';
+import { fmtHours } from '../utils';
 
 function downloadCSV(rows, filename) {
   const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -48,10 +49,10 @@ export default function WorkerMetrics({ worker }) {
           <span style={styles.username}>@{worker.username}</span>
         </div>
         <div style={styles.metrics}>
-          <Metric label="Total" value={`${parseFloat(worker.total_hours).toFixed(2)}h`} />
-          {parseFloat(worker.regular_hours) > 0 && <Metric label="Regular" value={`${parseFloat(worker.regular_hours).toFixed(2)}h`} color="#2563eb" />}
-          {parseFloat(worker.overtime_hours) > 0 && <Metric label="Overtime" value={`${parseFloat(worker.overtime_hours).toFixed(2)}h`} color="#dc2626" />}
-          {parseFloat(worker.prevailing_hours) > 0 && <Metric label="Prevailing" value={`${parseFloat(worker.prevailing_hours).toFixed(2)}h`} color="#d97706" />}
+          <Metric label="Total" value={fmtHours(parseFloat(worker.total_hours))} />
+          {parseFloat(worker.regular_hours) > 0 && <Metric label="Regular" value={fmtHours(parseFloat(worker.regular_hours))} color="#2563eb" />}
+          {parseFloat(worker.overtime_hours) > 0 && <Metric label="Overtime" value={fmtHours(parseFloat(worker.overtime_hours))} color="#dc2626" />}
+          {parseFloat(worker.prevailing_hours) > 0 && <Metric label="Prevailing" value={fmtHours(parseFloat(worker.prevailing_hours))} color="#d97706" />}
           <Metric label="Entries" value={worker.total_entries} />
         </div>
         <button style={styles.expandBtn}>{expanded ? '▲' : '▼'}</button>
@@ -78,10 +79,10 @@ export default function WorkerMetrics({ worker }) {
             <div style={{ marginTop: 16 }}>
               <div style={styles.billSummary}>
                 <span>Entries: <b>{billData.entries.length}</b></span>
-                <span>Total: <b>{billData.summary.total_hours.toFixed(2)}h</b></span>
-                {billData.summary.regular_hours > 0 && <span style={{ color: '#2563eb' }}>Regular: <b>{billData.summary.regular_hours.toFixed(2)}h · ${billData.summary.regular_cost.toFixed(2)}</b></span>}
-                {billData.summary.overtime_hours > 0 && <span style={{ color: '#dc2626' }}>Overtime: <b>{billData.summary.overtime_hours.toFixed(2)}h · ${billData.summary.overtime_cost.toFixed(2)}</b></span>}
-                {billData.summary.prevailing_hours > 0 && <span style={{ color: '#d97706' }}>Prevailing: <b>{billData.summary.prevailing_hours.toFixed(2)}h · ${billData.summary.prevailing_cost.toFixed(2)}</b></span>}
+                <span>Total: <b>{fmtHours(billData.summary.total_hours)}</b></span>
+                {billData.summary.regular_hours > 0 && <span style={{ color: '#2563eb' }}>Regular: <b>{fmtHours(billData.summary.regular_hours)} · ${billData.summary.regular_cost.toFixed(2)}</b></span>}
+                {billData.summary.overtime_hours > 0 && <span style={{ color: '#dc2626' }}>Overtime: <b>{fmtHours(billData.summary.overtime_hours)} · ${billData.summary.overtime_cost.toFixed(2)}</b></span>}
+                {billData.summary.prevailing_hours > 0 && <span style={{ color: '#d97706' }}>Prevailing: <b>{fmtHours(billData.summary.prevailing_hours)} · ${billData.summary.prevailing_cost.toFixed(2)}</b></span>}
                 <span style={{ fontWeight: 700 }}>Total Cost: <b>${billData.summary.total_cost.toFixed(2)}</b></span>
               </div>
               <div style={styles.btnRow}>
