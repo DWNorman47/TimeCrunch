@@ -95,7 +95,11 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
     }
   };
 
-  if (status === null) return null;
+  if (status === null) return (
+    <div style={styles.card}>
+      <p style={{ color: '#9ca3af', fontSize: 14, margin: 0 }}>Loading clock status...</p>
+    </div>
+  );
 
   if (status) {
     return (
