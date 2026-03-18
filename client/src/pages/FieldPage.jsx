@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import AppSwitcher from '../components/AppSwitcher';
+import TabBar from '../components/TabBar';
 import PhotoCapture from '../components/PhotoCapture';
 import DailyReports from '../components/DailyReports';
 import Punchlist from '../components/Punchlist';
@@ -273,20 +274,16 @@ export default function FieldPage() {
 
       <main style={styles.main}>
         {/* Module tabs */}
-        <div style={styles.moduleTabs}>
-          <button style={fieldTab === 'notes' ? styles.moduleTabActive : styles.moduleTab} onClick={() => switchTab('notes')}>
-            📷 Notes
-          </button>
-          <button style={fieldTab === 'daily' ? styles.moduleTabActive : styles.moduleTab} onClick={() => switchTab('daily')}>
-            📋 Daily
-          </button>
-          <button style={fieldTab === 'punchlist' ? styles.moduleTabActive : styles.moduleTab} onClick={() => switchTab('punchlist')}>
-            ✅ Punch
-          </button>
-          <button style={fieldTab === 'safety' ? styles.moduleTabActive : styles.moduleTab} onClick={() => switchTab('safety')}>
-            🦺 Safety
-          </button>
-        </div>
+        <TabBar
+          active={fieldTab}
+          onChange={switchTab}
+          tabs={[
+            { id: 'notes', label: '📷 Notes' },
+            { id: 'daily', label: '📋 Daily' },
+            { id: 'punchlist', label: '✅ Punch' },
+            { id: 'safety', label: '🦺 Safety' },
+          ]}
+        />
 
         {fieldTab === 'daily' ? (
           <DailyReports projects={projects} />
@@ -350,9 +347,6 @@ const styles = {
   userName: { fontSize: 14, opacity: 0.85 },
   headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' },
   main: { maxWidth: 860, margin: '0 auto', padding: '24px 16px' },
-  moduleTabs: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 10, padding: 4, marginBottom: 20, width: '100%', maxWidth: 440 },
-  moduleTab: { flex: 1, padding: '8px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, color: '#666', cursor: 'pointer', whiteSpace: 'nowrap' },
-  moduleTabActive: { flex: 1, padding: '8px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, color: '#059669', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', whiteSpace: 'nowrap' },
   topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 12 },
   heading: { fontSize: 22, fontWeight: 800, color: '#111827', margin: 0 },
   unreviewedNote: { fontSize: 13, color: '#d97706', fontWeight: 600, margin: '4px 0 0' },

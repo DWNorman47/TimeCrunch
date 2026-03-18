@@ -17,6 +17,7 @@ import OvertimeReport from '../components/OvertimeReport';
 import CompanyChat from '../components/CompanyChat';
 import LiveKPIs from '../components/LiveKPIs';
 import AppSwitcher from '../components/AppSwitcher';
+import TabBar from '../components/TabBar';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -79,14 +80,19 @@ export default function AdminDashboard() {
       })()}
 
       <main style={styles.main} className="admin-main">
-        <div style={styles.tabs} className="tab-bar">
-          <button style={tab === 'live' ? styles.tabActive : styles.tab} onClick={() => switchTab('live')}>🟢 Live</button>
-          <button style={tab === 'analytics' ? styles.tabActive : styles.tab} onClick={() => switchTab('analytics')}>Analytics</button>
-          <button style={tab === 'approvals' ? styles.tabActive : styles.tab} onClick={() => switchTab('approvals')}>Approvals</button>
-          <button style={tab === 'reports' ? styles.tabActive : styles.tab} onClick={() => switchTab('reports')}>Reports</button>
-          <button style={tab === 'manage' ? styles.tabActive : styles.tab} onClick={() => switchTab('manage')}>Manage</button>
-          <button style={tab === 'settings' ? styles.tabActive : styles.tab} onClick={() => switchTab('settings')}>Integrations</button>
-        </div>
+        <TabBar
+          breakpoint={720}
+          active={tab}
+          onChange={switchTab}
+          tabs={[
+            { id: 'live', label: '🟢 Live' },
+            { id: 'analytics', label: 'Analytics' },
+            { id: 'approvals', label: 'Approvals' },
+            { id: 'reports', label: 'Reports' },
+            { id: 'manage', label: 'Manage' },
+            { id: 'settings', label: 'Integrations' },
+          ]}
+        />
 
         {loading ? <p>Loading...</p> : tab === 'live' ? (
           <>

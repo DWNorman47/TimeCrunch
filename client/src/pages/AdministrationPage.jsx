@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import AppSwitcher from '../components/AppSwitcher';
+import TabBar from '../components/TabBar';
 import BillingPanel from '../components/BillingPanel';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -400,18 +401,7 @@ export default function AdministrationPage() {
       </header>
 
       <main style={styles.main}>
-        {/* Tab bar */}
-        <div style={styles.tabs}>
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              style={tab === t.id ? styles.tabActive : styles.tab}
-              onClick={() => switchTab(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <TabBar active={tab} onChange={switchTab} tabs={TABS} />
 
         {tab === 'company' && <CompanyTab />}
         {tab === 'team' && <TeamTab />}
@@ -437,10 +427,6 @@ const styles = {
   headerRight: { display: 'flex', alignItems: 'center', gap: 10 },
   headerBtn: { background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' },
   main: { maxWidth: 760, margin: '0 auto', padding: '24px 16px' },
-  // Tabs
-  tabs: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 12, padding: 4, marginBottom: 24 },
-  tab: { flex: 1, padding: '9px 0', background: 'none', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, color: '#6b7280', cursor: 'pointer', whiteSpace: 'nowrap' },
-  tabActive: { flex: 1, padding: '9px 0', background: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, color: '#64748b', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', whiteSpace: 'nowrap' },
   // Content sections
   tabContent: { display: 'flex', flexDirection: 'column', gap: 16 },
   tabTitle: { fontSize: 22, fontWeight: 800, color: '#111827', margin: '0 0 2px' },
