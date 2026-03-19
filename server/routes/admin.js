@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const pool = require('../db');
 const { requireAdmin } = require('../middleware/auth');
-const { sendPushToUser } = require('../push');
+const { sendPushToUser, sendPushToAllWorkers } = require('../push');
 const { sendEmail } = require('../email');
 const { hoursWorked, computeOT } = require('../utils/payCalculations');
 
@@ -1170,6 +1170,21 @@ router.get('/audit-log', requireAdmin, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// POST /admin/broadcast — push a message to all active workers
+router.post('/broadcast', requireAdmin, async (req, res) => {
+  const { message } = req.body;
+  if (!message?.trim()) return res.status(400).json({ error: 'message required' });
+  if (message.length > 200) return res.status(400).json({ error: 'Message must be 200 characters or fewer' });
+  const companyId = req.user.company_id;
+  await sendPushToAllWorkers(companyId, {
+    title: `📢 ${req.user.company_name || 'Announcement'}`,
+    body: message.trim(),
+    url: '/dashboard',
+  });
+  await logAudit(companyId, req.user.id, req.user.full_name, 'broadcast.sent', null, null, null, { message: message.trim() });
+  res.json({ sent: true });
 });
 
 module.exports = router;

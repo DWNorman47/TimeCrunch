@@ -26,6 +26,12 @@ export default function Dashboard() {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [tab, setTab] = useState('clock');
   const [entryView, setEntryView] = useState('list');
+  const [shiftPrefill, setShiftPrefill] = useState(null);
+
+  const handleFillFromShift = shift => {
+    setShiftPrefill(shift);
+    setTab('clock');
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -90,13 +96,13 @@ export default function Dashboard() {
         {tab === 'clock' && (
           <>
             <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} />
-            <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} />
+            <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} prefill={shiftPrefill} />
           </>
         )}
 
         {tab === 'timesheet' && (
           <>
-            <UpcomingShifts />
+            <UpcomingShifts onFillEntry={handleFillFromShift} />
             {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 45} overtimeRule={settings?.overtime_rule ?? 'daily'} overtimeThreshold={settings?.overtime_threshold ?? 8} />}
             <TimesheetSignOff t={t} />
             <div style={styles.viewToggle}>

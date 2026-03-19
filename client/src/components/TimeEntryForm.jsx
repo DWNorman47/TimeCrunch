@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api';
 
-export default function TimeEntryForm({ projects, onEntryAdded, t }) {
+export default function TimeEntryForm({ projects, onEntryAdded, t, prefill }) {
   const today = new Date().toISOString().split('T')[0];
   const [form, setForm] = useState({
     project_id: '',
@@ -12,6 +12,17 @@ export default function TimeEntryForm({ projects, onEntryAdded, t }) {
     break_minutes: '',
     mileage: '',
   });
+
+  useEffect(() => {
+    if (!prefill) return;
+    setForm(f => ({
+      ...f,
+      project_id: prefill.project_id ? String(prefill.project_id) : f.project_id,
+      work_date: prefill.shift_date ? prefill.shift_date.toString().substring(0, 10) : f.work_date,
+      start_time: prefill.start_time ? prefill.start_time.substring(0, 5) : f.start_time,
+      end_time: prefill.end_time ? prefill.end_time.substring(0, 5) : f.end_time,
+    }));
+  }, [prefill]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);

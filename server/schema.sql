@@ -1,163 +1,327 @@
+-- =============================================================================
+-- Time Crunch — full schema
+-- Run with: psql $DATABASE_URL -f schema.sql
+-- All statements use IF NOT EXISTS / IF EXISTS so they are safe to re-run.
+-- For an existing database, use the ALTER TABLE blocks at the bottom to add
+-- any columns that were introduced after the initial deploy.
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- companies
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS companies (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  slug VARCHAR(100) UNIQUE NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
+  id                   SERIAL PRIMARY KEY,
+  name                 VARCHAR(255) NOT NULL,
+  slug                 VARCHAR(100) UNIQUE NOT NULL,
+  subscription_status  VARCHAR(20)  NOT NULL DEFAULT 'trial',  -- trial | active | past_due | canceled
+  trial_ends_at        TIMESTAMP,
+  plan                 VARCHAR(20),                             -- e.g. 'starter', 'pro'
+  created_at           TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- ---------------------------------------------------------------------------
+-- users
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
-  id SERIAL PRIMARY KEY,
-  company_id INTEGER REFERENCES companies(id),
-  username VARCHAR(100) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  role VARCHAR(20) NOT NULL DEFAULT 'worker',
-  full_name VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
+  id                          SERIAL PRIMARY KEY,
+  company_id                  INTEGER REFERENCES companies(id),
+  username                    VARCHAR(100) UNIQUE NOT NULL,
+  password_hash               VARCHAR(255) NOT NULL,
+  role                        VARCHAR(20)  NOT NULL DEFAULT 'worker',  -- worker | admin | super_admin
+  full_name                   VARCHAR(100) NOT NULL,
+  first_name                  VARCHAR(100),
+  middle_name                 VARCHAR(100),
+  last_name                   VARCHAR(100),
+  email                       VARCHAR(255) UNIQUE,
+  email_confirmed             BOOLEAN      NOT NULL DEFAULT false,
+  email_confirm_token         VARCHAR(64),
+  email_confirm_token_expires TIMESTAMP,
+  reset_token                 VARCHAR(64),
+  reset_token_expires         TIMESTAMP,
+  invite_token                VARCHAR(64),
+  invite_token_expires        TIMESTAMP,
+  invite_pending              BOOLEAN      NOT NULL DEFAULT false,
+  hourly_rate                 DECIMAL(10,2),
+  language                    VARCHAR(20)  NOT NULL DEFAULT 'English',
+  active                      BOOLEAN      NOT NULL DEFAULT true,
+  created_at                  TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
+-- ---------------------------------------------------------------------------
+-- projects
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS projects (
-  id SERIAL PRIMARY KEY,
-  company_id INTEGER REFERENCES companies(id),
-  name VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
+  id            SERIAL PRIMARY KEY,
+  company_id    INTEGER      REFERENCES companies(id),
+  name          VARCHAR(255) NOT NULL,
+  wage_type     VARCHAR(20)  NOT NULL DEFAULT 'regular' CHECK (wage_type IN ('regular', 'prevailing')),
+  geo_lat       DECIMAL(10,7),
+  geo_lng       DECIMAL(10,7),
+  geo_radius_ft INTEGER,
+  active        BOOLEAN      NOT NULL DEFAULT true,
+  created_at    TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
+-- ---------------------------------------------------------------------------
+-- settings  (key/value store per company; value is TEXT to support strings)
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS settings (
-  company_id INTEGER NOT NULL REFERENCES companies(id),
-  key VARCHAR(50) NOT NULL,
-  value NUMERIC(10,4) NOT NULL,
+  company_id INTEGER      NOT NULL REFERENCES companies(id),
+  key        VARCHAR(50)  NOT NULL,
+  value      TEXT         NOT NULL,
   PRIMARY KEY (company_id, key)
 );
 
+-- ---------------------------------------------------------------------------
+-- time_entries
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS time_entries (
-  id SERIAL PRIMARY KEY,
-  company_id INTEGER REFERENCES companies(id),
-  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
-  work_date DATE NOT NULL,
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  wage_type VARCHAR(20) NOT NULL CHECK (wage_type IN ('regular', 'prevailing')),
-  rate DECIMAL(10,2),
-  notes TEXT,
-  locked BOOLEAN NOT NULL DEFAULT false,
-  created_at TIMESTAMP DEFAULT NOW()
+  id              SERIAL PRIMARY KEY,
+  company_id      INTEGER       REFERENCES companies(id),
+  user_id         INTEGER       REFERENCES users(id) ON DELETE CASCADE,
+  project_id      INTEGER       REFERENCES projects(id) ON DELETE SET NULL,
+  work_date       DATE          NOT NULL,
+  start_time      TIME          NOT NULL,
+  end_time        TIME          NOT NULL,
+  wage_type       VARCHAR(20)   NOT NULL CHECK (wage_type IN ('regular', 'prevailing')),
+  notes           TEXT,
+  break_minutes   INTEGER       NOT NULL DEFAULT 0,
+  mileage         DECIMAL(7,2),
+  status          VARCHAR(20)   NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  approval_note   TEXT,
+  approved_by     INTEGER       REFERENCES users(id) ON DELETE SET NULL,
+  approved_at     TIMESTAMP,
+  worker_signed_at TIMESTAMP,
+  locked          BOOLEAN       NOT NULL DEFAULT false,
+  clock_in_lat    DECIMAL(10,7),
+  clock_in_lng    DECIMAL(10,7),
+  clock_out_lat   DECIMAL(10,7),
+  clock_out_lng   DECIMAL(10,7),
+  created_at      TIMESTAMP     NOT NULL DEFAULT NOW()
 );
 
--- Field reports (photos + notes from the field)
+-- ---------------------------------------------------------------------------
+-- active_clock  (one row per currently-clocked-in worker; unique on user_id)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS active_clock (
+  id             SERIAL PRIMARY KEY,
+  user_id        INTEGER       UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  company_id     INTEGER       NOT NULL REFERENCES companies(id),
+  project_id     INTEGER       REFERENCES projects(id) ON DELETE SET NULL,
+  clock_in_time  TIMESTAMP     NOT NULL DEFAULT NOW(),
+  clock_in_lat   DECIMAL(10,7),
+  clock_in_lng   DECIMAL(10,7),
+  work_date      DATE          NOT NULL,
+  notes          TEXT,
+  created_at     TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+
+-- ---------------------------------------------------------------------------
+-- shifts  (scheduled shifts assigned to workers by admins)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS shifts (
+  id          SERIAL PRIMARY KEY,
+  company_id  INTEGER      NOT NULL REFERENCES companies(id),
+  user_id     INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  project_id  INTEGER      REFERENCES projects(id) ON DELETE SET NULL,
+  shift_date  DATE         NOT NULL,
+  start_time  TIME         NOT NULL,
+  end_time    TIME         NOT NULL,
+  notes       TEXT,
+  created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+-- ---------------------------------------------------------------------------
+-- pay_periods  (locking ranges that prevent editing time entries)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS pay_periods (
+  id           SERIAL PRIMARY KEY,
+  company_id   INTEGER      NOT NULL REFERENCES companies(id),
+  period_start DATE         NOT NULL,
+  period_end   DATE         NOT NULL,
+  label        VARCHAR(100),
+  locked_by    INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  created_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
+  UNIQUE (company_id, period_start, period_end)
+);
+
+-- ---------------------------------------------------------------------------
+-- entry_messages  (threaded comments on time entries for admin/worker dialog)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS entry_messages (
+  id            SERIAL PRIMARY KEY,
+  time_entry_id INTEGER   NOT NULL REFERENCES time_entries(id) ON DELETE CASCADE,
+  company_id    INTEGER   NOT NULL REFERENCES companies(id),
+  sender_id     INTEGER   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body          TEXT      NOT NULL,
+  read_at       TIMESTAMP,
+  created_at    TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- ---------------------------------------------------------------------------
+-- push_subscriptions  (Web Push API subscriptions per user device)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  company_id INTEGER      NOT NULL REFERENCES companies(id),
+  endpoint   TEXT         NOT NULL,
+  p256dh     TEXT         NOT NULL,
+  auth       TEXT         NOT NULL,
+  created_at TIMESTAMP    NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, endpoint)
+);
+
+-- ---------------------------------------------------------------------------
+-- audit_log  (immutable record of admin actions)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS audit_log (
+  id          SERIAL PRIMARY KEY,
+  company_id  INTEGER      NOT NULL REFERENCES companies(id),
+  actor_id    INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  actor_name  VARCHAR(100),
+  action      VARCHAR(100) NOT NULL,   -- e.g. 'entry.approved', 'worker.invited'
+  entity_type VARCHAR(50),             -- e.g. 'time_entry', 'user'
+  entity_id   INTEGER,
+  entity_name VARCHAR(255),
+  details     JSONB,
+  created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+-- ---------------------------------------------------------------------------
+-- field_reports
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS field_reports (
-  id SERIAL PRIMARY KEY,
-  company_id INTEGER NOT NULL REFERENCES companies(id),
-  project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
-  worker_id INTEGER NOT NULL REFERENCES users(id),
-  title VARCHAR(255),
-  notes TEXT,
-  lat DECIMAL(10,7),
-  lng DECIMAL(10,7),
-  status VARCHAR(20) NOT NULL DEFAULT 'submitted',
-  reported_at TIMESTAMP DEFAULT NOW()
+  id          SERIAL PRIMARY KEY,
+  company_id  INTEGER      NOT NULL REFERENCES companies(id),
+  project_id  INTEGER      REFERENCES projects(id) ON DELETE SET NULL,
+  worker_id   INTEGER      NOT NULL REFERENCES users(id),
+  title       VARCHAR(255),
+  notes       TEXT,
+  lat         DECIMAL(10,7),
+  lng         DECIMAL(10,7),
+  status      VARCHAR(20)  NOT NULL DEFAULT 'submitted',
+  reported_at TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS field_report_photos (
-  id SERIAL PRIMARY KEY,
+  id        SERIAL PRIMARY KEY,
   report_id INTEGER NOT NULL REFERENCES field_reports(id) ON DELETE CASCADE,
-  url TEXT NOT NULL,
-  caption VARCHAR(500)
+  url       TEXT    NOT NULL,
+  caption   VARCHAR(500)
 );
 
--- Daily site reports (replaces Raken)
+-- ---------------------------------------------------------------------------
+-- daily_reports
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS daily_reports (
-  id SERIAL PRIMARY KEY,
-  company_id INTEGER NOT NULL REFERENCES companies(id),
-  project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
-  report_date DATE NOT NULL,
-  superintendent VARCHAR(255),
+  id                SERIAL PRIMARY KEY,
+  company_id        INTEGER      NOT NULL REFERENCES companies(id),
+  project_id        INTEGER      REFERENCES projects(id) ON DELETE SET NULL,
+  report_date       DATE         NOT NULL,
+  superintendent    VARCHAR(255),
   weather_condition VARCHAR(50),
-  weather_temp INTEGER,
-  work_performed TEXT,
-  delays_issues TEXT,
-  visitor_log TEXT,
-  status VARCHAR(20) NOT NULL DEFAULT 'draft',
-  created_by INTEGER REFERENCES users(id),
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
+  weather_temp      INTEGER,
+  work_performed    TEXT,
+  delays_issues     TEXT,
+  visitor_log       TEXT,
+  status            VARCHAR(20)  NOT NULL DEFAULT 'draft',
+  created_by        INTEGER      REFERENCES users(id),
+  created_at        TIMESTAMP    NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMP    NOT NULL DEFAULT NOW(),
   UNIQUE (company_id, project_id, report_date)
 );
 
 CREATE TABLE IF NOT EXISTS daily_report_manpower (
-  id SERIAL PRIMARY KEY,
-  report_id INTEGER NOT NULL REFERENCES daily_reports(id) ON DELETE CASCADE,
-  trade VARCHAR(255),
-  worker_count INTEGER NOT NULL DEFAULT 1,
-  hours DECIMAL(5,2),
-  notes TEXT
+  id           SERIAL PRIMARY KEY,
+  report_id    INTEGER      NOT NULL REFERENCES daily_reports(id) ON DELETE CASCADE,
+  trade        VARCHAR(255),
+  worker_count INTEGER      NOT NULL DEFAULT 1,
+  hours        DECIMAL(5,2),
+  notes        TEXT
 );
 
 CREATE TABLE IF NOT EXISTS daily_report_equipment (
-  id SERIAL PRIMARY KEY,
-  report_id INTEGER NOT NULL REFERENCES daily_reports(id) ON DELETE CASCADE,
-  name VARCHAR(255) NOT NULL,
-  quantity INTEGER NOT NULL DEFAULT 1,
-  hours DECIMAL(5,2)
+  id        SERIAL PRIMARY KEY,
+  report_id INTEGER      NOT NULL REFERENCES daily_reports(id) ON DELETE CASCADE,
+  name      VARCHAR(255) NOT NULL,
+  quantity  INTEGER      NOT NULL DEFAULT 1,
+  hours     DECIMAL(5,2)
 );
 
 CREATE TABLE IF NOT EXISTS daily_report_materials (
-  id SERIAL PRIMARY KEY,
-  report_id INTEGER NOT NULL REFERENCES daily_reports(id) ON DELETE CASCADE,
+  id          SERIAL PRIMARY KEY,
+  report_id   INTEGER      NOT NULL REFERENCES daily_reports(id) ON DELETE CASCADE,
   description VARCHAR(500) NOT NULL,
-  quantity VARCHAR(100)
+  quantity    VARCHAR(100)
 );
 
--- Punchlist (items to fix before project closeout)
+-- ---------------------------------------------------------------------------
+-- punchlist
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS punchlist_items (
-  id SERIAL PRIMARY KEY,
-  company_id INTEGER NOT NULL REFERENCES companies(id),
-  project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
-  title VARCHAR(500) NOT NULL,
+  id          SERIAL PRIMARY KEY,
+  company_id  INTEGER      NOT NULL REFERENCES companies(id),
+  project_id  INTEGER      REFERENCES projects(id) ON DELETE SET NULL,
+  title       VARCHAR(500) NOT NULL,
   description TEXT,
-  location VARCHAR(255),
-  status VARCHAR(20) NOT NULL DEFAULT 'open',
-  priority VARCHAR(10) NOT NULL DEFAULT 'normal',
-  assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  created_by INTEGER NOT NULL REFERENCES users(id),
+  location    VARCHAR(255),
+  status      VARCHAR(20)  NOT NULL DEFAULT 'open',
+  priority    VARCHAR(10)  NOT NULL DEFAULT 'normal',
+  assigned_to INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  created_by  INTEGER      NOT NULL REFERENCES users(id),
   resolved_at TIMESTAMP,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
--- Safety / Toolbox Talks with worker sign-offs
+-- ---------------------------------------------------------------------------
+-- safety_talks
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS safety_talks (
-  id SERIAL PRIMARY KEY,
-  company_id INTEGER NOT NULL REFERENCES companies(id),
-  project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
-  title VARCHAR(255) NOT NULL,
-  content TEXT,
-  given_by VARCHAR(255),
-  talk_date DATE NOT NULL,
-  created_by INTEGER NOT NULL REFERENCES users(id),
-  created_at TIMESTAMP DEFAULT NOW()
+  id         SERIAL PRIMARY KEY,
+  company_id INTEGER      NOT NULL REFERENCES companies(id),
+  project_id INTEGER      REFERENCES projects(id) ON DELETE SET NULL,
+  title      VARCHAR(255) NOT NULL,
+  content    TEXT,
+  given_by   VARCHAR(255),
+  talk_date  DATE         NOT NULL,
+  created_by INTEGER      NOT NULL REFERENCES users(id),
+  created_at TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS safety_talk_signoffs (
-  id SERIAL PRIMARY KEY,
-  talk_id INTEGER NOT NULL REFERENCES safety_talks(id) ON DELETE CASCADE,
-  worker_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  id          SERIAL PRIMARY KEY,
+  talk_id     INTEGER      NOT NULL REFERENCES safety_talks(id) ON DELETE CASCADE,
+  worker_id   INTEGER      REFERENCES users(id) ON DELETE SET NULL,
   worker_name VARCHAR(255),
-  signed_at TIMESTAMP DEFAULT NOW()
+  signed_at   TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
--- Indexes for frequently filtered/joined columns
-CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);
-CREATE INDEX IF NOT EXISTS idx_time_entries_company_id ON time_entries(company_id);
-CREATE INDEX IF NOT EXISTS idx_time_entries_user_id ON time_entries(user_id);
-CREATE INDEX IF NOT EXISTS idx_time_entries_work_date ON time_entries(work_date);
-CREATE INDEX IF NOT EXISTS idx_time_entries_user_date ON time_entries(user_id, work_date);
-CREATE INDEX IF NOT EXISTS idx_projects_company_id ON projects(company_id);
-CREATE INDEX IF NOT EXISTS idx_field_reports_company_id ON field_reports(company_id);
-CREATE INDEX IF NOT EXISTS idx_field_reports_worker_id ON field_reports(worker_id);
-CREATE INDEX IF NOT EXISTS idx_daily_reports_company_id ON daily_reports(company_id);
-CREATE INDEX IF NOT EXISTS idx_daily_reports_report_date ON daily_reports(report_date);
-CREATE INDEX IF NOT EXISTS idx_daily_report_manpower_report_id ON daily_report_manpower(report_id);
-CREATE INDEX IF NOT EXISTS idx_safety_talks_company_id ON safety_talks(company_id);
+-- =============================================================================
+-- Indexes
+-- =============================================================================
+CREATE INDEX IF NOT EXISTS idx_users_company_id             ON users(company_id);
+CREATE INDEX IF NOT EXISTS idx_projects_company_id          ON projects(company_id);
+CREATE INDEX IF NOT EXISTS idx_time_entries_company_id      ON time_entries(company_id);
+CREATE INDEX IF NOT EXISTS idx_time_entries_user_id         ON time_entries(user_id);
+CREATE INDEX IF NOT EXISTS idx_time_entries_work_date       ON time_entries(work_date);
+CREATE INDEX IF NOT EXISTS idx_time_entries_user_date       ON time_entries(user_id, work_date);
+CREATE INDEX IF NOT EXISTS idx_time_entries_status          ON time_entries(status);
+CREATE INDEX IF NOT EXISTS idx_active_clock_company_id      ON active_clock(company_id);
+CREATE INDEX IF NOT EXISTS idx_shifts_company_id            ON shifts(company_id);
+CREATE INDEX IF NOT EXISTS idx_shifts_user_id               ON shifts(user_id);
+CREATE INDEX IF NOT EXISTS idx_shifts_shift_date            ON shifts(shift_date);
+CREATE INDEX IF NOT EXISTS idx_pay_periods_company_id       ON pay_periods(company_id);
+CREATE INDEX IF NOT EXISTS idx_entry_messages_entry_id      ON entry_messages(time_entry_id);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id   ON push_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_company_id         ON audit_log(company_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_at         ON audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_field_reports_company_id     ON field_reports(company_id);
+CREATE INDEX IF NOT EXISTS idx_field_reports_worker_id      ON field_reports(worker_id);
+CREATE INDEX IF NOT EXISTS idx_daily_reports_company_id     ON daily_reports(company_id);
+CREATE INDEX IF NOT EXISTS idx_daily_reports_report_date    ON daily_reports(report_date);
+CREATE INDEX IF NOT EXISTS idx_daily_report_manpower_report ON daily_report_manpower(report_id);
+CREATE INDEX IF NOT EXISTS idx_safety_talks_company_id      ON safety_talks(company_id);
 CREATE INDEX IF NOT EXISTS idx_safety_talk_signoffs_talk_id ON safety_talk_signoffs(talk_id);
-CREATE INDEX IF NOT EXISTS idx_punchlist_items_company_id ON punchlist_items(company_id);
+CREATE INDEX IF NOT EXISTS idx_punchlist_items_company_id   ON punchlist_items(company_id);

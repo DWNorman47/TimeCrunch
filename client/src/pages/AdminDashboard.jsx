@@ -16,6 +16,7 @@ import ExportPanel from '../components/ExportPanel';
 import OvertimeReport from '../components/OvertimeReport';
 import CompanyChat from '../components/CompanyChat';
 import LiveKPIs from '../components/LiveKPIs';
+import BroadcastMessage from '../components/BroadcastMessage';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
 import api from '../api';
@@ -196,6 +197,7 @@ export default function AdminDashboard() {
         ) : tab === 'live' ? (
           <>
             <LiveKPIs />
+            <BroadcastMessage />
             {settings?.feature_chat !== false ? (
               <div style={styles.liveLayout} className="live-layout">
                 <div style={styles.liveMain}><LiveWorkers /></div>
