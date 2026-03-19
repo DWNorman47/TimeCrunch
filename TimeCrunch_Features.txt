@@ -1,0 +1,359 @@
+TIME CRUNCH — FULL FEATURE LIST
+For marketing reference
+================================================================================
+
+
+OVERVIEW
+--------
+Time Crunch is a cloud-based time tracking and field management platform built
+for construction contractors and trades businesses. It covers the full workflow
+from workers clocking in on a job site to admin approving hours, running payroll
+reports, and billing clients — all from a phone or desktop, online or offline.
+
+The platform has two connected apps: a Time Clock app for workers and admins,
+and a Field app for job site documentation. Both are accessible from the same
+login, on any device.
+
+
+================================================================================
+TIME TRACKING — WORKER SIDE
+================================================================================
+
+CLOCK IN / CLOCK OUT
+  Workers clock in and out with a single tap. The app records the exact time,
+  the project, and optionally the worker's GPS location. No paper timesheets,
+  no calling in.
+
+GPS GEOFENCING
+  Admins can set a job site location and radius for any project. Workers will
+  only be able to clock in if they are physically within that radius. Prevents
+  buddy punching and off-site clock-ins.
+
+BREAK AND MILEAGE TRACKING
+  While clocked in, workers can log a break (in minutes) and job-related mileage
+  before clocking out. Both are captured on the time entry.
+
+CANCEL A WRONG CLOCK-IN
+  If a worker accidentally clocks in to the wrong project, they can cancel the
+  clock-in without creating any time entry, then clock in correctly.
+
+MANUAL TIME ENTRY
+  Workers can also log time manually — useful for entering hours after the fact.
+  Fields: project, date, start time, end time, break, mileage, and notes.
+
+EDIT AND DELETE ENTRIES
+  Workers can edit or delete their own entries up to 7 days after the work date.
+  Once approved by an admin, entries are locked and cannot be changed.
+
+TIMESHEET VIEW
+  A calendar-style view of a worker's own entries, grouped by week, so they can
+  see their schedule at a glance.
+
+TIMESHEET SIGN-OFF
+  Workers can digitally sign off on their timesheet for a date range, indicating
+  the hours are accurate. This timestamp is visible to admins in the approval
+  queue.
+
+PAY STUBS
+  Workers can view their own pay stubs for each pay period — showing regular
+  hours, overtime hours, prevailing wage hours, mileage, and estimated gross pay.
+
+PDF TIMESHEET EXPORT
+  Workers can export their own timesheet as a print-ready PDF from any date
+  range, useful for personal records or disputes.
+
+UPCOMING SHIFTS
+  Workers see their scheduled shifts for the coming days. A single tap
+  pre-fills the time entry form with the shift's project, date, and hours,
+  so logging time is even faster.
+
+
+================================================================================
+ADMIN — APPROVAL AND OVERSIGHT
+================================================================================
+
+APPROVAL QUEUE
+  All submitted time entries land in the admin's approval queue. Admins can
+  approve or reject entries one at a time, or approve all entries at once.
+  Rejections include an optional reason note that is visible to the worker.
+
+FILTER BY WORKER
+  When the queue has entries from multiple workers, admins can filter to a
+  single worker and approve or reject just that person's entries.
+
+APPROVE ALL (BULK)
+  A single button approves every pending entry, or every pending entry for a
+  specific worker, instantly.
+
+LIVE DASHBOARD (REFRESHES EVERY MINUTE)
+  Admins see real-time KPI cards: how many workers are clocked in right now,
+  total company hours this week, pending approvals, and workers approaching or
+  in overtime. Updates automatically without refreshing the page.
+
+LIVE WORKER STATUS
+  A live list of which workers are currently clocked in, what project they're
+  on, and how long they've been on the clock.
+
+COMMENTS ON TIME ENTRIES
+  Admins and workers can exchange threaded comments on any individual time
+  entry — useful for clarifying questions, corrections, or notes before
+  approval.
+
+BROADCAST ANNOUNCEMENTS
+  Admins can send a push notification to every active worker at once — for job
+  site updates, schedule changes, urgent notices, or anything else that needs
+  to reach the whole team immediately.
+
+UNUSUAL CLOCK-IN ALERTS
+  If a worker clocks in outside of configured working hours (e.g., 2 AM), the
+  admin automatically receives an email alert.
+
+INACTIVE WORKER ALERTS
+  The system sends the admin a daily push notification and email if any worker
+  has not submitted a time entry in a configurable number of days (default: 3).
+  Helps catch workers who may have stopped logging time without notice.
+
+AUDIT LOG
+  Every significant admin action (approval, rejection, rate change, pay period
+  lock/unlock, etc.) is recorded in an audit log with the actor's name and
+  timestamp.
+
+
+================================================================================
+SCHEDULING
+================================================================================
+
+SHIFT SCHEDULING
+  Admins can create shifts and assign them to workers and projects, with a
+  specific date and start/end time.
+
+WORKER SHIFT VIEW
+  Workers see their upcoming shifts on their dashboard and can tap to auto-fill
+  a time entry from any shift.
+
+
+================================================================================
+PAYROLL AND COMPLIANCE
+================================================================================
+
+OVERTIME CALCULATION
+  The system automatically calculates regular and overtime hours for each
+  worker. Supports both daily overtime (e.g., over 8 hours in a day) and weekly
+  overtime (e.g., over 40 hours in a week). Threshold and multiplier are
+  configurable per company.
+
+PREVAILING WAGE TRACKING
+  Projects can be flagged as "prevailing wage." Hours on those projects are
+  tracked separately from regular hours, with a configurable prevailing wage
+  rate. Prevailing wage hours do not count toward overtime.
+
+PAY PERIODS
+  Admins can create pay periods (e.g., bi-weekly, semi-monthly). Once a pay
+  period is locked, entries within it cannot be edited or deleted by workers.
+  Pay periods appear in workers' pay stub views.
+
+CERTIFIED PAYROLL REPORT
+  Generates a weekly certified payroll report — required by law for contractors
+  on government and public projects paying prevailing wages. Shows hours worked
+  each day of the week (Mon–Sun), total hours, work classification (regular vs.
+  prevailing), pay rate, and gross wages per worker. Printable and saveable
+  as a PDF.
+
+OVERTIME REPORT
+  A summary report showing regular hours, overtime hours, prevailing hours,
+  total hours, and estimated labor cost per worker for any date range.
+
+PAYROLL CSV EXPORT
+  Export a full payroll summary as a CSV — regular pay, overtime pay, prevailing
+  pay, total cost, and mileage per worker — for import into payroll software
+  (ADP, Gusto, Paychex, etc.).
+
+TIME ENTRY CSV EXPORT
+  Export a detailed CSV of every individual time entry for any date range, with
+  filters for worker, project, and approval status. Opens directly in Excel or
+  Google Sheets.
+
+QUICKBOOKS ONLINE INTEGRATION
+  Connect to QuickBooks Online via OAuth. Push time and payroll data directly
+  from Time Crunch into QuickBooks, eliminating double-entry. Supports employee
+  mapping between the two systems.
+
+WORKER PAY STUBS
+  Each worker can view a read-only pay stub for each pay period, showing their
+  hour breakdown and estimated gross pay, calculated using their assigned hourly
+  rate and the company's overtime settings.
+
+
+================================================================================
+ANALYTICS AND REPORTING
+================================================================================
+
+ANALYTICS DASHBOARD (ADMIN)
+  Visual charts and summary stats:
+    - Hours logged this week and this month
+    - Number of active workers this week and this month
+    - Pending approvals count
+    - Daily bar chart — hours logged each day for the last 14 days
+    - Weekly trend line — hours per week for the last 12 weeks
+    - Top projects by hours logged (last 30 days)
+    - Top workers by hours logged (last 30 days)
+
+WORKER METRICS
+  Per-worker breakdown showing their total hours, overtime, prevailing wage
+  hours, and mileage over a date range — useful for performance review and
+  labor cost analysis.
+
+PROJECT REPORTS
+  Per-project breakdown of hours logged, broken down by worker and date range.
+
+LABOR COST ESTIMATES
+  The overtime report and payroll export include estimated labor costs using
+  each worker's assigned hourly rate and the company's overtime multiplier.
+
+
+================================================================================
+FIELD APP
+================================================================================
+
+The Field App is a separate but connected app (same login) for job site
+documentation. Workers and admins switch between the Time Clock and Field
+apps from any screen.
+
+FIELD REPORTS
+  Workers submit daily field reports — notes, observations, issues — tied to a
+  specific date and GPS location. Admins can mark reports as reviewed.
+
+DAILY REPORTS
+  Structured daily job site reports with a title, date, description, and photos.
+  Admins can view, review, and download reports as PDFs.
+
+PHOTO CAPTURE
+  Workers can take or attach photos directly from their phone within the Field
+  app and attach them to daily reports.
+
+PUNCHLIST
+  Create and track punch list items for any project — open issues, deficiencies,
+  or tasks that need to be resolved. Items can be marked complete.
+
+TOOLBOX TALKS (SAFETY TALKS)
+  Record toolbox talk / safety meeting details: title, content, who gave the
+  talk, date, and project. Creates a digital record of safety training for
+  compliance purposes.
+
+PROJECT BILLING PDF
+  Generate a formatted billing summary PDF per project, showing hours and labor
+  costs for client invoicing.
+
+
+================================================================================
+COMPANY COMMUNICATION
+================================================================================
+
+COMPANY CHAT
+  A company-wide group chat where workers and admins can communicate in real
+  time. Messages are retained for a configurable number of days. Accessible
+  from the worker dashboard.
+
+PUSH NOTIFICATIONS
+  Workers and admins can opt in to browser push notifications (works on iOS,
+  Android, and desktop) to receive alerts for:
+    - Approvals and rejections of their time entries
+    - Comments on their entries from an admin
+    - Broadcast announcements from admin
+    - Inactive worker alerts (admin only)
+    - Worker timesheet sign-offs (admin only)
+
+ADMIN COMMENTS ON ENTRIES
+  Admins can leave comments on individual time entries, visible to the worker.
+  Workers can reply. Both sides are notified via push when a comment is added.
+
+
+================================================================================
+PLATFORM AND TECHNICAL
+================================================================================
+
+WORKS ON ANY DEVICE
+  Fully responsive web app — works on iPhone, Android, tablet, and desktop. No
+  app store download required. Workers can add it to their home screen for a
+  native-app feel.
+
+INSTALLABLE (PWA)
+  Time Crunch is a Progressive Web App. Workers can install it to their phone
+  home screen and launch it like a native app. An in-app prompt guides them
+  through installation.
+
+OFFLINE MODE
+  Clock-ins and clock-outs are queued locally if the worker loses internet
+  connection. Punches sync automatically when connectivity is restored — no
+  data is lost.
+
+BILINGUAL: ENGLISH AND SPANISH
+  The worker-facing Time Clock app is fully available in English and Spanish.
+  Workers can switch languages from their dashboard. All UI labels, buttons,
+  and status messages are translated.
+
+SELF-SERVICE REGISTRATION
+  New companies sign up online — choose a company name, create an admin
+  account, and start adding workers immediately. No sales call or setup required.
+
+FREE TRIAL
+  New companies get a free trial period (configurable, default 14 days) before
+  being prompted to subscribe. All features are available during the trial.
+
+WORKER INVITATIONS
+  Admins invite workers by name and username. Workers receive an email with a
+  link to set their own password. No admin handles worker passwords.
+
+PASSWORD RESET AND EMAIL CONFIRMATION
+  Standard forgot-password email flow. New admin accounts require email
+  confirmation before logging in.
+
+ROLE-BASED ACCESS
+  Three roles: Worker (can clock in/out, submit entries, view own data),
+  Admin (full company management), Super Admin (platform-level access for the
+  operator).
+
+FEATURE FLAGS
+  Admins can enable or disable individual features per company — scheduling,
+  analytics, company chat, and prevailing wage tracking — to simplify the UI
+  for companies that don't use those features.
+
+SUBSCRIPTION BILLING (STRIPE)
+  Starter and Pro plans, billed via Stripe. Admins manage their subscription and
+  billing details from within the app, including accessing the Stripe customer
+  portal to update payment methods, download invoices, or cancel. Stripe
+  webhooks keep subscription status in sync automatically.
+
+COMPANY SETTINGS
+  Admins configure:
+    - Default hourly rate
+    - Prevailing wage rate
+    - Overtime rule (daily or weekly) and threshold (e.g., 8 hrs/day or 40 hrs/week)
+    - Overtime multiplier (e.g., 1.5x)
+    - Inactive worker alert threshold (days)
+    - Unusual clock-in alert window (e.g., only alert outside 6 AM – 8 PM)
+    - Chat message retention (days)
+
+SECURITY
+  - All data scoped to the company — no company can see another company's data
+  - Rate limiting on login and sensitive auth endpoints
+  - Helmet security headers on all API responses
+  - JWT-based authentication with 8-hour token expiry
+  - Approved time entries are locked and cannot be modified
+
+
+================================================================================
+SUMMARY: WHO THIS IS FOR
+================================================================================
+
+Time Crunch is designed for:
+
+  - General contractors
+  - Specialty trade contractors (electrical, plumbing, HVAC, concrete, etc.)
+  - Landscaping and grounds maintenance companies
+  - Any construction or field services business with hourly workers
+
+It replaces paper timesheets, spreadsheets, and disconnected tools with a
+single platform that covers time collection, approval, reporting, field
+documentation, and payroll prep — built around how construction crews
+actually work.

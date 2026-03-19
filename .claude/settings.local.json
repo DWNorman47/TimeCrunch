@@ -1,25 +1,26 @@
 {
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -File \"C:\\Users\\v-normand\\Workspaces\\TimeCrunch_Claude\\.claude\\npm-install-hook.ps1\"",
+            "statusMessage": "Running npm install...",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
-      "Bash(git --version)",
-      "Bash(gh --version)",
-      "Bash(git pull:*)",
-      "Bash(git push:*)",
+      "Bash(git *)",
+      "Bash(gh *)",
       "Bash(npm install:*)",
       "Bash(npm.cmd install:*)",
-      "Bash(cmd.exe /c \"cd c:\\\\Users\\\\v-normand\\\\Workspaces\\\\TimeCrunch_Claude\\\\server && npm install resend\")",
-      "Bash(cmd.exe /c \"cd /d c:\\\\Users\\\\v-normand\\\\Workspaces\\\\TimeCrunch_Claude\\\\server && npm install resend 2>&1\")",
-      "Bash(cmd.exe /c \"cd /d c:\\\\Users\\\\v-normand\\\\Workspaces\\\\TimeCrunch_Claude\\\\server && npm install resend\")",
-      "Bash(echo \"EXIT: $?\")",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(node -e \":*)",
-      "Bash(cmd.exe /c \"where node 2>&1\")",
-      "Bash(cmd.exe /c \"where node\")",
-      "Bash(cmd.exe /c \"node --version\")",
-      "Bash(cmd.exe /c \"node --version 2>&1 && echo found\")",
-      "Bash(cmd.exe /c \"python --version 2>&1\")",
-      "Bash(cmd.exe /c \"python3 --version 2>&1\")"
+      "Bash(powershell.exe *)"
     ]
   }
 }
