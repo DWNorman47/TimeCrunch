@@ -11,9 +11,9 @@ function isEditable(dateStr) {
 }
 
 function formatHours(start, end, breakMinutes) {
-  const s = new Date(`1970-01-01T${start}`);
-  const e = new Date(`1970-01-01T${end}`);
-  const h = (e - s) / 3600000 - (breakMinutes || 0) / 60;
+  let ms = new Date(`1970-01-01T${end}`) - new Date(`1970-01-01T${start}`);
+  if (ms < 0) ms += 86400000; // midnight-crossing shift
+  const h = ms / 3600000 - (breakMinutes || 0) / 60;
   return fmtHours(h);
 }
 
