@@ -88,10 +88,11 @@ router.post('/register', authLimiter, async (req, res) => {
       await client.query('ROLLBACK');
       return res.status(409).json({ error: 'A company with that name already exists' });
     }
+    const trialDays = parseInt(process.env.TRIAL_DAYS) || 14;
     const companyResult = await client.query(
       `INSERT INTO companies (name, slug, subscription_status, trial_ends_at)
-       VALUES ($1, $2, 'trial', NOW() + INTERVAL '14 days') RETURNING id`,
-      [company_name, slug]
+       VALUES ($1, $2, 'trial', NOW() + ($3 || ' days')::INTERVAL) RETURNING id`,
+      [company_name, slug, trialDays]
     );
     const companyId = companyResult.rows[0].id;
     const defaults = [['prevailing_wage_rate', 45], ['default_hourly_rate', 30], ['overtime_multiplier', 1.5]];
