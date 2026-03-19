@@ -160,6 +160,7 @@ function ChatForm({ body, setBody, sending, onSubmit }) {
         value={body}
         onChange={e => setBody(e.target.value)}
         placeholder="Type a message..."
+        maxLength={1000}
         disabled={sending}
       />
       <button style={styles.sendBtn} type="submit" disabled={sending || !body.trim()}>

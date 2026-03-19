@@ -91,7 +91,7 @@ export default function TimeEntryForm({ projects, onEntryAdded, t }) {
         </div>
         <div style={styles.field}>
           <label style={styles.label}>{t.notesOptional}</label>
-          <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.notesPlaceholder} />
+          <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.notesPlaceholder} maxLength={500} />
         </div>
         {error && <p style={styles.error}>{error}</p>}
         {success && <p style={styles.success}>{t.entrySaved}</p>}

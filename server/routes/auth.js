@@ -73,6 +73,9 @@ router.post('/register', authLimiter, async (req, res) => {
   if (!company_name || !full_name || !username || !password || !email) {
     return res.status(400).json({ error: 'company_name, full_name, email, username, and password are required' });
   }
+  if (company_name.length > 100) return res.status(400).json({ error: 'Company name must be 100 characters or fewer' });
+  if (full_name.length > 100) return res.status(400).json({ error: 'Full name must be 100 characters or fewer' });
+  if (username.length > 50) return res.status(400).json({ error: 'Username must be 50 characters or fewer' });
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }

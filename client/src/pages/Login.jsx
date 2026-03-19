@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 
@@ -17,6 +17,8 @@ const OTHER = '__other__';
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sessionExpired = searchParams.get('session') === 'expired';
   const savedCompanies = getSavedCompanies();
   const [selected, setSelected] = useState(savedCompanies[0] || OTHER);
   const [otherText, setOtherText] = useState('');
@@ -63,6 +65,9 @@ export default function Login() {
       <div style={styles.card}>
         <h1 style={styles.title}>Time Crunch</h1>
         <p style={styles.subtitle}>Track your time, simply.</p>
+        {sessionExpired && (
+          <p style={styles.sessionMsg}>Your session expired. Please sign in again.</p>
+        )}
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>Company name</label>
           {savedCompanies.length > 0 ? (
@@ -152,6 +157,7 @@ const styles = {
   label: { fontWeight: 600, fontSize: 14, color: '#444' },
   input: { padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 15, outline: 'none' },
   error: { color: '#e53e3e', fontSize: 14 },
+  sessionMsg: { background: '#fffbeb', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 8 },
   button: { marginTop: 8, padding: '12px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 600 },
   registerLink: { marginTop: 20, textAlign: 'center', fontSize: 13, color: '#666' },
   link: { color: '#1a56db', fontWeight: 600, textDecoration: 'none' },

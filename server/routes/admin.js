@@ -18,22 +18,11 @@ async function logAudit(companyId, actorId, actorName, action, entityType, entit
   } catch (e) { console.error('Audit log error:', e); }
 }
 
-const FEATURE_KEYS = ['feature_scheduling', 'feature_analytics', 'feature_chat', 'feature_prevailing_wage'];
+const { FEATURE_KEYS, ADMIN_SETTINGS_DEFAULTS, applySettingsRows } = require('../settingsDefaults');
 
 async function getSettings(companyId) {
   const result = await pool.query('SELECT key, value FROM settings WHERE company_id = $1', [companyId]);
-  const s = {
-    prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5,
-    notification_inactive_days: 3, notification_start_hour: 6, notification_end_hour: 20,
-    overtime_rule: 'daily', overtime_threshold: 8, chat_retention_days: 3,
-    feature_scheduling: true, feature_analytics: true, feature_chat: true, feature_prevailing_wage: true,
-  };
-  result.rows.forEach(r => {
-    if (r.key === 'overtime_rule') { s.overtime_rule = r.value; }
-    else if (FEATURE_KEYS.includes(r.key)) { s[r.key] = r.value === '1'; }
-    else { s[r.key] = parseFloat(r.value); }
-  });
-  return s;
+  return applySettingsRows(result.rows, ADMIN_SETTINGS_DEFAULTS);
 }
 
 // Hours worked between two HH:MM:SS strings, handles midnight-crossing shifts
@@ -387,6 +376,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
 router.post('/workers/invite', requireAdmin, async (req, res) => {
   const { full_name, email, role, language, hourly_rate } = req.body;
   if (!full_name || !email) return res.status(400).json({ error: 'full_name and email required' });
+  if (full_name.length > 100) return res.status(400).json({ error: 'Full name must be 100 characters or fewer' });
   const companyId = req.user.company_id;
   const assignedRole = role === 'admin' ? 'admin' : 'worker';
   const assignedLanguage = language || 'English';
@@ -880,6 +870,7 @@ router.post('/entries/approve-all', requireAdmin, async (req, res) => {
 router.patch('/entries/:id/approve', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const { note } = req.body;
+  if (note && note.length > 500) return res.status(400).json({ error: 'Note must be 500 characters or fewer' });
   try {
     const result = await pool.query(
       `UPDATE time_entries SET status = 'approved', locked = true, approval_note = $1, approved_by = $2, approved_at = NOW()
@@ -906,6 +897,7 @@ router.patch('/entries/:id/approve', requireAdmin, async (req, res) => {
 router.patch('/entries/:id/reject', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const { note } = req.body;
+  if (note && note.length > 500) return res.status(400).json({ error: 'Note must be 500 characters or fewer' });
   try {
     const result = await pool.query(
       `UPDATE time_entries SET status = 'rejected', approval_note = $1, approved_by = $2, approved_at = NOW()

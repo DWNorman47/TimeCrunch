@@ -27,6 +27,7 @@ router.post('/', requireAuth, async (req, res) => {
   if (!project_id || !work_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'project_id, work_date, start_time, and end_time are required' });
   }
+  if (notes && notes.length > 500) return res.status(400).json({ error: 'Notes must be 500 characters or fewer' });
   const companyId = req.user.company_id;
   try {
     const projectResult = await pool.query(
@@ -55,6 +56,7 @@ router.post('/', requireAuth, async (req, res) => {
 router.patch('/:id', requireAuth, async (req, res) => {
   const { start_time, end_time, notes, break_minutes, mileage } = req.body;
   if (!start_time || !end_time) return res.status(400).json({ error: 'start_time and end_time required' });
+  if (notes && notes.length > 500) return res.status(400).json({ error: 'Notes must be 500 characters or fewer' });
   // Allow midnight-crossing shifts (end_time < start_time is valid, e.g. 23:00–00:30)
   try {
     const existing = await pool.query(
@@ -112,6 +114,7 @@ router.get('/:id/messages', requireAuth, async (req, res) => {
 router.post('/:id/messages', requireAuth, async (req, res) => {
   const { body } = req.body;
   if (!body?.trim()) return res.status(400).json({ error: 'Message body required' });
+  if (body.length > 1000) return res.status(400).json({ error: 'Message must be 1000 characters or fewer' });
   try {
     const entry = await pool.query('SELECT id FROM time_entries WHERE id = $1 AND company_id = $2', [req.params.id, req.user.company_id]);
     if (entry.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });

@@ -77,6 +77,7 @@ router.get('/', requireAuth, async (req, res) => {
 router.post('/', requireAuth, async (req, res) => {
   const { body, worker_id } = req.body;
   if (!body?.trim()) return res.status(400).json({ error: 'Message body required' });
+  if (body.length > 1000) return res.status(400).json({ error: 'Message must be 1000 characters or fewer' });
 
   const isAdmin = req.user.role === 'admin';
   const targetWorkerId = isAdmin ? worker_id : req.user.id;
