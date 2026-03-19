@@ -36,11 +36,13 @@ router.post('/', requireAuth, async (req, res) => {
     if (projectResult.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
     const wage_type = projectResult.rows[0].wage_type;
 
+    const bm = parseInt(break_minutes) || 0;
+    if (bm < 0) return res.status(400).json({ error: 'break_minutes must be non-negative' });
     const result = await pool.query(
       `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes, break_minutes, mileage)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notes || null,
-       parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null]
+       bm, mileage != null ? parseFloat(mileage) : null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -70,10 +72,12 @@ router.patch('/:id', requireAuth, async (req, res) => {
       [req.user.company_id, entry.work_date]
     );
     if (locked.rowCount > 0) return res.status(403).json({ error: 'This entry is in a locked pay period' });
+    const bm = parseInt(break_minutes) || 0;
+    if (bm < 0) return res.status(400).json({ error: 'break_minutes must be non-negative' });
     const result = await pool.query(
       `UPDATE time_entries SET start_time = $1, end_time = $2, notes = $3, break_minutes = $4, mileage = $5,
        status = 'pending', approval_note = NULL WHERE id = $6 RETURNING *`,
-      [start_time, end_time, notes || null, parseInt(break_minutes) || 0,
+      [start_time, end_time, notes || null, bm,
        mileage != null ? parseFloat(mileage) : null, req.params.id]
     );
     res.json(result.rows[0]);
@@ -176,15 +180,54 @@ router.delete('/:id', requireAuth, async (req, res) => {
   }
 });
 
+function hoursWorked(start, end) {
+  let ms = new Date(`1970-01-01T${end}`) - new Date(`1970-01-01T${start}`);
+  if (ms < 0) ms += 86400000;
+  return ms / 3600000;
+}
+
+function computeOT(entries, rule, threshold) {
+  const regular = entries.filter(e => e.wage_type === 'regular');
+  if (rule === 'weekly') {
+    const weekly = {};
+    regular.forEach(e => {
+      const d = new Date(e.work_date.toString().substring(0, 10) + 'T00:00:00');
+      const jan4 = new Date(d.getFullYear(), 0, 4);
+      const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7);
+      const key = `${d.getFullYear()}-W${week}`;
+      const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
+      weekly[key] = (weekly[key] || 0) + h;
+    });
+    const reg = Object.values(weekly).reduce((s, h) => s + Math.min(h, threshold), 0);
+    const ot = Object.values(weekly).reduce((s, h) => s + Math.max(h - threshold, 0), 0);
+    return { regularHours: reg, overtimeHours: ot };
+  }
+  // daily (default)
+  const daily = {};
+  regular.forEach(e => {
+    const key = e.work_date.toString().substring(0, 10);
+    const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
+    daily[key] = (daily[key] || 0) + h;
+  });
+  const reg = Object.values(daily).reduce((s, h) => s + Math.min(h, threshold), 0);
+  const ot = Object.values(daily).reduce((s, h) => s + Math.max(h - threshold, 0), 0);
+  return { regularHours: reg, overtimeHours: ot };
+}
+
 // GET /time-entries/pay-stubs — worker's pay periods with aggregated hours
 router.get('/pay-stubs', requireAuth, async (req, res) => {
   const userId = req.user.id;
   const companyId = req.user.company_id;
   try {
-    const periods = await pool.query(
-      'SELECT * FROM pay_periods WHERE company_id = $1 ORDER BY period_start DESC',
-      [companyId]
-    );
+    const [periods, settingsRows] = await Promise.all([
+      pool.query('SELECT * FROM pay_periods WHERE company_id = $1 ORDER BY period_start DESC', [companyId]),
+      pool.query('SELECT key, value FROM settings WHERE company_id = $1', [companyId]),
+    ]);
+    const s = { overtime_rule: 'daily', overtime_threshold: 8 };
+    settingsRows.rows.forEach(r => {
+      if (r.key === 'overtime_rule') s.overtime_rule = r.value;
+      else if (r.key === 'overtime_threshold') s.overtime_threshold = parseFloat(r.value);
+    });
 
     const result = [];
     for (const period of periods.rows) {
@@ -198,13 +241,12 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
       );
       if (entries.rowCount === 0) continue;
 
-      let regularHours = 0, overtimeHours = 0, prevailingHours = 0, totalMileage = 0;
+      const { regularHours, overtimeHours } = computeOT(entries.rows, s.overtime_rule, s.overtime_threshold);
+      let prevailingHours = 0, totalMileage = 0;
       for (const e of entries.rows) {
-        let ms = new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`);
-        if (ms < 0) ms += 86400000;
-        const gross = ms / 3600000 - (e.break_minutes || 0) / 60;
-        if (e.wage_type === 'prevailing') prevailingHours += gross;
-        else regularHours += gross;
+        if (e.wage_type === 'prevailing') {
+          prevailingHours += hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
+        }
         if (e.mileage) totalMileage += parseFloat(e.mileage);
       }
 

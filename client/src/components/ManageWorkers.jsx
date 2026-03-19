@@ -46,8 +46,13 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     try {
       const r = await api.post('/admin/workers/invite', inviteForm);
       onWorkerAdded(r.data);
-      setInviteSent(inviteForm.email);
-      setInviteForm({ full_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+      if (r.data.email_sent === false) {
+        setInviteError('Worker created, but the invite email failed to send. You can resend the invite later.');
+        setInviteForm({ full_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+      } else {
+        setInviteSent(inviteForm.email);
+        setInviteForm({ full_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+      }
     } catch (err) {
       setInviteError(err.response?.data?.error || 'Failed to send invite');
     } finally {

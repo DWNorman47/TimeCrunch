@@ -116,7 +116,8 @@ export default function Register() {
             style={styles.input}
             placeholder="jsmith"
             value={form.username}
-            onChange={e => { setUsernameEdited(true); set('username', e.target.value); }}
+            autoComplete="off"
+            onChange={e => { setUsernameEdited(!!e.target.value); set('username', e.target.value); }}
             required
           />
           <label style={styles.label}>Password</label>

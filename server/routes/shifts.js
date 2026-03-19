@@ -31,6 +31,11 @@ router.post('/admin', requireAdmin, async (req, res) => {
   }
   const companyId = req.user.company_id;
   try {
+    const workerCheck = await pool.query(
+      'SELECT id FROM users WHERE id = $1 AND company_id = $2 AND active = true',
+      [user_id, companyId]
+    );
+    if (workerCheck.rowCount === 0) return res.status(400).json({ error: 'Worker not found' });
     const result = await pool.query(
       `INSERT INTO shifts (company_id, user_id, project_id, shift_date, start_time, end_time, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,

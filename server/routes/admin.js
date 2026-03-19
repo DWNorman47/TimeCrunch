@@ -416,23 +416,29 @@ router.post('/workers/invite', requireAdmin, async (req, res) => {
        RETURNING id, username, full_name, role, language, hourly_rate, email`,
       [companyId, username, full_name, assignedRole, assignedLanguage, assignedRate, email, token, expires]
     );
-    const inviteUrl = `${process.env.APP_URL}/accept-invite?token=${token}`;
-    await sgMail.send({
-      from: { name: 'Time Crunch', email: process.env.SENDGRID_FROM_EMAIL },
-      to: email,
-      subject: `You've been invited to Time Crunch`,
-      html: `
-        <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
-          <h2 style="color:#1a56db;margin-bottom:8px">You're invited!</h2>
-          <p style="color:#444;margin-bottom:8px">Hi ${full_name}, ${req.user.full_name} has invited you to join Time Crunch.</p>
-          <p style="color:#444;margin-bottom:24px">Your username is: <strong>${username}</strong></p>
-          <a href="${inviteUrl}" style="display:inline-block;background:#1a56db;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700">Set your password</a>
-          <p style="color:#999;font-size:13px;margin-top:24px">This invite expires in 7 days.</p>
-        </div>
-      `,
-    });
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.invited', 'worker', result.rows[0].id, full_name, { email });
-    res.status(201).json(result.rows[0]);
+    const inviteUrl = `${process.env.APP_URL}/accept-invite?token=${token}`;
+    let emailSent = true;
+    try {
+      await sgMail.send({
+        from: { name: 'Time Crunch', email: process.env.SENDGRID_FROM_EMAIL },
+        to: email,
+        subject: `You've been invited to Time Crunch`,
+        html: `
+          <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+            <h2 style="color:#1a56db;margin-bottom:8px">You're invited!</h2>
+            <p style="color:#444;margin-bottom:8px">Hi ${full_name}, ${req.user.full_name} has invited you to join Time Crunch.</p>
+            <p style="color:#444;margin-bottom:24px">Your username is: <strong>${username}</strong></p>
+            <a href="${inviteUrl}" style="display:inline-block;background:#1a56db;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700">Set your password</a>
+            <p style="color:#999;font-size:13px;margin-top:24px">This invite expires in 7 days.</p>
+          </div>
+        `,
+      });
+    } catch (emailErr) {
+      console.error('Invite email failed:', emailErr?.response?.body || emailErr.message);
+      emailSent = false;
+    }
+    res.status(201).json({ ...result.rows[0], email_sent: emailSent });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
