@@ -4,6 +4,8 @@ const translations = {
     changePassword: 'Change Password',
     logout: 'Logout',
     loadingEntries: 'Loading entries...',
+    loadError: 'Failed to load data.',
+    retry: 'Retry',
     timesheetView: '📅 Timesheet',
     listView: '☰ List',
 
@@ -76,6 +78,8 @@ const translations = {
     changePassword: 'Cambiar Contraseña',
     logout: 'Cerrar Sesión',
     loadingEntries: 'Cargando entradas...',
+    loadError: 'Error al cargar los datos.',
+    retry: 'Reintentar',
     timesheetView: '📅 Planilla',
     listView: '☰ Lista',
 

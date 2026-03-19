@@ -22,17 +22,21 @@ export default function Dashboard() {
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [tab, setTab] = useState('clock');
   const [entryView, setEntryView] = useState('list');
 
   const fetchData = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const [e, p, s] = await Promise.all([api.get('/time-entries'), api.get('/projects'), api.get('/settings')]);
       setEntries(e.data);
       setProjects(p.data);
       setSettings(s.data);
+    } catch {
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -99,7 +103,7 @@ export default function Dashboard() {
               <button style={entryView === 'timesheet' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('timesheet')}>{t.timesheetView}</button>
               <button style={entryView === 'list' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('list')}>{t.listView}</button>
             </div>
-            {loading ? <p>{t.loadingEntries}</p> : entryView === 'timesheet' ? (
+            {loadError ? <p style={{ color: '#dc2626', padding: '12px' }}>{t.loadError} <button onClick={fetchData} style={{ textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}>{t.retry}</button></p> : loading ? <p>{t.loadingEntries}</p> : entryView === 'timesheet' ? (
               <TimesheetView entries={entries} language={user?.language} />
             ) : (
               <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} currentUserId={user?.id} />
