@@ -90,6 +90,22 @@ describe('computeOT — daily rule', () => {
     expect(regularHours).toBe(0);
     expect(overtimeHours).toBe(0);
   });
+
+  test('exactly at threshold triggers no overtime', () => {
+    // 8h exactly with threshold 8 — boundary is ≤, not <
+    const entries = [makeEntry('2024-01-01', '08:00', '16:00')]; // exactly 8h
+    const { regularHours, overtimeHours } = computeOT(entries, 'daily', 8);
+    expect(regularHours).toBeCloseTo(8);
+    expect(overtimeHours).toBeCloseTo(0);
+  });
+
+  test('custom threshold (4×10 schedule, threshold=10)', () => {
+    // 10h shift — no OT; 10.5h shift — 0.5h OT
+    const noOT = [makeEntry('2024-01-01', '06:00', '16:00')]; // 10h
+    const withOT = [makeEntry('2024-01-02', '06:00', '16:30')]; // 10.5h
+    expect(computeOT(noOT, 'daily', 10).overtimeHours).toBeCloseTo(0);
+    expect(computeOT(withOT, 'daily', 10).overtimeHours).toBeCloseTo(0.5);
+  });
 });
 
 describe('computeOT — weekly rule', () => {
@@ -125,5 +141,25 @@ describe('computeOT — weekly rule', () => {
     const { regularHours, overtimeHours } = computeOT([...regular, ...prevailing], 'weekly', 40);
     expect(regularHours).toBeCloseTo(35);
     expect(overtimeHours).toBeCloseTo(0);
+  });
+
+  test('weekly rule is per-calendar-week, not a running total', () => {
+    // Week 1 (Jan 1–5): 5 days × 9h = 45h → 5h OT
+    // Week 2 (Jan 8–12): 5 days × 7h = 35h → 0h OT
+    // If incorrectly totaled: 80h vs 40h threshold = 40h OT (wrong)
+    const week1 = ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05'].map(d => makeEntry(d, 9));
+    const week2 = ['2024-01-08', '2024-01-09', '2024-01-10', '2024-01-11', '2024-01-12'].map(d => makeEntry(d, 7));
+    const { regularHours, overtimeHours } = computeOT([...week1, ...week2], 'weekly', 40);
+    expect(regularHours).toBeCloseTo(75); // 40 + 35
+    expect(overtimeHours).toBeCloseTo(5); // only from week 1
+  });
+
+  test('weekly rule with OT in both weeks accumulates correctly', () => {
+    // Week 1: 45h → 5h OT; Week 2: 44h → 4h OT; Total: 89h reg, 9h OT
+    const week1 = ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05'].map(d => makeEntry(d, 9));
+    const week2 = ['2024-01-08', '2024-01-09', '2024-01-10', '2024-01-11', '2024-01-12'].map(d => makeEntry(d, 8.8));
+    const { regularHours, overtimeHours } = computeOT([...week1, ...week2], 'weekly', 40);
+    expect(regularHours).toBeCloseTo(80); // 40 + 40
+    expect(overtimeHours).toBeCloseTo(9); // 5 + 4
   });
 });

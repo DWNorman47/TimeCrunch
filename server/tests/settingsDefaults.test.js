@@ -67,4 +67,37 @@ describe('applySettingsRows', () => {
     applySettingsRows([{ key: 'default_hourly_rate', value: '99' }], SETTINGS_DEFAULTS);
     expect(SETTINGS_DEFAULTS.default_hourly_rate).toBe(defaults.default_hourly_rate);
   });
+
+  test('zero numeric value is applied and not discarded as falsy', () => {
+    const rows = [{ key: 'overtime_multiplier', value: '0' }];
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    expect(result.overtime_multiplier).toBe(0);
+  });
+
+  test('unknown key is added with parseFloat of its value', () => {
+    // Current behavior: unknown keys fall through to parseFloat().
+    // This documents the behavior so a change would be a conscious decision.
+    const rows = [{ key: 'mystery_key', value: '42' }];
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    expect(result.mystery_key).toBe(42);
+  });
+
+  test('non-numeric value for a numeric key becomes NaN', () => {
+    // parseFloat('bad') === NaN; documents that invalid DB data produces NaN
+    const rows = [{ key: 'overtime_multiplier', value: 'bad' }];
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    expect(result.overtime_multiplier).toBeNaN();
+  });
+
+  test('multiple rows are all applied', () => {
+    const rows = [
+      { key: 'default_hourly_rate', value: '35' },
+      { key: 'overtime_multiplier', value: '2' },
+      { key: 'overtime_rule', value: 'weekly' },
+    ];
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    expect(result.default_hourly_rate).toBe(35);
+    expect(result.overtime_multiplier).toBe(2);
+    expect(result.overtime_rule).toBe('weekly');
+  });
 });

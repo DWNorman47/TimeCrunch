@@ -2,15 +2,7 @@ const router = require('express').Router();
 const pool = require('../db');
 const sgMail = require('@sendgrid/mail');
 const { requireAuth } = require('../middleware/auth');
-
-function haversineDistanceFt(lat1, lng1, lat2, lng2) {
-  const R = 20902231; // Earth radius in feet
-  const toRad = d => d * Math.PI / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+const { haversineDistanceFt } = require('../utils/geoUtils');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -31,10 +23,7 @@ router.get('/status', requireAuth, async (req, res) => {
   }
 });
 
-function validCoords(lat, lng) {
-  const la = parseFloat(lat), lo = parseFloat(lng);
-  return !isNaN(la) && !isNaN(lo) && la >= -90 && la <= 90 && lo >= -180 && lo <= 180;
-}
+const { validCoords } = require('../utils/geoUtils');
 
 // POST /api/clock/in
 router.post('/in', requireAuth, async (req, res) => {
