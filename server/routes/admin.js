@@ -1197,4 +1197,79 @@ router.post('/broadcast', requireAdmin, async (req, res) => {
   res.json({ sent: true });
 });
 
+// GET /admin/certified-payroll?week_end=YYYY-MM-DD&project_id=N
+// Returns prevailing-wage hours by worker broken down by day of week for a 7-day window
+router.get('/certified-payroll', requireAdmin, async (req, res) => {
+  const { week_end, project_id } = req.query;
+  if (!week_end) return res.status(400).json({ error: 'week_end required' });
+  const companyId = req.user.company_id;
+
+  const weekEndDate = new Date(week_end + 'T00:00:00');
+  const weekStartDate = new Date(weekEndDate);
+  weekStartDate.setDate(weekStartDate.getDate() - 6);
+  const weekStart = weekStartDate.toISOString().substring(0, 10);
+
+  try {
+    const companyRow = await pool.query('SELECT name FROM companies WHERE id = $1', [companyId]);
+    const contractor = companyRow.rows[0]?.name || '';
+
+    let projectName = null;
+    if (project_id) {
+      const pr = await pool.query('SELECT name FROM projects WHERE id = $1 AND company_id = $2', [project_id, companyId]);
+      projectName = pr.rows[0]?.name || null;
+    }
+
+    const conditions = ['te.company_id = $1', 'te.work_date >= $2', 'te.work_date <= $3'];
+    const values = [companyId, weekStart, week_end];
+    let idx = 4;
+    if (project_id) { conditions.push(`te.project_id = $${idx++}`); values.push(parseInt(project_id)); }
+
+    const result = await pool.query(
+      `SELECT te.user_id, u.full_name as worker_name, u.hourly_rate,
+              to_char(te.work_date, 'YYYY-MM-DD') as work_date,
+              te.start_time, te.end_time, te.break_minutes, te.wage_type
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY u.full_name, te.work_date, te.start_time`,
+      values
+    );
+
+    const s = await getSettings(companyId);
+    const defaultRate = parseFloat(s.default_hourly_rate) || 30;
+    const prevRate = parseFloat(s.prevailing_wage_rate) || 45;
+
+    const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const workerMap = {};
+
+    for (const row of result.rows) {
+      if (!workerMap[row.user_id]) {
+        workerMap[row.user_id] = {
+          worker_id: row.user_id,
+          worker_name: row.worker_name,
+          rate: parseFloat(row.hourly_rate) || defaultRate,
+          regular_days: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0 },
+          prevailing_days: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0 },
+        };
+      }
+      const w = workerMap[row.user_id];
+      const dayKey = DAY_KEYS[new Date(row.work_date + 'T00:00:00').getDay()];
+      const h = hoursWorked(row.start_time, row.end_time) - (row.break_minutes || 0) / 60;
+      if (row.wage_type === 'prevailing') {
+        w.prevailing_days[dayKey] = +(w.prevailing_days[dayKey] + h).toFixed(2);
+      } else {
+        w.regular_days[dayKey] = +(w.regular_days[dayKey] + h).toFixed(2);
+      }
+    }
+
+    const workers = Object.values(workerMap).map(w => {
+      const regTotal = +Object.values(w.regular_days).reduce((s, h) => s + h, 0).toFixed(2);
+      const prevTotal = +Object.values(w.prevailing_days).reduce((s, h) => s + h, 0).toFixed(2);
+      return { ...w, regular_total: regTotal, prevailing_total: prevTotal, total: +(regTotal + prevTotal).toFixed(2), prevailing_rate: prevRate };
+    });
+
+    res.json({ week_start: weekStart, week_end, contractor, project: projectName, workers });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 module.exports = router;

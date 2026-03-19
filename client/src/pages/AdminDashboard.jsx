@@ -14,6 +14,7 @@ import ManagePayPeriods from '../components/ManagePayPeriods';
 import ManageSchedule from '../components/ManageSchedule';
 import ExportPanel from '../components/ExportPanel';
 import OvertimeReport from '../components/OvertimeReport';
+import CertifiedPayroll from '../components/CertifiedPayroll';
 import CompanyChat from '../components/CompanyChat';
 import LiveKPIs from '../components/LiveKPIs';
 import BroadcastMessage from '../components/BroadcastMessage';
@@ -229,6 +230,8 @@ export default function AdminDashboard() {
             <ProjectReports />
             <h3 style={styles.subheading}>Overtime Report</h3>
             <OvertimeReport />
+            <h3 style={styles.subheading}>Certified Payroll</h3>
+            <CertifiedPayroll projects={projects} />
             <h3 style={styles.subheading}>Export</h3>
             <ExportPanel workers={workers} projects={projects} />
           </>
