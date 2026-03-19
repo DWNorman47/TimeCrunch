@@ -230,39 +230,47 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
     });
 
     const result = [];
-    for (const period of periods.rows) {
-      const entries = await pool.query(
+    if (periods.rows.length > 0) {
+      const minDate = periods.rows[periods.rows.length - 1].period_start;
+      const maxDate = periods.rows[0].period_end;
+      const allEntries = await pool.query(
         `SELECT te.*, p.name as project_name,
                 to_char(te.work_date, 'YYYY-MM-DD') as work_date_str
          FROM time_entries te LEFT JOIN projects p ON te.project_id = p.id
          WHERE te.user_id = $1 AND te.work_date >= $2 AND te.work_date <= $3
          ORDER BY te.work_date, te.start_time`,
-        [userId, period.period_start, period.period_end]
+        [userId, minDate, maxDate]
       );
-      if (entries.rowCount === 0) continue;
 
-      const { regularHours, overtimeHours } = computeOT(entries.rows, s.overtime_rule, s.overtime_threshold);
-      let prevailingHours = 0, totalMileage = 0;
-      for (const e of entries.rows) {
-        if (e.wage_type === 'prevailing') {
-          prevailingHours += hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
+      for (const period of periods.rows) {
+        const ps = period.period_start.toString().substring(0, 10);
+        const pe = period.period_end.toString().substring(0, 10);
+        const entries = allEntries.rows.filter(e => e.work_date_str >= ps && e.work_date_str <= pe);
+        if (entries.length === 0) continue;
+
+        const { regularHours, overtimeHours } = computeOT(entries, s.overtime_rule, s.overtime_threshold);
+        let prevailingHours = 0, totalMileage = 0;
+        for (const e of entries) {
+          if (e.wage_type === 'prevailing') {
+            prevailingHours += hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
+          }
+          if (e.mileage) totalMileage += parseFloat(e.mileage);
         }
-        if (e.mileage) totalMileage += parseFloat(e.mileage);
-      }
 
-      result.push({
-        id: period.id,
-        period_start: period.period_start,
-        period_end: period.period_end,
-        label: period.label,
-        entries: entries.rows,
-        summary: {
-          regular_hours: +regularHours.toFixed(2),
-          overtime_hours: +overtimeHours.toFixed(2),
-          prevailing_hours: +prevailingHours.toFixed(2),
-          total_mileage: +totalMileage.toFixed(1),
-        },
-      });
+        result.push({
+          id: period.id,
+          period_start: period.period_start,
+          period_end: period.period_end,
+          label: period.label,
+          entries,
+          summary: {
+            regular_hours: +regularHours.toFixed(2),
+            overtime_hours: +overtimeHours.toFixed(2),
+            prevailing_hours: +prevailingHours.toFixed(2),
+            total_mileage: +totalMileage.toFixed(1),
+          },
+        });
+      }
     }
     res.json(result);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }

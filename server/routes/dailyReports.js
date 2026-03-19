@@ -38,11 +38,13 @@ router.get('/', requireAuth, async (req, res) => {
 
     const result = await pool.query(
       `SELECT r.*, p.name as project_name, u.full_name as created_by_name,
-              (SELECT COUNT(*) FROM daily_report_manpower WHERE report_id = r.id) as manpower_count
+              COUNT(m.id) as manpower_count
        FROM daily_reports r
        LEFT JOIN projects p ON r.project_id = p.id
        LEFT JOIN users u ON r.created_by = u.id
+       LEFT JOIN daily_report_manpower m ON m.report_id = r.id
        WHERE ${conditions.join(' AND ')}
+       GROUP BY r.id, p.name, u.full_name
        ORDER BY r.report_date DESC, r.created_at DESC`,
       params
     );

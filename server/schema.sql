@@ -145,3 +145,19 @@ CREATE TABLE IF NOT EXISTS safety_talk_signoffs (
   worker_name VARCHAR(255),
   signed_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Indexes for frequently filtered/joined columns
+CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);
+CREATE INDEX IF NOT EXISTS idx_time_entries_company_id ON time_entries(company_id);
+CREATE INDEX IF NOT EXISTS idx_time_entries_user_id ON time_entries(user_id);
+CREATE INDEX IF NOT EXISTS idx_time_entries_work_date ON time_entries(work_date);
+CREATE INDEX IF NOT EXISTS idx_time_entries_user_date ON time_entries(user_id, work_date);
+CREATE INDEX IF NOT EXISTS idx_projects_company_id ON projects(company_id);
+CREATE INDEX IF NOT EXISTS idx_field_reports_company_id ON field_reports(company_id);
+CREATE INDEX IF NOT EXISTS idx_field_reports_worker_id ON field_reports(worker_id);
+CREATE INDEX IF NOT EXISTS idx_daily_reports_company_id ON daily_reports(company_id);
+CREATE INDEX IF NOT EXISTS idx_daily_reports_report_date ON daily_reports(report_date);
+CREATE INDEX IF NOT EXISTS idx_daily_report_manpower_report_id ON daily_report_manpower(report_id);
+CREATE INDEX IF NOT EXISTS idx_safety_talks_company_id ON safety_talks(company_id);
+CREATE INDEX IF NOT EXISTS idx_safety_talk_signoffs_talk_id ON safety_talk_signoffs(talk_id);
+CREATE INDEX IF NOT EXISTS idx_punchlist_items_company_id ON punchlist_items(company_id);

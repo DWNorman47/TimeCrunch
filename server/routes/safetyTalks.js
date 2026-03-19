@@ -18,11 +18,13 @@ router.get('/', requireAuth, async (req, res) => {
 
     const result = await pool.query(
       `SELECT st.*, p.name as project_name, u.full_name as created_by_name,
-              (SELECT COUNT(*) FROM safety_talk_signoffs WHERE talk_id = st.id) as signoff_count
+              COUNT(s.id) as signoff_count
        FROM safety_talks st
        LEFT JOIN projects p ON st.project_id = p.id
        LEFT JOIN users u ON st.created_by = u.id
+       LEFT JOIN safety_talk_signoffs s ON s.talk_id = st.id
        WHERE ${conditions.join(' AND ')}
+       GROUP BY st.id, p.name, u.full_name
        ORDER BY st.talk_date DESC, st.created_at DESC`,
       params
     );
