@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 const APPS = [
   {
     id: 'timeclock',
-    name: 'Time Clock',
+    name: 'Time Crunch',
     bg: '#1a56db',
     icon: (
       <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
