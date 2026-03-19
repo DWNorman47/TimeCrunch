@@ -11,6 +11,7 @@ export default function Register() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(null); // email address waiting for confirmation
+  const [resendState, setResendState] = useState('idle'); // 'idle' | 'sending' | 'sent'
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -56,9 +57,15 @@ export default function Register() {
         </p>
         <p style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center' }}>
           Didn't get it? Check your spam folder or{' '}
-          <button style={{ background: 'none', border: 'none', color: '#1a56db', fontWeight: 600, cursor: 'pointer', fontSize: 13, padding: 0 }}
-            onClick={() => api.post('/auth/resend-confirmation', { email: confirming })}>
-            resend
+          <button style={{ background: 'none', border: 'none', color: resendState === 'sent' ? '#059669' : '#1a56db', fontWeight: 600, cursor: resendState === 'idle' ? 'pointer' : 'default', fontSize: 13, padding: 0 }}
+            disabled={resendState !== 'idle'}
+            onClick={async () => {
+              setResendState('sending');
+              try { await api.post('/auth/resend-confirmation', { email: confirming }); } catch {}
+              setResendState('sent');
+              setTimeout(() => setResendState('idle'), 4000);
+            }}>
+            {resendState === 'sending' ? 'Sending…' : resendState === 'sent' ? 'Sent!' : 'resend'}
           </button>.
         </p>
       </div>
