@@ -32,6 +32,7 @@ export default function ApprovalQueue() {
   const [openMessageId, setOpenMessageId] = useState(null);
   const [fetchError, setFetchError] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [workerFilter, setWorkerFilter] = useState('');
 
   const fetch = () => {
     setLoading(true);
@@ -62,12 +63,24 @@ export default function ApprovalQueue() {
     } finally { setWorking(null); }
   };
 
+  const visibleEntries = workerFilter
+    ? entries.filter(e => e.worker_name === workerFilter)
+    : entries;
+
+  const workerNames = [...new Set(entries.map(e => e.worker_name))].sort();
+
   const approveAll = async () => {
-    if (!confirm(`Approve all ${entries.length} pending entr${entries.length === 1 ? 'y' : 'ies'}? This cannot be undone.`)) return;
+    const targets = visibleEntries;
+    if (!confirm(`Approve ${targets.length} entr${targets.length === 1 ? 'y' : 'ies'}${workerFilter ? ` for ${workerFilter}` : ''}? This cannot be undone.`)) return;
     setApprovingAll(true);
     try {
-      await api.post('/admin/entries/approve-all');
-      setEntries([]);
+      if (workerFilter) {
+        for (const e of targets) await api.patch(`/admin/entries/${e.id}/approve`);
+        setEntries(prev => prev.filter(e => e.worker_name !== workerFilter));
+      } else {
+        await api.post('/admin/entries/approve-all');
+        setEntries([]);
+      }
     } finally { setApprovingAll(false); }
   };
 
@@ -79,9 +92,21 @@ export default function ApprovalQueue() {
         <h3 style={styles.title}>Approval Queue</h3>
         {entries.length > 0 && (
           <>
-            <span style={styles.badge}>{entries.length} pending</span>
-            <button style={styles.approveAllBtn} onClick={approveAll} disabled={approvingAll}>
-              {approvingAll ? 'Approving...' : '✓ Approve All'}
+            <span style={styles.badge}>{visibleEntries.length}{workerFilter ? '' : ' pending'}</span>
+            {workerNames.length > 1 && (
+              <select
+                style={styles.filterSelect}
+                value={workerFilter}
+                onChange={e => setWorkerFilter(e.target.value)}
+              >
+                <option value="">All workers</option>
+                {workerNames.map(n => (
+                  <option key={n} value={n}>{n} ({entries.filter(e => e.worker_name === n).length})</option>
+                ))}
+              </select>
+            )}
+            <button style={styles.approveAllBtn} onClick={approveAll} disabled={approvingAll || visibleEntries.length === 0}>
+              {approvingAll ? 'Approving...' : `✓ Approve${workerFilter ? ` ${workerFilter.split(' ')[0]}'s` : ' All'}`}
             </button>
           </>
         )}
@@ -98,7 +123,10 @@ export default function ApprovalQueue() {
               Showing the oldest 200 pending entries. Approve or reject these to see more.
             </p>
           )}
-          {entries.map(e => (
+          {visibleEntries.length === 0 && workerFilter && (
+            <p style={styles.empty}>No pending entries for {workerFilter}.</p>
+          )}
+          {visibleEntries.map(e => (
             <div key={e.id} style={styles.row}>
               <div style={styles.rowMain}>
                 <div style={styles.worker}>{e.worker_name}</div>
@@ -182,6 +210,7 @@ const styles = {
   header: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 },
   title: { fontSize: 17, fontWeight: 700, margin: 0 },
   badge: { background: '#fef3c7', color: '#b45309', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 700 },
+  filterSelect: { padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, color: '#374151', background: '#fff' },
   empty: { color: '#059669', fontSize: 14, fontWeight: 500 },
   fetchError: { color: '#991b1b', fontSize: 14 },
   retryBtn: { background: 'none', border: 'none', color: '#1a56db', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: 14 },

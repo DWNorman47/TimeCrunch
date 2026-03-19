@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line,
 } from 'recharts';
 import api from '../api';
 
@@ -45,6 +45,11 @@ function formatDay(dateStr) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function formatWeek(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export default function AnalyticsDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -59,7 +64,17 @@ export default function AnalyticsDashboard() {
   if (loading) return <p style={{ color: '#888' }}>Loading analytics...</p>;
   if (!data) return <p style={{ color: '#e53e3e' }}>Failed to load analytics.</p>;
 
-  const { summary, daily_hours, project_hours, worker_hours } = data;
+  const { summary, daily_hours, weekly_hours, project_hours, worker_hours } = data;
+
+  // Fill in any missing weeks in the last 12
+  const weeklyMap = Object.fromEntries((weekly_hours || []).map(d => [d.week_start, parseFloat(d.hours)]));
+  const weeklyFilled = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - d.getDay() - i * 7); // Monday of each week
+    const key = d.toISOString().substring(0, 10);
+    weeklyFilled.push({ week_start: key, hours: weeklyMap[key] || 0 });
+  }
 
   // Fill in any missing days in the last 14
   const dailyMap = Object.fromEntries(daily_hours.map(d => [d.date, parseFloat(d.hours)]));
@@ -128,6 +143,46 @@ export default function AnalyticsDashboard() {
                 ))}
               </Bar>
             </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Weekly hours trend */}
+      <div style={styles.card}>
+        <SectionTitle>Weekly Hours — Last 12 Weeks</SectionTitle>
+        {weeklyFilled.every(d => d.hours === 0) ? (
+          <p style={styles.empty}>No entries in the last 12 weeks.</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={weeklyFilled} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+              <XAxis
+                dataKey="week_start"
+                tickFormatter={formatWeek}
+                tick={{ fontSize: 11, fill: '#9ca3af' }}
+                axisLine={false}
+                tickLine={false}
+                interval={1}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#9ca3af' }}
+                axisLine={false}
+                tickLine={false}
+                width={32}
+              />
+              <Tooltip
+                formatter={v => [`${v}h`, 'Hours']}
+                labelFormatter={d => `Week of ${formatWeek(d)}`}
+                contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e5e7eb' }}
+              />
+              <Line
+                type="monotone"
+                dataKey="hours"
+                stroke={BLUE}
+                strokeWidth={2}
+                dot={{ fill: BLUE, r: 3 }}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
           </ResponsiveContainer>
         )}
       </div>

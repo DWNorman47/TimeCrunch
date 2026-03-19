@@ -735,7 +735,7 @@ router.delete('/projects/:id', requireAdmin, async (req, res) => {
 router.get('/analytics', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
-    const [daily, projects, workers, summary] = await Promise.all([
+    const [daily, weekly, projects, workers, summary] = await Promise.all([
       // Hours per day for the last 14 days
       pool.query(
         `SELECT work_date::text as date,
@@ -743,6 +743,15 @@ router.get('/analytics', requireAdmin, async (req, res) => {
          FROM time_entries
          WHERE company_id = $1 AND work_date >= CURRENT_DATE - 13
          GROUP BY work_date ORDER BY work_date ASC`,
+        [companyId]
+      ),
+      // Hours per week for the last 12 weeks
+      pool.query(
+        `SELECT to_char(date_trunc('week', work_date), 'YYYY-MM-DD') as week_start,
+                ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600)::numeric, 1) as hours
+         FROM time_entries
+         WHERE company_id = $1 AND work_date >= CURRENT_DATE - 83
+         GROUP BY week_start ORDER BY week_start ASC`,
         [companyId]
       ),
       // Top projects by hours, last 30 days
@@ -782,6 +791,7 @@ router.get('/analytics', requireAdmin, async (req, res) => {
 
     res.json({
       daily_hours: daily.rows,
+      weekly_hours: weekly.rows,
       project_hours: projects.rows,
       worker_hours: workers.rows,
       summary: summary.rows[0],
