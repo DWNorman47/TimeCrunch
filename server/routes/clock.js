@@ -181,4 +181,19 @@ router.post('/out', requireAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/clock/cancel — discard an active clock-in without creating a time entry
+router.delete('/cancel', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM active_clock WHERE user_id = $1 RETURNING id',
+      [req.user.id]
+    );
+    if (result.rowCount === 0) return res.status(400).json({ error: 'Not clocked in' });
+    res.json({ cancelled: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

@@ -132,6 +132,24 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
     }
   };
 
+  const handleCancelClockIn = async () => {
+    if (!confirm('Cancel this clock-in? No time entry will be created.')) return;
+    setLoading(true);
+    try {
+      await api.delete('/clock/cancel');
+      setStatus(false);
+      setSelectedProject('');
+      setBreakAdded(false);
+      setMileageAdded(false);
+      setBreakMinutes('');
+      setMileage('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to cancel');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleClockOut = async () => {
     setError('');
     setLoading(true);
@@ -248,6 +266,9 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
             <button style={styles.clockOutBtn} className="clock-btn" onClick={handleClockOut} disabled={loading}>
               {loading ? t.clockingOut : t.clockOut}
             </button>
+            <button style={styles.cancelClockInBtn} onClick={handleCancelClockIn} disabled={loading}>
+              Cancel clock-in
+            </button>
           </>
         )}
       </div>
@@ -317,6 +338,7 @@ const styles = {
   errorDark: { fontSize: 13, margin: 0, background: 'rgba(255,255,255,0.15)', borderRadius: 6, padding: '8px 12px', color: '#fff' },
   clockInBtn: { padding: '13px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 700 },
   clockOutBtn: { width: '100%', padding: '13px', background: 'rgba(255,255,255,0.2)', color: '#fff', border: '2px solid rgba(255,255,255,0.5)', borderRadius: 8, fontSize: 16, fontWeight: 700, cursor: 'pointer' },
+  cancelClockInBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: '2px 0', alignSelf: 'center' },
   offlineBanner: { background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 7, padding: '8px 12px', fontSize: 13, fontWeight: 500, marginBottom: 12 },
   offlineBannerDark: { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', borderRadius: 7, padding: '8px 12px', fontSize: 12, fontWeight: 500 },
   syncBanner: { background: '#d1fae5', border: '1px solid #6ee7b7', color: '#065f46', borderRadius: 7, padding: '8px 12px', fontSize: 13, fontWeight: 500, marginBottom: 4 },

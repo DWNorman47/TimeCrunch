@@ -35,14 +35,40 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
   const [openMessageId, setOpenMessageId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const handleDelete = async id => {
     if (!confirm(t.confirmDelete)) return;
     try {
       await api.delete(`/time-entries/${id}`);
       onDeleted(id);
+      setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s; });
     } catch {
       alert(t.failedDeleteEntry);
+    }
+  };
+
+  const toggleSelect = id => {
+    setSelectedIds(prev => {
+      const s = new Set(prev);
+      s.has(id) ? s.delete(id) : s.add(id);
+      return s;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = [...selectedIds];
+    if (!confirm(`Delete ${ids.length} entr${ids.length === 1 ? 'y' : 'ies'}? This cannot be undone.`)) return;
+    setBulkDeleting(true);
+    try {
+      await Promise.all(ids.map(id => api.delete(`/time-entries/${id}`)));
+      ids.forEach(id => onDeleted(id));
+      setSelectedIds(new Set());
+    } catch {
+      alert(t.failedDeleteEntry);
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -75,9 +101,18 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
     return <div style={styles.empty}>{t.noEntries}</div>;
   }
 
+  const deletableEntries = entries.filter(e => !e.locked && isEditable(e.work_date));
+
   return (
     <div style={styles.card} className="mobile-card">
-      <h2 style={styles.heading}>{t.yourEntries}</h2>
+      <div style={styles.headingRow}>
+        <h2 style={styles.heading}>{t.yourEntries}</h2>
+        {selectedIds.size > 0 && (
+          <button style={styles.bulkDeleteBtn} onClick={handleBulkDelete} disabled={bulkDeleting}>
+            {bulkDeleting ? 'Deleting...' : `Delete ${selectedIds.size} selected`}
+          </button>
+        )}
+      </div>
       <div style={styles.list}>
         {entries.map(e => (
           <div key={e.id} style={styles.entry}>
@@ -114,6 +149,14 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
             ) : (
               <>
                 <div style={styles.entryMain} className="entry-main">
+                  {!e.locked && isEditable(e.work_date) && (
+                    <input
+                      type="checkbox"
+                      style={styles.checkbox}
+                      checked={selectedIds.has(e.id)}
+                      onChange={() => toggleSelect(e.id)}
+                    />
+                  )}
                   <span style={styles.project}>{e.project_name}</span>
                   <div style={styles.entryRight}>
                     <span style={styles.date}>{formatDate(e.work_date, language)}</span>
@@ -159,7 +202,10 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
 
 const styles = {
   card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' },
-  heading: { marginBottom: 16, fontSize: 18, fontWeight: 700 },
+  headingRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 },
+  heading: { fontSize: 18, fontWeight: 700, margin: 0 },
+  bulkDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  checkbox: { marginRight: 8, cursor: 'pointer', width: 15, height: 15, flexShrink: 0 },
   empty: { textAlign: 'center', color: '#888', padding: 32 },
   list: { display: 'flex', flexDirection: 'column', gap: 12 },
   entry: { border: '1px solid #eee', borderRadius: 8, padding: 14 },
