@@ -22,18 +22,19 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const [archived, setArchived] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loadingArchived, setLoadingArchived] = useState(false);
+  const [archivedFetched, setArchivedFetched] = useState(false);
 
   const loadArchived = async () => {
+    if (archivedFetched) return;
     setLoadingArchived(true);
     try {
       const r = await api.get('/admin/workers/archived');
       setArchived(r.data);
+      setArchivedFetched(true);
     } finally {
       setLoadingArchived(false);
     }
   };
-
-  useEffect(() => { loadArchived(); }, []);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const setInvite = (k, v) => setInviteForm(f => ({ ...f, [k]: v }));
@@ -88,7 +89,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     try {
       await api.delete(`/admin/workers/${id}`);
       onWorkerDeleted(id);
-      loadArchived();
+      setArchivedFetched(false); // stale — will re-fetch when History is next opened
     } catch {
       toast('Failed to remove user', 'error');
     }
@@ -296,7 +297,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       )}
 
       <div style={styles.historyFooter}>
-        <button style={styles.historyToggle} onClick={() => setShowHistory(s => !s)}>
+        <button style={styles.historyToggle} onClick={() => { setShowHistory(s => !s); loadArchived(); }}>
           {showHistory ? '▾' : '▸'} History {archived.length > 0 ? `(${archived.length})` : ''}
         </button>
         {showHistory && (

@@ -287,7 +287,8 @@ router.get('/workers', requireAdmin, async (req, res) => {
       LEFT JOIN time_entries te ON te.user_id = u.id
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1
       GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate
-      ORDER BY u.role DESC, u.full_name`,
+      ORDER BY u.role DESC, u.full_name
+      LIMIT 500`,
       [companyId]
     );
     res.json(result.rows);
@@ -634,7 +635,12 @@ router.get('/projects/metrics', requireAdmin, async (req, res) => {
 router.get('/projects', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
-    const result = await pool.query('SELECT * FROM projects WHERE active = true AND company_id = $1 ORDER BY name', [companyId]);
+    const result = await pool.query(
+      `SELECT id, company_id, name, wage_type, geo_lat, geo_lng, geo_radius_ft,
+              budget_hours, budget_dollars, active, created_at
+       FROM projects WHERE active = true AND company_id = $1 ORDER BY name LIMIT 500`,
+      [companyId]
+    );
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -830,9 +836,10 @@ router.get('/analytics', requireAdmin, async (req, res) => {
   }
 });
 
-// GET /admin/entries/pending — all pending time entries for this company
+// GET /admin/entries/pending — pending time entries for this company (max 200; has_more signals overflow)
 router.get('/entries/pending', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
+  const LIMIT = 200;
   try {
     const result = await pool.query(
       `SELECT te.*, u.full_name as worker_name, u.email as worker_email, p.name as project_name
@@ -840,10 +847,12 @@ router.get('/entries/pending', requireAdmin, async (req, res) => {
        JOIN users u ON te.user_id = u.id
        LEFT JOIN projects p ON te.project_id = p.id
        WHERE te.company_id = $1 AND te.status = 'pending'
-       ORDER BY te.worker_signed_at DESC NULLS LAST, te.work_date DESC, te.start_time DESC`,
-      [companyId]
+       ORDER BY te.worker_signed_at DESC NULLS LAST, te.work_date DESC, te.start_time DESC
+       LIMIT $2`,
+      [companyId, LIMIT + 1]
     );
-    res.json(result.rows);
+    const has_more = result.rows.length > LIMIT;
+    res.json({ entries: result.rows.slice(0, LIMIT), has_more });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

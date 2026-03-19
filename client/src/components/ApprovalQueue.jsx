@@ -31,12 +31,13 @@ export default function ApprovalQueue() {
   const [approvingAll, setApprovingAll] = useState(false);
   const [openMessageId, setOpenMessageId] = useState(null);
   const [fetchError, setFetchError] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   const fetch = () => {
     setLoading(true);
     setFetchError(false);
     api.get('/admin/entries/pending')
-      .then(r => setEntries(r.data))
+      .then(r => { setEntries(r.data.entries); setHasMore(r.data.has_more); })
       .catch(() => setFetchError(true))
       .finally(() => setLoading(false));
   };
@@ -92,6 +93,11 @@ export default function ApprovalQueue() {
         <p style={styles.empty}>All caught up — no pending entries.</p>
       ) : (
         <div style={styles.list}>
+          {hasMore && (
+            <p style={{ color: '#b45309', fontSize: 13, marginBottom: 8 }}>
+              Showing the oldest 200 pending entries. Approve or reject these to see more.
+            </p>
+          )}
           {entries.map(e => (
             <div key={e.id} style={styles.row}>
               <div style={styles.rowMain}>
