@@ -36,7 +36,14 @@ export default function Login() {
     try {
       const user = await login(form.username, form.password, companyName.trim());
       saveCompany(companyName.trim());
-      navigate(user.role === 'admin' ? '/admin' : '/dashboard');
+      if (user.role === 'admin') {
+        const key = `tc_visited_${user.id}`;
+        const firstTime = !localStorage.getItem(key);
+        localStorage.setItem(key, '1');
+        navigate(firstTime ? '/administration' : '/admin');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       const data = err.response?.data;
       if (data?.error === 'email_not_confirmed') {
