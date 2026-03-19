@@ -29,12 +29,18 @@ app.use('/api/punchlist', require('./routes/punchlist'));
 app.use('/api/safety-talks', require('./routes/safetyTalks'));
 
 // Read-only company settings — available to all authenticated users
+const FEATURE_KEYS = ['feature_scheduling', 'feature_analytics', 'feature_chat', 'feature_prevailing_wage'];
 app.get('/api/settings', requireAuth, async (req, res) => {
   try {
     const result = await pool.query('SELECT key, value FROM settings WHERE company_id = $1', [req.user.company_id]);
-    const s = { prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5, overtime_rule: 'daily', overtime_threshold: 8 };
+    const s = {
+      prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5,
+      overtime_rule: 'daily', overtime_threshold: 8,
+      feature_scheduling: true, feature_analytics: true, feature_chat: true, feature_prevailing_wage: true,
+    };
     result.rows.forEach(r => {
       if (r.key === 'overtime_rule') s.overtime_rule = r.value;
+      else if (FEATURE_KEYS.includes(r.key)) s[r.key] = r.value === '1';
       else s[r.key] = parseFloat(r.value);
     });
     res.json(s);
