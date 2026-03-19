@@ -12,6 +12,7 @@ import NotificationSetup from '../components/NotificationSetup';
 import TimesheetSignOff from '../components/TimesheetSignOff';
 import CompanyChat from '../components/CompanyChat';
 import AppSwitcher from '../components/AppSwitcher';
+import NotificationBell from '../components/NotificationBell';
 import { getT } from '../i18n';
 import api from '../api';
 
@@ -93,6 +94,7 @@ export default function Dashboard() {
           {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         </div>
         <div style={styles.headerRight} className="header-right">
+          <NotificationBell />
           <span style={styles.userName} className="header-username">{user.full_name}</span>
           <select style={styles.langSelect} value={user?.language || 'English'} onChange={e => handleLanguageChange(e.target.value)}>
             <option value="English">EN</option>

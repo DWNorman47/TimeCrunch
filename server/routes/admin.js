@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const pool = require('../db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAdmin, requirePlan, requireProAddon } = require('../middleware/auth');
 const { sendPushToUser, sendPushToAllWorkers } = require('../push');
 const { sendEmail } = require('../email');
 const { hoursWorked, computeOT } = require('../utils/payCalculations');
@@ -732,7 +732,7 @@ router.delete('/projects/:id', requireAdmin, async (req, res) => {
 });
 
 // GET /admin/analytics
-router.get('/analytics', requireAdmin, async (req, res) => {
+router.get('/analytics', requireAdmin, requirePlan('business'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const [daily, weekly, projects, workers, summary] = await Promise.all([
@@ -963,7 +963,7 @@ router.delete('/pay-periods/:id', requireAdmin, async (req, res) => {
 });
 
 // CSV Export
-router.get('/export', requireAdmin, async (req, res) => {
+router.get('/export', requireAdmin, requirePlan('starter'), async (req, res) => {
   const { from, to, worker_id, project_id, status } = req.query;
   if (!from || !to) return res.status(400).json({ error: 'from and to required' });
   const companyId = req.user.company_id;
@@ -1005,7 +1005,7 @@ router.get('/export', requireAdmin, async (req, res) => {
 });
 
 // Overtime report
-router.get('/overtime-report', requireAdmin, async (req, res) => {
+router.get('/overtime-report', requireAdmin, requirePlan('starter'), async (req, res) => {
   const { from, to } = req.query;
   if (!from || !to) return res.status(400).json({ error: 'from and to required' });
   const companyId = req.user.company_id;
@@ -1067,7 +1067,7 @@ router.get('/overtime-report', requireAdmin, async (req, res) => {
 });
 
 // Payroll export CSV
-router.get('/payroll-export', requireAdmin, async (req, res) => {
+router.get('/payroll-export', requireAdmin, requirePlan('starter'), async (req, res) => {
   const { from, to } = req.query;
   if (!from || !to) return res.status(400).json({ error: 'from and to required' });
   const companyId = req.user.company_id;
@@ -1183,7 +1183,7 @@ router.get('/audit-log', requireAdmin, async (req, res) => {
 });
 
 // POST /admin/broadcast — push a message to all active workers
-router.post('/broadcast', requireAdmin, async (req, res) => {
+router.post('/broadcast', requireAdmin, requirePlan('business'), async (req, res) => {
   const { message } = req.body;
   if (!message?.trim()) return res.status(400).json({ error: 'message required' });
   if (message.length > 200) return res.status(400).json({ error: 'Message must be 200 characters or fewer' });
@@ -1199,7 +1199,7 @@ router.post('/broadcast', requireAdmin, async (req, res) => {
 
 // GET /admin/certified-payroll?week_end=YYYY-MM-DD&project_id=N
 // Returns prevailing-wage hours by worker broken down by day of week for a 7-day window
-router.get('/certified-payroll', requireAdmin, async (req, res) => {
+router.get('/certified-payroll', requireAdmin, requireProAddon, async (req, res) => {
   const { week_end, project_id } = req.query;
   if (!week_end) return res.status(400).json({ error: 'week_end required' });
   const companyId = req.user.company_id;

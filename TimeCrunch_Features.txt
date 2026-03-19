@@ -319,10 +319,11 @@ FEATURE FLAGS
   for companies that don't use those features.
 
 SUBSCRIPTION BILLING (STRIPE)
-  Starter and Pro plans, billed via Stripe. Admins manage their subscription and
-  billing details from within the app, including accessing the Stripe customer
-  portal to update payment methods, download invoices, or cancel. Stripe
-  webhooks keep subscription status in sync automatically.
+  Four-tier pricing — Free, Starter, Business, and a Pro add-on — billed via
+  Stripe. Admins manage their subscription and billing details from within the
+  app, including accessing the Stripe customer portal to update payment methods,
+  download invoices, or cancel. Stripe webhooks keep subscription status in sync
+  automatically. Annual billing saves 17% on the base plan price.
 
 COMPANY SETTINGS
   Admins configure:
@@ -340,6 +341,58 @@ SECURITY
   - Helmet security headers on all API responses
   - JWT-based authentication with 8-hour token expiry
   - Approved time entries are locked and cannot be modified
+
+
+================================================================================
+PRICING
+================================================================================
+
+FREE — $0/month
+  Up to 3 workers. No credit card required.
+  Includes:
+    - Clock in/out and time tracking
+    - Admin approval workflow
+    - Basic analytics
+    - Scheduling (current week only)
+    - Timesheet PDF export (latest completed week only)
+    - 90-day history
+
+STARTER — $19/month (or $190/year — save 17%)
+  Up to 10 workers.
+  Everything in Free, plus:
+    - GPS geofencing (prevent off-site and buddy clock-ins)
+    - Payroll CSV export and overtime report
+    - Scheduled shifts (any date range)
+    - Timesheet PDF export (any date range)
+    - Full history — no limit
+
+BUSINESS — $25/month base + $1/worker/month
+  Unlimited workers. Scales with your crew size.
+  Example: 25 workers = $50/mo. 75 workers = $100/mo.
+  Annual billing: $250/yr base, $10/worker/yr for committed headcount.
+  Mid-year worker additions are billed monthly and roll into the annual
+  rate at the next renewal.
+  Everything in Starter, plus:
+    - Broadcast push notifications to all workers
+    - Field reports, daily reports, and photo capture
+    - Safety talks / toolbox talks with sign-off records
+    - Punchlist management
+    - Advanced analytics — weekly trends, top projects, top workers
+    - Inactive worker alerts (daily admin notification)
+
+PRO ADD-ON — +$45/month (or +$450/year)
+  Available on Starter or Business plans. Adds:
+    - Certified Payroll Report (WH-347 format) — required by law for
+      Davis-Bacon and prevailing wage government contracts. Generates
+      weekly reports as print-ready PDFs.
+    - QuickBooks Online Integration — push time and payroll data directly
+      into QuickBooks. No manual double-entry.
+
+FREE TRIAL
+  All new companies get a 14-day free trial with full access to every
+  feature, including Business and Pro add-on features. No credit card
+  required to start. Remaining trial days carry over if you subscribe
+  before the trial ends.
 
 
 ================================================================================

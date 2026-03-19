@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const pool = require('../db');
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization;
@@ -32,4 +33,73 @@ function requireSuperAdmin(req, res, next) {
   });
 }
 
-module.exports = { requireAuth, requireAdmin, requireSuperAdmin };
+// Plan hierarchy: free < starter < business
+const PLAN_LEVEL = { free: 0, starter: 1, business: 2 };
+
+// Gate a route to a minimum plan.
+// Trial companies always pass — they get full access until the trial ends.
+// Canceled companies are always blocked.
+function requirePlan(minPlan) {
+  return async (req, res, next) => {
+    try {
+      const r = await pool.query(
+        'SELECT plan, subscription_status, pro_addon FROM companies WHERE id = $1',
+        [req.user.company_id]
+      );
+      const company = r.rows[0];
+      if (!company) return res.status(403).json({ error: 'Company not found' });
+
+      if (company.subscription_status === 'canceled') {
+        return res.status(403).json({ error: 'Subscription required', code: 'subscription_required' });
+      }
+
+      // Trial users get full access
+      if (company.subscription_status === 'trial') {
+        req.company = company;
+        return next();
+      }
+
+      const currentLevel = PLAN_LEVEL[company.plan || 'free'] ?? 0;
+      const requiredLevel = PLAN_LEVEL[minPlan] ?? 0;
+
+      if (currentLevel < requiredLevel) {
+        return res.status(403).json({ error: 'Plan upgrade required', code: 'plan_required', required_plan: minPlan });
+      }
+
+      req.company = company;
+      next();
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Server error' });
+    }
+  };
+}
+
+// Gate a route to the Pro add-on.
+async function requireProAddon(req, res, next) {
+  try {
+    const r = await pool.query(
+      'SELECT plan, subscription_status, pro_addon FROM companies WHERE id = $1',
+      [req.user.company_id]
+    );
+    const company = r.rows[0];
+    if (!company) return res.status(403).json({ error: 'Company not found' });
+
+    if (company.subscription_status === 'canceled') {
+      return res.status(403).json({ error: 'Subscription required', code: 'subscription_required' });
+    }
+
+    // Trial users get full access
+    if (company.subscription_status === 'trial' || company.pro_addon) {
+      req.company = company;
+      return next();
+    }
+
+    return res.status(403).json({ error: 'Pro add-on required', code: 'pro_addon_required' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+module.exports = { requireAuth, requireAdmin, requireSuperAdmin, requirePlan, requireProAddon };

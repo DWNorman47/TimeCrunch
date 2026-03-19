@@ -22,8 +22,10 @@ export function AuthProvider({ children }) {
   const login = async (username, password, company_name) => {
     const r = await api.post('/auth/login', { username, password, company_name });
     localStorage.setItem('tc_token', r.data.token);
-    setUser(r.data.user);
-    return r.data.user;
+    // Fetch fresh user+plan info from /me so plan fields are always included
+    const me = await api.get('/auth/me');
+    setUser(me.data.user);
+    return me.data.user;
   };
 
   const logout = () => {

@@ -1,4 +1,15 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(gh *)",
+      "Bash(npm install:*)",
+      "Bash(npm.cmd install:*)",
+      "Bash(powershell.exe *)",
+      "Bash(find c:Usersv-normandWorkspacesTimeCrunch_Claudeserverdb -type f -name *.sql -o -name *.js)",
+      "Bash(find /c/Users/v-normand/Workspaces/TimeCrunch_Claude -type f \\\\\\(-name *.sql -o -name *migration* \\\\\\))"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {
@@ -7,20 +18,11 @@
           {
             "type": "command",
             "command": "powershell.exe -NoProfile -File \"C:\\Users\\v-normand\\Workspaces\\TimeCrunch_Claude\\.claude\\npm-install-hook.ps1\"",
-            "statusMessage": "Running npm install...",
-            "timeout": 120
+            "timeout": 120,
+            "statusMessage": "Running npm install..."
           }
         ]
       }
-    ]
-  },
-  "permissions": {
-    "allow": [
-      "Bash(git *)",
-      "Bash(gh *)",
-      "Bash(npm install:*)",
-      "Bash(npm.cmd install:*)",
-      "Bash(powershell.exe *)"
     ]
   }
 }

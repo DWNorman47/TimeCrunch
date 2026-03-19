@@ -325,3 +325,31 @@ CREATE INDEX IF NOT EXISTS idx_daily_report_manpower_report ON daily_report_manp
 CREATE INDEX IF NOT EXISTS idx_safety_talks_company_id      ON safety_talks(company_id);
 CREATE INDEX IF NOT EXISTS idx_safety_talk_signoffs_talk_id ON safety_talk_signoffs(talk_id);
 CREATE INDEX IF NOT EXISTS idx_punchlist_items_company_id   ON punchlist_items(company_id);
+
+-- ---------------------------------------------------------------------------
+-- inbox  (in-app notification bell items per user)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS inbox (
+  id          SERIAL PRIMARY KEY,
+  company_id  INTEGER      NOT NULL REFERENCES companies(id),
+  user_id     INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type        VARCHAR(50)  NOT NULL,   -- 'approval', 'rejection', 'comment', 'announcement', etc.
+  title       VARCHAR(255) NOT NULL,
+  body        TEXT,
+  link        VARCHAR(255),
+  read_at     TIMESTAMP,
+  created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_inbox_user_id    ON inbox(user_id);
+CREATE INDEX IF NOT EXISTS idx_inbox_company_id ON inbox(company_id);
+
+-- =============================================================================
+-- ALTER TABLE migrations (safe to re-run on existing databases)
+-- =============================================================================
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS stripe_customer_id     VARCHAR(255);
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(255);
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS pro_addon              BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS billing_cycle          VARCHAR(10) NOT NULL DEFAULT 'monthly';
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS annual_worker_count    INTEGER;
+-- plan values: free | starter | business  (trial companies default to full access until plan is set)
+

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { usePlan } from '../hooks/usePlan';
+import NotificationBell from '../components/NotificationBell';
 import WorkerMetrics from '../components/WorkerMetrics';
 import ManageWorkers from '../components/ManageWorkers';
 import ManageProjects from '../components/ManageProjects';
@@ -104,8 +106,24 @@ const ftStyles = {
   knob: { display: 'block', width: 16, height: 32, borderRadius: 5, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s', flexShrink: 0 },
 };
 
+function UpgradePrompt({ requiredPlan, feature }) {
+  const planName = requiredPlan === 'pro_addon' ? 'Pro add-on' : requiredPlan === 'business' ? 'Business' : 'Starter';
+  return (
+    <div style={{ background: '#f9fafb', border: '2px dashed #d1d5db', borderRadius: 10, padding: '32px 24px', textAlign: 'center', marginBottom: 24 }}>
+      <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
+      <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 6 }}>{feature} requires the {planName} plan</div>
+      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>Upgrade your subscription to unlock this feature.</div>
+      <button style={{ background: '#1a56db', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+        onClick={() => window.location.href = '/administration#billing'}>
+        View Plans →
+      </button>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const { logout, user } = useAuth();
+  const plan = usePlan();
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
@@ -160,6 +178,7 @@ export default function AdminDashboard() {
           {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         </div>
         <div style={styles.headerRight}>
+          <NotificationBell />
           <button style={styles.headerBtn} className="header-btn" onClick={logout}>Logout</button>
         </div>
       </header>
@@ -198,7 +217,7 @@ export default function AdminDashboard() {
         ) : tab === 'live' ? (
           <>
             <LiveKPIs />
-            <BroadcastMessage />
+            {plan.isBusiness ? <BroadcastMessage /> : null}
             {settings?.feature_chat !== false ? (
               <div style={styles.liveLayout} className="live-layout">
                 <div style={styles.liveMain}><LiveWorkers /></div>
@@ -211,7 +230,10 @@ export default function AdminDashboard() {
         ) : tab === 'analytics' ? (
           <>
             <h2 style={styles.heading}>Analytics</h2>
-            <AnalyticsDashboard />
+            {plan.isBusiness
+              ? <AnalyticsDashboard />
+              : <UpgradePrompt requiredPlan="business" feature="Full Analytics" />
+            }
           </>
         ) : tab === 'approvals' ? (
           <>
@@ -229,11 +251,11 @@ export default function AdminDashboard() {
             <h3 style={styles.subheading}>Project Reports</h3>
             <ProjectReports />
             <h3 style={styles.subheading}>Overtime Report</h3>
-            <OvertimeReport />
+            {plan.isStarter ? <OvertimeReport /> : <UpgradePrompt requiredPlan="starter" feature="Overtime Report" />}
             <h3 style={styles.subheading}>Certified Payroll</h3>
-            <CertifiedPayroll projects={projects} />
+            {plan.hasProAddon ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="pro_addon" feature="Certified Payroll (WH-347)" />}
             <h3 style={styles.subheading}>Export</h3>
-            <ExportPanel workers={workers} projects={projects} />
+            {plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature="CSV & Payroll Export" />}
           </>
         ) : tab === 'manage' ? (
           <>
@@ -249,7 +271,10 @@ export default function AdminDashboard() {
           <>
             <h2 style={styles.heading}>Settings</h2>
             <FeatureToggles settings={settings} onSettingsUpdated={setSettings} />
-            <QuickBooks workers={workers} projects={projects} />
+            {plan.hasProAddon
+              ? <QuickBooks workers={workers} projects={projects} />
+              : <UpgradePrompt requiredPlan="pro_addon" feature="QuickBooks Online Integration" />
+            }
           </>
         )}
       </main>

@@ -61,9 +61,27 @@ router.post('/login', loginLimiter, async (req, res) => {
   }
 });
 
-// Get current user
-router.get('/me', requireAuth, (req, res) => {
-  res.json({ user: req.user });
+// Get current user — includes live company billing info for client-side plan gating
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      'SELECT plan, subscription_status, pro_addon, trial_ends_at FROM companies WHERE id = $1',
+      [req.user.company_id]
+    );
+    const company = r.rows[0] || {};
+    res.json({
+      user: {
+        ...req.user,
+        plan: company.plan || 'free',
+        subscription_status: company.subscription_status,
+        pro_addon: company.pro_addon || false,
+        trial_ends_at: company.trial_ends_at,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // Register — creates a new company and its first admin user

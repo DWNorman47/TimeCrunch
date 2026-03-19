@@ -9,28 +9,46 @@ function getStripe() {
 }
 
 function planFromPrice(priceId) {
-  if (priceId === process.env.STRIPE_PRICE_PRO) return 'pro';
-  if (priceId === process.env.STRIPE_PRICE_STARTER) return 'starter';
-  return 'starter';
+  if (priceId === process.env.STRIPE_PRICE_BUSINESS_BASE ||
+      priceId === process.env.STRIPE_PRICE_BUSINESS_BASE_ANNUAL) return 'business';
+  if (priceId === process.env.STRIPE_PRICE_STARTER ||
+      priceId === process.env.STRIPE_PRICE_STARTER_ANNUAL) return 'starter';
+  return 'free';
 }
 
-// GET /stripe/plans — available pricing plans (price IDs from env)
+// GET /stripe/plans — available pricing plans
 router.get('/plans', requireAdmin, (req, res) => {
-  const plans = [];
-  if (process.env.STRIPE_PRICE_STARTER) {
-    plans.push({ id: 'starter', name: 'Starter', price_id: process.env.STRIPE_PRICE_STARTER, monthly: 49, description: 'Up to 10 workers, all core features' });
-  }
-  if (process.env.STRIPE_PRICE_PRO) {
-    plans.push({ id: 'pro', name: 'Pro', price_id: process.env.STRIPE_PRICE_PRO, monthly: 99, description: 'Unlimited workers, priority support, advanced reports' });
-  }
-  res.json(plans);
+  res.json({
+    starter: {
+      monthly_price_id: process.env.STRIPE_PRICE_STARTER,
+      annual_price_id: process.env.STRIPE_PRICE_STARTER_ANNUAL,
+      monthly: 19,
+      annual: 190, // ~$15.83/mo
+    },
+    business: {
+      base_monthly_price_id: process.env.STRIPE_PRICE_BUSINESS_BASE,
+      base_annual_price_id: process.env.STRIPE_PRICE_BUSINESS_BASE_ANNUAL,
+      worker_monthly_price_id: process.env.STRIPE_PRICE_BUSINESS_WORKER,
+      worker_annual_price_id: process.env.STRIPE_PRICE_BUSINESS_WORKER_ANNUAL,
+      base_monthly: 25,
+      base_annual: 250, // ~$20.83/mo
+      per_worker_monthly: 1,
+      per_worker_annual: 10,
+    },
+    pro_addon: {
+      monthly_price_id: process.env.STRIPE_PRICE_PRO_ADDON,
+      annual_price_id: process.env.STRIPE_PRICE_PRO_ADDON_ANNUAL,
+      monthly: 45,
+      annual: 450, // ~$37.50/mo
+    },
+  });
 });
 
 // GET /stripe/status
 router.get('/status', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT subscription_status, trial_ends_at, plan, stripe_customer_id, stripe_subscription_id FROM companies WHERE id = $1',
+      'SELECT subscription_status, trial_ends_at, plan, pro_addon, billing_cycle, stripe_customer_id, stripe_subscription_id FROM companies WHERE id = $1',
       [req.user.company_id]
     );
     res.json(result.rows[0] || {});
@@ -39,7 +57,7 @@ router.get('/status', requireAdmin, async (req, res) => {
 
 // POST /stripe/checkout — create Stripe Checkout session
 router.post('/checkout', requireAdmin, async (req, res) => {
-  const { price_id } = req.body;
+  const { price_id, worker_price_id, worker_count, add_pro_addon, pro_addon_price_id } = req.body;
   if (!price_id) return res.status(400).json({ error: 'price_id required' });
   try {
     const stripe = getStripe();
@@ -61,15 +79,23 @@ router.post('/checkout', requireAdmin, async (req, res) => {
       await pool.query('UPDATE companies SET stripe_customer_id = $1 WHERE id = $2', [customerId, req.user.company_id]);
     }
 
-    // If still in trial, carry the remaining trial days over to Stripe
     const trialEnd = c.trial_ends_at && new Date(c.trial_ends_at) > new Date()
       ? Math.floor(new Date(c.trial_ends_at).getTime() / 1000)
       : undefined;
 
+    // Build line items — base plan + optional per-worker + optional pro add-on
+    const lineItems = [{ price: price_id, quantity: 1 }];
+    if (worker_price_id && worker_count > 0) {
+      lineItems.push({ price: worker_price_id, quantity: parseInt(worker_count, 10) });
+    }
+    if (add_pro_addon && pro_addon_price_id) {
+      lineItems.push({ price: pro_addon_price_id, quantity: 1 });
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
-      line_items: [{ price: price_id, quantity: 1 }],
+      line_items: lineItems,
       success_url: `${process.env.APP_URL}/admin#billing`,
       cancel_url: `${process.env.APP_URL}/admin#billing`,
       subscription_data: {
@@ -97,8 +123,7 @@ router.post('/portal', requireAdmin, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to open billing portal' }); }
 });
 
-// POST /stripe/webhook — Stripe sends events here
-// NOTE: must receive raw body (configured in index.js before express.json)
+// POST /stripe/webhook
 router.post('/webhook', async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
@@ -117,26 +142,33 @@ router.post('/webhook', async (req, res) => {
       if (companyId && obj.subscription) {
         const stripe = getStripe();
         const sub = await stripe.subscriptions.retrieve(obj.subscription);
-        const plan = planFromPrice(sub.items.data[0]?.price?.id);
+        const items = sub.items.data;
+        const plan = planFromPrice(items[0]?.price?.id);
+        // Pro add-on is present if any item matches the pro_addon price IDs
+        const proIds = [process.env.STRIPE_PRICE_PRO_ADDON, process.env.STRIPE_PRICE_PRO_ADDON_ANNUAL].filter(Boolean);
+        const hasProAddon = items.some(i => proIds.includes(i.price.id));
         await pool.query(
-          'UPDATE companies SET stripe_subscription_id = $1, subscription_status = $2, plan = $3 WHERE id = $4',
-          [obj.subscription, 'active', plan, companyId]
+          'UPDATE companies SET stripe_subscription_id = $1, subscription_status = $2, plan = $3, pro_addon = $4 WHERE id = $5',
+          [obj.subscription, 'active', plan, hasProAddon, companyId]
         );
       }
     } else if (event.type === 'customer.subscription.updated') {
       const companyId = obj.metadata?.company_id;
       if (companyId) {
-        const plan = planFromPrice(obj.items?.data[0]?.price?.id);
+        const items = obj.items?.data || [];
+        const plan = planFromPrice(items[0]?.price?.id);
+        const proIds = [process.env.STRIPE_PRICE_PRO_ADDON, process.env.STRIPE_PRICE_PRO_ADDON_ANNUAL].filter(Boolean);
+        const hasProAddon = items.some(i => proIds.includes(i.price.id));
         await pool.query(
-          'UPDATE companies SET subscription_status = $1, plan = $2 WHERE id = $3',
-          [obj.status, plan, companyId]
+          'UPDATE companies SET subscription_status = $1, plan = $2, pro_addon = $3 WHERE id = $4',
+          [obj.status, plan, hasProAddon, companyId]
         );
       }
     } else if (event.type === 'customer.subscription.deleted') {
       const companyId = obj.metadata?.company_id;
       if (companyId) {
         await pool.query(
-          'UPDATE companies SET subscription_status = $1 WHERE id = $2',
+          'UPDATE companies SET subscription_status = $1, pro_addon = false WHERE id = $2',
           ['canceled', companyId]
         );
       }
