@@ -65,6 +65,7 @@ export default function BillingPanel() {
   const [workerCount, setWorkerCount] = useState(15);
   const [addProAddon, setAddProAddon] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [workerInputMode, setWorkerInputMode] = useState('slider');
 
   useEffect(() => {
     Promise.all([api.get('/stripe/status'), api.get('/stripe/plans')])
@@ -316,21 +317,41 @@ export default function BillingPanel() {
           </div>
 
           <div style={s.sliderWrap}>
-            <label style={s.sliderLabel}>
-              Team size (Business plan): <strong>{workerCount} workers</strong>
-              {workerCount > INCLUDED_WORKERS
-                ? <span style={{ color: '#7c3aed', marginLeft: 8 }}>
-                    {annual ? `$${businessAnnualTotal}/yr` : `$${businessMonthly}/mo`}
-                  </span>
-                : <span style={{ color: '#6b7280', marginLeft: 8 }}>included in base price</span>
-              }
-            </label>
-            <input type="range" min={INCLUDED_WORKERS} max={500} value={workerCount}
-              onChange={e => setWorkerCount(Number(e.target.value))}
-              style={{ width: '100%', accentColor: '#7c3aed' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af' }}>
-              <span>{INCLUDED_WORKERS} (included)</span><span>500+</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <label style={{ ...s.sliderLabel, marginBottom: 0 }}>
+                Team size (Business plan): <strong>{workerCount} workers</strong>
+                {workerCount > INCLUDED_WORKERS
+                  ? <span style={{ color: '#7c3aed', marginLeft: 8 }}>
+                      {annual ? `$${businessAnnualTotal}/yr` : `$${businessMonthly}/mo`}
+                    </span>
+                  : <span style={{ color: '#6b7280', marginLeft: 8 }}>included in base price</span>
+                }
+              </label>
+              <button
+                style={s.inputModeBtn}
+                onClick={() => setWorkerInputMode(m => m === 'slider' ? 'number' : 'slider')}
+              >
+                {workerInputMode === 'slider' ? '✎ Enter exact' : '⇄ Use slider'}
+              </button>
             </div>
+            {workerInputMode === 'slider' ? (
+              <>
+                <input type="range" min={INCLUDED_WORKERS} max={500} value={workerCount}
+                  onChange={e => setWorkerCount(Number(e.target.value))}
+                  style={{ width: '100%', accentColor: '#7c3aed' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af' }}>
+                  <span>{INCLUDED_WORKERS} (included)</span><span>500+</span>
+                </div>
+              </>
+            ) : (
+              <input
+                type="number"
+                min={INCLUDED_WORKERS}
+                value={workerCount}
+                onChange={e => setWorkerCount(Math.max(INCLUDED_WORKERS, Number(e.target.value) || INCLUDED_WORKERS))}
+                style={s.workerNumInput}
+              />
+            )}
           </div>
 
           <div style={s.addonCard}>
@@ -406,6 +427,8 @@ const s = {
   planBtn: { width: '100%', color: '#fff', border: 'none', padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 4, transition: 'opacity 0.15s' },
   sliderWrap: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '14px 16px', marginBottom: 14 },
   sliderLabel: { fontSize: 13, color: '#374151', display: 'block', marginBottom: 8 },
+  inputModeBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 },
+  workerNumInput: { width: 100, padding: '7px 10px', border: '1px solid #c7d2fe', borderRadius: 7, fontSize: 15, fontWeight: 700, color: '#7c3aed', textAlign: 'center' },
   addonCard: { border: '2px solid #fde68a', borderRadius: 10, padding: '14px 16px', background: '#fffbeb', marginBottom: 16 },
   addonTitle: { fontSize: 15, fontWeight: 700, color: '#92400e' },
   trialCta: { background: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: 10, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 },
