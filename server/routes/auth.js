@@ -217,10 +217,24 @@ router.post('/resend-confirmation', async (req, res) => {
 
 // Forgot password — sends reset email
 router.post('/forgot-password', authLimiter, async (req, res) => {
-  const { email } = req.body;
+  const { email, company } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
   try {
-    const result = await pool.query('SELECT * FROM users WHERE email = $1 AND active = true', [email]);
+    let result;
+    if (company && company.trim()) {
+      result = await pool.query(
+        `SELECT u.* FROM users u
+         JOIN companies c ON c.id = u.company_id
+         WHERE u.email = $1 AND LOWER(c.name) = LOWER($2) AND u.active = true
+         LIMIT 1`,
+        [email, company.trim()]
+      );
+    } else {
+      result = await pool.query(
+        'SELECT * FROM users WHERE email = $1 AND active = true LIMIT 1',
+        [email]
+      );
+    }
     // Always return success to avoid leaking whether the email exists
     if (result.rowCount === 0) return res.json({ success: true });
 
