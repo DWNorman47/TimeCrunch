@@ -7,6 +7,7 @@ const { requireAdmin, requirePlan, requireProAddon } = require('../middleware/au
 const { sendPushToUser, sendPushToAllWorkers } = require('../push');
 const { sendEmail } = require('../email');
 const { hoursWorked, computeOT } = require('../utils/payCalculations');
+const { createInboxItem } = require('./inbox');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -861,8 +862,11 @@ router.patch('/entries/:id/approve', requireAdmin, async (req, res) => {
       sendEmail(worker.rows[0].email, 'Time entry approved ✓',
         `<p>Hi ${worker.rows[0].full_name},</p><p>Your time entry for <b>${work_date?.toString().substring(0,10)}</b> (${start_time}–${end_time}) has been <b style="color:#059669">approved</b>.</p><p>— Time Crunch</p>`);
     }
-    sendPushToUser(result.rows[0].user_id, { title: 'Time entry approved', body: 'An admin approved your time entry.', url: '/dashboard' });
-    res.json(result.rows[0]);
+    const entry = result.rows[0];
+    sendPushToUser(entry.user_id, { title: 'Time entry approved', body: 'An admin approved your time entry.', url: '/dashboard' });
+    createInboxItem(entry.user_id, companyId, 'approval', 'Time entry approved ✓',
+      `Your entry for ${entry.work_date?.toString().substring(0,10)} (${entry.start_time}–${entry.end_time}) was approved.`, '/dashboard');
+    res.json(entry);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -888,12 +892,15 @@ router.patch('/entries/:id/reject', requireAdmin, async (req, res) => {
       sendEmail(rejWorker.rows[0].email, 'Time entry rejected',
         `<p>Hi ${rejWorker.rows[0].full_name},</p><p>Your time entry for <b>${work_date?.toString().substring(0,10)}</b> (${start_time}–${end_time}) was <b style="color:#ef4444">rejected</b>${note ? ` with the note: <i>${note}</i>` : ''}.</p><p>Please log in to review and resubmit.</p><p>— Time Crunch</p>`);
     }
-    sendPushToUser(result.rows[0].user_id, {
+    const rejEntry = result.rows[0];
+    sendPushToUser(rejEntry.user_id, {
       title: 'Time entry rejected',
       body: note ? `Reason: ${note}` : 'An admin rejected your time entry.',
       url: '/dashboard',
     });
-    res.json(result.rows[0]);
+    createInboxItem(rejEntry.user_id, companyId, 'rejection', 'Time entry rejected',
+      `Your entry for ${rejEntry.work_date?.toString().substring(0,10)} was rejected.${note ? ` Reason: ${note}` : ''}`, '/dashboard');
+    res.json(rejEntry);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -1193,6 +1200,14 @@ router.post('/broadcast', requireAdmin, requirePlan('business'), async (req, res
     body: message.trim(),
     url: '/dashboard',
   });
+  // Create inbox item for every active worker
+  const broadcastWorkers = await pool.query(
+    `SELECT id FROM users WHERE company_id = $1 AND role = 'worker' AND active = true`,
+    [companyId]
+  );
+  for (const w of broadcastWorkers.rows) {
+    createInboxItem(w.id, companyId, 'announcement', `📢 ${req.user.company_name || 'Announcement'}`, message.trim(), '/dashboard');
+  }
   await logAudit(companyId, req.user.id, req.user.full_name, 'broadcast.sent', null, null, null, { message: message.trim() });
   res.json({ sent: true });
 });

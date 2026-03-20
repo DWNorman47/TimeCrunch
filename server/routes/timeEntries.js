@@ -2,6 +2,7 @@ const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
+const { createInboxItem } = require('./inbox');
 
 // Get current user's entries
 router.get('/', requireAuth, async (req, res) => {
@@ -127,20 +128,29 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
     const entryOwner = await pool.query('SELECT user_id FROM time_entries WHERE id = $1', [req.params.id]);
     const ownerId = entryOwner.rows[0]?.user_id;
     const isWorker = req.user.role === 'worker';
+    const snippet = body.trim().substring(0, 100);
     if (isWorker) {
       // Worker commented — notify all company admins
       sendPushToCompanyAdmins(req.user.company_id, {
         title: `Comment from ${req.user.full_name}`,
-        body: body.trim().substring(0, 100),
+        body: snippet,
         url: '/admin#approvals',
       });
+      const admins = await pool.query(
+        `SELECT id FROM users WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true`,
+        [req.user.company_id]
+      );
+      for (const a of admins.rows) {
+        createInboxItem(a.id, req.user.company_id, 'comment', `Comment from ${req.user.full_name}`, snippet, '/admin#approvals');
+      }
     } else if (ownerId && ownerId !== req.user.id) {
       // Admin commented — notify the entry's worker
       sendPushToUser(ownerId, {
         title: `Comment from ${req.user.full_name}`,
-        body: body.trim().substring(0, 100),
+        body: snippet,
         url: '/dashboard',
       });
+      createInboxItem(ownerId, req.user.company_id, 'comment', `Comment from ${req.user.full_name}`, snippet, '/dashboard');
     }
     res.status(201).json(msg);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
@@ -265,11 +275,11 @@ router.post('/sign-off', requireAuth, async (req, res) => {
       [req.user.company_id]
     );
     if (admin.rowCount > 0) {
-      sendPushToUser(admin.rows[0].id, {
-        title: `${req.user.full_name} signed their timesheet`,
-        body: `${result.rowCount} entr${result.rowCount === 1 ? 'y' : 'ies'} ready for review`,
-        url: '/admin#approvals',
-      });
+      const adminId = admin.rows[0].id;
+      const signTitle = `${req.user.full_name} signed their timesheet`;
+      const signBody = `${result.rowCount} entr${result.rowCount === 1 ? 'y' : 'ies'} ready for review`;
+      sendPushToUser(adminId, { title: signTitle, body: signBody, url: '/admin#approvals' });
+      createInboxItem(adminId, req.user.company_id, 'signoff', signTitle, signBody, '/admin#approvals');
     }
     res.json({ signed: result.rowCount });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }

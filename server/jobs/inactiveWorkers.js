@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const pool = require('../db');
 const { sendPushToCompanyAdmins } = require('../push');
 const { sendEmail } = require('../email');
+const { createInboxItem } = require('../routes/inbox');
 
 async function checkInactiveWorkers() {
   try {
@@ -35,12 +36,24 @@ async function checkInactiveWorkers() {
       const count = inactive.rowCount;
       const names = inactive.rows.map(r => r.full_name).join(', ');
 
+      const alertTitle = `${count} inactive worker${count !== 1 ? 's' : ''}`;
+      const alertBody = `${names} ${count !== 1 ? 'have' : 'has'} no entries in ${inactive_days}+ days`;
+
       // Push to all company admins
       await sendPushToCompanyAdmins(companyId, {
-        title: `${count} inactive worker${count !== 1 ? 's' : ''}`,
-        body: `${names} ${count !== 1 ? 'have' : 'has'} no entries in ${inactive_days}+ days`,
+        title: alertTitle,
+        body: alertBody,
         url: '/admin#reports',
       });
+
+      // Inbox for all company admins
+      const adminRows = await pool.query(
+        `SELECT id FROM users WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true`,
+        [companyId]
+      );
+      for (const a of adminRows.rows) {
+        createInboxItem(a.id, companyId, 'inactive_workers', alertTitle, alertBody, '/admin#reports');
+      }
 
       // Email to first admin with an email address
       const adminResult = await pool.query(
