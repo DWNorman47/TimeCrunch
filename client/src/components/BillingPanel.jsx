@@ -128,10 +128,16 @@ export default function BillingPanel() {
   const trialDays = daysLeft(status?.trial_ends_at);
 
   const INCLUDED_WORKERS = 15;
-  const PER_WORKER_RATE = 2;
-  const BASE_BUSINESS = plans?.business.base_monthly ?? 35;
   const businessOverage = Math.max(0, workerCount - INCLUDED_WORKERS);
-  const businessMonthly = BASE_BUSINESS + businessOverage * PER_WORKER_RATE;
+
+  const BASE_MONTHLY = plans?.business.base_monthly ?? 35;
+  const PER_WORKER_MONTHLY = plans?.business.per_worker_monthly ?? 2;
+  const businessMonthly = BASE_MONTHLY + businessOverage * PER_WORKER_MONTHLY;
+
+  const BASE_ANNUAL = plans?.business.base_annual ?? 350;
+  const PER_WORKER_ANNUAL = plans?.business.per_worker_annual ?? 20;
+  const businessAnnualTotal = BASE_ANNUAL + businessOverage * PER_WORKER_ANNUAL;
+  const businessAnnualPerMonth = Math.round(businessAnnualTotal / 12);
 
   const showPlans = isTrial || isTrialExpired || sub === 'canceled' || !isActive;
 
@@ -260,23 +266,30 @@ export default function BillingPanel() {
               highlight
               tag="Most Popular"
               priceEl={
-                <><span style={{ fontSize: 28, fontWeight: 800 }}>${BASE_BUSINESS}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
+                annual
+                  ? <><span style={{ fontSize: 28, fontWeight: 800 }}>${businessAnnualPerMonth}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
+                  : <><span style={{ fontSize: 28, fontWeight: 800 }}>${BASE_MONTHLY}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
               }
               subline={
-                <span>
-                  Includes {INCLUDED_WORKERS} workers
-                  {businessOverage > 0
-                    ? <> + {businessOverage} extra = <strong style={{ color: '#7c3aed' }}>${businessMonthly}/mo</strong></>
-                    : <> · $2/worker after {INCLUDED_WORKERS}</>
-                  }
-                </span>
+                annual
+                  ? <span>
+                      ${businessAnnualTotal}/yr — 2 months free
+                      {businessOverage > 0 && <> · {businessOverage} extra workers</>}
+                    </span>
+                  : <span>
+                      Includes {INCLUDED_WORKERS} workers
+                      {businessOverage > 0
+                        ? <> + {businessOverage} extra = <strong style={{ color: '#7c3aed' }}>${businessMonthly}/mo</strong></>
+                        : <> · ${PER_WORKER_MONTHLY}/worker after {INCLUDED_WORKERS}</>
+                      }
+                    </span>
               }
               color="#7c3aed"
               current={currentPlan === 'business' && isActive}
               selected={selectedPlan === 'business'}
               features={[
                 { text: 'Everything in Starter' },
-                { text: `${INCLUDED_WORKERS} workers included, $2/worker after` },
+                { text: `${INCLUDED_WORKERS} workers included, $${PER_WORKER_MONTHLY}/worker after` },
                 { text: 'Broadcast announcements' },
                 { text: 'Field reports & daily reports' },
                 { text: 'Safety talks / toolbox talks' },
@@ -287,7 +300,7 @@ export default function BillingPanel() {
               btnLabel={
                 currentPlan === 'business' && isActive ? 'Current Plan'
                   : isTrial ? (selectedPlan === 'business' ? '✓ Business Selected' : 'Choose Business')
-                  : `Subscribe — $${businessMonthly}/mo`
+                  : annual ? `Subscribe — $${businessAnnualTotal}/yr` : `Subscribe — $${businessMonthly}/mo`
               }
               disabled={!!redirecting || (currentPlan === 'business' && isActive)}
               onSelect={() => isTrial
@@ -306,7 +319,9 @@ export default function BillingPanel() {
             <label style={s.sliderLabel}>
               Team size (Business plan): <strong>{workerCount} workers</strong>
               {workerCount > INCLUDED_WORKERS
-                ? <span style={{ color: '#7c3aed', marginLeft: 8 }}>${businessMonthly}/mo</span>
+                ? <span style={{ color: '#7c3aed', marginLeft: 8 }}>
+                    {annual ? `$${businessAnnualTotal}/yr` : `$${businessMonthly}/mo`}
+                  </span>
                 : <span style={{ color: '#6b7280', marginLeft: 8 }}>included in base price</span>
               }
             </label>
@@ -337,7 +352,13 @@ export default function BillingPanel() {
             <div style={s.trialCta}>
               <div style={{ fontSize: 14, color: '#111827' }}>
                 Ready to subscribe to <strong style={{ textTransform: 'capitalize' }}>{selectedPlan}</strong>?
-                {selectedPlan === 'business' && <span style={{ color: '#6b7280' }}> ({workerCount} workers = ${businessMonthly}/mo)</span>}
+                {selectedPlan === 'business' && (
+                  <span style={{ color: '#6b7280' }}>
+                    {annual
+                      ? ` (${workerCount} workers = $${businessAnnualTotal}/yr)`
+                      : ` (${workerCount} workers = $${businessMonthly}/mo)`}
+                  </span>
+                )}
               </div>
               <button style={s.ctaBtn} onClick={subscribeSelectedPlan} disabled={!!redirecting}>
                 {redirecting ? 'Redirecting...' : `Subscribe to ${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} — ${annual ? 'Annual' : 'Monthly'}`}
