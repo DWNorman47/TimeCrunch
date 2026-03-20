@@ -328,6 +328,7 @@ export default function BillingPanel() {
                 }
               </label>
               <button
+                className="worker-mode-btn"
                 style={s.inputModeBtn}
                 onClick={() => setWorkerInputMode(m => m === 'slider' ? 'number' : 'slider')}
               >

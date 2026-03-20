@@ -52,6 +52,12 @@ input, select, textarea {
   scroll-margin-top: calc(64px + env(safe-area-inset-top));
 }
 
+/* Worker count mode toggle: mobile only */
+.worker-mode-btn { display: none; }
+@media (max-width: 600px) {
+  .worker-mode-btn { display: inline-block !important; }
+}
+
 /* ── Mobile responsive ── */
 @media (max-width: 600px) {
 
