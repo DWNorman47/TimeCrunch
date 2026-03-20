@@ -22,24 +22,24 @@ router.get('/plans', requireAdmin, (req, res) => {
     starter: {
       monthly_price_id: process.env.STRIPE_PRICE_STARTER,
       annual_price_id: process.env.STRIPE_PRICE_STARTER_ANNUAL,
-      monthly: 19,
-      annual: 190, // ~$15.83/mo
+      monthly: 20,
+      annual: 200, // 2 months free
     },
     business: {
       base_monthly_price_id: process.env.STRIPE_PRICE_BUSINESS_BASE,
       base_annual_price_id: process.env.STRIPE_PRICE_BUSINESS_BASE_ANNUAL,
       worker_monthly_price_id: process.env.STRIPE_PRICE_BUSINESS_WORKER,
       worker_annual_price_id: process.env.STRIPE_PRICE_BUSINESS_WORKER_ANNUAL,
-      base_monthly: 25,
-      base_annual: 250, // ~$20.83/mo
-      per_worker_monthly: 1,
-      per_worker_annual: 10,
+      base_monthly: 35,
+      base_annual: 350, // 2 months free
+      per_worker_monthly: 2,
+      per_worker_annual: 20,
     },
     pro_addon: {
       monthly_price_id: process.env.STRIPE_PRICE_PRO_ADDON,
       annual_price_id: process.env.STRIPE_PRICE_PRO_ADDON_ANNUAL,
-      monthly: 45,
-      annual: 450, // ~$37.50/mo
+      monthly: 25,
+      annual: 250, // 2 months free
     },
   });
 });
