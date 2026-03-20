@@ -19,6 +19,7 @@ function StatusBadge({ status, trialEndsAt, plan }) {
   }
   if (status === 'past_due') return <span style={{ ...badge, background: '#fef2f2', color: '#991b1b' }}>⚠ Payment past due</span>;
   if (status === 'canceled') return <span style={{ ...badge, background: '#f3f4f6', color: '#374151' }}>Canceled</span>;
+  if (status === 'trial_expired') return <span style={{ ...badge, background: '#fef2f2', color: '#991b1b' }}>Trial ended</span>;
   return null;
 }
 
@@ -100,9 +101,10 @@ export default function BillingPanel() {
   const hasProAddon = status?.pro_addon;
   const isActive = sub === 'active';
   const isTrial = sub === 'trial';
+  const isTrialExpired = sub === 'trial_expired';
   const trialExpired = isTrial && daysLeft(status?.trial_ends_at) === 0;
   const trialNote = isTrial && daysLeft(status?.trial_ends_at) > 0;
-  const showPlans = !isActive || sub === 'canceled';
+  const showPlans = !isActive || sub === 'canceled' || isTrialExpired;
 
   const businessMonthly = plans ? plans.business.base_monthly + workerCount * plans.business.per_worker_monthly : null;
   const businessAnnualBase = plans ? plans.business.base_annual : null;
@@ -127,9 +129,9 @@ export default function BillingPanel() {
         </div>
       )}
 
-      {trialExpired && (
+      {(trialExpired || isTrialExpired) && (
         <div style={{ ...s.alert, background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' }}>
-          Your trial has expired. Choose a plan below to continue.
+          Your free trial has ended. Your data is safe — subscribe below to restore full access.
         </div>
       )}
 

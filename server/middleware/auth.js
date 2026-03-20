@@ -49,7 +49,7 @@ function requirePlan(minPlan) {
       const company = r.rows[0];
       if (!company) return res.status(403).json({ error: 'Company not found' });
 
-      if (company.subscription_status === 'canceled') {
+      if (company.subscription_status === 'canceled' || company.subscription_status === 'trial_expired') {
         return res.status(403).json({ error: 'Subscription required', code: 'subscription_required' });
       }
 
@@ -85,7 +85,7 @@ async function requireProAddon(req, res, next) {
     const company = r.rows[0];
     if (!company) return res.status(403).json({ error: 'Company not found' });
 
-    if (company.subscription_status === 'canceled') {
+    if (company.subscription_status === 'canceled' || company.subscription_status === 'trial_expired') {
       return res.status(403).json({ error: 'Subscription required', code: 'subscription_required' });
     }
 

@@ -56,4 +56,6 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   const { startInactiveWorkerJob } = require('./jobs/inactiveWorkers');
   startInactiveWorkerJob();
+  const { startExpireTrialsJob } = require('./jobs/expireTrials');
+  startExpireTrialsJob();
 });

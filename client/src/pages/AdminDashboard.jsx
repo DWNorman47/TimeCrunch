@@ -183,12 +183,18 @@ export default function AdminDashboard() {
         </div>
       </header>
 
+      {billing?.subscription_status === 'trial_expired' && (
+        <div style={{ ...styles.trialBanner, background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' }}>
+          ⚠ Your free trial has ended. Your data is safe.
+          {' '}<button style={styles.trialUpgradeBtn} onClick={() => window.location.href = '/administration#billing'}>Subscribe now →</button>
+        </div>
+      )}
       {billing?.subscription_status === 'trial' && (() => {
         const days = Math.max(0, Math.ceil((new Date(billing.trial_ends_at) - new Date()) / 86400000));
         if (days > 7) return null;
         return (
           <div style={{ ...styles.trialBanner, background: days <= 2 ? '#fef2f2' : '#fffbeb', borderColor: days <= 2 ? '#fecaca' : '#fcd34d', color: days <= 2 ? '#991b1b' : '#92400e' }}>
-            {days === 0 ? '⚠ Your trial has expired.' : `⏳ ${days} day${days !== 1 ? 's' : ''} left in your trial.`}
+            {`⏳ ${days} day${days !== 1 ? 's' : ''} left in your trial.`}
             {' '}<button style={styles.trialUpgradeBtn} onClick={() => window.location.href = '/administration#billing'}>Subscribe now →</button>
           </div>
         );

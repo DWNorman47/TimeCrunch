@@ -10,6 +10,7 @@ export function usePlan() {
   const status = user?.subscription_status || 'trial';
   const proAddon = user?.pro_addon || false;
   const isTrial = status === 'trial';
+  const isTrialExpired = status === 'trial_expired';
   const isActive = status === 'active' || isTrial;
 
   // Does the current plan meet or exceed minPlan?
@@ -25,6 +26,7 @@ export function usePlan() {
     status,
     proAddon,
     isTrial,
+    isTrialExpired,
     isActive,
     isFree: plan === 'free' && !isTrial,
     isStarter: atLeast('starter'),
