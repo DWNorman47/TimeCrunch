@@ -54,7 +54,7 @@ export default function BillingPanel() {
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState(null);
   const [annual, setAnnual] = useState(false);
-  const [workerCount, setWorkerCount] = useState(10);
+  const [workerCount, setWorkerCount] = useState(15);
   const [addProAddon, setAddProAddon] = useState(false);
 
   useEffect(() => {
@@ -106,7 +106,9 @@ export default function BillingPanel() {
   const trialNote = isTrial && daysLeft(status?.trial_ends_at) > 0;
   const showPlans = !isActive || sub === 'canceled' || isTrialExpired;
 
-  const businessMonthly = plans ? plans.business.base_monthly + workerCount * plans.business.per_worker_monthly : null;
+  const BUSINESS_INCLUDED = 15;
+  const extraWorkers = Math.max(0, workerCount - BUSINESS_INCLUDED);
+  const businessMonthly = plans ? plans.business.base_monthly + extraWorkers * plans.business.per_worker_monthly : null;
   const businessAnnualBase = plans ? plans.business.base_annual : null;
   const proAddonMonthly = plans ? plans.pro_addon.monthly : null;
 
@@ -194,10 +196,10 @@ export default function BillingPanel() {
               name="Starter"
               priceEl={
                 annual
-                  ? <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans ? Math.round(plans.starter.annual / 12) : 16}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
-                  : <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans?.starter.monthly ?? 19}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
+                  ? <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans ? Math.round(plans.starter.annual / 12) : 17}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
+                  : <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans?.starter.monthly ?? 20}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
               }
-              subline={annual ? `$${plans?.starter.annual ?? 190}/yr — 2 months free` : 'Up to 10 workers'}
+              subline={annual ? `$${plans?.starter.annual ?? 200}/yr — 2 months free` : 'Up to 10 workers'}
               color="#2563eb"
               current={currentPlan === 'starter' && isActive}
               tag={!annual ? null : null}
@@ -213,7 +215,7 @@ export default function BillingPanel() {
                 { text: 'Broadcast announcements', lock: true },
                 { text: 'Field reports, safety, punchlist', lock: true },
               ]}
-              btnLabel={currentPlan === 'starter' && isActive ? 'Current Plan' : `Subscribe — ${annual ? `$${plans?.starter.annual ?? 190}/yr` : `$${plans?.starter.monthly ?? 19}/mo`}`}
+              btnLabel={currentPlan === 'starter' && isActive ? 'Current Plan' : `Subscribe — ${annual ? `$${plans?.starter.annual ?? 200}/yr` : `$${plans?.starter.monthly ?? 20}/mo`}`}
               disabled={!!redirecting || (currentPlan === 'starter' && isActive)}
               onSelect={() => checkout(annual ? plans?.starter.annual_price_id : plans?.starter.monthly_price_id)}
             />
@@ -224,12 +226,13 @@ export default function BillingPanel() {
               highlight
               tag="Most Popular"
               priceEl={
-                <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans?.business.base_monthly ?? 25}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo + $1/worker</span></>
+                <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans?.business.base_monthly ?? 35}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo · 15 workers included</span></>
               }
               subline={
                 <span>
-                  {workerCount} workers = <strong style={{ color: '#7c3aed' }}>${plans ? plans.business.base_monthly + workerCount : 25 + workerCount}/mo</strong>
-                  {annual && <span style={{ color: '#059669', fontSize: 12 }}> (${plans ? plans.business.base_annual : 250}/yr base)</span>}
+                  {workerCount} workers = <strong style={{ color: '#7c3aed' }}>${plans ? plans.business.base_monthly + extraWorkers * plans.business.per_worker_monthly : 35 + extraWorkers * 2}/mo</strong>
+                  {extraWorkers > 0 && <span style={{ color: '#9ca3af', fontSize: 11 }}> ({extraWorkers} extra × $2)</span>}
+                  {annual && <span style={{ color: '#059669', fontSize: 12 }}> (${plans ? plans.business.base_annual : 350}/yr base)</span>}
                 </span>
               }
               color="#7c3aed"
@@ -246,13 +249,13 @@ export default function BillingPanel() {
                 { text: 'Certified payroll (WH-347)', lock: !addProAddon },
                 { text: 'QuickBooks Online sync', lock: !addProAddon },
               ]}
-              btnLabel={currentPlan === 'business' && isActive ? 'Current Plan' : `Subscribe — $${plans ? plans.business.base_monthly + workerCount : 25 + workerCount}/mo`}
+              btnLabel={currentPlan === 'business' && isActive ? 'Current Plan' : `Subscribe — $${plans ? plans.business.base_monthly + extraWorkers * plans.business.per_worker_monthly : 35 + extraWorkers * 2}/mo`}
               disabled={!!redirecting || (currentPlan === 'business' && isActive)}
               onSelect={() => checkout(
                 annual ? plans?.business.base_annual_price_id : plans?.business.base_monthly_price_id,
                 annual
-                  ? { worker_price_id: plans?.business.worker_annual_price_id, worker_count: workerCount }
-                  : { worker_price_id: plans?.business.worker_monthly_price_id, worker_count: workerCount }
+                  ? { worker_price_id: plans?.business.worker_annual_price_id, worker_count: extraWorkers }
+                  : { worker_price_id: plans?.business.worker_monthly_price_id, worker_count: extraWorkers }
               )}
             />
           </div>
@@ -260,9 +263,9 @@ export default function BillingPanel() {
           {/* Worker count slider for Business */}
           <div style={s.sliderWrap}>
             <label style={s.sliderLabel}>Workers on Business plan: <strong>{workerCount}</strong></label>
-            <input type="range" min={4} max={200} value={workerCount} onChange={e => setWorkerCount(Number(e.target.value))} style={{ width: '100%', accentColor: '#7c3aed' }} />
+            <input type="range" min={15} max={200} value={workerCount} onChange={e => setWorkerCount(Number(e.target.value))} style={{ width: '100%', accentColor: '#7c3aed' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af' }}>
-              <span>4</span><span>200+</span>
+              <span>15</span><span>200+</span>
             </div>
           </div>
 

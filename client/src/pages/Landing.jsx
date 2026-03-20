@@ -34,7 +34,7 @@ const plans = [
   },
   {
     name: 'Starter',
-    price: '$19',
+    price: '$20',
     period: '/mo',
     desc: 'More workers, more exports, more control.',
     features: ['Up to 10 workers', 'Everything in Free', 'Full history & CSV export', 'Overtime reports', 'Entry approvals', 'Pay period lock', 'Mileage & break tracking'],
@@ -43,10 +43,10 @@ const plans = [
   },
   {
     name: 'Business',
-    price: '$25',
-    period: '/mo + $1/worker',
-    desc: 'The full platform for growing contractors.',
-    features: ['Unlimited workers', 'Everything in Starter', 'Daily & field reports', 'Punchlist management', 'Safety talks & sign-off', 'Analytics dashboard', 'Broadcast announcements', 'Worker count controls'],
+    price: '$35',
+    period: '/mo · 15 workers included',
+    desc: 'The full platform for growing contractors. $2/worker after 15.',
+    features: ['15 workers included', 'Everything in Starter', 'Daily & field reports', 'Punchlist management', 'Safety talks & sign-off', 'Analytics dashboard', 'Broadcast announcements', '+$2/worker after 15'],
     cta: 'Start free trial',
     highlight: true,
   },
