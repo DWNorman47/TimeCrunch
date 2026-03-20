@@ -246,7 +246,6 @@ export default function BillingPanel() {
                 { text: 'Punchlist management' },
                 { text: 'Advanced analytics & trends' },
                 { text: 'Inactive worker alerts' },
-                { text: 'Certified payroll (WH-347)', lock: !addProAddon },
                 { text: 'QuickBooks Online sync', lock: !addProAddon },
               ]}
               btnLabel={currentPlan === 'business' && isActive ? 'Current Plan' : `Subscribe — $${plans ? plans.business.base_monthly + extraWorkers * plans.business.per_worker_monthly : 35 + extraWorkers * 2}/mo`}
@@ -274,16 +273,12 @@ export default function BillingPanel() {
             <div style={s.addonLeft}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <input type="checkbox" checked={addProAddon} onChange={e => setAddProAddon(e.target.checked)} style={{ accentColor: '#d97706', width: 16, height: 16 }} />
-                <span style={s.addonTitle}>+ Pro Add-on &nbsp;<span style={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}>${plans?.pro_addon.monthly ?? 45}</span><span style={{ fontSize: 13, color: '#9ca3af' }}>/mo</span></span>
+                <span style={s.addonTitle}>+ QuickBooks Add-on &nbsp;<span style={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}>${plans?.pro_addon.monthly ?? 25}</span><span style={{ fontSize: 13, color: '#9ca3af' }}>/mo</span></span>
               </label>
               <div style={s.addonFeatures}>
                 <div style={s.addonFeature}>
-                  <span style={{ color: '#d97706', fontWeight: 700 }}>Certified Payroll (WH-347)</span>
-                  <span style={s.addonDesc}> — Required for Davis-Bacon & prevailing wage government contracts. Generates weekly reports as a print-ready PDF.</span>
-                </div>
-                <div style={s.addonFeature}>
                   <span style={{ color: '#d97706', fontWeight: 700 }}>QuickBooks Online Sync</span>
-                  <span style={s.addonDesc}> — Push hours and payroll data directly to QuickBooks. No manual entry, no double-keying.</span>
+                  <span style={s.addonDesc}> — Push approved hours and payroll data directly to QuickBooks Online. No manual entry, no double-keying.</span>
                 </div>
               </div>
             </div>

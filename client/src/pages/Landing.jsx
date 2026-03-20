@@ -12,8 +12,7 @@ const features = [
   { icon: '📊', title: 'Analytics & Reports', body: 'Live dashboards, overtime alerts, weekly trends, and approval queues. Know your labor cost before payroll closes.' },
   { icon: '📬', title: 'Team Messaging', body: 'Broadcast announcements to the whole crew or message workers inline on timesheet disputes. No email required.' },
   { icon: '🔒', title: 'Pay Period Lock', body: 'Lock a pay period when payroll runs. Workers cannot edit entries inside locked periods. Audit trail included.' },
-  { icon: '📄', title: 'Certified Payroll', body: 'Generate certified payroll reports for public works and Davis-Bacon contracts with one click. Pro add-on.' },
-  { icon: '🔗', title: 'QuickBooks Integration', body: 'Push approved time entries directly into QuickBooks Online. Zero manual entry, zero double-keying. Pro add-on.' },
+  { icon: '🔗', title: 'QuickBooks Integration', body: 'Push approved time entries directly into QuickBooks Online. Zero manual entry, zero double-keying. Available as an add-on.' },
 ];
 
 const steps = [
@@ -51,11 +50,11 @@ const plans = [
     highlight: true,
   },
   {
-    name: 'Pro Add-on',
-    price: '+$45',
+    name: 'QBO Add-on',
+    price: '+$25',
     period: '/mo',
-    desc: 'For Davis-Bacon contracts and QuickBooks users.',
-    features: ['Certified payroll reports', 'QuickBooks Online sync', 'Requires Starter or Business'],
+    desc: 'Push hours directly into QuickBooks Online.',
+    features: ['QuickBooks Online sync', 'Zero manual entry', 'Requires Starter or Business'],
     cta: 'Learn more',
     highlight: false,
   },
