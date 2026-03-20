@@ -25,10 +25,15 @@ function StatusBadge({ status, trialEndsAt, plan }) {
 
 const badge = { padding: '4px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700 };
 
-function PlanCard({ name, priceEl, subline, features, color, highlight, tag, onSelect, btnLabel, disabled, current }) {
+function PlanCard({ name, priceEl, subline, features, color, highlight, tag, onSelect, btnLabel, disabled, current, selected }) {
   return (
-    <div style={{ ...s.planCard, ...(highlight ? s.planCardHighlight : {}), ...(current ? s.planCardCurrent : {}), borderColor: current ? '#059669' : highlight ? color : '#e5e7eb' }}>
-      {tag && <div style={{ ...s.planTag, background: color }}>{tag}</div>}
+    <div style={{
+      ...s.planCard,
+      borderColor: current ? '#059669' : selected ? color : highlight ? color : '#e5e7eb',
+      boxShadow: selected ? `0 0 0 3px ${color}22` : highlight ? '0 4px 20px rgba(124,58,237,0.12)' : undefined,
+    }}>
+      {tag && !selected && <div style={{ ...s.planTag, background: color }}>{tag}</div>}
+      {selected && <div style={{ ...s.selectedTag, background: color }}>✓ Selected</div>}
       <div style={s.planName}>{name}</div>
       <div style={{ ...s.planPrice, color }}>{priceEl}</div>
       {subline && <div style={s.planSubline}>{subline}</div>}
@@ -40,8 +45,11 @@ function PlanCard({ name, priceEl, subline, features, color, highlight, tag, onS
           </li>
         ))}
       </ul>
-      <button style={{ ...s.planBtn, background: current ? '#059669' : color, opacity: disabled ? 0.6 : 1 }}
-        onClick={onSelect} disabled={disabled}>
+      <button
+        style={{ ...s.planBtn, background: selected ? color : current ? '#059669' : color, opacity: disabled ? 0.6 : 1 }}
+        onClick={onSelect}
+        disabled={disabled}
+      >
         {btnLabel}
       </button>
     </div>
@@ -56,6 +64,7 @@ export default function BillingPanel() {
   const [annual, setAnnual] = useState(false);
   const [workerCount, setWorkerCount] = useState(15);
   const [addProAddon, setAddProAddon] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState(null);
 
   useEffect(() => {
     Promise.all([api.get('/stripe/status'), api.get('/stripe/plans')])
@@ -94,6 +103,20 @@ export default function BillingPanel() {
     }
   };
 
+  const subscribeSelectedPlan = () => {
+    if (!selectedPlan || selectedPlan === 'free') return;
+    if (selectedPlan === 'starter') {
+      checkout(annual ? plans?.starter.annual_price_id : plans?.starter.monthly_price_id);
+    } else if (selectedPlan === 'business') {
+      checkout(
+        annual ? plans?.business.base_annual_price_id : plans?.business.base_monthly_price_id,
+        annual
+          ? { worker_price_id: plans?.business.worker_annual_price_id, worker_count: workerCount }
+          : { worker_price_id: plans?.business.worker_monthly_price_id, worker_count: workerCount }
+      );
+    }
+  };
+
   if (loading) return <div style={s.card}><p style={{ color: '#888' }}>Loading billing info...</p></div>;
 
   const sub = status?.subscription_status;
@@ -102,15 +125,15 @@ export default function BillingPanel() {
   const isActive = sub === 'active';
   const isTrial = sub === 'trial';
   const isTrialExpired = sub === 'trial_expired';
-  const trialExpired = isTrial && daysLeft(status?.trial_ends_at) === 0;
-  const trialNote = isTrial && daysLeft(status?.trial_ends_at) > 0;
-  const showPlans = !isActive || sub === 'canceled' || isTrialExpired;
+  const trialDays = daysLeft(status?.trial_ends_at);
 
-  const BUSINESS_INCLUDED = 15;
-  const extraWorkers = Math.max(0, workerCount - BUSINESS_INCLUDED);
-  const businessMonthly = plans ? plans.business.base_monthly + extraWorkers * plans.business.per_worker_monthly : null;
-  const businessAnnualBase = plans ? plans.business.base_annual : null;
-  const proAddonMonthly = plans ? plans.pro_addon.monthly : null;
+  const INCLUDED_WORKERS = 15;
+  const PER_WORKER_RATE = 2;
+  const BASE_BUSINESS = plans?.business.base_monthly ?? 35;
+  const businessOverage = Math.max(0, workerCount - INCLUDED_WORKERS);
+  const businessMonthly = BASE_BUSINESS + businessOverage * PER_WORKER_RATE;
+
+  const showPlans = isTrial || isTrialExpired || sub === 'canceled' || !isActive;
 
   return (
     <div style={s.card}>
@@ -131,15 +154,21 @@ export default function BillingPanel() {
         </div>
       )}
 
-      {(trialExpired || isTrialExpired) && (
+      {isTrialExpired && (
         <div style={{ ...s.alert, background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' }}>
           Your free trial has ended. Your data is safe — subscribe below to restore full access.
         </div>
       )}
 
-      {isTrial && !trialExpired && (
+      {isTrial && (
         <div style={s.trialBanner}>
-          You're on a free trial with full access to all features. Subscribe before your trial ends to keep uninterrupted access — remaining trial days carry over at no extra charge.
+          <strong>You have full Business-level access during your trial.</strong>
+          {' '}Choose the plan that fits your team below — your selection won't change what you can do now.
+          {trialDays > 0 && (
+            <span style={{ display: 'block', marginTop: 6, fontSize: 12, color: '#1e40af' }}>
+              {trialDays} day{trialDays !== 1 ? 's' : ''} remaining — remaining trial days carry over when you subscribe.
+            </span>
+          )}
         </div>
       )}
 
@@ -147,7 +176,7 @@ export default function BillingPanel() {
         <div style={s.activeSection}>
           <p style={s.activeText}>
             Your <strong>{currentPlan === 'business' ? 'Business' : 'Starter'}</strong> plan is active
-            {hasProAddon ? ' with the Pro add-on (Certified Payroll & QuickBooks)' : ''}.
+            {hasProAddon ? ' with QuickBooks Online sync' : ''}.
           </p>
           <button style={s.portalBtn} onClick={portal} disabled={redirecting === 'portal'}>
             {redirecting === 'portal' ? 'Redirecting...' : 'Manage Subscription'}
@@ -157,7 +186,6 @@ export default function BillingPanel() {
 
       {showPlans && (
         <>
-          {/* Annual toggle */}
           <div style={s.toggleRow}>
             <span style={{ fontSize: 14, color: annual ? '#9ca3af' : '#111827', fontWeight: annual ? 400 : 600 }}>Monthly</span>
             <button style={{ ...s.toggle, background: annual ? '#1a56db' : '#e5e7eb' }} onClick={() => setAnnual(a => !a)}>
@@ -169,13 +197,13 @@ export default function BillingPanel() {
           </div>
 
           <div style={s.plans}>
-            {/* Free */}
             <PlanCard
               name="Free"
               priceEl={<span><span style={{ fontSize: 28, fontWeight: 800 }}>$0</span></span>}
               subline="Up to 3 workers"
               color="#6b7280"
               current={currentPlan === 'free' && isActive}
+              selected={selectedPlan === 'free'}
               features={[
                 { text: 'Clock in/out & time tracking' },
                 { text: 'Admin approval workflow' },
@@ -187,11 +215,11 @@ export default function BillingPanel() {
                 { text: 'CSV payroll export', lock: true },
                 { text: 'Full history', lock: true },
               ]}
-              btnLabel={currentPlan === 'free' && isActive ? 'Current Plan' : 'Continue Free'}
-              disabled={true}
+              btnLabel={currentPlan === 'free' && isActive ? 'Current Plan' : isTrial ? 'Choose Free' : 'Continue Free'}
+              disabled={currentPlan === 'free' && isActive}
+              onSelect={() => isTrial ? setSelectedPlan('free') : null}
             />
 
-            {/* Starter */}
             <PlanCard
               name="Starter"
               priceEl={
@@ -202,7 +230,7 @@ export default function BillingPanel() {
               subline={annual ? `$${plans?.starter.annual ?? 200}/yr — 2 months free` : 'Up to 10 workers'}
               color="#2563eb"
               current={currentPlan === 'starter' && isActive}
-              tag={!annual ? null : null}
+              selected={selectedPlan === 'starter'}
               features={[
                 { text: 'Everything in Free' },
                 { text: 'Up to 10 workers' },
@@ -215,78 +243,114 @@ export default function BillingPanel() {
                 { text: 'Broadcast announcements', lock: true },
                 { text: 'Field reports, safety, punchlist', lock: true },
               ]}
-              btnLabel={currentPlan === 'starter' && isActive ? 'Current Plan' : `Subscribe — ${annual ? `$${plans?.starter.annual ?? 200}/yr` : `$${plans?.starter.monthly ?? 20}/mo`}`}
+              btnLabel={
+                currentPlan === 'starter' && isActive ? 'Current Plan'
+                  : isTrial ? (selectedPlan === 'starter' ? '✓ Starter Selected' : 'Choose Starter')
+                  : `Subscribe — ${annual ? `$${plans?.starter.annual ?? 200}/yr` : `$${plans?.starter.monthly ?? 20}/mo`}`
+              }
               disabled={!!redirecting || (currentPlan === 'starter' && isActive)}
-              onSelect={() => checkout(annual ? plans?.starter.annual_price_id : plans?.starter.monthly_price_id)}
+              onSelect={() => isTrial
+                ? setSelectedPlan('starter')
+                : checkout(annual ? plans?.starter.annual_price_id : plans?.starter.monthly_price_id)
+              }
             />
 
-            {/* Business */}
             <PlanCard
               name="Business"
               highlight
               tag="Most Popular"
               priceEl={
-                <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans?.business.base_monthly ?? 35}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo · 15 workers included</span></>
+                <><span style={{ fontSize: 28, fontWeight: 800 }}>${BASE_BUSINESS}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
               }
               subline={
                 <span>
-                  {workerCount} workers = <strong style={{ color: '#7c3aed' }}>${plans ? plans.business.base_monthly + extraWorkers * plans.business.per_worker_monthly : 35 + extraWorkers * 2}/mo</strong>
-                  {extraWorkers > 0 && <span style={{ color: '#9ca3af', fontSize: 11 }}> ({extraWorkers} extra × $2)</span>}
-                  {annual && <span style={{ color: '#059669', fontSize: 12 }}> (${plans ? plans.business.base_annual : 350}/yr base)</span>}
+                  Includes {INCLUDED_WORKERS} workers
+                  {businessOverage > 0
+                    ? <> + {businessOverage} extra = <strong style={{ color: '#7c3aed' }}>${businessMonthly}/mo</strong></>
+                    : <> · $2/worker after {INCLUDED_WORKERS}</>
+                  }
                 </span>
               }
               color="#7c3aed"
               current={currentPlan === 'business' && isActive}
+              selected={selectedPlan === 'business'}
               features={[
                 { text: 'Everything in Starter' },
-                { text: 'Unlimited workers' },
+                { text: `${INCLUDED_WORKERS} workers included, $2/worker after` },
                 { text: 'Broadcast announcements' },
                 { text: 'Field reports & daily reports' },
                 { text: 'Safety talks / toolbox talks' },
                 { text: 'Punchlist management' },
                 { text: 'Advanced analytics & trends' },
                 { text: 'Inactive worker alerts' },
-                { text: 'QuickBooks Online sync', lock: !addProAddon },
               ]}
-              btnLabel={currentPlan === 'business' && isActive ? 'Current Plan' : `Subscribe — $${plans ? plans.business.base_monthly + extraWorkers * plans.business.per_worker_monthly : 35 + extraWorkers * 2}/mo`}
+              btnLabel={
+                currentPlan === 'business' && isActive ? 'Current Plan'
+                  : isTrial ? (selectedPlan === 'business' ? '✓ Business Selected' : 'Choose Business')
+                  : `Subscribe — $${businessMonthly}/mo`
+              }
               disabled={!!redirecting || (currentPlan === 'business' && isActive)}
-              onSelect={() => checkout(
-                annual ? plans?.business.base_annual_price_id : plans?.business.base_monthly_price_id,
-                annual
-                  ? { worker_price_id: plans?.business.worker_annual_price_id, worker_count: extraWorkers }
-                  : { worker_price_id: plans?.business.worker_monthly_price_id, worker_count: extraWorkers }
-              )}
+              onSelect={() => isTrial
+                ? setSelectedPlan('business')
+                : checkout(
+                  annual ? plans?.business.base_annual_price_id : plans?.business.base_monthly_price_id,
+                  annual
+                    ? { worker_price_id: plans?.business.worker_annual_price_id, worker_count: workerCount }
+                    : { worker_price_id: plans?.business.worker_monthly_price_id, worker_count: workerCount }
+                )
+              }
             />
           </div>
 
-          {/* Worker count slider for Business */}
           <div style={s.sliderWrap}>
-            <label style={s.sliderLabel}>Workers on Business plan: <strong>{workerCount}</strong></label>
-            <input type="range" min={15} max={200} value={workerCount} onChange={e => setWorkerCount(Number(e.target.value))} style={{ width: '100%', accentColor: '#7c3aed' }} />
+            <label style={s.sliderLabel}>
+              Team size (Business plan): <strong>{workerCount} workers</strong>
+              {workerCount > INCLUDED_WORKERS
+                ? <span style={{ color: '#7c3aed', marginLeft: 8 }}>${businessMonthly}/mo</span>
+                : <span style={{ color: '#6b7280', marginLeft: 8 }}>included in base price</span>
+              }
+            </label>
+            <input type="range" min={INCLUDED_WORKERS} max={200} value={workerCount}
+              onChange={e => setWorkerCount(Number(e.target.value))}
+              style={{ width: '100%', accentColor: '#7c3aed' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af' }}>
-              <span>15</span><span>200+</span>
+              <span>{INCLUDED_WORKERS} (included)</span><span>200+</span>
             </div>
           </div>
 
-          {/* Pro Add-on */}
           <div style={s.addonCard}>
-            <div style={s.addonLeft}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                <input type="checkbox" checked={addProAddon} onChange={e => setAddProAddon(e.target.checked)} style={{ accentColor: '#d97706', width: 16, height: 16 }} />
-                <span style={s.addonTitle}>+ QuickBooks Add-on &nbsp;<span style={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}>${plans?.pro_addon.monthly ?? 25}</span><span style={{ fontSize: 13, color: '#9ca3af' }}>/mo</span></span>
-              </label>
-              <div style={s.addonFeatures}>
-                <div style={s.addonFeature}>
-                  <span style={{ color: '#d97706', fontWeight: 700 }}>QuickBooks Online Sync</span>
-                  <span style={s.addonDesc}> — Push approved hours and payroll data directly to QuickBooks Online. No manual entry, no double-keying.</span>
-                </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+              <input type="checkbox" checked={addProAddon} onChange={e => setAddProAddon(e.target.checked)}
+                style={{ accentColor: '#d97706', width: 16, height: 16 }} />
+              <span style={s.addonTitle}>
+                + QuickBooks Online Sync &nbsp;
+                <span style={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}>${plans?.pro_addon.monthly ?? 25}</span>
+                <span style={{ fontSize: 13, color: '#9ca3af' }}>/mo</span>
+              </span>
+            </label>
+            <div style={{ paddingLeft: 26, fontSize: 12, color: '#6b7280', lineHeight: 1.5, marginTop: 6 }}>
+              Push approved hours and payroll data directly to QuickBooks Online. No manual entry, no double-keying.
+            </div>
+          </div>
+
+          {isTrial && selectedPlan && selectedPlan !== 'free' && (
+            <div style={s.trialCta}>
+              <div style={{ fontSize: 14, color: '#111827' }}>
+                Ready to subscribe to <strong style={{ textTransform: 'capitalize' }}>{selectedPlan}</strong>?
+                {selectedPlan === 'business' && <span style={{ color: '#6b7280' }}> ({workerCount} workers = ${businessMonthly}/mo)</span>}
+              </div>
+              <button style={s.ctaBtn} onClick={subscribeSelectedPlan} disabled={!!redirecting}>
+                {redirecting ? 'Redirecting...' : `Subscribe to ${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} — ${annual ? 'Annual' : 'Monthly'}`}
+              </button>
+              <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'center' }}>
+                You won't be charged until your trial ends. Remaining trial days carry over.
               </div>
             </div>
-          </div>
+          )}
 
-          {trialNote && (
+          {isTrial && !selectedPlan && (
             <p style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', marginTop: 8, fontStyle: 'italic' }}>
-              Remaining trial days carry over — you won't be charged until your trial ends.
+              Select a plan above to lock in your pricing before your trial ends.
             </p>
           )}
         </>
@@ -311,9 +375,8 @@ const s = {
   toggleKnob: { position: 'absolute', top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', display: 'block' },
   plans: { display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 },
   planCard: { flex: 1, minWidth: 200, border: '2px solid #e5e7eb', borderRadius: 12, padding: 20, display: 'flex', flexDirection: 'column', gap: 10, position: 'relative' },
-  planCardHighlight: { boxShadow: '0 4px 20px rgba(124,58,237,0.12)' },
-  planCardCurrent: {},
   planTag: { position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 12px', borderRadius: 20, whiteSpace: 'nowrap' },
+  selectedTag: { position: 'absolute', top: -11, right: 12, color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 12px', borderRadius: 20, whiteSpace: 'nowrap' },
   planName: { fontSize: 16, fontWeight: 700, color: '#111827' },
   planPrice: { display: 'flex', alignItems: 'baseline', gap: 2, flexWrap: 'wrap' },
   planSubline: { fontSize: 12, color: '#6b7280', marginTop: -6 },
@@ -322,10 +385,8 @@ const s = {
   planBtn: { width: '100%', color: '#fff', border: 'none', padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 4, transition: 'opacity 0.15s' },
   sliderWrap: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '14px 16px', marginBottom: 14 },
   sliderLabel: { fontSize: 13, color: '#374151', display: 'block', marginBottom: 8 },
-  addonCard: { border: '2px solid #fde68a', borderRadius: 10, padding: '14px 16px', background: '#fffbeb' },
-  addonLeft: { display: 'flex', flexDirection: 'column', gap: 10 },
+  addonCard: { border: '2px solid #fde68a', borderRadius: 10, padding: '14px 16px', background: '#fffbeb', marginBottom: 16 },
   addonTitle: { fontSize: 15, fontWeight: 700, color: '#92400e' },
-  addonFeatures: { display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 26 },
-  addonFeature: { fontSize: 12, color: '#374151', lineHeight: 1.5 },
-  addonDesc: { color: '#6b7280' },
+  trialCta: { background: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: 10, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 },
+  ctaBtn: { background: '#059669', color: '#fff', border: 'none', padding: '12px', borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: 'pointer' },
 };
