@@ -155,7 +155,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   return (
     <div style={styles.card}>
       <h3 style={styles.cardTitle}>Manage Projects</h3>
-      <form onSubmit={handleAdd} style={styles.form}>
+      <form onSubmit={handleAdd} style={styles.form} className="manage-projects-form">
         <input
           style={styles.input}
           placeholder="Project name..."
