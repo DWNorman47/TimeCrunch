@@ -2,48 +2,61 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 const features = [
-  { icon: '⏱', title: 'Clock In/Out with GPS', body: 'Workers clock in from their phone. Location is captured automatically so you know where the work happened.' },
-  { icon: '📊', title: 'Real-Time Reports', body: 'Live dashboards show who is clocked in right now. Worker and project reports break down regular, overtime, and prevailing wage hours.' },
+  { icon: '⏱', title: 'Time Clock & GPS', body: 'Workers clock in from their phone. Location is captured automatically so you know where the work happened — and geofencing keeps it honest.' },
+  { icon: '📋', title: 'Daily Reports', body: 'Superintendent-ready daily logs with weather, manpower, equipment, materials, and work performed. Submittal-ready in minutes.' },
+  { icon: '📸', title: 'Field Reports', body: 'Workers submit photo reports from the field — tagged with location, project, and time. No more texting images to the office.' },
+  { icon: '✅', title: 'Punchlist Management', body: 'Create, assign, and track deficiency items through to resolution. Priority flags and status tracking keep nothing slipping through.' },
+  { icon: '🦺', title: 'Safety Talks', body: 'Document toolbox talks with digital sign-off. Every worker signature is timestamped and stored — ready for inspection.' },
   { icon: '💵', title: 'Prevailing Wage Ready', body: 'Track regular and prevailing wage hours side-by-side with configurable rates, overtime multipliers, and daily or weekly OT rules.' },
-  { icon: '✅', title: 'Entry Approvals', body: 'Workers submit hours, admins review and approve before payroll. Bulk-approve or reject with a note.' },
-  { icon: '📅', title: 'Scheduling', body: 'Assign workers to shifts in advance. Workers see their upcoming schedule the moment they log in.' },
-  { icon: '🔒', title: 'Pay Period Lock', body: 'Lock a pay period when payroll runs. Workers cannot edit entries inside locked periods.' },
-  { icon: '☕', title: 'Break & Mileage Tracking', body: 'Log unpaid breaks (deducted automatically) and mileage per shift. Visible in timesheets and reports.' },
-  { icon: '📬', title: 'Worker Messaging', body: 'Workers flag disputes on any entry. Admins reply inline from the approval queue. No email required.' },
+  { icon: '📅', title: 'Crew Scheduling', body: 'Assign workers to shifts and projects in advance. Workers see their upcoming schedule the moment they log in.' },
+  { icon: '📊', title: 'Analytics & Reports', body: 'Live dashboards, overtime alerts, weekly trends, and approval queues. Know your labor cost before payroll closes.' },
+  { icon: '📬', title: 'Team Messaging', body: 'Broadcast announcements to the whole crew or message workers inline on timesheet disputes. No email required.' },
+  { icon: '🔒', title: 'Pay Period Lock', body: 'Lock a pay period when payroll runs. Workers cannot edit entries inside locked periods. Audit trail included.' },
+  { icon: '📄', title: 'Certified Payroll', body: 'Generate certified payroll reports for public works and Davis-Bacon contracts with one click. Pro add-on.' },
+  { icon: '🔗', title: 'QuickBooks Integration', body: 'Push approved time entries directly into QuickBooks Online. Zero manual entry, zero double-keying. Pro add-on.' },
 ];
 
 const steps = [
-  { num: '1', title: 'Create your company', body: 'Sign up in under a minute. No credit card required.' },
-  { num: '2', title: 'Add workers & projects', body: 'Invite workers by email or add them manually. Set up your job sites.' },
-  { num: '3', title: 'Track time from day one', body: 'Workers clock in on any device. You see everything in real time.' },
+  { num: '1', title: 'Create your company', body: 'Sign up in under a minute. No credit card required. Your crew can be clocked in today.' },
+  { num: '2', title: 'Add workers & projects', body: 'Invite workers by email or add them manually. Set up job sites with GPS boundaries.' },
+  { num: '3', title: 'Run your field operations', body: 'Time, reports, safety, punchlist — everything flows through one platform your whole crew already has in their pocket.' },
 ];
 
 const plans = [
   {
+    name: 'Free',
+    price: '$0',
+    period: '',
+    desc: 'For small crews just getting started.',
+    features: ['Up to 3 workers', 'GPS time clock', 'Scheduling (1 week ahead)', 'Timesheet PDF (latest week)', '90-day history'],
+    cta: 'Get started free',
+    highlight: false,
+  },
+  {
     name: 'Starter',
-    price: '$29',
+    price: '$19',
     period: '/mo',
-    desc: 'Perfect for small crews just getting started.',
-    features: ['Up to 10 workers', 'Unlimited projects', 'Time tracking & GPS', 'Basic reports & CSV export', 'Email support'],
+    desc: 'More workers, more exports, more control.',
+    features: ['Up to 10 workers', 'Everything in Free', 'Full history & CSV export', 'Overtime reports', 'Entry approvals', 'Pay period lock', 'Mileage & break tracking'],
     cta: 'Start free trial',
     highlight: false,
   },
   {
-    name: 'Growth',
-    price: '$79',
-    period: '/mo',
-    desc: 'Everything you need to run a larger team.',
-    features: ['Up to 50 workers', 'Everything in Starter', 'Entry approvals & scheduling', 'Pay period lock', 'Break & mileage tracking', 'Analytics dashboard', 'Priority support'],
+    name: 'Business',
+    price: '$25',
+    period: '/mo + $1/worker',
+    desc: 'The full platform for growing contractors.',
+    features: ['Unlimited workers', 'Everything in Starter', 'Daily & field reports', 'Punchlist management', 'Safety talks & sign-off', 'Analytics dashboard', 'Broadcast announcements', 'Worker count controls'],
     cta: 'Start free trial',
     highlight: true,
   },
   {
-    name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    desc: 'For large contractors with complex needs.',
-    features: ['Unlimited workers', 'Everything in Growth', 'QuickBooks integration', 'Custom overtime rules', 'Dedicated onboarding', 'SLA support'],
-    cta: 'Contact us',
+    name: 'Pro Add-on',
+    price: '+$45',
+    period: '/mo',
+    desc: 'For Davis-Bacon contracts and QuickBooks users.',
+    features: ['Certified payroll reports', 'QuickBooks Online sync', 'Requires Starter or Business'],
+    cta: 'Learn more',
     highlight: false,
   },
 ];
@@ -75,9 +88,9 @@ export default function Landing() {
       {/* Hero */}
       <section style={styles.hero}>
         <div style={styles.heroBadge}>Built for contractors &amp; field crews</div>
-        <h1 style={styles.heroTitle}>Time tracking that<br />actually fits the job site</h1>
+        <h1 style={styles.heroTitle}>Operations management<br />for the job site</h1>
         <p style={styles.heroSub}>
-          Clock in with GPS, track prevailing wage, approve entries, schedule shifts, and run payroll reports — all in one place. No spreadsheets. No guesswork.
+          Time tracking, daily reports, field photos, punchlist, safety talks, and crew scheduling — all in one platform your whole team carries in their pocket.
         </p>
         <div style={styles.heroCtas}>
           <Link to="/register" style={styles.heroBtn}>Create your free account</Link>
@@ -88,7 +101,7 @@ export default function Landing() {
 
       {/* Social proof bar */}
       <div style={styles.proofBar}>
-        {['GPS clock-in', 'Prevailing wage', 'Entry approvals', 'Scheduling', 'Pay period lock', 'Live map view'].map(t => (
+        {['GPS time clock', 'Daily reports', 'Field photos', 'Punchlist', 'Safety talks', 'Certified payroll', 'QuickBooks sync'].map(t => (
           <span key={t} style={styles.proofItem}>✓ {t}</span>
         ))}
       </div>
@@ -96,8 +109,8 @@ export default function Landing() {
       {/* Features */}
       <section id="features" style={styles.section} className="landing-section">
         <div style={styles.sectionInner}>
-          <h2 style={styles.sectionTitle}>Everything your crew needs</h2>
-          <p style={styles.sectionSub}>From clock-in to payroll, every step is covered.</p>
+          <h2 style={styles.sectionTitle}>One platform. Every part of the job.</h2>
+          <p style={styles.sectionSub}>From first clock-in to final sign-off, every workflow is covered.</p>
           <div style={styles.featureGrid}>
             {features.map(f => (
               <div key={f.title} style={styles.featureCard}>
@@ -150,7 +163,7 @@ export default function Landing() {
                   ))}
                 </ul>
                 <Link
-                  to={p.cta === 'Contact us' ? '/login' : '/register'}
+                  to={p.cta === 'Learn more' ? '/register' : '/register'}
                   style={{ ...styles.planBtn, ...(p.highlight ? styles.planBtnHighlight : {}) }}
                 >
                   {p.cta}
@@ -158,13 +171,14 @@ export default function Landing() {
               </div>
             ))}
           </div>
+          <p style={styles.annualNote}>Annual plans available with 2 months free — choose at checkout.</p>
         </div>
       </section>
 
       {/* Final CTA */}
       <section style={styles.finalCta}>
-        <h2 style={styles.finalCtaTitle}>Ready to stop guessing and start tracking?</h2>
-        <p style={styles.finalCtaSub}>Join contractors already using OpsFloa to run tighter crews and cleaner payroll.</p>
+        <h2 style={styles.finalCtaTitle}>Your crew is already on the job site. Give them the tools to match.</h2>
+        <p style={styles.finalCtaSub}>Join contractors using OpsFloa to run tighter crews, cleaner reports, and faster payroll.</p>
         <Link to="/register" style={styles.finalCtaBtn}>Create your free account →</Link>
       </section>
 
@@ -198,7 +212,7 @@ const styles = {
   hero: { textAlign: 'center', padding: '100px 24px 80px', background: 'linear-gradient(160deg, #f0f4ff 0%, #fafbff 50%, #fff 100%)' },
   heroBadge: { display: 'inline-block', background: '#e0e7ff', color: '#3730a3', fontSize: 13, fontWeight: 700, padding: '4px 14px', borderRadius: 20, marginBottom: 20, letterSpacing: '0.03em' },
   heroTitle: { fontSize: 52, fontWeight: 900, lineHeight: 1.1, marginBottom: 22, color: '#111827', maxWidth: 680, margin: '0 auto 22px' },
-  heroSub: { fontSize: 19, color: '#4b5563', maxWidth: 560, margin: '0 auto 36px', lineHeight: 1.7 },
+  heroSub: { fontSize: 19, color: '#4b5563', maxWidth: 600, margin: '0 auto 36px', lineHeight: 1.7 },
   heroCtas: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 14, flexWrap: 'wrap' },
   heroBtn: { display: 'inline-block', background: '#1a56db', color: '#fff', padding: '15px 34px', borderRadius: 10, fontWeight: 700, fontSize: 16, textDecoration: 'none', boxShadow: '0 4px 14px rgba(26,86,219,0.35)' },
   heroSecondary: { color: '#1a56db', fontWeight: 600, fontSize: 15, textDecoration: 'none' },
@@ -230,24 +244,25 @@ const styles = {
   stepBody: { fontSize: 14, color: '#6b7280', lineHeight: 1.6 },
 
   // Pricing
-  pricingGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24, maxWidth: 900, margin: '0 auto' },
+  pricingGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 24, maxWidth: 960, margin: '0 auto' },
   planCard: { background: '#fff', borderRadius: 16, padding: '32px 28px', border: '2px solid #e5e7eb', position: 'relative' },
   planHighlight: { border: '2px solid #1a56db', boxShadow: '0 8px 32px rgba(26,86,219,0.15)' },
   popularBadge: { position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)', background: '#1a56db', color: '#fff', fontSize: 12, fontWeight: 700, padding: '4px 16px', borderRadius: 20, whiteSpace: 'nowrap' },
   planName: { fontSize: 14, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 },
-  planPrice: { display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 8 },
+  planPrice: { display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 8, flexWrap: 'wrap' },
   planAmount: { fontSize: 40, fontWeight: 800, color: '#111827' },
-  planPeriod: { fontSize: 15, color: '#9ca3af' },
+  planPeriod: { fontSize: 13, color: '#9ca3af' },
   planDesc: { fontSize: 13, color: '#6b7280', marginBottom: 20, lineHeight: 1.5 },
   planFeatures: { listStyle: 'none', padding: 0, margin: '0 0 24px', display: 'flex', flexDirection: 'column', gap: 8 },
   planFeatureItem: { fontSize: 13, color: '#374151', display: 'flex', alignItems: 'center', gap: 8 },
   check: { color: '#059669', fontWeight: 700 },
   planBtn: { display: 'block', textAlign: 'center', border: '2px solid #1a56db', color: '#1a56db', padding: '11px', borderRadius: 8, fontWeight: 700, fontSize: 14, textDecoration: 'none' },
   planBtnHighlight: { background: '#1a56db', color: '#fff' },
+  annualNote: { textAlign: 'center', fontSize: 13, color: '#9ca3af', marginTop: 28 },
 
   // Final CTA
   finalCta: { background: 'linear-gradient(135deg, #1a56db 0%, #1e40af 100%)', color: '#fff', textAlign: 'center', padding: '96px 24px' },
-  finalCtaTitle: { fontSize: 36, fontWeight: 800, marginBottom: 14, maxWidth: 580, margin: '0 auto 14px' },
+  finalCtaTitle: { fontSize: 36, fontWeight: 800, marginBottom: 14, maxWidth: 620, margin: '0 auto 14px', lineHeight: 1.2 },
   finalCtaSub: { fontSize: 17, opacity: 0.85, marginBottom: 36, lineHeight: 1.6 },
   finalCtaBtn: { display: 'inline-block', background: '#fff', color: '#1a56db', padding: '15px 34px', borderRadius: 10, fontWeight: 700, fontSize: 16, textDecoration: 'none' },
 
