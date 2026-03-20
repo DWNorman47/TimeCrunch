@@ -310,11 +310,11 @@ export default function BillingPanel() {
                 : <span style={{ color: '#6b7280', marginLeft: 8 }}>included in base price</span>
               }
             </label>
-            <input type="range" min={INCLUDED_WORKERS} max={200} value={workerCount}
+            <input type="range" min={INCLUDED_WORKERS} max={500} value={workerCount}
               onChange={e => setWorkerCount(Number(e.target.value))}
               style={{ width: '100%', accentColor: '#7c3aed' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af' }}>
-              <span>{INCLUDED_WORKERS} (included)</span><span>200+</span>
+              <span>{INCLUDED_WORKERS} (included)</span><span>500+</span>
             </div>
           </div>
 
