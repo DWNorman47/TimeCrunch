@@ -11,6 +11,25 @@ const { createInboxItem } = require('./inbox');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
+// Worker limits per plan (null = unlimited). Trial always gets unlimited.
+const WORKER_LIMITS = { free: 3, starter: 10, business: null };
+
+async function checkWorkerLimit(companyId) {
+  const company = await pool.query(
+    'SELECT plan, subscription_status FROM companies WHERE id = $1', [companyId]
+  );
+  const { plan, subscription_status } = company.rows[0] || {};
+  if (subscription_status === 'trial') return null; // trial = unlimited
+  const limit = WORKER_LIMITS[plan || 'free'];
+  if (limit === null) return null; // business = unlimited
+  const count = await pool.query(
+    `SELECT COUNT(*) FROM users WHERE company_id = $1 AND role = 'worker' AND active = true`,
+    [companyId]
+  );
+  const current = parseInt(count.rows[0].count, 10);
+  return current >= limit ? { limit, current, plan: plan || 'free' } : null;
+}
+
 async function logAudit(companyId, actorId, actorName, action, entityType, entityId, entityName, details) {
   try {
     await pool.query(
@@ -353,6 +372,20 @@ router.post('/workers/invite', requireAdmin, async (req, res) => {
   }
   const assignedRate = (!isNaN(rateVal) && rateVal >= 0) ? rateVal : 30;
 
+  // Enforce worker count limit (admins don't count against the limit)
+  if (assignedRole === 'worker') {
+    const overLimit = await checkWorkerLimit(companyId);
+    if (overLimit) {
+      const planName = overLimit.plan.charAt(0).toUpperCase() + overLimit.plan.slice(1);
+      return res.status(403).json({
+        error: `Worker limit reached. Your ${planName} plan allows up to ${overLimit.limit} workers (you have ${overLimit.current}). Upgrade to add more.`,
+        code: 'worker_limit_reached',
+        limit: overLimit.limit,
+        current: overLimit.current,
+      });
+    }
+  }
+
   // Auto-generate username from name
   const parts = full_name.trim().toLowerCase().split(/\s+/);
   const base = parts.length > 1 ? parts[0][0] + parts[parts.length - 1] : parts[0];
@@ -418,6 +451,21 @@ router.post('/workers', requireAdmin, async (req, res) => {
   }
   const assignedRate = (!isNaN(rateVal) && rateVal >= 0) ? rateVal : 30;
   const assignedEmail = req.body.email || null;
+
+  // Enforce worker count limit (admins don't count against the limit)
+  if (assignedRole === 'worker') {
+    const overLimit = await checkWorkerLimit(companyId);
+    if (overLimit) {
+      const planName = overLimit.plan.charAt(0).toUpperCase() + overLimit.plan.slice(1);
+      return res.status(403).json({
+        error: `Worker limit reached. Your ${planName} plan allows up to ${overLimit.limit} workers (you have ${overLimit.current}). Upgrade to add more.`,
+        code: 'worker_limit_reached',
+        limit: overLimit.limit,
+        current: overLimit.current,
+      });
+    }
+  }
+
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(

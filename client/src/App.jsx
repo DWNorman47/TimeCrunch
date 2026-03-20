@@ -16,12 +16,42 @@ import SuperAdmin from './pages/SuperAdmin';
 import InstallPrompt from './components/InstallPrompt';
 import { ToastProvider } from './contexts/ToastContext';
 
+const BLOCKED_STATUSES = ['trial_expired', 'canceled'];
+
+function WorkerSubscriptionWall() {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f6f9', padding: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: '40px 32px', maxWidth: 400, textAlign: 'center', boxShadow: '0 2px 16px rgba(0,0,0,0.08)' }}>
+        <div style={{ fontSize: 40, marginBottom: 16 }}>⏸</div>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#111827', marginBottom: 8 }}>Subscription ended</h2>
+        <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6 }}>
+          Your company's subscription has ended. Please contact your administrator to restore access.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function PrivateRoute({ children, adminOnly = false, superAdminOnly = false }) {
   const { user, loading } = useAuth();
   if (loading) return <div style={{ padding: 40 }}>Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (superAdminOnly && user.role !== 'super_admin') return <Navigate to="/" replace />;
   if (adminOnly && user.role !== 'admin' && user.role !== 'super_admin') return <Navigate to="/dashboard" replace />;
+
+  // Subscription gate — block access when trial expired or canceled
+  if (BLOCKED_STATUSES.includes(user.subscription_status)) {
+    const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+    if (isAdmin) {
+      // Admins can only reach /administration (billing) — redirect everything else
+      if (window.location.pathname !== '/administration') {
+        return <Navigate to="/administration" replace />;
+      }
+    } else {
+      return <WorkerSubscriptionWall />;
+    }
+  }
+
   return children;
 }
 
