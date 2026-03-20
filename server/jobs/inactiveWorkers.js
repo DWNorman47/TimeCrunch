@@ -93,7 +93,7 @@ async function checkInactiveWorkers() {
               <tbody>${rows}</tbody>
             </table>
             <p style="margin-top:20px">
-              <a href="${process.env.APP_URL}/admin#reports" style="color:#1a56db;font-weight:600">View reports in Time Crunch →</a>
+              <a href="${process.env.APP_URL}/admin#reports" style="color:#1a56db;font-weight:600">View reports in OpsFloa →</a>
             </p>
           </div>`
         );

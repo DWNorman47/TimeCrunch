@@ -52,7 +52,7 @@ export default function AcceptInvite() {
     <div style={styles.page}>
       <div style={styles.card}>
         <h2 style={styles.title}>Set your password</h2>
-        <p style={styles.sub}>Welcome to Time Crunch. Create a password to activate your account.</p>
+        <p style={styles.sub}>Welcome to OpsFloa. Create a password to activate your account.</p>
         <form onSubmit={handleSubmit} style={styles.form}>
           <input style={styles.input} type="password" placeholder="New password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
           <input style={styles.input} type="password" placeholder="Confirm password" value={confirm} onChange={e => setConfirm(e.target.value)} required />

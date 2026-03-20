@@ -47,7 +47,7 @@ export default function BillPDF({ data }) {
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        <Text style={s.title}>Time Crunch</Text>
+        <Text style={s.title}>OpsFloa</Text>
         <Text style={s.subtitle}>Work Report — {periodStr}</Text>
 
         <View style={s.section}>

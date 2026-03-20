@@ -25,7 +25,7 @@ export default function ForgotPassword() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <h1 style={styles.logo}>Time Crunch</h1>
+        <h1 style={styles.logo}>OpsFloa</h1>
         {sent ? (
           <>
             <h2 style={styles.title}>Check your email</h2>

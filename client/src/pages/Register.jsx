@@ -49,7 +49,7 @@ export default function Register() {
   if (confirming) return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <h1 style={styles.logo}>Time Crunch</h1>
+        <h1 style={styles.logo}>OpsFloa</h1>
         <div style={{ fontSize: 48, textAlign: 'center', marginBottom: 12 }}>📧</div>
         <h2 style={styles.title}>Check your email</h2>
         <p style={{ color: '#666', fontSize: 14, textAlign: 'center', marginBottom: 16 }}>
@@ -75,7 +75,7 @@ export default function Register() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <h1 style={styles.logo}>Time Crunch</h1>
+        <h1 style={styles.logo}>OpsFloa</h1>
         <h2 style={styles.title}>Create your account</h2>
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>Company name</label>

@@ -33,7 +33,7 @@ async function expireTrials() {
           admin.id, companyId,
           'trial_expired',
           'Your free trial has ended',
-          'Subscribe to keep your data and continue using Time Crunch.',
+          'Subscribe to keep your data and continue using OpsFloa.',
           '/administration#billing'
         );
 
@@ -41,11 +41,11 @@ async function expireTrials() {
         if (admin.email) {
           sendEmail(
             admin.email,
-            `Your Time Crunch trial has ended — ${companyName}`,
+            `Your OpsFloa trial has ended — ${companyName}`,
             `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px">
               <h2 style="color:#111827;margin-bottom:8px">Your free trial has ended</h2>
               <p style="color:#444;margin-bottom:16px">
-                Hi ${admin.full_name}, your 14-day trial of Time Crunch for <strong>${companyName}</strong> has expired.
+                Hi ${admin.full_name}, your 14-day trial of OpsFloa for <strong>${companyName}</strong> has expired.
               </p>
               <p style="color:#444;margin-bottom:24px">
                 Your data is safe — subscribe now to restore access. All your workers, projects, and time entries are waiting for you.

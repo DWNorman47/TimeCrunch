@@ -412,13 +412,13 @@ router.post('/workers/invite', requireAdmin, async (req, res) => {
     let emailSent = true;
     try {
       await sgMail.send({
-        from: { name: 'Time Crunch', email: process.env.SENDGRID_FROM_EMAIL },
+        from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
         to: email,
-        subject: `You've been invited to Time Crunch`,
+        subject: `You've been invited to OpsFloa`,
         html: `
           <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
             <h2 style="color:#1a56db;margin-bottom:8px">You're invited!</h2>
-            <p style="color:#444;margin-bottom:8px">Hi ${full_name}, ${req.user.full_name} has invited you to join Time Crunch.</p>
+            <p style="color:#444;margin-bottom:8px">Hi ${full_name}, ${req.user.full_name} has invited you to join OpsFloa.</p>
             <p style="color:#444;margin-bottom:24px">Your username is: <strong>${username}</strong></p>
             <a href="${inviteUrl}" style="display:inline-block;background:#1a56db;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700">Set your password</a>
             <p style="color:#999;font-size:13px;margin-top:24px">This invite expires in 7 days.</p>
@@ -908,7 +908,7 @@ router.patch('/entries/:id/approve', requireAdmin, async (req, res) => {
     if (worker.rows[0]?.email) {
       const { work_date, start_time, end_time } = result.rows[0];
       sendEmail(worker.rows[0].email, 'Time entry approved ✓',
-        `<p>Hi ${worker.rows[0].full_name},</p><p>Your time entry for <b>${work_date?.toString().substring(0,10)}</b> (${start_time}–${end_time}) has been <b style="color:#059669">approved</b>.</p><p>— Time Crunch</p>`);
+        `<p>Hi ${worker.rows[0].full_name},</p><p>Your time entry for <b>${work_date?.toString().substring(0,10)}</b> (${start_time}–${end_time}) has been <b style="color:#059669">approved</b>.</p><p>— OpsFloa</p>`);
     }
     const entry = result.rows[0];
     sendPushToUser(entry.user_id, { title: 'Time entry approved', body: 'An admin approved your time entry.', url: '/dashboard' });
@@ -938,7 +938,7 @@ router.patch('/entries/:id/reject', requireAdmin, async (req, res) => {
     if (rejWorker.rows[0]?.email) {
       const { work_date, start_time, end_time } = result.rows[0];
       sendEmail(rejWorker.rows[0].email, 'Time entry rejected',
-        `<p>Hi ${rejWorker.rows[0].full_name},</p><p>Your time entry for <b>${work_date?.toString().substring(0,10)}</b> (${start_time}–${end_time}) was <b style="color:#ef4444">rejected</b>${note ? ` with the note: <i>${note}</i>` : ''}.</p><p>Please log in to review and resubmit.</p><p>— Time Crunch</p>`);
+        `<p>Hi ${rejWorker.rows[0].full_name},</p><p>Your time entry for <b>${work_date?.toString().substring(0,10)}</b> (${start_time}–${end_time}) was <b style="color:#ef4444">rejected</b>${note ? ` with the note: <i>${note}</i>` : ''}.</p><p>Please log in to review and resubmit.</p><p>— OpsFloa</p>`);
     }
     const rejEntry = result.rows[0];
     sendPushToUser(rejEntry.user_id, {

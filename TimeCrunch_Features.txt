@@ -5,7 +5,7 @@ For marketing reference
 
 OVERVIEW
 --------
-Time Crunch is a cloud-based time tracking and field management platform built
+OpsFloa is a cloud-based time tracking and field management platform built
 for construction contractors and trades businesses. It covers the full workflow
 from workers clocking in on a job site to admin approving hours, running payroll
 reports, and billing clients — all from a phone or desktop, online or offline.
@@ -175,7 +175,7 @@ TIME ENTRY CSV EXPORT
 
 QUICKBOOKS ONLINE INTEGRATION
   Connect to QuickBooks Online via OAuth. Push time and payroll data directly
-  from Time Crunch into QuickBooks, eliminating double-entry. Supports employee
+  from OpsFloa into QuickBooks, eliminating double-entry. Supports employee
   mapping between the two systems.
 
 WORKER PAY STUBS
@@ -278,7 +278,7 @@ WORKS ON ANY DEVICE
   native-app feel.
 
 INSTALLABLE (PWA)
-  Time Crunch is a Progressive Web App. Workers can install it to their phone
+  OpsFloa is a Progressive Web App. Workers can install it to their phone
   home screen and launch it like a native app. An in-app prompt guides them
   through installation.
 
@@ -399,7 +399,7 @@ FREE TRIAL
 SUMMARY: WHO THIS IS FOR
 ================================================================================
 
-Time Crunch is designed for:
+OpsFloa is designed for:
 
   - General contractors
   - Specialty trade contractors (electrical, plumbing, HVAC, concrete, etc.)

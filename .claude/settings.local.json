@@ -7,7 +7,9 @@
       "Bash(npm.cmd install:*)",
       "Bash(powershell.exe *)",
       "Bash(find c:Usersv-normandWorkspacesTimeCrunch_Claudeserverdb -type f -name *.sql -o -name *.js)",
-      "Bash(find /c/Users/v-normand/Workspaces/TimeCrunch_Claude -type f \\\\\\(-name *.sql -o -name *migration* \\\\\\))"
+      "Bash(find /c/Users/v-normand/Workspaces/TimeCrunch_Claude -type f \\\\\\(-name *.sql -o -name *migration* \\\\\\))",
+      "Read(//c/Users/v-normand/.claude/projects/c--Users-v-normand-Workspaces-TimeCrunch-Claude/memory/**)",
+      "Bash(grep -rn \"Time Crunch\\\\|TimeCrunch\" --include=\"*.{js,jsx,json,txt,html,sql,md}\" .)"
     ]
   },
   "hooks": {
@@ -17,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -File \"C:\\Users\\v-normand\\Workspaces\\TimeCrunch_Claude\\.claude\\npm-install-hook.ps1\"",
+            "command": "powershell.exe -NoProfile -WindowStyle Hidden -File \"C:\\Users\\v-normand\\Workspaces\\TimeCrunch_Claude\\.claude\\npm-install-hook.ps1\"",
             "timeout": 120,
             "statusMessage": "Running npm install..."
           }

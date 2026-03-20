@@ -1,5 +1,5 @@
 -- =============================================================================
--- Time Crunch — full schema
+-- OpsFloa — full schema
 -- Run with: psql $DATABASE_URL -f schema.sql
 -- All statements use IF NOT EXISTS / IF EXISTS so they are safe to re-run.
 -- For an existing database, use the ALTER TABLE blocks at the bottom to add

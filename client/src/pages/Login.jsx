@@ -63,7 +63,7 @@ export default function Login() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>Time Crunch</h1>
+        <h1 style={styles.title}>OpsFloa</h1>
         <p style={styles.subtitle}>Track your time, simply.</p>
         {sessionExpired && (
           <p style={styles.sessionMsg}>Your session expired. Please sign in again.</p>
@@ -141,7 +141,7 @@ export default function Login() {
           <Link to="/forgot-password" style={styles.forgotLink}>Forgot password?</Link>
         </form>
         <p style={styles.registerLink}>
-          New to Time Crunch? <Link to="/register" style={styles.link}>Create an account</Link>
+          New to OpsFloa? <Link to="/register" style={styles.link}>Create an account</Link>
         </p>
       </div>
     </div>

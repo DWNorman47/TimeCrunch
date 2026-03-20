@@ -30,7 +30,7 @@ export default function ResetPassword() {
     return (
       <div style={styles.page}>
         <div style={styles.card}>
-          <h1 style={styles.logo}>Time Crunch</h1>
+          <h1 style={styles.logo}>OpsFloa</h1>
           <p style={styles.body}>Invalid reset link. <Link to="/forgot-password" style={styles.link}>Request a new one</Link>.</p>
         </div>
       </div>
@@ -40,7 +40,7 @@ export default function ResetPassword() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <h1 style={styles.logo}>Time Crunch</h1>
+        <h1 style={styles.logo}>OpsFloa</h1>
         <h2 style={styles.title}>Set a new password</h2>
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>New password</label>

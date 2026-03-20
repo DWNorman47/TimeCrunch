@@ -1,4 +1,4 @@
-# Time Crunch — Setup Guide
+# OpsFloa — Setup Guide
 
 ## Prerequisites
 - Node.js 18+

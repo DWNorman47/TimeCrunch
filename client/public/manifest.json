@@ -1,7 +1,7 @@
 {
-  "name": "Time Crunch",
-  "short_name": "TimeCrunch",
-  "description": "Time tracking for contractors and field crews",
+  "name": "OpsFloa",
+  "short_name": "OpsFloa",
+  "description": "Operations management for contractors and field crews",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f4f6f9",

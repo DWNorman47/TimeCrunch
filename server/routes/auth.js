@@ -131,13 +131,13 @@ router.post('/register', authLimiter, async (req, res) => {
 
     const confirmUrl = `${process.env.APP_URL}/confirm-email?token=${confirmToken}`;
     await sgMail.send({
-      from: { name: 'Time Crunch', email: process.env.SENDGRID_FROM_EMAIL },
+      from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
       to: email,
-      subject: 'Confirm your Time Crunch email',
+      subject: 'Confirm your OpsFloa email',
       html: `
         <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
           <h2 style="color:#1a56db;margin-bottom:8px">Confirm your email</h2>
-          <p style="color:#444;margin-bottom:24px">Hi ${full_name}, click below to confirm your email and activate your Time Crunch account.</p>
+          <p style="color:#444;margin-bottom:24px">Hi ${full_name}, click below to confirm your email and activate your OpsFloa account.</p>
           <a href="${confirmUrl}" style="display:inline-block;background:#1a56db;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700">Confirm email</a>
           <p style="color:#999;font-size:13px;margin-top:24px">This link expires in 24 hours.</p>
         </div>
@@ -196,9 +196,9 @@ router.post('/resend-confirmation', async (req, res) => {
     );
     const confirmUrl = `${process.env.APP_URL}/confirm-email?token=${confirmToken}`;
     await sgMail.send({
-      from: { name: 'Time Crunch', email: process.env.SENDGRID_FROM_EMAIL },
+      from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
       to: email,
-      subject: 'Confirm your Time Crunch email',
+      subject: 'Confirm your OpsFloa email',
       html: `
         <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
           <h2 style="color:#1a56db;margin-bottom:8px">Confirm your email</h2>
@@ -236,9 +236,9 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
     const resetUrl = `${process.env.APP_URL}/reset-password?token=${token}`;
 
     await sgMail.send({
-      from: { name: 'Time Crunch', email: process.env.SENDGRID_FROM_EMAIL },
+      from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
       to: email,
-      subject: 'Reset your Time Crunch password',
+      subject: 'Reset your OpsFloa password',
       html: `
         <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
           <h2 style="color:#1a56db;margin-bottom:8px">Reset your password</h2>

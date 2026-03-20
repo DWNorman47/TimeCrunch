@@ -94,7 +94,7 @@ router.post('/in', requireAuth, async (req, res) => {
           const admin = adminResult.rows[0];
           const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
           await sgMail.send({
-            from: { name: 'Time Crunch', email: process.env.SENDGRID_FROM_EMAIL },
+            from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
             to: admin.email,
             subject: `Unusual clock-in: ${req.user.full_name}`,
             html: `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px">

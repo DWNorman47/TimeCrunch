@@ -18,7 +18,7 @@ export default function ConfirmEmail() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <h1 style={styles.logo}>Time Crunch</h1>
+        <h1 style={styles.logo}>OpsFloa</h1>
         {status === 'loading' && <p style={styles.msg}>Confirming your email...</p>}
         {status === 'success' && (
           <>

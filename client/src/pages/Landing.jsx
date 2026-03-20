@@ -53,7 +53,7 @@ export default function Landing() {
     <div style={styles.page}>
       {/* Header */}
       <header style={styles.header} className="landing-header">
-        <span style={styles.logo}>Time Crunch</span>
+        <span style={styles.logo}>OpsFloa</span>
         <nav style={styles.nav} className="landing-nav">
           <a href="#features" style={styles.navLink}>Features</a>
           <a href="#how-it-works" style={styles.navLink}>How it works</a>
@@ -164,13 +164,13 @@ export default function Landing() {
       {/* Final CTA */}
       <section style={styles.finalCta}>
         <h2 style={styles.finalCtaTitle}>Ready to stop guessing and start tracking?</h2>
-        <p style={styles.finalCtaSub}>Join contractors already using Time Crunch to run tighter crews and cleaner payroll.</p>
+        <p style={styles.finalCtaSub}>Join contractors already using OpsFloa to run tighter crews and cleaner payroll.</p>
         <Link to="/register" style={styles.finalCtaBtn}>Create your free account →</Link>
       </section>
 
       <footer style={styles.footer}>
-        <span style={styles.footerLogo}>Time Crunch</span>
-        <span style={styles.footerCopy}>© {new Date().getFullYear()} Time Crunch. All rights reserved.</span>
+        <span style={styles.footerLogo}>OpsFloa</span>
+        <span style={styles.footerCopy}>© {new Date().getFullYear()} OpsFloa. All rights reserved.</span>
         <div style={styles.footerLinks}>
           <Link to="/login" style={styles.footerLink}>Log in</Link>
           <Link to="/register" style={styles.footerLink}>Sign up</Link>

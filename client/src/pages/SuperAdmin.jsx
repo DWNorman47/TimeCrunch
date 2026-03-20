@@ -44,7 +44,7 @@ export default function SuperAdmin() {
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.logoGroup}>
-          <span style={styles.logo}>Time Crunch</span>
+          <span style={styles.logo}>OpsFloa</span>
           <span style={styles.superBadge}>Super Admin</span>
         </div>
         <div style={styles.headerRight}>

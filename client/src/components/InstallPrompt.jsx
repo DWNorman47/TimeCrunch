@@ -91,7 +91,7 @@ export default function InstallPrompt() {
 
       {platform === 'ios' && (
         <>
-          <div style={styles.heading}>Install Time Crunch</div>
+          <div style={styles.heading}>Install OpsFloa</div>
           <div style={styles.steps}>
             <Step n={1}>Tap the <strong>Share</strong> button <ShareIcon /> at the bottom of Safari</Step>
             <Step n={2}>Scroll down and tap <strong>"Add to Home Screen"</strong></Step>
@@ -112,10 +112,10 @@ export default function InstallPrompt() {
 
       {platform === 'android' && (
         <>
-          <div style={styles.heading}>Install Time Crunch</div>
+          <div style={styles.heading}>Install OpsFloa</div>
           {deferredPrompt ? (
             <>
-              <div style={styles.body}>Add Time Crunch to your home screen for quick clock-in access.</div>
+              <div style={styles.body}>Add OpsFloa to your home screen for quick clock-in access.</div>
               <button style={styles.installBtn} onClick={androidInstall} disabled={installing}>
                 {installing ? 'Installing...' : 'Add to Home Screen'}
               </button>

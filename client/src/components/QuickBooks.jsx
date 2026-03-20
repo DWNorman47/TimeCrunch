@@ -110,7 +110,7 @@ export default function QuickBooks({ workers, projects }) {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>TimeCrunch Worker</th>
+                    <th style={styles.th}>OpsFloa Worker</th>
                     <th style={styles.th}>QuickBooks Employee</th>
                   </tr>
                 </thead>
@@ -144,7 +144,7 @@ export default function QuickBooks({ workers, projects }) {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>TimeCrunch Project</th>
+                    <th style={styles.th}>OpsFloa Project</th>
                     <th style={styles.th}>QuickBooks Customer / Job</th>
                   </tr>
                 </thead>
