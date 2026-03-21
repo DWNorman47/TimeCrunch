@@ -36,17 +36,34 @@ async function refreshAccessToken(companyId) {
   const refreshToken = result.rows[0]?.qbo_refresh_token;
   if (!refreshToken) throw new Error('QuickBooks not connected');
 
-  const r = await axios.post(TOKEN_URL,
-    new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
-    { headers: { Authorization: basicAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' } }
-  );
+  try {
+    const r = await axios.post(TOKEN_URL,
+      new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+      { headers: { Authorization: basicAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
 
-  const expiresAt = new Date(Date.now() + r.data.expires_in * 1000);
-  await pool.query(
-    'UPDATE companies SET qbo_access_token = $1, qbo_refresh_token = $2, qbo_token_expires_at = $3 WHERE id = $4',
-    [r.data.access_token, r.data.refresh_token, expiresAt, companyId]
-  );
-  return r.data.access_token;
+    const expiresAt = new Date(Date.now() + r.data.expires_in * 1000);
+    await pool.query(
+      'UPDATE companies SET qbo_access_token = $1, qbo_refresh_token = $2, qbo_token_expires_at = $3 WHERE id = $4',
+      [r.data.access_token, r.data.refresh_token, expiresAt, companyId]
+    );
+    return r.data.access_token;
+  } catch (err) {
+    // Expired refresh token or revoked access — clear connection and prompt user to reconnect
+    const status = err.response?.status;
+    const errorCode = err.response?.data?.error;
+    if (status === 400 && (errorCode === 'invalid_grant' || errorCode === 'Token expired')) {
+      await pool.query(
+        `UPDATE companies
+         SET qbo_access_token = NULL, qbo_refresh_token = NULL,
+             qbo_token_expires_at = NULL, qbo_disconnected = true
+         WHERE id = $1`,
+        [companyId]
+      );
+      throw new Error('QuickBooks authorization expired. Please reconnect your QuickBooks account.');
+    }
+    throw err;
+  }
 }
 
 async function getAccessToken(companyId) {

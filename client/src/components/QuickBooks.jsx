@@ -81,6 +81,11 @@ export default function QuickBooks({ workers, projects }) {
     <div style={styles.wrap}>
       <div style={styles.section}>
         <h3 style={styles.sectionTitle}>Connection</h3>
+        {status.disconnected && (
+          <div style={styles.reconnectBanner}>
+            ⚠ Your QuickBooks authorization expired or was revoked. Reconnect to resume syncing.
+          </div>
+        )}
         {status.connected ? (
           <div style={styles.connectedBox}>
             <span style={styles.connectedDot} />
@@ -94,7 +99,7 @@ export default function QuickBooks({ workers, projects }) {
           <div>
             <p style={styles.hint}>Connect your QuickBooks Online account to push time entries directly.</p>
             <button style={styles.connectBtn} onClick={handleConnect}>
-              Connect to QuickBooks
+              {status.disconnected ? 'Reconnect to QuickBooks' : 'Connect to QuickBooks'}
             </button>
           </div>
         )}
@@ -233,4 +238,5 @@ const styles = {
   dateInput: { padding: '8px 10px', border: '1px solid #ddd', borderRadius: 7, fontSize: 14 },
   pushBtn: { background: '#2CA01C', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontWeight: 700, fontSize: 14, cursor: 'pointer' },
   resultBox: { marginTop: 16, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '14px 16px' },
+  reconnectBanner: { background: '#fffbeb', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 14 },
 };

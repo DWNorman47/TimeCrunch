@@ -358,6 +358,8 @@ ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_refresh_token     TEXT;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_realm_id          VARCHAR(50);
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_token_expires_at  TIMESTAMP;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_connected_at      TIMESTAMP;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_oauth_nonce       VARCHAR(64);
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_disconnected      BOOLEAN NOT NULL DEFAULT false;
 -- QBO mappings on workers and projects
 ALTER TABLE users     ADD COLUMN IF NOT EXISTS qbo_employee_id       VARCHAR(50);
 ALTER TABLE projects  ADD COLUMN IF NOT EXISTS qbo_customer_id       VARCHAR(50);

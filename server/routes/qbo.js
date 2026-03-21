@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const pool = require('../db');
+const crypto = require('crypto');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const qbo = require('../services/qbo');
 
@@ -7,12 +8,13 @@ const qbo = require('../services/qbo');
 router.get('/status', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT qbo_realm_id, qbo_connected_at, qbo_token_expires_at FROM companies WHERE id = $1',
+      'SELECT qbo_realm_id, qbo_connected_at, qbo_token_expires_at, qbo_disconnected FROM companies WHERE id = $1',
       [req.user.company_id]
     );
     const row = result.rows[0];
     res.json({
       connected: !!row?.qbo_realm_id,
+      disconnected: row?.qbo_disconnected || false,
       connected_at: row?.qbo_connected_at || null,
       token_expires_at: row?.qbo_token_expires_at || null,
     });
@@ -23,12 +25,14 @@ router.get('/status', requireAdmin, async (req, res) => {
 });
 
 // GET /api/qbo/connect — returns the Intuit OAuth URL to redirect the user to
-router.get('/connect', requireAdmin, (req, res) => {
+router.get('/connect', requireAdmin, async (req, res) => {
   if (!process.env.QBO_CLIENT_ID || !process.env.QBO_REDIRECT_URI) {
     return res.status(503).json({ error: 'QuickBooks integration not configured' });
   }
-  // State encodes the company_id so we know who to save tokens for on callback
-  const state = Buffer.from(JSON.stringify({ company_id: req.user.company_id })).toString('base64');
+  // Generate a CSRF nonce, store it, encode it in state
+  const nonce = crypto.randomBytes(16).toString('hex');
+  await pool.query('UPDATE companies SET qbo_oauth_nonce = $1 WHERE id = $2', [nonce, req.user.company_id]);
+  const state = Buffer.from(JSON.stringify({ company_id: req.user.company_id, nonce })).toString('base64');
   res.json({ url: qbo.getAuthUrl(state) });
 });
 
@@ -40,13 +44,22 @@ async function oauthCallback(req, res) {
     return res.redirect(`${process.env.APP_URL}/administration#qbo?error=missing_params`);
   }
   try {
-    const { company_id } = JSON.parse(Buffer.from(state, 'base64').toString());
+    const { company_id, nonce } = JSON.parse(Buffer.from(state, 'base64').toString());
+
+    // CSRF check — verify nonce matches what we stored
+    const nonceResult = await pool.query('SELECT qbo_oauth_nonce FROM companies WHERE id = $1', [company_id]);
+    const storedNonce = nonceResult.rows[0]?.qbo_oauth_nonce;
+    if (!nonce || !storedNonce || nonce !== storedNonce) {
+      return res.redirect(`${process.env.APP_URL}/administration#qbo?error=invalid_state`);
+    }
+
     const tokens = await qbo.exchangeCode(code);
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
     await pool.query(
       `UPDATE companies
        SET qbo_realm_id = $1, qbo_access_token = $2, qbo_refresh_token = $3,
-           qbo_token_expires_at = $4, qbo_connected_at = NOW()
+           qbo_token_expires_at = $4, qbo_connected_at = NOW(),
+           qbo_oauth_nonce = NULL, qbo_disconnected = false
        WHERE id = $5`,
       [realmId, tokens.access_token, tokens.refresh_token, expiresAt, company_id]
     );
@@ -64,7 +77,7 @@ router.delete('/disconnect', requireAdmin, async (req, res) => {
     await pool.query(
       `UPDATE companies
        SET qbo_realm_id = NULL, qbo_access_token = NULL, qbo_refresh_token = NULL,
-           qbo_token_expires_at = NULL, qbo_connected_at = NULL
+           qbo_token_expires_at = NULL, qbo_connected_at = NULL, qbo_disconnected = false
        WHERE id = $1`,
       [req.user.company_id]
     );
