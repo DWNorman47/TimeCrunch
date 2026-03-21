@@ -9,7 +9,10 @@
       "Bash(find c:Usersv-normandWorkspacesTimeCrunch_Claudeserverdb -type f -name *.sql -o -name *.js)",
       "Bash(find /c/Users/v-normand/Workspaces/TimeCrunch_Claude -type f \\\\\\(-name *.sql -o -name *migration* \\\\\\))",
       "Read(//c/Users/v-normand/.claude/projects/c--Users-v-normand-Workspaces-TimeCrunch-Claude/memory/**)",
-      "Bash(grep -rn \"Time Crunch\\\\|TimeCrunch\" --include=\"*.{js,jsx,json,txt,html,sql,md}\" .)"
+      "Bash(grep -rn \"Time Crunch\\\\|TimeCrunch\" --include=\"*.{js,jsx,json,txt,html,sql,md}\" .)",
+      "Bash(node -e \"console.log\\(require\\(''crypto''\\).randomBytes\\(48\\).toString\\(''hex''\\)\\)\")",
+      "Bash(powershell.exe -NoProfile -Command \"[System.BitConverter]::ToString\\([System.Security.Cryptography.RandomNumberGenerator]::GetBytes\\(48\\)\\).Replace\\(''-'',''''\\).ToLower\\(\\)\")",
+      "Bash(chmod +x /c/Users/v-normand/Workspaces/TimeCrunch_Claude/.git/hooks/pre-push)"
     ]
   },
   "hooks": {

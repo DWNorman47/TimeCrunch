@@ -8,7 +8,7 @@ export function usePlan() {
 
   const plan = user?.plan || 'free';
   const status = user?.subscription_status || 'trial';
-  const proAddon = user?.pro_addon || false;
+  const qboAddon = user?.addon_qbo || false;
   const isTrial = status === 'trial';
   const isTrialExpired = status === 'trial_expired';
   const isActive = status === 'active' || isTrial;
@@ -24,14 +24,14 @@ export function usePlan() {
   return {
     plan,
     status,
-    proAddon,
+    qboAddon,
     isTrial,
     isTrialExpired,
     isActive,
     isFree: plan === 'free' && !isTrial,
     isStarter: atLeast('starter'),
     isBusiness: atLeast('business'),
-    hasProAddon: proAddon || isTrial,
+    hasQbo: qboAddon || isTrial,
     atLeast,
     // History limit in days — null means no limit
     historyDays: atLeast('starter') ? null : 90,

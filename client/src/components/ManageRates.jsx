@@ -48,7 +48,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     <div style={styles.card}>
       <h3 style={styles.cardTitle}>Manage Rates</h3>
       <form onSubmit={handleSave} style={styles.form}>
-        <div style={styles.row}>
+        <div style={styles.row} className="settings-row">
           <label style={styles.label}>Prevailing Wage Rate</label>
           <div style={styles.inputGroup}>
             <span style={styles.prefix}>$</span>
@@ -62,7 +62,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <span style={styles.suffix}>/hr</span>
           </div>
         </div>
-        <div style={styles.row}>
+        <div style={styles.row} className="settings-row">
           <label style={styles.label}>Default Employee Wage</label>
           <div style={styles.inputGroup}>
             <span style={styles.prefix}>$</span>
@@ -76,7 +76,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <span style={styles.suffix}>/hr</span>
           </div>
         </div>
-        <div style={styles.row}>
+        <div style={styles.row} className="settings-row">
           <label style={styles.label}>Overtime Calculation</label>
           <div style={styles.inputGroup}>
             <input
@@ -91,7 +91,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         </div>
         <div style={styles.divider} />
         <h4 style={styles.sectionTitle}>Overtime Rules</h4>
-        <div style={styles.row}>
+        <div style={styles.row} className="settings-row">
           <label style={styles.label}>Overtime method</label>
           <div style={styles.inputGroup}>
             <select style={{ ...styles.input, width: 'auto' }} value={form.overtime_rule} onChange={e => set('overtime_rule', e.target.value)}>
@@ -100,7 +100,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </select>
           </div>
         </div>
-        <div style={styles.row}>
+        <div style={styles.row} className="settings-row">
           <label style={styles.label}>{form.overtime_rule === 'weekly' ? 'Weekly threshold' : 'Daily threshold'}</label>
           <div style={styles.inputGroup}>
             <input style={styles.input} type="number" min="1" step="0.5" value={form.overtime_threshold} onChange={e => set('overtime_threshold', e.target.value)} required />
@@ -109,28 +109,28 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         </div>
         <div style={styles.divider} />
         <h4 style={styles.sectionTitle}>Notifications</h4>
-        <div style={styles.row}>
+        <div style={styles.row} className="settings-row">
           <label style={styles.label}>Alert if inactive for</label>
           <div style={styles.inputGroup}>
             <input style={styles.input} type="number" min="1" max="30" step="1" value={form.notification_inactive_days} onChange={e => set('notification_inactive_days', e.target.value)} required />
             <span style={styles.suffix}>days</span>
           </div>
         </div>
-        <div style={styles.row}>
+        <div style={styles.row} className="settings-row">
           <label style={styles.label}>Work hours start</label>
           <div style={styles.inputGroup}>
             <input style={styles.input} type="number" min="0" max="23" step="1" value={form.notification_start_hour} onChange={e => set('notification_start_hour', e.target.value)} required />
             <span style={styles.suffix}>:00</span>
           </div>
         </div>
-        <div style={styles.row}>
+        <div style={styles.row} className="settings-row">
           <label style={styles.label}>Work hours end</label>
           <div style={styles.inputGroup}>
             <input style={styles.input} type="number" min="0" max="23" step="1" value={form.notification_end_hour} onChange={e => set('notification_end_hour', e.target.value)} required />
             <span style={styles.suffix}>:00</span>
           </div>
         </div>
-        <div style={styles.row}>
+        <div style={styles.row} className="settings-row">
           <label style={styles.label}>Clear chat messages after</label>
           <div style={styles.inputGroup}>
             <input style={styles.input} type="number" min="1" max="90" step="1" value={form.chat_retention_days} onChange={e => set('chat_retention_days', e.target.value)} required />

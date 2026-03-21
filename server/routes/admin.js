@@ -206,7 +206,7 @@ router.get('/notifications', requireAdmin, async (req, res) => {
        LEFT JOIN time_entries te ON te.user_id = u.id AND te.company_id = $1
        WHERE u.company_id = $1 AND u.active = true AND u.role = 'worker'
        GROUP BY u.id, u.full_name, u.email
-       HAVING MAX(te.work_date) IS NULL OR MAX(te.work_date) < CURRENT_DATE - $2
+       HAVING MAX(te.work_date) IS NULL OR MAX(te.work_date) < CURRENT_DATE - $2::integer
        ORDER BY last_entry_date ASC NULLS FIRST`,
       [companyId, days]
     );

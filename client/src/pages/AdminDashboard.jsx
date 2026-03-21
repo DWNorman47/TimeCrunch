@@ -107,7 +107,7 @@ const ftStyles = {
 };
 
 function UpgradePrompt({ requiredPlan, feature }) {
-  const planName = requiredPlan === 'pro_addon' ? 'Pro add-on' : requiredPlan === 'business' ? 'Business' : 'Starter';
+  const planName = requiredPlan === 'qbo' ? 'QuickBooks Online add-on' : requiredPlan === 'business' ? 'Business' : 'Starter';
   return (
     <div style={{ background: '#f9fafb', border: '2px dashed #d1d5db', borderRadius: 10, padding: '32px 24px', textAlign: 'center', marginBottom: 24 }}>
       <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
@@ -259,7 +259,7 @@ export default function AdminDashboard() {
             <h3 style={styles.subheading}>Overtime Report</h3>
             {plan.isStarter ? <OvertimeReport /> : <UpgradePrompt requiredPlan="starter" feature="Overtime Report" />}
             <h3 style={styles.subheading}>Certified Payroll</h3>
-            {plan.hasProAddon ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="pro_addon" feature="Certified Payroll (WH-347)" />}
+            {plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature="Certified Payroll (WH-347)" />}
             <h3 style={styles.subheading}>Export</h3>
             {plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature="CSV & Payroll Export" />}
           </>
@@ -277,9 +277,9 @@ export default function AdminDashboard() {
           <>
             <h2 style={styles.heading}>Settings</h2>
             <FeatureToggles settings={settings} onSettingsUpdated={setSettings} />
-            {plan.hasProAddon
+            {plan.hasQbo
               ? <QuickBooks workers={workers} projects={projects} />
-              : <UpgradePrompt requiredPlan="pro_addon" feature="QuickBooks Online Integration" />
+              : <UpgradePrompt requiredPlan="qbo" feature="QuickBooks Online Integration" />
             }
           </>
         )}

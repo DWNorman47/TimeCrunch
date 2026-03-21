@@ -35,6 +35,9 @@ button {
 input, select, textarea, button {
   min-height: 40px;
 }
+.btn-circle {
+  min-height: unset !important;
+}
 
 /* Prevent iOS Safari from auto-zooming on input focus (requires font-size >= 16px) */
 input, select, textarea {
@@ -50,6 +53,12 @@ input, select, textarea {
 /* Landing page scroll offset — accounts for sticky header height */
 .landing-section {
   scroll-margin-top: calc(64px + env(safe-area-inset-top));
+}
+
+/* Worker count mode toggle: mobile only */
+.worker-mode-btn { display: none; }
+@media (max-width: 600px) {
+  .worker-mode-btn { display: inline-block !important; }
 }
 
 /* ── Mobile responsive ── */
@@ -111,7 +120,10 @@ input, select, textarea {
     font-size: 12px !important;
   }
   .company-name {
-    display: none !important;
+    max-width: 120px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
 
   /* Tab bar — scrollable on small screens */
@@ -235,6 +247,15 @@ input, select, textarea {
   /* Manage forms: stack on mobile */
   .manage-form {
     flex-direction: column !important;
+  }
+
+  /* ManageProjects: wage type select drops to its own line on mobile */
+  .manage-projects-form {
+    flex-wrap: wrap !important;
+  }
+  .manage-projects-form select {
+    width: 100% !important;
+    order: 3 !important;
   }
 
   /* ManageRates: label+input rows stack on very small screens */

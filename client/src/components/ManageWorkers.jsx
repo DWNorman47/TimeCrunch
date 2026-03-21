@@ -274,7 +274,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
               return (
                 <tr key={w.id} style={styles.tr}>
                   <td style={styles.td}>{w.full_name}</td>
-                  <td style={styles.td}>@{w.username}</td>
+                  <td style={styles.td} className="col-hide-mobile">@{w.username}</td>
                   {identityEditable && (
                     <td style={styles.td}>
                       <span style={{ ...styles.roleBadge, background: w.role === 'admin' ? '#1a56db' : '#6b7280' }}>
@@ -282,8 +282,8 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                       </span>
                     </td>
                   )}
-                  {identityEditable && <td style={styles.td}>{w.language || '—'}</td>}
-                  {showRate && <td style={styles.td}>${parseFloat(w.hourly_rate ?? 30).toFixed(2)}/hr</td>}
+                  {identityEditable && <td style={styles.td} className="col-hide-mobile">{w.language || '—'}</td>}
+                  {showRate && <td style={styles.td} className="col-hide-mobile">${parseFloat(w.hourly_rate ?? 30).toFixed(2)}/hr</td>}
                   <td style={styles.tdAction}>
                     <button style={styles.editBtn} onClick={() => startEdit(w)}>Edit</button>
                     {identityEditable && <button style={styles.removeBtn} onClick={() => handleRemove(w.id, w.full_name)}>Remove</button>}
@@ -320,7 +320,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   {archived.map(w => (
                     <tr key={w.id} style={{ ...styles.tr, color: '#888' }}>
                       <td style={styles.td}>{w.full_name}</td>
-                      <td style={styles.td}>@{w.username}</td>
+                      <td style={styles.td} className="col-hide-mobile">@{w.username}</td>
                       <td style={styles.td}>{w.role === 'admin' ? 'Admin' : 'User'}</td>
                       <td style={styles.tdAction}>
                         <button style={styles.restoreBtn} onClick={() => handleRestore(w.id)}>Restore</button>

@@ -43,7 +43,7 @@ function requirePlan(minPlan) {
   return async (req, res, next) => {
     try {
       const r = await pool.query(
-        'SELECT plan, subscription_status, pro_addon FROM companies WHERE id = $1',
+        'SELECT plan, subscription_status, addon_qbo FROM companies WHERE id = $1',
         [req.user.company_id]
       );
       const company = r.rows[0];
@@ -79,7 +79,7 @@ function requirePlan(minPlan) {
 async function requireProAddon(req, res, next) {
   try {
     const r = await pool.query(
-      'SELECT plan, subscription_status, pro_addon FROM companies WHERE id = $1',
+      'SELECT plan, subscription_status, addon_qbo FROM companies WHERE id = $1',
       [req.user.company_id]
     );
     const company = r.rows[0];
@@ -90,12 +90,12 @@ async function requireProAddon(req, res, next) {
     }
 
     // Trial users get full access
-    if (company.subscription_status === 'trial' || company.pro_addon) {
+    if (company.subscription_status === 'trial' || company.addon_qbo) {
       req.company = company;
       return next();
     }
 
-    return res.status(403).json({ error: 'Pro add-on required', code: 'pro_addon_required' });
+    return res.status(403).json({ error: 'QBO add-on required', code: 'qbo_required' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

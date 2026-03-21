@@ -4,6 +4,7 @@ import api from '../api';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
+  const [company, setCompany] = useState('');
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -13,7 +14,7 @@ export default function ForgotPassword() {
     setError('');
     setLoading(true);
     try {
-      await api.post('/auth/forgot-password', { email });
+      await api.post('/auth/forgot-password', { email, company });
       setSent(true);
     } catch {
       setError('Something went wrong. Please try again.');
@@ -47,6 +48,16 @@ export default function ForgotPassword() {
                 required
                 autoFocus
               />
+              <label style={styles.label}>
+                Company <span style={styles.optional}>(optional — if you have multiple accounts)</span>
+              </label>
+              <input
+                style={styles.input}
+                type="text"
+                placeholder="Your company name"
+                value={company}
+                onChange={e => setCompany(e.target.value)}
+              />
               {error && <p style={styles.error}>{error}</p>}
               <button style={styles.btn} type="submit" disabled={loading}>
                 {loading ? 'Sending...' : 'Send reset link'}
@@ -73,6 +84,7 @@ const styles = {
   input: { padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 },
   error: { color: '#e53e3e', fontSize: 13 },
   btn: { marginTop: 8, padding: '11px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 9, fontWeight: 700, fontSize: 15, cursor: 'pointer' },
+  optional: { fontWeight: 400, color: '#9ca3af', fontSize: 11 },
   footer: { marginTop: 20, textAlign: 'center', fontSize: 13 },
   link: { color: '#1a56db', fontWeight: 600, textDecoration: 'none' },
   backLink: { display: 'block', marginTop: 20, textAlign: 'center', fontSize: 13, color: '#1a56db', fontWeight: 600, textDecoration: 'none' },

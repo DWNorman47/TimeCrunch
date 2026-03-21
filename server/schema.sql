@@ -348,7 +348,8 @@ CREATE INDEX IF NOT EXISTS idx_inbox_company_id ON inbox(company_id);
 -- =============================================================================
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS stripe_customer_id     VARCHAR(255);
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(255);
-ALTER TABLE companies ADD COLUMN IF NOT EXISTS pro_addon              BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS pro_addon              BOOLEAN NOT NULL DEFAULT false; -- legacy, replaced by addon_qbo
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS addon_qbo             BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS billing_cycle          VARCHAR(10) NOT NULL DEFAULT 'monthly';
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS annual_worker_count    INTEGER;
 -- plan values: free | starter | business  (trial companies default to full access until plan is set)

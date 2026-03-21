@@ -155,7 +155,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   return (
     <div style={styles.card}>
       <h3 style={styles.cardTitle}>Manage Projects</h3>
-      <form onSubmit={handleAdd} style={styles.form}>
+      <form onSubmit={handleAdd} style={styles.form} className="manage-projects-form">
         <input
           style={styles.input}
           placeholder="Project name..."
@@ -185,6 +185,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       {projects.length === 0 ? (
         <p style={styles.empty}>No projects yet.</p>
       ) : (
+        <div className="table-scroll">
         <table style={styles.table}>
           <thead>
             <tr>
@@ -288,6 +289,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       <div style={styles.historyFooter}>

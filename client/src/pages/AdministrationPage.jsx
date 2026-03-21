@@ -242,7 +242,7 @@ export default function AdministrationPage() {
       <header style={styles.header}>
         <div style={styles.logoGroup}>
           <AppSwitcher currentApp="administration" userRole={user?.role} />
-          {user?.company_name && <span style={styles.companyName}>{user.company_name}</span>}
+          {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         </div>
         <div style={styles.headerRight}>
           <button style={styles.headerBtn} onClick={logout}>Logout</button>

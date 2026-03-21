@@ -1,4 +1,4 @@
-const CACHE_NAME = 'timecrunch-v2';
+const CACHE_NAME = 'opsfloa-v1';
 const STATIC_ASSETS = ['/', '/index.html'];
 const QUEUE_DB = 'tc-offline-queue';
 const QUEUE_STORE = 'punches';
@@ -185,8 +185,10 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
         return response;
       })
       .catch(() => caches.match(event.request))
