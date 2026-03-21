@@ -63,7 +63,7 @@ export default function BillingPanel() {
   const [redirecting, setRedirecting] = useState(null);
   const [annual, setAnnual] = useState(false);
   const [workerCount, setWorkerCount] = useState(15);
-  const [addProAddon, setAddProAddon] = useState(false);
+  const [addQbo, setAddQbo] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [workerInputMode, setWorkerInputMode] = useState('slider');
   const [workerDraft, setWorkerDraft] = useState('');
@@ -82,9 +82,9 @@ export default function BillingPanel() {
       const r = await api.post('/stripe/checkout', {
         price_id: priceId,
         ...opts,
-        ...(addProAddon && plans?.pro_addon ? {
-          add_pro_addon: true,
-          pro_addon_price_id: annual ? plans.pro_addon.annual_price_id : plans.pro_addon.monthly_price_id,
+        ...(addQbo && plans?.qbo ? {
+          add_qbo: true,
+          qbo_price_id: annual ? plans.qbo.annual_price_id : plans.qbo.monthly_price_id,
         } : {}),
       });
       window.location.href = r.data.url;
@@ -123,7 +123,7 @@ export default function BillingPanel() {
 
   const sub = status?.subscription_status;
   const currentPlan = status?.plan || 'free';
-  const hasProAddon = status?.pro_addon;
+  const hasQbo = status?.pro_addon;
   const isActive = sub === 'active';
   const isTrial = sub === 'trial';
   const isTrialExpired = sub === 'trial_expired';
@@ -184,7 +184,7 @@ export default function BillingPanel() {
         <div style={s.activeSection}>
           <p style={s.activeText}>
             Your <strong>{currentPlan === 'business' ? 'Business' : 'Starter'}</strong> plan is active
-            {hasProAddon ? ' with QuickBooks Online sync' : ''}.
+            {hasQbo ? ' with QuickBooks Online sync' : ''}.
           </p>
           <button style={s.portalBtn} onClick={portal} disabled={redirecting === 'portal'}>
             {redirecting === 'portal' ? 'Redirecting...' : 'Manage Subscription'}
@@ -386,11 +386,11 @@ export default function BillingPanel() {
 
           <div style={s.addonCard}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-              <input type="checkbox" checked={addProAddon} onChange={e => setAddProAddon(e.target.checked)}
+              <input type="checkbox" checked={addQbo} onChange={e => setAddQbo(e.target.checked)}
                 style={{ accentColor: '#d97706', width: 16, height: 16 }} />
               <span style={s.addonTitle}>
                 + QuickBooks Online Sync &nbsp;
-                <span style={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}>${plans?.pro_addon.monthly ?? 25}</span>
+                <span style={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}>${plans?.qbo.monthly ?? 25}</span>
                 <span style={{ fontSize: 13, color: '#9ca3af' }}>/mo</span>
               </span>
             </label>
