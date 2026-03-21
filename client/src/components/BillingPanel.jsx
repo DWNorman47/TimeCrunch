@@ -329,7 +329,7 @@ export default function BillingPanel() {
                 }
               </label>
               <button
-                className="worker-mode-btn"
+                className="worker-mode-btn btn-circle"
                 style={s.inputModeBtn}
                 title={workerInputMode === 'slider' ? 'Enter exact count' : 'Use slider'}
                 onClick={() => {
