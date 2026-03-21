@@ -3,6 +3,7 @@ const pool = require('../db');
 const crypto = require('crypto');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const qbo = require('../services/qbo');
+const { encrypt } = require('../services/encryption');
 
 // GET /api/qbo/status — connection status for this company
 router.get('/status', requireAdmin, async (req, res) => {
@@ -61,7 +62,7 @@ async function oauthCallback(req, res) {
            qbo_token_expires_at = $4, qbo_connected_at = NOW(),
            qbo_oauth_nonce = NULL, qbo_disconnected = false
        WHERE id = $5`,
-      [realmId, tokens.access_token, tokens.refresh_token, expiresAt, company_id]
+      [encrypt(realmId), encrypt(tokens.access_token), encrypt(tokens.refresh_token), expiresAt, company_id]
     );
     res.redirect(`${process.env.APP_URL}/administration#qbo`);
   } catch (err) {

@@ -16,6 +16,20 @@ const pool = require('./db');
 const app = express();
 app.use(helmet());
 app.use(cors());
+
+// Block TRACE method
+app.use((req, res, next) => {
+  if (req.method === 'TRACE') return res.status(405).end();
+  next();
+});
+
+// Prevent caching of all API responses
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  next();
+});
+
 // Stripe webhook needs raw body before express.json parses it
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
