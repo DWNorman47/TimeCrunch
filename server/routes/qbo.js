@@ -33,10 +33,11 @@ router.get('/connect', requireAdmin, (req, res) => {
 });
 
 // GET /api/qbo/callback — Intuit redirects here after user authorizes
-router.get('/callback', async (req, res) => {
+// This handler is exported and registered WITHOUT auth middleware in index.js
+async function oauthCallback(req, res) {
   const { code, state, realmId } = req.query;
   if (!code || !state || !realmId) {
-    return res.redirect(`${process.env.APP_URL}/admin#quickbooks?error=missing_params`);
+    return res.redirect(`${process.env.APP_URL}/administration#qbo?error=missing_params`);
   }
   try {
     const { company_id } = JSON.parse(Buffer.from(state, 'base64').toString());
@@ -49,12 +50,13 @@ router.get('/callback', async (req, res) => {
        WHERE id = $5`,
       [realmId, tokens.access_token, tokens.refresh_token, expiresAt, company_id]
     );
-    res.redirect(`${process.env.APP_URL}/admin#quickbooks`);
+    res.redirect(`${process.env.APP_URL}/administration#qbo`);
   } catch (err) {
     console.error(err);
-    res.redirect(`${process.env.APP_URL}/admin#quickbooks?error=auth_failed`);
+    res.redirect(`${process.env.APP_URL}/administration#qbo?error=auth_failed`);
   }
-});
+}
+router.get('/callback', oauthCallback);
 
 // DELETE /api/qbo/disconnect
 router.delete('/disconnect', requireAdmin, async (req, res) => {
@@ -182,3 +184,4 @@ router.post('/push', requireAdmin, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.oauthCallback = oauthCallback;

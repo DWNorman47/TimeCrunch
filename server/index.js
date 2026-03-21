@@ -24,7 +24,10 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/time-entries', require('./routes/timeEntries'));
 app.use('/api/admin', require('./routes/admin'));
-app.use('/api/qbo', requireAuth, requireProAddon, require('./routes/qbo'));
+// QBO OAuth callback must be public (Intuit redirects here without a JWT)
+const qboRouter = require('./routes/qbo');
+app.get('/api/qbo/callback', qboRouter.oauthCallback);
+app.use('/api/qbo', requireAuth, requireProAddon, qboRouter);
 app.use('/api/clock', require('./routes/clock'));
 app.use('/api/superadmin', require('./routes/superadmin'));
 app.use('/api/shifts', require('./routes/shifts'));
