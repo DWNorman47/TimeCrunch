@@ -363,6 +363,9 @@ ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_disconnected      BOOLEAN NOT
 -- QBO mappings on workers and projects
 ALTER TABLE users     ADD COLUMN IF NOT EXISTS qbo_employee_id       VARCHAR(50);
 ALTER TABLE projects  ADD COLUMN IF NOT EXISTS qbo_customer_id       VARCHAR(50);
+-- Login lockout
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS failed_login_attempts INT NOT NULL DEFAULT 0;
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS locked_until           TIMESTAMP;
 -- MFA (TOTP)
 ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_enabled           BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_secret            TEXT;

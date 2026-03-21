@@ -27,6 +27,13 @@ const authLimiter = rateLimit({
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
+function validatePassword(password, username) {
+  if (password.length < 6) return 'Password must be at least 6 characters';
+  if (password.length > 128) return 'Password must be 128 characters or fewer';
+  if (username && password.toLowerCase().includes(username.toLowerCase())) return 'Password cannot contain your username';
+  return null;
+}
+
 function signToken(user) {
   return jwt.sign(
     { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name },
@@ -49,9 +56,33 @@ router.post('/login', loginLimiter, async (req, res) => {
       [username, company_name]
     );
     const user = result.rows[0];
-    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+
+    // Check lockout before verifying password (don't reveal whether user exists)
+    if (user && user.locked_until && new Date(user.locked_until) > new Date()) {
+      const minutesLeft = Math.ceil((new Date(user.locked_until) - new Date()) / 60000);
+      return res.status(423).json({ error: `Account locked due to too many failed attempts. Try again in ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.` });
+    }
+
+    const passwordMatch = user && await bcrypt.compare(password, user.password_hash);
+    if (!user || !passwordMatch) {
+      // Increment failed attempts and lock if threshold reached
+      if (user) {
+        const newCount = (user.failed_login_attempts || 0) + 1;
+        if (newCount >= 10) {
+          await pool.query(
+            'UPDATE users SET failed_login_attempts = $1, locked_until = NOW() + INTERVAL \'24 hours\' WHERE id = $2',
+            [newCount, user.id]
+          );
+        } else {
+          await pool.query('UPDATE users SET failed_login_attempts = $1 WHERE id = $2', [newCount, user.id]);
+        }
+      }
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    // Reset failed attempts on successful password match
+    await pool.query('UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1', [user.id]);
+
     if (!user.email_confirmed) {
       return res.status(403).json({ error: 'email_not_confirmed', email: user.email });
     }
@@ -103,9 +134,8 @@ router.post('/register', authLimiter, async (req, res) => {
   if (company_name.length > 100) return res.status(400).json({ error: 'Company name must be 100 characters or fewer' });
   if (full_name.length > 100) return res.status(400).json({ error: 'Full name must be 100 characters or fewer' });
   if (username.length > 50) return res.status(400).json({ error: 'Username must be 50 characters or fewer' });
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  }
+  const pwErr = validatePassword(password, username);
+  if (pwErr) return res.status(400).json({ error: pwErr });
   const slug = company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
   const client = await pool.connect();
   try {
@@ -284,7 +314,8 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
 router.post('/reset-password', authLimiter, async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'token and password required' });
-  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  const pwErr = validatePassword(password);
+  if (pwErr) return res.status(400).json({ error: pwErr });
   try {
     const result = await pool.query(
       'SELECT * FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()',
@@ -308,7 +339,8 @@ router.post('/reset-password', authLimiter, async (req, res) => {
 router.post('/accept-invite', authLimiter, async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'token and password required' });
-  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  const pwErr = validatePassword(password);
+  if (pwErr) return res.status(400).json({ error: pwErr });
   try {
     const result = await pool.query(
       'SELECT * FROM users WHERE invite_token = $1 AND invite_token_expires > NOW() AND invite_pending = true',
@@ -334,9 +366,8 @@ router.post('/change-password', requireAuth, async (req, res) => {
   if (!current_password || !new_password) {
     return res.status(400).json({ error: 'current_password and new_password required' });
   }
-  if (new_password.length < 6) {
-    return res.status(400).json({ error: 'New password must be at least 6 characters' });
-  }
+  const pwErr = validatePassword(new_password, req.user.username);
+  if (pwErr) return res.status(400).json({ error: pwErr });
   try {
     const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
     const user = result.rows[0];
