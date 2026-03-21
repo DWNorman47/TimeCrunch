@@ -1,5 +1,6 @@
 const axios = require('axios');
 const pool = require('../db');
+const { encrypt, decrypt } = require('./encryption');
 
 const IS_PRODUCTION = process.env.QBO_ENVIRONMENT === 'production';
 const QBO_BASE = IS_PRODUCTION
@@ -33,20 +34,37 @@ async function exchangeCode(code) {
 
 async function refreshAccessToken(companyId) {
   const result = await pool.query('SELECT qbo_refresh_token FROM companies WHERE id = $1', [companyId]);
-  const refreshToken = result.rows[0]?.qbo_refresh_token;
+  const refreshToken = decrypt(result.rows[0]?.qbo_refresh_token);
   if (!refreshToken) throw new Error('QuickBooks not connected');
 
-  const r = await axios.post(TOKEN_URL,
-    new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
-    { headers: { Authorization: basicAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' } }
-  );
+  try {
+    const r = await axios.post(TOKEN_URL,
+      new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+      { headers: { Authorization: basicAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
 
-  const expiresAt = new Date(Date.now() + r.data.expires_in * 1000);
-  await pool.query(
-    'UPDATE companies SET qbo_access_token = $1, qbo_refresh_token = $2, qbo_token_expires_at = $3 WHERE id = $4',
-    [r.data.access_token, r.data.refresh_token, expiresAt, companyId]
-  );
-  return r.data.access_token;
+    const expiresAt = new Date(Date.now() + r.data.expires_in * 1000);
+    await pool.query(
+      'UPDATE companies SET qbo_access_token = $1, qbo_refresh_token = $2, qbo_token_expires_at = $3 WHERE id = $4',
+      [encrypt(r.data.access_token), encrypt(r.data.refresh_token), expiresAt, companyId]
+    );
+    return r.data.access_token;
+  } catch (err) {
+    // Expired refresh token or revoked access — clear connection and prompt user to reconnect
+    const status = err.response?.status;
+    const errorCode = err.response?.data?.error;
+    if (status === 400 && (errorCode === 'invalid_grant' || errorCode === 'Token expired')) {
+      await pool.query(
+        `UPDATE companies
+         SET qbo_access_token = NULL, qbo_refresh_token = NULL,
+             qbo_token_expires_at = NULL, qbo_disconnected = true
+         WHERE id = $1`,
+        [companyId]
+      );
+      throw new Error('QuickBooks authorization expired. Please reconnect your QuickBooks account.');
+    }
+    throw err;
+  }
 }
 
 async function getAccessToken(companyId) {
@@ -60,26 +78,30 @@ async function getAccessToken(companyId) {
   if (new Date(row.qbo_token_expires_at) < new Date(Date.now() + 5 * 60 * 1000)) {
     return refreshAccessToken(companyId);
   }
-  return row.qbo_access_token;
+  return decrypt(row.qbo_access_token);
 }
 
 async function qboGet(companyId, path) {
   const token = await getAccessToken(companyId);
   const realmResult = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
-  const realmId = realmResult.rows[0].qbo_realm_id;
+  const realmId = decrypt(realmResult.rows[0].qbo_realm_id);
   const r = await axios.get(`${QBO_BASE}/v3/company/${realmId}${path}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
   });
+  const tid = r.headers['intuit_tid'];
+  if (tid) console.log(`[QBO] intuit_tid=${tid} path=${path}`);
   return r.data;
 }
 
 async function qboPost(companyId, path, body) {
   const token = await getAccessToken(companyId);
   const realmResult = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
-  const realmId = realmResult.rows[0].qbo_realm_id;
+  const realmId = decrypt(realmResult.rows[0].qbo_realm_id);
   const r = await axios.post(`${QBO_BASE}/v3/company/${realmId}${path}`, body, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
   });
+  const tid = r.headers['intuit_tid'];
+  if (tid) console.log(`[QBO] intuit_tid=${tid} path=${path}`);
   return r.data;
 }
 

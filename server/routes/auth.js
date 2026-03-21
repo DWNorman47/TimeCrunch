@@ -2,6 +2,8 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const speakeasy = require('speakeasy');
+const qrcode = require('qrcode');
 const sgMail = require('@sendgrid/mail');
 const rateLimit = require('express-rate-limit');
 const pool = require('../db');
@@ -25,6 +27,13 @@ const authLimiter = rateLimit({
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
+function validatePassword(password, username) {
+  if (password.length < 6) return 'Password must be at least 6 characters';
+  if (password.length > 128) return 'Password must be 128 characters or fewer';
+  if (username && password.toLowerCase().includes(username.toLowerCase())) return 'Password cannot contain your username';
+  return null;
+}
+
 function signToken(user) {
   return jwt.sign(
     { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name },
@@ -47,11 +56,40 @@ router.post('/login', loginLimiter, async (req, res) => {
       [username, company_name]
     );
     const user = result.rows[0];
-    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+
+    // Check lockout before verifying password (don't reveal whether user exists)
+    if (user && user.locked_until && new Date(user.locked_until) > new Date()) {
+      const minutesLeft = Math.ceil((new Date(user.locked_until) - new Date()) / 60000);
+      return res.status(423).json({ error: `Account locked due to too many failed attempts. Try again in ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.` });
+    }
+
+    const passwordMatch = user && await bcrypt.compare(password, user.password_hash);
+    if (!user || !passwordMatch) {
+      // Increment failed attempts and lock if threshold reached
+      if (user) {
+        const newCount = (user.failed_login_attempts || 0) + 1;
+        if (newCount >= 10) {
+          await pool.query(
+            'UPDATE users SET failed_login_attempts = $1, locked_until = NOW() + INTERVAL \'24 hours\' WHERE id = $2',
+            [newCount, user.id]
+          );
+        } else {
+          await pool.query('UPDATE users SET failed_login_attempts = $1 WHERE id = $2', [newCount, user.id]);
+        }
+      }
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    // Reset failed attempts on successful password match
+    await pool.query('UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1', [user.id]);
+
     if (!user.email_confirmed) {
       return res.status(403).json({ error: 'email_not_confirmed', email: user.email });
+    }
+    // If MFA is enabled, issue a short-lived MFA token instead of the full JWT
+    if (user.mfa_enabled) {
+      const mfaToken = jwt.sign({ id: user.id, mfa_pending: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
+      return res.json({ mfa_required: true, mfa_token: mfaToken });
     }
     const token = signToken(user);
     res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
@@ -64,11 +102,12 @@ router.post('/login', loginLimiter, async (req, res) => {
 // Get current user — includes live company billing info for client-side plan gating
 router.get('/me', requireAuth, async (req, res) => {
   try {
-    const r = await pool.query(
-      'SELECT plan, subscription_status, addon_qbo, trial_ends_at FROM companies WHERE id = $1',
-      [req.user.company_id]
-    );
-    const company = r.rows[0] || {};
+    const [companyRes, userRes] = await Promise.all([
+      pool.query('SELECT plan, subscription_status, addon_qbo, trial_ends_at FROM companies WHERE id = $1', [req.user.company_id]),
+      pool.query('SELECT mfa_enabled FROM users WHERE id = $1', [req.user.id]),
+    ]);
+    const company = companyRes.rows[0] || {};
+    const userRow = userRes.rows[0] || {};
     res.json({
       user: {
         ...req.user,
@@ -76,6 +115,7 @@ router.get('/me', requireAuth, async (req, res) => {
         subscription_status: company.subscription_status,
         addon_qbo: company.addon_qbo || false,
         trial_ends_at: company.trial_ends_at,
+        mfa_enabled: userRow.mfa_enabled || false,
       },
     });
   } catch (err) {
@@ -94,9 +134,8 @@ router.post('/register', authLimiter, async (req, res) => {
   if (company_name.length > 100) return res.status(400).json({ error: 'Company name must be 100 characters or fewer' });
   if (full_name.length > 100) return res.status(400).json({ error: 'Full name must be 100 characters or fewer' });
   if (username.length > 50) return res.status(400).json({ error: 'Username must be 50 characters or fewer' });
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  }
+  const pwErr = validatePassword(password, username);
+  if (pwErr) return res.status(400).json({ error: pwErr });
   const slug = company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
   const client = await pool.connect();
   try {
@@ -275,7 +314,8 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
 router.post('/reset-password', authLimiter, async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'token and password required' });
-  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  const pwErr = validatePassword(password);
+  if (pwErr) return res.status(400).json({ error: pwErr });
   try {
     const result = await pool.query(
       'SELECT * FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()',
@@ -299,7 +339,8 @@ router.post('/reset-password', authLimiter, async (req, res) => {
 router.post('/accept-invite', authLimiter, async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'token and password required' });
-  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  const pwErr = validatePassword(password);
+  if (pwErr) return res.status(400).json({ error: pwErr });
   try {
     const result = await pool.query(
       'SELECT * FROM users WHERE invite_token = $1 AND invite_token_expires > NOW() AND invite_pending = true',
@@ -325,9 +366,8 @@ router.post('/change-password', requireAuth, async (req, res) => {
   if (!current_password || !new_password) {
     return res.status(400).json({ error: 'current_password and new_password required' });
   }
-  if (new_password.length < 6) {
-    return res.status(400).json({ error: 'New password must be at least 6 characters' });
-  }
+  const pwErr = validatePassword(new_password, req.user.username);
+  if (pwErr) return res.status(400).json({ error: pwErr });
   try {
     const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
     const user = result.rows[0];
@@ -337,6 +377,95 @@ router.post('/change-password', requireAuth, async (req, res) => {
     const hash = await bcrypt.hash(new_password, 10);
     await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.id]);
     res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// MFA: complete login after TOTP verification
+router.post('/mfa/confirm', loginLimiter, async (req, res) => {
+  const { mfa_token, code } = req.body;
+  if (!mfa_token || !code) return res.status(400).json({ error: 'mfa_token and code required' });
+  try {
+    let payload;
+    try {
+      payload = jwt.verify(mfa_token, process.env.JWT_SECRET);
+    } catch {
+      return res.status(400).json({ error: 'MFA session expired. Please sign in again.' });
+    }
+    if (!payload.mfa_pending) return res.status(400).json({ error: 'Invalid MFA token' });
+
+    const result = await pool.query(
+      `SELECT u.*, c.name as company_name FROM users u
+       JOIN companies c ON c.id = u.company_id
+       WHERE u.id = $1 AND u.active = true`,
+      [payload.id]
+    );
+    const user = result.rows[0];
+    if (!user || !user.mfa_secret) return res.status(400).json({ error: 'MFA not configured' });
+
+    const valid = speakeasy.totp.verify({ secret: user.mfa_secret, encoding: 'base32', token: code, window: 1 });
+    if (!valid) return res.status(401).json({ error: 'Invalid code. Try again.' });
+
+    const token = signToken(user);
+    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// MFA: generate setup QR code
+router.get('/mfa/setup', requireAuth, async (req, res) => {
+  try {
+    const secret = speakeasy.generateSecret({ name: `OpsFloa (${req.user.username})`, length: 20 });
+    await pool.query('UPDATE users SET mfa_secret_pending = $1 WHERE id = $2', [secret.base32, req.user.id]);
+    const qr = await qrcode.toDataURL(secret.otpauth_url);
+    res.json({ qr, secret: secret.base32 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// MFA: verify first code and enable
+router.post('/mfa/enable', requireAuth, async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'code required' });
+  try {
+    const result = await pool.query('SELECT mfa_secret_pending FROM users WHERE id = $1', [req.user.id]);
+    const secret = result.rows[0]?.mfa_secret_pending;
+    if (!secret) return res.status(400).json({ error: 'No pending MFA setup. Start setup again.' });
+
+    const valid = speakeasy.totp.verify({ secret, encoding: 'base32', token: code, window: 1 });
+    if (!valid) return res.status(401).json({ error: 'Invalid code. Try again.' });
+
+    await pool.query(
+      'UPDATE users SET mfa_secret = $1, mfa_secret_pending = NULL, mfa_enabled = true WHERE id = $2',
+      [secret, req.user.id]
+    );
+    res.json({ enabled: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// MFA: disable with password confirmation
+router.post('/mfa/disable', requireAuth, async (req, res) => {
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ error: 'password required' });
+  try {
+    const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+    if (!(await bcrypt.compare(password, result.rows[0].password_hash))) {
+      return res.status(401).json({ error: 'Incorrect password' });
+    }
+    await pool.query(
+      'UPDATE users SET mfa_secret = NULL, mfa_secret_pending = NULL, mfa_enabled = false WHERE id = $1',
+      [req.user.id]
+    );
+    res.json({ disabled: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

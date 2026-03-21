@@ -352,5 +352,23 @@ ALTER TABLE companies ADD COLUMN IF NOT EXISTS pro_addon              BOOLEAN NO
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS addon_qbo             BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS billing_cycle          VARCHAR(10) NOT NULL DEFAULT 'monthly';
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS annual_worker_count    INTEGER;
+-- QBO OAuth tokens (per company)
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_access_token      TEXT;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_refresh_token     TEXT;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_realm_id          VARCHAR(50);
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_token_expires_at  TIMESTAMP;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_connected_at      TIMESTAMP;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_oauth_nonce       VARCHAR(64);
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_disconnected      BOOLEAN NOT NULL DEFAULT false;
+-- QBO mappings on workers and projects
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS qbo_employee_id       VARCHAR(50);
+ALTER TABLE projects  ADD COLUMN IF NOT EXISTS qbo_customer_id       VARCHAR(50);
+-- Login lockout
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS failed_login_attempts INT NOT NULL DEFAULT 0;
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS locked_until           TIMESTAMP;
+-- MFA (TOTP)
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_enabled           BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_secret            TEXT;
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_secret_pending    TEXT;
 -- plan values: free | starter | business  (trial companies default to full access until plan is set)
 

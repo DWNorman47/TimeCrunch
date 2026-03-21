@@ -22,6 +22,7 @@ import LiveKPIs from '../components/LiveKPIs';
 import BroadcastMessage from '../components/BroadcastMessage';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
+import MFASetup from '../components/MFASetup';
 import api from '../api';
 
 const FEATURE_DEFS = [
@@ -277,6 +278,10 @@ export default function AdminDashboard() {
           <>
             <h2 style={styles.heading}>Settings</h2>
             <FeatureToggles settings={settings} onSettingsUpdated={setSettings} />
+            <MFASetup />
+            <div style={styles.supportNote}>
+              Need help? Email us at <a href="mailto:info@opsfloa.com" style={{ color: '#1a56db' }}>info@opsfloa.com</a>
+            </div>
             {plan.hasQbo
               ? <QuickBooks workers={workers} projects={projects} />
               : <UpgradePrompt requiredPlan="qbo" feature="QuickBooks Online Integration" />
@@ -314,4 +319,5 @@ const styles = {
   accountLabel: { fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 2 },
   accountSub: { fontSize: 12, color: '#6b7280' },
   accountBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '7px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
+  supportNote: { fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '8px 0 4px' },
 };

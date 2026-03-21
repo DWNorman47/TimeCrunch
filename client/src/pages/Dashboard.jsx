@@ -7,6 +7,7 @@ import TimesheetView from '../components/TimesheetView';
 import UpcomingShifts from '../components/UpcomingShifts';
 import WorkerSummary from '../components/WorkerSummary';
 import ChangePassword from '../components/ChangePassword';
+import MFASetup from '../components/MFASetup';
 import PayStubView from '../components/PayStubView';
 import NotificationSetup from '../components/NotificationSetup';
 import TimesheetSignOff from '../components/TimesheetSignOff';
@@ -156,6 +157,10 @@ export default function Dashboard() {
                 </div>
                 <button style={styles.accountBtn} onClick={() => setShowChangePassword(true)}>Change Password</button>
               </div>
+            </div>
+            <MFASetup />
+            <div style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '8px 0 4px' }}>
+              Need help? Email us at <a href="mailto:info@opsfloa.com" style={{ color: '#1a56db' }}>info@opsfloa.com</a>
             </div>
             {!loading && <PayStubView />}
           </>

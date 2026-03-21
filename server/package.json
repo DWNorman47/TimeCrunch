@@ -11,16 +11,20 @@
     "testEnvironment": "node"
   },
   "dependencies": {
-    "node-cron": "^3.0.3",
     "@sendgrid/mail": "^8.0.0",
+    "axios": "^1.13.6",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
     "express-rate-limit": "^8.3.1",
     "helmet": "^8.1.0",
+    "intuit-oauth": "^4.2.2",
     "jsonwebtoken": "^9.0.0",
+    "node-cron": "^3.0.3",
     "pg": "^8.11.0",
+    "qrcode": "^1.5.4",
+    "speakeasy": "^2.0.0",
     "stripe": "^14.0.0",
     "web-push": "^3.6.7"
   },
