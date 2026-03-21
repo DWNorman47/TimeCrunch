@@ -120,7 +120,10 @@ input, select, textarea {
     font-size: 12px !important;
   }
   .company-name {
-    display: none !important;
+    max-width: 120px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
 
   /* Tab bar — scrollable on small screens */
