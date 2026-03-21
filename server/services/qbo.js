@@ -87,6 +87,8 @@ async function qboGet(companyId, path) {
   const r = await axios.get(`${QBO_BASE}/v3/company/${realmId}${path}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
   });
+  const tid = r.headers['intuit_tid'];
+  if (tid) console.log(`[QBO] intuit_tid=${tid} path=${path}`);
   return r.data;
 }
 
@@ -97,6 +99,8 @@ async function qboPost(companyId, path, body) {
   const r = await axios.post(`${QBO_BASE}/v3/company/${realmId}${path}`, body, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
   });
+  const tid = r.headers['intuit_tid'];
+  if (tid) console.log(`[QBO] intuit_tid=${tid} path=${path}`);
   return r.data;
 }
 
