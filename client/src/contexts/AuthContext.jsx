@@ -30,6 +30,13 @@ export function AuthProvider({ children }) {
     return me.data.user;
   };
 
+  const loginWithToken = async token => {
+    localStorage.setItem('tc_token', token);
+    const me = await api.get('/auth/me');
+    setUser(me.data.user);
+    return me.data.user;
+  };
+
   const confirmMfa = async (mfa_token, code) => {
     const r = await api.post('/auth/mfa/confirm', { mfa_token, code });
     localStorage.setItem('tc_token', r.data.token);
@@ -46,7 +53,7 @@ export function AuthProvider({ children }) {
   const updateUser = patch => setUser(u => ({ ...u, ...patch }));
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, confirmMfa, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithToken, confirmMfa, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
