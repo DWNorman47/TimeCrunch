@@ -7,6 +7,7 @@ import TimesheetView from '../components/TimesheetView';
 import UpcomingShifts from '../components/UpcomingShifts';
 import WorkerSummary from '../components/WorkerSummary';
 import ChangePassword from '../components/ChangePassword';
+import MFASetup from '../components/MFASetup';
 import PayStubView from '../components/PayStubView';
 import NotificationSetup from '../components/NotificationSetup';
 import TimesheetSignOff from '../components/TimesheetSignOff';
@@ -157,6 +158,7 @@ export default function Dashboard() {
                 <button style={styles.accountBtn} onClick={() => setShowChangePassword(true)}>Change Password</button>
               </div>
             </div>
+            <MFASetup />
             {!loading && <PayStubView />}
           </>
         )}

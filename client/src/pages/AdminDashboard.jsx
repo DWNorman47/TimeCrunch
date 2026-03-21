@@ -22,6 +22,7 @@ import LiveKPIs from '../components/LiveKPIs';
 import BroadcastMessage from '../components/BroadcastMessage';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
+import MFASetup from '../components/MFASetup';
 import api from '../api';
 
 const FEATURE_DEFS = [
@@ -277,6 +278,7 @@ export default function AdminDashboard() {
           <>
             <h2 style={styles.heading}>Settings</h2>
             <FeatureToggles settings={settings} onSettingsUpdated={setSettings} />
+            <MFASetup />
             {plan.hasQbo
               ? <QuickBooks workers={workers} projects={projects} />
               : <UpgradePrompt requiredPlan="qbo" feature="QuickBooks Online Integration" />

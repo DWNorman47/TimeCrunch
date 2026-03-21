@@ -2,6 +2,8 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const speakeasy = require('speakeasy');
+const qrcode = require('qrcode');
 const sgMail = require('@sendgrid/mail');
 const rateLimit = require('express-rate-limit');
 const pool = require('../db');
@@ -53,6 +55,11 @@ router.post('/login', loginLimiter, async (req, res) => {
     if (!user.email_confirmed) {
       return res.status(403).json({ error: 'email_not_confirmed', email: user.email });
     }
+    // If MFA is enabled, issue a short-lived MFA token instead of the full JWT
+    if (user.mfa_enabled) {
+      const mfaToken = jwt.sign({ id: user.id, mfa_pending: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
+      return res.json({ mfa_required: true, mfa_token: mfaToken });
+    }
     const token = signToken(user);
     res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
   } catch (err) {
@@ -64,11 +71,12 @@ router.post('/login', loginLimiter, async (req, res) => {
 // Get current user — includes live company billing info for client-side plan gating
 router.get('/me', requireAuth, async (req, res) => {
   try {
-    const r = await pool.query(
-      'SELECT plan, subscription_status, addon_qbo, trial_ends_at FROM companies WHERE id = $1',
-      [req.user.company_id]
-    );
-    const company = r.rows[0] || {};
+    const [companyRes, userRes] = await Promise.all([
+      pool.query('SELECT plan, subscription_status, addon_qbo, trial_ends_at FROM companies WHERE id = $1', [req.user.company_id]),
+      pool.query('SELECT mfa_enabled FROM users WHERE id = $1', [req.user.id]),
+    ]);
+    const company = companyRes.rows[0] || {};
+    const userRow = userRes.rows[0] || {};
     res.json({
       user: {
         ...req.user,
@@ -76,6 +84,7 @@ router.get('/me', requireAuth, async (req, res) => {
         subscription_status: company.subscription_status,
         addon_qbo: company.addon_qbo || false,
         trial_ends_at: company.trial_ends_at,
+        mfa_enabled: userRow.mfa_enabled || false,
       },
     });
   } catch (err) {
@@ -337,6 +346,95 @@ router.post('/change-password', requireAuth, async (req, res) => {
     const hash = await bcrypt.hash(new_password, 10);
     await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.id]);
     res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// MFA: complete login after TOTP verification
+router.post('/mfa/confirm', loginLimiter, async (req, res) => {
+  const { mfa_token, code } = req.body;
+  if (!mfa_token || !code) return res.status(400).json({ error: 'mfa_token and code required' });
+  try {
+    let payload;
+    try {
+      payload = jwt.verify(mfa_token, process.env.JWT_SECRET);
+    } catch {
+      return res.status(400).json({ error: 'MFA session expired. Please sign in again.' });
+    }
+    if (!payload.mfa_pending) return res.status(400).json({ error: 'Invalid MFA token' });
+
+    const result = await pool.query(
+      `SELECT u.*, c.name as company_name FROM users u
+       JOIN companies c ON c.id = u.company_id
+       WHERE u.id = $1 AND u.active = true`,
+      [payload.id]
+    );
+    const user = result.rows[0];
+    if (!user || !user.mfa_secret) return res.status(400).json({ error: 'MFA not configured' });
+
+    const valid = speakeasy.totp.verify({ secret: user.mfa_secret, encoding: 'base32', token: code, window: 1 });
+    if (!valid) return res.status(401).json({ error: 'Invalid code. Try again.' });
+
+    const token = signToken(user);
+    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// MFA: generate setup QR code
+router.get('/mfa/setup', requireAuth, async (req, res) => {
+  try {
+    const secret = speakeasy.generateSecret({ name: `OpsFloa (${req.user.username})`, length: 20 });
+    await pool.query('UPDATE users SET mfa_secret_pending = $1 WHERE id = $2', [secret.base32, req.user.id]);
+    const qr = await qrcode.toDataURL(secret.otpauth_url);
+    res.json({ qr, secret: secret.base32 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// MFA: verify first code and enable
+router.post('/mfa/enable', requireAuth, async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'code required' });
+  try {
+    const result = await pool.query('SELECT mfa_secret_pending FROM users WHERE id = $1', [req.user.id]);
+    const secret = result.rows[0]?.mfa_secret_pending;
+    if (!secret) return res.status(400).json({ error: 'No pending MFA setup. Start setup again.' });
+
+    const valid = speakeasy.totp.verify({ secret, encoding: 'base32', token: code, window: 1 });
+    if (!valid) return res.status(401).json({ error: 'Invalid code. Try again.' });
+
+    await pool.query(
+      'UPDATE users SET mfa_secret = $1, mfa_secret_pending = NULL, mfa_enabled = true WHERE id = $2',
+      [secret, req.user.id]
+    );
+    res.json({ enabled: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// MFA: disable with password confirmation
+router.post('/mfa/disable', requireAuth, async (req, res) => {
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ error: 'password required' });
+  try {
+    const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+    if (!(await bcrypt.compare(password, result.rows[0].password_hash))) {
+      return res.status(401).json({ error: 'Incorrect password' });
+    }
+    await pool.query(
+      'UPDATE users SET mfa_secret = NULL, mfa_secret_pending = NULL, mfa_enabled = false WHERE id = $1',
+      [req.user.id]
+    );
+    res.json({ disabled: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

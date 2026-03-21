@@ -21,8 +21,18 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password, company_name) => {
     const r = await api.post('/auth/login', { username, password, company_name });
+    if (r.data.mfa_required) {
+      return { mfa_required: true, mfa_token: r.data.mfa_token };
+    }
     localStorage.setItem('tc_token', r.data.token);
-    // Fetch fresh user+plan info from /me so plan fields are always included
+    const me = await api.get('/auth/me');
+    setUser(me.data.user);
+    return me.data.user;
+  };
+
+  const confirmMfa = async (mfa_token, code) => {
+    const r = await api.post('/auth/mfa/confirm', { mfa_token, code });
+    localStorage.setItem('tc_token', r.data.token);
     const me = await api.get('/auth/me');
     setUser(me.data.user);
     return me.data.user;
@@ -36,7 +46,7 @@ export function AuthProvider({ children }) {
   const updateUser = patch => setUser(u => ({ ...u, ...patch }));
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, confirmMfa, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

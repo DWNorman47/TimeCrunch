@@ -363,5 +363,9 @@ ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_disconnected      BOOLEAN NOT
 -- QBO mappings on workers and projects
 ALTER TABLE users     ADD COLUMN IF NOT EXISTS qbo_employee_id       VARCHAR(50);
 ALTER TABLE projects  ADD COLUMN IF NOT EXISTS qbo_customer_id       VARCHAR(50);
+-- MFA (TOTP)
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_enabled           BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_secret            TEXT;
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_secret_pending    TEXT;
 -- plan values: free | starter | business  (trial companies default to full access until plan is set)
 
