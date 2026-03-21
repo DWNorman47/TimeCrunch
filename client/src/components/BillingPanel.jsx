@@ -66,6 +66,7 @@ export default function BillingPanel() {
   const [addProAddon, setAddProAddon] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [workerInputMode, setWorkerInputMode] = useState('slider');
+  const [workerDraft, setWorkerDraft] = useState('');
 
   useEffect(() => {
     Promise.all([api.get('/stripe/status'), api.get('/stripe/plans')])
@@ -330,9 +331,17 @@ export default function BillingPanel() {
               <button
                 className="worker-mode-btn"
                 style={s.inputModeBtn}
-                onClick={() => setWorkerInputMode(m => m === 'slider' ? 'number' : 'slider')}
+                title={workerInputMode === 'slider' ? 'Enter exact count' : 'Use slider'}
+                onClick={() => {
+                  if (workerInputMode === 'slider') {
+                    setWorkerDraft(String(workerCount));
+                    setWorkerInputMode('number');
+                  } else {
+                    setWorkerInputMode('slider');
+                  }
+                }}
               >
-                {workerInputMode === 'slider' ? '✎ Enter exact' : '⇄ Use slider'}
+                {workerInputMode === 'slider' ? '✏️' : '↔'}
               </button>
             </div>
             {workerInputMode === 'slider' ? (
@@ -345,13 +354,33 @@ export default function BillingPanel() {
                 </div>
               </>
             ) : (
-              <input
-                type="number"
-                min={INCLUDED_WORKERS}
-                value={workerCount}
-                onChange={e => setWorkerCount(Math.max(INCLUDED_WORKERS, Number(e.target.value) || INCLUDED_WORKERS))}
-                style={s.workerNumInput}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="number"
+                  min={1}
+                  value={workerDraft}
+                  onChange={e => setWorkerDraft(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const v = Math.max(INCLUDED_WORKERS, parseInt(workerDraft, 10) || INCLUDED_WORKERS);
+                      setWorkerCount(v);
+                      setWorkerDraft(String(v));
+                    }
+                  }}
+                  style={s.workerNumInput}
+                  autoFocus
+                />
+                <button
+                  style={s.workerUpdateBtn}
+                  onClick={() => {
+                    const v = Math.max(INCLUDED_WORKERS, parseInt(workerDraft, 10) || INCLUDED_WORKERS);
+                    setWorkerCount(v);
+                    setWorkerDraft(String(v));
+                  }}
+                >
+                  Update
+                </button>
+              </div>
             )}
           </div>
 
@@ -428,8 +457,9 @@ const s = {
   planBtn: { width: '100%', color: '#fff', border: 'none', padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 4, transition: 'opacity 0.15s' },
   sliderWrap: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '14px 16px', marginBottom: 14 },
   sliderLabel: { fontSize: 13, color: '#374151', display: 'block', marginBottom: 8 },
-  inputModeBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 },
-  workerNumInput: { width: 100, padding: '7px 10px', border: '1px solid #c7d2fe', borderRadius: 7, fontSize: 15, fontWeight: 700, color: '#7c3aed', textAlign: 'center' },
+  inputModeBtn: { background: '#f3f4f6', border: '1px solid #e5e7eb', color: '#6b7280', fontSize: 15, width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: 0, lineHeight: 1 },
+  workerNumInput: { width: 90, padding: '7px 10px', border: '1px solid #c7d2fe', borderRadius: 7, fontSize: 15, fontWeight: 700, color: '#7c3aed', textAlign: 'center' },
+  workerUpdateBtn: { padding: '7px 14px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 },
   addonCard: { border: '2px solid #fde68a', borderRadius: 10, padding: '14px 16px', background: '#fffbeb', marginBottom: 16 },
   addonTitle: { fontSize: 15, fontWeight: 700, color: '#92400e' },
   trialCta: { background: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: 10, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 },
