@@ -8,7 +8,7 @@ export function usePlan() {
 
   const plan = user?.plan || 'free';
   const status = user?.subscription_status || 'trial';
-  const qboAddon = user?.pro_addon || false;
+  const qboAddon = user?.addon_qbo || false;
   const isTrial = status === 'trial';
   const isTrialExpired = status === 'trial_expired';
   const isActive = status === 'active' || isTrial;

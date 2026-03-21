@@ -65,7 +65,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const r = await pool.query(
-      'SELECT plan, subscription_status, pro_addon, trial_ends_at FROM companies WHERE id = $1',
+      'SELECT plan, subscription_status, addon_qbo, trial_ends_at FROM companies WHERE id = $1',
       [req.user.company_id]
     );
     const company = r.rows[0] || {};
@@ -74,7 +74,7 @@ router.get('/me', requireAuth, async (req, res) => {
         ...req.user,
         plan: company.plan || 'free',
         subscription_status: company.subscription_status,
-        pro_addon: company.pro_addon || false,
+        addon_qbo: company.addon_qbo || false,
         trial_ends_at: company.trial_ends_at,
       },
     });

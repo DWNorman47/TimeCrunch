@@ -123,7 +123,7 @@ export default function BillingPanel() {
 
   const sub = status?.subscription_status;
   const currentPlan = status?.plan || 'free';
-  const hasQbo = status?.pro_addon;
+  const hasQbo = status?.addon_qbo;
   const isActive = sub === 'active';
   const isTrial = sub === 'trial';
   const isTrialExpired = sub === 'trial_expired';

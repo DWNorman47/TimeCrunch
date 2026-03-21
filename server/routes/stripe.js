@@ -48,7 +48,7 @@ router.get('/plans', requireAdmin, (req, res) => {
 router.get('/status', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT subscription_status, trial_ends_at, plan, pro_addon, billing_cycle, stripe_customer_id, stripe_subscription_id FROM companies WHERE id = $1',
+      'SELECT subscription_status, trial_ends_at, plan, addon_qbo, billing_cycle, stripe_customer_id, stripe_subscription_id FROM companies WHERE id = $1',
       [req.user.company_id]
     );
     res.json(result.rows[0] || {});
@@ -144,11 +144,11 @@ router.post('/webhook', async (req, res) => {
         const sub = await stripe.subscriptions.retrieve(obj.subscription);
         const items = sub.items.data;
         const plan = planFromPrice(items[0]?.price?.id);
-        // Pro add-on is present if any item matches the pro_addon price IDs
+        // Pro add-on is present if any item matches the addon_qbo price IDs
         const proIds = [process.env.STRIPE_PRICE_QBO, process.env.STRIPE_PRICE_QBO_ANNUAL].filter(Boolean);
         const hasProAddon = items.some(i => proIds.includes(i.price.id));
         await pool.query(
-          'UPDATE companies SET stripe_subscription_id = $1, subscription_status = $2, plan = $3, pro_addon = $4 WHERE id = $5',
+          'UPDATE companies SET stripe_subscription_id = $1, subscription_status = $2, plan = $3, addon_qbo = $4 WHERE id = $5',
           [obj.subscription, 'active', plan, hasProAddon, companyId]
         );
       }
@@ -160,7 +160,7 @@ router.post('/webhook', async (req, res) => {
         const proIds = [process.env.STRIPE_PRICE_QBO, process.env.STRIPE_PRICE_QBO_ANNUAL].filter(Boolean);
         const hasProAddon = items.some(i => proIds.includes(i.price.id));
         await pool.query(
-          'UPDATE companies SET subscription_status = $1, plan = $2, pro_addon = $3 WHERE id = $4',
+          'UPDATE companies SET subscription_status = $1, plan = $2, addon_qbo = $3 WHERE id = $4',
           [obj.status, plan, hasProAddon, companyId]
         );
       }
@@ -168,7 +168,7 @@ router.post('/webhook', async (req, res) => {
       const companyId = obj.metadata?.company_id;
       if (companyId) {
         await pool.query(
-          'UPDATE companies SET subscription_status = $1, pro_addon = false WHERE id = $2',
+          'UPDATE companies SET subscription_status = $1, addon_qbo = false WHERE id = $2',
           ['canceled', companyId]
         );
       }
