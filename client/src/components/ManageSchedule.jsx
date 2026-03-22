@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
+import {
+  DndContext, DragOverlay, PointerSensor, TouchSensor,
+  useSensor, useSensors, useDroppable, useDraggable,
+} from '@dnd-kit/core';
 
 function startOfWeek(date) {
   const d = new Date(date);
@@ -12,6 +16,88 @@ function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n)
 function toISO(d) { return d.toISOString().substring(0, 10); }
 function fmtDay(d) { return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
 function fmtTime(t) { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m}${hr < 12 ? 'a' : 'p'}`; }
+
+// Visual content of a shift pill — used both inline and in the drag overlay
+function PillContent({ s }) {
+  return (
+    <>
+      <div style={styles.pillWorker}>{s.worker_name}</div>
+      {s.project_name && <div style={styles.pillProject}>{s.project_name}</div>}
+      <div style={styles.pillTime}>{fmtTime(s.start_time)}–{fmtTime(s.end_time)}</div>
+      {s.notes && <div style={styles.pillNotes}>{s.notes}</div>}
+    </>
+  );
+}
+
+function DraggableShift({ s, projects, editingId, editForm, setEditForm, editSaving, startEdit, setEditingId, saveEdit, deleteShift, deleting, onDuplicate }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: String(s.id) });
+
+  return (
+    <div ref={setNodeRef}>
+      <div style={{ ...styles.shiftPill, opacity: isDragging ? 0.35 : 1, cursor: 'grab' }} {...listeners} {...attributes}>
+        <PillContent s={s} />
+        <div style={styles.pillActions} onPointerDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
+          <button style={styles.editPillBtn} onClick={() => editingId === s.id ? setEditingId(null) : startEdit(s)} title="Edit">✎</button>
+          <button style={styles.dupBtn} onClick={() => onDuplicate(s)} title="Duplicate">⧉</button>
+          <button style={styles.deleteBtn} onClick={() => deleteShift(s.id)} disabled={deleting === s.id} title="Delete">
+            {deleting === s.id ? '…' : '✕'}
+          </button>
+        </div>
+      </div>
+
+      {editingId === s.id && (
+        <div style={styles.editPanel}>
+          <div style={styles.editGrid}>
+            <div style={styles.editField}>
+              <label style={styles.editLabel}>Date</label>
+              <input style={styles.editInput} type="date" value={editForm.shift_date} onChange={ev => setEditForm(f => ({ ...f, shift_date: ev.target.value }))} />
+            </div>
+            <div style={styles.editField}>
+              <label style={styles.editLabel}>Start</label>
+              <input style={styles.editInput} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} />
+            </div>
+            <div style={styles.editField}>
+              <label style={styles.editLabel}>End</label>
+              <input style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
+            </div>
+            <div style={styles.editField}>
+              <label style={styles.editLabel}>Project</label>
+              <select style={styles.editInput} value={editForm.project_id} onChange={ev => setEditForm(f => ({ ...f, project_id: ev.target.value }))}>
+                <option value="">None</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div style={{ ...styles.editField, flex: 2 }}>
+              <label style={styles.editLabel}>Notes</label>
+              <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder="Optional" />
+            </div>
+          </div>
+          <div style={styles.editActions}>
+            <button style={styles.saveBtn} onClick={() => saveEdit(s.id)} disabled={editSaving}>{editSaving ? '…' : 'Save'}</button>
+            <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DroppableDay({ date, isToday, children }) {
+  const { setNodeRef, isOver } = useDroppable({ id: date });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        ...styles.dayCol,
+        borderTop: `3px solid ${isToday ? '#1a56db' : '#e5e7eb'}`,
+        background: isOver ? '#eff6ff' : undefined,
+        transition: 'background 0.15s',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function ManageSchedule({ workers, projects }) {
   const toast = useToast();
@@ -25,6 +111,12 @@ export default function ManageSchedule({ workers, projects }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
+  const [activeShift, setActiveShift] = useState(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  );
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const from = toISO(days[0]);
@@ -38,7 +130,6 @@ export default function ManageSchedule({ workers, projects }) {
       .finally(() => setLoading(false));
   }, [from, to]);
 
-  // Keep the add-shift date in sync with the viewed week
   useEffect(() => {
     const today = toISO(new Date());
     const dateInView = today >= from && today <= to ? today : from;
@@ -70,6 +161,23 @@ export default function ManageSchedule({ workers, projects }) {
     } finally { setDeleting(null); }
   };
 
+  const duplicateShift = async s => {
+    try {
+      const r = await api.post('/shifts/admin', {
+        user_id: s.user_id,
+        project_id: s.project_id || '',
+        shift_date: s.shift_date.substring(0, 10),
+        start_time: s.start_time.substring(0, 5),
+        end_time: s.end_time.substring(0, 5),
+        notes: s.notes || '',
+      });
+      setShifts(prev => [...prev, r.data].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
+      toast('Shift duplicated', 'success');
+    } catch {
+      toast('Failed to duplicate shift', 'error');
+    }
+  };
+
   const startEdit = s => {
     setEditingId(s.id);
     setEditForm({
@@ -92,6 +200,38 @@ export default function ManageSchedule({ workers, projects }) {
     } finally { setEditSaving(false); }
   };
 
+  const handleDragStart = ({ active }) => {
+    setActiveShift(shifts.find(s => String(s.id) === active.id) || null);
+    setEditingId(null);
+  };
+
+  const handleDragEnd = async ({ active, over }) => {
+    setActiveShift(null);
+    if (!over) return;
+    const shiftId = parseInt(active.id);
+    const shift = shifts.find(s => s.id === shiftId);
+    if (!shift) return;
+    const currentDate = shift.shift_date.substring(0, 10);
+    const newDate = over.id;
+    if (currentDate === newDate) return;
+
+    // Optimistic update
+    setShifts(prev => prev.map(s => s.id === shiftId ? { ...s, shift_date: newDate } : s));
+    try {
+      await api.patch(`/shifts/admin/${shiftId}`, {
+        shift_date: newDate,
+        start_time: shift.start_time.substring(0, 5),
+        end_time: shift.end_time.substring(0, 5),
+        project_id: shift.project_id || '',
+        notes: shift.notes || '',
+      });
+    } catch {
+      // Revert on failure
+      setShifts(prev => prev.map(s => s.id === shiftId ? { ...s, shift_date: currentDate } : s));
+      toast('Failed to move shift', 'error');
+    }
+  };
+
   const shiftsByDay = {};
   days.forEach(d => { shiftsByDay[toISO(d)] = []; });
   shifts.forEach(s => {
@@ -99,11 +239,12 @@ export default function ManageSchedule({ workers, projects }) {
     if (shiftsByDay[key]) shiftsByDay[key].push(s);
   });
 
+  const shiftProps = { projects, editingId, editForm, setEditForm, editSaving, startEdit, setEditingId, saveEdit, deleteShift, deleting, onDuplicate: duplicateShift };
+
   return (
     <div style={styles.card}>
       <h3 style={styles.title}>Schedule</h3>
 
-      {/* Add shift form */}
       <form onSubmit={addShift} style={styles.form}>
         <div style={styles.formRow}>
           <div style={styles.field}>
@@ -144,7 +285,6 @@ export default function ManageSchedule({ workers, projects }) {
         {error && <p style={styles.error}>{error}</p>}
       </form>
 
-      {/* Week navigation */}
       <div style={styles.weekNav}>
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, -7))}>‹ Prev</button>
         <span style={styles.weekLabel}>{fmtDay(days[0])} – {fmtDay(days[6])}</span>
@@ -153,71 +293,34 @@ export default function ManageSchedule({ workers, projects }) {
       </div>
 
       {loading ? <p style={{ color: '#888', fontSize: 13 }}>Loading...</p> : (
-        <div style={styles.grid}>
-          {days.map(day => {
-            const key = toISO(day);
-            const dayShifts = shiftsByDay[key] || [];
-            const isToday = key === toISO(new Date());
-            return (
-              <div key={key} style={{ ...styles.dayCol, borderTop: `3px solid ${isToday ? '#1a56db' : '#e5e7eb'}` }}>
-                <div style={{ ...styles.dayHead, color: isToday ? '#1a56db' : '#374151' }}>
-                  {day.toLocaleDateString('en-US', { weekday: 'short' })} {day.getDate()}
-                </div>
-                {dayShifts.length === 0 ? (
-                  <div style={styles.emptyDay} />
-                ) : dayShifts.map(s => (
-                  <div key={s.id}>
-                    <div style={styles.shiftPill}>
-                      <div style={styles.pillWorker}>{s.worker_name}</div>
-                      {s.project_name && <div style={styles.pillProject}>{s.project_name}</div>}
-                      <div style={styles.pillTime}>{fmtTime(s.start_time)}–{fmtTime(s.end_time)}</div>
-                      {s.notes && <div style={styles.pillNotes}>{s.notes}</div>}
-                      <div style={styles.pillActions}>
-                        <button style={styles.editPillBtn} onClick={() => editingId === s.id ? setEditingId(null) : startEdit(s)} title="Edit shift">✎</button>
-                        <button style={styles.deleteBtn} onClick={() => deleteShift(s.id)} disabled={deleting === s.id}>
-                          {deleting === s.id ? '...' : '✕'}
-                        </button>
-                      </div>
-                    </div>
-                    {editingId === s.id && (
-                      <div style={styles.editPanel}>
-                        <div style={styles.editGrid}>
-                          <div style={styles.editField}>
-                            <label style={styles.editLabel}>Date</label>
-                            <input style={styles.editInput} type="date" value={editForm.shift_date} onChange={ev => setEditForm(f => ({ ...f, shift_date: ev.target.value }))} />
-                          </div>
-                          <div style={styles.editField}>
-                            <label style={styles.editLabel}>Start</label>
-                            <input style={styles.editInput} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} />
-                          </div>
-                          <div style={styles.editField}>
-                            <label style={styles.editLabel}>End</label>
-                            <input style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
-                          </div>
-                          <div style={styles.editField}>
-                            <label style={styles.editLabel}>Project</label>
-                            <select style={styles.editInput} value={editForm.project_id} onChange={ev => setEditForm(f => ({ ...f, project_id: ev.target.value }))}>
-                              <option value="">None</option>
-                              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                          </div>
-                          <div style={{ ...styles.editField, flex: 2 }}>
-                            <label style={styles.editLabel}>Notes</label>
-                            <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder="Optional" />
-                          </div>
-                        </div>
-                        <div style={styles.editActions}>
-                          <button style={styles.saveBtn} onClick={() => saveEdit(s.id)} disabled={editSaving}>{editSaving ? '...' : 'Save'}</button>
-                          <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
-                        </div>
-                      </div>
-                    )}
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <div style={styles.grid}>
+            {days.map(day => {
+              const key = toISO(day);
+              const dayShifts = shiftsByDay[key] || [];
+              const isToday = key === toISO(new Date());
+              return (
+                <DroppableDay key={key} date={key} isToday={isToday}>
+                  <div style={{ ...styles.dayHead, color: isToday ? '#1a56db' : '#374151' }}>
+                    {day.toLocaleDateString('en-US', { weekday: 'short' })} {day.getDate()}
                   </div>
-                ))}
+                  {dayShifts.length === 0
+                    ? <div style={styles.emptyDay} />
+                    : dayShifts.map(s => <DraggableShift key={s.id} s={s} {...shiftProps} />)
+                  }
+                </DroppableDay>
+              );
+            })}
+          </div>
+
+          <DragOverlay dropAnimation={null}>
+            {activeShift && (
+              <div style={{ ...styles.shiftPill, boxShadow: '0 8px 24px rgba(0,0,0,0.18)', cursor: 'grabbing', opacity: 0.95 }}>
+                <PillContent s={activeShift} />
               </div>
-            );
-          })}
-        </div>
+            )}
+          </DragOverlay>
+        </DndContext>
       )}
     </div>
   );
@@ -248,6 +351,7 @@ const styles = {
   pillNotes: { color: '#9ca3af', fontSize: 10, fontStyle: 'italic' },
   pillActions: { display: 'flex', gap: 4, marginTop: 4 },
   editPillBtn: { background: 'none', border: 'none', color: '#1a56db', fontSize: 12, cursor: 'pointer', padding: 0, lineHeight: 1 },
+  dupBtn: { background: 'none', border: 'none', color: '#059669', fontSize: 12, cursor: 'pointer', padding: 0, lineHeight: 1 },
   deleteBtn: { background: 'none', border: 'none', color: '#fca5a5', fontSize: 11, cursor: 'pointer', padding: 0, lineHeight: 1 },
   editPanel: { background: '#f8faff', border: '1px solid #dbeafe', borderRadius: 6, padding: 10, marginTop: 4 },
   editGrid: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 },
