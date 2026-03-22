@@ -298,7 +298,7 @@ const styles = {
   annualNote: { textAlign: 'center', fontSize: 13, color: '#9ca3af', marginTop: 28 },
 
   // Final CTA
-  finalCta: { background: 'linear-gradient(135deg, #1a56db 0%, #1e40af 100%)', color: '#fff', textAlign: 'center', padding: '96px 24px' },
+  finalCta: { background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)', color: '#fff', textAlign: 'center', padding: '96px 24px' },
   finalCtaInner: { maxWidth: 640, margin: '0 auto' },
   finalCtaBrand: { fontSize: 12, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', opacity: 0.65, marginBottom: 20 },
   finalCtaTitle: { fontSize: 36, fontWeight: 800, marginBottom: 16, lineHeight: 1.2 },
