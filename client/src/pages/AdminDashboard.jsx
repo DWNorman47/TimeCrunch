@@ -3,11 +3,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePlan } from '../hooks/usePlan';
 import NotificationBell from '../components/NotificationBell';
 import WorkerMetrics from '../components/WorkerMetrics';
-import ManageRates from '../components/ManageRates';
 import ProjectReports from '../components/ProjectReports';
 import QuickBooks from '../components/QuickBooks';
 import LiveWorkers from '../components/LiveWorkers';
-import AuditLog from '../components/AuditLog';
 import ApprovalQueue from '../components/ApprovalQueue';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import ManagePayPeriods from '../components/ManagePayPeriods';
@@ -265,10 +263,7 @@ export default function AdminDashboard() {
         ) : tab === 'manage' ? (
           <>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
-            <ManageRates settings={settings} onSettingsUpdated={setSettings} />
             <ManagePayPeriods />
-            <h3 style={styles.subheading}>Audit Log</h3>
-            <AuditLog />
           </>
         ) : (
           <>

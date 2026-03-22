@@ -6,6 +6,8 @@ import TabBar from '../components/TabBar';
 import BillingPanel from '../components/BillingPanel';
 import ManageWorkers from '../components/ManageWorkers';
 import ManageProjects from '../components/ManageProjects';
+import ManageRates from '../components/ManageRates';
+import AuditLog from '../components/AuditLog';
 
 function RoleBadge({ role }) {
   const isAdmin = role === 'admin' || role === 'super_admin';
@@ -252,7 +254,14 @@ export default function AdministrationPage() {
       <main style={styles.main}>
         <TabBar active={tab} onChange={switchTab} tabs={TABS} />
 
-        {tab === 'company'  && <CompanyTab />}
+        {tab === 'company'  && (
+          <>
+            <CompanyTab />
+            <div style={{ padding: '0 0 24px' }}>
+              <ManageRates settings={settings} onSettingsUpdated={setSettings} />
+            </div>
+          </>
+        )}
         {tab === 'team'     && (
           <div style={styles.tabContent}>
             <h2 style={styles.tabTitle}>Team</h2>
@@ -266,6 +275,8 @@ export default function AdministrationPage() {
               showRate={true}
               identityEditable={true}
             />
+            <h3 style={styles.sectionTitle}>Audit Log</h3>
+            <AuditLog />
           </div>
         )}
         {tab === 'projects' && (
@@ -306,6 +317,7 @@ const styles = {
   main: { maxWidth: 900, margin: '0 auto', padding: '24px 16px' },
   // Content sections
   tabContent: { display: 'flex', flexDirection: 'column', gap: 16 },
+  sectionTitle: { fontSize: 17, fontWeight: 700, margin: '8px 0 0' },
   tabTitle: { fontSize: 22, fontWeight: 800, color: '#111827', margin: '0 0 4px' },
   // Cards
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
