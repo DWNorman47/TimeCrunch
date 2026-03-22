@@ -67,7 +67,7 @@ export default function Landing() {
       <header style={styles.header} className="landing-header">
         <a href="#top" style={styles.logoLink}>
           <span style={styles.logo}>OpsFloA</span>
-          <span style={styles.logoTagline}>Ops Flo Assist</span>
+          <span style={styles.logoTagline}>Ops Flow Assist</span>
         </a>
         <nav style={styles.nav} className="landing-nav">
           <a href="#features" style={styles.navLink}>Features</a>
@@ -90,8 +90,8 @@ export default function Landing() {
       {/* Hero */}
       <section style={styles.hero}>
         <div style={styles.heroBadge}>Built for contractors &amp; field crews</div>
-        <div style={styles.heroWordmark}>Ops Flo Assist</div>
-        <h1 style={styles.heroTitle}>Operations management<br />for the job site</h1>
+        <div style={styles.heroWordmark} spellCheck={false}>Ops Flow Assist</div>
+        <h1 style={styles.heroTitle}>Operations Management<br />For the Job Site</h1>
         <p style={styles.heroSub}>
           Time tracking, daily reports, field photos, punchlist, safety talks, and crew scheduling — all in one platform your whole team carries in their pocket.
         </p>
@@ -199,7 +199,7 @@ export default function Landing() {
       {/* Final CTA */}
       <section style={styles.finalCta}>
         <div style={styles.finalCtaInner}>
-          <div style={styles.finalCtaBrand}>OpsFloA · Ops Flo Assist</div>
+          <div style={styles.finalCtaBrand}>OpsFloA · Ops Flow Assist</div>
           <h2 style={styles.finalCtaTitle}>Your crew is already on the job site.<br />Give them the tools to match.</h2>
           <p style={styles.finalCtaSub}>One login. Every tool your field team needs — from clock-in to certified payroll.</p>
           <Link to="/register" style={styles.finalCtaBtn}>Create your free account →</Link>
@@ -209,7 +209,7 @@ export default function Landing() {
       <footer style={styles.footer}>
         <div style={styles.footerBrand}>
           <a href="#top" style={styles.footerLogo}>OpsFloA</a>
-          <span style={styles.footerTagline}>Ops Flo Assist</span>
+          <span style={styles.footerTagline}>Ops Flow Assist</span>
         </div>
         <span style={styles.footerCopy}>© {new Date().getFullYear()} OpsFloA. All rights reserved.</span>
         <div style={styles.footerLinks}>
@@ -242,7 +242,7 @@ const styles = {
   // Hero
   hero: { textAlign: 'center', padding: '80px 24px 72px', background: 'linear-gradient(160deg, #f0f4ff 0%, #fafbff 50%, #fff 100%)' },
   heroBadge: { display: 'inline-block', background: '#e0e7ff', color: '#3730a3', fontSize: 13, fontWeight: 700, padding: '4px 14px', borderRadius: 20, marginBottom: 18, letterSpacing: '0.03em' },
-  heroWordmark: { fontSize: 15, fontWeight: 700, color: '#1a56db', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 18, opacity: 0.8 },
+  heroWordmark: { fontSize: 15, fontWeight: 700, color: '#1a56db', letterSpacing: '0.08em', marginBottom: 18, opacity: 0.8 },
   heroTitle: { fontSize: 52, fontWeight: 900, lineHeight: 1.1, color: '#111827', maxWidth: 680, margin: '0 auto 22px' },
   heroSub: { fontSize: 19, color: '#4b5563', maxWidth: 600, margin: '0 auto 36px', lineHeight: 1.7 },
   heroCtas: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 14, flexWrap: 'wrap' },
