@@ -3,13 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePlan } from '../hooks/usePlan';
 import NotificationBell from '../components/NotificationBell';
 import WorkerMetrics from '../components/WorkerMetrics';
-import ManageWorkers from '../components/ManageWorkers';
-import ManageProjects from '../components/ManageProjects';
-import ManageRates from '../components/ManageRates';
 import ProjectReports from '../components/ProjectReports';
-import QuickBooks from '../components/QuickBooks';
 import LiveWorkers from '../components/LiveWorkers';
-import AuditLog from '../components/AuditLog';
 import ApprovalQueue from '../components/ApprovalQueue';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import ManagePayPeriods from '../components/ManagePayPeriods';
@@ -267,12 +262,7 @@ export default function AdminDashboard() {
         ) : tab === 'manage' ? (
           <>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
-            <ManageWorkers workers={workers} onWorkerAdded={handleWorkerAdded} onWorkerDeleted={handleWorkerDeleted} onWorkerUpdated={handleWorkerUpdated} onWorkerRestored={handleWorkerRestored} defaultRate={settings?.default_hourly_rate ?? 30} showRate={true} identityEditable={false} />
-            <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} onProjectRestored={handleProjectRestored} showWageType={settings?.feature_prevailing_wage !== false} nameEditable={false} showGeofenceBudget={false} />
-            <ManageRates settings={settings} onSettingsUpdated={setSettings} />
             <ManagePayPeriods />
-            <h3 style={styles.subheading}>Audit Log</h3>
-            <AuditLog />
           </>
         ) : (
           <>
@@ -282,10 +272,7 @@ export default function AdminDashboard() {
             <div style={styles.supportNote}>
               Need help? Email us at <a href="mailto:info@opsfloa.com" style={{ color: '#1a56db' }}>info@opsfloa.com</a>
             </div>
-            {plan.hasQbo
-              ? <QuickBooks workers={workers} projects={projects} />
-              : <UpgradePrompt requiredPlan="qbo" feature="QuickBooks Online Integration" />
-            }
+            <p style={{ fontSize: 13, color: '#6b7280' }}>QuickBooks and other integrations are managed in the <a href="/administration#integrations" style={{ color: '#1a56db' }}>Administration app</a>.</p>
           </>
         )}
       </main>

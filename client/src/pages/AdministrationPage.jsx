@@ -6,6 +6,10 @@ import TabBar from '../components/TabBar';
 import BillingPanel from '../components/BillingPanel';
 import ManageWorkers from '../components/ManageWorkers';
 import ManageProjects from '../components/ManageProjects';
+import ManageRates from '../components/ManageRates';
+import AuditLog from '../components/AuditLog';
+import QuickBooks from '../components/QuickBooks';
+import { usePlan } from '../hooks/usePlan';
 
 function RoleBadge({ role }) {
   const isAdmin = role === 'admin' || role === 'super_admin';
@@ -196,17 +200,19 @@ function AccountTab() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const ADMIN_TABS = ['company', 'team', 'projects', 'billing', 'account'];
+const ADMIN_TABS = ['company', 'team', 'projects', 'integrations', 'billing', 'account'];
 const TABS = [
-  { id: 'company',  label: '🏢 Company'  },
-  { id: 'team',     label: '👥 Team'     },
-  { id: 'projects', label: '📋 Projects' },
-  { id: 'billing',  label: '💳 Billing'  },
-  { id: 'account',  label: '👤 Account'  },
+  { id: 'company',      label: '🏢 Company'      },
+  { id: 'team',         label: '👥 Team'         },
+  { id: 'projects',     label: '📋 Projects'     },
+  { id: 'integrations', label: '🔗 Integrations' },
+  { id: 'billing',      label: '💳 Billing'      },
+  { id: 'account',      label: '👤 Account'      },
 ];
 
 export default function AdministrationPage() {
   const { user, logout } = useAuth();
+  const plan = usePlan();
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ADMIN_TABS.includes(hashTab) ? hashTab : 'company');
   const switchTab = t => { setTab(t); window.location.hash = t; };
@@ -252,7 +258,14 @@ export default function AdministrationPage() {
       <main style={styles.main}>
         <TabBar active={tab} onChange={switchTab} tabs={TABS} />
 
-        {tab === 'company'  && <CompanyTab />}
+        {tab === 'company'  && (
+          <>
+            <CompanyTab />
+            <div style={{ padding: '0 0 24px' }}>
+              <ManageRates settings={settings} onSettingsUpdated={setSettings} />
+            </div>
+          </>
+        )}
         {tab === 'team'     && (
           <div style={styles.tabContent}>
             <h2 style={styles.tabTitle}>Team</h2>
@@ -262,10 +275,12 @@ export default function AdministrationPage() {
               onWorkerDeleted={handleWorkerDeleted}
               onWorkerUpdated={handleWorkerUpdated}
               onWorkerRestored={handleWorkerRestored}
-              defaultRate={settings?.default_hourly_rate ?? 30}
-              showRate={false}
+              defaultRate={settings?.default_hourly_rate ?? 0}
+              showRate={true}
               identityEditable={true}
             />
+            <h3 style={styles.sectionTitle}>Audit Log</h3>
+            <AuditLog />
           </div>
         )}
         {tab === 'projects' && (
@@ -280,6 +295,20 @@ export default function AdministrationPage() {
               showWageType={false}
               nameEditable={true}
             />
+          </div>
+        )}
+        {tab === 'integrations' && (
+          <div style={styles.tabContent}>
+            <h2 style={styles.tabTitle}>Integrations</h2>
+            {plan.hasQbo
+              ? <QuickBooks workers={workers} projects={projects} />
+              : <div style={{ background: '#f9fafb', border: '2px dashed #d1d5db', borderRadius: 10, padding: '32px 24px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 6 }}>QuickBooks Online requires the QBO add-on</div>
+                  <button style={{ background: '#1a56db', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', marginTop: 8 }}
+                    onClick={() => switchTab('billing')}>View Plans →</button>
+                </div>
+            }
           </div>
         )}
         {tab === 'billing'  && <BillingTab />}
@@ -306,6 +335,7 @@ const styles = {
   main: { maxWidth: 900, margin: '0 auto', padding: '24px 16px' },
   // Content sections
   tabContent: { display: 'flex', flexDirection: 'column', gap: 16 },
+  sectionTitle: { fontSize: 17, fontWeight: 700, margin: '8px 0 0' },
   tabTitle: { fontSize: 22, fontWeight: 800, color: '#111827', margin: '0 0 4px' },
   // Cards
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },

@@ -114,7 +114,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
     const { lat, lng } = await getLocation();
     const local_work_date = new Date().toLocaleDateString('en-CA');
     try {
-      const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date });
+      const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
       if (r.data?.offline) {
         // Queued offline — show a pending state
         setStatus({ offline_queued: true, project_name: projects.find(p => p.id == selectedProject)?.name });

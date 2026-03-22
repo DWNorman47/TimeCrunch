@@ -20,7 +20,15 @@ export default function NotificationSetup() {
     }
     navigator.serviceWorker.ready.then(async reg => {
       const sub = await reg.pushManager.getSubscription();
-      if (sub) { setSubscription(sub); setState('subscribed'); }
+      if (sub) {
+        setSubscription(sub);
+        setState('subscribed');
+        return;
+      }
+      // Auto-subscribe if permission hasn't been denied
+      if (Notification.permission !== 'denied') {
+        subscribe();
+      }
     });
   }, []);
 

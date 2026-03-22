@@ -64,10 +64,10 @@ async function oauthCallback(req, res) {
        WHERE id = $5`,
       [encrypt(realmId), encrypt(tokens.access_token), encrypt(tokens.refresh_token), expiresAt, company_id]
     );
-    res.redirect(`${process.env.APP_URL}/administration#qbo`);
+    res.redirect(`${process.env.APP_URL}/administration#integrations`);
   } catch (err) {
     console.error(err);
-    res.redirect(`${process.env.APP_URL}/administration#qbo?error=auth_failed`);
+    res.redirect(`${process.env.APP_URL}/administration#integrations?error=auth_failed`);
   }
 }
 router.get('/callback', oauthCallback);

@@ -40,7 +40,7 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill }) {
     }
     setSaving(true);
     try {
-      const r = await api.post('/time-entries', form);
+      const r = await api.post('/time-entries', { ...form, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
       onEntryAdded({ ...r.data, project_name: selectedProject?.name });
       setForm(f => ({ ...f, start_time: '', end_time: '', notes: '', break_minutes: '', mileage: '' }));
       setSuccess(true);

@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS time_entries (
   clock_in_lng    DECIMAL(10,7),
   clock_out_lat   DECIMAL(10,7),
   clock_out_lng   DECIMAL(10,7),
+  timezone        VARCHAR(50),
   created_at      TIMESTAMP     NOT NULL DEFAULT NOW()
 );
 
@@ -113,6 +114,7 @@ CREATE TABLE IF NOT EXISTS active_clock (
   clock_in_lng   DECIMAL(10,7),
   work_date      DATE          NOT NULL,
   notes          TEXT,
+  timezone       VARCHAR(50),
   created_at     TIMESTAMP     NOT NULL DEFAULT NOW()
 );
 
@@ -370,5 +372,10 @@ ALTER TABLE users     ADD COLUMN IF NOT EXISTS locked_until           TIMESTAMP;
 ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_enabled           BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_secret            TEXT;
 ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_secret_pending    TEXT;
+-- Timezone tracking on time entries and active clock
+ALTER TABLE time_entries  ADD COLUMN IF NOT EXISTS timezone VARCHAR(50);
+ALTER TABLE active_clock  ADD COLUMN IF NOT EXISTS timezone VARCHAR(50);
+-- Fix QBO encrypted token column sizes
+ALTER TABLE companies ALTER COLUMN qbo_realm_id TYPE TEXT;
 -- plan values: free | starter | business  (trial companies default to full access until plan is set)
 

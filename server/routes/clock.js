@@ -27,7 +27,7 @@ const { validCoords } = require('../utils/geoUtils');
 
 // POST /api/clock/in
 router.post('/in', requireAuth, async (req, res) => {
-  const { project_id, notes, lat, lng, local_work_date } = req.body;
+  const { project_id, notes, lat, lng, local_work_date, timezone } = req.body;
   if (!project_id) return res.status(400).json({ error: 'project_id required' });
   if ((lat != null || lng != null) && !validCoords(lat, lng)) {
     return res.status(400).json({ error: 'Invalid coordinates' });
@@ -60,17 +60,18 @@ router.post('/in', requireAuth, async (req, res) => {
 
     // Upsert — replace any existing clock-in (safety valve)
     const result = await pool.query(
-      `INSERT INTO active_clock (user_id, company_id, project_id, clock_in_time, clock_in_lat, clock_in_lng, work_date, notes)
-       VALUES ($1, $2, $3, NOW(), $4, $5, COALESCE($6::date, CURRENT_DATE), $7)
+      `INSERT INTO active_clock (user_id, company_id, project_id, clock_in_time, clock_in_lat, clock_in_lng, work_date, notes, timezone)
+       VALUES ($1, $2, $3, NOW(), $4, $5, COALESCE($6::date, CURRENT_DATE), $7, $8)
        ON CONFLICT (user_id) DO UPDATE
          SET project_id = EXCLUDED.project_id,
              clock_in_time = EXCLUDED.clock_in_time,
              clock_in_lat = EXCLUDED.clock_in_lat,
              clock_in_lng = EXCLUDED.clock_in_lng,
              work_date = EXCLUDED.work_date,
-             notes = EXCLUDED.notes
+             notes = EXCLUDED.notes,
+             timezone = EXCLUDED.timezone
        RETURNING *`,
-      [req.user.id, companyId, project_id, lat || null, lng || null, local_work_date || null, notes || null]
+      [req.user.id, companyId, project_id, lat || null, lng || null, local_work_date || null, notes || null, timezone || null]
     );
 
     const row = result.rows[0];
@@ -149,14 +150,15 @@ router.post('/out', requireAuth, async (req, res) => {
     const entryResult = await pool.query(
       `INSERT INTO time_entries
          (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
-          clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, break_minutes, mileage)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, break_minutes, mileage, timezone)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING *`,
       [
         companyId, req.user.id, clock.project_id, clock.work_date,
         start_time, end_time, wage_type, clock.notes || null,
         clock.clock_in_lat, clock.clock_in_lng, lat || null, lng || null,
         parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
+        clock.timezone || null,
       ]
     );
 
