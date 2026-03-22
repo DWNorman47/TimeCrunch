@@ -12,6 +12,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     notification_start_hour: String(settings?.notification_start_hour ?? 6),
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
+    show_worker_wages: settings?.show_worker_wages ?? false,
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -34,6 +35,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         notification_start_hour: parseFloat(form.notification_start_hour),
         notification_end_hour: parseFloat(form.notification_end_hour),
         chat_retention_days: parseFloat(form.chat_retention_days),
+        show_worker_wages: form.show_worker_wages,
       });
       onSettingsUpdated(r.data);
       setSaved(true);
@@ -148,6 +150,31 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         </div>
       </div>
 
+      {/* ── Worker Access ── */}
+      <div style={styles.section}>
+        <div style={styles.sectionHeader}>
+          <span style={styles.sectionIcon}>👁️</span>
+          <div>
+            <div style={styles.sectionTitle}>Worker Access</div>
+            <div style={styles.sectionSub}>Control what workers can see in their dashboard</div>
+          </div>
+        </div>
+        <div style={styles.sectionBody}>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Show wages &amp; estimated earnings</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Workers can see their hourly rate, overtime pay, and pay stubs</div>
+            </div>
+            <label style={styles.toggle}>
+              <input type="checkbox" checked={form.show_worker_wages} onChange={e => set('show_worker_wages', e.target.checked)} style={{ display: 'none' }} />
+              <div style={{ ...styles.toggleTrack, background: form.show_worker_wages ? '#1a56db' : '#e5e7eb' }}>
+                <div style={{ ...styles.toggleThumb, transform: form.show_worker_wages ? 'translateX(20px)' : 'translateX(2px)' }} />
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.footer}>
         {saved && <span style={styles.savedMsg}>Settings saved</span>}
@@ -173,6 +200,9 @@ const styles = {
   prefix: { fontSize: 14, color: '#6b7280' },
   suffix: { fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap' },
   input: { width: 90, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, textAlign: 'right' },
+  toggle: { cursor: 'pointer', flexShrink: 0 },
+  toggleTrack: { width: 44, height: 24, borderRadius: 12, transition: 'background 0.2s', position: 'relative' },
+  toggleThumb: { position: 'absolute', top: 2, width: 20, height: 20, borderRadius: 10, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s' },
   error: { color: '#e53e3e', fontSize: 13 },
   footer: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, paddingTop: 4 },
   savedMsg: { color: '#059669', fontSize: 13, fontWeight: 600 },
