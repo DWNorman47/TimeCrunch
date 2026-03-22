@@ -16,9 +16,9 @@ const features = [
 ];
 
 const steps = [
-  { num: '1', title: 'Create your company', body: 'Sign up in under a minute. No credit card required. Your crew can be clocked in today.' },
-  { num: '2', title: 'Add workers & projects', body: 'Invite workers by email or add them manually. Set up job sites with GPS boundaries.' },
-  { num: '3', title: 'Run your field operations', body: 'Time, reports, safety, punchlist — everything flows through one platform your whole crew already has in their pocket.' },
+  { num: '1', title: 'Create Your Company', body: 'Sign up in under a minute. No credit card required. Your crew can be clocked in today.' },
+  { num: '2', title: 'Add Workers & Projects', body: 'Invite workers by email or add them manually. Set up job sites with GPS boundaries.' },
+  { num: '3', title: 'Run Your Field Operations', body: 'Time, reports, safety, punchlist — everything flows through one platform your whole crew already has in their pocket.' },
 ];
 
 const plans = [
@@ -27,8 +27,8 @@ const plans = [
     price: '$0',
     period: '',
     desc: 'For small crews just getting started.',
-    features: ['Up to 3 workers', 'GPS time clock', 'Scheduling (1 week ahead)', 'Timesheet PDF (latest week)', '90-day history'],
-    cta: 'Get started free',
+    features: ['Up to 3 Workers', 'GPS Time Clock', 'Scheduling (1 Week Ahead)', 'Timesheet PDF (Latest Week)', '90-Day History'],
+    cta: 'Get Started Free',
     highlight: false,
   },
   {
@@ -36,8 +36,8 @@ const plans = [
     price: '$20',
     period: '/mo',
     desc: 'More workers, more exports, more control.',
-    features: ['Up to 10 workers', 'Everything in Free', 'Full history & CSV export', 'Overtime reports', 'Entry approvals', 'Pay period lock', 'Mileage & break tracking'],
-    cta: 'Start free trial',
+    features: ['Up to 10 Workers', 'Everything in Free', 'Full History & CSV Export', 'Overtime Reports', 'Entry Approvals', 'Pay Period Lock', 'Mileage & Break Tracking'],
+    cta: 'Start Free Trial',
     highlight: false,
   },
   {
@@ -45,17 +45,17 @@ const plans = [
     price: '$35',
     period: '/mo · 15 workers included',
     desc: 'The full platform for growing contractors. $2/worker after 15.',
-    features: ['15 workers included', 'Everything in Starter', 'Daily & field reports', 'Punchlist management', 'Safety talks & sign-off', 'Analytics dashboard', 'Broadcast announcements', '+$2/worker after 15'],
-    cta: 'Start free trial',
+    features: ['15 Workers Included', 'Everything in Starter', 'Daily & Field Reports', 'Punchlist Management', 'Safety Talks & Sign-Off', 'Analytics Dashboard', 'Broadcast Announcements', '+$2/Worker After 15'],
+    cta: 'Start Free Trial',
     highlight: true,
   },
   {
-    name: 'QBO Add-on',
+    name: 'QBO Add-On',
     price: '+$25',
     period: '/mo',
     desc: 'Push hours directly into QuickBooks Online.',
-    features: ['QuickBooks Online sync', 'Zero manual entry', 'Requires Starter or Business'],
-    cta: 'Learn more',
+    features: ['QuickBooks Online Sync', 'Zero Manual Entry', 'Requires Starter or Business'],
+    cta: 'Learn More',
     highlight: false,
   },
 ];
@@ -71,58 +71,57 @@ export default function Landing() {
         </a>
         <nav style={styles.nav} className="landing-nav">
           <a href="#features" style={styles.navLink}>Features</a>
-          <a href="#how-it-works" style={styles.navLink}>How it works</a>
+          <a href="#how-it-works" style={styles.navLink}>How It Works</a>
           <a href="#pricing" style={styles.navLink}>Pricing</a>
         </nav>
         <div style={styles.headerRight}>
-          <Link to="/login" style={styles.loginLink}>Log in</Link>
-          <Link to="/register" style={styles.ctaBtn} className="landing-cta">Get started free</Link>
+          <Link to="/login" style={styles.loginLink}>Log In</Link>
+          <Link to="/register" style={styles.ctaBtn} className="landing-cta">Get Started Free</Link>
         </div>
       </header>
 
       {/* Mobile sub-nav */}
       <nav style={styles.mobileSubnav} className="landing-subnav">
         <a href="#features" style={styles.subnavLink}>Features</a>
-        <a href="#how-it-works" style={styles.subnavLink}>How it works</a>
+        <a href="#how-it-works" style={styles.subnavLink}>How It Works</a>
         <a href="#pricing" style={styles.subnavLink}>Pricing</a>
       </nav>
 
       {/* Hero */}
       <section style={styles.hero}>
-        <div style={styles.heroBadge}>Built for contractors &amp; field crews</div>
-        <div style={styles.heroWordmark} spellCheck={false}>Ops Flow Assist</div>
+        <div style={styles.heroBadge}>Built for Contractors &amp; Field Crews</div>
         <h1 style={styles.heroTitle}>Operations Management<br />For the Job Site</h1>
         <p style={styles.heroSub}>
           Time tracking, daily reports, field photos, punchlist, safety talks, and crew scheduling — all in one platform your whole team carries in their pocket.
         </p>
         <div style={styles.heroCtas}>
-          <Link to="/register" style={styles.heroBtn}>Create your free account</Link>
-          <a href="#features" style={styles.heroSecondary}>See all features →</a>
+          <Link to="/register" style={styles.heroBtn}>Create Your Free Account</Link>
+          <a href="#features" style={styles.heroSecondary}>See All Features →</a>
         </div>
-        <p style={styles.heroNote}>Free 14-day trial · No credit card required</p>
+        <p style={styles.heroNote}>Free 14-Day Trial · No Credit Card Required</p>
 
         {/* Trust stats */}
         <div style={styles.heroStats}>
           <div style={styles.heroStat}>
             <span style={styles.heroStatNum}>11+</span>
-            <span style={styles.heroStatLabel}>Features built for the field</span>
+            <span style={styles.heroStatLabel}>Features Built for the Field</span>
           </div>
           <div style={styles.heroStatDivider} />
           <div style={styles.heroStat}>
             <span style={styles.heroStatNum}>$0</span>
-            <span style={styles.heroStatLabel}>To get started — no card required</span>
+            <span style={styles.heroStatLabel}>To Get Started — No Card Required</span>
           </div>
           <div style={styles.heroStatDivider} />
           <div style={styles.heroStat}>
             <span style={styles.heroStatNum}>1 min</span>
-            <span style={styles.heroStatLabel}>To set up and clock in your crew</span>
+            <span style={styles.heroStatLabel}>To Set Up and Clock In Your Crew</span>
           </div>
         </div>
       </section>
 
       {/* Social proof bar */}
       <div style={styles.proofBar}>
-        {['GPS time clock', 'Daily reports', 'Field photos', 'Punchlist', 'Safety talks', 'Certified payroll', 'QuickBooks sync'].map(t => (
+        {['GPS Time Clock', 'Daily Reports', 'Field Photos', 'Punchlist', 'Safety Talks', 'Certified Payroll', 'QuickBooks Sync'].map(t => (
           <span key={t} style={styles.proofItem}>✓ {t}</span>
         ))}
       </div>
@@ -130,7 +129,7 @@ export default function Landing() {
       {/* Features */}
       <section id="features" style={styles.section} className="landing-section">
         <div style={styles.sectionInner}>
-          <h2 style={styles.sectionTitle}>One platform. Every part of the job.</h2>
+          <h2 style={styles.sectionTitle}>One Platform. Every Part of the Job.</h2>
           <p style={styles.sectionSub}>From first clock-in to final sign-off, every workflow is covered.</p>
           <div style={styles.featureGrid}>
             {features.map(f => (
@@ -147,7 +146,7 @@ export default function Landing() {
       {/* How it works */}
       <section id="how-it-works" style={styles.howSection} className="landing-section">
         <div style={styles.sectionInner}>
-          <h2 style={styles.sectionTitle}>Up and running in minutes</h2>
+          <h2 style={styles.sectionTitle}>Up and Running in Minutes</h2>
           <p style={styles.sectionSub}>No training. No onboarding call. Just sign up and go.</p>
           <div style={styles.steps}>
             {steps.map(s => (
@@ -164,12 +163,12 @@ export default function Landing() {
       {/* Pricing */}
       <section id="pricing" style={styles.section} className="landing-section">
         <div style={styles.sectionInner}>
-          <h2 style={styles.sectionTitle}>Simple, honest pricing</h2>
+          <h2 style={styles.sectionTitle}>Simple, Honest Pricing</h2>
           <p style={styles.sectionSub}>Start free. Upgrade when you're ready. Cancel any time.</p>
           <div style={styles.pricingGrid}>
             {plans.map(p => (
               <div key={p.name} style={{ ...styles.planCard, ...(p.highlight ? styles.planHighlight : {}) }}>
-                {p.highlight && <div style={styles.popularBadge}>Most popular</div>}
+                {p.highlight && <div style={styles.popularBadge}>Most Popular</div>}
                 <div style={styles.planName}>{p.name}</div>
                 <div style={styles.planPrice}>
                   <span style={styles.planAmount}>{p.price}</span>
@@ -202,7 +201,7 @@ export default function Landing() {
           <div style={styles.finalCtaBrand}>OpsFloA · Ops Flow Assist</div>
           <h2 style={styles.finalCtaTitle}>Your crew is already on the job site.<br />Give them the tools to match.</h2>
           <p style={styles.finalCtaSub}>One login. Every tool your field team needs — from clock-in to certified payroll.</p>
-          <Link to="/register" style={styles.finalCtaBtn}>Create your free account →</Link>
+          <Link to="/register" style={styles.finalCtaBtn}>Create Your Free Account →</Link>
         </div>
       </section>
 
@@ -213,8 +212,8 @@ export default function Landing() {
         </div>
         <span style={styles.footerCopy}>© {new Date().getFullYear()} OpsFloA. All rights reserved.</span>
         <div style={styles.footerLinks}>
-          <Link to="/login" style={styles.footerLink}>Log in</Link>
-          <Link to="/register" style={styles.footerLink}>Sign up</Link>
+          <Link to="/login" style={styles.footerLink}>Log In</Link>
+          <Link to="/register" style={styles.footerLink}>Sign Up</Link>
           <Link to="/privacy" style={styles.footerLink}>Privacy</Link>
           <Link to="/eula" style={styles.footerLink}>Terms</Link>
         </div>
