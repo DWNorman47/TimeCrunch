@@ -252,7 +252,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         WHERE wage_type = 'regular' AND company_id = $1
         GROUP BY user_id, work_date
       )
-      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate,
+      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.email,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE((SELECT SUM(LEAST(day_hours, 8)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as regular_hours,
@@ -261,7 +261,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1
-      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate
+      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.email
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
       [companyId]
