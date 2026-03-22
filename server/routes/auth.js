@@ -83,6 +83,12 @@ router.post('/login', loginLimiter, async (req, res) => {
     // Reset failed attempts on successful password match
     await pool.query('UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1', [user.id]);
 
+    // Track first login for welcome modal
+    const isFirstLogin = !user.welcomed_at;
+    if (isFirstLogin) {
+      await pool.query('UPDATE users SET welcomed_at = NOW() WHERE id = $1', [user.id]);
+    }
+
     if (!user.email_confirmed) {
       return res.status(403).json({ error: 'email_not_confirmed', email: user.email });
     }
@@ -92,7 +98,7 @@ router.post('/login', loginLimiter, async (req, res) => {
       return res.json({ mfa_required: true, mfa_token: mfaToken });
     }
     const token = signToken(user);
-    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
+    res.json({ token, first_login: isFirstLogin, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

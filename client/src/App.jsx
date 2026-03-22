@@ -16,6 +16,7 @@ import SuperAdmin from './pages/SuperAdmin';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import EULA from './pages/EULA';
 import InstallPrompt from './components/InstallPrompt';
+import WelcomeModal from './components/WelcomeModal';
 import { ToastProvider } from './contexts/ToastContext';
 
 const BLOCKED_STATUSES = ['trial_expired', 'canceled'];
@@ -86,6 +87,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <ToastProvider>
+          <WelcomeModal />
           <AppRoutes />
           <InstallPrompt />
         </ToastProvider>

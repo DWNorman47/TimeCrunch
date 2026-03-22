@@ -6,6 +6,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [firstLogin, setFirstLogin] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('tc_token');
@@ -27,6 +28,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('tc_token', r.data.token);
     const me = await api.get('/auth/me');
     setUser(me.data.user);
+    if (r.data.first_login) setFirstLogin(true);
     return me.data.user;
   };
 
@@ -34,6 +36,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('tc_token', token);
     const me = await api.get('/auth/me');
     setUser(me.data.user);
+    setFirstLogin(true); // registration always counts as first login
     return me.data.user;
   };
 
@@ -48,12 +51,14 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('tc_token');
     setUser(null);
+    setFirstLogin(false);
   };
 
   const updateUser = patch => setUser(u => ({ ...u, ...patch }));
+  const clearFirstLogin = () => setFirstLogin(false);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithToken, confirmMfa, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithToken, confirmMfa, logout, updateUser, firstLogin, clearFirstLogin }}>
       {children}
     </AuthContext.Provider>
   );

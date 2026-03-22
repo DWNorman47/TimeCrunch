@@ -358,6 +358,18 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
   }
 });
 
+// GET /admin/workers/check-username — check if a username is already taken
+router.get('/workers/check-username', requireAdmin, async (req, res) => {
+  const { username } = req.query;
+  if (!username) return res.json({ taken: false });
+  try {
+    const result = await pool.query('SELECT id FROM users WHERE username = $1', [username.toLowerCase().trim()]);
+    res.json({ taken: result.rowCount > 0 });
+  } catch (err) {
+    res.json({ taken: false });
+  }
+});
+
 // Invite a worker by email
 router.post('/workers/invite', requireAdmin, async (req, res) => {
   const { full_name, email, role, language, hourly_rate } = req.body;
@@ -412,13 +424,13 @@ router.post('/workers/invite', requireAdmin, async (req, res) => {
     let emailSent = true;
     try {
       await sgMail.send({
-        from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
+        from: { name: 'OpsFloA', email: process.env.SENDGRID_FROM_EMAIL },
         to: email,
-        subject: `You've been invited to OpsFloa`,
+        subject: `You've been invited to OpsFloA`,
         html: `
           <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
             <h2 style="color:#1a56db;margin-bottom:8px">You're invited!</h2>
-            <p style="color:#444;margin-bottom:8px">Hi ${full_name}, ${req.user.full_name} has invited you to join OpsFloa.</p>
+            <p style="color:#444;margin-bottom:8px">Hi ${full_name}, ${req.user.full_name} has invited you to join OpsFloA.</p>
             <p style="color:#444;margin-bottom:24px">Your username is: <strong>${username}</strong></p>
             <a href="${inviteUrl}" style="display:inline-block;background:#1a56db;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700">Set your password</a>
             <p style="color:#999;font-size:13px;margin-top:24px">This invite expires in 7 days.</p>
