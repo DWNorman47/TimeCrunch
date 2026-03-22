@@ -4,7 +4,6 @@ import { usePlan } from '../hooks/usePlan';
 import NotificationBell from '../components/NotificationBell';
 import WorkerMetrics from '../components/WorkerMetrics';
 import ProjectReports from '../components/ProjectReports';
-import QuickBooks from '../components/QuickBooks';
 import LiveWorkers from '../components/LiveWorkers';
 import ApprovalQueue from '../components/ApprovalQueue';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
@@ -273,10 +272,7 @@ export default function AdminDashboard() {
             <div style={styles.supportNote}>
               Need help? Email us at <a href="mailto:info@opsfloa.com" style={{ color: '#1a56db' }}>info@opsfloa.com</a>
             </div>
-            {plan.hasQbo
-              ? <QuickBooks workers={workers} projects={projects} />
-              : <UpgradePrompt requiredPlan="qbo" feature="QuickBooks Online Integration" />
-            }
+            <p style={{ fontSize: 13, color: '#6b7280' }}>QuickBooks and other integrations are managed in the <a href="/administration#integrations" style={{ color: '#1a56db' }}>Administration app</a>.</p>
           </>
         )}
       </main>

@@ -8,6 +8,8 @@ import ManageWorkers from '../components/ManageWorkers';
 import ManageProjects from '../components/ManageProjects';
 import ManageRates from '../components/ManageRates';
 import AuditLog from '../components/AuditLog';
+import QuickBooks from '../components/QuickBooks';
+import { usePlan } from '../hooks/usePlan';
 
 function RoleBadge({ role }) {
   const isAdmin = role === 'admin' || role === 'super_admin';
@@ -198,17 +200,19 @@ function AccountTab() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const ADMIN_TABS = ['company', 'team', 'projects', 'billing', 'account'];
+const ADMIN_TABS = ['company', 'team', 'projects', 'integrations', 'billing', 'account'];
 const TABS = [
-  { id: 'company',  label: '🏢 Company'  },
-  { id: 'team',     label: '👥 Team'     },
-  { id: 'projects', label: '📋 Projects' },
-  { id: 'billing',  label: '💳 Billing'  },
-  { id: 'account',  label: '👤 Account'  },
+  { id: 'company',      label: '🏢 Company'      },
+  { id: 'team',         label: '👥 Team'         },
+  { id: 'projects',     label: '📋 Projects'     },
+  { id: 'integrations', label: '🔗 Integrations' },
+  { id: 'billing',      label: '💳 Billing'      },
+  { id: 'account',      label: '👤 Account'      },
 ];
 
 export default function AdministrationPage() {
   const { user, logout } = useAuth();
+  const plan = usePlan();
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ADMIN_TABS.includes(hashTab) ? hashTab : 'company');
   const switchTab = t => { setTab(t); window.location.hash = t; };
@@ -291,6 +295,20 @@ export default function AdministrationPage() {
               showWageType={false}
               nameEditable={true}
             />
+          </div>
+        )}
+        {tab === 'integrations' && (
+          <div style={styles.tabContent}>
+            <h2 style={styles.tabTitle}>Integrations</h2>
+            {plan.hasQbo
+              ? <QuickBooks workers={workers} projects={projects} />
+              : <div style={{ background: '#f9fafb', border: '2px dashed #d1d5db', borderRadius: 10, padding: '32px 24px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 6 }}>QuickBooks Online requires the QBO add-on</div>
+                  <button style={{ background: '#1a56db', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', marginTop: 8 }}
+                    onClick={() => switchTab('billing')}>View Plans →</button>
+                </div>
+            }
           </div>
         )}
         {tab === 'billing'  && <BillingTab />}
