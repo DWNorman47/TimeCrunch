@@ -262,8 +262,8 @@ export default function AdministrationPage() {
               onWorkerDeleted={handleWorkerDeleted}
               onWorkerUpdated={handleWorkerUpdated}
               onWorkerRestored={handleWorkerRestored}
-              defaultRate={settings?.default_hourly_rate ?? 30}
-              showRate={false}
+              defaultRate={settings?.default_hourly_rate ?? 0}
+              showRate={true}
               identityEditable={true}
             />
           </div>

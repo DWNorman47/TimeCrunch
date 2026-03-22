@@ -3,8 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePlan } from '../hooks/usePlan';
 import NotificationBell from '../components/NotificationBell';
 import WorkerMetrics from '../components/WorkerMetrics';
-import ManageWorkers from '../components/ManageWorkers';
-import ManageProjects from '../components/ManageProjects';
 import ManageRates from '../components/ManageRates';
 import ProjectReports from '../components/ProjectReports';
 import QuickBooks from '../components/QuickBooks';
@@ -267,8 +265,6 @@ export default function AdminDashboard() {
         ) : tab === 'manage' ? (
           <>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
-            <ManageWorkers workers={workers} onWorkerAdded={handleWorkerAdded} onWorkerDeleted={handleWorkerDeleted} onWorkerUpdated={handleWorkerUpdated} onWorkerRestored={handleWorkerRestored} defaultRate={settings?.default_hourly_rate ?? 30} showRate={true} identityEditable={false} />
-            <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} onProjectRestored={handleProjectRestored} showWageType={settings?.feature_prevailing_wage !== false} nameEditable={false} showGeofenceBudget={false} />
             <ManageRates settings={settings} onSettingsUpdated={setSettings} />
             <ManagePayPeriods />
             <h3 style={styles.subheading}>Audit Log</h3>
