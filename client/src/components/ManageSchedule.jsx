@@ -55,6 +55,7 @@ export default function ManageSchedule({ workers, projects }) {
       const r = await api.post('/shifts/admin', form);
       setShifts(prev => [...prev, r.data].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
       setForm(f => ({ ...f, notes: '' }));
+      toast('Shift added', 'success');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save shift');
     } finally { setSaving(false); }

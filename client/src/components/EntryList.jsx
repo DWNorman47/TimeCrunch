@@ -29,6 +29,16 @@ function formatTime(t) {
   return `${hour % 12 || 12}:${m} ${hour < 12 ? 'AM' : 'PM'}`;
 }
 
+function tzAbbr(timezone, dateStr) {
+  if (!timezone) return '';
+  try {
+    const date = new Date((dateStr || '1970-01-01').substring(0, 10) + 'T12:00:00');
+    return new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'short' })
+      .formatToParts(date)
+      .find(p => p.type === 'timeZoneName')?.value || '';
+  } catch { return ''; }
+}
+
 export default function EntryList({ entries, onDeleted, onUpdated, t, language, currentUserId }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -170,7 +180,7 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                   </div>
                 </div>
                 <div style={styles.entryDetail} className="entry-detail">
-                  <span>{formatTime(e.start_time)} – {formatTime(e.end_time)} ({formatHours(e.start_time, e.end_time, e.break_minutes)})</span>
+                  <span>{formatTime(e.start_time)} – {formatTime(e.end_time)}{tzAbbr(e.timezone, e.work_date) ? ` ${tzAbbr(e.timezone, e.work_date)}` : ''} ({formatHours(e.start_time, e.end_time, e.break_minutes)})</span>
                   {e.break_minutes > 0 && <span style={styles.breakTag}>☕ {e.break_minutes}m break</span>}
                   {e.mileage > 0 && <span style={styles.mileageTag}>🚗 {parseFloat(e.mileage).toFixed(1)} mi</span>}
                   <span style={{ ...styles.badge, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
