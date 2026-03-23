@@ -89,6 +89,7 @@ input, select, textarea {
     border-bottom: 1px solid #f0f0f0;
     position: sticky;
     top: calc(64px + env(safe-area-inset-top));
+    z-index: 99;
   }
   .landing-subnav::-webkit-scrollbar { display: none; }
   .landing-subnav a {

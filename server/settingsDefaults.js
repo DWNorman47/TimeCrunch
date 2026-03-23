@@ -1,10 +1,11 @@
-const FEATURE_KEYS = ['feature_scheduling', 'feature_analytics', 'feature_chat', 'feature_prevailing_wage'];
+const FEATURE_KEYS = ['feature_scheduling', 'feature_analytics', 'feature_chat', 'feature_prevailing_wage', 'show_worker_wages'];
 
 // Defaults available to all authenticated users
 const SETTINGS_DEFAULTS = {
   prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5,
   overtime_rule: 'daily', overtime_threshold: 8,
   feature_scheduling: true, feature_analytics: true, feature_chat: true, feature_prevailing_wage: true,
+  show_worker_wages: false,
 };
 
 // Admin-only defaults (superset of SETTINGS_DEFAULTS)

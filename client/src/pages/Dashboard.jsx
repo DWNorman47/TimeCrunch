@@ -127,7 +127,7 @@ export default function Dashboard() {
         {tab === 'timesheet' && (
           <>
             <UpcomingShifts onFillEntry={handleFillFromShift} />
-            {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 45} overtimeRule={settings?.overtime_rule ?? 'daily'} overtimeThreshold={settings?.overtime_threshold ?? 8} />}
+            {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 45} overtimeRule={settings?.overtime_rule ?? 'daily'} overtimeThreshold={settings?.overtime_threshold ?? 8} showWages={settings?.show_worker_wages ?? false} />}
             <TimesheetSignOff t={t} />
             <div style={styles.timesheetToolbar}>
               <div style={styles.viewToggle}>
@@ -162,7 +162,7 @@ export default function Dashboard() {
             <div style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '8px 0 4px' }}>
               Need help? Email us at <a href="mailto:info@opsfloa.com" style={{ color: '#1a56db' }}>info@opsfloa.com</a>
             </div>
-            {!loading && <PayStubView />}
+            {!loading && (settings?.show_worker_wages ?? false) && <PayStubView />}
           </>
         )}
       </main>

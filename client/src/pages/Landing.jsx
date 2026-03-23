@@ -16,9 +16,9 @@ const features = [
 ];
 
 const steps = [
-  { num: '1', title: 'Create your company', body: 'Sign up in under a minute. No credit card required. Your crew can be clocked in today.' },
-  { num: '2', title: 'Add workers & projects', body: 'Invite workers by email or add them manually. Set up job sites with GPS boundaries.' },
-  { num: '3', title: 'Run your field operations', body: 'Time, reports, safety, punchlist — everything flows through one platform your whole crew already has in their pocket.' },
+  { num: '1', title: 'Create Your Company', body: 'Sign up in under a minute. No credit card required. Your crew can be clocked in today.' },
+  { num: '2', title: 'Add Workers & Projects', body: 'Invite workers by email or add them manually. Set up job sites with GPS boundaries.' },
+  { num: '3', title: 'Run Your Field Operations', body: 'Time, reports, safety, punchlist — everything flows through one platform your whole crew already has in their pocket.' },
 ];
 
 const plans = [
@@ -27,8 +27,8 @@ const plans = [
     price: '$0',
     period: '',
     desc: 'For small crews just getting started.',
-    features: ['Up to 3 workers', 'GPS time clock', 'Scheduling (1 week ahead)', 'Timesheet PDF (latest week)', '90-day history'],
-    cta: 'Get started free',
+    features: ['Up to 3 Workers', 'GPS Time Clock', 'Scheduling (1 Week Ahead)', 'Timesheet PDF (Latest Week)', '90-Day History'],
+    cta: 'Get Started Free',
     highlight: false,
   },
   {
@@ -36,8 +36,8 @@ const plans = [
     price: '$20',
     period: '/mo',
     desc: 'More workers, more exports, more control.',
-    features: ['Up to 10 workers', 'Everything in Free', 'Full history & CSV export', 'Overtime reports', 'Entry approvals', 'Pay period lock', 'Mileage & break tracking'],
-    cta: 'Start free trial',
+    features: ['Up to 10 Workers', 'Everything in Free', 'Full History & CSV Export', 'Overtime Reports', 'Entry Approvals', 'Pay Period Lock', 'Mileage & Break Tracking'],
+    cta: 'Start Free Trial',
     highlight: false,
   },
   {
@@ -45,62 +45,83 @@ const plans = [
     price: '$35',
     period: '/mo · 15 workers included',
     desc: 'The full platform for growing contractors. $2/worker after 15.',
-    features: ['15 workers included', 'Everything in Starter', 'Daily & field reports', 'Punchlist management', 'Safety talks & sign-off', 'Analytics dashboard', 'Broadcast announcements', '+$2/worker after 15'],
-    cta: 'Start free trial',
+    features: ['15 Workers Included', 'Everything in Starter', 'Daily & Field Reports', 'Punchlist Management', 'Safety Talks & Sign-Off', 'Analytics Dashboard', 'Broadcast Announcements', '+$2/Worker After 15'],
+    cta: 'Start Free Trial',
     highlight: true,
   },
   {
-    name: 'QBO Add-on',
+    name: 'QBO Add-On',
     price: '+$25',
     period: '/mo',
     desc: 'Push hours directly into QuickBooks Online.',
-    features: ['QuickBooks Online sync', 'Zero manual entry', 'Requires Starter or Business'],
-    cta: 'Learn more',
+    features: ['QuickBooks Online Sync', 'Zero Manual Entry', 'Requires Starter or Business'],
+    cta: 'Learn More',
     highlight: false,
   },
 ];
 
 export default function Landing() {
   return (
-    <div style={styles.page}>
+    <div id="top" style={styles.page}>
       {/* Header */}
       <header style={styles.header} className="landing-header">
-        <span style={styles.logo}>OpsFloa</span>
+        <a href="#top" style={styles.logoLink}>
+          <span style={styles.logo}>OpsFloA</span>
+          <span style={styles.logoTagline}>Ops Flow Assist</span>
+        </a>
         <nav style={styles.nav} className="landing-nav">
           <a href="#features" style={styles.navLink}>Features</a>
-          <a href="#how-it-works" style={styles.navLink}>How it works</a>
+          <a href="#how-it-works" style={styles.navLink}>How It Works</a>
           <a href="#pricing" style={styles.navLink}>Pricing</a>
         </nav>
         <div style={styles.headerRight}>
-          <Link to="/login" style={styles.loginLink}>Log in</Link>
-          <Link to="/register" style={styles.ctaBtn} className="landing-cta">Get started free</Link>
+          <Link to="/login" style={styles.loginLink}>Log In</Link>
+          <Link to="/register" style={styles.ctaBtn} className="landing-cta">Get Started Free</Link>
         </div>
       </header>
 
       {/* Mobile sub-nav */}
       <nav style={styles.mobileSubnav} className="landing-subnav">
         <a href="#features" style={styles.subnavLink}>Features</a>
-        <a href="#how-it-works" style={styles.subnavLink}>How it works</a>
+        <a href="#how-it-works" style={styles.subnavLink}>How It Works</a>
         <a href="#pricing" style={styles.subnavLink}>Pricing</a>
       </nav>
 
       {/* Hero */}
       <section style={styles.hero}>
-        <div style={styles.heroBadge}>Built for contractors &amp; field crews</div>
-        <h1 style={styles.heroTitle}>Operations management<br />for the job site</h1>
+        <div style={styles.heroBadge}>Built for Contractors &amp; Field Crews</div>
+        <h1 style={styles.heroTitle}>Operations Management<br />For the Job Site</h1>
         <p style={styles.heroSub}>
           Time tracking, daily reports, field photos, punchlist, safety talks, and crew scheduling — all in one platform your whole team carries in their pocket.
         </p>
         <div style={styles.heroCtas}>
-          <Link to="/register" style={styles.heroBtn}>Create your free account</Link>
-          <a href="#features" style={styles.heroSecondary}>See all features →</a>
+          <Link to="/register" style={styles.heroBtn}>Create Your Free Account</Link>
+          <a href="#features" style={styles.heroSecondary}>See All Features →</a>
         </div>
-        <p style={styles.heroNote}>Free 14-day trial · No credit card required</p>
+        <p style={styles.heroNote}>Free 14-Day Trial · No Credit Card Required</p>
+
+        {/* Trust stats */}
+        <div style={styles.heroStats}>
+          <div style={styles.heroStat}>
+            <span style={styles.heroStatNum}>11+</span>
+            <span style={styles.heroStatLabel}>Features Built for the Field</span>
+          </div>
+          <div style={styles.heroStatDivider} />
+          <div style={styles.heroStat}>
+            <span style={styles.heroStatNum}>$0</span>
+            <span style={styles.heroStatLabel}>To Get Started — No Card Required</span>
+          </div>
+          <div style={styles.heroStatDivider} />
+          <div style={styles.heroStat}>
+            <span style={styles.heroStatNum}>1 min</span>
+            <span style={styles.heroStatLabel}>To Set Up and Clock In Your Crew</span>
+          </div>
+        </div>
       </section>
 
       {/* Social proof bar */}
       <div style={styles.proofBar}>
-        {['GPS time clock', 'Daily reports', 'Field photos', 'Punchlist', 'Safety talks', 'Certified payroll', 'QuickBooks sync'].map(t => (
+        {['GPS Time Clock', 'Daily Reports', 'Field Photos', 'Punchlist', 'Safety Talks', 'Certified Payroll', 'QuickBooks Sync'].map(t => (
           <span key={t} style={styles.proofItem}>✓ {t}</span>
         ))}
       </div>
@@ -108,7 +129,7 @@ export default function Landing() {
       {/* Features */}
       <section id="features" style={styles.section} className="landing-section">
         <div style={styles.sectionInner}>
-          <h2 style={styles.sectionTitle}>One platform. Every part of the job.</h2>
+          <h2 style={styles.sectionTitle}>One Platform. Every Part of the Job.</h2>
           <p style={styles.sectionSub}>From first clock-in to final sign-off, every workflow is covered.</p>
           <div style={styles.featureGrid}>
             {features.map(f => (
@@ -125,7 +146,7 @@ export default function Landing() {
       {/* How it works */}
       <section id="how-it-works" style={styles.howSection} className="landing-section">
         <div style={styles.sectionInner}>
-          <h2 style={styles.sectionTitle}>Up and running in minutes</h2>
+          <h2 style={styles.sectionTitle}>Up and Running in Minutes</h2>
           <p style={styles.sectionSub}>No training. No onboarding call. Just sign up and go.</p>
           <div style={styles.steps}>
             {steps.map(s => (
@@ -142,12 +163,12 @@ export default function Landing() {
       {/* Pricing */}
       <section id="pricing" style={styles.section} className="landing-section">
         <div style={styles.sectionInner}>
-          <h2 style={styles.sectionTitle}>Simple, honest pricing</h2>
+          <h2 style={styles.sectionTitle}>Simple, Honest Pricing</h2>
           <p style={styles.sectionSub}>Start free. Upgrade when you're ready. Cancel any time.</p>
           <div style={styles.pricingGrid}>
             {plans.map(p => (
               <div key={p.name} style={{ ...styles.planCard, ...(p.highlight ? styles.planHighlight : {}) }}>
-                {p.highlight && <div style={styles.popularBadge}>Most popular</div>}
+                {p.highlight && <div style={styles.popularBadge}>Most Popular</div>}
                 <div style={styles.planName}>{p.name}</div>
                 <div style={styles.planPrice}>
                   <span style={styles.planAmount}>{p.price}</span>
@@ -162,7 +183,7 @@ export default function Landing() {
                   ))}
                 </ul>
                 <Link
-                  to={p.cta === 'Learn more' ? '/register' : '/register'}
+                  to="/register"
                   style={{ ...styles.planBtn, ...(p.highlight ? styles.planBtnHighlight : {}) }}
                 >
                   {p.cta}
@@ -176,17 +197,25 @@ export default function Landing() {
 
       {/* Final CTA */}
       <section style={styles.finalCta}>
-        <h2 style={styles.finalCtaTitle}>Your crew is already on the job site. Give them the tools to match.</h2>
-        <p style={styles.finalCtaSub}>Join contractors using OpsFloa to run tighter crews, cleaner reports, and faster payroll.</p>
-        <Link to="/register" style={styles.finalCtaBtn}>Create your free account →</Link>
+        <div style={styles.finalCtaInner}>
+          <div style={styles.finalCtaBrand}>OpsFloA · Ops Flow Assist</div>
+          <h2 style={styles.finalCtaTitle}>Your crew is already on the job site.<br />Give them the tools to match.</h2>
+          <p style={styles.finalCtaSub}>One login. Every tool your field team needs — from clock-in to certified payroll.</p>
+          <Link to="/register" style={styles.finalCtaBtn}>Create Your Free Account →</Link>
+        </div>
       </section>
 
       <footer style={styles.footer}>
-        <span style={styles.footerLogo}>OpsFloa</span>
-        <span style={styles.footerCopy}>© {new Date().getFullYear()} OpsFloa. All rights reserved.</span>
+        <div style={styles.footerBrand}>
+          <a href="#top" style={styles.footerLogo}>OpsFloA</a>
+          <span style={styles.footerTagline}>Ops Flow Assist</span>
+        </div>
+        <span style={styles.footerCopy}>© {new Date().getFullYear()} OpsFloA. All rights reserved.</span>
         <div style={styles.footerLinks}>
-          <Link to="/login" style={styles.footerLink}>Log in</Link>
-          <Link to="/register" style={styles.footerLink}>Sign up</Link>
+          <Link to="/login" style={styles.footerLink}>Log In</Link>
+          <Link to="/register" style={styles.footerLink}>Sign Up</Link>
+          <Link to="/privacy" style={styles.footerLink}>Privacy</Link>
+          <Link to="/eula" style={styles.footerLink}>Terms</Link>
         </div>
       </footer>
     </div>
@@ -198,7 +227,9 @@ const styles = {
 
   // Header
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', paddingTop: 'env(safe-area-inset-top)', height: 'calc(64px + env(safe-area-inset-top))', borderBottom: '1px solid #f0f0f0', position: 'sticky', top: 0, background: '#fff', zIndex: 100 },
+  logoLink: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textDecoration: 'none', lineHeight: 1.1 },
   logo: { fontWeight: 800, fontSize: 20, color: '#1a56db', letterSpacing: '-0.5px' },
+  logoTagline: { fontSize: 10, fontWeight: 500, color: '#9ca3af', letterSpacing: '0.04em' },
   nav: { display: 'flex', gap: 28 },
   navLink: { color: '#6b7280', fontWeight: 500, fontSize: 14, textDecoration: 'none' },
   mobileSubnav: { display: 'none' },
@@ -208,18 +239,24 @@ const styles = {
   ctaBtn: { background: '#1a56db', color: '#fff', padding: '8px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14, textDecoration: 'none' },
 
   // Hero
-  hero: { textAlign: 'center', padding: '100px 24px 80px', background: 'linear-gradient(160deg, #f0f4ff 0%, #fafbff 50%, #fff 100%)' },
-  heroBadge: { display: 'inline-block', background: '#e0e7ff', color: '#3730a3', fontSize: 13, fontWeight: 700, padding: '4px 14px', borderRadius: 20, marginBottom: 20, letterSpacing: '0.03em' },
-  heroTitle: { fontSize: 52, fontWeight: 900, lineHeight: 1.1, marginBottom: 22, color: '#111827', maxWidth: 680, margin: '0 auto 22px' },
+  hero: { textAlign: 'center', padding: '80px 24px 72px', background: 'linear-gradient(160deg, #f0f4ff 0%, #fafbff 50%, #fff 100%)' },
+  heroBadge: { display: 'inline-block', background: '#e0e7ff', color: '#3730a3', fontSize: 13, fontWeight: 700, padding: '4px 14px', borderRadius: 20, marginBottom: 18, letterSpacing: '0.03em' },
+  heroWordmark: { fontSize: 15, fontWeight: 700, color: '#1a56db', letterSpacing: '0.08em', marginBottom: 18, opacity: 0.8 },
+  heroTitle: { fontSize: 52, fontWeight: 900, lineHeight: 1.1, color: '#111827', maxWidth: 680, margin: '0 auto 22px' },
   heroSub: { fontSize: 19, color: '#4b5563', maxWidth: 600, margin: '0 auto 36px', lineHeight: 1.7 },
   heroCtas: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 14, flexWrap: 'wrap' },
   heroBtn: { display: 'inline-block', background: '#1a56db', color: '#fff', padding: '15px 34px', borderRadius: 10, fontWeight: 700, fontSize: 16, textDecoration: 'none', boxShadow: '0 4px 14px rgba(26,86,219,0.35)' },
   heroSecondary: { color: '#1a56db', fontWeight: 600, fontSize: 15, textDecoration: 'none' },
-  heroNote: { fontSize: 13, color: '#9ca3af' },
+  heroNote: { fontSize: 13, color: '#9ca3af', marginBottom: 40 },
+  heroStats: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, maxWidth: 580, margin: '0 auto', background: '#fff', borderRadius: 14, border: '1px solid #e8edf5', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden', flexWrap: 'wrap' },
+  heroStat: { flex: 1, padding: '18px 24px', display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 },
+  heroStatNum: { fontSize: 26, fontWeight: 800, color: '#1a56db', lineHeight: 1 },
+  heroStatLabel: { fontSize: 12, color: '#6b7280', lineHeight: 1.4 },
+  heroStatDivider: { width: 1, height: 48, background: '#e8edf5', flexShrink: 0 },
 
   // Proof bar
-  proofBar: { background: '#f8faff', borderTop: '1px solid #e8edf5', borderBottom: '1px solid #e8edf5', padding: '14px 40px', display: 'flex', justifyContent: 'center', gap: 32, flexWrap: 'wrap' },
-  proofItem: { fontSize: 13, fontWeight: 600, color: '#374151' },
+  proofBar: { background: '#f8faff', borderTop: '1px solid #e8edf5', borderBottom: '1px solid #e8edf5', padding: '14px 40px', display: 'flex', justifyContent: 'center', gap: 24, flexWrap: 'wrap' },
+  proofItem: { fontSize: 13, fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 },
 
   // Sections
   section: { padding: '88px 24px' },
@@ -230,7 +267,7 @@ const styles = {
 
   // Features
   featureGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 20 },
-  featureCard: { background: '#f8faff', borderRadius: 14, padding: '28px 22px', border: '1px solid #e8edf5' },
+  featureCard: { background: '#f8faff', borderRadius: 14, padding: '28px 22px', border: '1px solid #e8edf5', borderLeft: '4px solid #1a56db' },
   featureIcon: { fontSize: 28, display: 'block', marginBottom: 14 },
   featureTitle: { fontSize: 15, fontWeight: 700, marginBottom: 8, color: '#111827' },
   featureBody: { fontSize: 13, color: '#6b7280', lineHeight: 1.65, margin: 0 },
@@ -260,14 +297,18 @@ const styles = {
   annualNote: { textAlign: 'center', fontSize: 13, color: '#9ca3af', marginTop: 28 },
 
   // Final CTA
-  finalCta: { background: 'linear-gradient(135deg, #1a56db 0%, #1e40af 100%)', color: '#fff', textAlign: 'center', padding: '96px 24px' },
-  finalCtaTitle: { fontSize: 36, fontWeight: 800, marginBottom: 14, maxWidth: 620, margin: '0 auto 14px', lineHeight: 1.2 },
+  finalCta: { background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)', color: '#fff', textAlign: 'center', padding: '96px 24px' },
+  finalCtaInner: { maxWidth: 640, margin: '0 auto' },
+  finalCtaBrand: { fontSize: 12, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', opacity: 0.65, marginBottom: 20 },
+  finalCtaTitle: { fontSize: 36, fontWeight: 800, marginBottom: 16, lineHeight: 1.2 },
   finalCtaSub: { fontSize: 17, opacity: 0.85, marginBottom: 36, lineHeight: 1.6 },
   finalCtaBtn: { display: 'inline-block', background: '#fff', color: '#1a56db', padding: '15px 34px', borderRadius: 10, fontWeight: 700, fontSize: 16, textDecoration: 'none' },
 
   // Footer
   footer: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 40px', borderTop: '1px solid #f0f0f0', flexWrap: 'wrap', gap: 12 },
-  footerLogo: { fontWeight: 800, fontSize: 16, color: '#1a56db' },
+  footerBrand: { display: 'flex', flexDirection: 'column', gap: 2 },
+  footerLogo: { fontWeight: 800, fontSize: 16, color: '#1a56db', textDecoration: 'none' },
+  footerTagline: { fontSize: 10, color: '#9ca3af', letterSpacing: '0.04em' },
   footerCopy: { fontSize: 13, color: '#9ca3af' },
   footerLinks: { display: 'flex', gap: 20 },
   footerLink: { fontSize: 13, color: '#6b7280', textDecoration: 'none' },

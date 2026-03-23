@@ -17,12 +17,15 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const toast = useToast();
   const [showForm, setShowForm] = useState(false);
   const [addMode, setAddMode] = useState('manual');
-  const [form, setForm] = useState({ full_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
-  const [inviteForm, setInviteForm] = useState({ full_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+  const [form, setForm] = useState({ first_name: '', last_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+  const [inviteForm, setInviteForm] = useState({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
   const [error, setError] = useState('');
   const [inviteError, setInviteError] = useState('');
   const [inviteSent, setInviteSent] = useState('');
   const [saving, setSaving] = useState(false);
+  const [usernameEdited, setUsernameEdited] = useState(false);
+  const [usernameTaken, setUsernameTaken] = useState(false);
+  const [usernameChecking, setUsernameChecking] = useState(false);
   const [inviteSaving, setInviteSaving] = useState(false);
   const [archivedConflict, setArchivedConflict] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -37,6 +40,32 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const setInvite = (k, v) => setInviteForm(f => ({ ...f, [k]: v }));
   const setEdit = (k, v) => setEditForm(f => ({ ...f, [k]: v }));
+
+  const updateAutoUsername = (first, last) => {
+    if (usernameEdited) return;
+    const suggested = (first.charAt(0) + last).toLowerCase().replace(/[^a-z0-9]/g, '');
+    setForm(f => ({ ...f, username: suggested }));
+    setUsernameTaken(false);
+  };
+
+  const handleFirstNameChange = v => {
+    setForm(f => { const next = { ...f, first_name: v }; return next; });
+    updateAutoUsername(v, form.last_name);
+  };
+  const handleLastNameChange = v => {
+    setForm(f => { const next = { ...f, last_name: v }; return next; });
+    updateAutoUsername(form.first_name, v);
+  };
+
+  const checkUsername = async username => {
+    if (!username) return;
+    setUsernameChecking(true);
+    try {
+      const r = await api.get('/admin/workers/check-username', { params: { username } });
+      setUsernameTaken(r.data.taken);
+    } catch {}
+    finally { setUsernameChecking(false); }
+  };
 
   const loadArchived = async () => {
     if (archivedFetched) return;
@@ -54,9 +83,12 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     e.preventDefault();
     setError(''); setArchivedConflict(null); setSaving(true);
     try {
-      const r = await api.post('/admin/workers', form);
+      const full_name = [form.first_name, form.last_name].filter(Boolean).join(' ');
+      const r = await api.post('/admin/workers', { ...form, full_name });
       onWorkerAdded(r.data);
-      setForm({ full_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+      setForm({ first_name: '', last_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+      setUsernameEdited(false);
+      setUsernameTaken(false);
       setShowForm(false);
     } catch (err) {
       const data = err.response?.data;
@@ -69,14 +101,15 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     e.preventDefault();
     setInviteError(''); setInviteSaving(true);
     try {
-      const r = await api.post('/admin/workers/invite', inviteForm);
+      const inv_full_name = [inviteForm.first_name, inviteForm.last_name].filter(Boolean).join(' ');
+      const r = await api.post('/admin/workers/invite', { ...inviteForm, full_name: inv_full_name });
       onWorkerAdded(r.data);
       if (r.data.email_sent === false) {
         setInviteError('Worker created, but the invite email failed to send.');
-        setInviteForm({ full_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+        setInviteForm({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
       } else {
         setInviteSent(inviteForm.email);
-        setInviteForm({ full_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+        setInviteForm({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
       }
     } catch (err) {
       setInviteError(err.response?.data?.error || 'Failed to send invite');
@@ -152,12 +185,22 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
             <form onSubmit={handleAdd} style={s.addForm}>
               <div style={s.formGrid}>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>Full name</label>
-                  <input style={s.input} value={form.full_name} onChange={e => set('full_name', e.target.value)} required />
+                  <label style={s.label}>First name</label>
+                  <input style={s.input} value={form.first_name} onChange={e => handleFirstNameChange(e.target.value)} required />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>Username</label>
-                  <input style={s.input} value={form.username} onChange={e => set('username', e.target.value)} required />
+                  <label style={s.label}>Last name</label>
+                  <input style={s.input} value={form.last_name} onChange={e => handleLastNameChange(e.target.value)} required />
+                </div>
+                <div style={s.fieldGroup}>
+                  <label style={s.label}>Username{usernameChecking ? ' (checking...)' : usernameTaken ? ' ⚠ taken' : ''}</label>
+                  <input
+                    style={{ ...s.input, borderColor: usernameTaken ? '#fca5a5' : undefined }}
+                    value={form.username}
+                    onChange={e => { setUsernameEdited(!!e.target.value); set('username', e.target.value); setUsernameTaken(false); }}
+                    onBlur={e => checkUsername(e.target.value)}
+                    required
+                  />
                 </div>
                 <div style={s.fieldGroup}>
                   <label style={s.label}>Temporary password</label>
@@ -193,7 +236,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   {archivedConflict && <button type="button" style={s.restoreInlineBtn} onClick={handleRestoreConflict}>Restore {archivedConflict.name}</button>}
                 </div>
               )}
-              <button style={s.saveBtn} type="submit" disabled={saving}>{saving ? 'Creating...' : 'Create User'}</button>
+              <button style={s.saveBtn} type="submit" disabled={saving || usernameTaken}>{saving ? 'Creating...' : 'Create User'}</button>
             </form>
           ) : (
             <form onSubmit={handleInvite} style={s.addForm}>
@@ -206,8 +249,12 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 <>
                   <div style={s.formGrid}>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>Full name</label>
-                      <input style={s.input} value={inviteForm.full_name} onChange={e => setInvite('full_name', e.target.value)} required />
+                      <label style={s.label}>First name</label>
+                      <input style={s.input} value={inviteForm.first_name} onChange={e => setInvite('first_name', e.target.value)} required />
+                    </div>
+                    <div style={s.fieldGroup}>
+                      <label style={s.label}>Last name</label>
+                      <input style={s.input} value={inviteForm.last_name} onChange={e => setInvite('last_name', e.target.value)} required />
                     </div>
                     <div style={s.fieldGroup}>
                       <label style={s.label}>Email</label>

@@ -377,5 +377,7 @@ ALTER TABLE time_entries  ADD COLUMN IF NOT EXISTS timezone VARCHAR(50);
 ALTER TABLE active_clock  ADD COLUMN IF NOT EXISTS timezone VARCHAR(50);
 -- Fix QBO encrypted token column sizes
 ALTER TABLE companies ALTER COLUMN qbo_realm_id TYPE TEXT;
+-- First-login welcome tracking
+ALTER TABLE users ADD COLUMN IF NOT EXISTS welcomed_at TIMESTAMP;
 -- plan values: free | starter | business  (trial companies default to full access until plan is set)
 

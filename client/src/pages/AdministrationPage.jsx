@@ -62,43 +62,38 @@ function CompanyTab() {
   const si = statusInfo[company?.subscription_status] || statusInfo.trial;
 
   return (
-    <div style={styles.tabContent}>
-      <h2 style={styles.tabTitle}>Company</h2>
-
-      <div style={styles.card}>
-        <div style={styles.cardRow}>
-          <div style={styles.cardLabel}>Company Name</div>
+    <div style={styles.card}>
+        {/* Company name row */}
+        <div style={{ padding: '20px 20px 0' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Company Name</div>
           {editing ? (
-            <div style={{ display: 'flex', gap: 8, flex: 1 }}>
-              <input style={{ ...styles.input, flex: 1 }} value={name} onChange={e => setName(e.target.value)} autoFocus />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input style={{ ...styles.input, flex: 1, fontSize: 18, fontWeight: 700, padding: '8px 12px' }} value={name} onChange={e => setName(e.target.value)} autoFocus />
               <button style={styles.saveBtn} onClick={save} disabled={saving}>{saving ? '...' : 'Save'}</button>
               <button style={styles.ghostBtn} onClick={() => { setEditing(false); setName(company.name); }}>Cancel</button>
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
-              <span style={styles.cardValue}>{company?.name || '—'}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 22, fontWeight: 800, color: '#111827' }}>{company?.name || '—'}</span>
               <button style={styles.editLink} onClick={() => setEditing(true)}>Edit</button>
             </div>
           )}
+          {msg && <p style={{ fontSize: 13, margin: '6px 0 0', color: msg.includes('Failed') || msg.includes('taken') ? '#dc2626' : '#059669' }}>{msg}</p>}
         </div>
-        <div style={styles.cardRow}>
-          <div style={styles.cardLabel}>Plan</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ ...styles.planBadge, background: si.bg, color: si.color }}>{si.label}</span>
-            {company?.plan && <span style={styles.planName}>{company.plan.charAt(0).toUpperCase() + company.plan.slice(1)}</span>}
-          </div>
-        </div>
-        {company?.subscription_status === 'trial' && trialDaysLeft !== null && (
-          <div style={styles.cardRow}>
-            <div style={styles.cardLabel}>Trial ends</div>
-            <span style={{ ...styles.cardValue, color: trialDaysLeft <= 3 ? '#dc2626' : '#374151' }}>
-              {trialDaysLeft > 0 ? `${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''} remaining` : 'Expired'}
+
+        {/* Subscription info */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', marginTop: 14, borderTop: '1px solid #f3f4f6' }}>
+          <span style={{ ...styles.planBadge, background: si.bg, color: si.color }}>{si.label}</span>
+          {company?.plan && (
+            <span style={styles.planName}>{company.plan.charAt(0).toUpperCase() + company.plan.slice(1)} plan</span>
+          )}
+          {company?.subscription_status === 'trial' && trialDaysLeft !== null && (
+            <span style={{ fontSize: 13, color: trialDaysLeft <= 3 ? '#dc2626' : '#6b7280', marginLeft: 'auto' }}>
+              {trialDaysLeft > 0 ? `${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''} left in trial` : 'Trial expired'}
             </span>
-          </div>
-        )}
-        {msg && <p style={{ ...styles.feedback, padding: '6px 20px', color: msg.includes('Failed') || msg.includes('taken') ? '#dc2626' : '#059669' }}>{msg}</p>}
+          )}
+        </div>
       </div>
-    </div>
   );
 }
 
@@ -259,12 +254,12 @@ export default function AdministrationPage() {
         <TabBar active={tab} onChange={switchTab} tabs={TABS} />
 
         {tab === 'company'  && (
-          <>
+          <div style={styles.tabContent}>
+            <h2 style={styles.tabTitle}>Company</h2>
             <CompanyTab />
-            <div style={{ padding: '0 0 24px' }}>
-              <ManageRates settings={settings} onSettingsUpdated={setSettings} />
-            </div>
-          </>
+            <h3 style={{ ...styles.sectionTitle, marginTop: 8 }}>Settings</h3>
+            <ManageRates settings={settings} onSettingsUpdated={setSettings} />
+          </div>
         )}
         {tab === 'team'     && (
           <div style={styles.tabContent}>
