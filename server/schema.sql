@@ -384,6 +384,8 @@ ALTER TABLE companies ALTER COLUMN qbo_realm_id TYPE TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS welcomed_at TIMESTAMP;
 -- Per-admin feature permissions (null = full access, JSONB object = restricted)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_permissions JSONB;
+-- Per-admin worker access restriction (null = all workers, array of IDs = restricted group)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS worker_access_ids INTEGER[];
 -- Offline deduplication for time entries
 ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS client_id VARCHAR(36);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_time_entries_user_client_id ON time_entries(user_id, client_id) WHERE client_id IS NOT NULL;

@@ -246,9 +246,12 @@ router.get('/workers', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const allRoles = req.query.all_roles === 'true';
   const roleFilter = allRoles ? `u.role IN ('worker', 'admin')` : `u.role = 'worker'`;
+  const accessIds = req.user.worker_access_ids;
+  const accessFilter = accessIds && accessIds.length ? `AND (u.role != 'worker' OR u.id = ANY($3))` : '';
   try {
     const settings = await getSettings(companyId);
     const threshold = parseFloat(settings.overtime_threshold) || 8;
+    const queryParams = accessIds && accessIds.length ? [companyId, threshold, accessIds] : [companyId, threshold];
     const result = await pool.query(
       `WITH daily_regular AS (
         SELECT user_id, work_date,
@@ -264,7 +267,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         FROM daily_regular
         GROUP BY user_id, date_trunc('week', work_date)
       )
-      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions,
+      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE(
@@ -285,11 +288,11 @@ router.get('/workers', requireAdmin, async (req, res) => {
         COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600 ELSE 0 END), 0) as prevailing_hours
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
-      WHERE ${roleFilter} AND u.active = true AND u.company_id = $1
-      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions
+      WHERE ${roleFilter} AND u.active = true AND u.company_id = $1 ${accessFilter}
+      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
-      [companyId, threshold]
+      queryParams
     );
     res.json(result.rows);
   } catch (err) {
@@ -615,6 +618,32 @@ router.patch('/workers/:id/permissions', requireAdmin, async (req, res) => {
       `UPDATE users SET admin_permissions = $1
        WHERE id = $2 AND company_id = $3 AND role = 'admin' RETURNING id, full_name, admin_permissions`,
       [perms ? JSON.stringify(perms) : null, req.params.id, req.user.company_id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Admin not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /admin/workers/:id/worker-access — set which workers a partial admin can access (full-access admins only)
+router.patch('/workers/:id/worker-access', requireAdmin, async (req, res) => {
+  if (req.user.admin_permissions != null) {
+    return res.status(403).json({ error: 'Only full-access admins can manage worker access' });
+  }
+  if (String(req.params.id) === String(req.user.id)) {
+    return res.status(400).json({ error: 'You cannot change your own worker access' });
+  }
+  const { worker_access_ids } = req.body;
+  let ids = null;
+  if (Array.isArray(worker_access_ids) && worker_access_ids.length > 0) {
+    ids = worker_access_ids.map(Number).filter(n => !isNaN(n));
+  }
+  try {
+    const result = await pool.query(
+      `UPDATE users SET worker_access_ids = $1 WHERE id = $2 AND company_id = $3 AND role = 'admin' RETURNING id, full_name, worker_access_ids`,
+      [ids, req.params.id, req.user.company_id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Admin not found' });
     res.json(result.rows[0]);
@@ -958,16 +987,19 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
 router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const LIMIT = 200;
+  const accessIds = req.user.worker_access_ids;
   try {
+    const workerFilter = accessIds && accessIds.length ? `AND te.user_id = ANY($3)` : '';
+    const params = accessIds && accessIds.length ? [companyId, LIMIT + 1, accessIds] : [companyId, LIMIT + 1];
     const result = await pool.query(
       `SELECT te.*, u.full_name as worker_name, u.email as worker_email, p.name as project_name
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
        LEFT JOIN projects p ON te.project_id = p.id
-       WHERE te.company_id = $1 AND te.status = 'pending'
+       WHERE te.company_id = $1 AND te.status = 'pending' ${workerFilter}
        ORDER BY te.worker_signed_at DESC NULLS LAST, te.work_date DESC, te.start_time DESC
        LIMIT $2`,
-      [companyId, LIMIT + 1]
+      params
     );
     const has_more = result.rows.length > LIMIT;
     res.json({ entries: result.rows.slice(0, LIMIT), has_more });
@@ -980,11 +1012,14 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
 // POST /admin/entries/approve-all — approve every pending entry for this company
 router.post('/entries/approve-all', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
+  const accessIds = req.user.worker_access_ids;
   try {
+    const workerFilter = accessIds && accessIds.length ? `AND user_id = ANY($3)` : '';
+    const params = accessIds && accessIds.length ? [req.user.id, companyId, accessIds] : [req.user.id, companyId];
     const result = await pool.query(
       `UPDATE time_entries SET status = 'approved', locked = true, approved_by = $1, approved_at = NOW()
-       WHERE company_id = $2 AND status = 'pending' RETURNING id`,
-      [req.user.id, companyId]
+       WHERE company_id = $2 AND status = 'pending' ${workerFilter} RETURNING id`,
+      params
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'entries.approved_all', 'time_entry', null, null, { count: result.rowCount });
     res.json({ approved: result.rowCount });
@@ -999,11 +1034,16 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
   const companyId = req.user.company_id;
   const { note } = req.body;
   if (note && note.length > 500) return res.status(400).json({ error: 'Note must be 500 characters or fewer' });
+  const accessIds = req.user.worker_access_ids;
   try {
+    const workerFilter = accessIds && accessIds.length ? `AND user_id = ANY($5)` : '';
+    const params = accessIds && accessIds.length
+      ? [note || null, req.user.id, req.params.id, companyId, accessIds]
+      : [note || null, req.user.id, req.params.id, companyId];
     const result = await pool.query(
       `UPDATE time_entries SET status = 'approved', locked = true, approval_note = $1, approved_by = $2, approved_at = NOW()
-       WHERE id = $3 AND company_id = $4 RETURNING *`,
-      [note || null, req.user.id, req.params.id, companyId]
+       WHERE id = $3 AND company_id = $4 ${workerFilter} RETURNING *`,
+      params
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.approved', 'time_entry', parseInt(req.params.id), null);
@@ -1029,11 +1069,16 @@ router.patch('/entries/:id/reject', requireAdmin, requirePermission('approve_ent
   const companyId = req.user.company_id;
   const { note } = req.body;
   if (note && note.length > 500) return res.status(400).json({ error: 'Note must be 500 characters or fewer' });
+  const accessIds = req.user.worker_access_ids;
   try {
+    const workerFilter = accessIds && accessIds.length ? `AND user_id = ANY($5)` : '';
+    const params = accessIds && accessIds.length
+      ? [note || null, req.user.id, req.params.id, companyId, accessIds]
+      : [note || null, req.user.id, req.params.id, companyId];
     const result = await pool.query(
       `UPDATE time_entries SET status = 'rejected', approval_note = $1, approved_by = $2, approved_at = NOW()
-       WHERE id = $3 AND company_id = $4 RETURNING *`,
-      [note || null, req.user.id, req.params.id, companyId]
+       WHERE id = $3 AND company_id = $4 ${workerFilter} RETURNING *`,
+      params
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.rejected', 'time_entry', parseInt(req.params.id), null, { note });
@@ -1061,10 +1106,13 @@ router.patch('/entries/:id/reject', requireAdmin, requirePermission('approve_ent
 // PATCH /admin/entries/:id/unlock
 router.patch('/entries/:id/unlock', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
+  const accessIds = req.user.worker_access_ids;
   try {
+    const workerFilter = accessIds && accessIds.length ? `AND user_id = ANY($3)` : '';
+    const params = accessIds && accessIds.length ? [req.params.id, companyId, accessIds] : [req.params.id, companyId];
     const result = await pool.query(
-      `UPDATE time_entries SET locked = false WHERE id = $1 AND company_id = $2 RETURNING *`,
-      [req.params.id, companyId]
+      `UPDATE time_entries SET locked = false WHERE id = $1 AND company_id = $2 ${workerFilter} RETURNING *`,
+      params
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.unlocked', 'time_entry', parseInt(req.params.id), null);
