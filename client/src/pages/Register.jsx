@@ -38,6 +38,7 @@ export default function Register() {
       const r = await api.post('/auth/register', { ...form, full_name });
       if (r.data.pending_confirmation) { setConfirming(r.data.email); return; }
       await loginWithToken(r.data.token);
+      try { const saved = JSON.parse(localStorage.getItem('tc_companies') || '[]'); localStorage.setItem('tc_companies', JSON.stringify([form.company_name.trim(), ...saved.filter(c => c.toLowerCase() !== form.company_name.trim().toLowerCase())])); } catch {}
       navigate('/admin');
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed');
