@@ -255,16 +255,32 @@ router.get('/workers', requireAdmin, async (req, res) => {
         FROM time_entries
         WHERE wage_type = 'regular' AND company_id = $1
         GROUP BY user_id, work_date
+      ),
+      weekly_regular AS (
+        SELECT user_id,
+          date_trunc('week', work_date) as week_start,
+          SUM(day_hours) as week_hours
+        FROM daily_regular
+        GROUP BY user_id, date_trunc('week', work_date)
       )
       SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
-        COALESCE((SELECT SUM(LEAST(day_hours, $2)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as regular_hours,
-        COALESCE((SELECT SUM(
-          CASE WHEN u.overtime_rule = 'none' THEN 0
-               ELSE GREATEST(day_hours - $2, 0)
+        COALESCE(
+          CASE WHEN u.overtime_rule = 'weekly' THEN
+            (SELECT SUM(LEAST(week_hours, $2)) FROM weekly_regular wr WHERE wr.user_id = u.id)
+          ELSE
+            (SELECT SUM(LEAST(day_hours, $2)) FROM daily_regular dr WHERE dr.user_id = u.id)
           END
-        ) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as overtime_hours,
+        , 0) as regular_hours,
+        COALESCE(
+          CASE WHEN u.overtime_rule = 'none' THEN 0
+               WHEN u.overtime_rule = 'weekly' THEN
+                 (SELECT SUM(GREATEST(week_hours - $2, 0)) FROM weekly_regular wr WHERE wr.user_id = u.id)
+               ELSE
+                 (SELECT SUM(GREATEST(day_hours - $2, 0)) FROM daily_regular dr WHERE dr.user_id = u.id)
+               END
+        , 0) as overtime_hours,
         COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600 ELSE 0 END), 0) as prevailing_hours
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
