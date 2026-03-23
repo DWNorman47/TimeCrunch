@@ -16,9 +16,13 @@ import AppSwitcher from '../components/AppSwitcher';
 import NotificationBell from '../components/NotificationBell';
 import { getT } from '../i18n';
 import api from '../api';
+import { getOrFetch, setCached } from '../offlineDb';
+import { useOffline } from '../contexts/OfflineContext';
+import OfflineBanner from '../components/OfflineBanner';
 
 export default function Dashboard() {
   const { user, logout, updateUser } = useAuth();
+  const { onSync } = useOffline() || {};
   const t = getT(user?.language);
   const [entries, setEntries] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -39,10 +43,14 @@ export default function Dashboard() {
     setLoading(true);
     setLoadError(false);
     try {
-      const [e, p, s] = await Promise.all([api.get('/time-entries'), api.get('/projects'), api.get('/settings')]);
-      setEntries(e.data);
-      setProjects(p.data);
-      setSettings(s.data);
+      const [entries, projects, settings] = await Promise.all([
+        getOrFetch('entries', () => api.get('/time-entries').then(r => r.data)),
+        getOrFetch('projects', () => api.get('/projects').then(r => r.data)),
+        getOrFetch('settings', () => api.get('/settings').then(r => r.data)),
+      ]);
+      setEntries(entries);
+      setProjects(projects);
+      setSettings(settings);
     } catch {
       setLoadError(true);
     } finally {
@@ -50,7 +58,21 @@ export default function Dashboard() {
     }
   };
 
+  const refreshEntries = async () => {
+    try {
+      const data = await api.get('/time-entries').then(r => r.data);
+      await setCached('entries', data);
+      setEntries(data);
+    } catch {}
+  };
+
   useEffect(() => { fetchData(); }, []);
+
+  // Re-fetch entries after offline queue syncs
+  useEffect(() => {
+    if (!onSync) return;
+    return onSync(count => { if (count > 0) refreshEntries(); });
+  }, [onSync]);
 
   const handleEntryAdded = entry => {
     setEntries(prev => [entry, ...prev]);
@@ -89,6 +111,7 @@ export default function Dashboard() {
 
   return (
     <div style={styles.page}>
+      <OfflineBanner />
       <header style={styles.header}>
         <div style={styles.logoGroup}>
           <AppSwitcher currentApp="timeclock" userRole={user?.role} />

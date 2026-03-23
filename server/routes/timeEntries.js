@@ -24,7 +24,7 @@ router.get('/', requireAuth, async (req, res) => {
 
 // Submit a time entry (wage_type inherited from project)
 router.post('/', requireAuth, async (req, res) => {
-  const { project_id, work_date, start_time, end_time, notes, break_minutes, mileage, timezone } = req.body;
+  const { project_id, work_date, start_time, end_time, notes, break_minutes, mileage, timezone, client_id } = req.body;
   if (!project_id || !work_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'project_id, work_date, start_time, and end_time are required' });
   }
@@ -40,12 +40,16 @@ router.post('/', requireAuth, async (req, res) => {
 
     const bm = parseInt(break_minutes) || 0;
     if (bm < 0) return res.status(400).json({ error: 'break_minutes must be non-negative' });
+    const cid = (typeof client_id === 'string' && client_id.length <= 36) ? client_id : null;
     const result = await pool.query(
-      `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes, break_minutes, mileage, timezone)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes, break_minutes, mileage, timezone, client_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       ON CONFLICT (user_id, client_id) WHERE client_id IS NOT NULL DO NOTHING
+       RETURNING *`,
       [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notes || null,
-       bm, mileage != null ? parseFloat(mileage) : null, timezone || null]
+       bm, mileage != null ? parseFloat(mileage) : null, timezone || null, cid]
     );
+    if (result.rowCount === 0) return res.status(409).json({ error: 'Duplicate entry' });
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);

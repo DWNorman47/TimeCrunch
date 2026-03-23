@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS time_entries (
   clock_out_lat   DECIMAL(10,7),
   clock_out_lng   DECIMAL(10,7),
   timezone        VARCHAR(50),
+  client_id       VARCHAR(36),
   created_at      TIMESTAMP     NOT NULL DEFAULT NOW()
 );
 
@@ -381,6 +382,9 @@ ALTER TABLE active_clock  ADD COLUMN IF NOT EXISTS timezone VARCHAR(50);
 ALTER TABLE companies ALTER COLUMN qbo_realm_id TYPE TEXT;
 -- First-login welcome tracking
 ALTER TABLE users ADD COLUMN IF NOT EXISTS welcomed_at TIMESTAMP;
+-- Offline deduplication for time entries
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS client_id VARCHAR(36);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_time_entries_user_client_id ON time_entries(user_id, client_id) WHERE client_id IS NOT NULL;
 -- plan values: free | starter | business  (trial companies default to full access until plan is set)
 -- Per-worker overtime rule: daily | weekly | none
 ALTER TABLE users ADD COLUMN IF NOT EXISTS overtime_rule VARCHAR(10) NOT NULL DEFAULT 'daily';

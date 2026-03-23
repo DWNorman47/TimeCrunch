@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { getOrFetch } from '../offlineDb';
 
 function fmtDate(str) {
   const d = new Date(str.substring(0, 10) + 'T00:00:00');
@@ -21,8 +22,8 @@ export default function UpcomingShifts({ onFillEntry }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/shifts/mine')
-      .then(r => setShifts(r.data))
+    getOrFetch('shifts', () => api.get('/shifts/mine').then(r => r.data))
+      .then(data => setShifts(data))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
