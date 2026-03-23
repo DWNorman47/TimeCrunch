@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import MessageThread from './MessageThread';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
 import { fmtHours } from '../utils';
 
 function formatDate(dateStr) {
@@ -23,6 +24,7 @@ function formatHours(start, end) {
 
 export default function ApprovalQueue() {
   const { user } = useAuth();
+  const t = useT();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [rejectingId, setRejectingId] = useState(null);
@@ -84,12 +86,12 @@ export default function ApprovalQueue() {
     } finally { setApprovingAll(false); }
   };
 
-  if (loading) return <div style={styles.card}><p style={{ color: '#888' }}>Loading...</p></div>;
+  if (loading) return <div style={styles.card}><p style={{ color: '#888' }}>{t.loading}</p></div>;
 
   return (
     <div style={styles.card}>
       <div style={styles.header}>
-        <h3 style={styles.title}>Approval Queue</h3>
+        <h3 style={styles.title}>{t.approvalQueue}</h3>
         {entries.length > 0 && (
           <>
             <span style={styles.badge}>{visibleEntries.length}{workerFilter ? '' : ' pending'}</span>
@@ -99,7 +101,7 @@ export default function ApprovalQueue() {
                 value={workerFilter}
                 onChange={e => setWorkerFilter(e.target.value)}
               >
-                <option value="">All workers</option>
+                <option value="">{t.allWorkers}</option>
                 {workerNames.map(n => (
                   <option key={n} value={n}>{n} ({entries.filter(e => e.worker_name === n).length})</option>
                 ))}
@@ -113,14 +115,14 @@ export default function ApprovalQueue() {
       </div>
 
       {fetchError ? (
-        <p style={styles.fetchError}>Failed to load pending entries. <button style={styles.retryBtn} onClick={fetch}>Retry</button></p>
+        <p style={styles.fetchError}>{t.failedLoadPending} <button style={styles.retryBtn} onClick={fetch}>{t.retry}</button></p>
       ) : entries.length === 0 ? (
-        <p style={styles.empty}>All caught up — no pending entries.</p>
+        <p style={styles.empty}>{t.allCaughtUp}</p>
       ) : (
         <div style={styles.list}>
           {hasMore && (
             <p style={{ color: '#b45309', fontSize: 13, marginBottom: 8 }}>
-              Showing the oldest 200 pending entries. Approve or reject these to see more.
+              {t.showingOldest200}
             </p>
           )}
           {visibleEntries.length === 0 && workerFilter && (
@@ -141,7 +143,7 @@ export default function ApprovalQueue() {
                   </span>
                 </div>
                 {e.worker_signed_at && (
-                  <span style={styles.signedTag}>✍ Worker signed</span>
+                  <span style={styles.signedTag}>{t.workerSigned}</span>
                 )}
                 {e.notes && <div style={styles.notes}>{e.notes}</div>}
                 {(e.clock_in_lat || e.clock_out_lat) && (
@@ -151,14 +153,14 @@ export default function ApprovalQueue() {
                         href={`https://www.google.com/maps?q=${e.clock_in_lat},${e.clock_in_lng}`}
                         target="_blank" rel="noopener noreferrer"
                         style={styles.locationLink}
-                      >📍 Clock-in location</a>
+                      >{t.clockInLocation}</a>
                     )}
                     {e.clock_out_lat && (
                       <a
                         href={`https://www.google.com/maps?q=${e.clock_out_lat},${e.clock_out_lng}`}
                         target="_blank" rel="noopener noreferrer"
                         style={styles.locationLink}
-                      >📍 Clock-out location</a>
+                      >{t.clockOutLocation}</a>
                     )}
                   </div>
                 )}
@@ -166,7 +168,7 @@ export default function ApprovalQueue() {
                   style={styles.msgBtn}
                   onClick={() => setOpenMessageId(openMessageId === e.id ? null : e.id)}
                 >
-                  💬 {openMessageId === e.id ? 'Hide comments' : 'Comments'}
+                  {openMessageId === e.id ? `💬 ${t.hideComments}` : t.commentsOpen}
                 </button>
                 {openMessageId === e.id && (
                   <MessageThread entryId={e.id} currentUserId={user?.id} />
@@ -177,23 +179,23 @@ export default function ApprovalQueue() {
                 <div style={styles.rejectForm}>
                   <input
                     style={styles.rejectInput}
-                    placeholder="Reason (optional)"
+                    placeholder={t.reasonOptional}
                     value={rejectNote}
                     onChange={ev => setRejectNote(ev.target.value)}
                     autoFocus
                   />
                   <button style={styles.confirmRejectBtn} onClick={() => submitReject(e.id)} disabled={working === e.id}>
-                    {working === e.id ? '...' : 'Confirm Reject'}
+                    {working === e.id ? '...' : t.confirmReject}
                   </button>
-                  <button style={styles.cancelBtn} onClick={() => { setRejectingId(null); setRejectNote(''); }}>Cancel</button>
+                  <button style={styles.cancelBtn} onClick={() => { setRejectingId(null); setRejectNote(''); }}>{t.cancel}</button>
                 </div>
               ) : (
                 <div style={styles.actions}>
                   <button style={styles.approveBtn} onClick={() => approve(e.id)} disabled={working === e.id}>
-                    {working === e.id ? '...' : '✓ Approve'}
+                    {working === e.id ? '...' : t.approve}
                   </button>
                   <button style={styles.rejectBtn} onClick={() => { setRejectingId(e.id); setRejectNote(''); }}>
-                    ✕ Reject
+                    {t.reject}
                   </button>
                 </div>
               )}

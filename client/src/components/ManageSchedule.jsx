@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
+import { useT } from '../hooks/useT';
 import {
   DndContext, DragOverlay, PointerSensor, TouchSensor,
   useSensor, useSensors, useDroppable, useDraggable,
@@ -30,6 +31,7 @@ function PillContent({ s }) {
 }
 
 function DraggableShift({ s, projects, editingId, editForm, setEditForm, editSaving, startEdit, setEditingId, saveEdit, deleteShift, deleting, onDuplicate, dragMode }) {
+  const t = useT();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: String(s.id) });
 
   return (
@@ -37,10 +39,10 @@ function DraggableShift({ s, projects, editingId, editForm, setEditForm, editSav
       <div style={{ ...styles.shiftPill, opacity: isDragging ? 0.35 : 1, cursor: dragMode ? 'grab' : 'default' }} {...(dragMode ? { ...listeners, ...attributes } : {})}>
         <PillContent s={s} />
         <div style={styles.pillActions} onPointerDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
-          <button style={styles.editPillBtn} onClick={() => editingId === s.id ? setEditingId(null) : startEdit(s)}>Edit</button>
-          <button style={styles.dupBtn} onClick={() => onDuplicate(s)}>Copy</button>
+          <button style={styles.editPillBtn} onClick={() => editingId === s.id ? setEditingId(null) : startEdit(s)}>{t.edit}</button>
+          <button style={styles.dupBtn} onClick={() => onDuplicate(s)}>{t.copy}</button>
           <button style={styles.deleteBtn} onClick={() => deleteShift(s.id)} disabled={deleting === s.id}>
-            {deleting === s.id ? '…' : 'Del'}
+            {deleting === s.id ? '…' : t.del}
           </button>
         </div>
       </div>
@@ -49,32 +51,32 @@ function DraggableShift({ s, projects, editingId, editForm, setEditForm, editSav
         <div style={styles.editPanel}>
           <div style={styles.editGrid}>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>Date</label>
+              <label style={styles.editLabel}>{t.date}</label>
               <input style={styles.editInput} type="date" value={editForm.shift_date} onChange={ev => setEditForm(f => ({ ...f, shift_date: ev.target.value }))} />
             </div>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>Start</label>
+              <label style={styles.editLabel}>{t.start}</label>
               <input style={styles.editInput} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} />
             </div>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>End</label>
+              <label style={styles.editLabel}>{t.end}</label>
               <input style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
             </div>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>Project</label>
+              <label style={styles.editLabel}>{t.project}</label>
               <select style={styles.editInput} value={editForm.project_id} onChange={ev => setEditForm(f => ({ ...f, project_id: ev.target.value }))}>
-                <option value="">None</option>
+                <option value="">{t.none}</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div style={{ ...styles.editField, flex: 2 }}>
-              <label style={styles.editLabel}>Notes</label>
-              <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder="Optional" />
+              <label style={styles.editLabel}>{t.notes}</label>
+              <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} />
             </div>
           </div>
           <div style={styles.editActions}>
-            <button style={styles.saveBtn} onClick={() => saveEdit(s.id)} disabled={editSaving}>{editSaving ? '…' : 'Save'}</button>
-            <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+            <button style={styles.saveBtn} onClick={() => saveEdit(s.id)} disabled={editSaving}>{editSaving ? '…' : t.save}</button>
+            <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
           </div>
         </div>
       )}
@@ -101,6 +103,7 @@ function DroppableDay({ date, isToday, children }) {
 
 export default function ManageSchedule({ workers, projects }) {
   const toast = useToast();
+  const t = useT();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -154,7 +157,7 @@ export default function ManageSchedule({ workers, projects }) {
       }));
       toast(`${Object.keys(pendingMoves).length} shift${Object.keys(pendingMoves).length !== 1 ? 's' : ''} saved`, 'success');
     } catch {
-      toast('Some shifts failed to save', 'error');
+      toast(t.someShiftsFailed, 'error');
     } finally {
       setSavingMoves(false);
       setPendingMoves({});
@@ -185,15 +188,15 @@ export default function ManageSchedule({ workers, projects }) {
 
   const addShift = async e => {
     e.preventDefault();
-    if (!form.user_id) { setError('Select a worker'); return; }
+    if (!form.user_id) { setError(t.selectAWorker); return; }
     setSaving(true); setError('');
     try {
       const r = await api.post('/shifts/admin', form);
       setShifts(prev => [...prev, r.data].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
       setForm(f => ({ ...f, notes: '' }));
-      toast('Shift added', 'success');
+      toast(t.shiftAdded, 'success');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save shift');
+      setError(err.response?.data?.error || t.failedSaveShift);
     } finally { setSaving(false); }
   };
 
@@ -217,9 +220,9 @@ export default function ManageSchedule({ workers, projects }) {
         notes: s.notes || '',
       });
       setShifts(prev => [...prev, r.data].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
-      toast('Shift duplicated', 'success');
+      toast(t.shiftDuplicated, 'success');
     } catch {
-      toast('Failed to duplicate shift', 'error');
+      toast(t.failedDuplicateShift, 'error');
     }
   };
 
@@ -276,70 +279,70 @@ export default function ManageSchedule({ workers, projects }) {
 
   return (
     <div style={styles.card}>
-      <h3 style={styles.title}>Schedule</h3>
+      <h3 style={styles.title}>{t.schedule}</h3>
 
       <form onSubmit={addShift} style={styles.form}>
         <div style={styles.formRow}>
           <div style={styles.field}>
-            <label style={styles.label}>Worker</label>
+            <label style={styles.label}>{t.worker}</label>
             <select style={styles.input} value={form.user_id} onChange={e => set('user_id', e.target.value)} required>
-              <option value="">Select worker</option>
+              <option value="">{t.selectWorker}</option>
               {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
             </select>
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>Project</label>
+            <label style={styles.label}>{t.project}</label>
             <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">No project</option>
+              <option value="">{t.noProject}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>Date</label>
+            <label style={styles.label}>{t.date}</label>
             <input style={styles.input} type="date" value={form.shift_date} onChange={e => set('shift_date', e.target.value)} required />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>Start</label>
+            <label style={styles.label}>{t.start}</label>
             <input style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>End</label>
+            <label style={styles.label}>{t.end}</label>
             <input style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required />
           </div>
           <div style={{ ...styles.field, flex: 2 }}>
-            <label style={styles.label}>Notes</label>
-            <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Optional" />
+            <label style={styles.label}>{t.notes}</label>
+            <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.optional} />
           </div>
           <div style={styles.field}>
             <label style={styles.label}>&nbsp;</label>
-            <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? '...' : '+ Add Shift'}</button>
+            <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? '...' : t.addShift}</button>
           </div>
         </div>
         {error && <p style={styles.error}>{error}</p>}
       </form>
 
       <div style={styles.weekNav}>
-        <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, -7))}>‹ Prev</button>
+        <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, -7))}>{t.prevWeek}</button>
         <span style={styles.weekLabel}>{fmtDay(days[0])} – {fmtDay(days[6])}</span>
-        <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>Next ›</button>
-        <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>Today</button>
+        <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>{t.nextWeek}</button>
+        <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>{t.today}</button>
         {!dragMode
-          ? <button style={styles.dragModeBtn} onClick={enterDragMode}>⇄ Rearrange</button>
+          ? <button style={styles.dragModeBtn} onClick={enterDragMode}>{t.rearrange}</button>
           : (
             <div style={styles.dragModeBanner}>
               <span style={styles.dragModeLabel}>
-                Drag mode{Object.keys(pendingMoves).length > 0 ? ` · ${Object.keys(pendingMoves).length} unsaved` : ''}
+                {t.dragMode}{Object.keys(pendingMoves).length > 0 ? ` · ${Object.keys(pendingMoves).length} unsaved` : ''}
               </span>
               <button style={styles.saveDragBtn} onClick={saveDragMoves} disabled={savingMoves || Object.keys(pendingMoves).length === 0}>
-                {savingMoves ? 'Saving...' : 'Save & Notify'}
+                {savingMoves ? t.saving : t.saveAndNotify}
               </button>
-              <button style={styles.discardDragBtn} onClick={discardDrag} disabled={savingMoves}>Discard</button>
+              <button style={styles.discardDragBtn} onClick={discardDrag} disabled={savingMoves}>{t.discard}</button>
             </div>
           )
         }
       </div>
 
-      {loading ? <p style={{ color: '#888', fontSize: 13 }}>Loading...</p> : (
+      {loading ? <p style={{ color: '#888', fontSize: 13 }}>{t.loading}</p> : (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={styles.grid}>
             {days.map(day => {

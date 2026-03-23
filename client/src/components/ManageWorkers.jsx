@@ -2,12 +2,9 @@ import React, { useState } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { formatCurrency } from '../utils';
+import { useT } from '../hooks/useT';
 
 const LANGUAGES = ['English', 'Spanish'];
-const RATE_TYPES = [
-  { value: 'hourly', label: 'Per hour' },
-  { value: 'daily', label: 'Per day (8-hr day, OT above 8)' },
-];
 
 function fmtRate(w, currency = 'USD') {
   const amt = parseFloat(w.hourly_rate ?? 0);
@@ -16,16 +13,22 @@ function fmtRate(w, currency = 'USD') {
 }
 
 function RoleBadge({ role }) {
+  const t = useT();
   const isAdmin = role === 'admin' || role === 'super_admin';
   return (
     <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: isAdmin ? '#dbeafe' : '#f3f4f6', color: isAdmin ? '#1e40af' : '#6b7280' }}>
-      {isAdmin ? 'Admin' : 'Worker'}
+      {isAdmin ? t.adminRole : t.workerRole}
     </span>
   );
 }
 
 export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, showRate = true, identityEditable = true, currency = 'USD' }) {
   const toast = useToast();
+  const t = useT();
+  const rateTypes = [
+    { value: 'hourly', label: t.perHour },
+    { value: 'daily', label: t.perDay },
+  ];
 
   // Add form state
   const [showForm, setShowForm] = useState(false);
@@ -230,28 +233,28 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   return (
     <div style={s.card}>
       <div style={s.cardHeader}>
-        <h3 style={s.cardTitle}>Users</h3>
+        <h3 style={s.cardTitle}>{t.users}</h3>
         <button style={s.addBtn} onClick={() => { setShowForm(v => !v); setError(''); setArchivedConflict(null); setInviteError(''); setInviteSent(''); }}>
-          {showForm ? 'Cancel' : '+ Add User'}
+          {showForm ? t.cancel : t.addUser}
         </button>
       </div>
 
       {showForm && (
         <div style={s.addPanel}>
           <div style={s.modeTabs}>
-            <button style={addMode === 'manual' ? s.modeTabActive : s.modeTab} onClick={() => setAddMode('manual')}>Add manually</button>
-            <button style={addMode === 'invite' ? s.modeTabActive : s.modeTab} onClick={() => setAddMode('invite')}>Invite by email</button>
+            <button style={addMode === 'manual' ? s.modeTabActive : s.modeTab} onClick={() => setAddMode('manual')}>{t.addManually}</button>
+            <button style={addMode === 'invite' ? s.modeTabActive : s.modeTab} onClick={() => setAddMode('invite')}>{t.inviteByEmail}</button>
           </div>
 
           {addMode === 'manual' ? (
             <form onSubmit={handleAdd} style={s.addForm}>
               <div style={s.formGrid}>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>First name</label>
+                  <label style={s.label}>{t.firstName}</label>
                   <input style={s.input} value={form.first_name} onChange={e => handleFirstNameChange(e.target.value)} required />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>Last name</label>
+                  <label style={s.label}>{t.lastName}</label>
                   <input style={s.input} value={form.last_name} onChange={e => handleLastNameChange(e.target.value)} required />
                 </div>
                 <div style={s.fieldGroup}>
@@ -265,25 +268,25 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>Temporary password</label>
+                  <label style={s.label}>{t.temporaryPassword}</label>
                   <div style={{ position: 'relative' }}>
                     <input style={{ ...s.input, width: '100%', paddingRight: 36, boxSizing: 'border-box' }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
                     <button type="button" onClick={() => setShowPassword(v => !v)} style={s.eyeBtn} tabIndex={-1}>{showPassword ? '🙈' : '👁'}</button>
                   </div>
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>Email (optional)</label>
+                  <label style={s.label}>{t.emailOptional}</label>
                   <input style={s.input} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>Role</label>
+                  <label style={s.label}>{t.role}</label>
                   <select style={s.input} value={form.role} onChange={e => set('role', e.target.value)}>
-                    <option value="worker">Worker</option>
-                    <option value="admin">Admin</option>
+                    <option value="worker">{t.workerRole}</option>
+                    <option value="admin">{t.adminRole}</option>
                   </select>
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>Language</label>
+                  <label style={s.label}>{t.language}</label>
                   <select style={s.input} value={form.language} onChange={e => set('language', e.target.value)}>
                     {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                   </select>
@@ -291,13 +294,13 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 {showRate && (
                   <>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>Pay rate</label>
+                      <label style={s.label}>{t.payRate}</label>
                       <input style={s.input} type="number" min="0" step="0.01" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>Rate type</label>
+                      <label style={s.label}>{t.rateType}</label>
                       <select style={s.input} value={form.rate_type} onChange={e => set('rate_type', e.target.value)}>
-                        {RATE_TYPES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                        {rateTypes.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                     </div>
                   </>
@@ -309,7 +312,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   {archivedConflict && <button type="button" style={s.restoreInlineBtn} onClick={handleRestoreConflict}>Restore {archivedConflict.name}</button>}
                 </div>
               )}
-              <button style={s.saveBtn} type="submit" disabled={saving || usernameTaken}>{saving ? 'Creating...' : 'Create User'}</button>
+              <button style={s.saveBtn} type="submit" disabled={saving || usernameTaken}>{saving ? t.creating : t.createUser}</button>
             </form>
           ) : (
             <form onSubmit={handleInvite} style={s.addForm}>
@@ -322,39 +325,39 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 <>
                   <div style={s.formGrid}>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>First name</label>
+                      <label style={s.label}>{t.firstName}</label>
                       <input style={s.input} value={inviteForm.first_name} onChange={e => setInvite('first_name', e.target.value)} required />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>Last name</label>
+                      <label style={s.label}>{t.lastName}</label>
                       <input style={s.input} value={inviteForm.last_name} onChange={e => setInvite('last_name', e.target.value)} required />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>Email</label>
+                      <label style={s.label}>{t.email}</label>
                       <input style={s.input} type="email" value={inviteForm.email} onChange={e => setInvite('email', e.target.value)} required />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>Role</label>
+                      <label style={s.label}>{t.role}</label>
                       <select style={s.input} value={inviteForm.role} onChange={e => setInvite('role', e.target.value)}>
-                        <option value="worker">Worker</option>
-                        <option value="admin">Admin</option>
+                        <option value="worker">{t.workerRole}</option>
+                        <option value="admin">{t.adminRole}</option>
                       </select>
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>Language</label>
+                      <label style={s.label}>{t.language}</label>
                       <select style={s.input} value={inviteForm.language} onChange={e => setInvite('language', e.target.value)}>
                         {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                       </select>
                     </div>
                     {showRate && (
                       <div style={s.fieldGroup}>
-                        <label style={s.label}>Pay rate ($/hr)</label>
+                        <label style={s.label}>{t.payRate}</label>
                         <input style={s.input} type="number" min="0" step="0.01" value={inviteForm.hourly_rate} onChange={e => setInvite('hourly_rate', e.target.value)} />
                       </div>
                     )}
                   </div>
                   {inviteError && <p style={s.errorText}>{inviteError}</p>}
-                  <button style={s.saveBtn} type="submit" disabled={inviteSaving}>{inviteSaving ? 'Sending...' : 'Send Invite'}</button>
+                  <button style={s.saveBtn} type="submit" disabled={inviteSaving}>{inviteSaving ? t.sendingInvite : t.sendInvite}</button>
                 </>
               )}
             </form>
@@ -363,7 +366,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       )}
 
       {workers.length === 0 ? (
-        <p style={s.empty}>No users yet.</p>
+        <p style={s.empty}>{t.noUsers}</p>
       ) : (
         <div style={s.list}>
           {workers.map(w => {
@@ -387,39 +390,39 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                     {identityEditable && (
                       <div style={s.section}>
                         <div style={s.sectionHeader}>
-                          <span style={s.sectionTitle}>Profile</span>
+                          <span style={s.sectionTitle}>{t.profile}</span>
                           {(!isEditing || editSection !== 'info') && (
-                            <button style={s.sectionBtn} onClick={() => isEditing && editSection === 'info' ? cancelEdit() : startEditInfo(w)}>Edit</button>
+                            <button style={s.sectionBtn} onClick={() => isEditing && editSection === 'info' ? cancelEdit() : startEditInfo(w)}>{t.edit}</button>
                           )}
                         </div>
                         {isEditing && editSection === 'info' ? (
                           <div style={s.editBlock}>
                             <div style={s.formGrid}>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>Full name</label>
+                                <label style={s.label}>{t.fullName}</label>
                                 <input style={s.input} value={editInfoForm.full_name} onChange={e => setEditInfoForm(f => ({ ...f, full_name: e.target.value }))} />
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>Email</label>
+                                <label style={s.label}>{t.email}</label>
                                 <input style={s.input} type="email" value={editInfoForm.email} onChange={e => setEditInfoForm(f => ({ ...f, email: e.target.value }))} />
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>Role</label>
+                                <label style={s.label}>{t.role}</label>
                                 <select style={s.input} value={editInfoForm.role} onChange={e => setEditInfoForm(f => ({ ...f, role: e.target.value }))}>
-                                  <option value="worker">Worker</option>
-                                  <option value="admin">Admin</option>
+                                  <option value="worker">{t.workerRole}</option>
+                                  <option value="admin">{t.adminRole}</option>
                                 </select>
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>Language</label>
+                                <label style={s.label}>{t.language}</label>
                                 <select style={s.input} value={editInfoForm.language} onChange={e => setEditInfoForm(f => ({ ...f, language: e.target.value }))}>
                                   {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                                 </select>
                               </div>
                             </div>
                             <div style={s.editActions}>
-                              <button style={s.saveBtn} onClick={() => saveInfo(w.id)} disabled={editInfoSaving}>{editInfoSaving ? 'Saving...' : 'Save'}</button>
-                              <button style={s.cancelBtn} onClick={cancelEdit}>Cancel</button>
+                              <button style={s.saveBtn} onClick={() => saveInfo(w.id)} disabled={editInfoSaving}>{editInfoSaving ? t.loading : t.save}</button>
+                              <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
                           </div>
                         ) : (
@@ -427,7 +430,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                             <span style={s.infoLabel}>Name</span>
                             <span style={s.infoValue}>{w.full_name}</span>
                             <span style={s.infoLabel}>Email</span>
-                            <span style={s.infoValue}>{w.email || <em style={{ color: '#9ca3af' }}>not set</em>}</span>
+                            <span style={s.infoValue}>{w.email || <em style={{ color: '#9ca3af' }}>{t.notSet}</em>}</span>
                             <span style={s.infoLabel}>Language</span>
                             <span style={s.infoValue}>{w.language || 'English'}</span>
                             <span style={s.infoLabel}>Role</span>
@@ -441,15 +444,15 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                     {identityEditable && (
                       <div style={s.section}>
                         <div style={s.sectionHeader}>
-                          <span style={s.sectionTitle}>Username</span>
+                          <span style={s.sectionTitle}>{t.usernameSection}</span>
                           {(!isEditing || editSection !== 'username') && (
-                            <button style={s.sectionBtn} onClick={() => isEditing && editSection === 'username' ? cancelEdit() : startEditUsername(w)}>Change</button>
+                            <button style={s.sectionBtn} onClick={() => isEditing && editSection === 'username' ? cancelEdit() : startEditUsername(w)}>{t.changeUsername}</button>
                           )}
                         </div>
                         {isEditing && editSection === 'username' ? (
                           <div style={s.editBlock}>
                             <div style={s.fieldGroup}>
-                              <label style={s.label}>New username{editUsernameChecking ? ' (checking...)' : editUsernameTaken ? ' ⚠ taken' : ''}</label>
+                              <label style={s.label}>{t.newUsername}{editUsernameChecking ? ' (checking...)' : editUsernameTaken ? ' ⚠ taken' : ''}</label>
                               <input
                                 style={{ ...s.input, borderColor: editUsernameTaken ? '#fca5a5' : undefined, maxWidth: 240 }}
                                 value={editUsernameVal}
@@ -458,8 +461,8 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               />
                             </div>
                             <div style={s.editActions}>
-                              <button style={s.saveBtn} onClick={() => saveUsername(w.id)} disabled={editUsernameSaving || editUsernameTaken}>{editUsernameSaving ? 'Saving...' : 'Save'}</button>
-                              <button style={s.cancelBtn} onClick={cancelEdit}>Cancel</button>
+                              <button style={s.saveBtn} onClick={() => saveUsername(w.id)} disabled={editUsernameSaving || editUsernameTaken}>{editUsernameSaving ? t.loading : t.save}</button>
+                              <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
                           </div>
                         ) : (
@@ -472,28 +475,28 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                     {showRate && (
                       <div style={s.section}>
                         <div style={s.sectionHeader}>
-                          <span style={s.sectionTitle}>Pay Rate</span>
+                          <span style={s.sectionTitle}>{t.payRateSection}</span>
                           {(!isEditing || editSection !== 'rate') && (
-                            <button style={s.sectionBtn} onClick={() => isEditing && editSection === 'rate' ? cancelEdit() : startEditRate(w)}>Edit</button>
+                            <button style={s.sectionBtn} onClick={() => isEditing && editSection === 'rate' ? cancelEdit() : startEditRate(w)}>{t.edit}</button>
                           )}
                         </div>
                         {isEditing && editSection === 'rate' ? (
                           <div style={s.editBlock}>
                             <div style={s.formGrid}>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>Amount ($)</label>
+                                <label style={s.label}>{t.amount}</label>
                                 <input style={{ ...s.input, maxWidth: 120 }} type="number" min="0" step="0.01" value={editRateForm.rate} onChange={e => setEditRateForm(f => ({ ...f, rate: e.target.value }))} />
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>Rate type</label>
+                                <label style={s.label}>{t.rateType}</label>
                                 <select style={s.input} value={editRateForm.rate_type} onChange={e => setEditRateForm(f => ({ ...f, rate_type: e.target.value }))}>
-                                  {RATE_TYPES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                                  {rateTypes.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                                 </select>
                               </div>
                             </div>
                             <div style={s.editActions}>
-                              <button style={s.saveBtn} onClick={() => saveRate(w.id)} disabled={editRateSaving}>{editRateSaving ? 'Saving...' : 'Save'}</button>
-                              <button style={s.cancelBtn} onClick={cancelEdit}>Cancel</button>
+                              <button style={s.saveBtn} onClick={() => saveRate(w.id)} disabled={editRateSaving}>{editRateSaving ? t.loading : t.save}</button>
+                              <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
                           </div>
                         ) : (
@@ -505,7 +508,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                     {/* ── Remove ── */}
                     {identityEditable && !isEditing && (
                       <div style={{ paddingTop: 4 }}>
-                        <button style={s.removeBtn} onClick={() => handleRemove(w.id, w.full_name)}>Remove user</button>
+                        <button style={s.removeBtn} onClick={() => handleRemove(w.id, w.full_name)}>{t.removeUser}</button>
                       </div>
                     )}
                   </div>
@@ -518,12 +521,12 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
       <div style={s.historyFooter}>
         <button style={s.historyToggle} onClick={() => { setShowHistory(v => !v); loadArchived(); }}>
-          {showHistory ? '▾' : '▸'} History {archived.length > 0 ? `(${archived.length})` : ''}
+          {showHistory ? '▾' : '▸'} {t.history} {archived.length > 0 ? `(${archived.length})` : ''}
         </button>
         {showHistory && (
           <div style={s.historyList}>
-            {loadingArchived ? <p style={s.empty}>Loading...</p>
-              : archived.length === 0 ? <p style={s.empty}>No removed users.</p>
+            {loadingArchived ? <p style={s.empty}>{t.loading}</p>
+              : archived.length === 0 ? <p style={s.empty}>{t.noRemovedUsers}</p>
               : archived.map(w => (
                 <div key={w.id} style={s.historyItem}>
                   <div style={s.itemLeft}>
@@ -531,7 +534,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                     <span style={{ ...s.itemUsername, color: '#d1d5db' }}>@{w.username}</span>
                     <RoleBadge role={w.role} />
                   </div>
-                  <button style={s.restoreBtn} onClick={() => handleRestore(w.id)}>Restore</button>
+                  <button style={s.restoreBtn} onClick={() => handleRestore(w.id)}>{t.restore}</button>
                 </div>
               ))
             }
