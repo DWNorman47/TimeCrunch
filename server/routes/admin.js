@@ -362,10 +362,12 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
 
 // GET /admin/workers/check-username — check if a username is already taken
 router.get('/workers/check-username', requireAdmin, async (req, res) => {
-  const { username } = req.query;
+  const { username, exclude_id } = req.query;
   if (!username) return res.json({ taken: false });
   try {
-    const result = await pool.query('SELECT id FROM users WHERE username = $1', [username.toLowerCase().trim()]);
+    const result = exclude_id
+      ? await pool.query('SELECT id FROM users WHERE username = $1 AND id != $2', [username.toLowerCase().trim(), exclude_id])
+      : await pool.query('SELECT id FROM users WHERE username = $1', [username.toLowerCase().trim()]);
     res.json({ taken: result.rowCount > 0 });
   } catch (err) {
     res.json({ taken: false });
@@ -502,15 +504,20 @@ router.post('/workers', requireAdmin, async (req, res) => {
   }
 });
 
-// Update a worker (full_name, first_name, middle_name, last_name, role, language, hourly_rate, email)
+// Update a worker (full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, email)
 router.patch('/workers/:id', requireAdmin, async (req, res) => {
-  const { full_name, first_name, middle_name, last_name, role, language, hourly_rate, email } = req.body;
-  if (!full_name && !first_name && !last_name && !role && !language && hourly_rate === undefined && email === undefined) {
+  const { full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, email } = req.body;
+  if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && email === undefined) {
     return res.status(400).json({ error: 'At least one field required' });
   }
   const companyId = req.user.company_id;
   const assignedRole = role ? (role === 'admin' ? 'admin' : 'worker') : undefined;
   try {
+    if (username) {
+      const clean = username.toLowerCase().trim();
+      const conflict = await pool.query('SELECT id FROM users WHERE username = $1 AND id != $2', [clean, req.params.id]);
+      if (conflict.rowCount > 0) return res.status(409).json({ error: 'Username already taken' });
+    }
     const fields = [];
     const values = [];
     let idx = 1;
@@ -518,6 +525,7 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
     if (first_name !== undefined) { fields.push(`first_name = $${idx++}`); values.push(first_name || null); }
     if (middle_name !== undefined) { fields.push(`middle_name = $${idx++}`); values.push(middle_name || null); }
     if (last_name !== undefined) { fields.push(`last_name = $${idx++}`); values.push(last_name || null); }
+    if (username) { fields.push(`username = $${idx++}`); values.push(username.toLowerCase().trim()); }
     if (assignedRole !== undefined) { fields.push(`role = $${idx++}`); values.push(assignedRole); }
     if (language) { fields.push(`language = $${idx++}`); values.push(language); }
     if (hourly_rate !== undefined) {
