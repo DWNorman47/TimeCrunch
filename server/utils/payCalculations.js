@@ -47,4 +47,24 @@ function computeOT(entries, rule, threshold) {
   return { regularHours: reg, overtimeHours: ot };
 }
 
-module.exports = { hoursWorked, computeOT };
+/**
+ * Compute regular and overtime pay costs for a daily-rate worker.
+ * Daily workers earn `dailyRate` per distinct work day.
+ * Overtime hours (above daily threshold) are paid at (dailyRate / threshold) × multiplier.
+ * @param {Array}  entries          - regular wage_type entries for one worker
+ * @param {number} threshold        - daily OT threshold (e.g. 8)
+ * @param {number} dailyRate        - amount earned per full day
+ * @param {number} overtimeMultiplier
+ * @returns {{ regularCost: number, overtimeCost: number }}
+ */
+function computeDailyPayCosts(entries, threshold, dailyRate, overtimeMultiplier) {
+  const regular = entries.filter(e => e.wage_type === 'regular');
+  const days = new Set(regular.map(e => e.work_date.toString().substring(0, 10))).size;
+  const { overtimeHours } = computeOT(entries, 'daily', threshold);
+  return {
+    regularCost: days * dailyRate,
+    overtimeCost: overtimeHours * (dailyRate / threshold) * overtimeMultiplier,
+  };
+}
+
+module.exports = { hoursWorked, computeOT, computeDailyPayCosts };
