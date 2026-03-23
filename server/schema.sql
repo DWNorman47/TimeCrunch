@@ -382,6 +382,8 @@ ALTER TABLE active_clock  ADD COLUMN IF NOT EXISTS timezone VARCHAR(50);
 ALTER TABLE companies ALTER COLUMN qbo_realm_id TYPE TEXT;
 -- First-login welcome tracking
 ALTER TABLE users ADD COLUMN IF NOT EXISTS welcomed_at TIMESTAMP;
+-- Per-admin feature permissions (null = full access, JSONB object = restricted)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_permissions JSONB;
 -- Offline deduplication for time entries
 ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS client_id VARCHAR(36);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_time_entries_user_client_id ON time_entries(user_id, client_id) WHERE client_id IS NOT NULL;

@@ -36,7 +36,7 @@ function validatePassword(password, username) {
 
 function signToken(user) {
   return jwt.sign(
-    { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name },
+    { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name, admin_permissions: user.admin_permissions || null },
     process.env.JWT_SECRET,
     { expiresIn: '8h' }
   );
@@ -115,7 +115,7 @@ router.get('/me', requireAuth, async (req, res) => {
   try {
     const [companyRes, userRes] = await Promise.all([
       pool.query('SELECT plan, subscription_status, addon_qbo, trial_ends_at FROM companies WHERE id = $1', [req.user.company_id]),
-      pool.query('SELECT mfa_enabled, language FROM users WHERE id = $1', [req.user.id]),
+      pool.query('SELECT mfa_enabled, language, admin_permissions FROM users WHERE id = $1', [req.user.id]),
     ]);
     const company = companyRes.rows[0] || {};
     const userRow = userRes.rows[0] || {};
@@ -128,6 +128,7 @@ router.get('/me', requireAuth, async (req, res) => {
         addon_qbo: company.addon_qbo || false,
         trial_ends_at: company.trial_ends_at,
         mfa_enabled: userRow.mfa_enabled || false,
+        admin_permissions: userRow.admin_permissions || null,
       },
     });
   } catch (err) {

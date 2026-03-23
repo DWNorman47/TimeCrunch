@@ -281,6 +281,7 @@ export default function AdministrationPage() {
               showRate={true}
               identityEditable={true}
               currency={settings?.currency ?? 'USD'}
+              currentUser={user}
             />
             <h3 style={styles.sectionTitle}>{t.auditLog}</h3>
             <AuditLog />

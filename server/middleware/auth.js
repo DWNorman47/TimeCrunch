@@ -102,4 +102,22 @@ async function requireProAddon(req, res, next) {
   }
 }
 
-module.exports = { requireAuth, requireAdmin, requireSuperAdmin, requirePlan, requireProAddon };
+// Returns true if the user has a given admin permission.
+// null admin_permissions = full access (existing admins + company founder).
+function hasAdminPermission(user, key) {
+  if (user.role === 'super_admin') return true;
+  if (!user.admin_permissions) return true;
+  return user.admin_permissions[key] === true;
+}
+
+// Middleware factory — gate a route to a specific admin permission.
+function requirePermission(key) {
+  return (req, res, next) => {
+    if (!hasAdminPermission(req.user, key)) {
+      return res.status(403).json({ error: 'Insufficient permissions', code: 'permission_denied', required: key });
+    }
+    next();
+  };
+}
+
+module.exports = { requireAuth, requireAdmin, requireSuperAdmin, requirePlan, requireProAddon, hasAdminPermission, requirePermission };

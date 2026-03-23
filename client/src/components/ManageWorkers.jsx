@@ -6,6 +6,14 @@ import { useT } from '../hooks/useT';
 
 const LANGUAGES = ['English', 'Spanish'];
 
+const PERM_LABELS = [
+  { key: 'approve_entries', label: 'Approve entries' },
+  { key: 'manage_workers', label: 'Manage workers' },
+  { key: 'manage_projects', label: 'Manage projects' },
+  { key: 'view_reports', label: 'View reports' },
+  { key: 'manage_settings', label: 'Manage settings' },
+];
+
 function fmtRate(w, currency = 'USD') {
   const amt = parseFloat(w.hourly_rate ?? 0);
   if (w.rate_type === 'daily') return `${formatCurrency(amt, currency)} / day`;
@@ -22,7 +30,7 @@ function RoleBadge({ role }) {
   );
 }
 
-export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, showRate = true, identityEditable = true, currency = 'USD' }) {
+export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, showRate = true, identityEditable = true, currency = 'USD', currentUser = null }) {
   const toast = useToast();
   const t = useT();
   const rateTypes = [
@@ -66,6 +74,9 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
   const [editRateForm, setEditRateForm] = useState({ rate: '', rate_type: 'hourly', overtime_rule: 'daily' });
   const [editRateSaving, setEditRateSaving] = useState(false);
+
+  const [editPermForm, setEditPermForm] = useState({ full_access: true, keys: {} });
+  const [editPermSaving, setEditPermSaving] = useState(false);
 
   // History
   const [archived, setArchived] = useState([]);
@@ -205,6 +216,24 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       cancelEdit();
     } catch (err) { toast(err.response?.data?.error || 'Failed to update', 'error'); }
     finally { setEditRateSaving(false); }
+  };
+
+  const startEditPermissions = w => {
+    setEditingId(w.id); setEditSection('permissions');
+    const fullAccess = w.admin_permissions == null;
+    const defaultKeys = PERM_LABELS.reduce((acc, { key }) => ({ ...acc, [key]: true }), {});
+    setEditPermForm({ full_access: fullAccess, keys: fullAccess ? defaultKeys : { ...defaultKeys, ...w.admin_permissions } });
+  };
+
+  const savePermissions = async id => {
+    setEditPermSaving(true);
+    try {
+      const perms = editPermForm.full_access ? null : editPermForm.keys;
+      const r = await api.patch(`/admin/workers/${id}/permissions`, { admin_permissions: perms });
+      onWorkerUpdated(r.data);
+      cancelEdit();
+    } catch (err) { toast(err.response?.data?.error || 'Failed to update permissions', 'error'); }
+    finally { setEditPermSaving(false); }
   };
 
   // ── Archive helpers ──────────────────────────────────────────────────────────
@@ -522,6 +551,64 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                             <span style={{ ...s.infoValue, marginLeft: 10, fontSize: 12, color: '#9ca3af' }}>
                               {overtimeRules.find(r => r.value === (w.overtime_rule || 'daily'))?.label}
                             </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── Permissions section (admin-role workers only, visible to full-access admins) ── */}
+                    {w.role === 'admin' && !currentUser?.admin_permissions && (
+                      <div style={s.section}>
+                        <div style={s.sectionHeader}>
+                          <span style={s.sectionTitle}>Permissions</span>
+                          {(!isEditing || editSection !== 'permissions') && (
+                            <button style={s.sectionBtn} onClick={() => startEditPermissions(w)}>Edit</button>
+                          )}
+                        </div>
+                        {isEditing && editSection === 'permissions' ? (
+                          <div style={s.editBlock}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#111827' }}>
+                              <input
+                                type="checkbox"
+                                checked={editPermForm.full_access}
+                                onChange={e => setEditPermForm(f => ({ ...f, full_access: e.target.checked }))}
+                              />
+                              Full access (no restrictions)
+                            </label>
+                            {!editPermForm.full_access && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 4, marginTop: 4 }}>
+                                {PERM_LABELS.map(({ key, label }) => (
+                                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#374151' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={editPermForm.keys[key] === true}
+                                      onChange={e => setEditPermForm(f => ({ ...f, keys: { ...f.keys, [key]: e.target.checked } }))}
+                                    />
+                                    {label}
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                            <div style={s.editActions}>
+                              <button style={s.saveBtn} onClick={() => savePermissions(w.id)} disabled={editPermSaving}>{editPermSaving ? t.loading : t.save}</button>
+                              <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            {w.admin_permissions == null
+                              ? <span style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>Full access</span>
+                              : (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
+                                  {PERM_LABELS.filter(({ key }) => w.admin_permissions[key]).map(({ key, label }) => (
+                                    <span key={key} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: '#dbeafe', color: '#1e40af' }}>{label}</span>
+                                  ))}
+                                  {PERM_LABELS.every(({ key }) => !w.admin_permissions[key]) && (
+                                    <span style={{ fontSize: 13, color: '#9ca3af' }}>No permissions</span>
+                                  )}
+                                </div>
+                              )
+                            }
                           </div>
                         )}
                       </div>

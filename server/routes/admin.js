@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const pool = require('../db');
-const { requireAdmin, requirePlan, requireProAddon } = require('../middleware/auth');
+const { requireAdmin, requirePlan, requireProAddon, requirePermission } = require('../middleware/auth');
 const { sendPushToUser, sendPushToAllWorkers } = require('../push');
 const { sendEmail } = require('../email');
 const { hoursWorked, computeOT, computeDailyPayCosts } = require('../utils/payCalculations');
@@ -145,7 +145,7 @@ router.get('/settings', requireAdmin, async (req, res) => {
 });
 
 // Update settings
-router.patch('/settings', requireAdmin, async (req, res) => {
+router.patch('/settings', requireAdmin, requirePermission('manage_settings'), async (req, res) => {
   const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
   const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour', 'chat_retention_days'];
   const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold'];
@@ -264,7 +264,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         FROM daily_regular
         GROUP BY user_id, date_trunc('week', work_date)
       )
-      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email,
+      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE(
@@ -286,7 +286,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1
-      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email
+      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
       [companyId, threshold]
@@ -407,7 +407,7 @@ router.get('/workers/check-username', requireAdmin, async (req, res) => {
 });
 
 // Invite a worker by email
-router.post('/workers/invite', requireAdmin, async (req, res) => {
+router.post('/workers/invite', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
   const { full_name, email, role, language, hourly_rate } = req.body;
   if (!full_name || !email) return res.status(400).json({ error: 'full_name and email required' });
   if (full_name.length > 100) return res.status(400).json({ error: 'Full name must be 100 characters or fewer' });
@@ -485,7 +485,7 @@ router.post('/workers/invite', requireAdmin, async (req, res) => {
 });
 
 // Create a worker or admin
-router.post('/workers', requireAdmin, async (req, res) => {
+router.post('/workers', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
   const { username, password, full_name, first_name, middle_name, last_name, role } = req.body;
   if (!username || !password || !full_name) {
     return res.status(400).json({ error: 'username, password, and full_name required' });
@@ -540,7 +540,7 @@ router.post('/workers', requireAdmin, async (req, res) => {
 });
 
 // Update a worker (full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, email)
-router.patch('/workers/:id', requireAdmin, async (req, res) => {
+router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
   const { full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, overtime_rule, email } = req.body;
   if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && rate_type === undefined && overtime_rule === undefined && email === undefined) {
     return res.status(400).json({ error: 'At least one field required' });
@@ -594,8 +594,38 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
   }
 });
 
+// Update admin permissions for another admin (full-access admins only)
+router.patch('/workers/:id/permissions', requireAdmin, async (req, res) => {
+  // Only admins with null admin_permissions (full access) may manage others' permissions
+  if (req.user.admin_permissions != null) {
+    return res.status(403).json({ error: 'Only full-access admins can manage permissions' });
+  }
+  if (String(req.params.id) === String(req.user.id)) {
+    return res.status(400).json({ error: 'You cannot change your own permissions' });
+  }
+  const VALID_KEYS = ['approve_entries', 'manage_workers', 'manage_projects', 'view_reports', 'manage_settings'];
+  const { admin_permissions } = req.body;
+  let perms = null;
+  if (admin_permissions !== null && admin_permissions !== undefined) {
+    perms = {};
+    for (const key of VALID_KEYS) perms[key] = admin_permissions[key] === true;
+  }
+  try {
+    const result = await pool.query(
+      `UPDATE users SET admin_permissions = $1
+       WHERE id = $2 AND company_id = $3 AND role = 'admin' RETURNING id, full_name, admin_permissions`,
+      [perms ? JSON.stringify(perms) : null, req.params.id, req.user.company_id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Admin not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Remove (soft-delete) a worker
-router.delete('/workers/:id', requireAdmin, async (req, res) => {
+router.delete('/workers/:id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const worker = await pool.query('SELECT full_name FROM users WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
@@ -756,7 +786,7 @@ router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
 });
 
 // Update project (name and/or wage_type and/or geofence)
-router.patch('/projects/:id', requireAdmin, async (req, res) => {
+router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
   const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence, budget_hours, budget_dollars } = req.body;
   if (wage_type !== undefined && !['regular', 'prevailing'].includes(wage_type)) {
     return res.status(400).json({ error: 'wage_type must be regular or prevailing' });
@@ -809,7 +839,7 @@ router.patch('/projects/:id', requireAdmin, async (req, res) => {
 });
 
 // Create a project
-router.post('/projects', requireAdmin, async (req, res) => {
+router.post('/projects', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
   const { name, wage_type } = req.body;
   if (!name) return res.status(400).json({ error: 'Project name required' });
   const companyId = req.user.company_id;
@@ -836,7 +866,7 @@ router.post('/projects', requireAdmin, async (req, res) => {
 });
 
 // Remove (soft-delete) a project
-router.delete('/projects/:id', requireAdmin, async (req, res) => {
+router.delete('/projects/:id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const project = await pool.query('SELECT name FROM projects WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
@@ -854,7 +884,7 @@ router.delete('/projects/:id', requireAdmin, async (req, res) => {
 });
 
 // GET /admin/analytics
-router.get('/analytics', requireAdmin, requirePlan('business'), async (req, res) => {
+router.get('/analytics', requireAdmin, requirePermission('view_reports'), requirePlan('business'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const [daily, weekly, projects, workers, summary] = await Promise.all([
@@ -925,7 +955,7 @@ router.get('/analytics', requireAdmin, requirePlan('business'), async (req, res)
 });
 
 // GET /admin/entries/pending — pending time entries for this company (max 200; has_more signals overflow)
-router.get('/entries/pending', requireAdmin, async (req, res) => {
+router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const LIMIT = 200;
   try {
@@ -948,7 +978,7 @@ router.get('/entries/pending', requireAdmin, async (req, res) => {
 });
 
 // POST /admin/entries/approve-all — approve every pending entry for this company
-router.post('/entries/approve-all', requireAdmin, async (req, res) => {
+router.post('/entries/approve-all', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -965,7 +995,7 @@ router.post('/entries/approve-all', requireAdmin, async (req, res) => {
 });
 
 // PATCH /admin/entries/:id/approve
-router.patch('/entries/:id/approve', requireAdmin, async (req, res) => {
+router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const { note } = req.body;
   if (note && note.length > 500) return res.status(400).json({ error: 'Note must be 500 characters or fewer' });
@@ -995,7 +1025,7 @@ router.patch('/entries/:id/approve', requireAdmin, async (req, res) => {
 });
 
 // PATCH /admin/entries/:id/reject
-router.patch('/entries/:id/reject', requireAdmin, async (req, res) => {
+router.patch('/entries/:id/reject', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const { note } = req.body;
   if (note && note.length > 500) return res.status(400).json({ error: 'Note must be 500 characters or fewer' });
@@ -1029,7 +1059,7 @@ router.patch('/entries/:id/reject', requireAdmin, async (req, res) => {
 });
 
 // PATCH /admin/entries/:id/unlock
-router.patch('/entries/:id/unlock', requireAdmin, async (req, res) => {
+router.patch('/entries/:id/unlock', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -1058,7 +1088,7 @@ router.get('/pay-periods', requireAdmin, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/pay-periods', requireAdmin, async (req, res) => {
+router.post('/pay-periods', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const { period_start, period_end, label } = req.body;
   if (!period_start || !period_end) return res.status(400).json({ error: 'period_start and period_end required' });
   if (period_start >= period_end) return res.status(400).json({ error: 'period_end must be after period_start' });
@@ -1077,7 +1107,7 @@ router.post('/pay-periods', requireAdmin, async (req, res) => {
   }
 });
 
-router.delete('/pay-periods/:id', requireAdmin, async (req, res) => {
+router.delete('/pay-periods/:id', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -1091,7 +1121,7 @@ router.delete('/pay-periods/:id', requireAdmin, async (req, res) => {
 });
 
 // CSV Export
-router.get('/export', requireAdmin, requirePlan('starter'), async (req, res) => {
+router.get('/export', requireAdmin, requirePermission('view_reports'), requirePlan('starter'), async (req, res) => {
   const { from, to, worker_id, project_id, status } = req.query;
   if (!from || !to) return res.status(400).json({ error: 'from and to required' });
   const companyId = req.user.company_id;
@@ -1133,7 +1163,7 @@ router.get('/export', requireAdmin, requirePlan('starter'), async (req, res) => 
 });
 
 // Overtime report
-router.get('/overtime-report', requireAdmin, requirePlan('starter'), async (req, res) => {
+router.get('/overtime-report', requireAdmin, requirePermission('view_reports'), requirePlan('starter'), async (req, res) => {
   const { from, to } = req.query;
   if (!from || !to) return res.status(400).json({ error: 'from and to required' });
   const companyId = req.user.company_id;
@@ -1203,7 +1233,7 @@ router.get('/overtime-report', requireAdmin, requirePlan('starter'), async (req,
 });
 
 // Payroll export CSV
-router.get('/payroll-export', requireAdmin, requirePlan('starter'), async (req, res) => {
+router.get('/payroll-export', requireAdmin, requirePermission('view_reports'), requirePlan('starter'), async (req, res) => {
   const { from, to } = req.query;
   if (!from || !to) return res.status(400).json({ error: 'from and to required' });
   const companyId = req.user.company_id;
@@ -1330,7 +1360,7 @@ router.get('/audit-log', requireAdmin, async (req, res) => {
 });
 
 // POST /admin/broadcast — push a message to all active workers
-router.post('/broadcast', requireAdmin, requirePlan('business'), async (req, res) => {
+router.post('/broadcast', requireAdmin, requirePermission('manage_settings'), requirePlan('business'), async (req, res) => {
   const { message } = req.body;
   if (!message?.trim()) return res.status(400).json({ error: 'message required' });
   if (message.length > 200) return res.status(400).json({ error: 'Message must be 200 characters or fewer' });
@@ -1354,7 +1384,7 @@ router.post('/broadcast', requireAdmin, requirePlan('business'), async (req, res
 
 // GET /admin/certified-payroll?week_end=YYYY-MM-DD&project_id=N
 // Returns prevailing-wage hours by worker broken down by day of week for a 7-day window
-router.get('/certified-payroll', requireAdmin, requireProAddon, async (req, res) => {
+router.get('/certified-payroll', requireAdmin, requirePermission('view_reports'), requireProAddon, async (req, res) => {
   const { week_end, project_id } = req.query;
   if (!week_end) return res.status(400).json({ error: 'week_end required' });
   const companyId = req.user.company_id;

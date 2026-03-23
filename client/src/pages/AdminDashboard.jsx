@@ -144,6 +144,9 @@ export default function AdminDashboard() {
     const interval = setInterval(fetchPending, 60000);
     return () => clearInterval(interval);
   }, []);
+  // Permission helper — null admin_permissions means full access
+  const canDo = key => !user?.admin_permissions || user.admin_permissions[key] === true;
+
   const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'manage', 'settings'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
@@ -207,11 +210,11 @@ export default function AdminDashboard() {
           onChange={switchTab}
           tabs={[
             { id: 'live', label: t.tabLive },
-            ...(settings?.feature_analytics !== false ? [{ id: 'analytics', label: t.tabAnalytics }] : []),
-            { id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null },
-            { id: 'reports', label: t.tabReports },
+            ...(settings?.feature_analytics !== false && canDo('view_reports') ? [{ id: 'analytics', label: t.tabAnalytics }] : []),
+            ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
+            ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
             { id: 'manage', label: t.tabManage },
-            { id: 'settings', label: t.tabSettings },
+            ...(canDo('manage_settings') ? [{ id: 'settings', label: t.tabSettings }] : []),
           ]}
         />
 
@@ -266,7 +269,7 @@ export default function AdminDashboard() {
         ) : tab === 'manage' ? (
           <>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
-            <ManagePayPeriods />
+            {canDo('approve_entries') && <ManagePayPeriods />}
           </>
         ) : (
           <>
