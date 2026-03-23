@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api';
 
 const CURRENCIES = [
@@ -32,6 +32,23 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!settings) return;
+    setForm({
+      prevailing_wage_rate: String(settings.prevailing_wage_rate ?? 45),
+      default_hourly_rate: String(settings.default_hourly_rate ?? 30),
+      overtime_multiplier: String(settings.overtime_multiplier ?? 1.5),
+      overtime_rule: settings.overtime_rule ?? 'daily',
+      overtime_threshold: String(settings.overtime_threshold ?? 8),
+      notification_inactive_days: String(settings.notification_inactive_days ?? 3),
+      notification_start_hour: String(settings.notification_start_hour ?? 6),
+      notification_end_hour: String(settings.notification_end_hour ?? 20),
+      chat_retention_days: String(settings.chat_retention_days ?? 3),
+      show_worker_wages: settings.show_worker_wages ?? false,
+      currency: settings.currency ?? 'USD',
+    });
+  }, [settings]);
 
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); setError(''); };
 
