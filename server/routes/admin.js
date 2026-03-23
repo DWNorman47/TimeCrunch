@@ -246,6 +246,8 @@ router.get('/workers', requireAdmin, async (req, res) => {
   const allRoles = req.query.all_roles === 'true';
   const roleFilter = allRoles ? `u.role IN ('worker', 'admin')` : `u.role = 'worker'`;
   try {
+    const settings = await getSettings(companyId);
+    const threshold = parseFloat(settings.overtime_threshold) || 8;
     const result = await pool.query(
       `WITH daily_regular AS (
         SELECT user_id, work_date,
@@ -254,19 +256,23 @@ router.get('/workers', requireAdmin, async (req, res) => {
         WHERE wage_type = 'regular' AND company_id = $1
         GROUP BY user_id, work_date
       )
-      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.email,
+      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
-        COALESCE((SELECT SUM(LEAST(day_hours, 8)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as regular_hours,
-        COALESCE((SELECT SUM(GREATEST(day_hours - 8, 0)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as overtime_hours,
+        COALESCE((SELECT SUM(LEAST(day_hours, $2)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as regular_hours,
+        COALESCE((SELECT SUM(
+          CASE WHEN u.overtime_rule = 'none' THEN 0
+               ELSE GREATEST(day_hours - $2, 0)
+          END
+        ) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as overtime_hours,
         COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600 ELSE 0 END), 0) as prevailing_hours
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1
-      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.email
+      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
-      [companyId]
+      [companyId, threshold]
     );
     res.json(result.rows);
   } catch (err) {

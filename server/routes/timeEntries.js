@@ -200,15 +200,17 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
   const userId = req.user.id;
   const companyId = req.user.company_id;
   try {
-    const [periods, settingsRows] = await Promise.all([
+    const [periods, settingsRows, workerRow] = await Promise.all([
       pool.query('SELECT * FROM pay_periods WHERE company_id = $1 ORDER BY period_start DESC', [companyId]),
       pool.query('SELECT key, value FROM settings WHERE company_id = $1', [companyId]),
+      pool.query('SELECT overtime_rule FROM users WHERE id = $1', [userId]),
     ]);
-    const s = { overtime_rule: 'daily', overtime_threshold: 8 };
+    const s = { overtime_threshold: 8 };
     settingsRows.rows.forEach(r => {
-      if (r.key === 'overtime_rule') s.overtime_rule = r.value;
-      else if (r.key === 'overtime_threshold') s.overtime_threshold = parseFloat(r.value);
+      if (r.key === 'overtime_threshold') s.overtime_threshold = parseFloat(r.value);
     });
+    // Use the worker's own overtime_rule, falling back to company setting if not set
+    const workerOTRule = workerRow.rows[0]?.overtime_rule || 'daily';
 
     const result = [];
     if (periods.rows.length > 0) {
@@ -229,7 +231,7 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
         const entries = allEntries.rows.filter(e => e.work_date_str >= ps && e.work_date_str <= pe);
         if (entries.length === 0) continue;
 
-        const { regularHours, overtimeHours } = computeOT(entries, s.overtime_rule, s.overtime_threshold);
+        const { regularHours, overtimeHours } = computeOT(entries, workerOTRule, s.overtime_threshold);
         let prevailingHours = 0, totalMileage = 0;
         for (const e of entries) {
           if (e.wage_type === 'prevailing') {
