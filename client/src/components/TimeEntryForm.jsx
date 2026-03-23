@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useFormPersist } from '../hooks/useFormPersist';
 
 export default function TimeEntryForm({ projects, onEntryAdded, t, prefill }) {
   const today = new Date().toISOString().split('T')[0];
@@ -26,6 +27,8 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill }) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const { clearPersisted } = useFormPersist('time-entry', form, setForm);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -62,6 +65,7 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill }) {
       } else {
         onEntryAdded({ ...r.data, project_name: selectedProject?.name });
       }
+      clearPersisted();
       setForm(f => ({ ...f, start_time: '', end_time: '', notes: '', break_minutes: '', mileage: '' }));
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);

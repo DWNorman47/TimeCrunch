@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useOffline } from '../contexts/OfflineContext';
+import { useFormPersist } from '../hooks/useFormPersist';
 
 function getLocation() {
   return new Promise(resolve => {
@@ -24,8 +25,12 @@ function formatElapsed(seconds) {
 export default function ClockInOut({ projects, onEntryAdded, t }) {
   const { isOffline, queueCount, onSync } = useOffline() || {};
   const [status, setStatus] = useState(null); // null = loading, false = not clocked in, object = clocked in
-  const [selectedProject, setSelectedProject] = useState('');
-  const [notes, setNotes] = useState('');
+  const [clockInForm, setClockInForm] = useState({ selectedProject: '', notes: '' });
+  const { clearPersisted: clearClockInPersisted } = useFormPersist('clock-in', clockInForm, setClockInForm);
+  const selectedProject = clockInForm.selectedProject;
+  const notes = clockInForm.notes;
+  const setSelectedProject = v => setClockInForm(f => ({ ...f, selectedProject: v }));
+  const setNotes = v => setClockInForm(f => ({ ...f, notes: v }));
   const [elapsed, setElapsed] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -81,9 +86,11 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
         // Queued offline — show a pending state
         setStatus({ offline_queued: true, project_name: projects.find(p => p.id == selectedProject)?.name });
         setNotes('');
+        clearClockInPersisted();
       } else {
         setStatus(r.data);
         setNotes('');
+        clearClockInPersisted();
       }
     } catch (err) {
       const data = err.response?.data;
@@ -100,6 +107,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
       await api.delete('/clock/cancel');
       setStatus(false);
       setSelectedProject('');
+      clearClockInPersisted();
       setBreakAdded(false);
       setMileageAdded(false);
       setBreakMinutes('');
