@@ -115,13 +115,14 @@ router.get('/me', requireAuth, async (req, res) => {
   try {
     const [companyRes, userRes] = await Promise.all([
       pool.query('SELECT plan, subscription_status, addon_qbo, trial_ends_at FROM companies WHERE id = $1', [req.user.company_id]),
-      pool.query('SELECT mfa_enabled FROM users WHERE id = $1', [req.user.id]),
+      pool.query('SELECT mfa_enabled, language FROM users WHERE id = $1', [req.user.id]),
     ]);
     const company = companyRes.rows[0] || {};
     const userRow = userRes.rows[0] || {};
     res.json({
       user: {
         ...req.user,
+        language: userRow.language || req.user.language,
         plan: company.plan || 'free',
         subscription_status: company.subscription_status,
         addon_qbo: company.addon_qbo || false,
