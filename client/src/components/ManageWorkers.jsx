@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
+import { formatCurrency } from '../utils';
 
 const LANGUAGES = ['English', 'Spanish'];
 const RATE_TYPES = [
@@ -8,10 +9,10 @@ const RATE_TYPES = [
   { value: 'daily', label: 'Per day (8-hr day, OT above 8)' },
 ];
 
-function fmtRate(w) {
-  const amt = parseFloat(w.hourly_rate ?? 0).toFixed(2);
-  if (w.rate_type === 'daily') return `$${amt} / day`;
-  return `$${amt} / hr`;
+function fmtRate(w, currency = 'USD') {
+  const amt = parseFloat(w.hourly_rate ?? 0);
+  if (w.rate_type === 'daily') return `${formatCurrency(amt, currency)} / day`;
+  return `${formatCurrency(amt, currency)} / hr`;
 }
 
 function RoleBadge({ role }) {
@@ -23,7 +24,7 @@ function RoleBadge({ role }) {
   );
 }
 
-export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, showRate = true, identityEditable = true }) {
+export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, showRate = true, identityEditable = true, currency = 'USD' }) {
   const toast = useToast();
 
   // Add form state
@@ -496,7 +497,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                             </div>
                           </div>
                         ) : (
-                          <span style={s.infoValue}>{fmtRate(w)}</span>
+                          <span style={s.infoValue}>{fmtRate(w, currency)}</span>
                         )}
                       </div>
                     )}

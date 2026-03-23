@@ -273,6 +273,7 @@ export default function AdministrationPage() {
               defaultRate={settings?.default_hourly_rate ?? 0}
               showRate={true}
               identityEditable={true}
+              currency={settings?.currency ?? 'USD'}
             />
             <h3 style={styles.sectionTitle}>Audit Log</h3>
             <AuditLog />

@@ -113,7 +113,7 @@ export default function OvertimeReport({ currency = 'USD' }) {
               {sorted.map(r => (
                 <tr key={r.worker_id} style={r.overtime_hours > 0 ? styles.rowOT : {}}>
                   <td style={styles.td}><strong>{r.worker_name}</strong></td>
-                  <td style={styles.tdNum}>${r.rate.toFixed(2)}</td>
+                  <td style={styles.tdNum}>{money(r.rate)}</td>
                   <td style={styles.tdNum}>{fmt(r.regular_hours)}</td>
                   <td style={{ ...styles.tdNum, color: r.overtime_hours > 0 ? '#d97706' : undefined, fontWeight: r.overtime_hours > 0 ? 700 : undefined }}>
                     {fmt(r.overtime_hours)}

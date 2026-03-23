@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { currencySymbol } from '../utils';
 
 const CURRENCIES = [
   { code: 'USD', name: 'USD — US Dollar' },
@@ -103,7 +104,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <div style={styles.row}>
             <label style={styles.label}>Prevailing wage rate</label>
             <div style={styles.inputGroup}>
-              <span style={styles.prefix}>$</span>
+              <span style={styles.prefix}>{currencySymbol(form.currency)}</span>
               <input style={styles.input} type="number" min="0" step="0.01" value={form.prevailing_wage_rate} onChange={e => set('prevailing_wage_rate', e.target.value)} required />
               <span style={styles.suffix}>/hr</span>
             </div>
@@ -111,7 +112,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <div style={styles.row}>
             <label style={styles.label}>Default employee wage</label>
             <div style={styles.inputGroup}>
-              <span style={styles.prefix}>$</span>
+              <span style={styles.prefix}>{currencySymbol(form.currency)}</span>
               <input style={styles.input} type="number" min="0" step="0.01" value={form.default_hourly_rate} onChange={e => set('default_hourly_rate', e.target.value)} required />
               <span style={styles.suffix}>/hr</span>
             </div>
