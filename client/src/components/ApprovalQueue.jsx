@@ -4,6 +4,42 @@ import MessageThread from './MessageThread';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import { fmtHours } from '../utils';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet default marker icons broken by Vite bundling
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+const clockInIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41],
+});
+
+const clockOutIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41],
+});
+
+// Fits the map bounds to show all markers when the map opens
+function FitBounds({ positions }) {
+  const map = useMap();
+  useEffect(() => {
+    if (positions.length === 1) {
+      map.setView(positions[0], 15);
+    } else if (positions.length > 1) {
+      map.fitBounds(positions, { padding: [40, 40] });
+    }
+  }, [map, positions]);
+  return null;
+}
 
 function formatDate(dateStr) {
   const d = new Date(dateStr.substring(0, 10) + 'T00:00:00');
@@ -32,6 +68,7 @@ export default function ApprovalQueue() {
   const [working, setWorking] = useState(null);
   const [approvingAll, setApprovingAll] = useState(false);
   const [openMessageId, setOpenMessageId] = useState(null);
+  const [openMapId, setOpenMapId] = useState(null);
   const [fetchError, setFetchError] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [workerFilter, setWorkerFilter] = useState('');
@@ -148,20 +185,50 @@ export default function ApprovalQueue() {
                 {e.notes && <div style={styles.notes}>{e.notes}</div>}
                 {(e.clock_in_lat || e.clock_out_lat) && (
                   <div style={styles.locationRow}>
-                    {e.clock_in_lat && (
-                      <a
-                        href={`https://www.google.com/maps?q=${e.clock_in_lat},${e.clock_in_lng}`}
-                        target="_blank" rel="noopener noreferrer"
-                        style={styles.locationLink}
-                      >{t.clockInLocation}</a>
-                    )}
-                    {e.clock_out_lat && (
-                      <a
-                        href={`https://www.google.com/maps?q=${e.clock_out_lat},${e.clock_out_lng}`}
-                        target="_blank" rel="noopener noreferrer"
-                        style={styles.locationLink}
-                      >{t.clockOutLocation}</a>
-                    )}
+                    <button
+                      style={styles.locationBtn}
+                      onClick={() => setOpenMapId(openMapId === e.id ? null : e.id)}
+                    >
+                      📍 {openMapId === e.id ? 'Hide Map' : 'View Location'}
+                    </button>
+                    {openMapId === e.id && (() => {
+                      const positions = [
+                        e.clock_in_lat  ? [parseFloat(e.clock_in_lat),  parseFloat(e.clock_in_lng)]  : null,
+                        e.clock_out_lat ? [parseFloat(e.clock_out_lat), parseFloat(e.clock_out_lng)] : null,
+                      ].filter(Boolean);
+                      return (
+                        <div style={styles.mapWrap}>
+                          <MapContainer
+                            center={positions[0]}
+                            zoom={14}
+                            style={styles.map}
+                            scrollWheelZoom={false}
+                          >
+                            <TileLayer
+                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                            />
+                            <FitBounds positions={positions} />
+                            {e.clock_in_lat && (
+                              <Marker
+                                position={[parseFloat(e.clock_in_lat), parseFloat(e.clock_in_lng)]}
+                                icon={clockInIcon}
+                              >
+                                <Popup>🟢 Clock In<br />{e.worker_name}</Popup>
+                              </Marker>
+                            )}
+                            {e.clock_out_lat && (
+                              <Marker
+                                position={[parseFloat(e.clock_out_lat), parseFloat(e.clock_out_lng)]}
+                                icon={clockOutIcon}
+                              >
+                                <Popup>🔴 Clock Out<br />{e.worker_name}</Popup>
+                              </Marker>
+                            )}
+                          </MapContainer>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
                 <button
@@ -235,6 +302,8 @@ const styles = {
   approveAllBtn: { background: '#059669', color: '#fff', border: 'none', padding: '5px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', marginLeft: 'auto' },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 6 },
   signedTag: { display: 'inline-block', marginTop: 4, background: '#ede9fe', color: '#5b21b6', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
-  locationRow: { display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap' },
-  locationLink: { fontSize: 11, color: '#2563eb', textDecoration: 'none', fontWeight: 600 },
+  locationRow: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 },
+  locationBtn: { background: 'none', border: '1px solid #bfdbfe', color: '#1a56db', padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer', alignSelf: 'flex-start' },
+  mapWrap: { borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' },
+  map: { height: 280, width: '100%' },
 };
