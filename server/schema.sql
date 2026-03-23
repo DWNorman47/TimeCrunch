@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS users (
   invite_pending              BOOLEAN      NOT NULL DEFAULT false,
   hourly_rate                 DECIMAL(10,2),
   rate_type                   VARCHAR(20)  NOT NULL DEFAULT 'hourly',
+  overtime_rule               VARCHAR(10)  NOT NULL DEFAULT 'daily', -- 'daily' | 'weekly' | 'none'
   language                    VARCHAR(20)  NOT NULL DEFAULT 'English',
   active                      BOOLEAN      NOT NULL DEFAULT true,
   created_at                  TIMESTAMP    NOT NULL DEFAULT NOW()
@@ -381,4 +382,6 @@ ALTER TABLE companies ALTER COLUMN qbo_realm_id TYPE TEXT;
 -- First-login welcome tracking
 ALTER TABLE users ADD COLUMN IF NOT EXISTS welcomed_at TIMESTAMP;
 -- plan values: free | starter | business  (trial companies default to full access until plan is set)
+-- Per-worker overtime rule: daily | weekly | none
+ALTER TABLE users ADD COLUMN IF NOT EXISTS overtime_rule VARCHAR(10) NOT NULL DEFAULT 'daily';
 

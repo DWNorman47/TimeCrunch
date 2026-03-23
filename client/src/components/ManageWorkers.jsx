@@ -29,11 +29,16 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     { value: 'hourly', label: t.perHour },
     { value: 'daily', label: t.perDay },
   ];
+  const overtimeRules = [
+    { value: 'daily', label: t.otDaily },
+    { value: 'weekly', label: t.otWeekly },
+    { value: 'none', label: t.otNone },
+  ];
 
   // Add form state
   const [showForm, setShowForm] = useState(false);
   const [addMode, setAddMode] = useState('manual');
-  const [form, setForm] = useState({ first_name: '', last_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly' });
+  const [form, setForm] = useState({ first_name: '', last_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
   const [inviteForm, setInviteForm] = useState({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
   const [error, setError] = useState('');
   const [inviteError, setInviteError] = useState('');
@@ -59,7 +64,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const [editUsernameChecking, setEditUsernameChecking] = useState(false);
   const [editUsernameSaving, setEditUsernameSaving] = useState(false);
 
-  const [editRateForm, setEditRateForm] = useState({ rate: '', rate_type: 'hourly' });
+  const [editRateForm, setEditRateForm] = useState({ rate: '', rate_type: 'hourly', overtime_rule: 'daily' });
   const [editRateSaving, setEditRateSaving] = useState(false);
 
   // History
@@ -105,7 +110,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const full_name = [form.first_name, form.last_name].filter(Boolean).join(' ');
       const r = await api.post('/admin/workers', { ...form, full_name });
       onWorkerAdded(r.data);
-      setForm({ first_name: '', last_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly' });
+      setForm({ first_name: '', last_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
       setUsernameEdited(false); setUsernameTaken(false); setShowForm(false);
     } catch (err) {
       const data = err.response?.data;
@@ -159,7 +164,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
   const startEditRate = w => {
     setEditingId(w.id); setEditSection('rate');
-    setEditRateForm({ rate: String(w.hourly_rate ?? 0), rate_type: w.rate_type || 'hourly' });
+    setEditRateForm({ rate: String(w.hourly_rate ?? 0), rate_type: w.rate_type || 'hourly', overtime_rule: w.overtime_rule || 'daily' });
   };
 
   const checkEditUsername = async (username, workerId) => {
@@ -195,7 +200,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const saveRate = async id => {
     setEditRateSaving(true);
     try {
-      const r = await api.patch(`/admin/workers/${id}`, { hourly_rate: editRateForm.rate, rate_type: editRateForm.rate_type });
+      const r = await api.patch(`/admin/workers/${id}`, { hourly_rate: editRateForm.rate, rate_type: editRateForm.rate_type, overtime_rule: editRateForm.overtime_rule });
       onWorkerUpdated(r.data);
       cancelEdit();
     } catch (err) { toast(err.response?.data?.error || 'Failed to update', 'error'); }
@@ -301,6 +306,12 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                       <label style={s.label}>{t.rateType}</label>
                       <select style={s.input} value={form.rate_type} onChange={e => set('rate_type', e.target.value)}>
                         {rateTypes.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                    </div>
+                    <div style={s.fieldGroup}>
+                      <label style={s.label}>{t.overtimeRule}</label>
+                      <select style={s.input} value={form.overtime_rule} onChange={e => set('overtime_rule', e.target.value)}>
+                        {overtimeRules.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                     </div>
                   </>
@@ -493,6 +504,12 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                   {rateTypes.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                                 </select>
                               </div>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>{t.overtimeRule}</label>
+                                <select style={s.input} value={editRateForm.overtime_rule} onChange={e => setEditRateForm(f => ({ ...f, overtime_rule: e.target.value }))}>
+                                  {overtimeRules.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                                </select>
+                              </div>
                             </div>
                             <div style={s.editActions}>
                               <button style={s.saveBtn} onClick={() => saveRate(w.id)} disabled={editRateSaving}>{editRateSaving ? t.loading : t.save}</button>
@@ -500,7 +517,12 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                             </div>
                           </div>
                         ) : (
-                          <span style={s.infoValue}>{fmtRate(w, currency)}</span>
+                          <div>
+                            <span style={s.infoValue}>{fmtRate(w, currency)}</span>
+                            <span style={{ ...s.infoValue, marginLeft: 10, fontSize: 12, color: '#9ca3af' }}>
+                              {overtimeRules.find(r => r.value === (w.overtime_rule || 'daily'))?.label}
+                            </span>
+                          </div>
                         )}
                       </div>
                     )}

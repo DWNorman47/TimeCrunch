@@ -378,7 +378,11 @@ const translations = {
     removeUser: 'Remove user',
     notSet: 'not set',
     perHour: 'Per hour',
-    perDay: 'Per day (8-hr day, OT above 8)',
+    perDay: 'Per day',
+    overtimeRule: 'Overtime',
+    otNone: 'No overtime',
+    otDaily: 'Daily overtime',
+    otWeekly: 'Weekly overtime',
   },
 
   Spanish: {
@@ -760,7 +764,11 @@ const translations = {
     removeUser: 'Eliminar usuario',
     notSet: 'no establecido',
     perHour: 'Por hora',
-    perDay: 'Por día (día de 8 hrs, HE arriba de 8)',
+    perDay: 'Por día',
+    overtimeRule: 'Horas extra',
+    otNone: 'Sin horas extra',
+    otDaily: 'Horas extra diarias',
+    otWeekly: 'Horas extra semanales',
   },
 };
 
