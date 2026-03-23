@@ -12,6 +12,7 @@ import PayStubView from '../components/PayStubView';
 import NotificationSetup from '../components/NotificationSetup';
 import TimesheetSignOff from '../components/TimesheetSignOff';
 import CompanyChat from '../components/CompanyChat';
+import DayTimeline from '../components/DayTimeline';
 import AppSwitcher from '../components/AppSwitcher';
 import NotificationBell from '../components/NotificationBell';
 import { getT } from '../i18n';
@@ -134,11 +135,22 @@ export default function Dashboard() {
         <div style={styles.tabs} className="tab-bar">
           <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => setTab('clock')}>🕐 Clock</button>
           <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => setTab('messages')}>💬 Messages</button>
+          <button style={tab === 'timeline' ? styles.tabActive : styles.tab} onClick={() => setTab('timeline')}>📅 Timeline</button>
           <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => setTab('timesheet')}>📋 Timesheet</button>
           <button style={tab === 'account' ? styles.tabActive : styles.tab} onClick={() => setTab('account')}>👤 Account</button>
         </div>
 
         {tab === 'messages' && <CompanyChat />}
+
+        {tab === 'timeline' && (
+          <DayTimeline
+            entries={entries}
+            projects={projects}
+            onEntryAdded={entry => setEntries(prev => [entry, ...prev])}
+            onEntryUpdated={handleEntryUpdated}
+            onRefresh={refreshEntries}
+          />
+        )}
 
         {tab === 'clock' && (
           <>
