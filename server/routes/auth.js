@@ -84,9 +84,14 @@ router.post('/login', loginLimiter, async (req, res) => {
     await pool.query('UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1', [user.id]);
 
     // Track first login for welcome modal
-    const isFirstLogin = !user.welcomed_at;
-    if (isFirstLogin) {
-      await pool.query('UPDATE users SET welcomed_at = NOW() WHERE id = $1', [user.id]);
+    let isFirstLogin = false;
+    try {
+      isFirstLogin = !user.welcomed_at;
+      if (isFirstLogin) {
+        await pool.query('UPDATE users SET welcomed_at = NOW() WHERE id = $1', [user.id]);
+      }
+    } catch {
+      // welcomed_at column may not exist yet — login proceeds normally
     }
 
     if (!user.email_confirmed) {
