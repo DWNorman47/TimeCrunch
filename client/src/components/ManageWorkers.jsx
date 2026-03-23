@@ -3,6 +3,16 @@ import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 
 const LANGUAGES = ['English', 'Spanish'];
+const RATE_TYPES = [
+  { value: 'hourly', label: 'Per hour' },
+  { value: 'daily', label: 'Per day (8-hr day, OT above 8)' },
+];
+
+function fmtRate(w) {
+  const amt = parseFloat(w.hourly_rate ?? 0).toFixed(2);
+  if (w.rate_type === 'daily') return `$${amt} / day`;
+  return `$${amt} / hr`;
+}
 
 function RoleBadge({ role }) {
   const isAdmin = role === 'admin' || role === 'super_admin';
@@ -15,34 +25,48 @@ function RoleBadge({ role }) {
 
 export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, showRate = true, identityEditable = true }) {
   const toast = useToast();
+
+  // Add form state
   const [showForm, setShowForm] = useState(false);
   const [addMode, setAddMode] = useState('manual');
-  const [form, setForm] = useState({ first_name: '', last_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+  const [form, setForm] = useState({ first_name: '', last_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly' });
   const [inviteForm, setInviteForm] = useState({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
   const [error, setError] = useState('');
   const [inviteError, setInviteError] = useState('');
   const [inviteSent, setInviteSent] = useState('');
   const [saving, setSaving] = useState(false);
+  const [inviteSaving, setInviteSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [usernameEdited, setUsernameEdited] = useState(false);
   const [usernameTaken, setUsernameTaken] = useState(false);
   const [usernameChecking, setUsernameChecking] = useState(false);
-  const [inviteSaving, setInviteSaving] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [editUsernameTaken, setEditUsernameTaken] = useState(false);
-  const [editUsernameChecking, setEditUsernameChecking] = useState(false);
   const [archivedConflict, setArchivedConflict] = useState(null);
+
+  // Expand / edit state
   const [expandedId, setExpandedId] = useState(null);
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({});
-  const [editSaving, setEditSaving] = useState(false);
+  const [editSection, setEditSection] = useState(null); // 'info' | 'username' | 'rate'
+
+  const [editInfoForm, setEditInfoForm] = useState({});
+  const [editInfoSaving, setEditInfoSaving] = useState(false);
+
+  const [editUsernameVal, setEditUsernameVal] = useState('');
+  const [editUsernameTaken, setEditUsernameTaken] = useState(false);
+  const [editUsernameChecking, setEditUsernameChecking] = useState(false);
+  const [editUsernameSaving, setEditUsernameSaving] = useState(false);
+
+  const [editRateForm, setEditRateForm] = useState({ rate: '', rate_type: 'hourly' });
+  const [editRateSaving, setEditRateSaving] = useState(false);
+
+  // History
   const [archived, setArchived] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loadingArchived, setLoadingArchived] = useState(false);
   const [archivedFetched, setArchivedFetched] = useState(false);
 
+  // ── Add form helpers ────────────────────────────────────────────────────────
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const setInvite = (k, v) => setInviteForm(f => ({ ...f, [k]: v }));
-  const setEdit = (k, v) => setEditForm(f => ({ ...f, [k]: v }));
 
   const updateAutoUsername = (first, last) => {
     if (usernameEdited) return;
@@ -52,11 +76,11 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   };
 
   const handleFirstNameChange = v => {
-    setForm(f => { const next = { ...f, first_name: v }; return next; });
+    setForm(f => ({ ...f, first_name: v }));
     updateAutoUsername(v, form.last_name);
   };
   const handleLastNameChange = v => {
-    setForm(f => { const next = { ...f, last_name: v }; return next; });
+    setForm(f => ({ ...f, last_name: v }));
     updateAutoUsername(form.first_name, v);
   };
 
@@ -70,18 +94,6 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     finally { setUsernameChecking(false); }
   };
 
-  const loadArchived = async () => {
-    if (archivedFetched) return;
-    setLoadingArchived(true);
-    try {
-      const r = await api.get('/admin/workers/archived');
-      setArchived(r.data);
-      setArchivedFetched(true);
-    } finally {
-      setLoadingArchived(false);
-    }
-  };
-
   const handleAdd = async e => {
     e.preventDefault();
     setError(''); setArchivedConflict(null); setSaving(true);
@@ -89,10 +101,8 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const full_name = [form.first_name, form.last_name].filter(Boolean).join(' ');
       const r = await api.post('/admin/workers', { ...form, full_name });
       onWorkerAdded(r.data);
-      setForm({ first_name: '', last_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
-      setUsernameEdited(false);
-      setUsernameTaken(false);
-      setShowForm(false);
+      setForm({ first_name: '', last_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly' });
+      setUsernameEdited(false); setUsernameTaken(false); setShowForm(false);
     } catch (err) {
       const data = err.response?.data;
       if (data?.archived_id) { setArchivedConflict({ id: data.archived_id, name: data.archived_name }); setError(data.error); }
@@ -125,6 +135,79 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     setArchivedConflict(null); setError(''); setShowForm(false);
   };
 
+  // ── Expand / panel edit helpers ─────────────────────────────────────────────
+  const cancelEdit = () => { setEditingId(null); setEditSection(null); setEditUsernameTaken(false); };
+
+  const toggleExpand = id => {
+    if (expandedId === id) { setExpandedId(null); cancelEdit(); }
+    else { setExpandedId(id); cancelEdit(); }
+  };
+
+  const startEditInfo = w => {
+    setEditingId(w.id); setEditSection('info');
+    setEditInfoForm({ full_name: w.full_name, email: w.email || '', role: w.role, language: w.language || 'English' });
+  };
+
+  const startEditUsername = w => {
+    setEditingId(w.id); setEditSection('username');
+    setEditUsernameVal(w.username); setEditUsernameTaken(false);
+  };
+
+  const startEditRate = w => {
+    setEditingId(w.id); setEditSection('rate');
+    setEditRateForm({ rate: String(w.hourly_rate ?? 0), rate_type: w.rate_type || 'hourly' });
+  };
+
+  const checkEditUsername = async (username, workerId) => {
+    if (!username) return;
+    setEditUsernameChecking(true);
+    try {
+      const r = await api.get('/admin/workers/check-username', { params: { username, exclude_id: workerId } });
+      setEditUsernameTaken(r.data.taken);
+    } catch {}
+    finally { setEditUsernameChecking(false); }
+  };
+
+  const saveInfo = async id => {
+    setEditInfoSaving(true);
+    try {
+      const r = await api.patch(`/admin/workers/${id}`, editInfoForm);
+      onWorkerUpdated(r.data);
+      cancelEdit();
+    } catch (err) { toast(err.response?.data?.error || 'Failed to update', 'error'); }
+    finally { setEditInfoSaving(false); }
+  };
+
+  const saveUsername = async id => {
+    setEditUsernameSaving(true);
+    try {
+      const r = await api.patch(`/admin/workers/${id}`, { username: editUsernameVal });
+      onWorkerUpdated(r.data);
+      cancelEdit();
+    } catch (err) { toast(err.response?.data?.error || 'Username already taken', 'error'); }
+    finally { setEditUsernameSaving(false); }
+  };
+
+  const saveRate = async id => {
+    setEditRateSaving(true);
+    try {
+      const r = await api.patch(`/admin/workers/${id}`, { hourly_rate: editRateForm.rate, rate_type: editRateForm.rate_type });
+      onWorkerUpdated(r.data);
+      cancelEdit();
+    } catch (err) { toast(err.response?.data?.error || 'Failed to update', 'error'); }
+    finally { setEditRateSaving(false); }
+  };
+
+  // ── Archive helpers ──────────────────────────────────────────────────────────
+  const loadArchived = async () => {
+    if (archivedFetched) return;
+    setLoadingArchived(true);
+    try {
+      const r = await api.get('/admin/workers/archived');
+      setArchived(r.data); setArchivedFetched(true);
+    } finally { setLoadingArchived(false); }
+  };
+
   const handleRemove = async (id, name) => {
     if (!confirm(`Remove "${name}"? Their time entries will be kept. You can restore them from History.`)) return;
     try {
@@ -141,44 +224,6 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       onWorkerRestored({ ...r.data, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 });
       setArchived(prev => prev.filter(w => w.id !== id));
     } catch { toast('Failed to restore user', 'error'); }
-  };
-
-  const checkEditUsername = async (username, workerId) => {
-    if (!username) return;
-    setEditUsernameChecking(true);
-    try {
-      const r = await api.get('/admin/workers/check-username', { params: { username, exclude_id: workerId } });
-      setEditUsernameTaken(r.data.taken);
-    } catch {}
-    finally { setEditUsernameChecking(false); }
-  };
-
-  const startEdit = w => {
-    setEditingId(w.id);
-    setEditUsernameTaken(false);
-    setEditForm({ full_name: w.full_name, username: w.username, role: w.role, language: w.language || 'English', hourly_rate: String(w.hourly_rate ?? 0), email: w.email || '' });
-  };
-
-  const cancelEdit = () => { setEditingId(null); setEditForm({}); setEditUsernameTaken(false); };
-
-  const handleSaveEdit = async id => {
-    setEditSaving(true);
-    try {
-      const patch = identityEditable && showRate ? editForm
-        : identityEditable ? { full_name: editForm.full_name, username: editForm.username, role: editForm.role, language: editForm.language, email: editForm.email }
-        : { hourly_rate: editForm.hourly_rate };
-      const r = await api.patch(`/admin/workers/${id}`, patch);
-      onWorkerUpdated(r.data);
-      cancelEdit();
-    } catch (err) {
-      toast(err.response?.data?.error || 'Failed to update user', 'error');
-    }
-    finally { setEditSaving(false); }
-  };
-
-  const toggleExpand = id => {
-    if (expandedId === id) { setExpandedId(null); if (editingId === id) cancelEdit(); }
-    else { setExpandedId(id); setEditingId(null); }
   };
 
   return (
@@ -243,10 +288,18 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   </select>
                 </div>
                 {showRate && (
-                  <div style={s.fieldGroup}>
-                    <label style={s.label}>Pay rate ($/hr)</label>
-                    <input style={s.input} type="number" min="0" step="0.01" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />
-                  </div>
+                  <>
+                    <div style={s.fieldGroup}>
+                      <label style={s.label}>Pay rate</label>
+                      <input style={s.input} type="number" min="0" step="0.01" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />
+                    </div>
+                    <div style={s.fieldGroup}>
+                      <label style={s.label}>Rate type</label>
+                      <select style={s.input} value={form.rate_type} onChange={e => set('rate_type', e.target.value)}>
+                        {RATE_TYPES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                    </div>
+                  </>
                 )}
               </div>
               {error && (
@@ -326,81 +379,134 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   <span style={{ ...s.chevron, transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▾</span>
                 </button>
 
-                {isExpanded && !isEditing && (
+                {isExpanded && (
                   <div style={s.panel}>
-                    <div style={s.panelGrid}>
-                      {identityEditable && (
-                        <>
-                          <span style={s.panelLabel}>Email</span>
-                          <span style={s.panelValue}>{w.email || <em style={{ color: '#9ca3af' }}>not set</em>}</span>
-                          <span style={s.panelLabel}>Language</span>
-                          <span style={s.panelValue}>{w.language || 'English'}</span>
-                        </>
-                      )}
-                      {showRate && (
-                        <>
-                          <span style={s.panelLabel}>Pay rate</span>
-                          <span style={s.panelValue}>${parseFloat(w.hourly_rate ?? 0).toFixed(2)}/hr</span>
-                        </>
-                      )}
-                    </div>
-                    <div style={s.panelActions}>
-                      <button style={s.editBtn} onClick={() => startEdit(w)}>Edit</button>
-                      {identityEditable && (
-                        <button style={s.removeBtn} onClick={() => handleRemove(w.id, w.full_name)}>Remove</button>
-                      )}
-                    </div>
-                  </div>
-                )}
 
-                {isExpanded && isEditing && (
-                  <div style={s.panel}>
-                    <div style={s.formGrid}>
-                      {identityEditable && (
-                        <>
-                          <div style={s.fieldGroup}>
-                            <label style={s.label}>Full name</label>
-                            <input style={s.input} value={editForm.full_name} onChange={e => setEdit('full_name', e.target.value)} />
-                          </div>
-                          <div style={s.fieldGroup}>
-                            <label style={s.label}>Username{editUsernameChecking ? ' (checking...)' : editUsernameTaken ? ' ⚠ taken' : ''}</label>
-                            <input
-                              style={{ ...s.input, borderColor: editUsernameTaken ? '#fca5a5' : undefined }}
-                              value={editForm.username || ''}
-                              onChange={e => { setEdit('username', e.target.value); setEditUsernameTaken(false); }}
-                              onBlur={e => checkEditUsername(e.target.value, w.id)}
-                            />
-                          </div>
-                          <div style={s.fieldGroup}>
-                            <label style={s.label}>Email</label>
-                            <input style={s.input} type="email" value={editForm.email} onChange={e => setEdit('email', e.target.value)} />
-                          </div>
-                          <div style={s.fieldGroup}>
-                            <label style={s.label}>Role</label>
-                            <select style={s.input} value={editForm.role} onChange={e => setEdit('role', e.target.value)}>
-                              <option value="worker">Worker</option>
-                              <option value="admin">Admin</option>
-                            </select>
-                          </div>
-                          <div style={s.fieldGroup}>
-                            <label style={s.label}>Language</label>
-                            <select style={s.input} value={editForm.language} onChange={e => setEdit('language', e.target.value)}>
-                              {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
-                            </select>
-                          </div>
-                        </>
-                      )}
-                      {showRate && (
-                        <div style={s.fieldGroup}>
-                          <label style={s.label}>Pay rate ($/hr)</label>
-                          <input style={s.input} type="number" min="0" step="0.01" value={editForm.hourly_rate} onChange={e => setEdit('hourly_rate', e.target.value)} />
+                    {/* ── Profile section ── */}
+                    {identityEditable && (
+                      <div style={s.section}>
+                        <div style={s.sectionHeader}>
+                          <span style={s.sectionTitle}>Profile</span>
+                          {(!isEditing || editSection !== 'info') && (
+                            <button style={s.sectionBtn} onClick={() => isEditing && editSection === 'info' ? cancelEdit() : startEditInfo(w)}>Edit</button>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div style={s.panelActions}>
-                      <button style={s.saveBtn} onClick={() => handleSaveEdit(w.id)} disabled={editSaving || editUsernameTaken}>{editSaving ? 'Saving...' : 'Save'}</button>
-                      <button style={s.cancelBtn} onClick={cancelEdit}>Cancel</button>
-                    </div>
+                        {isEditing && editSection === 'info' ? (
+                          <div style={s.editBlock}>
+                            <div style={s.formGrid}>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>Full name</label>
+                                <input style={s.input} value={editInfoForm.full_name} onChange={e => setEditInfoForm(f => ({ ...f, full_name: e.target.value }))} />
+                              </div>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>Email</label>
+                                <input style={s.input} type="email" value={editInfoForm.email} onChange={e => setEditInfoForm(f => ({ ...f, email: e.target.value }))} />
+                              </div>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>Role</label>
+                                <select style={s.input} value={editInfoForm.role} onChange={e => setEditInfoForm(f => ({ ...f, role: e.target.value }))}>
+                                  <option value="worker">Worker</option>
+                                  <option value="admin">Admin</option>
+                                </select>
+                              </div>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>Language</label>
+                                <select style={s.input} value={editInfoForm.language} onChange={e => setEditInfoForm(f => ({ ...f, language: e.target.value }))}>
+                                  {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                                </select>
+                              </div>
+                            </div>
+                            <div style={s.editActions}>
+                              <button style={s.saveBtn} onClick={() => saveInfo(w.id)} disabled={editInfoSaving}>{editInfoSaving ? 'Saving...' : 'Save'}</button>
+                              <button style={s.cancelBtn} onClick={cancelEdit}>Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={s.infoGrid}>
+                            <span style={s.infoLabel}>Name</span>
+                            <span style={s.infoValue}>{w.full_name}</span>
+                            <span style={s.infoLabel}>Email</span>
+                            <span style={s.infoValue}>{w.email || <em style={{ color: '#9ca3af' }}>not set</em>}</span>
+                            <span style={s.infoLabel}>Language</span>
+                            <span style={s.infoValue}>{w.language || 'English'}</span>
+                            <span style={s.infoLabel}>Role</span>
+                            <span style={s.infoValue}><RoleBadge role={w.role} /></span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── Username section ── */}
+                    {identityEditable && (
+                      <div style={s.section}>
+                        <div style={s.sectionHeader}>
+                          <span style={s.sectionTitle}>Username</span>
+                          {(!isEditing || editSection !== 'username') && (
+                            <button style={s.sectionBtn} onClick={() => isEditing && editSection === 'username' ? cancelEdit() : startEditUsername(w)}>Change</button>
+                          )}
+                        </div>
+                        {isEditing && editSection === 'username' ? (
+                          <div style={s.editBlock}>
+                            <div style={s.fieldGroup}>
+                              <label style={s.label}>New username{editUsernameChecking ? ' (checking...)' : editUsernameTaken ? ' ⚠ taken' : ''}</label>
+                              <input
+                                style={{ ...s.input, borderColor: editUsernameTaken ? '#fca5a5' : undefined, maxWidth: 240 }}
+                                value={editUsernameVal}
+                                onChange={e => { setEditUsernameVal(e.target.value); setEditUsernameTaken(false); }}
+                                onBlur={e => checkEditUsername(e.target.value, w.id)}
+                              />
+                            </div>
+                            <div style={s.editActions}>
+                              <button style={s.saveBtn} onClick={() => saveUsername(w.id)} disabled={editUsernameSaving || editUsernameTaken}>{editUsernameSaving ? 'Saving...' : 'Save'}</button>
+                              <button style={s.cancelBtn} onClick={cancelEdit}>Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <span style={s.infoMono}>@{w.username}</span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── Pay Rate section ── */}
+                    {showRate && (
+                      <div style={s.section}>
+                        <div style={s.sectionHeader}>
+                          <span style={s.sectionTitle}>Pay Rate</span>
+                          {(!isEditing || editSection !== 'rate') && (
+                            <button style={s.sectionBtn} onClick={() => isEditing && editSection === 'rate' ? cancelEdit() : startEditRate(w)}>Edit</button>
+                          )}
+                        </div>
+                        {isEditing && editSection === 'rate' ? (
+                          <div style={s.editBlock}>
+                            <div style={s.formGrid}>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>Amount ($)</label>
+                                <input style={{ ...s.input, maxWidth: 120 }} type="number" min="0" step="0.01" value={editRateForm.rate} onChange={e => setEditRateForm(f => ({ ...f, rate: e.target.value }))} />
+                              </div>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>Rate type</label>
+                                <select style={s.input} value={editRateForm.rate_type} onChange={e => setEditRateForm(f => ({ ...f, rate_type: e.target.value }))}>
+                                  {RATE_TYPES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                                </select>
+                              </div>
+                            </div>
+                            <div style={s.editActions}>
+                              <button style={s.saveBtn} onClick={() => saveRate(w.id)} disabled={editRateSaving}>{editRateSaving ? 'Saving...' : 'Save'}</button>
+                              <button style={s.cancelBtn} onClick={cancelEdit}>Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <span style={s.infoValue}>{fmtRate(w)}</span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── Remove ── */}
+                    {identityEditable && !isEditing && (
+                      <div style={{ paddingTop: 4 }}>
+                        <button style={s.removeBtn} onClick={() => handleRemove(w.id, w.full_name)}>Remove user</button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -449,6 +555,7 @@ const s = {
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 4 },
   label: { fontSize: 12, fontWeight: 600, color: '#6b7280' },
   input: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14 },
+  eyeBtn: { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: 0, lineHeight: 1 },
   errorBox: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   errorText: { color: '#e53e3e', fontSize: 13 },
   restoreInlineBtn: { background: '#059669', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
@@ -463,17 +570,21 @@ const s = {
   itemName: { fontSize: 14, fontWeight: 600, color: '#111827' },
   itemUsername: { fontSize: 13, color: '#6b7280' },
   chevron: { fontSize: 14, color: '#9ca3af', transition: 'transform 0.2s', flexShrink: 0, display: 'inline-block' },
-  panel: { padding: '12px 16px', borderTop: '1px solid #f3f4f6', background: '#f9fafb', display: 'flex', flexDirection: 'column', gap: 12 },
-  panelGrid: { display: 'grid', gridTemplateColumns: '120px 1fr', gap: '6px 12px', alignItems: 'center' },
-  panelLabel: { fontSize: 12, fontWeight: 600, color: '#6b7280' },
-  panelValue: { fontSize: 14, color: '#111827' },
-  panelActions: { display: 'flex', gap: 8 },
-  editBtn: { padding: '6px 14px', background: 'none', border: '1px solid #93c5fd', color: '#2563eb', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  panel: { padding: '4px 16px 16px', borderTop: '1px solid #f3f4f6', background: '#f9fafb', display: 'flex', flexDirection: 'column', gap: 0 },
+  section: { borderBottom: '1px solid #eeeeee', paddingBottom: 12, paddingTop: 12 },
+  sectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  sectionTitle: { fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionBtn: { padding: '3px 12px', background: 'none', border: '1px solid #d1d5db', color: '#374151', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  infoGrid: { display: 'grid', gridTemplateColumns: '90px 1fr', gap: '5px 12px', alignItems: 'center' },
+  infoLabel: { fontSize: 12, color: '#6b7280', fontWeight: 500 },
+  infoValue: { fontSize: 14, color: '#111827' },
+  infoMono: { fontSize: 14, color: '#374151', fontFamily: 'monospace' },
+  editBlock: { display: 'flex', flexDirection: 'column', gap: 10 },
+  editActions: { display: 'flex', gap: 8 },
   removeBtn: { padding: '6px 14px', background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   historyFooter: { marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 12 },
   historyToggle: { background: 'none', border: 'none', color: '#6b7280', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '2px 0' },
   historyList: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 },
   historyItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#f9fafb', borderRadius: 7 },
   restoreBtn: { padding: '4px 12px', background: 'none', border: '1px solid #6ee7b7', color: '#059669', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-  eyeBtn: { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: 0, lineHeight: 1 },
 };

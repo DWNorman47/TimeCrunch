@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS users (
   invite_token_expires        TIMESTAMP,
   invite_pending              BOOLEAN      NOT NULL DEFAULT false,
   hourly_rate                 DECIMAL(10,2),
+  rate_type                   VARCHAR(20)  NOT NULL DEFAULT 'hourly',
   language                    VARCHAR(20)  NOT NULL DEFAULT 'English',
   active                      BOOLEAN      NOT NULL DEFAULT true,
   created_at                  TIMESTAMP    NOT NULL DEFAULT NOW()

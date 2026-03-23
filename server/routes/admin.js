@@ -254,7 +254,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         WHERE wage_type = 'regular' AND company_id = $1
         GROUP BY user_id, work_date
       )
-      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.email,
+      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.email,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE((SELECT SUM(LEAST(day_hours, 8)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as regular_hours,
@@ -263,7 +263,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1
-      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.email
+      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.email
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
       [companyId]
@@ -504,19 +504,23 @@ router.post('/workers', requireAdmin, async (req, res) => {
   }
 });
 
-// Update a worker (full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, email)
+// Update a worker (full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, email)
 router.patch('/workers/:id', requireAdmin, async (req, res) => {
-  const { full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, email } = req.body;
-  if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && email === undefined) {
+  const { full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, email } = req.body;
+  if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && rate_type === undefined && email === undefined) {
     return res.status(400).json({ error: 'At least one field required' });
   }
   const companyId = req.user.company_id;
   const assignedRole = role ? (role === 'admin' ? 'admin' : 'worker') : undefined;
+  const VALID_RATE_TYPES = ['hourly', 'daily'];
   try {
     if (username) {
       const clean = username.toLowerCase().trim();
       const conflict = await pool.query('SELECT id FROM users WHERE username = $1 AND id != $2', [clean, req.params.id]);
       if (conflict.rowCount > 0) return res.status(409).json({ error: 'Username already taken' });
+    }
+    if (rate_type !== undefined && !VALID_RATE_TYPES.includes(rate_type)) {
+      return res.status(400).json({ error: 'Invalid rate_type' });
     }
     const fields = [];
     const values = [];
@@ -533,11 +537,12 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
       if (isNaN(rv) || rv < 0) return res.status(400).json({ error: 'hourly_rate must be a non-negative number' });
       fields.push(`hourly_rate = $${idx++}`); values.push(rv);
     }
+    if (rate_type !== undefined) { fields.push(`rate_type = $${idx++}`); values.push(rate_type); }
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email || null); }
     values.push(req.params.id);
     values.push(companyId);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, role, language, hourly_rate, email`,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, role, language, hourly_rate, rate_type, email`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
