@@ -37,10 +37,10 @@ function DraggableShift({ s, projects, editingId, editForm, setEditForm, editSav
       <div style={{ ...styles.shiftPill, opacity: isDragging ? 0.35 : 1, cursor: 'grab' }} {...listeners} {...attributes}>
         <PillContent s={s} />
         <div style={styles.pillActions} onPointerDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
-          <button style={styles.editPillBtn} onClick={() => editingId === s.id ? setEditingId(null) : startEdit(s)} title="Edit">✎</button>
-          <button style={styles.dupBtn} onClick={() => onDuplicate(s)} title="Duplicate">⧉</button>
-          <button style={styles.deleteBtn} onClick={() => deleteShift(s.id)} disabled={deleting === s.id} title="Delete">
-            {deleting === s.id ? '…' : '✕'}
+          <button style={styles.editPillBtn} onClick={() => editingId === s.id ? setEditingId(null) : startEdit(s)}>Edit</button>
+          <button style={styles.dupBtn} onClick={() => onDuplicate(s)}>Copy</button>
+          <button style={styles.deleteBtn} onClick={() => deleteShift(s.id)} disabled={deleting === s.id}>
+            {deleting === s.id ? '…' : 'Del'}
           </button>
         </div>
       </div>
@@ -349,10 +349,10 @@ const styles = {
   pillProject: { color: '#6b7280', fontSize: 10 },
   pillTime: { fontWeight: 600, color: '#1a56db', marginTop: 2 },
   pillNotes: { color: '#9ca3af', fontSize: 10, fontStyle: 'italic' },
-  pillActions: { display: 'flex', gap: 4, marginTop: 4 },
-  editPillBtn: { background: 'none', border: 'none', color: '#1a56db', fontSize: 12, cursor: 'pointer', padding: 0, lineHeight: 1 },
-  dupBtn: { background: 'none', border: 'none', color: '#059669', fontSize: 12, cursor: 'pointer', padding: 0, lineHeight: 1 },
-  deleteBtn: { background: 'none', border: 'none', color: '#fca5a5', fontSize: 11, cursor: 'pointer', padding: 0, lineHeight: 1 },
+  pillActions: { display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' },
+  editPillBtn: { background: '#dbeafe', border: 'none', color: '#1d4ed8', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 9px', borderRadius: 5, lineHeight: 1 },
+  dupBtn: { background: '#d1fae5', border: 'none', color: '#065f46', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 9px', borderRadius: 5, lineHeight: 1 },
+  deleteBtn: { background: '#fee2e2', border: 'none', color: '#b91c1c', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 9px', borderRadius: 5, lineHeight: 1 },
   editPanel: { background: '#f8faff', border: '1px solid #dbeafe', borderRadius: 6, padding: 10, marginTop: 4 },
   editGrid: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 },
   editField: { display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 80 },
