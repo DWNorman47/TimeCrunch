@@ -27,6 +27,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const [usernameTaken, setUsernameTaken] = useState(false);
   const [usernameChecking, setUsernameChecking] = useState(false);
   const [inviteSaving, setInviteSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [archivedConflict, setArchivedConflict] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -204,7 +205,10 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 </div>
                 <div style={s.fieldGroup}>
                   <label style={s.label}>Temporary password</label>
-                  <input style={s.input} type="password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
+                  <div style={{ position: 'relative' }}>
+                    <input style={{ ...s.input, width: '100%', paddingRight: 36, boxSizing: 'border-box' }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
+                    <button type="button" onClick={() => setShowPassword(v => !v)} style={s.eyeBtn} tabIndex={-1}>{showPassword ? '🙈' : '👁'}</button>
+                  </div>
                 </div>
                 <div style={s.fieldGroup}>
                   <label style={s.label}>Email (optional)</label>
@@ -447,4 +451,5 @@ const s = {
   historyList: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 },
   historyItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#f9fafb', borderRadius: 7 },
   restoreBtn: { padding: '4px 12px', background: 'none', border: '1px solid #6ee7b7', color: '#059669', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  eyeBtn: { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: 0, lineHeight: 1 },
 };

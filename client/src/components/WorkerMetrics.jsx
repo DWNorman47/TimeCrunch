@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import api from '../api';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import BillPDF from './BillPDF';
-import { fmtHours } from '../utils';
+import { fmtHours, formatCurrency } from '../utils';
 
 function downloadCSV(rows, filename) {
   const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -20,7 +20,7 @@ function defaultDates() {
   return { from: fmt(from), to: fmt(today) };
 }
 
-export default function WorkerMetrics({ worker }) {
+export default function WorkerMetrics({ worker, currency = 'USD' }) {
   const [expanded, setExpanded] = useState(false);
   const [from, setFrom] = useState(defaultDates().from);
   const [to, setTo] = useState(defaultDates().to);
@@ -80,10 +80,10 @@ export default function WorkerMetrics({ worker }) {
               <div style={styles.billSummary}>
                 <span>Entries: <b>{billData.entries.length}</b></span>
                 <span>Total: <b>{fmtHours(billData.summary.total_hours)}</b></span>
-                {billData.summary.regular_hours > 0 && <span style={{ color: '#2563eb' }}>Regular: <b>{fmtHours(billData.summary.regular_hours)} · ${billData.summary.regular_cost.toFixed(2)}</b></span>}
-                {billData.summary.overtime_hours > 0 && <span style={{ color: '#dc2626' }}>Overtime: <b>{fmtHours(billData.summary.overtime_hours)} · ${billData.summary.overtime_cost.toFixed(2)}</b></span>}
-                {billData.summary.prevailing_hours > 0 && <span style={{ color: '#d97706' }}>Prevailing: <b>{fmtHours(billData.summary.prevailing_hours)} · ${billData.summary.prevailing_cost.toFixed(2)}</b></span>}
-                <span style={{ fontWeight: 700 }}>Total Cost: <b>${billData.summary.total_cost.toFixed(2)}</b></span>
+                {billData.summary.regular_hours > 0 && <span style={{ color: '#2563eb' }}>Regular: <b>{fmtHours(billData.summary.regular_hours)} · {formatCurrency(billData.summary.regular_cost, currency)}</b></span>}
+                {billData.summary.overtime_hours > 0 && <span style={{ color: '#dc2626' }}>Overtime: <b>{fmtHours(billData.summary.overtime_hours)} · {formatCurrency(billData.summary.overtime_cost, currency)}</b></span>}
+                {billData.summary.prevailing_hours > 0 && <span style={{ color: '#d97706' }}>Prevailing: <b>{fmtHours(billData.summary.prevailing_hours)} · {formatCurrency(billData.summary.prevailing_cost, currency)}</b></span>}
+                <span style={{ fontWeight: 700 }}>Total Cost: <b>{formatCurrency(billData.summary.total_cost, currency)}</b></span>
               </div>
               <div style={styles.btnRow}>
                 <button style={styles.previewBtn} onClick={() => setShowPreview(p => !p)}>
@@ -98,7 +98,7 @@ export default function WorkerMetrics({ worker }) {
                   downloadCSV([headers, ...rows], `${worker.username}-${from||'all'}-to-${to||'all'}.csv`);
                 }}>Export CSV</button>
                 <PDFDownloadLink
-                  document={<BillPDF data={billData} />}
+                  document={<BillPDF data={billData} currency={currency} />}
                   fileName={`bill-${worker.username}-${from || 'all'}-to-${to || 'all'}.pdf`}
                   style={styles.pdfBtn}
                 >
@@ -107,7 +107,7 @@ export default function WorkerMetrics({ worker }) {
               </div>
               {showPreview && (
                 <PDFViewer style={styles.pdfViewer}>
-                  <BillPDF data={billData} />
+                  <BillPDF data={billData} currency={currency} />
                 </PDFViewer>
               )}
             </div>

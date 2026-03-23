@@ -1,5 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { formatCurrency } from '../utils';
 
 const s = StyleSheet.create({
   page: { padding: 40, fontSize: 11, fontFamily: 'Helvetica', color: '#222' },
@@ -38,7 +39,7 @@ function calcHours(start, end) {
   return ((e - s) / 3600000).toFixed(2);
 }
 
-export default function BillPDF({ data }) {
+export default function BillPDF({ data, currency = 'USD' }) {
   const { worker, entries, summary, period } = data;
   const periodStr = period.from || period.to
     ? `${period.from ? formatDate(period.from) : 'Beginning'} – ${period.to ? formatDate(period.to) : 'Present'}`
@@ -88,25 +89,25 @@ export default function BillPDF({ data }) {
           <Text style={s.sectionTitle}>Cost Breakdown</Text>
           {summary.regular_hours > 0 && (
             <View style={s.costRow}>
-              <Text style={{ color: '#2563eb' }}>Regular ({summary.regular_hours.toFixed(2)}h × ${summary.rate.toFixed(2)}/hr)</Text>
-              <Text style={{ color: '#2563eb', fontWeight: 'bold' }}>${summary.regular_cost.toFixed(2)}</Text>
+              <Text style={{ color: '#2563eb' }}>Regular ({summary.regular_hours.toFixed(2)}h × {formatCurrency(summary.rate, currency)}/hr)</Text>
+              <Text style={{ color: '#2563eb', fontWeight: 'bold' }}>{formatCurrency(summary.regular_cost, currency)}</Text>
             </View>
           )}
           {summary.overtime_hours > 0 && (
             <View style={s.costRow}>
-              <Text style={{ color: '#dc2626' }}>Overtime ({summary.overtime_hours.toFixed(2)}h × ${(summary.rate * 1.5).toFixed(2)}/hr)</Text>
-              <Text style={{ color: '#dc2626', fontWeight: 'bold' }}>${summary.overtime_cost.toFixed(2)}</Text>
+              <Text style={{ color: '#dc2626' }}>Overtime ({summary.overtime_hours.toFixed(2)}h × {formatCurrency(summary.rate * 1.5, currency)}/hr)</Text>
+              <Text style={{ color: '#dc2626', fontWeight: 'bold' }}>{formatCurrency(summary.overtime_cost, currency)}</Text>
             </View>
           )}
           {summary.prevailing_hours > 0 && (
             <View style={s.costRow}>
-              <Text style={{ color: '#d97706' }}>Prevailing ({summary.prevailing_hours.toFixed(2)}h × $45.00/hr)</Text>
-              <Text style={{ color: '#d97706', fontWeight: 'bold' }}>${summary.prevailing_cost.toFixed(2)}</Text>
+              <Text style={{ color: '#d97706' }}>Prevailing ({summary.prevailing_hours.toFixed(2)}h × {formatCurrency(45, currency)}/hr)</Text>
+              <Text style={{ color: '#d97706', fontWeight: 'bold' }}>{formatCurrency(summary.prevailing_cost, currency)}</Text>
             </View>
           )}
           <View style={s.costTotal}>
             <Text style={{ fontWeight: 'bold', fontSize: 13 }}>Total Due</Text>
-            <Text style={{ fontWeight: 'bold', fontSize: 13 }}>${summary.total_cost.toFixed(2)}</Text>
+            <Text style={{ fontWeight: 'bold', fontSize: 13 }}>{formatCurrency(summary.total_cost, currency)}</Text>
           </View>
         </View>
 

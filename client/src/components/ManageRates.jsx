@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
 import api from '../api';
 
+const CURRENCIES = [
+  { code: 'USD', name: 'USD — US Dollar' },
+  { code: 'CAD', name: 'CAD — Canadian Dollar' },
+  { code: 'EUR', name: 'EUR — Euro' },
+  { code: 'GBP', name: 'GBP — British Pound' },
+  { code: 'MXN', name: 'MXN — Mexican Peso' },
+  { code: 'HNL', name: 'HNL — Honduran Lempira' },
+  { code: 'GTQ', name: 'GTQ — Guatemalan Quetzal' },
+  { code: 'NIO', name: 'NIO — Nicaraguan Córdoba' },
+  { code: 'BZD', name: 'BZD — Belize Dollar' },
+  { code: 'CRC', name: 'CRC — Costa Rican Colón' },
+  { code: 'PAB', name: 'PAB — Panamanian Balboa' },
+];
+
 export default function ManageRates({ settings, onSettingsUpdated }) {
   const [form, setForm] = useState({
     prevailing_wage_rate: String(settings?.prevailing_wage_rate ?? 45),
@@ -13,6 +27,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
     show_worker_wages: settings?.show_worker_wages ?? false,
+    currency: settings?.currency ?? 'USD',
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -36,6 +51,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         notification_end_hour: parseFloat(form.notification_end_hour),
         chat_retention_days: parseFloat(form.chat_retention_days),
         show_worker_wages: form.show_worker_wages,
+        currency: form.currency,
       });
       onSettingsUpdated(r.data);
       setSaved(true);
@@ -59,6 +75,14 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
         </div>
         <div style={styles.sectionBody}>
+          <div style={styles.row}>
+            <label style={styles.label}>Currency</label>
+            <div style={styles.inputGroup}>
+              <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.currency} onChange={e => set('currency', e.target.value)}>
+                {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
           <div style={styles.row}>
             <label style={styles.label}>Prevailing wage rate</label>
             <div style={styles.inputGroup}>

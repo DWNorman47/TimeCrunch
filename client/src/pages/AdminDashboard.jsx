@@ -248,12 +248,12 @@ export default function AdminDashboard() {
             <h3 style={styles.subheading}>Worker Reports</h3>
             {workers.length === 0
               ? <p style={{ color: '#666' }}>No workers yet. Add one in the Manage tab.</p>
-              : workers.map(w => <WorkerMetrics key={w.id} worker={w} />)
+              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} />)
             }
             <h3 style={styles.subheading}>Project Reports</h3>
-            <ProjectReports />
+            <ProjectReports currency={settings?.currency ?? 'USD'} />
             <h3 style={styles.subheading}>Overtime Report</h3>
-            {plan.isStarter ? <OvertimeReport /> : <UpgradePrompt requiredPlan="starter" feature="Overtime Report" />}
+            {plan.isStarter ? <OvertimeReport currency={settings?.currency ?? 'USD'} /> : <UpgradePrompt requiredPlan="starter" feature="Overtime Report" />}
             <h3 style={styles.subheading}>Certified Payroll</h3>
             {plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature="Certified Payroll (WH-347)" />}
             <h3 style={styles.subheading}>Export</h3>
