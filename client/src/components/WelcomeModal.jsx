@@ -1,12 +1,19 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function WelcomeModal() {
   const { user, firstLogin, clearFirstLogin } = useAuth();
+  const navigate = useNavigate();
   if (!firstLogin || !user) return null;
 
   const firstName = user.first_name || user.full_name?.split(' ')[0] || user.username;
   const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+  const handleStart = () => {
+    clearFirstLogin();
+    if (isAdmin) navigate('/administration');
+  };
 
   return (
     <div style={styles.overlay}>
@@ -17,12 +24,11 @@ export default function WelcomeModal() {
         {isAdmin ? (
           <>
             <p style={styles.body}>
-              <strong>Ops Flow Assist</strong> (OpsFloA) is your all-in-one field operations platform — built for contractors and the crews who run the job.
+              <strong>Ops Flow Assist</strong> is your all-in-one field operations platform — built for contractors and the crews who run the job.
             </p>
             <p style={styles.body}>
               As an admin, you're in control. Add your team, set up projects, track time, approve timesheets, and push hours straight to QuickBooks.
             </p>
-            <p style={styles.body}>Head to <strong>Administration</strong> to get your company set up.</p>
           </>
         ) : (
           <>
@@ -34,7 +40,7 @@ export default function WelcomeModal() {
             </p>
           </>
         )}
-        <button style={styles.btn} onClick={clearFirstLogin}>
+        <button style={styles.btn} onClick={handleStart}>
           {isAdmin ? 'Let\'s get started →' : 'Got it →'}
         </button>
       </div>
