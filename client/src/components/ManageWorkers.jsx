@@ -27,6 +27,9 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const [usernameTaken, setUsernameTaken] = useState(false);
   const [usernameChecking, setUsernameChecking] = useState(false);
   const [inviteSaving, setInviteSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [editUsernameTaken, setEditUsernameTaken] = useState(false);
+  const [editUsernameChecking, setEditUsernameChecking] = useState(false);
   const [archivedConflict, setArchivedConflict] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -140,23 +143,36 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     } catch { toast('Failed to restore user', 'error'); }
   };
 
-  const startEdit = w => {
-    setEditingId(w.id);
-    setEditForm({ full_name: w.full_name, role: w.role, language: w.language || 'English', hourly_rate: String(w.hourly_rate ?? 0), email: w.email || '' });
+  const checkEditUsername = async (username, workerId) => {
+    if (!username) return;
+    setEditUsernameChecking(true);
+    try {
+      const r = await api.get('/admin/workers/check-username', { params: { username, exclude_id: workerId } });
+      setEditUsernameTaken(r.data.taken);
+    } catch {}
+    finally { setEditUsernameChecking(false); }
   };
 
-  const cancelEdit = () => { setEditingId(null); setEditForm({}); };
+  const startEdit = w => {
+    setEditingId(w.id);
+    setEditUsernameTaken(false);
+    setEditForm({ full_name: w.full_name, username: w.username, role: w.role, language: w.language || 'English', hourly_rate: String(w.hourly_rate ?? 0), email: w.email || '' });
+  };
+
+  const cancelEdit = () => { setEditingId(null); setEditForm({}); setEditUsernameTaken(false); };
 
   const handleSaveEdit = async id => {
     setEditSaving(true);
     try {
       const patch = identityEditable && showRate ? editForm
-        : identityEditable ? { full_name: editForm.full_name, role: editForm.role, language: editForm.language, email: editForm.email }
+        : identityEditable ? { full_name: editForm.full_name, username: editForm.username, role: editForm.role, language: editForm.language, email: editForm.email }
         : { hourly_rate: editForm.hourly_rate };
       const r = await api.patch(`/admin/workers/${id}`, patch);
       onWorkerUpdated(r.data);
       cancelEdit();
-    } catch { toast('Failed to update user', 'error'); }
+    } catch (err) {
+      toast(err.response?.data?.error || 'Failed to update user', 'error');
+    }
     finally { setEditSaving(false); }
   };
 
@@ -204,7 +220,10 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 </div>
                 <div style={s.fieldGroup}>
                   <label style={s.label}>Temporary password</label>
-                  <input style={s.input} type="password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
+                  <div style={{ position: 'relative' }}>
+                    <input style={{ ...s.input, width: '100%', paddingRight: 36, boxSizing: 'border-box' }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
+                    <button type="button" onClick={() => setShowPassword(v => !v)} style={s.eyeBtn} tabIndex={-1}>{showPassword ? '🙈' : '👁'}</button>
+                  </div>
                 </div>
                 <div style={s.fieldGroup}>
                   <label style={s.label}>Email (optional)</label>
@@ -344,6 +363,15 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                             <input style={s.input} value={editForm.full_name} onChange={e => setEdit('full_name', e.target.value)} />
                           </div>
                           <div style={s.fieldGroup}>
+                            <label style={s.label}>Username{editUsernameChecking ? ' (checking...)' : editUsernameTaken ? ' ⚠ taken' : ''}</label>
+                            <input
+                              style={{ ...s.input, borderColor: editUsernameTaken ? '#fca5a5' : undefined }}
+                              value={editForm.username || ''}
+                              onChange={e => { setEdit('username', e.target.value); setEditUsernameTaken(false); }}
+                              onBlur={e => checkEditUsername(e.target.value, w.id)}
+                            />
+                          </div>
+                          <div style={s.fieldGroup}>
                             <label style={s.label}>Email</label>
                             <input style={s.input} type="email" value={editForm.email} onChange={e => setEdit('email', e.target.value)} />
                           </div>
@@ -370,7 +398,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                       )}
                     </div>
                     <div style={s.panelActions}>
-                      <button style={s.saveBtn} onClick={() => handleSaveEdit(w.id)} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save'}</button>
+                      <button style={s.saveBtn} onClick={() => handleSaveEdit(w.id)} disabled={editSaving || editUsernameTaken}>{editSaving ? 'Saving...' : 'Save'}</button>
                       <button style={s.cancelBtn} onClick={cancelEdit}>Cancel</button>
                     </div>
                   </div>
@@ -447,4 +475,5 @@ const s = {
   historyList: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 },
   historyItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#f9fafb', borderRadius: 7 },
   restoreBtn: { padding: '4px 12px', background: 'none', border: '1px solid #6ee7b7', color: '#059669', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  eyeBtn: { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: 0, lineHeight: 1 },
 };
