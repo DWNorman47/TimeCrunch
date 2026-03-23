@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 
 export default function Register() {
-  const { login } = useAuth();
+  const { loginWithToken } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ company_name: '', first_name: '', middle_name: '', last_name: '', email: '', username: '', password: '' });
   const [usernameEdited, setUsernameEdited] = useState(false);
@@ -37,7 +37,7 @@ export default function Register() {
     try {
       const r = await api.post('/auth/register', { ...form, full_name });
       if (r.data.pending_confirmation) { setConfirming(r.data.email); return; }
-      login(r.data.token, r.data.user);
+      await loginWithToken(r.data.token);
       navigate('/admin');
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed');

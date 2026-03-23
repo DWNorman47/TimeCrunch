@@ -1,5 +1,9 @@
-const CACHE_NAME = 'timecrunch-v2';
-const STATIC_ASSETS = ['/', '/index.html'];
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+
+// Injected by vite-plugin-pwa at build time
+precacheAndRoute(self.__WB_MANIFEST);
+cleanupOutdatedCaches();
+
 const QUEUE_DB = 'tc-offline-queue';
 const QUEUE_STORE = 'punches';
 
@@ -7,9 +11,12 @@ const QUEUE_STORE = 'punches';
 
 function openQueueDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(QUEUE_DB, 1);
+    const req = indexedDB.open(QUEUE_DB, 2);
     req.onupgradeneeded = e => {
-      e.target.result.createObjectStore(QUEUE_STORE, { keyPath: 'id', autoIncrement: true });
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(QUEUE_STORE)) {
+        db.createObjectStore(QUEUE_STORE, { keyPath: 'id', autoIncrement: true });
+      }
     };
     req.onsuccess = e => resolve(e.target.result);
     req.onerror = () => reject(req.error);
@@ -62,17 +69,17 @@ async function broadcastQueueCount() {
   clients.forEach(c => c.postMessage({ type: 'QUEUE_COUNT', count }));
 }
 
-// ── Clock request interception ─────────────────────────────────────────────────
+// ── Offline request handler (clock + time entries) ─────────────────────────────
 
-async function handleClockRequest(event) {
+async function handleOfflineableRequest(event, type) {
   try {
     const response = await fetch(event.request.clone());
     return response;
   } catch {
-    // Offline — queue the request
     const body = await event.request.clone().json().catch(() => ({}));
     const auth = event.request.headers.get('Authorization') || '';
     await enqueue({
+      type,
       url: event.request.url,
       body,
       auth,
@@ -92,6 +99,7 @@ async function replayQueue() {
   const items = await getAllQueued();
   let replayed = 0;
   let authFailed = false;
+  let partialFailure = false;
   for (const item of items) {
     try {
       const res = await fetch(item.url, {
@@ -109,6 +117,10 @@ async function replayQueue() {
       if (res.ok || res.status === 409) {
         await dequeue(item.id);
         replayed++;
+      } else {
+        // 400/403 — bad request, remove from queue to avoid loop
+        await dequeue(item.id);
+        partialFailure = true;
       }
     } catch {
       // Still offline — leave in queue
@@ -119,26 +131,18 @@ async function replayQueue() {
   if (authFailed) {
     clients.forEach(c => c.postMessage({ type: 'REPLAY_AUTH_FAILED' }));
   } else {
+    if (partialFailure) {
+      clients.forEach(c => c.postMessage({ type: 'REPLAY_PARTIAL_FAILURE' }));
+    }
     clients.forEach(c => c.postMessage({ type: 'QUEUE_REPLAYED', count: replayed }));
   }
 }
 
 // ── Service worker lifecycle ───────────────────────────────────────────────────
 
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
-  );
-  self.skipWaiting();
-});
-
+self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+  event.waitUntil(self.clients.claim());
 });
 
 // ── Push notifications ─────────────────────────────────────────────────────────
@@ -172,25 +176,16 @@ self.addEventListener('notificationclick', event => {
 self.addEventListener('fetch', event => {
   const url = event.request.url;
 
-  // Intercept clock-in and clock-out POSTs for offline queueing
-  if (event.request.method === 'POST' && (url.includes('/api/clock/in') || url.includes('/api/clock/out'))) {
-    event.respondWith(handleClockRequest(event));
-    return;
+  if (event.request.method === 'POST') {
+    if (url.includes('/api/clock/in') || url.includes('/api/clock/out')) {
+      event.respondWith(handleOfflineableRequest(event, 'clock'));
+      return;
+    }
+    if (url.includes('/api/time-entries') && !url.includes('/messages') && !url.includes('/sign-off')) {
+      event.respondWith(handleOfflineableRequest(event, 'time-entry'));
+      return;
+    }
   }
-
-  // Pass all other non-GET requests through
-  if (event.request.method !== 'GET') return;
-  if (url.includes('/api/')) return;
-
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        return response;
-      })
-      .catch(() => caches.match(event.request))
-  );
 });
 
 // ── Message handler (page → SW) ────────────────────────────────────────────────

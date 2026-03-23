@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
+import { useOffline } from '../contexts/OfflineContext';
+import { useFormPersist } from '../hooks/useFormPersist';
 
 function getLocation() {
   return new Promise(resolve => {
@@ -20,16 +22,15 @@ function formatElapsed(seconds) {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
-function sendToSW(type) {
-  if (navigator.serviceWorker?.controller) {
-    navigator.serviceWorker.controller.postMessage({ type });
-  }
-}
-
 export default function ClockInOut({ projects, onEntryAdded, t }) {
+  const { isOffline, queueCount, onSync } = useOffline() || {};
   const [status, setStatus] = useState(null); // null = loading, false = not clocked in, object = clocked in
-  const [selectedProject, setSelectedProject] = useState('');
-  const [notes, setNotes] = useState('');
+  const [clockInForm, setClockInForm] = useState({ selectedProject: '', notes: '' });
+  const { clearPersisted: clearClockInPersisted } = useFormPersist('clock-in', clockInForm, setClockInForm);
+  const selectedProject = clockInForm.selectedProject;
+  const notes = clockInForm.notes;
+  const setSelectedProject = v => setClockInForm(f => ({ ...f, selectedProject: v }));
+  const setNotes = v => setClockInForm(f => ({ ...f, notes: v }));
   const [elapsed, setElapsed] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -37,55 +38,21 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
   const [mileageAdded, setMileageAdded] = useState(false);
   const [breakMinutes, setBreakMinutes] = useState('');
   const [mileage, setMileage] = useState('');
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
-  const [queueCount, setQueueCount] = useState(0);
-  const [syncMsg, setSyncMsg] = useState('');
   const timerRef = useRef(null);
-  const syncMsgTimer = useRef(null);
 
   useEffect(() => {
     api.get('/clock/status').then(r => setStatus(r.data || false)).catch(() => setStatus(false));
   }, []);
 
-  // Offline/online detection + SW message handler
+  // Refresh clock status after offline queue syncs
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOffline(false);
-      // Trigger queue replay
-      sendToSW('REPLAY_QUEUE');
-    };
-    const handleOffline = () => setIsOffline(true);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    const handleSWMessage = e => {
-      if (e.data?.type === 'QUEUE_COUNT') setQueueCount(e.data.count);
-      if (e.data?.type === 'QUEUE_REPLAYED') {
-        setQueueCount(0);
-        if (e.data.count > 0) {
-          setSyncMsg(`${e.data.count} punch${e.data.count !== 1 ? 'es' : ''} synced.`);
-          clearTimeout(syncMsgTimer.current);
-          syncMsgTimer.current = setTimeout(() => setSyncMsg(''), 4000);
-          // Refresh clock status after sync
-          api.get('/clock/status').then(r => setStatus(r.data || false)).catch(() => {});
-        }
+    if (!onSync) return;
+    return onSync(count => {
+      if (count > 0) {
+        api.get('/clock/status').then(r => setStatus(r.data || false)).catch(() => {});
       }
-      if (e.data?.type === 'REPLAY_AUTH_FAILED') {
-        setSyncMsg('Session expired — please log in again to sync offline punches.');
-      }
-    };
-    navigator.serviceWorker?.addEventListener('message', handleSWMessage);
-
-    // Ask SW for current queue count on mount
-    sendToSW('GET_QUEUE_COUNT');
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      navigator.serviceWorker?.removeEventListener('message', handleSWMessage);
-      clearTimeout(syncMsgTimer.current);
-    };
-  }, []);
+    });
+  }, [onSync]);
 
   useEffect(() => {
     if (status && status.clock_in_time) {
@@ -114,15 +81,16 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
     const { lat, lng } = await getLocation();
     const local_work_date = new Date().toLocaleDateString('en-CA');
     try {
-      const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date });
+      const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
       if (r.data?.offline) {
         // Queued offline — show a pending state
         setStatus({ offline_queued: true, project_name: projects.find(p => p.id == selectedProject)?.name });
         setNotes('');
-        setQueueCount(c => c + 1);
+        clearClockInPersisted();
       } else {
         setStatus(r.data);
         setNotes('');
+        clearClockInPersisted();
       }
     } catch (err) {
       const data = err.response?.data;
@@ -139,6 +107,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
       await api.delete('/clock/cancel');
       setStatus(false);
       setSelectedProject('');
+      clearClockInPersisted();
       setBreakAdded(false);
       setMileageAdded(false);
       setBreakMinutes('');
@@ -167,7 +136,6 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
       if (r.data?.offline) {
         // Queued offline — stay "clocked in" locally until sync
         setStatus(prev => ({ ...prev, clock_out_queued: true }));
-        setQueueCount(c => c + 1);
       } else {
         onEntryAdded({ ...r.data, project_name: status.project_name });
         setStatus(false);
@@ -192,10 +160,6 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
     </div>
   );
 
-  const syncBanner = syncMsg && (
-    <div style={styles.syncBanner}>{syncMsg}</div>
-  );
-
   if (status === null) return (
     <div style={styles.card}>
       {offlineBanner}
@@ -208,7 +172,6 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
     return (
       <div style={styles.clockedInCard}>
         {isOffline && <div style={styles.offlineBannerDark}>Offline — clock-out will sync when reconnected.</div>}
-        {syncBanner}
         <div style={styles.clockedInTop}>
           <div>
             <div style={styles.clockedInLabel}>{t.currentlyClockedIn}</div>
@@ -278,7 +241,6 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
   return (
     <div style={styles.card}>
       {offlineBanner}
-      {syncBanner}
       <h2 style={styles.heading}>{t.clockIn}</h2>
       <div style={styles.form}>
         <div>
@@ -341,5 +303,4 @@ const styles = {
   cancelClockInBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: '2px 0', alignSelf: 'center' },
   offlineBanner: { background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 7, padding: '8px 12px', fontSize: 13, fontWeight: 500, marginBottom: 12 },
   offlineBannerDark: { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', borderRadius: 7, padding: '8px 12px', fontSize: 12, fontWeight: 500 },
-  syncBanner: { background: '#d1fae5', border: '1px solid #6ee7b7', color: '#065f46', borderRadius: 7, padding: '8px 12px', fontSize: 13, fontWeight: 500, marginBottom: 4 },
 };

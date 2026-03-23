@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
@@ -15,7 +15,7 @@ function saveCompany(name) {
 const OTHER = '__other__';
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, confirmMfa } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionExpired = searchParams.get('session') === 'expired';
@@ -27,8 +27,23 @@ export default function Login() {
   const [unconfirmedEmail, setUnconfirmedEmail] = useState('');
   const [resentConfirmation, setResentConfirmation] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mfaToken, setMfaToken] = useState(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const mfaInputRef = useRef(null);
 
   const companyName = selected === OTHER ? otherText : selected;
+
+  const navigateAfterLogin = user => {
+    saveCompany(companyName.trim());
+    if (user.role === 'admin') {
+      const key = `tc_visited_${user.id}`;
+      const firstTime = !localStorage.getItem(key);
+      localStorage.setItem(key, '1');
+      navigate(firstTime ? '/administration' : '/admin');
+    } else {
+      navigate('/dashboard');
+    }
+  };
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -36,16 +51,13 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const user = await login(form.username, form.password, companyName.trim());
-      saveCompany(companyName.trim());
-      if (user.role === 'admin') {
-        const key = `tc_visited_${user.id}`;
-        const firstTime = !localStorage.getItem(key);
-        localStorage.setItem(key, '1');
-        navigate(firstTime ? '/administration' : '/admin');
-      } else {
-        navigate('/dashboard');
+      const result = await login(form.username, form.password, companyName.trim());
+      if (result?.mfa_required) {
+        setMfaToken(result.mfa_token);
+        setTimeout(() => mfaInputRef.current?.focus(), 50);
+        return;
       }
+      navigateAfterLogin(result);
     } catch (err) {
       const data = err.response?.data;
       if (data?.error === 'email_not_confirmed') {
@@ -59,6 +71,54 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  const handleMfaSubmit = async e => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const user = await confirmMfa(mfaToken, mfaCode);
+      navigateAfterLogin(user);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Invalid code');
+      setMfaCode('');
+      setTimeout(() => mfaInputRef.current?.focus(), 50);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (mfaToken) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.card}>
+          <h1 style={styles.title}>OpsFloa</h1>
+          <p style={styles.subtitle}>Two-factor authentication</p>
+          <form onSubmit={handleMfaSubmit} style={styles.form}>
+            <label style={styles.label}>Enter the 6-digit code from your authenticator app</label>
+            <input
+              ref={mfaInputRef}
+              style={{ ...styles.input, textAlign: 'center', fontSize: 22, letterSpacing: 8, fontWeight: 700 }}
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={mfaCode}
+              onChange={e => setMfaCode(e.target.value.replace(/\D/g, ''))}
+              placeholder="000000"
+              required
+            />
+            {error && <p style={styles.error}>{error}</p>}
+            <button style={styles.button} type="submit" disabled={loading || mfaCode.length !== 6}>
+              {loading ? 'Verifying...' : 'Verify'}
+            </button>
+            <button type="button" style={styles.forgotLink} onClick={() => { setMfaToken(null); setError(''); setMfaCode(''); }}>
+              ← Back to sign in
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>

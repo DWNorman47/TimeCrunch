@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePlan } from '../hooks/usePlan';
+import { useT } from '../hooks/useT';
 import NotificationBell from '../components/NotificationBell';
 import WorkerMetrics from '../components/WorkerMetrics';
-import ManageWorkers from '../components/ManageWorkers';
-import ManageProjects from '../components/ManageProjects';
-import ManageRates from '../components/ManageRates';
 import ProjectReports from '../components/ProjectReports';
-import QuickBooks from '../components/QuickBooks';
 import LiveWorkers from '../components/LiveWorkers';
-import AuditLog from '../components/AuditLog';
 import ApprovalQueue from '../components/ApprovalQueue';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import ManagePayPeriods from '../components/ManagePayPeriods';
@@ -22,14 +18,8 @@ import LiveKPIs from '../components/LiveKPIs';
 import BroadcastMessage from '../components/BroadcastMessage';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
+import MFASetup from '../components/MFASetup';
 import api from '../api';
-
-const FEATURE_DEFS = [
-  { key: 'feature_scheduling',      label: 'Scheduling',      desc: 'Show the shift scheduling tool in the Manage tab' },
-  { key: 'feature_analytics',       label: 'Analytics',       desc: 'Show the Analytics tab with charts and trends' },
-  { key: 'feature_chat',            label: 'Company Chat',    desc: 'Show the company chat panel on the Live tab' },
-  { key: 'feature_prevailing_wage', label: 'Prevailing Wage', desc: 'Show prevailing wage type on projects and entries' },
-];
 
 function FeatureToggle({ name, desc, serverEnabled, onToggle }) {
   const [enabled, setEnabled] = useState(serverEnabled);
@@ -69,17 +59,25 @@ function FeatureToggle({ name, desc, serverEnabled, onToggle }) {
 }
 
 function FeatureToggles({ settings, onSettingsUpdated }) {
+  const t = useT();
   const handleToggle = async (key, newVal) => {
     const r = await api.patch('/admin/settings', { [key]: newVal });
     onSettingsUpdated(r.data);
   };
 
+  const featureDefs = [
+    { key: 'feature_scheduling',      label: t.featScheduling,    desc: t.featSchedulingDesc },
+    { key: 'feature_analytics',       label: t.featAnalytics,     desc: t.featAnalyticsDesc },
+    { key: 'feature_chat',            label: t.featChat,          desc: t.featChatDesc },
+    { key: 'feature_prevailing_wage', label: t.featPrevailingWage, desc: t.featPrevailingWageDesc },
+  ];
+
   return (
     <div style={ftStyles.card}>
-      <h3 style={ftStyles.title}>Features</h3>
-      <p style={ftStyles.subtitle}>Turn off sections your company doesn't use to keep the interface clean.</p>
+      <h3 style={ftStyles.title}>{t.featuresTitle}</h3>
+      <p style={ftStyles.subtitle}>{t.featuresSubtitle}</p>
       <div style={ftStyles.list}>
-        {FEATURE_DEFS.map(({ key, label, desc }) => (
+        {featureDefs.map(({ key, label, desc }) => (
           <FeatureToggle
             key={key}
             name={label}
@@ -107,15 +105,16 @@ const ftStyles = {
 };
 
 function UpgradePrompt({ requiredPlan, feature }) {
-  const planName = requiredPlan === 'pro_addon' ? 'Pro add-on' : requiredPlan === 'business' ? 'Business' : 'Starter';
+  const t = useT();
+  const planName = requiredPlan === 'qbo' ? 'QuickBooks Online add-on' : requiredPlan === 'business' ? 'Business' : 'Starter';
   return (
     <div style={{ background: '#f9fafb', border: '2px dashed #d1d5db', borderRadius: 10, padding: '32px 24px', textAlign: 'center', marginBottom: 24 }}>
       <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
       <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 6 }}>{feature} requires the {planName} plan</div>
-      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>Upgrade your subscription to unlock this feature.</div>
+      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>{t.upgradePlanPrompt}</div>
       <button style={{ background: '#1a56db', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
         onClick={() => window.location.href = '/administration#billing'}>
-        View Plans →
+        {t.viewPlans}
       </button>
     </div>
   );
@@ -124,6 +123,7 @@ function UpgradePrompt({ requiredPlan, feature }) {
 export default function AdminDashboard() {
   const { logout, user } = useAuth();
   const plan = usePlan();
+  const t = useT();
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
@@ -179,14 +179,14 @@ export default function AdminDashboard() {
         </div>
         <div style={styles.headerRight}>
           <NotificationBell />
-          <button style={styles.headerBtn} className="header-btn" onClick={logout}>Logout</button>
+          <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
         </div>
       </header>
 
       {billing?.subscription_status === 'trial_expired' && (
         <div style={{ ...styles.trialBanner, background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' }}>
-          ⚠ Your free trial has ended. Your data is safe.
-          {' '}<button style={styles.trialUpgradeBtn} onClick={() => window.location.href = '/administration#billing'}>Subscribe now →</button>
+          ⚠ {t.trialEnded}
+          {' '}<button style={styles.trialUpgradeBtn} onClick={() => window.location.href = '/administration#billing'}>{t.subscribeNow}</button>
         </div>
       )}
       {billing?.subscription_status === 'trial' && (() => {
@@ -195,7 +195,7 @@ export default function AdminDashboard() {
         return (
           <div style={{ ...styles.trialBanner, background: days <= 2 ? '#fef2f2' : '#fffbeb', borderColor: days <= 2 ? '#fecaca' : '#fcd34d', color: days <= 2 ? '#991b1b' : '#92400e' }}>
             {`⏳ ${days} day${days !== 1 ? 's' : ''} left in your trial.`}
-            {' '}<button style={styles.trialUpgradeBtn} onClick={() => window.location.href = '/administration#billing'}>Subscribe now →</button>
+            {' '}<button style={styles.trialUpgradeBtn} onClick={() => window.location.href = '/administration#billing'}>{t.subscribeNow}</button>
           </div>
         );
       })()}
@@ -206,19 +206,19 @@ export default function AdminDashboard() {
           active={tab}
           onChange={switchTab}
           tabs={[
-            { id: 'live', label: '🟢 Live' },
-            ...(settings?.feature_analytics !== false ? [{ id: 'analytics', label: 'Analytics' }] : []),
-            { id: 'approvals', label: 'Approvals', dot: pendingCount > 0 ? '#f59e0b' : null },
-            { id: 'reports', label: 'Reports' },
-            { id: 'manage', label: 'Manage' },
-            { id: 'settings', label: 'Settings' },
+            { id: 'live', label: t.tabLive },
+            ...(settings?.feature_analytics !== false ? [{ id: 'analytics', label: t.tabAnalytics }] : []),
+            { id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null },
+            { id: 'reports', label: t.tabReports },
+            { id: 'manage', label: t.tabManage },
+            { id: 'settings', label: t.tabSettings },
           ]}
         />
 
-        {loading ? <p>Loading...</p> : loadError ? (
+        {loading ? <p>{t.loading}</p> : loadError ? (
           <div style={styles.errorBanner}>
-            <strong>Failed to load dashboard data.</strong> Check your connection and{' '}
-            <button style={styles.retryBtn} onClick={() => window.location.reload()}>try again</button>.
+            <strong>{t.failedLoadDashboard}</strong> Check your connection and{' '}
+            <button style={styles.retryBtn} onClick={() => window.location.reload()}>{t.tryAgain}</button>.
           </div>
         ) : tab === 'live' ? (
           <>
@@ -235,52 +235,48 @@ export default function AdminDashboard() {
           </>
         ) : tab === 'analytics' ? (
           <>
-            <h2 style={styles.heading}>Analytics</h2>
+            <h2 style={styles.heading}>{t.tabAnalytics}</h2>
             {plan.isBusiness
               ? <AnalyticsDashboard />
-              : <UpgradePrompt requiredPlan="business" feature="Full Analytics" />
+              : <UpgradePrompt requiredPlan="business" feature={t.fullAnalytics} />
             }
           </>
         ) : tab === 'approvals' ? (
           <>
-            <h2 style={styles.heading}>Approvals</h2>
+            <h2 style={styles.heading}>{t.tabApprovals}</h2>
             <ApprovalQueue />
           </>
         ) : tab === 'reports' ? (
           <>
-            <h2 style={styles.heading}>Reports</h2>
-            <h3 style={styles.subheading}>Worker Reports</h3>
+            <h2 style={styles.heading}>{t.tabReports}</h2>
+            <h3 style={styles.subheading}>{t.workerReports}</h3>
             {workers.length === 0
-              ? <p style={{ color: '#666' }}>No workers yet. Add one in the Manage tab.</p>
-              : workers.map(w => <WorkerMetrics key={w.id} worker={w} />)
+              ? <p style={{ color: '#666' }}>{t.noWorkersYet}</p>
+              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} />)
             }
-            <h3 style={styles.subheading}>Project Reports</h3>
-            <ProjectReports />
-            <h3 style={styles.subheading}>Overtime Report</h3>
-            {plan.isStarter ? <OvertimeReport /> : <UpgradePrompt requiredPlan="starter" feature="Overtime Report" />}
-            <h3 style={styles.subheading}>Certified Payroll</h3>
-            {plan.hasProAddon ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="pro_addon" feature="Certified Payroll (WH-347)" />}
-            <h3 style={styles.subheading}>Export</h3>
-            {plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature="CSV & Payroll Export" />}
+            <h3 style={styles.subheading}>{t.projectReports}</h3>
+            <ProjectReports currency={settings?.currency ?? 'USD'} />
+            <h3 style={styles.subheading}>{t.overtimeReport}</h3>
+            {plan.isStarter ? <OvertimeReport currency={settings?.currency ?? 'USD'} /> : <UpgradePrompt requiredPlan="starter" feature={t.overtimeReport} />}
+            <h3 style={styles.subheading}>{t.certifiedPayroll}</h3>
+            {plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature={t.certifiedPayroll} />}
+            <h3 style={styles.subheading}>{t.export}</h3>
+            {plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />}
           </>
         ) : tab === 'manage' ? (
           <>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
-            <ManageWorkers workers={workers} onWorkerAdded={handleWorkerAdded} onWorkerDeleted={handleWorkerDeleted} onWorkerUpdated={handleWorkerUpdated} onWorkerRestored={handleWorkerRestored} defaultRate={settings?.default_hourly_rate ?? 30} showRate={true} identityEditable={false} />
-            <ManageProjects projects={projects} onProjectAdded={handleProjectAdded} onProjectDeleted={handleProjectDeleted} onProjectUpdated={handleProjectUpdated} onProjectRestored={handleProjectRestored} showWageType={settings?.feature_prevailing_wage !== false} nameEditable={false} showGeofenceBudget={false} />
-            <ManageRates settings={settings} onSettingsUpdated={setSettings} />
             <ManagePayPeriods />
-            <h3 style={styles.subheading}>Audit Log</h3>
-            <AuditLog />
           </>
         ) : (
           <>
-            <h2 style={styles.heading}>Settings</h2>
+            <h2 style={styles.heading}>{t.tabSettings}</h2>
             <FeatureToggles settings={settings} onSettingsUpdated={setSettings} />
-            {plan.hasProAddon
-              ? <QuickBooks workers={workers} projects={projects} />
-              : <UpgradePrompt requiredPlan="pro_addon" feature="QuickBooks Online Integration" />
-            }
+            <MFASetup />
+            <div style={styles.supportNote}>
+              {t.helpText.split('info@opsfloa.com')[0]}<a href="mailto:info@opsfloa.com" style={{ color: '#1a56db' }}>info@opsfloa.com</a>
+            </div>
+            <p style={{ fontSize: 13, color: '#6b7280' }}>{t.qboNote.split('Administration app')[0]}<a href="/administration#integrations" style={{ color: '#1a56db' }}>Administration app</a>.</p>
           </>
         )}
       </main>
@@ -314,4 +310,5 @@ const styles = {
   accountLabel: { fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 2 },
   accountSub: { fontSize: 12, color: '#6b7280' },
   accountBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '7px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
+  supportNote: { fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '8px 0 4px' },
 };

@@ -6,6 +6,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [firstLogin, setFirstLogin] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('tc_token');
@@ -21,8 +22,27 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password, company_name) => {
     const r = await api.post('/auth/login', { username, password, company_name });
+    if (r.data.mfa_required) {
+      return { mfa_required: true, mfa_token: r.data.mfa_token };
+    }
     localStorage.setItem('tc_token', r.data.token);
-    // Fetch fresh user+plan info from /me so plan fields are always included
+    const me = await api.get('/auth/me');
+    setUser(me.data.user);
+    if (r.data.first_login) setFirstLogin(true);
+    return me.data.user;
+  };
+
+  const loginWithToken = async token => {
+    localStorage.setItem('tc_token', token);
+    const me = await api.get('/auth/me');
+    setUser(me.data.user);
+    setFirstLogin(true); // registration always counts as first login
+    return me.data.user;
+  };
+
+  const confirmMfa = async (mfa_token, code) => {
+    const r = await api.post('/auth/mfa/confirm', { mfa_token, code });
+    localStorage.setItem('tc_token', r.data.token);
     const me = await api.get('/auth/me');
     setUser(me.data.user);
     return me.data.user;
@@ -31,12 +51,14 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('tc_token');
     setUser(null);
+    setFirstLogin(false);
   };
 
   const updateUser = patch => setUser(u => ({ ...u, ...patch }));
+  const clearFirstLogin = () => setFirstLogin(false);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithToken, confirmMfa, logout, updateUser, firstLogin, clearFirstLogin }}>
       {children}
     </AuthContext.Provider>
   );

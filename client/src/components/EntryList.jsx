@@ -29,6 +29,16 @@ function formatTime(t) {
   return `${hour % 12 || 12}:${m} ${hour < 12 ? 'AM' : 'PM'}`;
 }
 
+function tzAbbr(timezone, dateStr) {
+  if (!timezone) return '';
+  try {
+    const date = new Date((dateStr || '1970-01-01').substring(0, 10) + 'T12:00:00');
+    return new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'short' })
+      .formatToParts(date)
+      .find(p => p.type === 'timeZoneName')?.value || '';
+  } catch { return ''; }
+}
+
 export default function EntryList({ entries, onDeleted, onUpdated, t, language, currentUserId }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -101,7 +111,7 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
     return <div style={styles.empty}>{t.noEntries}</div>;
   }
 
-  const deletableEntries = entries.filter(e => !e.locked && isEditable(e.work_date));
+  const deletableEntries = entries.filter(e => !e.pending && !e.locked && isEditable(e.work_date));
 
   return (
     <div style={styles.card} className="mobile-card">
@@ -149,7 +159,7 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
             ) : (
               <>
                 <div style={styles.entryMain} className="entry-main">
-                  {!e.locked && isEditable(e.work_date) && (
+                  {!e.pending && !e.locked && isEditable(e.work_date) && (
                     <input
                       type="checkbox"
                       style={styles.checkbox}
@@ -160,17 +170,19 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                   <span style={styles.project}>{e.project_name}</span>
                   <div style={styles.entryRight}>
                     <span style={styles.date}>{formatDate(e.work_date, language)}</span>
-                    {e.locked
-                      ? <span style={styles.lockIcon} title="Approved and locked by admin">🔒</span>
-                      : isEditable(e.work_date)
-                        ? <button style={styles.editBtn} onClick={() => startEdit(e)}>{t.edit}</button>
-                        : <span style={styles.lockIcon} title="Entries older than 7 days cannot be edited">🔒</span>
+                    {e.pending
+                      ? null
+                      : e.locked
+                        ? <span style={styles.lockIcon} title="Approved and locked by admin">🔒</span>
+                        : isEditable(e.work_date)
+                          ? <button style={styles.editBtn} onClick={() => startEdit(e)}>{t.edit}</button>
+                          : <span style={styles.lockIcon} title="Entries older than 7 days cannot be edited">🔒</span>
                     }
-                    {!e.locked && <button style={styles.deleteBtn} onClick={() => handleDelete(e.id)}>{t.delete}</button>}
+                    {!e.pending && !e.locked && <button style={styles.deleteBtn} onClick={() => handleDelete(e.id)}>{t.delete}</button>}
                   </div>
                 </div>
                 <div style={styles.entryDetail} className="entry-detail">
-                  <span>{formatTime(e.start_time)} – {formatTime(e.end_time)} ({formatHours(e.start_time, e.end_time, e.break_minutes)})</span>
+                  <span>{formatTime(e.start_time)} – {formatTime(e.end_time)}{tzAbbr(e.timezone, e.work_date) ? ` ${tzAbbr(e.timezone, e.work_date)}` : ''} ({formatHours(e.start_time, e.end_time, e.break_minutes)})</span>
                   {e.break_minutes > 0 && <span style={styles.breakTag}>☕ {e.break_minutes}m break</span>}
                   {e.mileage > 0 && <span style={styles.mileageTag}>🚗 {parseFloat(e.mileage).toFixed(1)} mi</span>}
                   <span style={{ ...styles.badge, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
@@ -179,7 +191,8 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                   {e.status === 'approved' && <span style={styles.statusApproved}>{t.approved}</span>}
                   {e.locked && <span style={styles.lockedBadge}>🔒 Locked</span>}
                   {e.status === 'rejected' && <span style={styles.statusRejected}>{t.rejected}{e.approval_note ? `: ${e.approval_note}` : ''}</span>}
-                  {(!e.status || e.status === 'pending') && <span style={styles.statusPending}>{t.pending}</span>}
+                  {e.pending && <span style={styles.statusOffline}>⏳ Pending sync</span>}
+                  {!e.pending && (!e.status || e.status === 'pending') && <span style={styles.statusPending}>{t.pending}</span>}
                 </div>
                 {e.notes && <div style={styles.notes}>{e.notes}</div>}
                 <button
@@ -231,6 +244,7 @@ const styles = {
   statusApproved: { fontSize: 11, fontWeight: 700, color: '#059669', background: '#d1fae5', padding: '1px 7px', borderRadius: 10 },
   statusRejected: { fontSize: 11, fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '1px 7px', borderRadius: 10 },
   statusPending: { fontSize: 11, color: '#92400e', background: '#fef3c7', padding: '1px 7px', borderRadius: 10 },
+  statusOffline: { fontSize: 11, color: '#92400e', background: '#fef3c7', padding: '1px 7px', borderRadius: 10, fontWeight: 700 },
   breakTag: { fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
   mileageTag: { fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 6 },

@@ -6,7 +6,7 @@ const pool = require('../db');
 const { requireAdmin, requirePlan, requireProAddon } = require('../middleware/auth');
 const { sendPushToUser, sendPushToAllWorkers } = require('../push');
 const { sendEmail } = require('../email');
-const { hoursWorked, computeOT } = require('../utils/payCalculations');
+const { hoursWorked, computeOT, computeDailyPayCosts } = require('../utils/payCalculations');
 const { createInboxItem } = require('./inbox');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -149,7 +149,7 @@ router.patch('/settings', requireAdmin, async (req, res) => {
   const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
   const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour', 'chat_retention_days'];
   const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold'];
-  const stringKeys = ['overtime_rule'];
+  const stringKeys = ['overtime_rule', 'currency'];
   const allowed = [...numericKeys, ...stringKeys, ...FEATURE_KEYS];
   const companyId = req.user.company_id;
   try {
@@ -167,6 +167,8 @@ router.patch('/settings', requireAdmin, async (req, res) => {
           const val = req.body[key];
           if (key === 'overtime_rule' && !['daily', 'weekly'].includes(val))
             return res.status(400).json({ error: 'overtime_rule must be daily or weekly' });
+          if (key === 'currency' && !/^[A-Z]{3}$/.test(val))
+            return res.status(400).json({ error: 'currency must be a valid 3-letter ISO code' });
           await pool.query(
             'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
             [companyId, key, val]
@@ -205,8 +207,9 @@ router.get('/notifications', requireAdmin, async (req, res) => {
        FROM users u
        LEFT JOIN time_entries te ON te.user_id = u.id AND te.company_id = $1
        WHERE u.company_id = $1 AND u.active = true AND u.role = 'worker'
+         AND NOT EXISTS (SELECT 1 FROM active_clock ac WHERE ac.user_id = u.id AND ac.company_id = $1)
        GROUP BY u.id, u.full_name, u.email
-       HAVING MAX(te.work_date) IS NULL OR MAX(te.work_date) < CURRENT_DATE - $2
+       HAVING MAX(te.work_date) IS NULL OR MAX(te.work_date) < CURRENT_DATE - $2::integer
        ORDER BY last_entry_date ASC NULLS FIRST`,
       [companyId, days]
     );
@@ -244,6 +247,8 @@ router.get('/workers', requireAdmin, async (req, res) => {
   const allRoles = req.query.all_roles === 'true';
   const roleFilter = allRoles ? `u.role IN ('worker', 'admin')` : `u.role = 'worker'`;
   try {
+    const settings = await getSettings(companyId);
+    const threshold = parseFloat(settings.overtime_threshold) || 8;
     const result = await pool.query(
       `WITH daily_regular AS (
         SELECT user_id, work_date,
@@ -251,20 +256,40 @@ router.get('/workers', requireAdmin, async (req, res) => {
         FROM time_entries
         WHERE wage_type = 'regular' AND company_id = $1
         GROUP BY user_id, work_date
+      ),
+      weekly_regular AS (
+        SELECT user_id,
+          date_trunc('week', work_date) as week_start,
+          SUM(day_hours) as week_hours
+        FROM daily_regular
+        GROUP BY user_id, date_trunc('week', work_date)
       )
-      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate,
+      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
-        COALESCE((SELECT SUM(LEAST(day_hours, 8)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as regular_hours,
-        COALESCE((SELECT SUM(GREATEST(day_hours - 8, 0)) FROM daily_regular dr WHERE dr.user_id = u.id), 0) as overtime_hours,
+        COALESCE(
+          CASE WHEN u.overtime_rule = 'weekly' THEN
+            (SELECT SUM(LEAST(week_hours, $2)) FROM weekly_regular wr WHERE wr.user_id = u.id)
+          ELSE
+            (SELECT SUM(LEAST(day_hours, $2)) FROM daily_regular dr WHERE dr.user_id = u.id)
+          END
+        , 0) as regular_hours,
+        COALESCE(
+          CASE WHEN u.overtime_rule = 'none' THEN 0
+               WHEN u.overtime_rule = 'weekly' THEN
+                 (SELECT SUM(GREATEST(week_hours - $2, 0)) FROM weekly_regular wr WHERE wr.user_id = u.id)
+               ELSE
+                 (SELECT SUM(GREATEST(day_hours - $2, 0)) FROM daily_regular dr WHERE dr.user_id = u.id)
+               END
+        , 0) as overtime_hours,
         COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600 ELSE 0 END), 0) as prevailing_hours
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1
-      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate
+      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
-      [companyId]
+      [companyId, threshold]
     );
     res.json(result.rows);
   } catch (err) {
@@ -312,7 +337,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const userResult = await pool.query(
-      'SELECT id, full_name, username, hourly_rate FROM users WHERE id = $1 AND role = $2 AND company_id = $3',
+      'SELECT id, full_name, username, hourly_rate, rate_type, overtime_rule FROM users WHERE id = $1 AND role = $2 AND company_id = $3',
       [req.params.id, 'worker', companyId]
     );
     if (userResult.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
@@ -330,20 +355,29 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
 
     const entries = entriesResult.rows;
     const settings = await getSettings(companyId);
-    const { regularHours, overtimeHours } = computeOT(entries, settings.overtime_rule, settings.overtime_threshold);
+    const worker = userResult.rows[0];
+    const workerOTRule = worker.overtime_rule || 'daily';
+    const { regularHours, overtimeHours } = computeOT(entries, workerOTRule, settings.overtime_threshold);
     const prevailingHours = entries.filter(e => e.wage_type === 'prevailing').reduce((sum, e) => {
       const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
       return sum + h;
     }, 0);
     const totalHours = regularHours + overtimeHours + prevailingHours;
-    const rate = parseFloat(userResult.rows[0].hourly_rate) || settings.default_hourly_rate;
-    const regularCost = regularHours * rate;
-    const overtimeCost = overtimeHours * rate * settings.overtime_multiplier;
+    const rate = parseFloat(worker.hourly_rate) || settings.default_hourly_rate;
+    let regularCost, overtimeCost;
+    if (worker.rate_type === 'daily') {
+      const dc = computeDailyPayCosts(entries, workerOTRule, settings.overtime_threshold, rate, settings.overtime_multiplier);
+      regularCost = dc.regularCost;
+      overtimeCost = dc.overtimeCost;
+    } else {
+      regularCost = regularHours * rate;
+      overtimeCost = overtimeHours * rate * settings.overtime_multiplier;
+    }
     const prevailingCost = prevailingHours * settings.prevailing_wage_rate;
     const totalCost = regularCost + overtimeCost + prevailingCost;
 
     res.json({
-      worker: userResult.rows[0],
+      worker,
       entries,
       summary: {
         total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours,
@@ -355,6 +389,20 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /admin/workers/check-username — check if a username is already taken
+router.get('/workers/check-username', requireAdmin, async (req, res) => {
+  const { username, exclude_id } = req.query;
+  if (!username) return res.json({ taken: false });
+  try {
+    const result = exclude_id
+      ? await pool.query('SELECT id FROM users WHERE username = $1 AND id != $2', [username.toLowerCase().trim(), exclude_id])
+      : await pool.query('SELECT id FROM users WHERE username = $1', [username.toLowerCase().trim()]);
+    res.json({ taken: result.rowCount > 0 });
+  } catch (err) {
+    res.json({ taken: false });
   }
 });
 
@@ -412,13 +460,13 @@ router.post('/workers/invite', requireAdmin, async (req, res) => {
     let emailSent = true;
     try {
       await sgMail.send({
-        from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
+        from: { name: 'OpsFloA', email: process.env.SENDGRID_FROM_EMAIL },
         to: email,
-        subject: `You've been invited to OpsFloa`,
+        subject: `You've been invited to OpsFloA`,
         html: `
           <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
             <h2 style="color:#1a56db;margin-bottom:8px">You're invited!</h2>
-            <p style="color:#444;margin-bottom:8px">Hi ${full_name}, ${req.user.full_name} has invited you to join OpsFloa.</p>
+            <p style="color:#444;margin-bottom:8px">Hi ${full_name}, ${req.user.full_name} has invited you to join OpsFloA.</p>
             <p style="color:#444;margin-bottom:24px">Your username is: <strong>${username}</strong></p>
             <a href="${inviteUrl}" style="display:inline-block;background:#1a56db;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700">Set your password</a>
             <p style="color:#999;font-size:13px;margin-top:24px">This invite expires in 7 days.</p>
@@ -451,6 +499,9 @@ router.post('/workers', requireAdmin, async (req, res) => {
   }
   const assignedRate = (!isNaN(rateVal) && rateVal >= 0) ? rateVal : 30;
   const assignedEmail = req.body.email || null;
+  const VALID_OT_RULES = ['daily', 'weekly', 'none'];
+  const assignedRateType = ['hourly', 'daily'].includes(req.body.rate_type) ? req.body.rate_type : 'hourly';
+  const assignedOTRule = VALID_OT_RULES.includes(req.body.overtime_rule) ? req.body.overtime_rule : 'daily';
 
   // Enforce worker count limit (admins don't count against the limit)
   if (assignedRole === 'worker') {
@@ -469,8 +520,8 @@ router.post('/workers', requireAdmin, async (req, res) => {
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      'INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, language, hourly_rate, email, email_confirmed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true) RETURNING id, username, full_name, first_name, middle_name, last_name, role, language, hourly_rate, email',
-      [companyId, username, hash, full_name, first_name || null, middle_name || null, last_name || null, assignedRole, assignedLanguage, assignedRate, assignedEmail]
+      'INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, language, hourly_rate, rate_type, overtime_rule, email, email_confirmed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true) RETURNING id, username, full_name, first_name, middle_name, last_name, role, language, hourly_rate, rate_type, overtime_rule, email',
+      [companyId, username, hash, full_name, first_name || null, middle_name || null, last_name || null, assignedRole, assignedLanguage, assignedRate, assignedRateType, assignedOTRule, assignedEmail]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.created', 'worker', result.rows[0].id, full_name, { role: assignedRole });
     res.status(201).json(result.rows[0]);
@@ -488,15 +539,28 @@ router.post('/workers', requireAdmin, async (req, res) => {
   }
 });
 
-// Update a worker (full_name, first_name, middle_name, last_name, role, language, hourly_rate, email)
+// Update a worker (full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, email)
 router.patch('/workers/:id', requireAdmin, async (req, res) => {
-  const { full_name, first_name, middle_name, last_name, role, language, hourly_rate, email } = req.body;
-  if (!full_name && !first_name && !last_name && !role && !language && hourly_rate === undefined && email === undefined) {
+  const { full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, overtime_rule, email } = req.body;
+  if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && rate_type === undefined && overtime_rule === undefined && email === undefined) {
     return res.status(400).json({ error: 'At least one field required' });
   }
   const companyId = req.user.company_id;
   const assignedRole = role ? (role === 'admin' ? 'admin' : 'worker') : undefined;
+  const VALID_RATE_TYPES = ['hourly', 'daily'];
+  const VALID_OT_RULES = ['daily', 'weekly', 'none'];
   try {
+    if (username) {
+      const clean = username.toLowerCase().trim();
+      const conflict = await pool.query('SELECT id FROM users WHERE username = $1 AND id != $2', [clean, req.params.id]);
+      if (conflict.rowCount > 0) return res.status(409).json({ error: 'Username already taken' });
+    }
+    if (rate_type !== undefined && !VALID_RATE_TYPES.includes(rate_type)) {
+      return res.status(400).json({ error: 'Invalid rate_type' });
+    }
+    if (overtime_rule !== undefined && !VALID_OT_RULES.includes(overtime_rule)) {
+      return res.status(400).json({ error: 'Invalid overtime_rule' });
+    }
     const fields = [];
     const values = [];
     let idx = 1;
@@ -504,6 +568,7 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
     if (first_name !== undefined) { fields.push(`first_name = $${idx++}`); values.push(first_name || null); }
     if (middle_name !== undefined) { fields.push(`middle_name = $${idx++}`); values.push(middle_name || null); }
     if (last_name !== undefined) { fields.push(`last_name = $${idx++}`); values.push(last_name || null); }
+    if (username) { fields.push(`username = $${idx++}`); values.push(username.toLowerCase().trim()); }
     if (assignedRole !== undefined) { fields.push(`role = $${idx++}`); values.push(assignedRole); }
     if (language) { fields.push(`language = $${idx++}`); values.push(language); }
     if (hourly_rate !== undefined) {
@@ -511,11 +576,13 @@ router.patch('/workers/:id', requireAdmin, async (req, res) => {
       if (isNaN(rv) || rv < 0) return res.status(400).json({ error: 'hourly_rate must be a non-negative number' });
       fields.push(`hourly_rate = $${idx++}`); values.push(rv);
     }
+    if (rate_type !== undefined) { fields.push(`rate_type = $${idx++}`); values.push(rate_type); }
+    if (overtime_rule !== undefined) { fields.push(`overtime_rule = $${idx++}`); values.push(overtime_rule); }
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email || null); }
     values.push(req.params.id);
     values.push(companyId);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, role, language, hourly_rate, email`,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, role, language, hourly_rate, rate_type, overtime_rule, email`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
@@ -554,7 +621,7 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
     if (projectResult.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
 
     const entriesResult = await pool.query(
-      `SELECT te.*, u.full_name as worker_name, u.username, u.hourly_rate
+      `SELECT te.*, u.full_name as worker_name, u.username, u.hourly_rate, u.rate_type, u.overtime_rule
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
        WHERE te.project_id = $1
@@ -567,18 +634,24 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
     const entries = entriesResult.rows;
     const settings = await getSettings(companyId);
 
-    // Per-worker OT using configured rule
+    // Per-worker OT using each worker's own rule
     const workerEntries = {};
     entries.filter(e => e.wage_type === 'regular').forEach(e => {
-      if (!workerEntries[e.user_id]) workerEntries[e.user_id] = { items: [], rate: parseFloat(e.hourly_rate) || settings.default_hourly_rate };
+      if (!workerEntries[e.user_id]) workerEntries[e.user_id] = { items: [], rate: parseFloat(e.hourly_rate) || settings.default_hourly_rate, rate_type: e.rate_type, overtime_rule: e.overtime_rule || 'daily' };
       workerEntries[e.user_id].items.push(e);
     });
     let regularHours = 0, overtimeHours = 0, regularCost = 0, overtimeCost = 0;
-    Object.values(workerEntries).forEach(({ items, rate }) => {
-      const { regularHours: reg, overtimeHours: ot } = computeOT(items, settings.overtime_rule, settings.overtime_threshold);
+    Object.values(workerEntries).forEach(({ items, rate, rate_type, overtime_rule }) => {
+      const { regularHours: reg, overtimeHours: ot } = computeOT(items, overtime_rule, settings.overtime_threshold);
       regularHours += reg; overtimeHours += ot;
-      regularCost += reg * rate;
-      overtimeCost += ot * rate * settings.overtime_multiplier;
+      if (rate_type === 'daily') {
+        const dc = computeDailyPayCosts(items, overtime_rule, settings.overtime_threshold, rate, settings.overtime_multiplier);
+        regularCost += dc.regularCost;
+        overtimeCost += dc.overtimeCost;
+      } else {
+        regularCost += reg * rate;
+        overtimeCost += ot * rate * settings.overtime_multiplier;
+      }
     });
 
     let prevailingHours = 0, prevailingCost = 0;
@@ -1073,7 +1146,7 @@ router.get('/overtime-report', requireAdmin, requirePlan('starter'), async (req,
     const prevRate = parseFloat(s.prevailing_wage_rate) || 45;
 
     const workers = await pool.query(
-      `SELECT u.id, u.full_name, u.hourly_rate FROM users u
+      `SELECT u.id, u.full_name, u.hourly_rate, u.rate_type, u.overtime_rule FROM users u
        WHERE u.company_id = $1 AND u.role = 'worker' AND u.active = true
        ORDER BY u.full_name`,
       [companyId]
@@ -1093,19 +1166,27 @@ router.get('/overtime-report', requireAdmin, requirePlan('starter'), async (req,
 
     const rows = workers.rows.map(w => {
       const wEntries = byWorker[w.id] || [];
-      const { regularHours, overtimeHours } = computeOT(wEntries, rule, threshold);
+      const workerOTRule = w.overtime_rule || 'daily';
+      const { regularHours, overtimeHours } = computeOT(wEntries, workerOTRule, threshold);
       const prevHours = wEntries
         .filter(e => e.wage_type === 'prevailing')
         .reduce((s, e) => s + hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60, 0);
       const totalHours = regularHours + overtimeHours + prevHours;
       const rate = parseFloat(w.hourly_rate) || defaultRate;
-      const regularCost = regularHours * rate;
-      const overtimeCost = overtimeHours * rate * otMult;
+      let regularCost, overtimeCost;
+      if (w.rate_type === 'daily') {
+        const dc = computeDailyPayCosts(wEntries, workerOTRule, threshold, rate, otMult);
+        regularCost = dc.regularCost;
+        overtimeCost = dc.overtimeCost;
+      } else {
+        regularCost = regularHours * rate;
+        overtimeCost = overtimeHours * rate * otMult;
+      }
       const prevailingCost = prevHours * prevRate;
       const totalCost = regularCost + overtimeCost + prevailingCost;
       const mileage = wEntries.reduce((s, e) => s + (parseFloat(e.mileage) || 0), 0);
       return {
-        worker_id: w.id, worker_name: w.full_name, rate,
+        worker_id: w.id, worker_name: w.full_name, rate, rate_type: w.rate_type || 'hourly', overtime_rule: workerOTRule,
         regular_hours: parseFloat(regularHours.toFixed(2)),
         overtime_hours: parseFloat(overtimeHours.toFixed(2)),
         prevailing_hours: parseFloat(prevHours.toFixed(2)),
@@ -1135,7 +1216,7 @@ router.get('/payroll-export', requireAdmin, requirePlan('starter'), async (req, 
     const prevRate = parseFloat(s.prevailing_wage_rate) || 45;
 
     const workers = await pool.query(
-      `SELECT u.id, u.full_name, u.hourly_rate FROM users u
+      `SELECT u.id, u.full_name, u.hourly_rate, u.rate_type, u.overtime_rule FROM users u
        WHERE u.company_id = $1 AND u.role = 'worker' AND u.active = true
        ORDER BY u.full_name`,
       [companyId]
@@ -1153,26 +1234,37 @@ router.get('/payroll-export', requireAdmin, requirePlan('starter'), async (req, 
     });
 
     const esc = v => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`;
-    const headers = ['Worker', 'Rate ($/hr)', 'Regular Hrs', 'OT Hrs', 'Prevailing Hrs', 'Total Hrs', 'Mileage (mi)', 'Regular Pay', 'OT Pay', 'Prevailing Pay', 'Total Pay'];
+    const headers = ['Worker', 'Rate Type', 'Overtime', 'Rate', 'Regular Hrs', 'OT Hrs', 'Prevailing Hrs', 'Total Hrs', 'Mileage (mi)', 'Regular Pay', 'OT Pay', 'Prevailing Pay', 'Total Pay'];
     const lines = [headers.join(',')];
 
     workers.rows.forEach(w => {
       const wEntries = byWorker[w.id] || [];
-      const { regularHours, overtimeHours } = computeOT(wEntries, rule, threshold);
+      const workerOTRule = w.overtime_rule || 'daily';
+      const { regularHours, overtimeHours } = computeOT(wEntries, workerOTRule, threshold);
       const prevHours = wEntries
         .filter(e => e.wage_type === 'prevailing')
         .reduce((s, e) => s + hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60, 0);
       const rate = parseFloat(w.hourly_rate) || defaultRate;
       const mileage = wEntries.reduce((s, e) => s + (parseFloat(e.mileage) || 0), 0);
+      let regularCost, overtimeCost;
+      if (w.rate_type === 'daily') {
+        const dc = computeDailyPayCosts(wEntries, workerOTRule, threshold, rate, otMult);
+        regularCost = dc.regularCost;
+        overtimeCost = dc.overtimeCost;
+      } else {
+        regularCost = regularHours * rate;
+        overtimeCost = overtimeHours * rate * otMult;
+      }
+      const prevailingCost = prevHours * prevRate;
       lines.push([
-        esc(w.full_name), rate.toFixed(2),
+        esc(w.full_name), w.rate_type || 'hourly', workerOTRule, rate.toFixed(2),
         regularHours.toFixed(2), overtimeHours.toFixed(2), prevHours.toFixed(2),
         (regularHours + overtimeHours + prevHours).toFixed(2),
         mileage.toFixed(1),
-        (regularHours * rate).toFixed(2),
-        (overtimeHours * rate * otMult).toFixed(2),
-        (prevHours * prevRate).toFixed(2),
-        (regularHours * rate + overtimeHours * rate * otMult + prevHours * prevRate).toFixed(2),
+        regularCost.toFixed(2),
+        overtimeCost.toFixed(2),
+        prevailingCost.toFixed(2),
+        (regularCost + overtimeCost + prevailingCost).toFixed(2),
       ].join(','));
     });
 

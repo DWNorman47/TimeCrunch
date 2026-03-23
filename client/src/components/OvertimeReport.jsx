@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import api from '../api';
-import { fmtHours } from '../utils';
+import { fmtHours, formatCurrency } from '../utils';
 
 function monthStart() {
   const d = new Date();
@@ -8,9 +8,9 @@ function monthStart() {
 }
 function today() { return new Date().toISOString().substring(0, 10); }
 function fmt(n) { return n == null ? '—' : fmtHours(n); }
-function money(n) { return n == null ? '—' : `$${n.toFixed(2)}`; }
 
-export default function OvertimeReport() {
+export default function OvertimeReport({ currency = 'USD' }) {
+  const money = n => n == null ? '—' : formatCurrency(n, currency);
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(today());
   const [rows, setRows] = useState(null);
@@ -113,7 +113,7 @@ export default function OvertimeReport() {
               {sorted.map(r => (
                 <tr key={r.worker_id} style={r.overtime_hours > 0 ? styles.rowOT : {}}>
                   <td style={styles.td}><strong>{r.worker_name}</strong></td>
-                  <td style={styles.tdNum}>${r.rate.toFixed(2)}</td>
+                  <td style={styles.tdNum}>{money(r.rate)}</td>
                   <td style={styles.tdNum}>{fmt(r.regular_hours)}</td>
                   <td style={{ ...styles.tdNum, color: r.overtime_hours > 0 ? '#d97706' : undefined, fontWeight: r.overtime_hours > 0 ? 700 : undefined }}>
                     {fmt(r.overtime_hours)}

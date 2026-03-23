@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -22,6 +23,7 @@ function lastSunday() {
 }
 
 export default function CertifiedPayroll({ projects }) {
+  const t = useT();
   const [weekEnd, setWeekEnd] = useState(lastSunday());
   const [projectId, setProjectId] = useState('');
   const [data, setData] = useState(null);
@@ -37,7 +39,7 @@ export default function CertifiedPayroll({ projects }) {
       const r = await api.get(`/admin/certified-payroll?${params}`);
       setData(r.data);
     } catch {
-      setError('Failed to load report. Check that the date range has entries.');
+      setError(t.failedLoadReport);
     } finally {
       setLoading(false);
     }
@@ -112,23 +114,23 @@ export default function CertifiedPayroll({ projects }) {
 
   return (
     <div style={styles.card}>
-      <h3 style={styles.title}>Certified Payroll</h3>
-      <p style={styles.sub}>Weekly hours by worker and classification for prevailing wage compliance reporting.</p>
+      <h3 style={styles.title}>{t.certifiedPayrollTitle}</h3>
+      <p style={styles.sub}>{t.certPayrollDesc}</p>
 
       <div style={styles.controls}>
         <div style={styles.field}>
-          <label style={styles.label}>Week ending</label>
+          <label style={styles.label}>{t.weekEnding}</label>
           <input style={styles.input} type="date" value={weekEnd} onChange={e => { setWeekEnd(e.target.value); setData(null); }} />
         </div>
         <div style={styles.field}>
-          <label style={styles.label}>Project (optional)</label>
+          <label style={styles.label}>{t.projectOptional}</label>
           <select style={styles.input} value={projectId} onChange={e => { setProjectId(e.target.value); setData(null); }}>
-            <option value="">All projects</option>
+            <option value="">{t.allProjectsOpt}</option>
             {(projects || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
         <button style={styles.generateBtn} onClick={generate} disabled={loading || !weekEnd}>
-          {loading ? 'Loading...' : 'Generate'}
+          {loading ? t.loading : t.generate}
         </button>
       </div>
 
@@ -138,22 +140,22 @@ export default function CertifiedPayroll({ projects }) {
         <>
           <div style={styles.reportHeader}>
             <div>
-              <div style={styles.metaLine}><strong>Contractor:</strong> {data.contractor}</div>
-              <div style={styles.metaLine}><strong>Project:</strong> {data.project || 'All projects'}</div>
+              <div style={styles.metaLine}><strong>{t.contractorLabel}</strong> {data.contractor}</div>
+              <div style={styles.metaLine}><strong>{t.project}:</strong> {data.project || t.allProjectsOpt}</div>
               <div style={styles.metaLine}><strong>Period:</strong> {fmtDate(data.week_start)} – {fmtDate(data.week_end)}</div>
             </div>
-            <button style={styles.printBtn} onClick={printReport}>⬇ Print / Save PDF</button>
+            <button style={styles.printBtn} onClick={printReport}>{t.printSavePDF}</button>
           </div>
 
           {data.workers.length === 0 ? (
-            <p style={styles.empty}>No time entries found for this week and project.</p>
+            <p style={styles.empty}>{t.noTimeEntriesFound}</p>
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Worker</th>
-                    <th style={styles.th}>Class.</th>
+                    <th style={styles.th}>{t.worker}</th>
+                    <th style={styles.th}>{t.classLabel}</th>
                     {DAY_LABELS.map(d => <th key={d} style={{ ...styles.th, ...styles.dayTh }}>{d}</th>)}
                     <th style={styles.th}>Total</th>
                     <th style={styles.th}>Rate</th>
@@ -166,7 +168,7 @@ export default function CertifiedPayroll({ projects }) {
                     if (w.regular_total > 0) rows.push(
                       <tr key={`${w.worker_id}-reg`} style={styles.tr}>
                         <td style={styles.nameTd}>{w.worker_name}</td>
-                        <td style={{ ...styles.td, ...styles.classTd }}>Regular</td>
+                        <td style={{ ...styles.td, ...styles.classTd }}>{t.regular}</td>
                         {DAY_KEYS.map(d => <td key={d} style={styles.dayTd}>{w.regular_days[d] || '—'}</td>)}
                         <td style={{ ...styles.td, fontWeight: 700 }}>{fmtH(w.regular_total)}</td>
                         <td style={styles.td}>${w.rate.toFixed(2)}</td>
@@ -176,7 +178,7 @@ export default function CertifiedPayroll({ projects }) {
                     if (w.prevailing_total > 0) rows.push(
                       <tr key={`${w.worker_id}-prev`} style={{ ...styles.tr, background: '#fffbeb' }}>
                         <td style={styles.nameTd}>{w.regular_total === 0 ? w.worker_name : ''}</td>
-                        <td style={{ ...styles.td, ...styles.classTd, color: '#92400e', fontWeight: 600 }}>Prevailing</td>
+                        <td style={{ ...styles.td, ...styles.classTd, color: '#92400e', fontWeight: 600 }}>{t.prevailing}</td>
                         {DAY_KEYS.map(d => <td key={d} style={styles.dayTd}>{w.prevailing_days[d] || '—'}</td>)}
                         <td style={{ ...styles.td, fontWeight: 700 }}>{fmtH(w.prevailing_total)}</td>
                         <td style={styles.td}>${w.prevailing_rate.toFixed(2)}</td>

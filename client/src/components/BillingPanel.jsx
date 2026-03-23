@@ -25,10 +25,15 @@ function StatusBadge({ status, trialEndsAt, plan }) {
 
 const badge = { padding: '4px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700 };
 
-function PlanCard({ name, priceEl, subline, features, color, highlight, tag, onSelect, btnLabel, disabled, current }) {
+function PlanCard({ name, priceEl, subline, features, color, highlight, tag, onSelect, btnLabel, disabled, current, selected }) {
   return (
-    <div style={{ ...s.planCard, ...(highlight ? s.planCardHighlight : {}), ...(current ? s.planCardCurrent : {}), borderColor: current ? '#059669' : highlight ? color : '#e5e7eb' }}>
-      {tag && <div style={{ ...s.planTag, background: color }}>{tag}</div>}
+    <div style={{
+      ...s.planCard,
+      borderColor: current ? '#059669' : selected ? color : highlight ? color : '#e5e7eb',
+      boxShadow: selected ? `0 0 0 3px ${color}22` : highlight ? '0 4px 20px rgba(124,58,237,0.12)' : undefined,
+    }}>
+      {tag && !selected && <div style={{ ...s.planTag, background: color }}>{tag}</div>}
+      {selected && <div style={{ ...s.selectedTag, background: color }}>✓ Selected</div>}
       <div style={s.planName}>{name}</div>
       <div style={{ ...s.planPrice, color }}>{priceEl}</div>
       {subline && <div style={s.planSubline}>{subline}</div>}
@@ -40,8 +45,11 @@ function PlanCard({ name, priceEl, subline, features, color, highlight, tag, onS
           </li>
         ))}
       </ul>
-      <button style={{ ...s.planBtn, background: current ? '#059669' : color, opacity: disabled ? 0.6 : 1 }}
-        onClick={onSelect} disabled={disabled}>
+      <button
+        style={{ ...s.planBtn, background: selected ? color : current ? '#059669' : color, opacity: disabled ? 0.6 : 1 }}
+        onClick={onSelect}
+        disabled={disabled}
+      >
         {btnLabel}
       </button>
     </div>
@@ -54,8 +62,11 @@ export default function BillingPanel() {
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState(null);
   const [annual, setAnnual] = useState(false);
-  const [workerCount, setWorkerCount] = useState(10);
-  const [addProAddon, setAddProAddon] = useState(false);
+  const [workerCount, setWorkerCount] = useState(15);
+  const [addQbo, setAddQbo] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [workerInputMode, setWorkerInputMode] = useState('slider');
+  const [workerDraft, setWorkerDraft] = useState('');
 
   useEffect(() => {
     Promise.all([api.get('/stripe/status'), api.get('/stripe/plans')])
@@ -71,9 +82,9 @@ export default function BillingPanel() {
       const r = await api.post('/stripe/checkout', {
         price_id: priceId,
         ...opts,
-        ...(addProAddon && plans?.pro_addon ? {
-          add_pro_addon: true,
-          pro_addon_price_id: annual ? plans.pro_addon.annual_price_id : plans.pro_addon.monthly_price_id,
+        ...(addQbo && plans?.qbo ? {
+          add_qbo: true,
+          qbo_price_id: annual ? plans.qbo.annual_price_id : plans.qbo.monthly_price_id,
         } : {}),
       });
       window.location.href = r.data.url;
@@ -94,21 +105,43 @@ export default function BillingPanel() {
     }
   };
 
+  const subscribeSelectedPlan = () => {
+    if (!selectedPlan || selectedPlan === 'free') return;
+    if (selectedPlan === 'starter') {
+      checkout(annual ? plans?.starter.annual_price_id : plans?.starter.monthly_price_id);
+    } else if (selectedPlan === 'business') {
+      checkout(
+        annual ? plans?.business.base_annual_price_id : plans?.business.base_monthly_price_id,
+        annual
+          ? { worker_price_id: plans?.business.worker_annual_price_id, worker_count: workerCount }
+          : { worker_price_id: plans?.business.worker_monthly_price_id, worker_count: workerCount }
+      );
+    }
+  };
+
   if (loading) return <div style={s.card}><p style={{ color: '#888' }}>Loading billing info...</p></div>;
 
   const sub = status?.subscription_status;
   const currentPlan = status?.plan || 'free';
-  const hasProAddon = status?.pro_addon;
+  const hasQbo = status?.addon_qbo;
   const isActive = sub === 'active';
   const isTrial = sub === 'trial';
   const isTrialExpired = sub === 'trial_expired';
-  const trialExpired = isTrial && daysLeft(status?.trial_ends_at) === 0;
-  const trialNote = isTrial && daysLeft(status?.trial_ends_at) > 0;
-  const showPlans = !isActive || sub === 'canceled' || isTrialExpired;
+  const trialDays = daysLeft(status?.trial_ends_at);
 
-  const businessMonthly = plans ? plans.business.base_monthly + workerCount * plans.business.per_worker_monthly : null;
-  const businessAnnualBase = plans ? plans.business.base_annual : null;
-  const proAddonMonthly = plans ? plans.pro_addon.monthly : null;
+  const INCLUDED_WORKERS = 15;
+  const businessOverage = Math.max(0, workerCount - INCLUDED_WORKERS);
+
+  const BASE_MONTHLY = plans?.business.base_monthly ?? 35;
+  const PER_WORKER_MONTHLY = plans?.business.per_worker_monthly ?? 2;
+  const businessMonthly = BASE_MONTHLY + businessOverage * PER_WORKER_MONTHLY;
+
+  const BASE_ANNUAL = plans?.business.base_annual ?? 350;
+  const PER_WORKER_ANNUAL = plans?.business.per_worker_annual ?? 20;
+  const businessAnnualTotal = BASE_ANNUAL + businessOverage * PER_WORKER_ANNUAL;
+  const businessAnnualPerMonth = Math.round(businessAnnualTotal / 12);
+
+  const showPlans = isTrial || isTrialExpired || sub === 'canceled' || !isActive;
 
   return (
     <div style={s.card}>
@@ -129,15 +162,21 @@ export default function BillingPanel() {
         </div>
       )}
 
-      {(trialExpired || isTrialExpired) && (
+      {isTrialExpired && (
         <div style={{ ...s.alert, background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' }}>
           Your free trial has ended. Your data is safe — subscribe below to restore full access.
         </div>
       )}
 
-      {isTrial && !trialExpired && (
+      {isTrial && (
         <div style={s.trialBanner}>
-          You're on a free trial with full access to all features. Subscribe before your trial ends to keep uninterrupted access — remaining trial days carry over at no extra charge.
+          <strong>You have full Business-level access during your trial.</strong>
+          {' '}Choose the plan that fits your team below — your selection won't change what you can do now.
+          {trialDays > 0 && (
+            <span style={{ display: 'block', marginTop: 6, fontSize: 12, color: '#1e40af' }}>
+              {trialDays} day{trialDays !== 1 ? 's' : ''} remaining — remaining trial days carry over when you subscribe.
+            </span>
+          )}
         </div>
       )}
 
@@ -145,7 +184,7 @@ export default function BillingPanel() {
         <div style={s.activeSection}>
           <p style={s.activeText}>
             Your <strong>{currentPlan === 'business' ? 'Business' : 'Starter'}</strong> plan is active
-            {hasProAddon ? ' with the Pro add-on (Certified Payroll & QuickBooks)' : ''}.
+            {hasQbo ? ' with QuickBooks Online sync' : ''}.
           </p>
           <button style={s.portalBtn} onClick={portal} disabled={redirecting === 'portal'}>
             {redirecting === 'portal' ? 'Redirecting...' : 'Manage Subscription'}
@@ -155,11 +194,10 @@ export default function BillingPanel() {
 
       {showPlans && (
         <>
-          {/* Annual toggle */}
           <div style={s.toggleRow}>
             <span style={{ fontSize: 14, color: annual ? '#9ca3af' : '#111827', fontWeight: annual ? 400 : 600 }}>Monthly</span>
-            <button style={{ ...s.toggle, background: annual ? '#1a56db' : '#e5e7eb' }} onClick={() => setAnnual(a => !a)}>
-              <span style={{ ...s.toggleKnob, transform: annual ? 'translateX(20px)' : 'translateX(2px)' }} />
+            <button style={{ ...s.toggle, background: annual ? '#1a56db' : '#d1d5db' }} onClick={() => setAnnual(a => !a)}>
+              <span style={{ ...s.toggleKnob, transform: annual ? 'translateX(46px)' : 'translateX(0)' }} />
             </button>
             <span style={{ fontSize: 14, color: annual ? '#111827' : '#9ca3af', fontWeight: annual ? 600 : 400 }}>
               Annual <span style={{ background: '#d1fae5', color: '#065f46', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>Save 17%</span>
@@ -167,13 +205,13 @@ export default function BillingPanel() {
           </div>
 
           <div style={s.plans}>
-            {/* Free */}
             <PlanCard
               name="Free"
               priceEl={<span><span style={{ fontSize: 28, fontWeight: 800 }}>$0</span></span>}
               subline="Up to 3 workers"
               color="#6b7280"
               current={currentPlan === 'free' && isActive}
+              selected={selectedPlan === 'free'}
               features={[
                 { text: 'Clock in/out & time tracking' },
                 { text: 'Admin approval workflow' },
@@ -185,22 +223,22 @@ export default function BillingPanel() {
                 { text: 'CSV payroll export', lock: true },
                 { text: 'Full history', lock: true },
               ]}
-              btnLabel={currentPlan === 'free' && isActive ? 'Current Plan' : 'Continue Free'}
-              disabled={true}
+              btnLabel={currentPlan === 'free' && isActive ? 'Current Plan' : isTrial ? 'Choose Free' : 'Continue Free'}
+              disabled={currentPlan === 'free' && isActive}
+              onSelect={() => isTrial ? setSelectedPlan('free') : null}
             />
 
-            {/* Starter */}
             <PlanCard
               name="Starter"
               priceEl={
                 annual
-                  ? <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans ? Math.round(plans.starter.annual / 12) : 16}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
-                  : <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans?.starter.monthly ?? 19}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
+                  ? <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans ? Math.round(plans.starter.annual / 12) : 17}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
+                  : <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans?.starter.monthly ?? 20}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
               }
-              subline={annual ? `$${plans?.starter.annual ?? 190}/yr — 2 months free` : 'Up to 10 workers'}
+              subline={annual ? `$${plans?.starter.annual ?? 200}/yr — 2 months free` : 'Up to 10 workers'}
               color="#2563eb"
               current={currentPlan === 'starter' && isActive}
-              tag={!annual ? null : null}
+              selected={selectedPlan === 'starter'}
               features={[
                 { text: 'Everything in Free' },
                 { text: 'Up to 10 workers' },
@@ -213,82 +251,178 @@ export default function BillingPanel() {
                 { text: 'Broadcast announcements', lock: true },
                 { text: 'Field reports, safety, punchlist', lock: true },
               ]}
-              btnLabel={currentPlan === 'starter' && isActive ? 'Current Plan' : `Subscribe — ${annual ? `$${plans?.starter.annual ?? 190}/yr` : `$${plans?.starter.monthly ?? 19}/mo`}`}
+              btnLabel={
+                currentPlan === 'starter' && isActive ? 'Current Plan'
+                  : isTrial ? (selectedPlan === 'starter' ? '✓ Starter Selected' : 'Choose Starter')
+                  : `Subscribe — ${annual ? `$${plans?.starter.annual ?? 200}/yr` : `$${plans?.starter.monthly ?? 20}/mo`}`
+              }
               disabled={!!redirecting || (currentPlan === 'starter' && isActive)}
-              onSelect={() => checkout(annual ? plans?.starter.annual_price_id : plans?.starter.monthly_price_id)}
+              onSelect={() => isTrial
+                ? setSelectedPlan('starter')
+                : checkout(annual ? plans?.starter.annual_price_id : plans?.starter.monthly_price_id)
+              }
             />
 
-            {/* Business */}
             <PlanCard
               name="Business"
               highlight
               tag="Most Popular"
               priceEl={
-                <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans?.business.base_monthly ?? 25}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo + $1/worker</span></>
+                annual
+                  ? <><span style={{ fontSize: 28, fontWeight: 800 }}>${businessAnnualPerMonth}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
+                  : <><span style={{ fontSize: 28, fontWeight: 800 }}>${BASE_MONTHLY}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
               }
               subline={
-                <span>
-                  {workerCount} workers = <strong style={{ color: '#7c3aed' }}>${plans ? plans.business.base_monthly + workerCount : 25 + workerCount}/mo</strong>
-                  {annual && <span style={{ color: '#059669', fontSize: 12 }}> (${plans ? plans.business.base_annual : 250}/yr base)</span>}
-                </span>
+                annual
+                  ? <span>
+                      ${businessAnnualTotal}/yr — 2 months free
+                      {businessOverage > 0 && <> · {businessOverage} extra workers</>}
+                    </span>
+                  : <span>
+                      Includes {INCLUDED_WORKERS} workers
+                      {businessOverage > 0
+                        ? <> + {businessOverage} extra = <strong style={{ color: '#7c3aed' }}>${businessMonthly}/mo</strong></>
+                        : <> · ${PER_WORKER_MONTHLY}/worker after {INCLUDED_WORKERS}</>
+                      }
+                    </span>
               }
               color="#7c3aed"
               current={currentPlan === 'business' && isActive}
+              selected={selectedPlan === 'business'}
               features={[
                 { text: 'Everything in Starter' },
-                { text: 'Unlimited workers' },
+                { text: `${INCLUDED_WORKERS} workers included, $${PER_WORKER_MONTHLY}/worker after` },
                 { text: 'Broadcast announcements' },
                 { text: 'Field reports & daily reports' },
                 { text: 'Safety talks / toolbox talks' },
                 { text: 'Punchlist management' },
                 { text: 'Advanced analytics & trends' },
                 { text: 'Inactive worker alerts' },
-                { text: 'Certified payroll (WH-347)', lock: !addProAddon },
-                { text: 'QuickBooks Online sync', lock: !addProAddon },
               ]}
-              btnLabel={currentPlan === 'business' && isActive ? 'Current Plan' : `Subscribe — $${plans ? plans.business.base_monthly + workerCount : 25 + workerCount}/mo`}
+              btnLabel={
+                currentPlan === 'business' && isActive ? 'Current Plan'
+                  : isTrial ? (selectedPlan === 'business' ? '✓ Business Selected' : 'Choose Business')
+                  : annual ? `Subscribe — $${businessAnnualTotal}/yr` : `Subscribe — $${businessMonthly}/mo`
+              }
               disabled={!!redirecting || (currentPlan === 'business' && isActive)}
-              onSelect={() => checkout(
-                annual ? plans?.business.base_annual_price_id : plans?.business.base_monthly_price_id,
-                annual
-                  ? { worker_price_id: plans?.business.worker_annual_price_id, worker_count: workerCount }
-                  : { worker_price_id: plans?.business.worker_monthly_price_id, worker_count: workerCount }
-              )}
+              onSelect={() => isTrial
+                ? setSelectedPlan('business')
+                : checkout(
+                  annual ? plans?.business.base_annual_price_id : plans?.business.base_monthly_price_id,
+                  annual
+                    ? { worker_price_id: plans?.business.worker_annual_price_id, worker_count: workerCount }
+                    : { worker_price_id: plans?.business.worker_monthly_price_id, worker_count: workerCount }
+                )
+              }
             />
           </div>
 
-          {/* Worker count slider for Business */}
           <div style={s.sliderWrap}>
-            <label style={s.sliderLabel}>Workers on Business plan: <strong>{workerCount}</strong></label>
-            <input type="range" min={4} max={200} value={workerCount} onChange={e => setWorkerCount(Number(e.target.value))} style={{ width: '100%', accentColor: '#7c3aed' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af' }}>
-              <span>4</span><span>200+</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <label style={{ ...s.sliderLabel, marginBottom: 0 }}>
+                Team size (Business plan): <strong>{workerCount} workers</strong>
+                {workerCount > INCLUDED_WORKERS
+                  ? <span style={{ color: '#7c3aed', marginLeft: 8 }}>
+                      {annual ? `$${businessAnnualTotal}/yr` : `$${businessMonthly}/mo`}
+                    </span>
+                  : <span style={{ color: '#6b7280', marginLeft: 8 }}>included in base price</span>
+                }
+              </label>
+              <button
+                className="worker-mode-btn btn-circle"
+                style={s.inputModeBtn}
+                title={workerInputMode === 'slider' ? 'Enter exact count' : 'Use slider'}
+                onClick={() => {
+                  if (workerInputMode === 'slider') {
+                    setWorkerDraft(String(workerCount));
+                    setWorkerInputMode('number');
+                  } else {
+                    setWorkerInputMode('slider');
+                  }
+                }}
+              >
+                {workerInputMode === 'slider' ? '✏️' : '↔'}
+              </button>
+            </div>
+            {workerInputMode === 'slider' ? (
+              <>
+                <input type="range" min={INCLUDED_WORKERS} max={500} value={workerCount}
+                  onChange={e => setWorkerCount(Number(e.target.value))}
+                  style={{ width: '100%', accentColor: '#7c3aed' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af' }}>
+                  <span>{INCLUDED_WORKERS} (included)</span><span>500+</span>
+                </div>
+              </>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="number"
+                  min={1}
+                  value={workerDraft}
+                  onChange={e => setWorkerDraft(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const v = Math.max(INCLUDED_WORKERS, parseInt(workerDraft, 10) || INCLUDED_WORKERS);
+                      setWorkerCount(v);
+                      setWorkerDraft(String(v));
+                    }
+                  }}
+                  style={s.workerNumInput}
+                  autoFocus
+                />
+                <button
+                  style={s.workerUpdateBtn}
+                  onClick={() => {
+                    const v = Math.max(INCLUDED_WORKERS, parseInt(workerDraft, 10) || INCLUDED_WORKERS);
+                    setWorkerCount(v);
+                    setWorkerDraft(String(v));
+                  }}
+                >
+                  Update
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div style={s.addonCard}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+              <input type="checkbox" checked={addQbo} onChange={e => setAddQbo(e.target.checked)}
+                style={{ accentColor: '#d97706', width: 16, height: 16 }} />
+              <span style={s.addonTitle}>
+                + QuickBooks Online Sync &nbsp;
+                <span style={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}>${plans?.qbo.monthly ?? 25}</span>
+                <span style={{ fontSize: 13, color: '#9ca3af' }}>/mo</span>
+              </span>
+            </label>
+            <div style={{ paddingLeft: 26, fontSize: 12, color: '#6b7280', lineHeight: 1.5, marginTop: 6 }}>
+              Push approved hours and payroll data directly to QuickBooks Online. No manual entry, no double-keying.
             </div>
           </div>
 
-          {/* Pro Add-on */}
-          <div style={s.addonCard}>
-            <div style={s.addonLeft}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                <input type="checkbox" checked={addProAddon} onChange={e => setAddProAddon(e.target.checked)} style={{ accentColor: '#d97706', width: 16, height: 16 }} />
-                <span style={s.addonTitle}>+ Pro Add-on &nbsp;<span style={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}>${plans?.pro_addon.monthly ?? 45}</span><span style={{ fontSize: 13, color: '#9ca3af' }}>/mo</span></span>
-              </label>
-              <div style={s.addonFeatures}>
-                <div style={s.addonFeature}>
-                  <span style={{ color: '#d97706', fontWeight: 700 }}>Certified Payroll (WH-347)</span>
-                  <span style={s.addonDesc}> — Required for Davis-Bacon & prevailing wage government contracts. Generates weekly reports as a print-ready PDF.</span>
-                </div>
-                <div style={s.addonFeature}>
-                  <span style={{ color: '#d97706', fontWeight: 700 }}>QuickBooks Online Sync</span>
-                  <span style={s.addonDesc}> — Push hours and payroll data directly to QuickBooks. No manual entry, no double-keying.</span>
-                </div>
+          {isTrial && selectedPlan && selectedPlan !== 'free' && (
+            <div style={s.trialCta}>
+              <div style={{ fontSize: 14, color: '#111827' }}>
+                Ready to subscribe to <strong style={{ textTransform: 'capitalize' }}>{selectedPlan}</strong>?
+                {selectedPlan === 'business' && (
+                  <span style={{ color: '#6b7280' }}>
+                    {annual
+                      ? ` (${workerCount} workers = $${businessAnnualTotal}/yr)`
+                      : ` (${workerCount} workers = $${businessMonthly}/mo)`}
+                  </span>
+                )}
+              </div>
+              <button style={s.ctaBtn} onClick={subscribeSelectedPlan} disabled={!!redirecting}>
+                {redirecting ? 'Redirecting...' : `Subscribe to ${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} — ${annual ? 'Annual' : 'Monthly'}`}
+              </button>
+              <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'center' }}>
+                You won't be charged until your trial ends. Remaining trial days carry over.
               </div>
             </div>
-          </div>
+          )}
 
-          {trialNote && (
+          {isTrial && !selectedPlan && (
             <p style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', marginTop: 8, fontStyle: 'italic' }}>
-              Remaining trial days carry over — you won't be charged until your trial ends.
+              Select a plan above to lock in your pricing before your trial ends.
             </p>
           )}
         </>
@@ -309,13 +443,12 @@ const s = {
   activeText: { fontSize: 14, color: '#374151', marginBottom: 12 },
   portalBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 7, fontSize: 14, fontWeight: 600, cursor: 'pointer' },
   toggleRow: { display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', marginBottom: 20 },
-  toggle: { width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', padding: 0, flexShrink: 0 },
-  toggleKnob: { position: 'absolute', top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', display: 'block' },
+  toggle: { display: 'flex', alignItems: 'center', width: 70, height: 40, borderRadius: 7, border: 'none', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, padding: 4 },
+  toggleKnob: { display: 'block', width: 16, height: 32, borderRadius: 5, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s', flexShrink: 0 },
   plans: { display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 },
   planCard: { flex: 1, minWidth: 200, border: '2px solid #e5e7eb', borderRadius: 12, padding: 20, display: 'flex', flexDirection: 'column', gap: 10, position: 'relative' },
-  planCardHighlight: { boxShadow: '0 4px 20px rgba(124,58,237,0.12)' },
-  planCardCurrent: {},
   planTag: { position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 12px', borderRadius: 20, whiteSpace: 'nowrap' },
+  selectedTag: { position: 'absolute', top: -11, right: 12, color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 12px', borderRadius: 20, whiteSpace: 'nowrap' },
   planName: { fontSize: 16, fontWeight: 700, color: '#111827' },
   planPrice: { display: 'flex', alignItems: 'baseline', gap: 2, flexWrap: 'wrap' },
   planSubline: { fontSize: 12, color: '#6b7280', marginTop: -6 },
@@ -324,10 +457,11 @@ const s = {
   planBtn: { width: '100%', color: '#fff', border: 'none', padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 4, transition: 'opacity 0.15s' },
   sliderWrap: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '14px 16px', marginBottom: 14 },
   sliderLabel: { fontSize: 13, color: '#374151', display: 'block', marginBottom: 8 },
-  addonCard: { border: '2px solid #fde68a', borderRadius: 10, padding: '14px 16px', background: '#fffbeb' },
-  addonLeft: { display: 'flex', flexDirection: 'column', gap: 10 },
+  inputModeBtn: { background: '#f3f4f6', border: '1px solid #e5e7eb', color: '#6b7280', fontSize: 15, minWidth: 30, width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, flexGrow: 0, padding: 0, lineHeight: 1, boxSizing: 'content-box' },
+  workerNumInput: { width: 90, padding: '7px 10px', border: '1px solid #c7d2fe', borderRadius: 7, fontSize: 15, fontWeight: 700, color: '#7c3aed', textAlign: 'center' },
+  workerUpdateBtn: { padding: '7px 14px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 },
+  addonCard: { border: '2px solid #fde68a', borderRadius: 10, padding: '14px 16px', background: '#fffbeb', marginBottom: 16 },
   addonTitle: { fontSize: 15, fontWeight: 700, color: '#92400e' },
-  addonFeatures: { display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 26 },
-  addonFeature: { fontSize: 12, color: '#374151', lineHeight: 1.5 },
-  addonDesc: { color: '#6b7280' },
+  trialCta: { background: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: 10, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 },
+  ctaBtn: { background: '#059669', color: '#fff', border: 'none', padding: '12px', borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: 'pointer' },
 };

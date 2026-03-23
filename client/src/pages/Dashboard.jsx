@@ -7,6 +7,7 @@ import TimesheetView from '../components/TimesheetView';
 import UpcomingShifts from '../components/UpcomingShifts';
 import WorkerSummary from '../components/WorkerSummary';
 import ChangePassword from '../components/ChangePassword';
+import MFASetup from '../components/MFASetup';
 import PayStubView from '../components/PayStubView';
 import NotificationSetup from '../components/NotificationSetup';
 import TimesheetSignOff from '../components/TimesheetSignOff';
@@ -15,9 +16,13 @@ import AppSwitcher from '../components/AppSwitcher';
 import NotificationBell from '../components/NotificationBell';
 import { getT } from '../i18n';
 import api from '../api';
+import { getOrFetch, setCached } from '../offlineDb';
+import { useOffline } from '../contexts/OfflineContext';
+import OfflineBanner from '../components/OfflineBanner';
 
 export default function Dashboard() {
   const { user, logout, updateUser } = useAuth();
+  const { onSync } = useOffline() || {};
   const t = getT(user?.language);
   const [entries, setEntries] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -38,10 +43,14 @@ export default function Dashboard() {
     setLoading(true);
     setLoadError(false);
     try {
-      const [e, p, s] = await Promise.all([api.get('/time-entries'), api.get('/projects'), api.get('/settings')]);
-      setEntries(e.data);
-      setProjects(p.data);
-      setSettings(s.data);
+      const [entries, projects, settings] = await Promise.all([
+        getOrFetch('entries', () => api.get('/time-entries').then(r => r.data)),
+        getOrFetch('projects', () => api.get('/projects').then(r => r.data)),
+        getOrFetch('settings', () => api.get('/settings').then(r => r.data)),
+      ]);
+      setEntries(entries);
+      setProjects(projects);
+      setSettings(settings);
     } catch {
       setLoadError(true);
     } finally {
@@ -49,7 +58,21 @@ export default function Dashboard() {
     }
   };
 
+  const refreshEntries = async () => {
+    try {
+      const data = await api.get('/time-entries').then(r => r.data);
+      await setCached('entries', data);
+      setEntries(data);
+    } catch {}
+  };
+
   useEffect(() => { fetchData(); }, []);
+
+  // Re-fetch entries after offline queue syncs
+  useEffect(() => {
+    if (!onSync) return;
+    return onSync(count => { if (count > 0) refreshEntries(); });
+  }, [onSync]);
 
   const handleEntryAdded = entry => {
     setEntries(prev => [entry, ...prev]);
@@ -88,6 +111,7 @@ export default function Dashboard() {
 
   return (
     <div style={styles.page}>
+      <OfflineBanner />
       <header style={styles.header}>
         <div style={styles.logoGroup}>
           <AppSwitcher currentApp="timeclock" userRole={user?.role} />
@@ -126,7 +150,7 @@ export default function Dashboard() {
         {tab === 'timesheet' && (
           <>
             <UpcomingShifts onFillEntry={handleFillFromShift} />
-            {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 45} overtimeRule={settings?.overtime_rule ?? 'daily'} overtimeThreshold={settings?.overtime_threshold ?? 8} />}
+            {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 45} overtimeRule={settings?.overtime_rule ?? 'daily'} overtimeThreshold={settings?.overtime_threshold ?? 8} showWages={settings?.show_worker_wages ?? false} currency={settings?.currency ?? 'USD'} />}
             <TimesheetSignOff t={t} />
             <div style={styles.timesheetToolbar}>
               <div style={styles.viewToggle}>
@@ -157,7 +181,11 @@ export default function Dashboard() {
                 <button style={styles.accountBtn} onClick={() => setShowChangePassword(true)}>Change Password</button>
               </div>
             </div>
-            {!loading && <PayStubView />}
+            <MFASetup />
+            <div style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '8px 0 4px' }}>
+              Need help? Email us at <a href="mailto:info@opsfloa.com" style={{ color: '#1a56db' }}>info@opsfloa.com</a>
+            </div>
+            {!loading && (settings?.show_worker_wages ?? false) && <PayStubView />}
           </>
         )}
       </main>

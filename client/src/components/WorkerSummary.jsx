@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { fmtHours } from '../utils';
+import { fmtHours, formatCurrency } from '../utils';
 
 const RANGES = [
   { label: 'This week', key: 'this_week' },
@@ -65,7 +65,7 @@ function computeOT(entries, rule, threshold) {
   };
 }
 
-export default function WorkerSummary({ entries, hourlyRate, overtimeMultiplier = 1.5, prevailingRate = 45, overtimeRule = 'daily', overtimeThreshold = 8 }) {
+export default function WorkerSummary({ entries, hourlyRate, overtimeMultiplier = 1.5, prevailingRate = 45, overtimeRule = 'daily', overtimeThreshold = 8, showWages = false, currency = 'USD' }) {
   const [range, setRange] = useState('this_week');
   const { from, to } = getDateRange(range);
 
@@ -133,10 +133,12 @@ export default function WorkerSummary({ entries, hourlyRate, overtimeMultiplier 
                 <div style={styles.statLabel}>Prevailing</div>
               </div>
             )}
-            <div style={{ ...styles.stat, borderColor: '#6ee7b7' }}>
-              <div style={{ ...styles.statValue, color: '#059669' }}>${estimatedPay.toFixed(2)}</div>
-              <div style={styles.statLabel}>Est. earnings</div>
-            </div>
+            {showWages && (
+              <div style={{ ...styles.stat, borderColor: '#6ee7b7' }}>
+                <div style={{ ...styles.statValue, color: '#059669' }}>{formatCurrency(estimatedPay, currency)}</div>
+                <div style={styles.statLabel}>Est. earnings</div>
+              </div>
+            )}
           </div>
 
           {Object.keys(byProject).length > 1 && (

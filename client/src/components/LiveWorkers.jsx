@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 // Fix default marker icons broken by Webpack/Vite bundling
 delete L.Icon.Default.prototype._getIconUrl;
@@ -31,6 +32,7 @@ function ElapsedTimer({ clockInTime }) {
 }
 
 export default function LiveWorkers() {
+  const t = useT();
   const [workers, setWorkers] = useState([]);
   const [inactiveWorkers, setInactiveWorkers] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -93,7 +95,7 @@ export default function LiveWorkers() {
           <div style={styles.inactiveBannerLeft}>
             <span style={styles.inactiveIcon}>⚠️</span>
             <div>
-              <div style={styles.inactiveBannerTitle}>Inactive workers</div>
+              <div style={styles.inactiveBannerTitle}>{t.inactiveWorkers}</div>
               <div style={styles.inactiveBannerList}>
                 {inactiveWorkers.map(w => (
                   <span key={w.id} style={styles.inactivePill}>
@@ -107,21 +109,21 @@ export default function LiveWorkers() {
         </div>
       )}
       <div style={styles.header}>
-        <h2 style={styles.title}>Live Workers</h2>
+        <h2 style={styles.title}>{t.liveWorkers}</h2>
         <div style={styles.liveIndicator}>
           <span style={styles.liveDot} />
-          <span style={styles.liveText}>Live</span>
+          <span style={styles.liveText}>{t.liveLabel}</span>
           {lastUpdated && (
             <span style={styles.updated}>Updated {lastUpdated.toLocaleTimeString()}</span>
           )}
-          <button style={styles.refreshBtn} onClick={fetchActive}>Refresh</button>
+          <button style={styles.refreshBtn} onClick={fetchActive}>{t.refresh}</button>
         </div>
       </div>
 
       {workers.length > 0 && (
         <div style={styles.filters}>
           <select style={styles.filterSelect} value={selectedProject} onChange={handleProjectSelect}>
-            <option value="">All Projects ({workers.length})</option>
+            <option value="">{t.allProjects} ({workers.length})</option>
             {activeProjects.map(p => (
               <option key={p} value={p}>
                 {p} ({workers.filter(w => w.project_name === p).length})
@@ -129,7 +131,7 @@ export default function LiveWorkers() {
             ))}
           </select>
           <select style={styles.filterSelect} value={selectedWorker} onChange={handleWorkerSelect}>
-            <option value="">Find worker...</option>
+            <option value="">{t.findWorker}</option>
             {workers.map(w => (
               <option key={w.user_id} value={w.user_id}>{w.full_name}</option>
             ))}
@@ -138,9 +140,9 @@ export default function LiveWorkers() {
       )}
 
       {workers.length === 0 ? (
-        <div style={styles.empty}>No workers currently clocked in.</div>
+        <div style={styles.empty}>{t.noClockedIn}</div>
       ) : filtered.length === 0 ? (
-        <div style={styles.empty}>No workers on this project right now.</div>
+        <div style={styles.empty}>{t.noWorkersOnProject}</div>
       ) : (
         <>
           <div style={styles.workerList}>
@@ -155,10 +157,10 @@ export default function LiveWorkers() {
                 </div>
                 {w.notes && <div style={styles.workerNotes}>{w.notes}</div>}
                 <div style={styles.workerMeta}>
-                  <span>Clocked in: {new Date(w.clock_in_time).toLocaleTimeString()}</span>
+                  <span>{t.clockedIn} {new Date(w.clock_in_time).toLocaleTimeString()}</span>
                   {w.clock_in_lat
-                    ? <span style={styles.locationTag}>📍 Location captured</span>
-                    : <span style={styles.noLocation}>No location</span>
+                    ? <span style={styles.locationTag}>{t.locationCaptured}</span>
+                    : <span style={styles.noLocation}>{t.noLocation}</span>
                   }
                 </div>
               </div>
@@ -167,7 +169,7 @@ export default function LiveWorkers() {
 
           {mapped.length > 0 && (
             <div style={styles.mapWrap}>
-              <h3 style={styles.mapTitle}>Clock-in Locations</h3>
+              <h3 style={styles.mapTitle}>{t.clockInLocations}</h3>
               <MapContainer center={center} zoom={mapped.length === 1 ? 13 : 5} style={styles.map}>
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

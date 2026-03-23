@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 function today() {
   return new Date().toISOString().substring(0, 10);
@@ -10,6 +11,7 @@ function monthStart() {
 }
 
 export default function ExportPanel({ workers, projects }) {
+  const t = useT();
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(today());
   const [workerId, setWorkerId] = useState('');
@@ -35,7 +37,7 @@ export default function ExportPanel({ workers, projects }) {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      setError('Export failed. Check your date range and try again.');
+      setError(t.exportFailed);
     } finally {
       setLoading(false);
     }
@@ -43,39 +45,39 @@ export default function ExportPanel({ workers, projects }) {
 
   return (
     <div style={styles.card}>
-      <h3 style={styles.title}>Export Time Entries</h3>
-      <p style={styles.sub}>Download a CSV of time entries for any date range. Open in Excel, Google Sheets, or import into your payroll system.</p>
+      <h3 style={styles.title}>{t.exportTimeEntries}</h3>
+      <p style={styles.sub}>{t.exportDesc}</p>
 
       <div style={styles.filters} className="export-filters">
         <div style={styles.filterGroup}>
-          <label style={styles.label}>From</label>
+          <label style={styles.label}>{t.from}</label>
           <input style={styles.input} type="date" value={from} onChange={e => setFrom(e.target.value)} />
         </div>
         <div style={styles.filterGroup}>
-          <label style={styles.label}>To</label>
+          <label style={styles.label}>{t.to}</label>
           <input style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
         </div>
         <div style={styles.filterGroup}>
-          <label style={styles.label}>Worker</label>
+          <label style={styles.label}>{t.worker}</label>
           <select style={styles.input} value={workerId} onChange={e => setWorkerId(e.target.value)}>
-            <option value="">All workers</option>
+            <option value="">{t.allWorkers}</option>
             {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
           </select>
         </div>
         <div style={styles.filterGroup}>
-          <label style={styles.label}>Project</label>
+          <label style={styles.label}>{t.project}</label>
           <select style={styles.input} value={projectId} onChange={e => setProjectId(e.target.value)}>
-            <option value="">All projects</option>
+            <option value="">{t.allProjectsOpt}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
         <div style={styles.filterGroup}>
-          <label style={styles.label}>Status</label>
+          <label style={styles.label}>{t.status}</label>
           <select style={styles.input} value={status} onChange={e => setStatus(e.target.value)}>
-            <option value="">All statuses</option>
-            <option value="approved">Approved</option>
-            <option value="pending">Pending</option>
-            <option value="rejected">Rejected</option>
+            <option value="">{t.allStatuses}</option>
+            <option value="approved">{t.approved}</option>
+            <option value="pending">{t.pending}</option>
+            <option value="rejected">{t.rejected}</option>
           </select>
         </div>
       </div>
@@ -84,9 +86,9 @@ export default function ExportPanel({ workers, projects }) {
 
       <div style={styles.actions}>
         <button style={styles.downloadBtn} onClick={download} disabled={loading || !from || !to}>
-          {loading ? 'Preparing...' : '⬇ Download CSV'}
+          {loading ? t.preparing : t.downloadCSV}
         </button>
-        <span style={styles.hint}>Columns: Worker, Project, Date, Start, End, Break, Net Hours, Wage Type, Mileage, Status, Notes</span>
+        <span style={styles.hint}>{t.exportColumns}</span>
       </div>
     </div>
   );

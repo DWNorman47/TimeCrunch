@@ -1,87 +1,220 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
+import { formatCurrency } from '../utils';
+import { useT } from '../hooks/useT';
 
 const LANGUAGES = ['English', 'Spanish'];
 
-export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 30, showRate = true, identityEditable = true }) {
+function fmtRate(w, currency = 'USD') {
+  const amt = parseFloat(w.hourly_rate ?? 0);
+  if (w.rate_type === 'daily') return `${formatCurrency(amt, currency)} / day`;
+  return `${formatCurrency(amt, currency)} / hr`;
+}
+
+function RoleBadge({ role }) {
+  const t = useT();
+  const isAdmin = role === 'admin' || role === 'super_admin';
+  return (
+    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: isAdmin ? '#dbeafe' : '#f3f4f6', color: isAdmin ? '#1e40af' : '#6b7280' }}>
+      {isAdmin ? t.adminRole : t.workerRole}
+    </span>
+  );
+}
+
+export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, showRate = true, identityEditable = true, currency = 'USD' }) {
   const toast = useToast();
-  const [form, setForm] = useState({ full_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
-  const [addMode, setAddMode] = useState('manual'); // 'manual' | 'invite'
-  const [inviteForm, setInviteForm] = useState({ full_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
-  const [inviteError, setInviteError] = useState('');
-  const [inviteSaving, setInviteSaving] = useState(false);
-  const [inviteSent, setInviteSent] = useState('');
-  const [error, setError] = useState('');
-  const [archivedConflict, setArchivedConflict] = useState(null); // { id, name }
-  const [saving, setSaving] = useState(false);
+  const t = useT();
+  const rateTypes = [
+    { value: 'hourly', label: t.perHour },
+    { value: 'daily', label: t.perDay },
+  ];
+  const overtimeRules = [
+    { value: 'daily', label: t.otDaily },
+    { value: 'weekly', label: t.otWeekly },
+    { value: 'none', label: t.otNone },
+  ];
+
+  // Add form state
   const [showForm, setShowForm] = useState(false);
+  const [addMode, setAddMode] = useState('manual');
+  const [form, setForm] = useState({ first_name: '', last_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
+  const [inviteForm, setInviteForm] = useState({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+  const [error, setError] = useState('');
+  const [inviteError, setInviteError] = useState('');
+  const [inviteSent, setInviteSent] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [inviteSaving, setInviteSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [usernameEdited, setUsernameEdited] = useState(false);
+  const [usernameTaken, setUsernameTaken] = useState(false);
+  const [usernameChecking, setUsernameChecking] = useState(false);
+  const [archivedConflict, setArchivedConflict] = useState(null);
+
+  // Expand / edit state
+  const [expandedId, setExpandedId] = useState(null);
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({});
-  const [editSaving, setEditSaving] = useState(false);
+  const [editSection, setEditSection] = useState(null); // 'info' | 'username' | 'rate'
+
+  const [editInfoForm, setEditInfoForm] = useState({});
+  const [editInfoSaving, setEditInfoSaving] = useState(false);
+
+  const [editUsernameVal, setEditUsernameVal] = useState('');
+  const [editUsernameTaken, setEditUsernameTaken] = useState(false);
+  const [editUsernameChecking, setEditUsernameChecking] = useState(false);
+  const [editUsernameSaving, setEditUsernameSaving] = useState(false);
+
+  const [editRateForm, setEditRateForm] = useState({ rate: '', rate_type: 'hourly', overtime_rule: 'daily' });
+  const [editRateSaving, setEditRateSaving] = useState(false);
+
+  // History
   const [archived, setArchived] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loadingArchived, setLoadingArchived] = useState(false);
   const [archivedFetched, setArchivedFetched] = useState(false);
 
+  // ── Add form helpers ────────────────────────────────────────────────────────
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const setInvite = (k, v) => setInviteForm(f => ({ ...f, [k]: v }));
+
+  const updateAutoUsername = (first, last) => {
+    if (usernameEdited) return;
+    const suggested = (first.charAt(0) + last).toLowerCase().replace(/[^a-z0-9]/g, '');
+    setForm(f => ({ ...f, username: suggested }));
+    setUsernameTaken(false);
+  };
+
+  const handleFirstNameChange = v => {
+    setForm(f => ({ ...f, first_name: v }));
+    updateAutoUsername(v, form.last_name);
+  };
+  const handleLastNameChange = v => {
+    setForm(f => ({ ...f, last_name: v }));
+    updateAutoUsername(form.first_name, v);
+  };
+
+  const checkUsername = async username => {
+    if (!username) return;
+    setUsernameChecking(true);
+    try {
+      const r = await api.get('/admin/workers/check-username', { params: { username } });
+      setUsernameTaken(r.data.taken);
+    } catch {}
+    finally { setUsernameChecking(false); }
+  };
+
+  const handleAdd = async e => {
+    e.preventDefault();
+    setError(''); setArchivedConflict(null); setSaving(true);
+    try {
+      const full_name = [form.first_name, form.last_name].filter(Boolean).join(' ');
+      const r = await api.post('/admin/workers', { ...form, full_name });
+      onWorkerAdded(r.data);
+      setForm({ first_name: '', last_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
+      setUsernameEdited(false); setUsernameTaken(false); setShowForm(false);
+    } catch (err) {
+      const data = err.response?.data;
+      if (data?.archived_id) { setArchivedConflict({ id: data.archived_id, name: data.archived_name }); setError(data.error); }
+      else setError(data?.error || 'Failed to create user');
+    } finally { setSaving(false); }
+  };
+
+  const handleInvite = async e => {
+    e.preventDefault();
+    setInviteError(''); setInviteSaving(true);
+    try {
+      const inv_full_name = [inviteForm.first_name, inviteForm.last_name].filter(Boolean).join(' ');
+      const r = await api.post('/admin/workers/invite', { ...inviteForm, full_name: inv_full_name });
+      onWorkerAdded(r.data);
+      if (r.data.email_sent === false) {
+        setInviteError('Worker created, but the invite email failed to send.');
+        setInviteForm({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+      } else {
+        setInviteSent(inviteForm.email);
+        setInviteForm({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
+      }
+    } catch (err) {
+      setInviteError(err.response?.data?.error || 'Failed to send invite');
+    } finally { setInviteSaving(false); }
+  };
+
+  const handleRestoreConflict = async () => {
+    if (!archivedConflict) return;
+    await handleRestore(archivedConflict.id);
+    setArchivedConflict(null); setError(''); setShowForm(false);
+  };
+
+  // ── Expand / panel edit helpers ─────────────────────────────────────────────
+  const cancelEdit = () => { setEditingId(null); setEditSection(null); setEditUsernameTaken(false); };
+
+  const toggleExpand = id => {
+    if (expandedId === id) { setExpandedId(null); cancelEdit(); }
+    else { setExpandedId(id); cancelEdit(); }
+  };
+
+  const startEditInfo = w => {
+    setEditingId(w.id); setEditSection('info');
+    setEditInfoForm({ full_name: w.full_name, email: w.email || '', role: w.role, language: w.language || 'English' });
+  };
+
+  const startEditUsername = w => {
+    setEditingId(w.id); setEditSection('username');
+    setEditUsernameVal(w.username); setEditUsernameTaken(false);
+  };
+
+  const startEditRate = w => {
+    setEditingId(w.id); setEditSection('rate');
+    setEditRateForm({ rate: String(w.hourly_rate ?? 0), rate_type: w.rate_type || 'hourly', overtime_rule: w.overtime_rule || 'daily' });
+  };
+
+  const checkEditUsername = async (username, workerId) => {
+    if (!username) return;
+    setEditUsernameChecking(true);
+    try {
+      const r = await api.get('/admin/workers/check-username', { params: { username, exclude_id: workerId } });
+      setEditUsernameTaken(r.data.taken);
+    } catch {}
+    finally { setEditUsernameChecking(false); }
+  };
+
+  const saveInfo = async id => {
+    setEditInfoSaving(true);
+    try {
+      const r = await api.patch(`/admin/workers/${id}`, editInfoForm);
+      onWorkerUpdated(r.data);
+      cancelEdit();
+    } catch (err) { toast(err.response?.data?.error || 'Failed to update', 'error'); }
+    finally { setEditInfoSaving(false); }
+  };
+
+  const saveUsername = async id => {
+    setEditUsernameSaving(true);
+    try {
+      const r = await api.patch(`/admin/workers/${id}`, { username: editUsernameVal });
+      onWorkerUpdated(r.data);
+      cancelEdit();
+    } catch (err) { toast(err.response?.data?.error || 'Username already taken', 'error'); }
+    finally { setEditUsernameSaving(false); }
+  };
+
+  const saveRate = async id => {
+    setEditRateSaving(true);
+    try {
+      const r = await api.patch(`/admin/workers/${id}`, { hourly_rate: editRateForm.rate, rate_type: editRateForm.rate_type, overtime_rule: editRateForm.overtime_rule });
+      onWorkerUpdated(r.data);
+      cancelEdit();
+    } catch (err) { toast(err.response?.data?.error || 'Failed to update', 'error'); }
+    finally { setEditRateSaving(false); }
+  };
+
+  // ── Archive helpers ──────────────────────────────────────────────────────────
   const loadArchived = async () => {
     if (archivedFetched) return;
     setLoadingArchived(true);
     try {
       const r = await api.get('/admin/workers/archived');
-      setArchived(r.data);
-      setArchivedFetched(true);
-    } finally {
-      setLoadingArchived(false);
-    }
-  };
-
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const setInvite = (k, v) => setInviteForm(f => ({ ...f, [k]: v }));
-  const setEdit = (k, v) => setEditForm(f => ({ ...f, [k]: v }));
-
-  const handleInvite = async e => {
-    e.preventDefault();
-    setInviteError('');
-    setInviteSaving(true);
-    try {
-      const r = await api.post('/admin/workers/invite', inviteForm);
-      onWorkerAdded(r.data);
-      if (r.data.email_sent === false) {
-        setInviteError('Worker created, but the invite email failed to send. You can resend the invite later.');
-        setInviteForm({ full_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
-      } else {
-        setInviteSent(inviteForm.email);
-        setInviteForm({ full_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
-      }
-    } catch (err) {
-      setInviteError(err.response?.data?.error || 'Failed to send invite');
-    } finally {
-      setInviteSaving(false);
-    }
-  };
-
-  const handleAdd = async e => {
-    e.preventDefault();
-    setError('');
-    setArchivedConflict(null);
-    setSaving(true);
-    try {
-      const r = await api.post('/admin/workers', form);
-      onWorkerAdded(r.data);
-      setForm({ full_name: '', username: '', password: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
-      setShowForm(false);
-    } catch (err) {
-      const data = err.response?.data;
-      if (data?.archived_id) {
-        setArchivedConflict({ id: data.archived_id, name: data.archived_name });
-        setError(data.error);
-      } else {
-        setError(data?.error || 'Failed to create user');
-      }
-    } finally {
-      setSaving(false);
-    }
+      setArchived(r.data); setArchivedFetched(true);
+    } finally { setLoadingArchived(false); }
   };
 
   const handleRemove = async (id, name) => {
@@ -89,116 +222,153 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     try {
       await api.delete(`/admin/workers/${id}`);
       onWorkerDeleted(id);
-      setArchivedFetched(false); // stale — will re-fetch when History is next opened
-    } catch {
-      toast('Failed to remove user', 'error');
-    }
+      setArchivedFetched(false);
+      if (expandedId === id) setExpandedId(null);
+    } catch { toast('Failed to remove user', 'error'); }
   };
 
-  const handleRestore = async (id) => {
+  const handleRestore = async id => {
     try {
       const r = await api.patch(`/admin/workers/${id}/restore`);
       onWorkerRestored({ ...r.data, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 });
       setArchived(prev => prev.filter(w => w.id !== id));
-    } catch {
-      toast('Failed to restore user', 'error');
-    }
-  };
-
-  const handleRestoreConflict = async () => {
-    if (!archivedConflict) return;
-    await handleRestore(archivedConflict.id);
-    setArchivedConflict(null);
-    setError('');
-    setShowForm(false);
-  };
-
-  const startEdit = w => {
-    setEditingId(w.id);
-    setEditForm({ full_name: w.full_name, role: w.role, language: w.language || 'English', hourly_rate: String(w.hourly_rate ?? 30), email: w.email || '' });
-  };
-
-  const cancelEdit = () => { setEditingId(null); setEditForm({}); };
-
-  const handleSaveEdit = async id => {
-    setEditSaving(true);
-    try {
-      const patch = identityEditable && showRate ? editForm
-        : identityEditable ? { full_name: editForm.full_name, role: editForm.role, language: editForm.language, email: editForm.email }
-        : { hourly_rate: editForm.hourly_rate };
-      const r = await api.patch(`/admin/workers/${id}`, patch);
-      onWorkerUpdated(r.data);
-      cancelEdit();
-    } catch {
-      toast('Failed to update user', 'error');
-    } finally {
-      setEditSaving(false);
-    }
+    } catch { toast('Failed to restore user', 'error'); }
   };
 
   return (
-    <div style={styles.card}>
-      <div style={styles.cardHeader}>
-        <h3 style={styles.cardTitle}>Manage Users</h3>
-        <button style={styles.addBtn} onClick={() => { setShowForm(s => !s); setError(''); setArchivedConflict(null); setInviteError(''); setInviteSent(''); }}>
-          {showForm ? 'Cancel' : '+ Add User'}
+    <div style={s.card}>
+      <div style={s.cardHeader}>
+        <h3 style={s.cardTitle}>{t.users}</h3>
+        <button style={s.addBtn} onClick={() => { setShowForm(v => !v); setError(''); setArchivedConflict(null); setInviteError(''); setInviteSent(''); }}>
+          {showForm ? t.cancel : t.addUser}
         </button>
       </div>
 
       {showForm && (
-        <div>
-          <div style={styles.modeTabs}>
-            <button style={addMode === 'manual' ? styles.modeTabActive : styles.modeTab} onClick={() => setAddMode('manual')}>Add manually</button>
-            <button style={addMode === 'invite' ? styles.modeTabActive : styles.modeTab} onClick={() => setAddMode('invite')}>Invite by email</button>
+        <div style={s.addPanel}>
+          <div style={s.modeTabs}>
+            <button style={addMode === 'manual' ? s.modeTabActive : s.modeTab} onClick={() => setAddMode('manual')}>{t.addManually}</button>
+            <button style={addMode === 'invite' ? s.modeTabActive : s.modeTab} onClick={() => setAddMode('invite')}>{t.inviteByEmail}</button>
           </div>
 
           {addMode === 'manual' ? (
-            <form onSubmit={handleAdd} style={styles.form}>
-              <input style={styles.input} placeholder="Full name" value={form.full_name} onChange={e => set('full_name', e.target.value)} required />
-              <input style={styles.input} placeholder="Username" value={form.username} onChange={e => set('username', e.target.value)} required />
-              <input style={styles.input} type="password" placeholder="Temporary password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
-              <input style={styles.input} type="email" placeholder="Email (optional, for password reset)" value={form.email} onChange={e => set('email', e.target.value)} />
-              <select style={styles.input} value={form.role} onChange={e => set('role', e.target.value)}>
-                <option value="worker">User</option>
-                <option value="admin">Admin</option>
-              </select>
-              <select style={styles.input} value={form.language} onChange={e => set('language', e.target.value)}>
-                {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
-              {showRate && <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder="$/hr (30)" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />}
+            <form onSubmit={handleAdd} style={s.addForm}>
+              <div style={s.formGrid}>
+                <div style={s.fieldGroup}>
+                  <label style={s.label}>{t.firstName}</label>
+                  <input style={s.input} value={form.first_name} onChange={e => handleFirstNameChange(e.target.value)} required />
+                </div>
+                <div style={s.fieldGroup}>
+                  <label style={s.label}>{t.lastName}</label>
+                  <input style={s.input} value={form.last_name} onChange={e => handleLastNameChange(e.target.value)} required />
+                </div>
+                <div style={s.fieldGroup}>
+                  <label style={s.label}>Username{usernameChecking ? ' (checking...)' : usernameTaken ? ' ⚠ taken' : ''}</label>
+                  <input
+                    style={{ ...s.input, borderColor: usernameTaken ? '#fca5a5' : undefined }}
+                    value={form.username}
+                    onChange={e => { setUsernameEdited(!!e.target.value); set('username', e.target.value); setUsernameTaken(false); }}
+                    onBlur={e => checkUsername(e.target.value)}
+                    required
+                  />
+                </div>
+                <div style={s.fieldGroup}>
+                  <label style={s.label}>{t.temporaryPassword}</label>
+                  <div style={{ position: 'relative' }}>
+                    <input style={{ ...s.input, width: '100%', paddingRight: 36, boxSizing: 'border-box' }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
+                    <button type="button" onClick={() => setShowPassword(v => !v)} style={s.eyeBtn} tabIndex={-1}>{showPassword ? '🙈' : '👁'}</button>
+                  </div>
+                </div>
+                <div style={s.fieldGroup}>
+                  <label style={s.label}>{t.emailOptional}</label>
+                  <input style={s.input} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+                </div>
+                <div style={s.fieldGroup}>
+                  <label style={s.label}>{t.role}</label>
+                  <select style={s.input} value={form.role} onChange={e => set('role', e.target.value)}>
+                    <option value="worker">{t.workerRole}</option>
+                    <option value="admin">{t.adminRole}</option>
+                  </select>
+                </div>
+                <div style={s.fieldGroup}>
+                  <label style={s.label}>{t.language}</label>
+                  <select style={s.input} value={form.language} onChange={e => set('language', e.target.value)}>
+                    {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+                {showRate && (
+                  <>
+                    <div style={s.fieldGroup}>
+                      <label style={s.label}>{t.payRate}</label>
+                      <input style={s.input} type="number" min="0" step="0.01" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />
+                    </div>
+                    <div style={s.fieldGroup}>
+                      <label style={s.label}>{t.rateType}</label>
+                      <select style={s.input} value={form.rate_type} onChange={e => set('rate_type', e.target.value)}>
+                        {rateTypes.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                    </div>
+                    <div style={s.fieldGroup}>
+                      <label style={s.label}>{t.overtimeRule}</label>
+                      <select style={s.input} value={form.overtime_rule} onChange={e => set('overtime_rule', e.target.value)}>
+                        {overtimeRules.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                    </div>
+                  </>
+                )}
+              </div>
               {error && (
-                <div style={styles.errorBox}>
-                  <p style={styles.errorText}>{error}</p>
-                  {archivedConflict && (
-                    <button type="button" style={styles.restoreInlineBtn} onClick={handleRestoreConflict}>
-                      Restore {archivedConflict.name}
-                    </button>
-                  )}
+                <div style={s.errorBox}>
+                  <span style={s.errorText}>{error}</span>
+                  {archivedConflict && <button type="button" style={s.restoreInlineBtn} onClick={handleRestoreConflict}>Restore {archivedConflict.name}</button>}
                 </div>
               )}
-              <button style={styles.saveBtn} type="submit" disabled={saving}>{saving ? 'Creating...' : 'Create User'}</button>
+              <button style={s.saveBtn} type="submit" disabled={saving || usernameTaken}>{saving ? t.creating : t.createUser}</button>
             </form>
           ) : (
-            <form onSubmit={handleInvite} style={styles.form}>
+            <form onSubmit={handleInvite} style={s.addForm}>
               {inviteSent ? (
-                <div style={styles.inviteSuccess}>
-                  Invite sent to <strong>{inviteSent}</strong>. They'll receive an email to set their password.
-                  <button type="button" style={{ ...styles.restoreInlineBtn, marginLeft: 12 }} onClick={() => setInviteSent('')}>Send another</button>
+                <div style={s.inviteSuccess}>
+                  Invite sent to <strong>{inviteSent}</strong>.{' '}
+                  <button type="button" style={s.restoreInlineBtn} onClick={() => setInviteSent('')}>Send another</button>
                 </div>
               ) : (
                 <>
-                  <input style={styles.input} placeholder="Full name" value={inviteForm.full_name} onChange={e => setInvite('full_name', e.target.value)} required />
-                  <input style={styles.input} type="email" placeholder="Email address (required)" value={inviteForm.email} onChange={e => setInvite('email', e.target.value)} required />
-                  <select style={styles.input} value={inviteForm.role} onChange={e => setInvite('role', e.target.value)}>
-                    <option value="worker">User</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                  <select style={styles.input} value={inviteForm.language} onChange={e => setInvite('language', e.target.value)}>
-                    {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                  {showRate && <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder="$/hr (30)" value={inviteForm.hourly_rate} onChange={e => setInvite('hourly_rate', e.target.value)} />}
-                  {inviteError && <p style={styles.errorText}>{inviteError}</p>}
-                  <button style={styles.saveBtn} type="submit" disabled={inviteSaving}>{inviteSaving ? 'Sending...' : 'Send Invite'}</button>
+                  <div style={s.formGrid}>
+                    <div style={s.fieldGroup}>
+                      <label style={s.label}>{t.firstName}</label>
+                      <input style={s.input} value={inviteForm.first_name} onChange={e => setInvite('first_name', e.target.value)} required />
+                    </div>
+                    <div style={s.fieldGroup}>
+                      <label style={s.label}>{t.lastName}</label>
+                      <input style={s.input} value={inviteForm.last_name} onChange={e => setInvite('last_name', e.target.value)} required />
+                    </div>
+                    <div style={s.fieldGroup}>
+                      <label style={s.label}>{t.email}</label>
+                      <input style={s.input} type="email" value={inviteForm.email} onChange={e => setInvite('email', e.target.value)} required />
+                    </div>
+                    <div style={s.fieldGroup}>
+                      <label style={s.label}>{t.role}</label>
+                      <select style={s.input} value={inviteForm.role} onChange={e => setInvite('role', e.target.value)}>
+                        <option value="worker">{t.workerRole}</option>
+                        <option value="admin">{t.adminRole}</option>
+                      </select>
+                    </div>
+                    <div style={s.fieldGroup}>
+                      <label style={s.label}>{t.language}</label>
+                      <select style={s.input} value={inviteForm.language} onChange={e => setInvite('language', e.target.value)}>
+                        {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                    </div>
+                    {showRate && (
+                      <div style={s.fieldGroup}>
+                        <label style={s.label}>{t.payRate}</label>
+                        <input style={s.input} type="number" min="0" step="0.01" value={inviteForm.hourly_rate} onChange={e => setInvite('hourly_rate', e.target.value)} />
+                      </div>
+                    )}
+                  </div>
+                  {inviteError && <p style={s.errorText}>{inviteError}</p>}
+                  <button style={s.saveBtn} type="submit" disabled={inviteSaving}>{inviteSaving ? t.sendingInvite : t.sendInvite}</button>
                 </>
               )}
             </form>
@@ -207,129 +377,189 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       )}
 
       {workers.length === 0 ? (
-        <p style={styles.empty}>No users yet.</p>
+        <p style={s.empty}>{t.noUsers}</p>
       ) : (
-        <div className="table-scroll">
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Name</th>
-              <th style={styles.th} className="col-hide-mobile">Username</th>
-              {identityEditable && <th style={styles.th}>Type</th>}
-              {identityEditable && <th style={styles.th} className="col-hide-mobile">Language</th>}
-              {showRate && <th style={styles.th} className="col-hide-mobile">Rate</th>}
-              <th style={styles.th}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {workers.map(w => {
-              if (editingId === w.id) {
-                return (
-                  <React.Fragment key={w.id}>
-                    <tr style={{ ...styles.tr, background: '#f0f4ff' }}>
-                      <td style={styles.td}>
-                        {identityEditable
-                          ? <input style={styles.editInput} value={editForm.full_name} onChange={e => setEdit('full_name', e.target.value)} />
-                          : w.full_name}
-                      </td>
-                      <td style={styles.td}>@{w.username}</td>
-                      {identityEditable && (
-                        <td style={styles.td}>
-                          <select style={styles.editInput} value={editForm.role} onChange={e => setEdit('role', e.target.value)}>
-                            <option value="worker">User</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        </td>
-                      )}
-                      {identityEditable && (
-                        <td style={styles.td}>
-                          <select style={styles.editInput} value={editForm.language} onChange={e => setEdit('language', e.target.value)}>
-                            {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
-                          </select>
-                        </td>
-                      )}
-                      {showRate && (
-                        <td style={styles.td}>
-                          <input style={{ ...styles.editInput, width: 70 }} type="number" min="0" step="0.01" value={editForm.hourly_rate} onChange={e => setEdit('hourly_rate', e.target.value)} />
-                        </td>
-                      )}
-                      <td style={styles.tdAction}>
-                        <button style={styles.saveEditBtn} onClick={() => handleSaveEdit(w.id)} disabled={editSaving}>
-                          {editSaving ? '...' : 'Save'}
-                        </button>
-                        <button style={styles.cancelBtn} onClick={cancelEdit}>Cancel</button>
-                      </td>
-                    </tr>
+        <div style={s.list}>
+          {workers.map(w => {
+            const isExpanded = expandedId === w.id;
+            const isEditing = editingId === w.id;
+            return (
+              <div key={w.id} style={s.item}>
+                <button style={s.itemBar} onClick={() => toggleExpand(w.id)}>
+                  <div style={s.itemLeft}>
+                    <span style={s.itemName}>{w.full_name}</span>
+                    <span style={s.itemUsername}>@{w.username}</span>
+                    <RoleBadge role={w.role} />
+                  </div>
+                  <span style={{ ...s.chevron, transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▾</span>
+                </button>
+
+                {isExpanded && (
+                  <div style={s.panel}>
+
+                    {/* ── Profile section ── */}
                     {identityEditable && (
-                      <tr style={{ ...styles.tr, background: '#f0f4ff' }}>
-                        <td style={styles.td} colSpan={showRate ? 5 : 4}>
-                          <input style={{ ...styles.editInput, maxWidth: 280 }} type="email" placeholder="Email (optional)" value={editForm.email} onChange={e => setEdit('email', e.target.value)} />
-                        </td>
-                        <td style={styles.tdAction} />
-                      </tr>
+                      <div style={s.section}>
+                        <div style={s.sectionHeader}>
+                          <span style={s.sectionTitle}>{t.profile}</span>
+                          {(!isEditing || editSection !== 'info') && (
+                            <button style={s.sectionBtn} onClick={() => isEditing && editSection === 'info' ? cancelEdit() : startEditInfo(w)}>{t.edit}</button>
+                          )}
+                        </div>
+                        {isEditing && editSection === 'info' ? (
+                          <div style={s.editBlock}>
+                            <div style={s.formGrid}>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>{t.fullName}</label>
+                                <input style={s.input} value={editInfoForm.full_name} onChange={e => setEditInfoForm(f => ({ ...f, full_name: e.target.value }))} />
+                              </div>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>{t.email}</label>
+                                <input style={s.input} type="email" value={editInfoForm.email} onChange={e => setEditInfoForm(f => ({ ...f, email: e.target.value }))} />
+                              </div>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>{t.role}</label>
+                                <select style={s.input} value={editInfoForm.role} onChange={e => setEditInfoForm(f => ({ ...f, role: e.target.value }))}>
+                                  <option value="worker">{t.workerRole}</option>
+                                  <option value="admin">{t.adminRole}</option>
+                                </select>
+                              </div>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>{t.language}</label>
+                                <select style={s.input} value={editInfoForm.language} onChange={e => setEditInfoForm(f => ({ ...f, language: e.target.value }))}>
+                                  {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                                </select>
+                              </div>
+                            </div>
+                            <div style={s.editActions}>
+                              <button style={s.saveBtn} onClick={() => saveInfo(w.id)} disabled={editInfoSaving}>{editInfoSaving ? t.loading : t.save}</button>
+                              <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={s.infoGrid}>
+                            <span style={s.infoLabel}>Name</span>
+                            <span style={s.infoValue}>{w.full_name}</span>
+                            <span style={s.infoLabel}>Email</span>
+                            <span style={s.infoValue}>{w.email || <em style={{ color: '#9ca3af' }}>{t.notSet}</em>}</span>
+                            <span style={s.infoLabel}>Language</span>
+                            <span style={s.infoValue}>{w.language || 'English'}</span>
+                            <span style={s.infoLabel}>Role</span>
+                            <span style={s.infoValue}><RoleBadge role={w.role} /></span>
+                          </div>
+                        )}
+                      </div>
                     )}
-                  </React.Fragment>
-                );
-              }
-              return (
-                <tr key={w.id} style={styles.tr}>
-                  <td style={styles.td}>{w.full_name}</td>
-                  <td style={styles.td}>@{w.username}</td>
-                  {identityEditable && (
-                    <td style={styles.td}>
-                      <span style={{ ...styles.roleBadge, background: w.role === 'admin' ? '#1a56db' : '#6b7280' }}>
-                        {w.role === 'admin' ? 'Admin' : 'User'}
-                      </span>
-                    </td>
-                  )}
-                  {identityEditable && <td style={styles.td}>{w.language || '—'}</td>}
-                  {showRate && <td style={styles.td}>${parseFloat(w.hourly_rate ?? 30).toFixed(2)}/hr</td>}
-                  <td style={styles.tdAction}>
-                    <button style={styles.editBtn} onClick={() => startEdit(w)}>Edit</button>
-                    {identityEditable && <button style={styles.removeBtn} onClick={() => handleRemove(w.id, w.full_name)}>Remove</button>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+
+                    {/* ── Username section ── */}
+                    {identityEditable && (
+                      <div style={s.section}>
+                        <div style={s.sectionHeader}>
+                          <span style={s.sectionTitle}>{t.usernameSection}</span>
+                          {(!isEditing || editSection !== 'username') && (
+                            <button style={s.sectionBtn} onClick={() => isEditing && editSection === 'username' ? cancelEdit() : startEditUsername(w)}>{t.changeUsername}</button>
+                          )}
+                        </div>
+                        {isEditing && editSection === 'username' ? (
+                          <div style={s.editBlock}>
+                            <div style={s.fieldGroup}>
+                              <label style={s.label}>{t.newUsername}{editUsernameChecking ? ' (checking...)' : editUsernameTaken ? ' ⚠ taken' : ''}</label>
+                              <input
+                                style={{ ...s.input, borderColor: editUsernameTaken ? '#fca5a5' : undefined, maxWidth: 240 }}
+                                value={editUsernameVal}
+                                onChange={e => { setEditUsernameVal(e.target.value); setEditUsernameTaken(false); }}
+                                onBlur={e => checkEditUsername(e.target.value, w.id)}
+                              />
+                            </div>
+                            <div style={s.editActions}>
+                              <button style={s.saveBtn} onClick={() => saveUsername(w.id)} disabled={editUsernameSaving || editUsernameTaken}>{editUsernameSaving ? t.loading : t.save}</button>
+                              <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <span style={s.infoMono}>@{w.username}</span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── Pay Rate section ── */}
+                    {showRate && (
+                      <div style={s.section}>
+                        <div style={s.sectionHeader}>
+                          <span style={s.sectionTitle}>{t.payRateSection}</span>
+                          {(!isEditing || editSection !== 'rate') && (
+                            <button style={s.sectionBtn} onClick={() => isEditing && editSection === 'rate' ? cancelEdit() : startEditRate(w)}>{t.edit}</button>
+                          )}
+                        </div>
+                        {isEditing && editSection === 'rate' ? (
+                          <div style={s.editBlock}>
+                            <div style={s.formGrid}>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>{t.amount}</label>
+                                <input style={{ ...s.input, maxWidth: 120 }} type="number" min="0" step="0.01" value={editRateForm.rate} onChange={e => setEditRateForm(f => ({ ...f, rate: e.target.value }))} />
+                              </div>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>{t.rateType}</label>
+                                <select style={s.input} value={editRateForm.rate_type} onChange={e => setEditRateForm(f => ({ ...f, rate_type: e.target.value }))}>
+                                  {rateTypes.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                                </select>
+                              </div>
+                              <div style={s.fieldGroup}>
+                                <label style={s.label}>{t.overtimeRule}</label>
+                                <select style={s.input} value={editRateForm.overtime_rule} onChange={e => setEditRateForm(f => ({ ...f, overtime_rule: e.target.value }))}>
+                                  {overtimeRules.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                                </select>
+                              </div>
+                            </div>
+                            <div style={s.editActions}>
+                              <button style={s.saveBtn} onClick={() => saveRate(w.id)} disabled={editRateSaving}>{editRateSaving ? t.loading : t.save}</button>
+                              <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <span style={s.infoValue}>{fmtRate(w, currency)}</span>
+                            <span style={{ ...s.infoValue, marginLeft: 10, fontSize: 12, color: '#9ca3af' }}>
+                              {overtimeRules.find(r => r.value === (w.overtime_rule || 'daily'))?.label}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── Remove ── */}
+                    {identityEditable && !isEditing && (
+                      <div style={{ paddingTop: 4 }}>
+                        <button style={s.removeBtn} onClick={() => handleRemove(w.id, w.full_name)}>{t.removeUser}</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
-      <div style={styles.historyFooter}>
-        <button style={styles.historyToggle} onClick={() => { setShowHistory(s => !s); loadArchived(); }}>
-          {showHistory ? '▾' : '▸'} History {archived.length > 0 ? `(${archived.length})` : ''}
+      <div style={s.historyFooter}>
+        <button style={s.historyToggle} onClick={() => { setShowHistory(v => !v); loadArchived(); }}>
+          {showHistory ? '▾' : '▸'} {t.history} {archived.length > 0 ? `(${archived.length})` : ''}
         </button>
         {showHistory && (
-          <div style={styles.historySection}>
-            {loadingArchived ? (
-              <p style={styles.empty}>Loading...</p>
-            ) : archived.length === 0 ? (
-              <p style={styles.empty}>No removed users.</p>
-            ) : (
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Name</th>
-                    <th style={styles.th}>Username</th>
-                    <th style={styles.th}>Type</th>
-                    <th style={styles.th}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {archived.map(w => (
-                    <tr key={w.id} style={{ ...styles.tr, color: '#888' }}>
-                      <td style={styles.td}>{w.full_name}</td>
-                      <td style={styles.td}>@{w.username}</td>
-                      <td style={styles.td}>{w.role === 'admin' ? 'Admin' : 'User'}</td>
-                      <td style={styles.tdAction}>
-                        <button style={styles.restoreBtn} onClick={() => handleRestore(w.id)}>Restore</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          <div style={s.historyList}>
+            {loadingArchived ? <p style={s.empty}>{t.loading}</p>
+              : archived.length === 0 ? <p style={s.empty}>{t.noRemovedUsers}</p>
+              : archived.map(w => (
+                <div key={w.id} style={s.historyItem}>
+                  <div style={s.itemLeft}>
+                    <span style={{ ...s.itemName, color: '#9ca3af' }}>{w.full_name}</span>
+                    <span style={{ ...s.itemUsername, color: '#d1d5db' }}>@{w.username}</span>
+                    <RoleBadge role={w.role} />
+                  </div>
+                  <button style={s.restoreBtn} onClick={() => handleRestore(w.id)}>{t.restore}</button>
+                </div>
+              ))
+            }
           </div>
         )}
       </div>
@@ -337,35 +567,50 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   );
 }
 
-const styles = {
+const s = {
   card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 24 },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  cardTitle: { fontSize: 17, fontWeight: 700 },
-  addBtn: { padding: '7px 16px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13 },
+  cardTitle: { fontSize: 17, fontWeight: 700, margin: 0 },
+  addBtn: { padding: '7px 16px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  addPanel: { background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginBottom: 16 },
   modeTabs: { display: 'flex', gap: 4, marginBottom: 14, background: '#f0f4ff', borderRadius: 8, padding: 3, width: 'fit-content' },
   modeTab: { padding: '5px 14px', background: 'none', border: 'none', borderRadius: 6, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 },
   modeTabActive: { padding: '5px 14px', background: '#fff', border: 'none', borderRadius: 6, fontSize: 13, color: '#1a56db', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
-  inviteSuccess: { background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: '#166534' },
-  form: { display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'flex-start' },
-  input: { padding: '8px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, flex: 1, minWidth: 140 },
-  editInput: { padding: '5px 8px', border: '1px solid #c7d2fe', borderRadius: 6, fontSize: 13, width: '100%' },
-  errorBox: { width: '100%', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-  errorText: { color: '#e53e3e', fontSize: 13, margin: 0 },
+  addForm: { display: 'flex', flexDirection: 'column', gap: 12 },
+  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 },
+  fieldGroup: { display: 'flex', flexDirection: 'column', gap: 4 },
+  label: { fontSize: 12, fontWeight: 600, color: '#6b7280' },
+  input: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14 },
+  eyeBtn: { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: 0, lineHeight: 1 },
+  errorBox: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  errorText: { color: '#e53e3e', fontSize: 13 },
   restoreInlineBtn: { background: '#059669', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-  saveBtn: { padding: '8px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14 },
-  empty: { color: '#888', fontSize: 14 },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', fontSize: 12, color: '#999', fontWeight: 600, textTransform: 'uppercase', padding: '6px 8px', borderBottom: '1px solid #eee' },
-  tr: { borderBottom: '1px solid #f5f5f5' },
-  td: { padding: '10px 8px', fontSize: 14 },
-  tdAction: { padding: '10px 8px', textAlign: 'right', whiteSpace: 'nowrap' },
-  roleBadge: { color: '#fff', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700 },
-  editBtn: { background: 'none', border: '1px solid #93c5fd', color: '#2563eb', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', marginRight: 6 },
-  saveEditBtn: { background: '#059669', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', marginRight: 6, fontWeight: 600 },
-  cancelBtn: { background: 'none', border: '1px solid #ddd', color: '#666', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
-  removeBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  inviteSuccess: { background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: '#166534' },
+  saveBtn: { padding: '8px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer', width: 'fit-content' },
+  cancelBtn: { padding: '8px 14px', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
+  empty: { color: '#9ca3af', fontSize: 14, margin: 0 },
+  list: { display: 'flex', flexDirection: 'column', gap: 2 },
+  item: { border: '1px solid #f3f4f6', borderRadius: 8, overflow: 'hidden' },
+  itemBar: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 10 },
+  itemLeft: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  itemName: { fontSize: 14, fontWeight: 600, color: '#111827' },
+  itemUsername: { fontSize: 13, color: '#6b7280' },
+  chevron: { fontSize: 14, color: '#9ca3af', transition: 'transform 0.2s', flexShrink: 0, display: 'inline-block' },
+  panel: { padding: '4px 16px 16px', borderTop: '1px solid #f3f4f6', background: '#f9fafb', display: 'flex', flexDirection: 'column', gap: 0 },
+  section: { borderBottom: '1px solid #eeeeee', paddingBottom: 12, paddingTop: 12 },
+  sectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  sectionTitle: { fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionBtn: { padding: '3px 12px', background: 'none', border: '1px solid #d1d5db', color: '#374151', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  infoGrid: { display: 'grid', gridTemplateColumns: '90px 1fr', gap: '5px 12px', alignItems: 'center' },
+  infoLabel: { fontSize: 12, color: '#6b7280', fontWeight: 500 },
+  infoValue: { fontSize: 14, color: '#111827' },
+  infoMono: { fontSize: 14, color: '#374151', fontFamily: 'monospace' },
+  editBlock: { display: 'flex', flexDirection: 'column', gap: 10 },
+  editActions: { display: 'flex', gap: 8 },
+  removeBtn: { padding: '6px 14px', background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   historyFooter: { marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 12 },
-  historyToggle: { background: 'none', border: 'none', color: '#666', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '2px 0' },
-  historySection: { marginTop: 10 },
-  restoreBtn: { background: 'none', border: '1px solid #6ee7b7', color: '#059669', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 },
+  historyToggle: { background: 'none', border: 'none', color: '#6b7280', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '2px 0' },
+  historyList: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 },
+  historyItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#f9fafb', borderRadius: 7 },
+  restoreBtn: { padding: '4px 12px', background: 'none', border: '1px solid #6ee7b7', color: '#059669', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
 };

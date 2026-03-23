@@ -13,8 +13,12 @@ import AdminDashboard from './pages/AdminDashboard';
 import FieldPage from './pages/FieldPage';
 import AdministrationPage from './pages/AdministrationPage';
 import SuperAdmin from './pages/SuperAdmin';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import EULA from './pages/EULA';
 import InstallPrompt from './components/InstallPrompt';
+import WelcomeModal from './components/WelcomeModal';
 import { ToastProvider } from './contexts/ToastContext';
+import { OfflineProvider } from './contexts/OfflineContext';
 
 const BLOCKED_STATUSES = ['trial_expired', 'canceled'];
 
@@ -62,6 +66,8 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Login />} />
       <Route path="/register" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Register />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/eula" element={<EULA />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
@@ -82,8 +88,11 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <ToastProvider>
-          <AppRoutes />
-          <InstallPrompt />
+          <OfflineProvider>
+            <WelcomeModal />
+            <AppRoutes />
+            <InstallPrompt />
+          </OfflineProvider>
         </ToastProvider>
       </BrowserRouter>
     </AuthProvider>

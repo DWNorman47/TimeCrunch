@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 export default function LiveKPIs() {
+  const t = useT();
   const [kpis, setKpis] = useState(null);
 
   const load = () =>
@@ -15,7 +17,7 @@ export default function LiveKPIs() {
 
   if (!kpis) return (
     <div style={styles.grid} className="kpi-grid">
-      {['Pending Approvals', 'Clocked In Now', 'Hours This Week', 'Workers with OT'].map(label => (
+      {[t.pendingApprovals, t.clockedInNow, t.hoursThisWeek, t.workersWithOT].map(label => (
         <div key={label} style={styles.card}>
           <div style={styles.skelValue} />
           <div style={styles.label}>{label}</div>
@@ -25,10 +27,10 @@ export default function LiveKPIs() {
   );
 
   const cards = [
-    { label: 'Pending Approvals', value: kpis.pending_approvals, color: kpis.pending_approvals > 0 ? '#d97706' : '#059669' },
-    { label: 'Clocked In Now', value: kpis.clocked_in_count, color: '#1a56db' },
-    { label: 'Hours This Week', value: kpis.company_hours_this_week, color: '#1a56db' },
-    { label: 'Workers with OT', value: kpis.overtime_workers_this_week, color: kpis.overtime_workers_this_week > 0 ? '#dc2626' : '#059669' },
+    { label: t.pendingApprovals, value: kpis.pending_approvals, color: kpis.pending_approvals > 0 ? '#d97706' : '#059669' },
+    { label: t.clockedInNow, value: kpis.clocked_in_count, color: '#1a56db' },
+    { label: t.hoursThisWeek, value: kpis.company_hours_this_week, color: '#1a56db' },
+    { label: t.workersWithOT, value: kpis.overtime_workers_this_week, color: kpis.overtime_workers_this_week > 0 ? '#dc2626' : '#059669' },
   ];
 
   return (

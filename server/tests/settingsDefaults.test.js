@@ -12,10 +12,14 @@ describe('SETTINGS_DEFAULTS', () => {
     expect(typeof SETTINGS_DEFAULTS.overtime_rule).toBe('string');
   });
 
-  test('all feature flags default to true', () => {
+  test('all feature flags have a boolean default', () => {
     for (const key of FEATURE_KEYS) {
-      expect(SETTINGS_DEFAULTS[key]).toBe(true);
+      expect(typeof SETTINGS_DEFAULTS[key]).toBe('boolean');
     }
+  });
+
+  test('show_worker_wages defaults to false', () => {
+    expect(SETTINGS_DEFAULTS.show_worker_wages).toBe(false);
   });
 });
 

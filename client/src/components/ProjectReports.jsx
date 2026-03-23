@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import ProjectBillPDF from './ProjectBillPDF';
-import { fmtHours } from '../utils';
+import { fmtHours, formatCurrency } from '../utils';
 
 function downloadCSV(rows, filename) {
   const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -20,7 +20,7 @@ function defaultDates() {
   return { from: fmt(from), to: fmt(today) };
 }
 
-export default function ProjectReports() {
+export default function ProjectReports({ currency = 'USD' }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,12 +35,12 @@ export default function ProjectReports() {
 
   return (
     <div style={styles.list}>
-      {projects.map(p => <ProjectCard key={p.id} project={p} />)}
+      {projects.map(p => <ProjectCard key={p.id} project={p} currency={currency} />)}
     </div>
   );
 }
 
-function ProjectCard({ project: p }) {
+function ProjectCard({ project: p, currency = 'USD' }) {
   const [expanded, setExpanded] = useState(false);
   const [from, setFrom] = useState(defaultDates().from);
   const [to, setTo] = useState(defaultDates().to);
@@ -84,7 +84,7 @@ function ProjectCard({ project: p }) {
           <BudgetBar used={parseFloat(p.total_hours)} budget={parseFloat(p.budget_hours)} label="hrs" />
         )}
         {p.budget_dollars && (
-          <BudgetBar used={parseFloat(p.total_hours) * 30} budget={parseFloat(p.budget_dollars)} label="$" money />
+          <BudgetBar used={parseFloat(p.total_hours) * 30} budget={parseFloat(p.budget_dollars)} label="$" money currency={currency} />
         )}
       </div>
 
@@ -110,10 +110,10 @@ function ProjectCard({ project: p }) {
               <div style={styles.billSummary}>
                 <span>Entries: <b>{billData.entries.length}</b></span>
                 <span>Total: <b>{fmtHours(billData.summary.total_hours)}</b></span>
-                {billData.summary.regular_hours > 0 && <span style={{ color: '#2563eb' }}>Regular: <b>{fmtHours(billData.summary.regular_hours)} · ${billData.summary.regular_cost.toFixed(2)}</b></span>}
-                {billData.summary.overtime_hours > 0 && <span style={{ color: '#dc2626' }}>Overtime: <b>{fmtHours(billData.summary.overtime_hours)} · ${billData.summary.overtime_cost.toFixed(2)}</b></span>}
-                {billData.summary.prevailing_hours > 0 && <span style={{ color: '#d97706' }}>Prevailing: <b>{fmtHours(billData.summary.prevailing_hours)} · ${billData.summary.prevailing_cost.toFixed(2)}</b></span>}
-                <span style={{ fontWeight: 700 }}>Total Cost: <b>${billData.summary.total_cost.toFixed(2)}</b></span>
+                {billData.summary.regular_hours > 0 && <span style={{ color: '#2563eb' }}>Regular: <b>{fmtHours(billData.summary.regular_hours)} · {formatCurrency(billData.summary.regular_cost, currency)}</b></span>}
+                {billData.summary.overtime_hours > 0 && <span style={{ color: '#dc2626' }}>Overtime: <b>{fmtHours(billData.summary.overtime_hours)} · {formatCurrency(billData.summary.overtime_cost, currency)}</b></span>}
+                {billData.summary.prevailing_hours > 0 && <span style={{ color: '#d97706' }}>Prevailing: <b>{fmtHours(billData.summary.prevailing_hours)} · {formatCurrency(billData.summary.prevailing_cost, currency)}</b></span>}
+                <span style={{ fontWeight: 700 }}>Total Cost: <b>{formatCurrency(billData.summary.total_cost, currency)}</b></span>
               </div>
               <div style={styles.btnRow}>
                 <button style={styles.previewBtn} onClick={() => setShowPreview(s => !s)}>
@@ -128,7 +128,7 @@ function ProjectCard({ project: p }) {
                   downloadCSV([headers, ...rows], `${p.name.replace(/\s+/g,'-')}-${from||'all'}-to-${to||'all'}.csv`);
                 }}>Export CSV</button>
                 <PDFDownloadLink
-                  document={<ProjectBillPDF data={billData} />}
+                  document={<ProjectBillPDF data={billData} currency={currency} />}
                   fileName={`bill-${p.name.replace(/\s+/g, '-')}-${from || 'all'}-to-${to || 'all'}.pdf`}
                   style={styles.pdfBtn}
                 >
@@ -137,7 +137,7 @@ function ProjectCard({ project: p }) {
               </div>
               {showPreview && (
                 <PDFViewer style={styles.pdfViewer}>
-                  <ProjectBillPDF data={billData} />
+                  <ProjectBillPDF data={billData} currency={currency} />
                 </PDFViewer>
               )}
             </div>
@@ -157,11 +157,11 @@ function Metric({ label, value, color }) {
   );
 }
 
-function BudgetBar({ used, budget, label, money }) {
+function BudgetBar({ used, budget, label, money, currency = 'USD' }) {
   const pct = Math.min((used / budget) * 100, 100);
   const over = used > budget;
   const color = pct >= 90 ? '#dc2626' : pct >= 70 ? '#d97706' : '#059669';
-  const fmt = v => money ? `$${v.toFixed(0)}` : `${v.toFixed(1)}`;
+  const fmt = v => money ? formatCurrency(v, currency) : `${v.toFixed(1)}`;
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6b7280', marginBottom: 3 }}>

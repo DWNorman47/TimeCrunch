@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS users (
   invite_token_expires        TIMESTAMP,
   invite_pending              BOOLEAN      NOT NULL DEFAULT false,
   hourly_rate                 DECIMAL(10,2),
+  rate_type                   VARCHAR(20)  NOT NULL DEFAULT 'hourly',
+  overtime_rule               VARCHAR(10)  NOT NULL DEFAULT 'daily', -- 'daily' | 'weekly' | 'none'
   language                    VARCHAR(20)  NOT NULL DEFAULT 'English',
   active                      BOOLEAN      NOT NULL DEFAULT true,
   created_at                  TIMESTAMP    NOT NULL DEFAULT NOW()
@@ -97,6 +99,8 @@ CREATE TABLE IF NOT EXISTS time_entries (
   clock_in_lng    DECIMAL(10,7),
   clock_out_lat   DECIMAL(10,7),
   clock_out_lng   DECIMAL(10,7),
+  timezone        VARCHAR(50),
+  client_id       VARCHAR(36),
   created_at      TIMESTAMP     NOT NULL DEFAULT NOW()
 );
 
@@ -113,6 +117,7 @@ CREATE TABLE IF NOT EXISTS active_clock (
   clock_in_lng   DECIMAL(10,7),
   work_date      DATE          NOT NULL,
   notes          TEXT,
+  timezone       VARCHAR(50),
   created_at     TIMESTAMP     NOT NULL DEFAULT NOW()
 );
 
@@ -348,8 +353,39 @@ CREATE INDEX IF NOT EXISTS idx_inbox_company_id ON inbox(company_id);
 -- =============================================================================
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS stripe_customer_id     VARCHAR(255);
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(255);
-ALTER TABLE companies ADD COLUMN IF NOT EXISTS pro_addon              BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS pro_addon              BOOLEAN NOT NULL DEFAULT false; -- legacy, replaced by addon_qbo
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS addon_qbo             BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS billing_cycle          VARCHAR(10) NOT NULL DEFAULT 'monthly';
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS annual_worker_count    INTEGER;
+-- QBO OAuth tokens (per company)
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_access_token      TEXT;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_refresh_token     TEXT;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_realm_id          VARCHAR(50);
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_token_expires_at  TIMESTAMP;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_connected_at      TIMESTAMP;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_oauth_nonce       VARCHAR(64);
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS qbo_disconnected      BOOLEAN NOT NULL DEFAULT false;
+-- QBO mappings on workers and projects
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS qbo_employee_id       VARCHAR(50);
+ALTER TABLE projects  ADD COLUMN IF NOT EXISTS qbo_customer_id       VARCHAR(50);
+-- Login lockout
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS failed_login_attempts INT NOT NULL DEFAULT 0;
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS locked_until           TIMESTAMP;
+-- MFA (TOTP)
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_enabled           BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_secret            TEXT;
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS mfa_secret_pending    TEXT;
+-- Timezone tracking on time entries and active clock
+ALTER TABLE time_entries  ADD COLUMN IF NOT EXISTS timezone VARCHAR(50);
+ALTER TABLE active_clock  ADD COLUMN IF NOT EXISTS timezone VARCHAR(50);
+-- Fix QBO encrypted token column sizes
+ALTER TABLE companies ALTER COLUMN qbo_realm_id TYPE TEXT;
+-- First-login welcome tracking
+ALTER TABLE users ADD COLUMN IF NOT EXISTS welcomed_at TIMESTAMP;
+-- Offline deduplication for time entries
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS client_id VARCHAR(36);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_time_entries_user_client_id ON time_entries(user_id, client_id) WHERE client_id IS NOT NULL;
 -- plan values: free | starter | business  (trial companies default to full access until plan is set)
+-- Per-worker overtime rule: daily | weekly | none
+ALTER TABLE users ADD COLUMN IF NOT EXISTS overtime_rule VARCHAR(10) NOT NULL DEFAULT 'daily';
 

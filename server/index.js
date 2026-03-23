@@ -16,6 +16,20 @@ const pool = require('./db');
 const app = express();
 app.use(helmet());
 app.use(cors());
+
+// Block TRACE method
+app.use((req, res, next) => {
+  if (req.method === 'TRACE') return res.status(405).end();
+  next();
+});
+
+// Prevent caching of all API responses
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  next();
+});
+
 // Stripe webhook needs raw body before express.json parses it
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
@@ -24,7 +38,10 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/time-entries', require('./routes/timeEntries'));
 app.use('/api/admin', require('./routes/admin'));
-app.use('/api/qbo', requireAuth, requireProAddon, require('./routes/qbo'));
+// QBO OAuth callback must be public (Intuit redirects here without a JWT)
+const qboRouter = require('./routes/qbo');
+app.get('/api/qbo/callback', qboRouter.oauthCallback);
+app.use('/api/qbo', requireAuth, requireProAddon, qboRouter);
 app.use('/api/clock', require('./routes/clock'));
 app.use('/api/superadmin', require('./routes/superadmin'));
 app.use('/api/shifts', require('./routes/shifts'));
