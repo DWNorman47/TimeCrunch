@@ -29,12 +29,12 @@ function PillContent({ s }) {
   );
 }
 
-function DraggableShift({ s, projects, editingId, editForm, setEditForm, editSaving, startEdit, setEditingId, saveEdit, deleteShift, deleting, onDuplicate }) {
+function DraggableShift({ s, projects, editingId, editForm, setEditForm, editSaving, startEdit, setEditingId, saveEdit, deleteShift, deleting, onDuplicate, dragMode }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: String(s.id) });
 
   return (
     <div ref={setNodeRef}>
-      <div style={{ ...styles.shiftPill, opacity: isDragging ? 0.35 : 1, cursor: 'grab' }} {...listeners} {...attributes}>
+      <div style={{ ...styles.shiftPill, opacity: isDragging ? 0.35 : 1, cursor: dragMode ? 'grab' : 'default' }} {...(dragMode ? { ...listeners, ...attributes } : {})}>
         <PillContent s={s} />
         <div style={styles.pillActions} onPointerDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
           <button style={styles.editPillBtn} onClick={() => editingId === s.id ? setEditingId(null) : startEdit(s)}>Edit</button>
@@ -112,11 +112,56 @@ export default function ManageSchedule({ workers, projects }) {
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
   const [activeShift, setActiveShift] = useState(null);
+  const [dragMode, setDragMode] = useState(false);
+  const [preDragShifts, setPreDragShifts] = useState(null);
+  const [pendingMoves, setPendingMoves] = useState({});
+  const [savingMoves, setSavingMoves] = useState(false);
 
-  const sensors = useSensors(
+  const activeSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
   );
+  const disabledSensors = useSensors();
+  const sensors = dragMode ? activeSensors : disabledSensors;
+
+  const enterDragMode = () => {
+    setPreDragShifts(shifts);
+    setPendingMoves({});
+    setDragMode(true);
+    setEditingId(null);
+  };
+
+  const discardDrag = () => {
+    setShifts(preDragShifts);
+    setPendingMoves({});
+    setPreDragShifts(null);
+    setDragMode(false);
+  };
+
+  const saveDragMoves = async () => {
+    setSavingMoves(true);
+    try {
+      await Promise.all(Object.entries(pendingMoves).map(([shiftId, newDate]) => {
+        const shift = shifts.find(s => s.id === parseInt(shiftId));
+        if (!shift) return Promise.resolve();
+        return api.patch(`/shifts/admin/${shiftId}`, {
+          shift_date: newDate,
+          start_time: shift.start_time.substring(0, 5),
+          end_time: shift.end_time.substring(0, 5),
+          project_id: shift.project_id || '',
+          notes: shift.notes || '',
+        });
+      }));
+      toast(`${Object.keys(pendingMoves).length} shift${Object.keys(pendingMoves).length !== 1 ? 's' : ''} saved`, 'success');
+    } catch {
+      toast('Some shifts failed to save', 'error');
+    } finally {
+      setSavingMoves(false);
+      setPendingMoves({});
+      setPreDragShifts(null);
+      setDragMode(false);
+    }
+  };
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const from = toISO(days[0]);
@@ -205,9 +250,9 @@ export default function ManageSchedule({ workers, projects }) {
     setEditingId(null);
   };
 
-  const handleDragEnd = async ({ active, over }) => {
+  const handleDragEnd = ({ active, over }) => {
     setActiveShift(null);
-    if (!over) return;
+    if (!over || !dragMode) return;
     const shiftId = parseInt(active.id);
     const shift = shifts.find(s => s.id === shiftId);
     if (!shift) return;
@@ -215,21 +260,9 @@ export default function ManageSchedule({ workers, projects }) {
     const newDate = over.id;
     if (currentDate === newDate) return;
 
-    // Optimistic update
+    // Local-only update — no API call until Save
     setShifts(prev => prev.map(s => s.id === shiftId ? { ...s, shift_date: newDate } : s));
-    try {
-      await api.patch(`/shifts/admin/${shiftId}`, {
-        shift_date: newDate,
-        start_time: shift.start_time.substring(0, 5),
-        end_time: shift.end_time.substring(0, 5),
-        project_id: shift.project_id || '',
-        notes: shift.notes || '',
-      });
-    } catch {
-      // Revert on failure
-      setShifts(prev => prev.map(s => s.id === shiftId ? { ...s, shift_date: currentDate } : s));
-      toast('Failed to move shift', 'error');
-    }
+    setPendingMoves(prev => ({ ...prev, [shiftId]: newDate }));
   };
 
   const shiftsByDay = {};
@@ -239,7 +272,7 @@ export default function ManageSchedule({ workers, projects }) {
     if (shiftsByDay[key]) shiftsByDay[key].push(s);
   });
 
-  const shiftProps = { projects, editingId, editForm, setEditForm, editSaving, startEdit, setEditingId, saveEdit, deleteShift, deleting, onDuplicate: duplicateShift };
+  const shiftProps = { projects, editingId, editForm, setEditForm, editSaving, startEdit, setEditingId, saveEdit, deleteShift, deleting, onDuplicate: duplicateShift, dragMode };
 
   return (
     <div style={styles.card}>
@@ -290,6 +323,20 @@ export default function ManageSchedule({ workers, projects }) {
         <span style={styles.weekLabel}>{fmtDay(days[0])} – {fmtDay(days[6])}</span>
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>Next ›</button>
         <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>Today</button>
+        {!dragMode
+          ? <button style={styles.dragModeBtn} onClick={enterDragMode}>⇄ Rearrange</button>
+          : (
+            <div style={styles.dragModeBanner}>
+              <span style={styles.dragModeLabel}>
+                Drag mode{Object.keys(pendingMoves).length > 0 ? ` · ${Object.keys(pendingMoves).length} unsaved` : ''}
+              </span>
+              <button style={styles.saveDragBtn} onClick={saveDragMoves} disabled={savingMoves || Object.keys(pendingMoves).length === 0}>
+                {savingMoves ? 'Saving...' : 'Save & Notify'}
+              </button>
+              <button style={styles.discardDragBtn} onClick={discardDrag} disabled={savingMoves}>Discard</button>
+            </div>
+          )
+        }
       </div>
 
       {loading ? <p style={{ color: '#888', fontSize: 13 }}>Loading...</p> : (
@@ -340,6 +387,11 @@ const styles = {
   navBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 10px', fontSize: 13, cursor: 'pointer', color: '#374151' },
   weekLabel: { fontWeight: 600, fontSize: 14, color: '#111827', flex: 1 },
   todayBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: '#6b7280' },
+  dragModeBtn: { background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#374151' },
+  dragModeBanner: { display: 'flex', alignItems: 'center', gap: 8, background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8, padding: '5px 12px' },
+  dragModeLabel: { fontSize: 12, fontWeight: 600, color: '#92400e', flex: 1 },
+  saveDragBtn: { background: '#059669', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  discardDragBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 12px', fontSize: 12, cursor: 'pointer', color: '#6b7280' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, overflowX: 'auto' },
   dayCol: { padding: '8px 6px', minHeight: 80, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 90 },
   dayHead: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 },

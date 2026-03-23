@@ -88,11 +88,20 @@ router.patch('/admin/:id', requireAdmin, async (req, res) => {
 // DELETE /admin/shifts/:id
 router.delete('/admin/:id', requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query(
-      'DELETE FROM shifts WHERE id = $1 AND company_id = $2 RETURNING id',
+    const full = await pool.query(
+      `SELECT s.*, u.full_name as worker_name, p.name as project_name
+       FROM shifts s JOIN users u ON s.user_id = u.id LEFT JOIN projects p ON s.project_id = p.id
+       WHERE s.id = $1 AND s.company_id = $2`,
       [req.params.id, req.user.company_id]
     );
-    if (result.rowCount === 0) return res.status(404).json({ error: 'Shift not found' });
+    if (full.rowCount === 0) return res.status(404).json({ error: 'Shift not found' });
+    const shift = full.rows[0];
+    await pool.query('DELETE FROM shifts WHERE id = $1', [req.params.id]);
+    sendPushToUser(shift.user_id, {
+      title: 'Shift cancelled',
+      body: `${shift.shift_date?.toString().substring(0, 10)} · ${shift.start_time.substring(0, 5)}–${shift.end_time.substring(0, 5)}${shift.project_name ? ' · ' + shift.project_name : ''}`,
+      url: '/dashboard',
+    });
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
