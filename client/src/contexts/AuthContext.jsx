@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api';
+import { clearCache } from '../offlineDb';
 
 const AuthContext = createContext(null);
 
@@ -21,6 +22,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (username, password, company_name) => {
+    await clearCache();
     const r = await api.post('/auth/login', { username, password, company_name });
     if (r.data.mfa_required) {
       return { mfa_required: true, mfa_token: r.data.mfa_token };
@@ -33,6 +35,7 @@ export function AuthProvider({ children }) {
   };
 
   const loginWithToken = async token => {
+    await clearCache();
     localStorage.setItem('tc_token', token);
     const me = await api.get('/auth/me');
     setUser(me.data.user);
@@ -41,6 +44,7 @@ export function AuthProvider({ children }) {
   };
 
   const confirmMfa = async (mfa_token, code) => {
+    await clearCache();
     const r = await api.post('/auth/mfa/confirm', { mfa_token, code });
     localStorage.setItem('tc_token', r.data.token);
     const me = await api.get('/auth/me');
@@ -49,6 +53,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    clearCache();
     localStorage.removeItem('tc_token');
     setUser(null);
     setFirstLogin(false);

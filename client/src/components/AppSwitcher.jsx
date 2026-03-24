@@ -77,7 +77,7 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
     if (a.adminOnly && !isAdmin) return false;
     if (!isAdmin) {
       if (a.soon) return false;
-      if (a.id === 'field' && features.feature_field === false) return false;
+      if (a.id === 'field' && features?.feature_field === false) return false;
     }
     return true;
   });
