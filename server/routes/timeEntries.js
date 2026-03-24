@@ -24,7 +24,7 @@ router.get('/', requireAuth, async (req, res) => {
 
 // Submit a time entry (wage_type inherited from project)
 router.post('/', requireAuth, async (req, res) => {
-  const { project_id, work_date, start_time, end_time, notes, break_minutes, mileage, timezone } = req.body;
+  const { project_id, work_date, start_time, end_time, notes, break_minutes, mileage, timezone, client_id } = req.body;
   if (!project_id || !work_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'project_id, work_date, start_time, and end_time are required' });
   }
@@ -40,12 +40,16 @@ router.post('/', requireAuth, async (req, res) => {
 
     const bm = parseInt(break_minutes) || 0;
     if (bm < 0) return res.status(400).json({ error: 'break_minutes must be non-negative' });
+    const cid = (typeof client_id === 'string' && client_id.length <= 36) ? client_id : null;
     const result = await pool.query(
-      `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes, break_minutes, mileage, timezone)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes, break_minutes, mileage, timezone, client_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       ON CONFLICT (user_id, client_id) WHERE client_id IS NOT NULL DO NOTHING
+       RETURNING *`,
       [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notes || null,
-       bm, mileage != null ? parseFloat(mileage) : null, timezone || null]
+       bm, mileage != null ? parseFloat(mileage) : null, timezone || null, cid]
     );
+    if (result.rowCount === 0) return res.status(409).json({ error: 'Duplicate entry' });
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -200,15 +204,17 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
   const userId = req.user.id;
   const companyId = req.user.company_id;
   try {
-    const [periods, settingsRows] = await Promise.all([
+    const [periods, settingsRows, workerRow] = await Promise.all([
       pool.query('SELECT * FROM pay_periods WHERE company_id = $1 ORDER BY period_start DESC', [companyId]),
       pool.query('SELECT key, value FROM settings WHERE company_id = $1', [companyId]),
+      pool.query('SELECT overtime_rule FROM users WHERE id = $1', [userId]),
     ]);
-    const s = { overtime_rule: 'daily', overtime_threshold: 8 };
+    const s = { overtime_threshold: 8 };
     settingsRows.rows.forEach(r => {
-      if (r.key === 'overtime_rule') s.overtime_rule = r.value;
-      else if (r.key === 'overtime_threshold') s.overtime_threshold = parseFloat(r.value);
+      if (r.key === 'overtime_threshold') s.overtime_threshold = parseFloat(r.value);
     });
+    // Use the worker's own overtime_rule, falling back to company setting if not set
+    const workerOTRule = workerRow.rows[0]?.overtime_rule || 'daily';
 
     const result = [];
     if (periods.rows.length > 0) {
@@ -229,7 +235,7 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
         const entries = allEntries.rows.filter(e => e.work_date_str >= ps && e.work_date_str <= pe);
         if (entries.length === 0) continue;
 
-        const { regularHours, overtimeHours } = computeOT(entries, s.overtime_rule, s.overtime_threshold);
+        const { regularHours, overtimeHours } = computeOT(entries, workerOTRule, s.overtime_threshold);
         let prevailingHours = 0, totalMileage = 0;
         for (const e of entries) {
           if (e.wage_type === 'prevailing') {

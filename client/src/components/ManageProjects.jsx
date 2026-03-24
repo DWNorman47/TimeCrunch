@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
+import { useT } from '../hooks/useT';
 
 export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true, showGeofenceBudget = true }) {
   const toast = useToast();
+  const t = useT();
   const [name, setName] = useState('');
   const [wageType, setWageType] = useState('regular');
   const [error, setError] = useState('');
@@ -103,7 +105,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
 
   const useMyLocation = () => {
     if (!navigator.geolocation) {
-      setGeoError('Geolocation is not supported by this browser.');
+      setGeoError(t.geolocationNotSupported);
       return;
     }
     setGeoLocating(true);
@@ -116,9 +118,9 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       },
       err => {
         setGeoLocating(false);
-        if (err.code === 1) setGeoError('Location access denied. Please allow location in your browser settings.');
-        else if (err.code === 2) setGeoError('Location unavailable. Try entering coordinates manually.');
-        else setGeoError('Location request timed out. Try again or enter coordinates manually.');
+        if (err.code === 1) setGeoError(t.locationAccessDenied);
+        else if (err.code === 2) setGeoError(t.locationUnavailable);
+        else setGeoError(t.locationTimeout);
       },
       { timeout: 8000 }
     );
@@ -154,22 +156,22 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
 
   return (
     <div style={styles.card}>
-      <h3 style={styles.cardTitle}>Manage Projects</h3>
+      <h3 style={styles.cardTitle}>{t.manageProjects}</h3>
       <form onSubmit={handleAdd} style={styles.form} className="manage-projects-form">
         <input
           style={styles.input}
-          placeholder="Project name..."
+          placeholder={t.projectNamePlaceholder}
           value={name}
           onChange={e => { setName(e.target.value); setError(''); setArchivedConflict(null); }}
           required
         />
         {showWageType && (
           <select style={styles.select} value={wageType} onChange={e => setWageType(e.target.value)}>
-            <option value="regular">Regular Wages</option>
-            <option value="prevailing">Prevailing Wages</option>
+            <option value="regular">{t.regularWages}</option>
+            <option value="prevailing">{t.prevailingWages}</option>
           </select>
         )}
-        <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? 'Adding...' : '+ Add'}</button>
+        <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? t.adding : t.add}</button>
       </form>
       {error && (
         <div style={styles.errorBox}>
@@ -183,14 +185,14 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       )}
 
       {projects.length === 0 ? (
-        <p style={styles.empty}>No projects yet.</p>
+        <p style={styles.empty}>{t.noProjects}</p>
       ) : (
         <div className="table-scroll">
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={styles.th}>Name</th>
-              {showWageType && <th style={styles.th}>Wage Type</th>}
+              <th style={styles.th}>{t.name}</th>
+              {showWageType && <th style={styles.th}>{t.wageType}</th>}
               <th style={styles.th}></th>
             </tr>
           </thead>
@@ -213,34 +215,34 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       }
                       {showWageType && (
                         <select style={styles.editInput} value={editWageType} onChange={e => setEditWageType(e.target.value)}>
-                          <option value="regular">Regular Wages</option>
-                          <option value="prevailing">Prevailing Wages</option>
+                          <option value="regular">{t.regularWages}</option>
+                          <option value="prevailing">{t.prevailingWages}</option>
                         </select>
                       )}
-                      <button style={styles.saveBtn} onClick={() => handleEditSave(p.id)}>Save</button>
-                      <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+                      <button style={styles.saveBtn} onClick={() => handleEditSave(p.id)}>{t.save}</button>
+                      <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
                     </div>
                     {showGeofenceBudget && (
                       <div style={styles.geoSection}>
-                        <span style={styles.geoLabel}>📍 Geofence (optional)</span>
+                        <span style={styles.geoLabel}>{t.geofenceOptional}</span>
                         <div style={styles.geoFields}>
-                          <input style={styles.geoInput} type="number" step="0.000001" placeholder="Latitude" value={editGeoLat} onChange={e => setEditGeoLat(e.target.value)} />
-                          <input style={styles.geoInput} type="number" step="0.000001" placeholder="Longitude" value={editGeoLng} onChange={e => setEditGeoLng(e.target.value)} />
-                          <input style={styles.geoInput} type="number" min="50" step="50" placeholder="Radius (ft)" value={editGeoRadius} onChange={e => setEditGeoRadius(e.target.value)} />
+                          <input style={styles.geoInput} type="number" step="0.000001" placeholder={t.latitude} value={editGeoLat} onChange={e => setEditGeoLat(e.target.value)} />
+                          <input style={styles.geoInput} type="number" step="0.000001" placeholder={t.longitude} value={editGeoLng} onChange={e => setEditGeoLng(e.target.value)} />
+                          <input style={styles.geoInput} type="number" min="50" step="50" placeholder={t.radiusFt} value={editGeoRadius} onChange={e => setEditGeoRadius(e.target.value)} />
                           <button style={styles.geoLocBtn} type="button" onClick={useMyLocation} disabled={geoLocating}>
-                            {geoLocating ? '...' : '📡 My location'}
+                            {geoLocating ? '...' : t.myLocation}
                           </button>
                         </div>
                         {geoError && <p style={styles.geoErrorText}>{geoError}</p>}
-                        <p style={styles.geoHint}>Workers outside the radius will be blocked from clocking in. Leave blank to remove.</p>
+                        <p style={styles.geoHint}>{t.geofenceNote}</p>
                       </div>
                     )}
                     {showGeofenceBudget && (
                       <div style={styles.budgetSection}>
-                        <span style={styles.budgetLabel}>💰 Budget (optional)</span>
+                        <span style={styles.budgetLabel}>{t.budgetOptional}</span>
                         <div style={styles.budgetFields}>
                           <div style={styles.budgetField}>
-                            <label style={styles.budgetFieldLabel}>Hours</label>
+                            <label style={styles.budgetFieldLabel}>{t.hours}</label>
                             <input style={styles.geoInput} type="number" min="0" step="0.5" placeholder="e.g. 200" value={editBudgetHours} onChange={e => setEditBudgetHours(e.target.value)} />
                           </div>
                           <div style={styles.budgetField}>
@@ -248,7 +250,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                             <input style={styles.geoInput} type="number" min="0" step="100" placeholder="e.g. 15000" value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
                           </div>
                         </div>
-                        <p style={styles.geoHint}>Shows a burn bar in Project Reports. Leave blank for no budget.</p>
+                        <p style={styles.geoHint}>{t.budgetNote}</p>
                       </div>
                     )}
                   </div>
@@ -266,7 +268,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                 {showWageType && (
                   <td style={styles.td}>
                     <span style={{ ...styles.wageBadge, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
-                      {p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}
+                      {p.wage_type === 'prevailing' ? t.prevailingWages : t.regularWages}
                     </span>
                   </td>
                 )}
@@ -280,10 +282,10 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                     setEditGeoRadius(p.geo_radius_ft || '');
                     setEditBudgetHours(p.budget_hours || '');
                     setEditBudgetDollars(p.budget_dollars || '');
-                  }}>Edit</button>
+                  }}>{t.edit}</button>
                   {p.geo_radius_ft && <button style={styles.clearGeoBtn} onClick={() => handleClearGeofence(p.id)}>✕ Fence</button>}
                   {hasBudget(p) && <button style={styles.clearGeoBtn} onClick={() => handleClearBudget(p.id)}>✕ Budget</button>}
-                  <button style={styles.removeBtn} onClick={() => handleRemove(p.id, p.name)}>Remove</button>
+                  <button style={styles.removeBtn} onClick={() => handleRemove(p.id, p.name)}>{t.remove}</button>
                 </td>
               </tr>
             ))}
@@ -294,20 +296,20 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
 
       <div style={styles.historyFooter}>
         <button style={styles.historyToggle} onClick={() => setShowHistory(s => !s)}>
-          {showHistory ? '▾' : '▸'} History {archived.length > 0 ? `(${archived.length})` : ''}
+          {showHistory ? '▾' : '▸'} {t.history} {archived.length > 0 ? `(${archived.length})` : ''}
         </button>
         {showHistory && (
           <div style={styles.historySection}>
             {loadingArchived ? (
-              <p style={styles.empty}>Loading...</p>
+              <p style={styles.empty}>{t.loading}</p>
             ) : archived.length === 0 ? (
-              <p style={styles.empty}>No removed projects.</p>
+              <p style={styles.empty}>{t.noRemovedProjects}</p>
             ) : (
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Name</th>
-                    {showWageType && <th style={styles.th}>Wage Type</th>}
+                    <th style={styles.th}>{t.name}</th>
+                    {showWageType && <th style={styles.th}>{t.wageType}</th>}
                     <th style={styles.th}></th>
                   </tr>
                 </thead>
@@ -315,9 +317,9 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                   {archived.map(p => (
                     <tr key={p.id} style={{ ...styles.tr, color: '#888' }}>
                       <td style={styles.td}>{p.name}</td>
-                      {showWageType && <td style={styles.td}>{p.wage_type === 'prevailing' ? 'Prevailing Wages' : 'Regular Wages'}</td>}
+                      {showWageType && <td style={styles.td}>{p.wage_type === 'prevailing' ? t.prevailingWages : t.regularWages}</td>}
                       <td style={styles.tdAction}>
-                        <button style={styles.restoreBtn} onClick={() => handleRestore(p.id)}>Restore</button>
+                        <button style={styles.restoreBtn} onClick={() => handleRestore(p.id)}>{t.restore}</button>
                       </td>
                     </tr>
                   ))}

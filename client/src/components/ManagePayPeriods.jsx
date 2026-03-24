@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 function fmt(dateStr) {
   return new Date(dateStr.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -17,6 +18,7 @@ function defaultPeriod() {
 }
 
 export default function ManagePayPeriods() {
+  const t = useT();
   const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ from: defaultPeriod().from, to: defaultPeriod().to, label: '' });
@@ -56,35 +58,35 @@ export default function ManagePayPeriods() {
 
   return (
     <div style={styles.card}>
-      <h3 style={styles.title}>Pay Period Lock</h3>
-      <p style={styles.desc}>Locked periods prevent workers from editing or deleting entries within those dates.</p>
+      <h3 style={styles.title}>{t.payPeriodLock}</h3>
+      <p style={styles.desc}>{t.payPeriodLockDesc}</p>
 
       <form onSubmit={lock} style={styles.form}>
         <div style={styles.formRow}>
           <div style={styles.field}>
-            <label style={styles.label}>From</label>
+            <label style={styles.label}>{t.from}</label>
             <input style={styles.input} type="date" value={form.from} onChange={e => setForm(f => ({ ...f, from: e.target.value }))} required />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>To</label>
+            <label style={styles.label}>{t.to}</label>
             <input style={styles.input} type="date" value={form.to} onChange={e => setForm(f => ({ ...f, to: e.target.value }))} required />
           </div>
           <div style={{ ...styles.field, flex: 2 }}>
-            <label style={styles.label}>Label (optional)</label>
+            <label style={styles.label}>{t.labelOptional}</label>
             <input style={styles.input} type="text" value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="e.g. Week of Mar 10" />
           </div>
           <div style={styles.field}>
             <label style={styles.label}>&nbsp;</label>
             <button style={styles.lockBtn} type="submit" disabled={saving}>
-              {saving ? 'Locking...' : '🔒 Lock Period'}
+              {saving ? t.locking : t.lockPeriod}
             </button>
           </div>
         </div>
         {error && <p style={styles.error}>{error}</p>}
       </form>
 
-      {loading ? <p style={{ color: '#888', fontSize: 13 }}>Loading...</p> : periods.length === 0 ? (
-        <p style={styles.empty}>No locked periods yet.</p>
+      {loading ? <p style={{ color: '#888', fontSize: 13 }}>{t.loading}</p> : periods.length === 0 ? (
+        <p style={styles.empty}>{t.noLockedPeriods}</p>
       ) : (
         <div style={styles.list}>
           {periods.map(p => (
@@ -100,7 +102,7 @@ export default function ManagePayPeriods() {
                 onClick={() => unlock(p.id)}
                 disabled={unlocking === p.id}
               >
-                {unlocking === p.id ? '...' : 'Unlock'}
+                {unlocking === p.id ? '...' : t.unlock}
               </button>
             </div>
           ))}

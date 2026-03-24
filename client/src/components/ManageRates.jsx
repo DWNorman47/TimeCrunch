@@ -1,5 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { currencySymbol } from '../utils';
+import { useT } from '../hooks/useT';
+
+const TIMEZONES = [
+  { value: 'America/New_York',    label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago',     label: 'Central Time (CT)' },
+  { value: 'America/Denver',      label: 'Mountain Time (MT)' },
+  { value: 'America/Phoenix',     label: 'Arizona (MST, no DST)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  { value: 'America/Anchorage',   label: 'Alaska (AKT)' },
+  { value: 'Pacific/Honolulu',    label: 'Hawaii (HST)' },
+  { value: 'America/Puerto_Rico', label: 'Puerto Rico (AST)' },
+  { value: 'America/Mexico_City', label: 'Mexico City (CST)' },
+  { value: 'America/Tijuana',     label: 'Tijuana (PST)' },
+  { value: 'America/Monterrey',   label: 'Monterrey (CST)' },
+  { value: 'America/Tegucigalpa', label: 'Honduras (CST)' },
+  { value: 'America/Guatemala',   label: 'Guatemala (CST)' },
+  { value: 'America/Managua',     label: 'Nicaragua (CST)' },
+  { value: 'America/Belize',      label: 'Belize (CST)' },
+  { value: 'America/Costa_Rica',  label: 'Costa Rica (CST)' },
+  { value: 'America/Panama',      label: 'Panama (EST)' },
+  { value: 'America/Bogota',      label: 'Colombia (COT)' },
+  { value: 'America/Lima',        label: 'Peru (PET)' },
+  { value: 'America/Santiago',    label: 'Chile (CLT)' },
+  { value: 'America/Buenos_Aires', label: 'Argentina (ART)' },
+  { value: 'America/Sao_Paulo',   label: 'Brazil — São Paulo (BRT)' },
+  { value: 'America/Toronto',     label: 'Toronto (ET)' },
+  { value: 'America/Vancouver',   label: 'Vancouver (PT)' },
+  { value: 'Europe/London',       label: 'London (GMT/BST)' },
+  { value: 'Europe/Paris',        label: 'Paris (CET)' },
+  { value: 'Europe/Berlin',       label: 'Berlin (CET)' },
+  { value: 'Europe/Madrid',       label: 'Madrid (CET)' },
+  { value: 'Asia/Dubai',          label: 'Dubai (GST)' },
+  { value: 'Asia/Kolkata',        label: 'India (IST)' },
+  { value: 'Asia/Tokyo',          label: 'Japan (JST)' },
+  { value: 'Asia/Shanghai',       label: 'China (CST)' },
+  { value: 'Australia/Sydney',    label: 'Sydney (AEST)' },
+  { value: 'Pacific/Auckland',    label: 'New Zealand (NZST)' },
+  { value: 'UTC',                 label: 'UTC' },
+];
 
 const CURRENCIES = [
   { code: 'USD', name: 'USD — US Dollar' },
@@ -16,6 +56,7 @@ const CURRENCIES = [
 ];
 
 export default function ManageRates({ settings, onSettingsUpdated }) {
+  const t = useT();
   const [form, setForm] = useState({
     prevailing_wage_rate: String(settings?.prevailing_wage_rate ?? 45),
     default_hourly_rate: String(settings?.default_hourly_rate ?? 30),
@@ -23,15 +64,36 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     overtime_rule: settings?.overtime_rule ?? 'daily',
     overtime_threshold: String(settings?.overtime_threshold ?? 8),
     notification_inactive_days: String(settings?.notification_inactive_days ?? 3),
+    notification_use_work_hours: settings?.notification_use_work_hours ?? true,
     notification_start_hour: String(settings?.notification_start_hour ?? 6),
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
     show_worker_wages: settings?.show_worker_wages ?? false,
     currency: settings?.currency ?? 'USD',
+    company_timezone: settings?.company_timezone ?? '',
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!settings) return;
+    setForm({
+      prevailing_wage_rate: String(settings.prevailing_wage_rate ?? 45),
+      default_hourly_rate: String(settings.default_hourly_rate ?? 30),
+      overtime_multiplier: String(settings.overtime_multiplier ?? 1.5),
+      overtime_rule: settings.overtime_rule ?? 'daily',
+      overtime_threshold: String(settings.overtime_threshold ?? 8),
+      notification_inactive_days: String(settings.notification_inactive_days ?? 3),
+      notification_use_work_hours: settings.notification_use_work_hours ?? true,
+      notification_start_hour: String(settings.notification_start_hour ?? 6),
+      notification_end_hour: String(settings.notification_end_hour ?? 20),
+      chat_retention_days: String(settings.chat_retention_days ?? 3),
+      show_worker_wages: settings.show_worker_wages ?? false,
+      currency: settings.currency ?? 'USD',
+      company_timezone: settings.company_timezone ?? '',
+    });
+  }, [settings]);
 
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); setError(''); };
 
@@ -47,11 +109,13 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         overtime_rule: form.overtime_rule,
         overtime_threshold: parseFloat(form.overtime_threshold),
         notification_inactive_days: parseFloat(form.notification_inactive_days),
+        notification_use_work_hours: form.notification_use_work_hours,
         notification_start_hour: parseFloat(form.notification_start_hour),
         notification_end_hour: parseFloat(form.notification_end_hour),
         chat_retention_days: parseFloat(form.chat_retention_days),
         show_worker_wages: form.show_worker_wages,
         currency: form.currency,
+        company_timezone: form.company_timezone,
       });
       onSettingsUpdated(r.data);
       setSaved(true);
@@ -70,13 +134,13 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         <div style={styles.sectionHeader}>
           <span style={styles.sectionIcon}>💰</span>
           <div>
-            <div style={styles.sectionTitle}>Wages</div>
-            <div style={styles.sectionSub}>Default rates used when calculating worker pay</div>
+            <div style={styles.sectionTitle}>{t.ratesWages}</div>
+            <div style={styles.sectionSub}>{t.ratesWagesDesc}</div>
           </div>
         </div>
         <div style={styles.sectionBody}>
           <div style={styles.row}>
-            <label style={styles.label}>Currency</label>
+            <label style={styles.label}>{t.ratesCurrency}</label>
             <div style={styles.inputGroup}>
               <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.currency} onChange={e => set('currency', e.target.value)}>
                 {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
@@ -84,17 +148,26 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </div>
           </div>
           <div style={styles.row}>
-            <label style={styles.label}>Prevailing wage rate</label>
+            <label style={styles.label}>Company Timezone</label>
             <div style={styles.inputGroup}>
-              <span style={styles.prefix}>$</span>
+              <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.company_timezone} onChange={e => set('company_timezone', e.target.value)}>
+                <option value="">(Use browser timezone)</option>
+                {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={styles.row}>
+            <label style={styles.label}>{t.ratesPrevailingWage}</label>
+            <div style={styles.inputGroup}>
+              <span style={styles.prefix}>{currencySymbol(form.currency)}</span>
               <input style={styles.input} type="number" min="0" step="0.01" value={form.prevailing_wage_rate} onChange={e => set('prevailing_wage_rate', e.target.value)} required />
               <span style={styles.suffix}>/hr</span>
             </div>
           </div>
           <div style={styles.row}>
-            <label style={styles.label}>Default employee wage</label>
+            <label style={styles.label}>{t.ratesDefaultWage}</label>
             <div style={styles.inputGroup}>
-              <span style={styles.prefix}>$</span>
+              <span style={styles.prefix}>{currencySymbol(form.currency)}</span>
               <input style={styles.input} type="number" min="0" step="0.01" value={form.default_hourly_rate} onChange={e => set('default_hourly_rate', e.target.value)} required />
               <span style={styles.suffix}>/hr</span>
             </div>
@@ -107,32 +180,32 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         <div style={styles.sectionHeader}>
           <span style={styles.sectionIcon}>⏱️</span>
           <div>
-            <div style={styles.sectionTitle}>Overtime</div>
-            <div style={styles.sectionSub}>How overtime hours are calculated and paid</div>
+            <div style={styles.sectionTitle}>{t.ratesOvertime}</div>
+            <div style={styles.sectionSub}>{t.ratesOvertimeDesc}</div>
           </div>
         </div>
         <div style={styles.sectionBody}>
           <div style={styles.row}>
-            <label style={styles.label}>Overtime rate</label>
+            <label style={styles.label}>{t.ratesOTRate}</label>
             <div style={styles.inputGroup}>
               <input style={styles.input} type="number" min="1" step="0.01" value={form.overtime_multiplier} onChange={e => set('overtime_multiplier', e.target.value)} required />
-              <span style={styles.suffix}>× regular pay</span>
+              <span style={styles.suffix}>{t.ratesXRegularPay}</span>
             </div>
           </div>
           <div style={styles.row}>
-            <label style={styles.label}>Calculation method</label>
+            <label style={styles.label}>{t.ratesCalcMethod}</label>
             <div style={styles.inputGroup}>
               <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.overtime_rule} onChange={e => set('overtime_rule', e.target.value)}>
-                <option value="daily">Daily — over X hrs/day</option>
-                <option value="weekly">Weekly — over X hrs/week</option>
+                <option value="daily">{t.ratesDailyMethod}</option>
+                <option value="weekly">{t.ratesWeeklyMethod}</option>
               </select>
             </div>
           </div>
           <div style={styles.row}>
-            <label style={styles.label}>{form.overtime_rule === 'weekly' ? 'Weekly threshold' : 'Daily threshold'}</label>
+            <label style={styles.label}>{form.overtime_rule === 'weekly' ? t.ratesWeeklyThreshold : t.ratesDailyThreshold}</label>
             <div style={styles.inputGroup}>
               <input style={styles.input} type="number" min="1" step="0.5" value={form.overtime_threshold} onChange={e => set('overtime_threshold', e.target.value)} required />
-              <span style={styles.suffix}>hrs</span>
+              <span style={styles.suffix}>{t.ratesHrs}</span>
             </div>
           </div>
         </div>
@@ -143,32 +216,50 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         <div style={styles.sectionHeader}>
           <span style={styles.sectionIcon}>🔔</span>
           <div>
-            <div style={styles.sectionTitle}>Notifications</div>
-            <div style={styles.sectionSub}>When admin alerts are triggered</div>
+            <div style={styles.sectionTitle}>{t.ratesNotifications}</div>
+            <div style={styles.sectionSub}>{t.ratesNotificationsDesc}</div>
           </div>
         </div>
         <div style={styles.sectionBody}>
           <div style={styles.row}>
-            <label style={styles.label}>Alert if worker inactive for</label>
+            <label style={styles.label}>{t.ratesAlertInactive}</label>
             <div style={styles.inputGroup}>
               <input style={styles.input} type="number" min="1" max="30" step="1" value={form.notification_inactive_days} onChange={e => set('notification_inactive_days', e.target.value)} required />
-              <span style={styles.suffix}>days</span>
+              <span style={styles.suffix}>{t.ratesDays}</span>
             </div>
           </div>
           <div style={styles.row}>
-            <label style={styles.label}>Normal work hours</label>
-            <div style={styles.inputGroup}>
-              <input style={{ ...styles.input, width: 54 }} type="number" min="0" max="23" step="1" value={form.notification_start_hour} onChange={e => set('notification_start_hour', e.target.value)} required />
-              <span style={styles.suffix}>:00 –</span>
-              <input style={{ ...styles.input, width: 54 }} type="number" min="0" max="23" step="1" value={form.notification_end_hour} onChange={e => set('notification_end_hour', e.target.value)} required />
-              <span style={styles.suffix}>:00</span>
-            </div>
+            <label style={styles.label}>Alert outside work hours</label>
+            <label style={styles.toggle}>
+              <input type="checkbox" checked={form.notification_use_work_hours} onChange={e => set('notification_use_work_hours', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleTrack, background: form.notification_use_work_hours ? '#1a56db' : '#d1d5db' }}>
+                <span style={{ ...styles.toggleThumb, transform: form.notification_use_work_hours ? 'translateX(18px)' : 'translateX(2px)' }} />
+              </span>
+            </label>
           </div>
+          {form.notification_use_work_hours && (
+            <div style={styles.row}>
+              <label style={styles.label}>{t.ratesWorkHours}</label>
+              <div style={styles.inputGroup}>
+                <select style={styles.input} value={form.notification_start_hour} onChange={e => set('notification_start_hour', e.target.value)}>
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
+                  ))}
+                </select>
+                <span style={styles.suffix}>–</span>
+                <select style={styles.input} value={form.notification_end_hour} onChange={e => set('notification_end_hour', e.target.value)}>
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
           <div style={styles.row}>
-            <label style={styles.label}>Clear chat messages after</label>
+            <label style={styles.label}>{t.ratesClearChat}</label>
             <div style={styles.inputGroup}>
               <input style={styles.input} type="number" min="1" max="90" step="1" value={form.chat_retention_days} onChange={e => set('chat_retention_days', e.target.value)} required />
-              <span style={styles.suffix}>days</span>
+              <span style={styles.suffix}>{t.ratesDays}</span>
             </div>
           </div>
         </div>
@@ -179,15 +270,15 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         <div style={styles.sectionHeader}>
           <span style={styles.sectionIcon}>👁️</span>
           <div>
-            <div style={styles.sectionTitle}>Worker Access</div>
-            <div style={styles.sectionSub}>Control what workers can see in their dashboard</div>
+            <div style={styles.sectionTitle}>{t.ratesWorkerAccess}</div>
+            <div style={styles.sectionSub}>{t.ratesWorkerAccessDesc}</div>
           </div>
         </div>
         <div style={styles.sectionBody}>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Show wages &amp; estimated earnings</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Workers can see their hourly rate, overtime pay, and pay stubs</div>
+              <div style={styles.label}>{t.ratesShowWages}</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.ratesShowWagesDesc}</div>
             </div>
             <label style={styles.toggle}>
               <input type="checkbox" checked={form.show_worker_wages} onChange={e => set('show_worker_wages', e.target.checked)} style={{ display: 'none' }} />
@@ -201,9 +292,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.footer}>
-        {saved && <span style={styles.savedMsg}>Settings saved</span>}
+        {saved && <span style={styles.savedMsg}>{t.ratesSettingsSaved}</span>}
         <button style={styles.saveBtn} type="submit" disabled={saving}>
-          {saving ? 'Saving...' : 'Save Settings'}
+          {saving ? t.saving : t.ratesSaveSettings}
         </button>
       </div>
     </form>
@@ -223,10 +314,10 @@ const styles = {
   inputGroup: { display: 'flex', alignItems: 'center', gap: 6 },
   prefix: { fontSize: 14, color: '#6b7280' },
   suffix: { fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap' },
-  input: { width: 90, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, textAlign: 'right' },
   toggle: { cursor: 'pointer', flexShrink: 0 },
   toggleTrack: { width: 44, height: 24, borderRadius: 12, transition: 'background 0.2s', position: 'relative' },
   toggleThumb: { position: 'absolute', top: 2, width: 20, height: 20, borderRadius: 10, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s' },
+  input: { width: 90, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, textAlign: 'right' },
   error: { color: '#e53e3e', fontSize: 13 },
   footer: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, paddingTop: 4 },
   savedMsg: { color: '#059669', fontSize: 13, fontWeight: 600 },

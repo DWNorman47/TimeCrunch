@@ -35,6 +35,12 @@ function computeOT(entries, rule, threshold) {
     return { regularHours: reg, overtimeHours: ot };
   }
 
+  // none — no overtime, all hours are regular
+  if (rule === 'none') {
+    const total = regular.reduce((s, e) => s + hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60, 0);
+    return { regularHours: total, overtimeHours: 0 };
+  }
+
   // daily (default)
   const daily = {};
   regular.forEach(e => {
@@ -47,4 +53,28 @@ function computeOT(entries, rule, threshold) {
   return { regularHours: reg, overtimeHours: ot };
 }
 
-module.exports = { hoursWorked, computeOT };
+/**
+ * Compute regular and overtime pay costs for a daily-rate worker.
+ * Daily workers earn `dailyRate` per distinct work day.
+ * Overtime hours (above threshold) are paid at (dailyRate / threshold) × multiplier.
+ * @param {Array}  entries          - all entries for one worker
+ * @param {string} overtimeRule     - 'daily' | 'weekly' | 'none'
+ * @param {number} threshold        - OT threshold in hours
+ * @param {number} dailyRate        - amount earned per full day
+ * @param {number} overtimeMultiplier
+ * @returns {{ regularCost: number, overtimeCost: number }}
+ */
+function computeDailyPayCosts(entries, overtimeRule, threshold, dailyRate, overtimeMultiplier) {
+  const regular = entries.filter(e => e.wage_type === 'regular');
+  const days = new Set(regular.map(e => e.work_date.toString().substring(0, 10))).size;
+  if (overtimeRule === 'none') {
+    return { regularCost: days * dailyRate, overtimeCost: 0 };
+  }
+  const { overtimeHours } = computeOT(entries, overtimeRule, threshold);
+  return {
+    regularCost: days * dailyRate,
+    overtimeCost: overtimeHours * (dailyRate / threshold) * overtimeMultiplier,
+  };
+}
+
+module.exports = { hoursWorked, computeOT, computeDailyPayCosts };

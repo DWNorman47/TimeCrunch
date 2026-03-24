@@ -36,7 +36,7 @@ function validatePassword(password, username) {
 
 function signToken(user) {
   return jwt.sign(
-    { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name },
+    { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name, admin_permissions: user.admin_permissions || null, worker_access_ids: user.worker_access_ids || null },
     process.env.JWT_SECRET,
     { expiresIn: '8h' }
   );
@@ -115,18 +115,21 @@ router.get('/me', requireAuth, async (req, res) => {
   try {
     const [companyRes, userRes] = await Promise.all([
       pool.query('SELECT plan, subscription_status, addon_qbo, trial_ends_at FROM companies WHERE id = $1', [req.user.company_id]),
-      pool.query('SELECT mfa_enabled FROM users WHERE id = $1', [req.user.id]),
+      pool.query('SELECT mfa_enabled, language, admin_permissions FROM users WHERE id = $1', [req.user.id]),
     ]);
     const company = companyRes.rows[0] || {};
     const userRow = userRes.rows[0] || {};
     res.json({
       user: {
         ...req.user,
+        language: userRow.language || req.user.language,
         plan: company.plan || 'free',
         subscription_status: company.subscription_status,
         addon_qbo: company.addon_qbo || false,
         trial_ends_at: company.trial_ends_at,
         mfa_enabled: userRow.mfa_enabled || false,
+        admin_permissions: userRow.admin_permissions || null,
+        worker_access_ids: userRow.worker_access_ids || null,
       },
     });
   } catch (err) {
@@ -137,7 +140,7 @@ router.get('/me', requireAuth, async (req, res) => {
 
 // Register — creates a new company and its first admin user
 router.post('/register', authLimiter, async (req, res) => {
-  const { full_name, first_name, middle_name, last_name, username, password, email } = req.body;
+  const { full_name, first_name, middle_name, last_name, username, password, email, timezone } = req.body;
   const company_name = req.body.company_name?.trim();
   if (!company_name || !full_name || !username || !password || !email) {
     return res.status(400).json({ error: 'company_name, full_name, email, username, and password are required' });
@@ -166,6 +169,9 @@ router.post('/register', authLimiter, async (req, res) => {
     const defaults = [['prevailing_wage_rate', 45], ['default_hourly_rate', 30], ['overtime_multiplier', 1.5]];
     for (const [key, value] of defaults) {
       await client.query('INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3)', [companyId, key, value]);
+    }
+    if (timezone && /^[A-Za-z_]+\/[A-Za-z_\/]+$/.test(timezone)) {
+      await client.query('INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3)', [companyId, 'company_timezone', timezone]);
     }
     const hash = await bcrypt.hash(password, 10);
     const confirmToken = crypto.randomBytes(32).toString('hex');

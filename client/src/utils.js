@@ -1,12 +1,45 @@
+// Maps ISO 4217 currency codes to a locale that produces the correct local symbol
+const CURRENCY_LOCALES = {
+  USD: 'en-US', CAD: 'en-CA', EUR: 'de-DE', GBP: 'en-GB',
+  MXN: 'es-MX', HNL: 'es-HN', GTQ: 'es-GT', NIO: 'es-NI',
+  BZD: 'en-BZ', CRC: 'es-CR', PAB: 'es-PA',
+};
+
 /**
  * Format a monetary amount using the given ISO 4217 currency code.
- * Falls back to plain "$X.XX" if the currency is unrecognised by the runtime.
+ * Uses a locale that produces the local symbol (e.g. "L" for HNL, "Q" for GTQ).
  */
 export function formatCurrency(amount, currency = 'USD') {
+  const locale = CURRENCY_LOCALES[currency] ?? 'en-US';
   try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+    return new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
   } catch {
     return `$${Number(amount).toFixed(2)}`;
+  }
+}
+
+/**
+ * Returns just the currency symbol for the given ISO 4217 code (e.g. "$", "L", "€").
+ */
+export function currencySymbol(currency = 'USD') {
+  const locale = CURRENCY_LOCALES[currency] ?? 'en-US';
+  try {
+    const parts = new Intl.NumberFormat(locale, { style: 'currency', currency }).formatToParts(0);
+    return parts.find(p => p.type === 'currency')?.value ?? currency;
+  } catch {
+    return '$';
+  }
+}
+
+/**
+ * Format a UTC ISO timestamp in a given IANA timezone (falls back to browser locale).
+ * opts: Intl.DateTimeFormat options (default: time only, 12-hour)
+ */
+export function formatInTz(isoStr, tz, opts = { hour: 'numeric', minute: '2-digit' }) {
+  try {
+    return new Date(isoStr).toLocaleString('en-US', { ...opts, ...(tz ? { timeZone: tz } : {}) });
+  } catch {
+    return new Date(isoStr).toLocaleString('en-US', opts);
   }
 }
 

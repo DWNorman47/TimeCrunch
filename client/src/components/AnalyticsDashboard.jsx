@@ -3,6 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line,
 } from 'recharts';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 const BLUE = '#1a56db';
 const GREEN = '#059669';
@@ -22,8 +23,8 @@ function SectionTitle({ children }) {
   return <h3 style={styles.sectionTitle}>{children}</h3>;
 }
 
-function HorizontalBars({ data, color }) {
-  if (!data || data.length === 0) return <p style={styles.empty}>No data yet.</p>;
+function HorizontalBars({ data, color, noDataLabel }) {
+  if (!data || data.length === 0) return <p style={styles.empty}>{noDataLabel}</p>;
   const max = Math.max(...data.map(d => d.hours));
   return (
     <div style={styles.hBarList}>
@@ -51,6 +52,7 @@ function formatWeek(dateStr) {
 }
 
 export default function AnalyticsDashboard() {
+  const t = useT();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -61,8 +63,8 @@ export default function AnalyticsDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p style={{ color: '#888' }}>Loading analytics...</p>;
-  if (!data) return <p style={{ color: '#e53e3e' }}>Failed to load analytics.</p>;
+  if (loading) return <p style={{ color: '#888' }}>{t.loadingAnalytics}</p>;
+  if (!data) return <p style={{ color: '#e53e3e' }}>{t.failedLoadAnalytics}</p>;
 
   const { summary, daily_hours, weekly_hours, project_hours, worker_hours } = data;
 
@@ -91,30 +93,30 @@ export default function AnalyticsDashboard() {
       {/* Summary cards */}
       <div style={styles.statRow}>
         <StatCard
-          label="Hours this week"
+          label={t.hoursThisWeek}
           value={`${summary.hours_this_week}h`}
-          sub={`${summary.active_workers_this_week} workers active`}
+          sub={`${summary.active_workers_this_week} ${t.workersActive}`}
           color={BLUE}
         />
         <StatCard
-          label="Hours this month"
+          label={t.hoursThisMonth}
           value={`${summary.hours_this_month}h`}
-          sub={`${summary.active_workers_this_month} workers active`}
+          sub={`${summary.active_workers_this_month} ${t.workersActive}`}
           color={GREEN}
         />
         <StatCard
-          label="Pending approvals"
+          label={t.pendingApprovalsAnalytics}
           value={summary.pending_approvals}
-          sub={summary.pending_approvals > 0 ? 'needs review' : 'all caught up'}
+          sub={summary.pending_approvals > 0 ? t.needsReview : t.allCaughtUpAnalytics}
           color={summary.pending_approvals > 0 ? ORANGE : GREEN}
         />
       </div>
 
       {/* Daily hours bar chart */}
       <div style={styles.card}>
-        <SectionTitle>Daily Hours — Last 14 Days</SectionTitle>
+        <SectionTitle>{t.dailyHoursChart}</SectionTitle>
         {dailyFilled.every(d => d.hours === 0) ? (
-          <p style={styles.empty}>No entries in the last 14 days.</p>
+          <p style={styles.empty}>{t.noEntries14Days}</p>
         ) : (
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={dailyFilled} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
@@ -133,7 +135,7 @@ export default function AnalyticsDashboard() {
                 width={32}
               />
               <Tooltip
-                formatter={v => [`${v}h`, 'Hours']}
+                formatter={v => [`${v}h`, t.chartHoursLabel]}
                 labelFormatter={formatDay}
                 contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e5e7eb' }}
               />
@@ -149,9 +151,9 @@ export default function AnalyticsDashboard() {
 
       {/* Weekly hours trend */}
       <div style={styles.card}>
-        <SectionTitle>Weekly Hours — Last 12 Weeks</SectionTitle>
+        <SectionTitle>{t.weeklyHoursChart}</SectionTitle>
         {weeklyFilled.every(d => d.hours === 0) ? (
-          <p style={styles.empty}>No entries in the last 12 weeks.</p>
+          <p style={styles.empty}>{t.noEntries12Weeks}</p>
         ) : (
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={weeklyFilled} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
@@ -170,7 +172,7 @@ export default function AnalyticsDashboard() {
                 width={32}
               />
               <Tooltip
-                formatter={v => [`${v}h`, 'Hours']}
+                formatter={v => [`${v}h`, t.chartHoursLabel]}
                 labelFormatter={d => `Week of ${formatWeek(d)}`}
                 contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e5e7eb' }}
               />
@@ -190,12 +192,12 @@ export default function AnalyticsDashboard() {
       {/* Project and worker breakdown */}
       <div style={styles.twoCol}>
         <div style={styles.card}>
-          <SectionTitle>Hours by Project — Last 30 Days</SectionTitle>
-          <HorizontalBars data={project_hours} color={BLUE} />
+          <SectionTitle>{t.hoursByProject}</SectionTitle>
+          <HorizontalBars data={project_hours} color={BLUE} noDataLabel={t.noDataYet} />
         </div>
         <div style={styles.card}>
-          <SectionTitle>Hours by Worker — Last 30 Days</SectionTitle>
-          <HorizontalBars data={worker_hours} color={GREEN} />
+          <SectionTitle>{t.hoursByWorker}</SectionTitle>
+          <HorizontalBars data={worker_hours} color={GREEN} noDataLabel={t.noDataYet} />
         </div>
       </div>
     </div>

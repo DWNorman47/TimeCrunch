@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useFormPersist } from '../hooks/useFormPersist';
 
 export default function TimeEntryForm({ projects, onEntryAdded, t, prefill }) {
   const today = new Date().toISOString().split('T')[0];
@@ -27,6 +28,8 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill }) {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  const { clearPersisted } = useFormPersist('time-entry', form, setForm);
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const selectedProject = projects.find(p => p.id === parseInt(form.project_id));
@@ -39,9 +42,30 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill }) {
       return;
     }
     setSaving(true);
+    const client_id = crypto.randomUUID();
     try {
-      const r = await api.post('/time-entries', { ...form, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
-      onEntryAdded({ ...r.data, project_name: selectedProject?.name });
+      const r = await api.post('/time-entries', { ...form, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, client_id });
+      if (r.data?.offline) {
+        // Queued offline — add optimistic pending entry
+        const pendingEntry = {
+          id: client_id,
+          pending: true,
+          project_id: parseInt(form.project_id),
+          project_name: selectedProject?.name,
+          work_date: form.work_date,
+          start_time: form.start_time,
+          end_time: form.end_time,
+          break_minutes: parseInt(form.break_minutes) || 0,
+          mileage: form.mileage ? parseFloat(form.mileage) : null,
+          notes: form.notes || null,
+          wage_type: selectedProject?.wage_type || 'regular',
+          status: 'pending',
+        };
+        onEntryAdded(pendingEntry);
+      } else {
+        onEntryAdded({ ...r.data, project_name: selectedProject?.name });
+      }
+      clearPersisted();
       setForm(f => ({ ...f, start_time: '', end_time: '', notes: '', break_minutes: '', mileage: '' }));
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 export default function BroadcastMessage() {
+  const t = useT();
   const [message, setMessage] = useState('');
   const [state, setState] = useState('idle'); // idle | sending | sent | error
 
@@ -21,8 +23,8 @@ export default function BroadcastMessage() {
 
   return (
     <div style={styles.card}>
-      <h3 style={styles.heading}>📢 Announce to All Workers</h3>
-      <p style={styles.sub}>Sends a push notification to every worker who has notifications enabled.</p>
+      <h3 style={styles.heading}>{t.announceTitle}</h3>
+      <p style={styles.sub}>{t.announceDesc}</p>
       <div style={styles.row}>
         <input
           style={styles.input}
@@ -39,10 +41,10 @@ export default function BroadcastMessage() {
           onClick={handleSend}
           disabled={!message.trim() || state === 'sending' || state === 'sent'}
         >
-          {state === 'sending' ? 'Sending…' : state === 'sent' ? 'Sent ✓' : 'Send'}
+          {state === 'sending' ? t.sending : state === 'sent' ? t.sent : t.send}
         </button>
       </div>
-      {state === 'error' && <p style={styles.error}>Failed to send. Try again.</p>}
+      {state === 'error' && <p style={styles.error}>{t.failedSend}</p>}
       <div style={styles.charCount}>{message.length}/200</div>
     </div>
   );

@@ -18,6 +18,7 @@ import EULA from './pages/EULA';
 import InstallPrompt from './components/InstallPrompt';
 import WelcomeModal from './components/WelcomeModal';
 import { ToastProvider } from './contexts/ToastContext';
+import { OfflineProvider } from './contexts/OfflineContext';
 
 const BLOCKED_STATUSES = ['trial_expired', 'canceled'];
 
@@ -87,9 +88,11 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <ToastProvider>
-          <WelcomeModal />
-          <AppRoutes />
-          <InstallPrompt />
+          <OfflineProvider>
+            <WelcomeModal />
+            <AppRoutes />
+            <InstallPrompt />
+          </OfflineProvider>
         </ToastProvider>
       </BrowserRouter>
     </AuthProvider>

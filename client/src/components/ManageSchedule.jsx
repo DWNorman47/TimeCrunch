@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
+import { useT } from '../hooks/useT';
 import {
   DndContext, DragOverlay, PointerSensor, TouchSensor,
   useSensor, useSensors, useDroppable, useDraggable,
@@ -29,18 +30,19 @@ function PillContent({ s }) {
   );
 }
 
-function DraggableShift({ s, projects, editingId, editForm, setEditForm, editSaving, startEdit, setEditingId, saveEdit, deleteShift, deleting, onDuplicate }) {
+function DraggableShift({ s, projects, editingId, editForm, setEditForm, editSaving, startEdit, setEditingId, saveEdit, deleteShift, deleting, onDuplicate, dragMode }) {
+  const t = useT();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: String(s.id) });
 
   return (
     <div ref={setNodeRef}>
-      <div style={{ ...styles.shiftPill, opacity: isDragging ? 0.35 : 1, cursor: 'grab' }} {...listeners} {...attributes}>
+      <div style={{ ...styles.shiftPill, opacity: isDragging ? 0.35 : 1, cursor: dragMode ? 'grab' : 'default' }} {...(dragMode ? { ...listeners, ...attributes } : {})}>
         <PillContent s={s} />
         <div style={styles.pillActions} onPointerDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
-          <button style={styles.editPillBtn} onClick={() => editingId === s.id ? setEditingId(null) : startEdit(s)} title="Edit">✎</button>
-          <button style={styles.dupBtn} onClick={() => onDuplicate(s)} title="Duplicate">⧉</button>
-          <button style={styles.deleteBtn} onClick={() => deleteShift(s.id)} disabled={deleting === s.id} title="Delete">
-            {deleting === s.id ? '…' : '✕'}
+          <button style={styles.editPillBtn} onClick={() => editingId === s.id ? setEditingId(null) : startEdit(s)}>{t.edit}</button>
+          <button style={styles.dupBtn} onClick={() => onDuplicate(s)}>{t.copy}</button>
+          <button style={styles.deleteBtn} onClick={() => deleteShift(s.id)} disabled={deleting === s.id}>
+            {deleting === s.id ? '…' : t.del}
           </button>
         </div>
       </div>
@@ -49,32 +51,32 @@ function DraggableShift({ s, projects, editingId, editForm, setEditForm, editSav
         <div style={styles.editPanel}>
           <div style={styles.editGrid}>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>Date</label>
+              <label style={styles.editLabel}>{t.date}</label>
               <input style={styles.editInput} type="date" value={editForm.shift_date} onChange={ev => setEditForm(f => ({ ...f, shift_date: ev.target.value }))} />
             </div>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>Start</label>
+              <label style={styles.editLabel}>{t.start}</label>
               <input style={styles.editInput} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} />
             </div>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>End</label>
+              <label style={styles.editLabel}>{t.end}</label>
               <input style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
             </div>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>Project</label>
+              <label style={styles.editLabel}>{t.project}</label>
               <select style={styles.editInput} value={editForm.project_id} onChange={ev => setEditForm(f => ({ ...f, project_id: ev.target.value }))}>
-                <option value="">None</option>
+                <option value="">{t.none}</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div style={{ ...styles.editField, flex: 2 }}>
-              <label style={styles.editLabel}>Notes</label>
-              <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder="Optional" />
+              <label style={styles.editLabel}>{t.notes}</label>
+              <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} />
             </div>
           </div>
           <div style={styles.editActions}>
-            <button style={styles.saveBtn} onClick={() => saveEdit(s.id)} disabled={editSaving}>{editSaving ? '…' : 'Save'}</button>
-            <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+            <button style={styles.saveBtn} onClick={() => saveEdit(s.id)} disabled={editSaving}>{editSaving ? '…' : t.save}</button>
+            <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
           </div>
         </div>
       )}
@@ -101,6 +103,7 @@ function DroppableDay({ date, isToday, children }) {
 
 export default function ManageSchedule({ workers, projects }) {
   const toast = useToast();
+  const t = useT();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -112,11 +115,56 @@ export default function ManageSchedule({ workers, projects }) {
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
   const [activeShift, setActiveShift] = useState(null);
+  const [dragMode, setDragMode] = useState(false);
+  const [preDragShifts, setPreDragShifts] = useState(null);
+  const [pendingMoves, setPendingMoves] = useState({});
+  const [savingMoves, setSavingMoves] = useState(false);
 
-  const sensors = useSensors(
+  const activeSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
   );
+  const disabledSensors = useSensors();
+  const sensors = dragMode ? activeSensors : disabledSensors;
+
+  const enterDragMode = () => {
+    setPreDragShifts(shifts);
+    setPendingMoves({});
+    setDragMode(true);
+    setEditingId(null);
+  };
+
+  const discardDrag = () => {
+    setShifts(preDragShifts);
+    setPendingMoves({});
+    setPreDragShifts(null);
+    setDragMode(false);
+  };
+
+  const saveDragMoves = async () => {
+    setSavingMoves(true);
+    try {
+      await Promise.all(Object.entries(pendingMoves).map(([shiftId, newDate]) => {
+        const shift = shifts.find(s => s.id === parseInt(shiftId));
+        if (!shift) return Promise.resolve();
+        return api.patch(`/shifts/admin/${shiftId}`, {
+          shift_date: newDate,
+          start_time: shift.start_time.substring(0, 5),
+          end_time: shift.end_time.substring(0, 5),
+          project_id: shift.project_id || '',
+          notes: shift.notes || '',
+        });
+      }));
+      toast(`${Object.keys(pendingMoves).length} shift${Object.keys(pendingMoves).length !== 1 ? 's' : ''} saved`, 'success');
+    } catch {
+      toast(t.someShiftsFailed, 'error');
+    } finally {
+      setSavingMoves(false);
+      setPendingMoves({});
+      setPreDragShifts(null);
+      setDragMode(false);
+    }
+  };
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const from = toISO(days[0]);
@@ -140,15 +188,15 @@ export default function ManageSchedule({ workers, projects }) {
 
   const addShift = async e => {
     e.preventDefault();
-    if (!form.user_id) { setError('Select a worker'); return; }
+    if (!form.user_id) { setError(t.selectAWorker); return; }
     setSaving(true); setError('');
     try {
       const r = await api.post('/shifts/admin', form);
       setShifts(prev => [...prev, r.data].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
       setForm(f => ({ ...f, notes: '' }));
-      toast('Shift added', 'success');
+      toast(t.shiftAdded, 'success');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save shift');
+      setError(err.response?.data?.error || t.failedSaveShift);
     } finally { setSaving(false); }
   };
 
@@ -172,9 +220,9 @@ export default function ManageSchedule({ workers, projects }) {
         notes: s.notes || '',
       });
       setShifts(prev => [...prev, r.data].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
-      toast('Shift duplicated', 'success');
+      toast(t.shiftDuplicated, 'success');
     } catch {
-      toast('Failed to duplicate shift', 'error');
+      toast(t.failedDuplicateShift, 'error');
     }
   };
 
@@ -205,9 +253,9 @@ export default function ManageSchedule({ workers, projects }) {
     setEditingId(null);
   };
 
-  const handleDragEnd = async ({ active, over }) => {
+  const handleDragEnd = ({ active, over }) => {
     setActiveShift(null);
-    if (!over) return;
+    if (!over || !dragMode) return;
     const shiftId = parseInt(active.id);
     const shift = shifts.find(s => s.id === shiftId);
     if (!shift) return;
@@ -215,21 +263,9 @@ export default function ManageSchedule({ workers, projects }) {
     const newDate = over.id;
     if (currentDate === newDate) return;
 
-    // Optimistic update
+    // Local-only update — no API call until Save
     setShifts(prev => prev.map(s => s.id === shiftId ? { ...s, shift_date: newDate } : s));
-    try {
-      await api.patch(`/shifts/admin/${shiftId}`, {
-        shift_date: newDate,
-        start_time: shift.start_time.substring(0, 5),
-        end_time: shift.end_time.substring(0, 5),
-        project_id: shift.project_id || '',
-        notes: shift.notes || '',
-      });
-    } catch {
-      // Revert on failure
-      setShifts(prev => prev.map(s => s.id === shiftId ? { ...s, shift_date: currentDate } : s));
-      toast('Failed to move shift', 'error');
-    }
+    setPendingMoves(prev => ({ ...prev, [shiftId]: newDate }));
   };
 
   const shiftsByDay = {};
@@ -239,60 +275,74 @@ export default function ManageSchedule({ workers, projects }) {
     if (shiftsByDay[key]) shiftsByDay[key].push(s);
   });
 
-  const shiftProps = { projects, editingId, editForm, setEditForm, editSaving, startEdit, setEditingId, saveEdit, deleteShift, deleting, onDuplicate: duplicateShift };
+  const shiftProps = { projects, editingId, editForm, setEditForm, editSaving, startEdit, setEditingId, saveEdit, deleteShift, deleting, onDuplicate: duplicateShift, dragMode };
 
   return (
     <div style={styles.card}>
-      <h3 style={styles.title}>Schedule</h3>
+      <h3 style={styles.title}>{t.schedule}</h3>
 
       <form onSubmit={addShift} style={styles.form}>
         <div style={styles.formRow}>
           <div style={styles.field}>
-            <label style={styles.label}>Worker</label>
+            <label style={styles.label}>{t.worker}</label>
             <select style={styles.input} value={form.user_id} onChange={e => set('user_id', e.target.value)} required>
-              <option value="">Select worker</option>
+              <option value="">{t.selectWorker}</option>
               {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
             </select>
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>Project</label>
+            <label style={styles.label}>{t.project}</label>
             <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">No project</option>
+              <option value="">{t.noProject}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>Date</label>
+            <label style={styles.label}>{t.date}</label>
             <input style={styles.input} type="date" value={form.shift_date} onChange={e => set('shift_date', e.target.value)} required />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>Start</label>
+            <label style={styles.label}>{t.start}</label>
             <input style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>End</label>
+            <label style={styles.label}>{t.end}</label>
             <input style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required />
           </div>
           <div style={{ ...styles.field, flex: 2 }}>
-            <label style={styles.label}>Notes</label>
-            <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Optional" />
+            <label style={styles.label}>{t.notes}</label>
+            <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.optional} />
           </div>
           <div style={styles.field}>
             <label style={styles.label}>&nbsp;</label>
-            <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? '...' : '+ Add Shift'}</button>
+            <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? '...' : t.addShift}</button>
           </div>
         </div>
         {error && <p style={styles.error}>{error}</p>}
       </form>
 
       <div style={styles.weekNav}>
-        <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, -7))}>‹ Prev</button>
+        <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, -7))}>{t.prevWeek}</button>
         <span style={styles.weekLabel}>{fmtDay(days[0])} – {fmtDay(days[6])}</span>
-        <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>Next ›</button>
-        <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>Today</button>
+        <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>{t.nextWeek}</button>
+        <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>{t.today}</button>
+        {!dragMode
+          ? <button style={styles.dragModeBtn} onClick={enterDragMode}>{t.rearrange}</button>
+          : (
+            <div style={styles.dragModeBanner}>
+              <span style={styles.dragModeLabel}>
+                {t.dragMode}{Object.keys(pendingMoves).length > 0 ? ` · ${Object.keys(pendingMoves).length} unsaved` : ''}
+              </span>
+              <button style={styles.saveDragBtn} onClick={saveDragMoves} disabled={savingMoves || Object.keys(pendingMoves).length === 0}>
+                {savingMoves ? t.saving : t.saveAndNotify}
+              </button>
+              <button style={styles.discardDragBtn} onClick={discardDrag} disabled={savingMoves}>{t.discard}</button>
+            </div>
+          )
+        }
       </div>
 
-      {loading ? <p style={{ color: '#888', fontSize: 13 }}>Loading...</p> : (
+      {loading ? <p style={{ color: '#888', fontSize: 13 }}>{t.loading}</p> : (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={styles.grid}>
             {days.map(day => {
@@ -340,6 +390,11 @@ const styles = {
   navBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 10px', fontSize: 13, cursor: 'pointer', color: '#374151' },
   weekLabel: { fontWeight: 600, fontSize: 14, color: '#111827', flex: 1 },
   todayBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: '#6b7280' },
+  dragModeBtn: { background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#374151' },
+  dragModeBanner: { display: 'flex', alignItems: 'center', gap: 8, background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8, padding: '5px 12px' },
+  dragModeLabel: { fontSize: 12, fontWeight: 600, color: '#92400e', flex: 1 },
+  saveDragBtn: { background: '#059669', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  discardDragBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 12px', fontSize: 12, cursor: 'pointer', color: '#6b7280' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, overflowX: 'auto' },
   dayCol: { padding: '8px 6px', minHeight: 80, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 90 },
   dayHead: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 },
@@ -349,10 +404,10 @@ const styles = {
   pillProject: { color: '#6b7280', fontSize: 10 },
   pillTime: { fontWeight: 600, color: '#1a56db', marginTop: 2 },
   pillNotes: { color: '#9ca3af', fontSize: 10, fontStyle: 'italic' },
-  pillActions: { display: 'flex', gap: 4, marginTop: 4 },
-  editPillBtn: { background: 'none', border: 'none', color: '#1a56db', fontSize: 12, cursor: 'pointer', padding: 0, lineHeight: 1 },
-  dupBtn: { background: 'none', border: 'none', color: '#059669', fontSize: 12, cursor: 'pointer', padding: 0, lineHeight: 1 },
-  deleteBtn: { background: 'none', border: 'none', color: '#fca5a5', fontSize: 11, cursor: 'pointer', padding: 0, lineHeight: 1 },
+  pillActions: { display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' },
+  editPillBtn: { background: '#dbeafe', border: 'none', color: '#1d4ed8', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 9px', borderRadius: 5, lineHeight: 1 },
+  dupBtn: { background: '#d1fae5', border: 'none', color: '#065f46', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 9px', borderRadius: 5, lineHeight: 1 },
+  deleteBtn: { background: '#fee2e2', border: 'none', color: '#b91c1c', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 9px', borderRadius: 5, lineHeight: 1 },
   editPanel: { background: '#f8faff', border: '1px solid #dbeafe', borderRadius: 6, padding: 10, marginTop: 4 },
   editGrid: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 },
   editField: { display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 80 },

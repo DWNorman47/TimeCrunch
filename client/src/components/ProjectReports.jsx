@@ -84,7 +84,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
           <BudgetBar used={parseFloat(p.total_hours)} budget={parseFloat(p.budget_hours)} label="hrs" />
         )}
         {p.budget_dollars && (
-          <BudgetBar used={parseFloat(p.total_hours) * 30} budget={parseFloat(p.budget_dollars)} label="$" money />
+          <BudgetBar used={parseFloat(p.total_hours) * 30} budget={parseFloat(p.budget_dollars)} label="$" money currency={currency} />
         )}
       </div>
 
@@ -157,11 +157,11 @@ function Metric({ label, value, color }) {
   );
 }
 
-function BudgetBar({ used, budget, label, money }) {
+function BudgetBar({ used, budget, label, money, currency = 'USD' }) {
   const pct = Math.min((used / budget) * 100, 100);
   const over = used > budget;
   const color = pct >= 90 ? '#dc2626' : pct >= 70 ? '#d97706' : '#059669';
-  const fmt = v => money ? `$${v.toFixed(0)}` : `${v.toFixed(1)}`;
+  const fmt = v => money ? formatCurrency(v, currency) : `${v.toFixed(1)}`;
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6b7280', marginBottom: 3 }}>

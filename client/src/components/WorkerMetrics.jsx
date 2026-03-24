@@ -3,6 +3,7 @@ import api from '../api';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import BillPDF from './BillPDF';
 import { fmtHours, formatCurrency } from '../utils';
+import { useT } from '../hooks/useT';
 
 function downloadCSV(rows, filename) {
   const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -21,6 +22,7 @@ function defaultDates() {
 }
 
 export default function WorkerMetrics({ worker, currency = 'USD' }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [from, setFrom] = useState(defaultDates().from);
   const [to, setTo] = useState(defaultDates().to);
@@ -49,45 +51,45 @@ export default function WorkerMetrics({ worker, currency = 'USD' }) {
           <span style={styles.username}>@{worker.username}</span>
         </div>
         <div style={styles.metrics}>
-          <Metric label="Total" value={fmtHours(parseFloat(worker.total_hours))} />
-          {parseFloat(worker.regular_hours) > 0 && <Metric label="Regular" value={fmtHours(parseFloat(worker.regular_hours))} color="#2563eb" />}
-          {parseFloat(worker.overtime_hours) > 0 && <Metric label="Overtime" value={fmtHours(parseFloat(worker.overtime_hours))} color="#dc2626" />}
-          {parseFloat(worker.prevailing_hours) > 0 && <Metric label="Prevailing" value={fmtHours(parseFloat(worker.prevailing_hours))} color="#d97706" />}
-          <Metric label="Entries" value={worker.total_entries} />
+          <Metric label={t.totalMetric} value={fmtHours(parseFloat(worker.total_hours))} />
+          {parseFloat(worker.regular_hours) > 0 && <Metric label={t.regularMetric} value={fmtHours(parseFloat(worker.regular_hours))} color="#2563eb" />}
+          {parseFloat(worker.overtime_hours) > 0 && <Metric label={t.overtimeMetric} value={fmtHours(parseFloat(worker.overtime_hours))} color="#dc2626" />}
+          {parseFloat(worker.prevailing_hours) > 0 && <Metric label={t.prevailingMetric} value={fmtHours(parseFloat(worker.prevailing_hours))} color="#d97706" />}
+          <Metric label={t.entriesMetric} value={worker.total_entries} />
         </div>
         <button style={styles.expandBtn}>{expanded ? '▲' : '▼'}</button>
       </div>
 
       {expanded && (
         <div style={styles.billSection}>
-          <h4 style={styles.billHeading}>Generate Bill</h4>
+          <h4 style={styles.billHeading}>{t.generateBill}</h4>
           <div style={styles.dateRow}>
             <div style={styles.dateField}>
-              <label style={styles.label}>From</label>
+              <label style={styles.label}>{t.from}</label>
               <input style={styles.input} type="date" value={from} onChange={e => setFrom(e.target.value)} />
             </div>
             <div style={styles.dateField}>
-              <label style={styles.label}>To</label>
+              <label style={styles.label}>{t.to}</label>
               <input style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
             </div>
             <button style={styles.fetchBtn} onClick={fetchBill} disabled={loading}>
-              {loading ? 'Loading...' : 'Load Entries'}
+              {loading ? t.loading : t.loadEntries}
             </button>
           </div>
 
           {billData && (
             <div style={{ marginTop: 16 }}>
               <div style={styles.billSummary}>
-                <span>Entries: <b>{billData.entries.length}</b></span>
-                <span>Total: <b>{fmtHours(billData.summary.total_hours)}</b></span>
-                {billData.summary.regular_hours > 0 && <span style={{ color: '#2563eb' }}>Regular: <b>{fmtHours(billData.summary.regular_hours)} · {formatCurrency(billData.summary.regular_cost, currency)}</b></span>}
-                {billData.summary.overtime_hours > 0 && <span style={{ color: '#dc2626' }}>Overtime: <b>{fmtHours(billData.summary.overtime_hours)} · {formatCurrency(billData.summary.overtime_cost, currency)}</b></span>}
-                {billData.summary.prevailing_hours > 0 && <span style={{ color: '#d97706' }}>Prevailing: <b>{fmtHours(billData.summary.prevailing_hours)} · {formatCurrency(billData.summary.prevailing_cost, currency)}</b></span>}
-                <span style={{ fontWeight: 700 }}>Total Cost: <b>{formatCurrency(billData.summary.total_cost, currency)}</b></span>
+                <span>{t.entriesLabel} <b>{billData.entries.length}</b></span>
+                <span>{t.totalLabel} <b>{fmtHours(billData.summary.total_hours)}</b></span>
+                {billData.summary.regular_hours > 0 && <span style={{ color: '#2563eb' }}>{t.regularLabel} <b>{fmtHours(billData.summary.regular_hours)} · {formatCurrency(billData.summary.regular_cost, currency)}</b></span>}
+                {billData.summary.overtime_hours > 0 && <span style={{ color: '#dc2626' }}>{t.overtimeLabel} <b>{fmtHours(billData.summary.overtime_hours)} · {formatCurrency(billData.summary.overtime_cost, currency)}</b></span>}
+                {billData.summary.prevailing_hours > 0 && <span style={{ color: '#d97706' }}>{t.prevailingLabel} <b>{fmtHours(billData.summary.prevailing_hours)} · {formatCurrency(billData.summary.prevailing_cost, currency)}</b></span>}
+                <span style={{ fontWeight: 700 }}>{t.totalCostLabel} <b>{formatCurrency(billData.summary.total_cost, currency)}</b></span>
               </div>
               <div style={styles.btnRow}>
                 <button style={styles.previewBtn} onClick={() => setShowPreview(p => !p)}>
-                  {showPreview ? 'Hide Preview' : 'Preview Bill'}
+                  {showPreview ? t.hideBill : t.previewBill}
                 </button>
                 <button style={styles.csvBtn} onClick={() => {
                   const headers = ['Date', 'Project', 'Wage Type', 'Start', 'End', 'Hours'];
@@ -96,13 +98,13 @@ export default function WorkerMetrics({ worker, currency = 'USD' }) {
                     return [e.work_date?.toString().substring(0,10), e.project_name, e.wage_type, e.start_time, e.end_time, h];
                   });
                   downloadCSV([headers, ...rows], `${worker.username}-${from||'all'}-to-${to||'all'}.csv`);
-                }}>Export CSV</button>
+                }}>{t.exportCSV}</button>
                 <PDFDownloadLink
                   document={<BillPDF data={billData} currency={currency} />}
                   fileName={`bill-${worker.username}-${from || 'all'}-to-${to || 'all'}.pdf`}
                   style={styles.pdfBtn}
                 >
-                  {({ loading: l }) => l ? 'Preparing PDF...' : 'Download PDF'}
+                  {({ loading: l }) => l ? t.preparingPDF : t.downloadPDF}
                 </PDFDownloadLink>
               </div>
               {showPreview && (
