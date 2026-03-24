@@ -313,12 +313,21 @@ CREATE INDEX IF NOT EXISTS idx_time_entries_user_id         ON time_entries(user
 CREATE INDEX IF NOT EXISTS idx_time_entries_work_date       ON time_entries(work_date);
 CREATE INDEX IF NOT EXISTS idx_time_entries_user_date       ON time_entries(user_id, work_date);
 CREATE INDEX IF NOT EXISTS idx_time_entries_status          ON time_entries(status);
+-- Composite index for approval queue sort (company + status + sort columns)
+CREATE INDEX IF NOT EXISTS idx_time_entries_pending_sort     ON time_entries(company_id, status, worker_signed_at DESC NULLS LAST, work_date DESC);
+-- Partial index for pending entries (avoids scanning approved/rejected rows)
+CREATE INDEX IF NOT EXISTS idx_time_entries_pending          ON time_entries(company_id, work_date) WHERE status = 'pending';
+-- Compound index for worker metrics CTE (company + wage_type + user)
+CREATE INDEX IF NOT EXISTS idx_time_entries_company_wage     ON time_entries(company_id, wage_type, user_id);
 CREATE INDEX IF NOT EXISTS idx_active_clock_company_id      ON active_clock(company_id);
 CREATE INDEX IF NOT EXISTS idx_shifts_company_id            ON shifts(company_id);
 CREATE INDEX IF NOT EXISTS idx_shifts_user_id               ON shifts(user_id);
 CREATE INDEX IF NOT EXISTS idx_shifts_shift_date            ON shifts(shift_date);
 CREATE INDEX IF NOT EXISTS idx_pay_periods_company_id       ON pay_periods(company_id);
 CREATE INDEX IF NOT EXISTS idx_entry_messages_entry_id      ON entry_messages(time_entry_id);
+-- Index for unread message count query (filters by company + sender + read_at)
+CREATE INDEX IF NOT EXISTS idx_entry_messages_company_id    ON entry_messages(company_id);
+CREATE INDEX IF NOT EXISTS idx_entry_messages_unread        ON entry_messages(company_id, sender_id, read_at) WHERE read_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id   ON push_subscriptions(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_company_id         ON audit_log(company_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_created_at         ON audit_log(created_at);
@@ -398,4 +407,10 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS prevailing_wage_rate DECIMAL(10,2)
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS address TEXT;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS phone VARCHAR(30);
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS contact_email VARCHAR(200);
+-- Performance indexes (safe to add on existing databases)
+CREATE INDEX IF NOT EXISTS idx_time_entries_pending_sort  ON time_entries(company_id, status, worker_signed_at DESC NULLS LAST, work_date DESC);
+CREATE INDEX IF NOT EXISTS idx_time_entries_pending       ON time_entries(company_id, work_date) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_time_entries_company_wage  ON time_entries(company_id, wage_type, user_id);
+CREATE INDEX IF NOT EXISTS idx_entry_messages_company_id  ON entry_messages(company_id);
+CREATE INDEX IF NOT EXISTS idx_entry_messages_unread      ON entry_messages(company_id, sender_id, read_at) WHERE read_at IS NULL;
 

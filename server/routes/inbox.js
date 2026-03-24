@@ -49,7 +49,7 @@ router.patch('/read-all', requireAuth, async (req, res) => {
   }
 });
 
-// Helper used by other routes to create inbox items
+// Helper used by other routes to create a single inbox item (fire-and-forget safe)
 async function createInboxItem(userId, companyId, type, title, body, link) {
   try {
     await pool.query(
@@ -61,5 +61,18 @@ async function createInboxItem(userId, companyId, type, title, body, link) {
   }
 }
 
+// Batch insert inbox items for multiple users in a single query (used for broadcasts)
+async function createInboxItemBatch(userIds, companyId, type, title, body, link) {
+  if (!userIds.length) return;
+  try {
+    const values = userIds.map((_, i) => `($${i * 6 + 1}, $${i * 6 + 2}, $${i * 6 + 3}, $${i * 6 + 4}, $${i * 6 + 5}, $${i * 6 + 6})`).join(', ');
+    const params = userIds.flatMap(uid => [uid, companyId, type, title, body || null, link || null]);
+    await pool.query(`INSERT INTO inbox (user_id, company_id, type, title, body, link) VALUES ${values}`, params);
+  } catch (err) {
+    console.error('createInboxItemBatch error:', err);
+  }
+}
+
 module.exports = router;
 module.exports.createInboxItem = createInboxItem;
+module.exports.createInboxItemBatch = createInboxItemBatch;
