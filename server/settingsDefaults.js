@@ -1,5 +1,5 @@
 const FEATURE_KEYS = ['feature_scheduling', 'feature_analytics', 'feature_chat', 'feature_prevailing_wage', 'show_worker_wages', 'notification_use_work_hours'];
-const STRING_KEYS = ['overtime_rule', 'currency'];
+const STRING_KEYS = ['overtime_rule', 'currency', 'company_timezone'];
 
 // Defaults available to all authenticated users
 const SETTINGS_DEFAULTS = {
@@ -16,6 +16,7 @@ const ADMIN_SETTINGS_DEFAULTS = {
   notification_inactive_days: 3, notification_start_hour: 6, notification_end_hour: 20,
   notification_use_work_hours: true,
   chat_retention_days: 3,
+  company_timezone: '',
 };
 
 function applySettingsRows(rows, defaults) {

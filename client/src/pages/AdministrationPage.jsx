@@ -284,7 +284,7 @@ export default function AdministrationPage() {
               currentUser={user}
             />
             <h3 style={styles.sectionTitle}>{t.auditLog}</h3>
-            <AuditLog />
+            <AuditLog timezone={settings?.company_timezone ?? ''} />
           </div>
         )}
         {tab === 'projects' && (

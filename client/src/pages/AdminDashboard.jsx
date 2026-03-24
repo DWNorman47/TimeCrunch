@@ -229,11 +229,11 @@ export default function AdminDashboard() {
             {plan.isBusiness ? <BroadcastMessage /> : null}
             {settings?.feature_chat !== false ? (
               <div style={styles.liveLayout} className="live-layout">
-                <div style={styles.liveMain}><LiveWorkers /></div>
+                <div style={styles.liveMain}><LiveWorkers timezone={settings?.company_timezone ?? ''} /></div>
                 <div style={styles.liveChat}><CompanyChat workers={workers} /></div>
               </div>
             ) : (
-              <LiveWorkers />
+              <LiveWorkers timezone={settings?.company_timezone ?? ''} />
             )}
           </>
         ) : tab === 'analytics' ? (

@@ -35,7 +35,7 @@ export default function Register() {
     setSaving(true);
     const full_name = [form.first_name, form.middle_name, form.last_name].filter(Boolean).join(' ');
     try {
-      const r = await api.post('/auth/register', { ...form, full_name });
+      const r = await api.post('/auth/register', { ...form, full_name, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
       if (r.data.pending_confirmation) { setConfirming(r.data.email); return; }
       await loginWithToken(r.data.token);
       try { const saved = JSON.parse(localStorage.getItem('tc_companies') || '[]'); localStorage.setItem('tc_companies', JSON.stringify([form.company_name.trim(), ...saved.filter(c => c.toLowerCase() !== form.company_name.trim().toLowerCase())])); } catch {}

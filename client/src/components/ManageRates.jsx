@@ -3,6 +3,44 @@ import api from '../api';
 import { currencySymbol } from '../utils';
 import { useT } from '../hooks/useT';
 
+const TIMEZONES = [
+  { value: 'America/New_York',    label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago',     label: 'Central Time (CT)' },
+  { value: 'America/Denver',      label: 'Mountain Time (MT)' },
+  { value: 'America/Phoenix',     label: 'Arizona (MST, no DST)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  { value: 'America/Anchorage',   label: 'Alaska (AKT)' },
+  { value: 'Pacific/Honolulu',    label: 'Hawaii (HST)' },
+  { value: 'America/Puerto_Rico', label: 'Puerto Rico (AST)' },
+  { value: 'America/Mexico_City', label: 'Mexico City (CST)' },
+  { value: 'America/Tijuana',     label: 'Tijuana (PST)' },
+  { value: 'America/Monterrey',   label: 'Monterrey (CST)' },
+  { value: 'America/Tegucigalpa', label: 'Honduras (CST)' },
+  { value: 'America/Guatemala',   label: 'Guatemala (CST)' },
+  { value: 'America/Managua',     label: 'Nicaragua (CST)' },
+  { value: 'America/Belize',      label: 'Belize (CST)' },
+  { value: 'America/Costa_Rica',  label: 'Costa Rica (CST)' },
+  { value: 'America/Panama',      label: 'Panama (EST)' },
+  { value: 'America/Bogota',      label: 'Colombia (COT)' },
+  { value: 'America/Lima',        label: 'Peru (PET)' },
+  { value: 'America/Santiago',    label: 'Chile (CLT)' },
+  { value: 'America/Buenos_Aires', label: 'Argentina (ART)' },
+  { value: 'America/Sao_Paulo',   label: 'Brazil — São Paulo (BRT)' },
+  { value: 'America/Toronto',     label: 'Toronto (ET)' },
+  { value: 'America/Vancouver',   label: 'Vancouver (PT)' },
+  { value: 'Europe/London',       label: 'London (GMT/BST)' },
+  { value: 'Europe/Paris',        label: 'Paris (CET)' },
+  { value: 'Europe/Berlin',       label: 'Berlin (CET)' },
+  { value: 'Europe/Madrid',       label: 'Madrid (CET)' },
+  { value: 'Asia/Dubai',          label: 'Dubai (GST)' },
+  { value: 'Asia/Kolkata',        label: 'India (IST)' },
+  { value: 'Asia/Tokyo',          label: 'Japan (JST)' },
+  { value: 'Asia/Shanghai',       label: 'China (CST)' },
+  { value: 'Australia/Sydney',    label: 'Sydney (AEST)' },
+  { value: 'Pacific/Auckland',    label: 'New Zealand (NZST)' },
+  { value: 'UTC',                 label: 'UTC' },
+];
+
 const CURRENCIES = [
   { code: 'USD', name: 'USD — US Dollar' },
   { code: 'CAD', name: 'CAD — Canadian Dollar' },
@@ -32,6 +70,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
     show_worker_wages: settings?.show_worker_wages ?? false,
     currency: settings?.currency ?? 'USD',
+    company_timezone: settings?.company_timezone ?? '',
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -52,6 +91,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       chat_retention_days: String(settings.chat_retention_days ?? 3),
       show_worker_wages: settings.show_worker_wages ?? false,
       currency: settings.currency ?? 'USD',
+      company_timezone: settings.company_timezone ?? '',
     });
   }, [settings]);
 
@@ -75,6 +115,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         chat_retention_days: parseFloat(form.chat_retention_days),
         show_worker_wages: form.show_worker_wages,
         currency: form.currency,
+        company_timezone: form.company_timezone,
       });
       onSettingsUpdated(r.data);
       setSaved(true);
@@ -103,6 +144,15 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <div style={styles.inputGroup}>
               <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.currency} onChange={e => set('currency', e.target.value)}>
                 {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={styles.row}>
+            <label style={styles.label}>Company Timezone</label>
+            <div style={styles.inputGroup}>
+              <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.company_timezone} onChange={e => set('company_timezone', e.target.value)}>
+                <option value="">(Use browser timezone)</option>
+                {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
               </select>
             </div>
           </div>

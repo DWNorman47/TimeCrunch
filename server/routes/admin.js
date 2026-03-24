@@ -149,7 +149,7 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
   const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
   const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour', 'chat_retention_days'];
   const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold'];
-  const stringKeys = ['overtime_rule', 'currency'];
+  const stringKeys = ['overtime_rule', 'currency', 'company_timezone'];
   const allowed = [...numericKeys, ...stringKeys, ...FEATURE_KEYS];
   const companyId = req.user.company_id;
   try {
@@ -169,6 +169,8 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
             return res.status(400).json({ error: 'overtime_rule must be daily or weekly' });
           if (key === 'currency' && !/^[A-Z]{3}$/.test(val))
             return res.status(400).json({ error: 'currency must be a valid 3-letter ISO code' });
+          if (key === 'company_timezone' && val !== '' && !/^[A-Za-z_]+\/[A-Za-z_\/]+$/.test(val))
+            return res.status(400).json({ error: 'Invalid timezone' });
           await pool.query(
             'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
             [companyId, key, val]

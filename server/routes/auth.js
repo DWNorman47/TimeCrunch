@@ -140,7 +140,7 @@ router.get('/me', requireAuth, async (req, res) => {
 
 // Register — creates a new company and its first admin user
 router.post('/register', authLimiter, async (req, res) => {
-  const { full_name, first_name, middle_name, last_name, username, password, email } = req.body;
+  const { full_name, first_name, middle_name, last_name, username, password, email, timezone } = req.body;
   const company_name = req.body.company_name?.trim();
   if (!company_name || !full_name || !username || !password || !email) {
     return res.status(400).json({ error: 'company_name, full_name, email, username, and password are required' });
@@ -169,6 +169,9 @@ router.post('/register', authLimiter, async (req, res) => {
     const defaults = [['prevailing_wage_rate', 45], ['default_hourly_rate', 30], ['overtime_multiplier', 1.5]];
     for (const [key, value] of defaults) {
       await client.query('INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3)', [companyId, key, value]);
+    }
+    if (timezone && /^[A-Za-z_]+\/[A-Za-z_\/]+$/.test(timezone)) {
+      await client.query('INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3)', [companyId, 'company_timezone', timezone]);
     }
     const hash = await bcrypt.hash(password, 10);
     const confirmToken = crypto.randomBytes(32).toString('hex');

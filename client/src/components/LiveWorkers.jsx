@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { formatInTz } from '../utils';
 
 // Fix default marker icons broken by Webpack/Vite bundling
 delete L.Icon.Default.prototype._getIconUrl;
@@ -31,7 +32,7 @@ function ElapsedTimer({ clockInTime }) {
   return <span style={styles.elapsed}>{formatElapsed(clockInTime)}</span>;
 }
 
-export default function LiveWorkers() {
+export default function LiveWorkers({ timezone = '' }) {
   const t = useT();
   const [workers, setWorkers] = useState([]);
   const [inactiveWorkers, setInactiveWorkers] = useState([]);
@@ -114,7 +115,7 @@ export default function LiveWorkers() {
           <span style={styles.liveDot} />
           <span style={styles.liveText}>{t.liveLabel}</span>
           {lastUpdated && (
-            <span style={styles.updated}>Updated {lastUpdated.toLocaleTimeString()}</span>
+            <span style={styles.updated}>Updated {formatInTz(lastUpdated.toISOString(), timezone)}</span>
           )}
           <button style={styles.refreshBtn} onClick={fetchActive}>{t.refresh}</button>
         </div>
@@ -157,7 +158,7 @@ export default function LiveWorkers() {
                 </div>
                 {w.notes && <div style={styles.workerNotes}>{w.notes}</div>}
                 <div style={styles.workerMeta}>
-                  <span>{t.clockedIn} {new Date(w.clock_in_time).toLocaleTimeString()}</span>
+                  <span>{t.clockedIn} {formatInTz(w.clock_in_time, timezone)}</span>
                   {w.clock_in_lat
                     ? <span style={styles.locationTag}>{t.locationCaptured}</span>
                     : <span style={styles.noLocation}>{t.noLocation}</span>
@@ -180,7 +181,7 @@ export default function LiveWorkers() {
                     <Popup>
                       <strong>{w.full_name}</strong><br />
                       {w.project_name}<br />
-                      In: {new Date(w.clock_in_time).toLocaleTimeString()}
+                      In: {formatInTz(w.clock_in_time, timezone)}
                     </Popup>
                   </Marker>
                 ))}
