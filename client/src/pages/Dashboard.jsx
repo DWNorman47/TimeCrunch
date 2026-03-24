@@ -345,7 +345,7 @@ tr:last-child td{border-bottom:none}
             <div style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '8px 0 4px' }}>
               Need help? Email us at <a href="mailto:info@opsfloa.com" style={{ color: '#1a56db' }}>info@opsfloa.com</a>
             </div>
-            {!loading && (settings?.show_worker_wages ?? false) && <PayStubView />}
+            {!loading && (settings?.show_worker_wages ?? false) && <PayStubView user={user} settings={settings} companyInfo={companyInfo} />}
           </>
         )}
       </main>
