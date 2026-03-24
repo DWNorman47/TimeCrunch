@@ -116,10 +116,10 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole }) {
               }}
               onClick={() => navigate(app)}
             >
-              <div style={{ ...styles.itemIcon, background: app.bg, opacity: app.soon ? 0.65 : 1 }}>
+              <div style={{ ...styles.itemIcon, background: app.soon ? '#e5e7eb' : app.bg }}>
                 {app.icon}
               </div>
-              <span style={styles.itemName}>{app.name}</span>
+              <span style={{ ...styles.itemName, color: app.soon ? '#9ca3af' : '#111827' }}>{app.name}</span>
               {app.soon && <span style={styles.soonBadge}>Soon</span>}
             </button>
           ))}
