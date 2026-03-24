@@ -65,7 +65,7 @@ function computeOT(entries, rule, threshold) {
   };
 }
 
-export default function WorkerSummary({ entries, hourlyRate, overtimeMultiplier = 1.5, prevailingRate = 45, overtimeRule = 'daily', overtimeThreshold = 8, showWages = false, currency = 'USD' }) {
+export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly', overtimeMultiplier = 1.5, prevailingRate = 45, overtimeRule = 'daily', overtimeThreshold = 8, showWages = false, currency = 'USD' }) {
   const [range, setRange] = useState('this_week');
   const { from, to } = getDateRange(range);
 
@@ -83,7 +83,14 @@ export default function WorkerSummary({ entries, hourlyRate, overtimeMultiplier 
   const prevailingHours = filtered.filter(e => e.wage_type === 'prevailing').reduce((s, e) => s + entryHours(e), 0);
 
   const rate = parseFloat(hourlyRate) || 30;
-  const estimatedPay = (regularHours * rate) + (overtimeHours * rate * overtimeMultiplier) + (prevailingHours * prevailingRate);
+  let estimatedPay;
+  if (rateType === 'daily') {
+    const regularDays = new Set(filtered.filter(e => e.wage_type === 'regular').map(e => e.work_date.toString().substring(0, 10))).size;
+    const otCost = overtimeHours * (rate / overtimeThreshold) * overtimeMultiplier;
+    estimatedPay = (regularDays * rate) + otCost + (prevailingHours * prevailingRate);
+  } else {
+    estimatedPay = (regularHours * rate) + (overtimeHours * rate * overtimeMultiplier) + (prevailingHours * prevailingRate);
+  }
 
   const byProject = {};
   filtered.forEach(e => {
