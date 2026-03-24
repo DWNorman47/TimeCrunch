@@ -120,6 +120,8 @@ function UpgradePrompt({ requiredPlan, feature }) {
   );
 }
 
+const isPwa = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
 export default function AdminDashboard() {
   const { logout, user } = useAuth();
   const plan = usePlan();
@@ -127,6 +129,7 @@ export default function AdminDashboard() {
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
+  const [companyInfo, setCompanyInfo] = useState({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [billing, setBilling] = useState(null);
@@ -144,6 +147,9 @@ export default function AdminDashboard() {
     const interval = setInterval(fetchPending, 60000);
     return () => clearInterval(interval);
   }, []);
+  // Permission helper — null admin_permissions means full access
+  const canDo = key => !user?.admin_permissions || user.admin_permissions[key] === true;
+
   const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'manage', 'settings'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
@@ -154,8 +160,8 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    Promise.all([api.get('/admin/workers'), api.get('/admin/projects'), api.get('/admin/settings')])
-      .then(([w, p, s]) => { setWorkers(w.data); setProjects(p.data); setSettings(s.data); })
+    Promise.all([api.get('/admin/workers'), api.get('/admin/projects'), api.get('/admin/settings'), api.get('/company-info')])
+      .then(([w, p, s, ci]) => { setWorkers(w.data); setProjects(p.data); setSettings(s.data); setCompanyInfo(ci.data || {}); })
       .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }, []);
@@ -179,6 +185,7 @@ export default function AdminDashboard() {
         </div>
         <div style={styles.headerRight}>
           <NotificationBell />
+          {isPwa && <button style={styles.headerBtn} onClick={() => window.location.reload()}>↻</button>}
           <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
         </div>
       </header>
@@ -207,11 +214,11 @@ export default function AdminDashboard() {
           onChange={switchTab}
           tabs={[
             { id: 'live', label: t.tabLive },
-            ...(settings?.feature_analytics !== false ? [{ id: 'analytics', label: t.tabAnalytics }] : []),
-            { id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null },
-            { id: 'reports', label: t.tabReports },
+            ...(settings?.feature_analytics !== false && canDo('view_reports') ? [{ id: 'analytics', label: t.tabAnalytics }] : []),
+            ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
+            ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
             { id: 'manage', label: t.tabManage },
-            { id: 'settings', label: t.tabSettings },
+            ...(canDo('manage_settings') ? [{ id: 'settings', label: t.tabSettings }] : []),
           ]}
         />
 
@@ -226,11 +233,11 @@ export default function AdminDashboard() {
             {plan.isBusiness ? <BroadcastMessage /> : null}
             {settings?.feature_chat !== false ? (
               <div style={styles.liveLayout} className="live-layout">
-                <div style={styles.liveMain}><LiveWorkers /></div>
+                <div style={styles.liveMain}><LiveWorkers timezone={settings?.company_timezone ?? ''} /></div>
                 <div style={styles.liveChat}><CompanyChat workers={workers} /></div>
               </div>
             ) : (
-              <LiveWorkers />
+              <LiveWorkers timezone={settings?.company_timezone ?? ''} />
             )}
           </>
         ) : tab === 'analytics' ? (
@@ -252,7 +259,7 @@ export default function AdminDashboard() {
             <h3 style={styles.subheading}>{t.workerReports}</h3>
             {workers.length === 0
               ? <p style={{ color: '#666' }}>{t.noWorkersYet}</p>
-              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} />)
+              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} />)
             }
             <h3 style={styles.subheading}>{t.projectReports}</h3>
             <ProjectReports currency={settings?.currency ?? 'USD'} />
@@ -266,7 +273,7 @@ export default function AdminDashboard() {
         ) : tab === 'manage' ? (
           <>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
-            <ManagePayPeriods />
+            {canDo('approve_entries') && <ManagePayPeriods />}
           </>
         ) : (
           <>

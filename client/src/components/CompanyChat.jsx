@@ -21,8 +21,12 @@ function WorkerChat({ userId }) {
 
   useEffect(() => {
     load();
-    pollRef.current = setInterval(load, 15000);
-    return () => clearInterval(pollRef.current);
+    pollRef.current = setInterval(load, 30000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(pollRef.current); document.removeEventListener('visibilitychange', onVisible); };
   }, []);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -74,7 +78,7 @@ function AdminChat({ workers }) {
     clearInterval(pollRef.current);
     const fetch = () => api.get(`/chat?worker_id=${selectedId}`).then(r => setMessages(r.data)).catch(() => {}).finally(() => setLoading(false));
     fetch();
-    pollRef.current = setInterval(fetch, 15000);
+    pollRef.current = setInterval(fetch, 30000);
     return () => clearInterval(pollRef.current);
   }, [selectedId]);
 

@@ -32,6 +32,18 @@ export function currencySymbol(currency = 'USD') {
 }
 
 /**
+ * Format a UTC ISO timestamp in a given IANA timezone (falls back to browser locale).
+ * opts: Intl.DateTimeFormat options (default: time only, 12-hour)
+ */
+export function formatInTz(isoStr, tz, opts = { hour: 'numeric', minute: '2-digit' }) {
+  try {
+    return new Date(isoStr).toLocaleString('en-US', { ...opts, ...(tz ? { timeZone: tz } : {}) });
+  } catch {
+    return new Date(isoStr).toLocaleString('en-US', opts);
+  }
+}
+
+/**
  * Format decimal hours as "Xh Ym" (e.g. 1.5 → "1h 30m", 0.25 → "15m", 8 → "8h")
  */
 export function fmtHours(h) {

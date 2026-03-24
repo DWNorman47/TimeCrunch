@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { formatInTz } from '../utils';
 
 const ACTION_META = {
   'worker.created':       { label: 'Worker added',        color: '#059669', bg: '#d1fae5' },
@@ -27,11 +28,10 @@ const ACTION_GROUPS = {
   settings: 'Settings',
 };
 
-function formatDt(str) {
-  const d = new Date(str);
+function formatDt(str, tz) {
   return {
-    date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-    time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+    date: formatInTz(str, tz, { month: 'short', day: 'numeric', year: 'numeric' }),
+    time: formatInTz(str, tz, { hour: 'numeric', minute: '2-digit' }),
   };
 }
 
@@ -44,7 +44,7 @@ function ActionBadge({ action }) {
   );
 }
 
-export default function AuditLog() {
+export default function AuditLog({ timezone = '' }) {
   const [entries, setEntries] = useState([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -100,7 +100,7 @@ export default function AuditLog() {
         <>
           <div style={styles.list}>
             {entries.map(e => {
-              const dt = formatDt(e.created_at);
+              const dt = formatDt(e.created_at, timezone);
               return (
                 <div key={e.id} style={styles.row}>
                   <div style={styles.rowTime}>

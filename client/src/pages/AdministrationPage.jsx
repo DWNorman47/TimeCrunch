@@ -30,20 +30,32 @@ function CompanyTab() {
   const [company, setCompany] = useState(null);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
+  const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
-    api.get('/admin/company').then(r => { setCompany(r.data); setName(r.data.name); }).catch(() => {});
+    api.get('/admin/company').then(r => {
+      setCompany(r.data);
+      setName(r.data.name);
+      setAddress(r.data.address || '');
+      setPhone(r.data.phone || '');
+      setContactEmail(r.data.contact_email || '');
+    }).catch(() => {});
   }, []);
 
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true); setMsg('');
     try {
-      const r = await api.patch('/admin/company', { name });
+      const r = await api.patch('/admin/company', { name, address, phone, contact_email: contactEmail });
       setCompany(r.data);
       setName(r.data.name);
+      setAddress(r.data.address || '');
+      setPhone(r.data.phone || '');
+      setContactEmail(r.data.contact_email || '');
       setEditing(false);
       setMsg(t.companyNameUpdated);
     } catch (err) {
@@ -73,7 +85,7 @@ function CompanyTab() {
             <div style={{ display: 'flex', gap: 8 }}>
               <input style={{ ...styles.input, flex: 1, fontSize: 18, fontWeight: 700, padding: '8px 12px' }} value={name} onChange={e => setName(e.target.value)} autoFocus />
               <button style={styles.saveBtn} onClick={save} disabled={saving}>{saving ? '...' : t.save}</button>
-              <button style={styles.ghostBtn} onClick={() => { setEditing(false); setName(company.name); }}>{t.cancel}</button>
+              <button style={styles.ghostBtn} onClick={() => { setEditing(false); setName(company.name); setAddress(company.address || ''); setPhone(company.phone || ''); setContactEmail(company.contact_email || ''); }}>{t.cancel}</button>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -84,8 +96,30 @@ function CompanyTab() {
           {msg && <p style={{ fontSize: 13, margin: '6px 0 0', color: msg.includes('Failed') || msg.includes('taken') ? '#dc2626' : '#059669' }}>{msg}</p>}
         </div>
 
+        {/* Contact info */}
+        <div style={{ padding: '16px 20px', borderTop: '1px solid #f3f4f6', marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Contact Info <span style={{ fontWeight: 400, color: '#d1d5db' }}>— used in worker invoices</span></div>
+          {editing ? (
+            <>
+              <input style={styles.input} placeholder="Physical address (e.g. 123 Main St, City, ST 00000)" value={address} onChange={e => setAddress(e.target.value)} />
+              <div style={{ display: 'flex', gap: 10 }}>
+                <input style={{ ...styles.input, flex: 1 }} placeholder="Phone (e.g. (555) 123-4567)" value={phone} onChange={e => setPhone(e.target.value)} />
+                <input style={{ ...styles.input, flex: 2 }} type="email" placeholder="Email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} />
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.7 }}>
+              {company?.address ? <div>{company.address}</div> : <div style={{ color: '#d1d5db' }}>No address set</div>}
+              <div style={{ display: 'flex', gap: 20 }}>
+                {company?.phone ? <span>{company.phone}</span> : <span style={{ color: '#d1d5db' }}>No phone</span>}
+                {company?.contact_email ? <span>{company.contact_email}</span> : <span style={{ color: '#d1d5db' }}>No email</span>}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Subscription info */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', marginTop: 14, borderTop: '1px solid #f3f4f6' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderTop: '1px solid #f3f4f6' }}>
           <span style={{ ...styles.planBadge, background: si.bg, color: si.color }}>{si.label}</span>
           {company?.plan && (
             <span style={styles.planName}>{company.plan.charAt(0).toUpperCase() + company.plan.slice(1)} plan</span>
@@ -281,9 +315,10 @@ export default function AdministrationPage() {
               showRate={true}
               identityEditable={true}
               currency={settings?.currency ?? 'USD'}
+              currentUser={user}
             />
             <h3 style={styles.sectionTitle}>{t.auditLog}</h3>
-            <AuditLog />
+            <AuditLog timezone={settings?.company_timezone ?? ''} />
           </div>
         )}
         {tab === 'projects' && (
@@ -295,8 +330,9 @@ export default function AdministrationPage() {
               onProjectDeleted={handleProjectDeleted}
               onProjectUpdated={handleProjectUpdated}
               onProjectRestored={handleProjectRestored}
-              showWageType={false}
               nameEditable={true}
+              defaultPrevailingRate={settings?.prevailing_wage_rate}
+              currency={settings?.currency ?? 'USD'}
             />
           </div>
         )}

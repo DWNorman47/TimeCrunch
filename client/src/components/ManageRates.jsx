@@ -3,6 +3,44 @@ import api from '../api';
 import { currencySymbol } from '../utils';
 import { useT } from '../hooks/useT';
 
+const TIMEZONES = [
+  { value: 'America/New_York',    label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago',     label: 'Central Time (CT)' },
+  { value: 'America/Denver',      label: 'Mountain Time (MT)' },
+  { value: 'America/Phoenix',     label: 'Arizona (MST, no DST)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  { value: 'America/Anchorage',   label: 'Alaska (AKT)' },
+  { value: 'Pacific/Honolulu',    label: 'Hawaii (HST)' },
+  { value: 'America/Puerto_Rico', label: 'Puerto Rico (AST)' },
+  { value: 'America/Mexico_City', label: 'Mexico City (CST)' },
+  { value: 'America/Tijuana',     label: 'Tijuana (PST)' },
+  { value: 'America/Monterrey',   label: 'Monterrey (CST)' },
+  { value: 'America/Tegucigalpa', label: 'Honduras (CST)' },
+  { value: 'America/Guatemala',   label: 'Guatemala (CST)' },
+  { value: 'America/Managua',     label: 'Nicaragua (CST)' },
+  { value: 'America/Belize',      label: 'Belize (CST)' },
+  { value: 'America/Costa_Rica',  label: 'Costa Rica (CST)' },
+  { value: 'America/Panama',      label: 'Panama (EST)' },
+  { value: 'America/Bogota',      label: 'Colombia (COT)' },
+  { value: 'America/Lima',        label: 'Peru (PET)' },
+  { value: 'America/Santiago',    label: 'Chile (CLT)' },
+  { value: 'America/Buenos_Aires', label: 'Argentina (ART)' },
+  { value: 'America/Sao_Paulo',   label: 'Brazil — São Paulo (BRT)' },
+  { value: 'America/Toronto',     label: 'Toronto (ET)' },
+  { value: 'America/Vancouver',   label: 'Vancouver (PT)' },
+  { value: 'Europe/London',       label: 'London (GMT/BST)' },
+  { value: 'Europe/Paris',        label: 'Paris (CET)' },
+  { value: 'Europe/Berlin',       label: 'Berlin (CET)' },
+  { value: 'Europe/Madrid',       label: 'Madrid (CET)' },
+  { value: 'Asia/Dubai',          label: 'Dubai (GST)' },
+  { value: 'Asia/Kolkata',        label: 'India (IST)' },
+  { value: 'Asia/Tokyo',          label: 'Japan (JST)' },
+  { value: 'Asia/Shanghai',       label: 'China (CST)' },
+  { value: 'Australia/Sydney',    label: 'Sydney (AEST)' },
+  { value: 'Pacific/Auckland',    label: 'New Zealand (NZST)' },
+  { value: 'UTC',                 label: 'UTC' },
+];
+
 const CURRENCIES = [
   { code: 'USD', name: 'USD — US Dollar' },
   { code: 'CAD', name: 'CAD — Canadian Dollar' },
@@ -26,11 +64,13 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     overtime_rule: settings?.overtime_rule ?? 'daily',
     overtime_threshold: String(settings?.overtime_threshold ?? 8),
     notification_inactive_days: String(settings?.notification_inactive_days ?? 3),
+    notification_use_work_hours: settings?.notification_use_work_hours ?? true,
     notification_start_hour: String(settings?.notification_start_hour ?? 6),
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
     show_worker_wages: settings?.show_worker_wages ?? false,
     currency: settings?.currency ?? 'USD',
+    company_timezone: settings?.company_timezone ?? '',
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -45,11 +85,13 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       overtime_rule: settings.overtime_rule ?? 'daily',
       overtime_threshold: String(settings.overtime_threshold ?? 8),
       notification_inactive_days: String(settings.notification_inactive_days ?? 3),
+      notification_use_work_hours: settings.notification_use_work_hours ?? true,
       notification_start_hour: String(settings.notification_start_hour ?? 6),
       notification_end_hour: String(settings.notification_end_hour ?? 20),
       chat_retention_days: String(settings.chat_retention_days ?? 3),
       show_worker_wages: settings.show_worker_wages ?? false,
       currency: settings.currency ?? 'USD',
+      company_timezone: settings.company_timezone ?? '',
     });
   }, [settings]);
 
@@ -67,11 +109,13 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         overtime_rule: form.overtime_rule,
         overtime_threshold: parseFloat(form.overtime_threshold),
         notification_inactive_days: parseFloat(form.notification_inactive_days),
+        notification_use_work_hours: form.notification_use_work_hours,
         notification_start_hour: parseFloat(form.notification_start_hour),
         notification_end_hour: parseFloat(form.notification_end_hour),
         chat_retention_days: parseFloat(form.chat_retention_days),
         show_worker_wages: form.show_worker_wages,
         currency: form.currency,
+        company_timezone: form.company_timezone,
       });
       onSettingsUpdated(r.data);
       setSaved(true);
@@ -100,6 +144,15 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <div style={styles.inputGroup}>
               <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.currency} onChange={e => set('currency', e.target.value)}>
                 {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={styles.row}>
+            <label style={styles.label}>Company Timezone</label>
+            <div style={styles.inputGroup}>
+              <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.company_timezone} onChange={e => set('company_timezone', e.target.value)}>
+                <option value="">(Use browser timezone)</option>
+                {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
               </select>
             </div>
           </div>
@@ -176,14 +229,32 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </div>
           </div>
           <div style={styles.row}>
-            <label style={styles.label}>{t.ratesWorkHours}</label>
-            <div style={styles.inputGroup}>
-              <input style={{ ...styles.input, width: 54 }} type="number" min="0" max="23" step="1" value={form.notification_start_hour} onChange={e => set('notification_start_hour', e.target.value)} required />
-              <span style={styles.suffix}>:00 –</span>
-              <input style={{ ...styles.input, width: 54 }} type="number" min="0" max="23" step="1" value={form.notification_end_hour} onChange={e => set('notification_end_hour', e.target.value)} required />
-              <span style={styles.suffix}>:00</span>
-            </div>
+            <label style={styles.label}>Alert outside work hours</label>
+            <label style={styles.toggle}>
+              <input type="checkbox" checked={form.notification_use_work_hours} onChange={e => set('notification_use_work_hours', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleTrack, background: form.notification_use_work_hours ? '#1a56db' : '#d1d5db' }}>
+                <span style={{ ...styles.toggleThumb, transform: form.notification_use_work_hours ? 'translateX(18px)' : 'translateX(2px)' }} />
+              </span>
+            </label>
           </div>
+          {form.notification_use_work_hours && (
+            <div style={styles.row}>
+              <label style={styles.label}>{t.ratesWorkHours}</label>
+              <div style={styles.inputGroup}>
+                <select style={styles.input} value={form.notification_start_hour} onChange={e => set('notification_start_hour', e.target.value)}>
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
+                  ))}
+                </select>
+                <span style={styles.suffix}>–</span>
+                <select style={styles.input} value={form.notification_end_hour} onChange={e => set('notification_end_hour', e.target.value)}>
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
           <div style={styles.row}>
             <label style={styles.label}>{t.ratesClearChat}</label>
             <div style={styles.inputGroup}>
@@ -243,10 +314,10 @@ const styles = {
   inputGroup: { display: 'flex', alignItems: 'center', gap: 6 },
   prefix: { fontSize: 14, color: '#6b7280' },
   suffix: { fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap' },
-  input: { width: 90, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, textAlign: 'right' },
   toggle: { cursor: 'pointer', flexShrink: 0 },
   toggleTrack: { width: 44, height: 24, borderRadius: 12, transition: 'background 0.2s', position: 'relative' },
   toggleThumb: { position: 'absolute', top: 2, width: 20, height: 20, borderRadius: 10, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s' },
+  input: { width: 90, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, textAlign: 'right' },
   error: { color: '#e53e3e', fontSize: 13 },
   footer: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, paddingTop: 4 },
   savedMsg: { color: '#059669', fontSize: 13, fontWeight: 600 },
