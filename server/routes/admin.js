@@ -715,11 +715,12 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
       }
     });
 
+    const effectivePrevRate = parseFloat(projectResult.rows[0].prevailing_wage_rate) || settings.prevailing_wage_rate;
     let prevailingHours = 0, prevailingCost = 0;
     entries.filter(e => e.wage_type === 'prevailing').forEach(e => {
       const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
       prevailingHours += h;
-      prevailingCost += h * settings.prevailing_wage_rate;
+      prevailingCost += h * effectivePrevRate;
     });
 
     const totalHours = regularHours + overtimeHours + prevailingHours;
@@ -728,7 +729,7 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
     res.json({
       project: projectResult.rows[0],
       entries,
-      summary: { total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours, regular_cost: regularCost, overtime_cost: overtimeCost, prevailing_cost: prevailingCost, total_cost: totalCost, overtime_multiplier: settings.overtime_multiplier, prevailing_wage_rate: settings.prevailing_wage_rate },
+      summary: { total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours, regular_cost: regularCost, overtime_cost: overtimeCost, prevailing_cost: prevailingCost, total_cost: totalCost, overtime_multiplier: settings.overtime_multiplier, prevailing_wage_rate: effectivePrevRate },
       period: { from: from || null, to: to || null },
     });
   } catch (err) {
@@ -775,7 +776,7 @@ router.get('/projects', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
-      `SELECT id, company_id, name, wage_type, geo_lat, geo_lng, geo_radius_ft,
+      `SELECT id, company_id, name, wage_type, prevailing_wage_rate, geo_lat, geo_lng, geo_radius_ft,
               budget_hours, budget_dollars, active, created_at
        FROM projects WHERE active = true AND company_id = $1 ORDER BY name LIMIT 500`,
       [companyId]
@@ -818,7 +819,7 @@ router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
 
 // Update project (name and/or wage_type and/or geofence)
 router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
-  const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence, budget_hours, budget_dollars } = req.body;
+  const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence, budget_hours, budget_dollars, prevailing_wage_rate } = req.body;
   if (wage_type !== undefined && !['regular', 'prevailing'].includes(wage_type)) {
     return res.status(400).json({ error: 'wage_type must be regular or prevailing' });
   }
@@ -853,6 +854,11 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
       if (bd !== null && (isNaN(bd) || bd < 0)) return res.status(400).json({ error: 'budget_dollars must be non-negative' });
       fields.push(`budget_dollars = $${idx++}`); values.push(bd);
     }
+    if (prevailing_wage_rate !== undefined) {
+      const pwr = prevailing_wage_rate === null ? null : parseFloat(prevailing_wage_rate);
+      if (pwr !== null && (isNaN(pwr) || pwr < 0)) return res.status(400).json({ error: 'prevailing_wage_rate must be non-negative' });
+      fields.push(`prevailing_wage_rate = $${idx++}`); values.push(pwr);
+    }
     if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
     values.push(req.params.id);
     values.push(companyId);
@@ -871,14 +877,16 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
 
 // Create a project
 router.post('/projects', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
-  const { name, wage_type } = req.body;
+  const { name, wage_type, prevailing_wage_rate } = req.body;
   if (!name) return res.status(400).json({ error: 'Project name required' });
   const companyId = req.user.company_id;
   const wt = wage_type === 'prevailing' ? 'prevailing' : 'regular';
+  const pwr = prevailing_wage_rate != null ? parseFloat(prevailing_wage_rate) : null;
+  if (pwr !== null && (isNaN(pwr) || pwr < 0)) return res.status(400).json({ error: 'prevailing_wage_rate must be non-negative' });
   try {
     const result = await pool.query(
-      'INSERT INTO projects (company_id, name, wage_type) VALUES ($1, $2, $3) RETURNING *',
-      [companyId, name, wt]
+      'INSERT INTO projects (company_id, name, wage_type, prevailing_wage_rate) VALUES ($1, $2, $3, $4) RETURNING *',
+      [companyId, name, wt, pwr]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.created', 'project', result.rows[0].id, name, { wage_type: wt });
     res.status(201).json(result.rows[0]);
@@ -1232,11 +1240,16 @@ router.get('/overtime-report', requireAdmin, requirePermission('view_reports'), 
       [companyId]
     );
     const entries = await pool.query(
-      `SELECT te.user_id, te.wage_type, te.start_time, te.end_time, te.work_date, te.break_minutes, te.mileage
+      `SELECT te.user_id, te.project_id, te.wage_type, te.start_time, te.end_time, te.work_date, te.break_minutes, te.mileage
        FROM time_entries te
        WHERE te.company_id = $1 AND te.work_date >= $2 AND te.work_date <= $3 AND te.status = 'approved'`,
       [companyId, from, to]
     );
+    const projectRates = await pool.query(
+      'SELECT id, prevailing_wage_rate FROM projects WHERE company_id = $1', [companyId]
+    );
+    const projectRateMap = {};
+    projectRates.rows.forEach(p => { if (p.prevailing_wage_rate != null) projectRateMap[p.id] = parseFloat(p.prevailing_wage_rate); });
 
     const byWorker = {};
     entries.rows.forEach(e => {
@@ -1248,9 +1261,12 @@ router.get('/overtime-report', requireAdmin, requirePermission('view_reports'), 
       const wEntries = byWorker[w.id] || [];
       const workerOTRule = w.overtime_rule || 'daily';
       const { regularHours, overtimeHours } = computeOT(wEntries, workerOTRule, threshold);
-      const prevHours = wEntries
-        .filter(e => e.wage_type === 'prevailing')
-        .reduce((s, e) => s + hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60, 0);
+      let prevHours = 0, prevailingCost = 0;
+      wEntries.filter(e => e.wage_type === 'prevailing').forEach(e => {
+        const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
+        prevHours += h;
+        prevailingCost += h * (projectRateMap[e.project_id] ?? prevRate);
+      });
       const totalHours = regularHours + overtimeHours + prevHours;
       const rate = parseFloat(w.hourly_rate) || defaultRate;
       let regularCost, overtimeCost;
@@ -1262,7 +1278,6 @@ router.get('/overtime-report', requireAdmin, requirePermission('view_reports'), 
         regularCost = regularHours * rate;
         overtimeCost = overtimeHours * rate * otMult;
       }
-      const prevailingCost = prevHours * prevRate;
       const totalCost = regularCost + overtimeCost + prevailingCost;
       const mileage = wEntries.reduce((s, e) => s + (parseFloat(e.mileage) || 0), 0);
       return {
@@ -1302,11 +1317,17 @@ router.get('/payroll-export', requireAdmin, requirePermission('view_reports'), r
       [companyId]
     );
     const entries = await pool.query(
-      `SELECT te.user_id, te.wage_type, te.start_time, te.end_time, te.work_date, te.break_minutes, te.mileage
+      `SELECT te.user_id, te.project_id, te.wage_type, te.start_time, te.end_time, te.work_date, te.break_minutes, te.mileage
        FROM time_entries te
        WHERE te.company_id = $1 AND te.work_date >= $2 AND te.work_date <= $3 AND te.status = 'approved'`,
       [companyId, from, to]
     );
+    const projectRatesExport = await pool.query(
+      'SELECT id, prevailing_wage_rate FROM projects WHERE company_id = $1', [companyId]
+    );
+    const projectRateMapExport = {};
+    projectRatesExport.rows.forEach(p => { if (p.prevailing_wage_rate != null) projectRateMapExport[p.id] = parseFloat(p.prevailing_wage_rate); });
+
     const byWorker = {};
     entries.rows.forEach(e => {
       if (!byWorker[e.user_id]) byWorker[e.user_id] = [];
@@ -1321,9 +1342,12 @@ router.get('/payroll-export', requireAdmin, requirePermission('view_reports'), r
       const wEntries = byWorker[w.id] || [];
       const workerOTRule = w.overtime_rule || 'daily';
       const { regularHours, overtimeHours } = computeOT(wEntries, workerOTRule, threshold);
-      const prevHours = wEntries
-        .filter(e => e.wage_type === 'prevailing')
-        .reduce((s, e) => s + hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60, 0);
+      let prevHours = 0, prevailingCost = 0;
+      wEntries.filter(e => e.wage_type === 'prevailing').forEach(e => {
+        const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
+        prevHours += h;
+        prevailingCost += h * (projectRateMapExport[e.project_id] ?? prevRate);
+      });
       const rate = parseFloat(w.hourly_rate) || defaultRate;
       const mileage = wEntries.reduce((s, e) => s + (parseFloat(e.mileage) || 0), 0);
       let regularCost, overtimeCost;
@@ -1335,7 +1359,6 @@ router.get('/payroll-export', requireAdmin, requirePermission('view_reports'), r
         regularCost = regularHours * rate;
         overtimeCost = overtimeHours * rate * otMult;
       }
-      const prevailingCost = prevHours * prevRate;
       lines.push([
         esc(w.full_name), w.rate_type || 'hourly', workerOTRule, rate.toFixed(2),
         regularHours.toFixed(2), overtimeHours.toFixed(2), prevHours.toFixed(2),
@@ -1449,9 +1472,11 @@ router.get('/certified-payroll', requireAdmin, requirePermission('view_reports')
     const contractor = companyRow.rows[0]?.name || '';
 
     let projectName = null;
+    let projectPrevRate = null;
     if (project_id) {
-      const pr = await pool.query('SELECT name FROM projects WHERE id = $1 AND company_id = $2', [project_id, companyId]);
+      const pr = await pool.query('SELECT name, prevailing_wage_rate FROM projects WHERE id = $1 AND company_id = $2', [project_id, companyId]);
       projectName = pr.rows[0]?.name || null;
+      projectPrevRate = pr.rows[0]?.prevailing_wage_rate != null ? parseFloat(pr.rows[0].prevailing_wage_rate) : null;
     }
 
     const conditions = ['te.company_id = $1', 'te.work_date >= $2', 'te.work_date <= $3'];
@@ -1472,7 +1497,7 @@ router.get('/certified-payroll', requireAdmin, requirePermission('view_reports')
 
     const s = await getSettings(companyId);
     const defaultRate = parseFloat(s.default_hourly_rate) || 30;
-    const prevRate = parseFloat(s.prevailing_wage_rate) || 45;
+    const prevRate = projectPrevRate ?? parseFloat(s.prevailing_wage_rate) ?? 45;
 
     const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     const workerMap = {};

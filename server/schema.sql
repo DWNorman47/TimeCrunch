@@ -392,4 +392,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_time_entries_user_client_id ON time_entrie
 -- plan values: free | starter | business  (trial companies default to full access until plan is set)
 -- Per-worker overtime rule: daily | weekly | none
 ALTER TABLE users ADD COLUMN IF NOT EXISTS overtime_rule VARCHAR(10) NOT NULL DEFAULT 'daily';
+-- Per-project prevailing wage rate (overrides company setting when set)
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS prevailing_wage_rate DECIMAL(10,2);
 

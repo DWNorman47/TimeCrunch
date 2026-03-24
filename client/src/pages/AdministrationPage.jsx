@@ -296,8 +296,9 @@ export default function AdministrationPage() {
               onProjectDeleted={handleProjectDeleted}
               onProjectUpdated={handleProjectUpdated}
               onProjectRestored={handleProjectRestored}
-              showWageType={false}
               nameEditable={true}
+              defaultPrevailingRate={settings?.prevailing_wage_rate}
+              currency={settings?.currency ?? 'USD'}
             />
           </div>
         )}
