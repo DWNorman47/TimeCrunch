@@ -58,7 +58,11 @@ export default function LiveWorkers({ timezone = '' }) {
     fetchActive();
     fetchInactive();
     intervalRef.current = setInterval(fetchActive, 30000);
-    return () => clearInterval(intervalRef.current);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchActive();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(intervalRef.current); document.removeEventListener('visibilitychange', onVisible); };
   }, []);
 
   // Unique projects from currently clocked-in workers

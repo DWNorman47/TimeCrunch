@@ -127,7 +127,7 @@ router.post('/out', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const clockResult = await pool.query(
-      'SELECT * FROM active_clock WHERE user_id = $1',
+      'SELECT user_id, company_id, project_id, clock_in_time, work_date, notes, timezone FROM active_clock WHERE user_id = $1',
       [req.user.id]
     );
     if (clockResult.rowCount === 0) return res.status(400).json({ error: 'Not clocked in' });

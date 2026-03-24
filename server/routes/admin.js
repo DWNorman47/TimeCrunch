@@ -7,7 +7,7 @@ const { requireAdmin, requirePlan, requireProAddon, requirePermission } = requir
 const { sendPushToUser, sendPushToAllWorkers } = require('../push');
 const { sendEmail } = require('../email');
 const { hoursWorked, computeOT, computeDailyPayCosts } = require('../utils/payCalculations');
-const { createInboxItem } = require('./inbox');
+const { createInboxItem, createInboxItemBatch } = require('./inbox');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -1454,14 +1454,17 @@ router.post('/broadcast', requireAdmin, requirePermission('manage_settings'), re
     body: message.trim(),
     url: '/dashboard',
   });
-  // Create inbox item for every active worker
+  // Create inbox item for every active worker (single batch insert)
   const broadcastWorkers = await pool.query(
     `SELECT id FROM users WHERE company_id = $1 AND role = 'worker' AND active = true`,
     [companyId]
   );
-  for (const w of broadcastWorkers.rows) {
-    createInboxItem(w.id, companyId, 'announcement', `📢 ${req.user.company_name || 'Announcement'}`, message.trim(), '/dashboard');
-  }
+  createInboxItemBatch(
+    broadcastWorkers.rows.map(w => w.id),
+    companyId, 'announcement',
+    `📢 ${req.user.company_name || 'Announcement'}`,
+    message.trim(), '/dashboard'
+  );
   await logAudit(companyId, req.user.id, req.user.full_name, 'broadcast.sent', null, null, null, { message: message.trim() });
   res.json({ sent: true });
 });
