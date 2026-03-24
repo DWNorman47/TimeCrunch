@@ -10,7 +10,7 @@
 -- companies
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS companies (
-  id                   SERIAL PRIMARY KEY,
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name                 VARCHAR(255) NOT NULL,
   slug                 VARCHAR(100) UNIQUE NOT NULL,
   subscription_status  VARCHAR(20)  NOT NULL DEFAULT 'trial',  -- trial | active | past_due | canceled
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS companies (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
   id                          SERIAL PRIMARY KEY,
-  company_id                  INTEGER REFERENCES companies(id),
+  company_id                  UUID REFERENCES companies(id),
   username                    VARCHAR(100) UNIQUE NOT NULL,
   password_hash               VARCHAR(255) NOT NULL,
   role                        VARCHAR(20)  NOT NULL DEFAULT 'worker',  -- worker | admin | super_admin
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS projects (
   id            SERIAL PRIMARY KEY,
-  company_id    INTEGER      REFERENCES companies(id),
+  company_id    UUID         REFERENCES companies(id),
   name          VARCHAR(255) NOT NULL,
   wage_type     VARCHAR(20)  NOT NULL DEFAULT 'regular' CHECK (wage_type IN ('regular', 'prevailing')),
   geo_lat       DECIMAL(10,7),
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS projects (
 -- settings  (key/value store per company; value is TEXT to support strings)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS settings (
-  company_id INTEGER      NOT NULL REFERENCES companies(id),
+  company_id UUID         NOT NULL REFERENCES companies(id),
   key        VARCHAR(50)  NOT NULL,
   value      TEXT         NOT NULL,
   PRIMARY KEY (company_id, key)
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS settings (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS time_entries (
   id              SERIAL PRIMARY KEY,
-  company_id      INTEGER       REFERENCES companies(id),
+  company_id      UUID          REFERENCES companies(id),
   user_id         INTEGER       REFERENCES users(id) ON DELETE CASCADE,
   project_id      INTEGER       REFERENCES projects(id) ON DELETE SET NULL,
   work_date       DATE          NOT NULL,
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS time_entries (
 CREATE TABLE IF NOT EXISTS active_clock (
   id             SERIAL PRIMARY KEY,
   user_id        INTEGER       UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  company_id     INTEGER       NOT NULL REFERENCES companies(id),
+  company_id     UUID          NOT NULL REFERENCES companies(id),
   project_id     INTEGER       REFERENCES projects(id) ON DELETE SET NULL,
   clock_in_time  TIMESTAMP     NOT NULL DEFAULT NOW(),
   clock_in_lat   DECIMAL(10,7),
@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS active_clock (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS shifts (
   id          SERIAL PRIMARY KEY,
-  company_id  INTEGER      NOT NULL REFERENCES companies(id),
+  company_id  UUID         NOT NULL REFERENCES companies(id),
   user_id     INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   project_id  INTEGER      REFERENCES projects(id) ON DELETE SET NULL,
   shift_date  DATE         NOT NULL,
@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS shifts (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pay_periods (
   id           SERIAL PRIMARY KEY,
-  company_id   INTEGER      NOT NULL REFERENCES companies(id),
+  company_id   UUID         NOT NULL REFERENCES companies(id),
   period_start DATE         NOT NULL,
   period_end   DATE         NOT NULL,
   label        VARCHAR(100),
@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS pay_periods (
 CREATE TABLE IF NOT EXISTS entry_messages (
   id            SERIAL PRIMARY KEY,
   time_entry_id INTEGER   NOT NULL REFERENCES time_entries(id) ON DELETE CASCADE,
-  company_id    INTEGER   NOT NULL REFERENCES companies(id),
+  company_id    UUID      NOT NULL REFERENCES companies(id),
   sender_id     INTEGER   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   body          TEXT      NOT NULL,
   read_at       TIMESTAMP,
@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS entry_messages (
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id         SERIAL PRIMARY KEY,
   user_id    INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  company_id INTEGER      NOT NULL REFERENCES companies(id),
+  company_id UUID         NOT NULL REFERENCES companies(id),
   endpoint   TEXT         NOT NULL,
   p256dh     TEXT         NOT NULL,
   auth       TEXT         NOT NULL,
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS audit_log (
   id          SERIAL PRIMARY KEY,
-  company_id  INTEGER      NOT NULL REFERENCES companies(id),
+  company_id  UUID         NOT NULL REFERENCES companies(id),
   actor_id    INTEGER      REFERENCES users(id) ON DELETE SET NULL,
   actor_name  VARCHAR(100),
   action      VARCHAR(100) NOT NULL,   -- e.g. 'entry.approved', 'worker.invited'
@@ -198,7 +198,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS field_reports (
   id          SERIAL PRIMARY KEY,
-  company_id  INTEGER      NOT NULL REFERENCES companies(id),
+  company_id  UUID         NOT NULL REFERENCES companies(id),
   project_id  INTEGER      REFERENCES projects(id) ON DELETE SET NULL,
   worker_id   INTEGER      NOT NULL REFERENCES users(id),
   title       VARCHAR(255),
@@ -221,7 +221,7 @@ CREATE TABLE IF NOT EXISTS field_report_photos (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS daily_reports (
   id                SERIAL PRIMARY KEY,
-  company_id        INTEGER      NOT NULL REFERENCES companies(id),
+  company_id        UUID         NOT NULL REFERENCES companies(id),
   project_id        INTEGER      REFERENCES projects(id) ON DELETE SET NULL,
   report_date       DATE         NOT NULL,
   superintendent    VARCHAR(255),
@@ -266,7 +266,7 @@ CREATE TABLE IF NOT EXISTS daily_report_materials (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS punchlist_items (
   id          SERIAL PRIMARY KEY,
-  company_id  INTEGER      NOT NULL REFERENCES companies(id),
+  company_id  UUID         NOT NULL REFERENCES companies(id),
   project_id  INTEGER      REFERENCES projects(id) ON DELETE SET NULL,
   title       VARCHAR(500) NOT NULL,
   description TEXT,
@@ -285,7 +285,7 @@ CREATE TABLE IF NOT EXISTS punchlist_items (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS safety_talks (
   id         SERIAL PRIMARY KEY,
-  company_id INTEGER      NOT NULL REFERENCES companies(id),
+  company_id UUID         NOT NULL REFERENCES companies(id),
   project_id INTEGER      REFERENCES projects(id) ON DELETE SET NULL,
   title      VARCHAR(255) NOT NULL,
   content    TEXT,
@@ -336,7 +336,7 @@ CREATE INDEX IF NOT EXISTS idx_punchlist_items_company_id   ON punchlist_items(c
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS inbox (
   id          SERIAL PRIMARY KEY,
-  company_id  INTEGER      NOT NULL REFERENCES companies(id),
+  company_id  UUID         NOT NULL REFERENCES companies(id),
   user_id     INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   type        VARCHAR(50)  NOT NULL,   -- 'approval', 'rejection', 'comment', 'announcement', etc.
   title       VARCHAR(255) NOT NULL,
