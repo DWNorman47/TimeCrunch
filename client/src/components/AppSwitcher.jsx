@@ -69,11 +69,18 @@ const APPS = [
   },
 ];
 
-export default function AppSwitcher({ currentApp = 'timeclock', userRole }) {
+export default function AppSwitcher({ currentApp = 'timeclock', userRole, features = {} }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
-  const visibleApps = APPS.filter(a => !a.adminOnly || isAdmin);
+  const visibleApps = APPS.filter(a => {
+    if (a.adminOnly && !isAdmin) return false;
+    if (!isAdmin) {
+      if (a.soon) return false;
+      if (a.id === 'field' && features.feature_field === false) return false;
+    }
+    return true;
+  });
   const current = APPS.find(a => a.id === currentApp) || APPS[0];
 
   useEffect(() => {

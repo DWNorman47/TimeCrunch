@@ -283,7 +283,7 @@ export default function AdministrationPage() {
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.logoGroup}>
-          <AppSwitcher currentApp="administration" userRole={user?.role} />
+          <AppSwitcher currentApp="administration" userRole={user?.role} features={settings} />
           {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         </div>
         <div style={styles.headerRight}>

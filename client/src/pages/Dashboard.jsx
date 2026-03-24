@@ -265,7 +265,7 @@ tr:last-child td{border-bottom:none}
       <OfflineBanner />
       <header style={styles.header}>
         <div style={styles.logoGroup}>
-          <AppSwitcher currentApp="timeclock" userRole={user?.role} />
+          <AppSwitcher currentApp="timeclock" userRole={user?.role} features={settings} />
           {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         </div>
         <div style={styles.headerRight} className="header-right">

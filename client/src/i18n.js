@@ -96,6 +96,8 @@ const translations = {
     featChatDesc: 'Show the company chat panel on the Live tab',
     featPrevailingWage: 'Prevailing Wage',
     featPrevailingWageDesc: 'Show prevailing wage type on projects and entries',
+    featField: 'Field Module',
+    featFieldDesc: 'Allow workers to access the Field module from the app switcher',
     upgradePlanPrompt: 'Upgrade your subscription to unlock this feature.',
     viewPlans: 'View Plans →',
 
@@ -482,6 +484,8 @@ const translations = {
     featChatDesc: 'Muestra el panel de chat de empresa en la pestaña En Vivo',
     featPrevailingWage: 'Salario Prevaleciente',
     featPrevailingWageDesc: 'Muestra el tipo de salario prevaleciente en proyectos y entradas',
+    featField: 'Módulo de Campo',
+    featFieldDesc: 'Permite a los trabajadores acceder al módulo de campo desde el selector de aplicaciones',
     upgradePlanPrompt: 'Actualiza tu suscripción para desbloquear esta función.',
     viewPlans: 'Ver Planes →',
 
