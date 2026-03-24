@@ -21,6 +21,8 @@ import { getOrFetch, setCached } from '../offlineDb';
 import { useOffline } from '../contexts/OfflineContext';
 import OfflineBanner from '../components/OfflineBanner';
 
+const isPwa = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
 export default function Dashboard() {
   const { user, logout, updateUser } = useAuth();
   const { onSync } = useOffline() || {};
@@ -268,6 +270,7 @@ tr:last-child td{border-bottom:none}
         </div>
         <div style={styles.headerRight} className="header-right">
           <NotificationBell />
+          {isPwa && <button style={styles.headerBtn} className="header-btn" onClick={() => window.location.reload()}>↻</button>}
           <span style={styles.userName} className="header-username">{user.full_name}</span>
           <select style={styles.langSelect} value={user?.language || 'English'} onChange={e => handleLanguageChange(e.target.value)}>
             <option value="English">EN</option>
