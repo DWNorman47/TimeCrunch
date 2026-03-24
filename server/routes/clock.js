@@ -82,10 +82,13 @@ router.post('/in', requireAuth, async (req, res) => {
       const settingsResult = await pool.query(
         'SELECT key, value FROM settings WHERE company_id = $1', [companyId]
       );
-      const s = { notification_start_hour: 6, notification_end_hour: 20 };
-      settingsResult.rows.forEach(r => { s[r.key] = parseFloat(r.value); });
+      const s = { notification_start_hour: 6, notification_end_hour: 20, notification_use_work_hours: true };
+      settingsResult.rows.forEach(r => {
+        if (r.key === 'notification_use_work_hours') s[r.key] = r.value === '1';
+        else s[r.key] = parseFloat(r.value);
+      });
       const nowHour = new Date().getHours();
-      if (nowHour < s.notification_start_hour || nowHour >= s.notification_end_hour) {
+      if (s.notification_use_work_hours && (nowHour < s.notification_start_hour || nowHour >= s.notification_end_hour)) {
         const adminResult = await pool.query(
           `SELECT u.email, u.full_name FROM users u
            WHERE u.company_id = $1 AND u.role = 'admin' AND u.active = true AND u.email IS NOT NULL

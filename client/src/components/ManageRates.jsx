@@ -26,6 +26,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     overtime_rule: settings?.overtime_rule ?? 'daily',
     overtime_threshold: String(settings?.overtime_threshold ?? 8),
     notification_inactive_days: String(settings?.notification_inactive_days ?? 3),
+    notification_use_work_hours: settings?.notification_use_work_hours ?? true,
     notification_start_hour: String(settings?.notification_start_hour ?? 6),
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
@@ -45,6 +46,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       overtime_rule: settings.overtime_rule ?? 'daily',
       overtime_threshold: String(settings.overtime_threshold ?? 8),
       notification_inactive_days: String(settings.notification_inactive_days ?? 3),
+      notification_use_work_hours: settings.notification_use_work_hours ?? true,
       notification_start_hour: String(settings.notification_start_hour ?? 6),
       notification_end_hour: String(settings.notification_end_hour ?? 20),
       chat_retention_days: String(settings.chat_retention_days ?? 3),
@@ -67,6 +69,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         overtime_rule: form.overtime_rule,
         overtime_threshold: parseFloat(form.overtime_threshold),
         notification_inactive_days: parseFloat(form.notification_inactive_days),
+        notification_use_work_hours: form.notification_use_work_hours,
         notification_start_hour: parseFloat(form.notification_start_hour),
         notification_end_hour: parseFloat(form.notification_end_hour),
         chat_retention_days: parseFloat(form.chat_retention_days),
@@ -176,14 +179,32 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </div>
           </div>
           <div style={styles.row}>
-            <label style={styles.label}>{t.ratesWorkHours}</label>
-            <div style={styles.inputGroup}>
-              <input style={{ ...styles.input, width: 54 }} type="number" min="0" max="23" step="1" value={form.notification_start_hour} onChange={e => set('notification_start_hour', e.target.value)} required />
-              <span style={styles.suffix}>:00 –</span>
-              <input style={{ ...styles.input, width: 54 }} type="number" min="0" max="23" step="1" value={form.notification_end_hour} onChange={e => set('notification_end_hour', e.target.value)} required />
-              <span style={styles.suffix}>:00</span>
-            </div>
+            <label style={styles.label}>Alert outside work hours</label>
+            <label style={styles.toggle}>
+              <input type="checkbox" checked={form.notification_use_work_hours} onChange={e => set('notification_use_work_hours', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleTrack, background: form.notification_use_work_hours ? '#1a56db' : '#d1d5db' }}>
+                <span style={{ ...styles.toggleThumb, transform: form.notification_use_work_hours ? 'translateX(18px)' : 'translateX(2px)' }} />
+              </span>
+            </label>
           </div>
+          {form.notification_use_work_hours && (
+            <div style={styles.row}>
+              <label style={styles.label}>{t.ratesWorkHours}</label>
+              <div style={styles.inputGroup}>
+                <select style={styles.input} value={form.notification_start_hour} onChange={e => set('notification_start_hour', e.target.value)}>
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
+                  ))}
+                </select>
+                <span style={styles.suffix}>–</span>
+                <select style={styles.input} value={form.notification_end_hour} onChange={e => set('notification_end_hour', e.target.value)}>
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
           <div style={styles.row}>
             <label style={styles.label}>{t.ratesClearChat}</label>
             <div style={styles.inputGroup}>
@@ -243,10 +264,10 @@ const styles = {
   inputGroup: { display: 'flex', alignItems: 'center', gap: 6 },
   prefix: { fontSize: 14, color: '#6b7280' },
   suffix: { fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap' },
-  input: { width: 90, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, textAlign: 'right' },
   toggle: { cursor: 'pointer', flexShrink: 0 },
   toggleTrack: { width: 44, height: 24, borderRadius: 12, transition: 'background 0.2s', position: 'relative' },
   toggleThumb: { position: 'absolute', top: 2, width: 20, height: 20, borderRadius: 10, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s' },
+  input: { width: 90, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, textAlign: 'right' },
   error: { color: '#e53e3e', fontSize: 13 },
   footer: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, paddingTop: 4 },
   savedMsg: { color: '#059669', fontSize: 13, fontWeight: 600 },
