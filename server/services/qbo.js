@@ -16,6 +16,7 @@ function getAuthUrl(state) {
     scope: 'com.intuit.quickbooks.accounting',
     redirect_uri: process.env.QBO_REDIRECT_URI,
     state,
+    prompt: 'login',
   });
   return `${AUTH_URL}?${params}`;
 }
