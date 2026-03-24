@@ -21,7 +21,7 @@ function defaultDates() {
   return { from: fmt(from), to: fmt(today) };
 }
 
-export default function WorkerMetrics({ worker, currency = 'USD' }) {
+export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = {} }) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [from, setFrom] = useState(defaultDates().from);
@@ -100,7 +100,7 @@ export default function WorkerMetrics({ worker, currency = 'USD' }) {
                   downloadCSV([headers, ...rows], `${worker.username}-${from||'all'}-to-${to||'all'}.csv`);
                 }}>{t.exportCSV}</button>
                 <PDFDownloadLink
-                  document={<BillPDF data={billData} currency={currency} />}
+                  document={<BillPDF data={billData} currency={currency} companyInfo={companyInfo} />}
                   fileName={`bill-${worker.username}-${from || 'all'}-to-${to || 'all'}.pdf`}
                   style={styles.pdfBtn}
                 >
@@ -109,7 +109,7 @@ export default function WorkerMetrics({ worker, currency = 'USD' }) {
               </div>
               {showPreview && (
                 <PDFViewer style={styles.pdfViewer}>
-                  <BillPDF data={billData} currency={currency} />
+                  <BillPDF data={billData} currency={currency} companyInfo={companyInfo} />
                 </PDFViewer>
               )}
             </div>

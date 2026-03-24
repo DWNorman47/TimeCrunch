@@ -127,6 +127,7 @@ export default function AdminDashboard() {
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
+  const [companyInfo, setCompanyInfo] = useState({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [billing, setBilling] = useState(null);
@@ -157,8 +158,8 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    Promise.all([api.get('/admin/workers'), api.get('/admin/projects'), api.get('/admin/settings')])
-      .then(([w, p, s]) => { setWorkers(w.data); setProjects(p.data); setSettings(s.data); })
+    Promise.all([api.get('/admin/workers'), api.get('/admin/projects'), api.get('/admin/settings'), api.get('/company-info')])
+      .then(([w, p, s, ci]) => { setWorkers(w.data); setProjects(p.data); setSettings(s.data); setCompanyInfo(ci.data || {}); })
       .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }, []);
@@ -255,7 +256,7 @@ export default function AdminDashboard() {
             <h3 style={styles.subheading}>{t.workerReports}</h3>
             {workers.length === 0
               ? <p style={{ color: '#666' }}>{t.noWorkersYet}</p>
-              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} />)
+              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} />)
             }
             <h3 style={styles.subheading}>{t.projectReports}</h3>
             <ProjectReports currency={settings?.currency ?? 'USD'} />

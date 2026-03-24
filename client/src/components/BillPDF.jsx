@@ -1,136 +1,210 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
-import { formatCurrency } from '../utils';
+
+function fmtDate(str) {
+  const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function fmtDateShort(str) {
+  const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function fmtTime(t) {
+  const [h, m] = t.split(':');
+  const hr = parseInt(h);
+  return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`;
+}
+
+function netHours(start, end, brk) {
+  let ms = new Date(`1970-01-01T${end}`) - new Date(`1970-01-01T${start}`);
+  if (ms < 0) ms += 86400000;
+  return Math.max(0, ms / 3600000 - (brk || 0) / 60);
+}
+
+function fmtH(h) {
+  const wh = Math.floor(h);
+  const wm = Math.round((h - wh) * 60);
+  return wm > 0 ? `${wh}h ${wm}m` : `${wh}h`;
+}
+
+function fmtMoney(v) {
+  return `$${Number(v).toFixed(2)}`;
+}
 
 const s = StyleSheet.create({
-  page: { padding: 40, fontSize: 11, fontFamily: 'Helvetica', color: '#222' },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 4, color: '#1a56db' },
-  subtitle: { fontSize: 12, color: '#666', marginBottom: 20 },
-  section: { marginBottom: 16 },
-  sectionTitle: { fontSize: 13, fontWeight: 'bold', marginBottom: 6, borderBottom: '1pt solid #ddd', paddingBottom: 3 },
-  row: { flexDirection: 'row', paddingVertical: 4, borderBottom: '0.5pt solid #eee' },
-  headerRow: { flexDirection: 'row', paddingVertical: 5, backgroundColor: '#f0f4ff', borderBottom: '1pt solid #ccd' },
-  col: { flex: 1, paddingHorizontal: 4 },
-  colWide: { flex: 2, paddingHorizontal: 4 },
-  bold: { fontWeight: 'bold' },
-  summaryRow: { flexDirection: 'row', gap: 24, marginTop: 8, flexWrap: 'wrap' },
-  summaryItem: { alignItems: 'center' },
-  summaryVal: { fontSize: 16, fontWeight: 'bold' },
-  summaryLabel: { fontSize: 9, color: '#888' },
-  costRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, borderBottom: '0.5pt solid #eee' },
-  costTotal: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, marginTop: 2 },
-  badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  page: { padding: 40, fontSize: 10, fontFamily: 'Helvetica', color: '#222' },
+
+  invHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+  brand: { fontSize: 18, fontWeight: 'bold', color: '#1a56db' },
+  brandSub: { fontSize: 9, color: '#888', marginTop: 2 },
+  invRight: { alignItems: 'flex-end' },
+  invTitle: { fontSize: 22, fontWeight: 'bold', color: '#111' },
+  metaLabel: { fontSize: 8, fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },
+  metaVal: { fontSize: 10, color: '#374151' },
+
+  parties: { flexDirection: 'row', marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1.5, borderBottomColor: '#e5e7eb', borderBottomStyle: 'solid' },
+  partyBlock: { flex: 1 },
+  partyLabel: { fontSize: 8, fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  partyName: { fontSize: 12, fontWeight: 'bold', color: '#111', marginBottom: 2 },
+  partyDetail: { fontSize: 9, color: '#6b7280', lineHeight: 1.5 },
+
+  tableHeader: { flexDirection: 'row', backgroundColor: '#f9fafb', paddingVertical: 6, paddingHorizontal: 4, borderBottomWidth: 1.5, borderBottomColor: '#e5e7eb', borderBottomStyle: 'solid' },
+  th: { fontSize: 8, fontWeight: 'bold', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.4 },
+  tableRow: { flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 4, borderBottomWidth: 0.5, borderBottomColor: '#f3f4f6', borderBottomStyle: 'solid' },
+  td: { fontSize: 9, color: '#374151' },
+
+  colDate:    { width: '13%' },
+  colProject: { width: '18%' },
+  colDesc:    { width: '20%' },
+  colIn:      { width: '11%' },
+  colOut:     { width: '11%' },
+  colType:    { width: '14%' },
+  colHours:   { width: '13%', textAlign: 'right' },
+
+  summaryWrap: { flexDirection: 'row', marginTop: 20 },
+  thankYou: { flex: 1, fontSize: 9, color: '#9ca3af', lineHeight: 1.8, marginRight: 20 },
+  sumTable: { width: 230, borderWidth: 1, borderColor: '#e5e7eb', borderStyle: 'solid', borderRadius: 6, overflow: 'hidden' },
+  sumRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 0.5, borderBottomColor: '#f3f4f6', borderBottomStyle: 'solid' },
+  sumLabel: { fontSize: 10, color: '#374151' },
+  sumVal: { fontSize: 10, color: '#374151' },
+  sumDivider: { borderTopWidth: 1, borderTopColor: '#e5e7eb', borderTopStyle: 'solid' },
+  sumBold: { fontWeight: 'bold' },
+  sumTotal: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 10, backgroundColor: '#1a56db' },
+  sumTotalText: { fontSize: 11, fontWeight: 'bold', color: '#fff' },
 });
 
-function formatDate(d) {
-  const dt = new Date(d.substring(0, 10) + 'T00:00:00');
-  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function formatTime(t) {
-  const [h, m] = t.split(':');
-  const hour = parseInt(h);
-  return `${hour % 12 || 12}:${m} ${hour < 12 ? 'AM' : 'PM'}`;
-}
-
-function calcHours(start, end) {
-  const s = new Date(`1970-01-01T${start}`);
-  const e = new Date(`1970-01-01T${end}`);
-  return ((e - s) / 3600000).toFixed(2);
-}
-
-export default function BillPDF({ data, currency = 'USD' }) {
+export default function BillPDF({ data, companyInfo = {} }) {
   const { worker, entries, summary, period } = data;
+
   const periodStr = period.from || period.to
-    ? `${period.from ? formatDate(period.from) : 'Beginning'} – ${period.to ? formatDate(period.to) : 'Present'}`
+    ? `${period.from ? fmtDateShort(period.from) : 'Beginning'} – ${period.to ? fmtDateShort(period.to) : 'Present'}`
     : 'All Time';
+
+  const invoiceDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const invoiceNum = `INV-${(period.from || '').replace(/-/g, '') || 'ALL'}-${worker.id}`;
+
+  const ci = companyInfo || {};
+  const billToLines = [ci.name, ci.address, ci.phone, ci.contact_email].filter(Boolean);
 
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        <Text style={s.title}>OpsFloa</Text>
-        <Text style={s.subtitle}>Work Report — {periodStr}</Text>
-
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Employee</Text>
-          <Text>{worker.full_name}</Text>
-          <Text style={{ color: '#888', fontSize: 10 }}>@{worker.username}</Text>
+        {/* Invoice header */}
+        <View style={s.invHeader}>
+          <View>
+            <Text style={s.brand}>Ops Flow Assist</Text>
+            <Text style={s.brandSub}>Employee Time Invoice</Text>
+          </View>
+          <View style={s.invRight}>
+            <Text style={s.invTitle}>INVOICE</Text>
+            <Text style={s.metaLabel}>Invoice #</Text>
+            <Text style={s.metaVal}>{invoiceNum}</Text>
+            <Text style={s.metaLabel}>Invoice Date</Text>
+            <Text style={s.metaVal}>{invoiceDate}</Text>
+            <Text style={s.metaLabel}>Pay Period</Text>
+            <Text style={s.metaVal}>{periodStr}</Text>
+          </View>
         </View>
 
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Summary</Text>
-          <View style={s.summaryRow}>
-            <View style={s.summaryItem}>
-              <Text style={s.summaryVal}>{summary.total_hours.toFixed(2)}h</Text>
-              <Text style={s.summaryLabel}>Total Hours</Text>
+        {/* From / Bill To */}
+        <View style={s.parties}>
+          <View style={s.partyBlock}>
+            <Text style={s.partyLabel}>From</Text>
+            <Text style={s.partyName}>{worker.full_name || '—'}</Text>
+            {worker.email ? <Text style={s.partyDetail}>{worker.email}</Text> : null}
+          </View>
+          <View style={s.partyBlock}>
+            <Text style={s.partyLabel}>Bill To</Text>
+            {billToLines.length > 0
+              ? billToLines.map((line, i) => (
+                  <Text key={i} style={i === 0 ? s.partyName : s.partyDetail}>{line}</Text>
+                ))
+              : <Text style={s.partyDetail}>—</Text>
+            }
+          </View>
+        </View>
+
+        {/* Entry table */}
+        <View style={s.tableHeader}>
+          <Text style={[s.th, s.colDate]}>Date</Text>
+          <Text style={[s.th, s.colProject]}>Project</Text>
+          <Text style={[s.th, s.colDesc]}>Description</Text>
+          <Text style={[s.th, s.colIn]}>Clock In</Text>
+          <Text style={[s.th, s.colOut]}>Clock Out</Text>
+          <Text style={[s.th, s.colType]}>Rate Type</Text>
+          <Text style={[s.th, s.colHours]}>Hours</Text>
+        </View>
+        {entries.map(e => {
+          const h = netHours(e.start_time, e.end_time, e.break_minutes);
+          const isPrev = e.wage_type === 'prevailing';
+          return (
+            <View key={e.id} style={s.tableRow}>
+              <Text style={[s.td, s.colDate]}>{fmtDate(e.work_date_str || e.work_date)}</Text>
+              <Text style={[s.td, s.colProject]}>{e.project_name || '—'}</Text>
+              <Text style={[s.td, s.colDesc, { color: '#6b7280' }]}>{e.notes || ''}</Text>
+              <Text style={[s.td, s.colIn]}>{fmtTime(e.start_time)}</Text>
+              <Text style={[s.td, s.colOut]}>{fmtTime(e.end_time)}</Text>
+              <Text style={[s.td, s.colType, { color: isPrev ? '#d97706' : '#2563eb', fontWeight: 'bold' }]}>
+                {isPrev ? 'Prevailing' : 'Regular'}
+              </Text>
+              <Text style={[s.td, s.colHours, { fontWeight: 'bold' }]}>{fmtH(h)}</Text>
             </View>
+          );
+        })}
+
+        {/* Summary */}
+        <View style={s.summaryWrap}>
+          <Text style={s.thankYou}>
+            {'Thank you for reviewing this invoice.\nPlease approve all time entries in OpsFloa\nand process payment at your earliest convenience.'}
+          </Text>
+          <View style={s.sumTable}>
             {summary.regular_hours > 0 && (
-              <View style={s.summaryItem}>
-                <Text style={[s.summaryVal, { color: '#2563eb' }]}>{summary.regular_hours.toFixed(2)}h</Text>
-                <Text style={s.summaryLabel}>Regular</Text>
+              <View style={s.sumRow}>
+                <Text style={s.sumLabel}>Regular Hours</Text>
+                <Text style={s.sumVal}>{fmtH(summary.regular_hours)}</Text>
               </View>
             )}
             {summary.overtime_hours > 0 && (
-              <View style={s.summaryItem}>
-                <Text style={[s.summaryVal, { color: '#dc2626' }]}>{summary.overtime_hours.toFixed(2)}h</Text>
-                <Text style={s.summaryLabel}>Overtime</Text>
+              <View style={s.sumRow}>
+                <Text style={s.sumLabel}>Overtime Hours</Text>
+                <Text style={s.sumVal}>{fmtH(summary.overtime_hours)}</Text>
               </View>
             )}
             {summary.prevailing_hours > 0 && (
-              <View style={s.summaryItem}>
-                <Text style={[s.summaryVal, { color: '#d97706' }]}>{summary.prevailing_hours.toFixed(2)}h</Text>
-                <Text style={s.summaryLabel}>Prevailing</Text>
+              <View style={s.sumRow}>
+                <Text style={s.sumLabel}>Prevailing Hours</Text>
+                <Text style={s.sumVal}>{fmtH(summary.prevailing_hours)}</Text>
               </View>
             )}
+            <View style={[s.sumRow, s.sumDivider]}>
+              <Text style={[s.sumLabel, s.sumBold]}>Total Hours</Text>
+              <Text style={[s.sumVal, s.sumBold]}>{fmtH(summary.total_hours)}</Text>
+            </View>
+            {summary.rate > 0 && summary.regular_hours > 0 && (
+              <View style={[s.sumRow, s.sumDivider]}>
+                <Text style={s.sumLabel}>Regular Pay ({fmtMoney(summary.rate)}/hr)</Text>
+                <Text style={s.sumVal}>{fmtMoney(summary.regular_cost)}</Text>
+              </View>
+            )}
+            {summary.overtime_hours > 0 && summary.rate > 0 && (
+              <View style={s.sumRow}>
+                <Text style={s.sumLabel}>Overtime Pay ({summary.overtime_multiplier}×)</Text>
+                <Text style={s.sumVal}>{fmtMoney(summary.overtime_cost)}</Text>
+              </View>
+            )}
+            {summary.prevailing_hours > 0 && summary.prevailing_wage_rate > 0 && (
+              <View style={s.sumRow}>
+                <Text style={s.sumLabel}>Prevailing Pay ({fmtMoney(summary.prevailing_wage_rate)}/hr)</Text>
+                <Text style={s.sumVal}>{fmtMoney(summary.prevailing_cost)}</Text>
+              </View>
+            )}
+            <View style={s.sumTotal}>
+              <Text style={s.sumTotalText}>Total Due</Text>
+              <Text style={s.sumTotalText}>{fmtMoney(summary.total_cost)}</Text>
+            </View>
           </View>
-        </View>
-
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Cost Breakdown</Text>
-          {summary.regular_hours > 0 && (
-            <View style={s.costRow}>
-              <Text style={{ color: '#2563eb' }}>Regular ({summary.regular_hours.toFixed(2)}h × {formatCurrency(summary.rate, currency)}/hr)</Text>
-              <Text style={{ color: '#2563eb', fontWeight: 'bold' }}>{formatCurrency(summary.regular_cost, currency)}</Text>
-            </View>
-          )}
-          {summary.overtime_hours > 0 && (
-            <View style={s.costRow}>
-              <Text style={{ color: '#dc2626' }}>Overtime ({summary.overtime_hours.toFixed(2)}h × {formatCurrency(summary.rate * 1.5, currency)}/hr)</Text>
-              <Text style={{ color: '#dc2626', fontWeight: 'bold' }}>{formatCurrency(summary.overtime_cost, currency)}</Text>
-            </View>
-          )}
-          {summary.prevailing_hours > 0 && (
-            <View style={s.costRow}>
-              <Text style={{ color: '#d97706' }}>Prevailing ({summary.prevailing_hours.toFixed(2)}h × {formatCurrency(45, currency)}/hr)</Text>
-              <Text style={{ color: '#d97706', fontWeight: 'bold' }}>{formatCurrency(summary.prevailing_cost, currency)}</Text>
-            </View>
-          )}
-          <View style={s.costTotal}>
-            <Text style={{ fontWeight: 'bold', fontSize: 13 }}>Total Due</Text>
-            <Text style={{ fontWeight: 'bold', fontSize: 13 }}>{formatCurrency(summary.total_cost, currency)}</Text>
-          </View>
-        </View>
-
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Time Entries ({entries.length})</Text>
-          <View style={s.headerRow}>
-            <Text style={[s.colWide, s.bold]}>Project</Text>
-            <Text style={[s.col, s.bold]}>Date</Text>
-            <Text style={[s.col, s.bold]}>Start</Text>
-            <Text style={[s.col, s.bold]}>End</Text>
-            <Text style={[s.col, s.bold]}>Hours</Text>
-            <Text style={[s.col, s.bold]}>Type</Text>
-          </View>
-          {entries.map(e => (
-            <View key={e.id} style={s.row}>
-              <Text style={s.colWide}>{e.project_name}</Text>
-              <Text style={s.col}>{formatDate(e.work_date)}</Text>
-              <Text style={s.col}>{formatTime(e.start_time)}</Text>
-              <Text style={s.col}>{formatTime(e.end_time)}</Text>
-              <Text style={s.col}>{calcHours(e.start_time, e.end_time)}</Text>
-              <Text style={s.col}>{e.wage_type}</Text>
-            </View>
-          ))}
         </View>
       </Page>
     </Document>
