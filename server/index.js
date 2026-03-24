@@ -66,6 +66,17 @@ app.get('/api/settings', requireAuth, async (req, res) => {
   }
 });
 
+// Company contact info — available to all authenticated users (used in worker invoice)
+app.get('/api/company-info', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT name, address, phone, contact_email FROM companies WHERE id = $1',
+      [req.user.company_id]
+    );
+    res.json(result.rows[0] || {});
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 const PORT = process.env.PORT || 3001;

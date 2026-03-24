@@ -1377,29 +1377,40 @@ router.get('/payroll-export', requireAdmin, requirePermission('view_reports'), r
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
-// GET /admin/company — company name and subscription status
+// GET /admin/company — company profile
 router.get('/company', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, subscription_status, trial_ends_at, plan FROM companies WHERE id = $1',
+      'SELECT id, name, subscription_status, trial_ends_at, plan, address, phone, contact_email FROM companies WHERE id = $1',
       [req.user.company_id]
     );
     res.json(result.rows[0] || {});
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
-// PATCH /admin/company — update company name
+// PATCH /admin/company — update company profile
 router.patch('/company', requireAdmin, async (req, res) => {
-  const { name } = req.body;
-  if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  const { name, address, phone, contact_email } = req.body;
+  if (name !== undefined && !name?.trim()) return res.status(400).json({ error: 'name cannot be empty' });
   try {
-    const existing = await pool.query('SELECT id FROM companies WHERE lower(name) = lower($1) AND id != $2', [name.trim(), req.user.company_id]);
-    if (existing.rowCount > 0) return res.status(409).json({ error: 'That company name is already taken' });
+    const fields = [];
+    const values = [];
+    let idx = 1;
+    if (name !== undefined) {
+      const existing = await pool.query('SELECT id FROM companies WHERE lower(name) = lower($1) AND id != $2', [name.trim(), req.user.company_id]);
+      if (existing.rowCount > 0) return res.status(409).json({ error: 'That company name is already taken' });
+      fields.push(`name = $${idx++}`); values.push(name.trim());
+    }
+    if (address !== undefined) { fields.push(`address = $${idx++}`); values.push(address || null); }
+    if (phone !== undefined) { fields.push(`phone = $${idx++}`); values.push(phone || null); }
+    if (contact_email !== undefined) { fields.push(`contact_email = $${idx++}`); values.push(contact_email || null); }
+    if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+    values.push(req.user.company_id);
     const result = await pool.query(
-      'UPDATE companies SET name = $1 WHERE id = $2 RETURNING id, name',
-      [name.trim(), req.user.company_id]
+      `UPDATE companies SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, name, address, phone, contact_email`,
+      values
     );
-    await logAudit(req.user.company_id, req.user.id, req.user.full_name, 'company.updated', 'company', req.user.company_id, name.trim());
+    await logAudit(req.user.company_id, req.user.id, req.user.full_name, 'company.updated', 'company', req.user.company_id, result.rows[0].name);
     res.json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });

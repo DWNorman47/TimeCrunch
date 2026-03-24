@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [entries, setEntries] = useState([]);
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
+  const [companyInfo, setCompanyInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -44,14 +45,16 @@ export default function Dashboard() {
     setLoading(true);
     setLoadError(false);
     try {
-      const [entries, projects, settings] = await Promise.all([
+      const [entries, projects, settings, ci] = await Promise.all([
         getOrFetch('entries', () => api.get('/time-entries').then(r => r.data)),
         getOrFetch('projects', () => api.get('/projects').then(r => r.data)),
         getOrFetch('settings', () => api.get('/settings').then(r => r.data)),
+        api.get('/company-info').then(r => r.data).catch(() => ({})),
       ]);
       setEntries(entries);
       setProjects(projects);
       setSettings(settings);
+      setCompanyInfo(ci);
     } catch {
       setLoadError(true);
     } finally {
@@ -84,21 +87,166 @@ export default function Dashboard() {
 
   const handleExportPDF = () => {
     const win = window.open('', '_blank');
-    const company = user?.company_name || 'Time Sheet';
     const workerName = user?.full_name || '';
+    const workerEmail = user?.email || '';
     const sorted = [...entries].sort((a, b) => a.work_date.localeCompare(b.work_date));
-    let totalHours = 0;
-    const fmtTime = t => { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`; };
+
+    const fmtTime = s => { const [h, m] = s.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`; };
     const fmtDate = d => new Date(d.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    const fmtDateShort = d => new Date(d.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const fmtH = h => { const wh = Math.floor(h); const wm = Math.round((h - wh) * 60); return wm > 0 ? `${wh}h ${wm}m` : `${wh}h`; };
+    const fmtMoney = v => `$${v.toFixed(2)}`;
+
+    // Pay period
+    const dates = sorted.map(e => e.work_date);
+    const periodStart = dates.length ? fmtDateShort(dates[0]) : '—';
+    const periodEnd = dates.length ? fmtDateShort(dates[dates.length - 1]) : '—';
+
+    // Invoice metadata
+    const now = new Date();
+    const pad2 = n => String(n).padStart(2, '0');
+    const invoiceNo = `INV-${now.getFullYear()}${pad2(now.getMonth()+1)}${pad2(now.getDate())}-${String(Date.now()).slice(-5)}`;
+    const invoiceDate = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    // Company info (Bill To)
+    const ci = companyInfo || {};
+    const billToLines = [
+      ci.name || user?.company_name || '',
+      ci.address || '',
+      ci.phone || '',
+      ci.contact_email || '',
+    ].filter(Boolean);
+
+    // Rates
+    const workerRate = parseFloat(user?.hourly_rate) || parseFloat(settings?.default_hourly_rate) || 0;
+    const prevRate = parseFloat(settings?.prevailing_wage_rate) || 0;
+
+    // Build table rows + accumulate totals
+    let regularHours = 0, prevailingHours = 0, regularPay = 0, prevailingPay = 0;
     const rows = sorted.map(e => {
       let ms = new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`);
       if (ms < 0) ms += 86400000;
-      const h = ms / 3600000 - (e.break_minutes || 0) / 60;
-      totalHours += h;
-      return `<tr><td>${fmtDate(e.work_date)}</td><td>${e.project_name || ''}</td><td>${fmtTime(e.start_time)} – ${fmtTime(e.end_time)}</td><td>${e.break_minutes > 0 ? e.break_minutes + 'm' : '—'}</td><td>${fmtH(h)}</td><td>${e.wage_type === 'prevailing' ? 'Prevailing' : 'Regular'}</td><td>${e.status || 'pending'}</td></tr>`;
+      const h = Math.max(0, ms / 3600000 - (e.break_minutes || 0) / 60);
+      const isPrev = e.wage_type === 'prevailing';
+      if (isPrev) { prevailingHours += h; prevailingPay += h * prevRate; }
+      else { regularHours += h; regularPay += h * workerRate; }
+      const badge = isPrev
+        ? `<span style="background:#d97706;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">Prevailing</span>`
+        : `<span style="background:#2563eb;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">Regular</span>`;
+      return `<tr>
+        <td>${fmtDate(e.work_date)}</td>
+        <td>${e.project_name || '—'}</td>
+        <td style="color:#6b7280">${e.notes || ''}</td>
+        <td>${fmtTime(e.start_time)}</td>
+        <td>${fmtTime(e.end_time)}</td>
+        <td>${badge}</td>
+        <td style="text-align:right;font-weight:600">${fmtH(h)}</td>
+      </tr>`;
     }).join('');
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Timesheet — ${workerName}</title><style>body{font-family:system-ui,sans-serif;margin:32px;color:#111;font-size:13px}h1{font-size:20px;margin:0 0 4px}.sub{color:#666;margin:0 0 20px}table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#f3f4f6;text-align:left;padding:8px 10px;border-bottom:2px solid #e5e7eb;font-size:11px;text-transform:uppercase;letter-spacing:.5px}td{padding:7px 10px;border-bottom:1px solid #f3f4f6}.total td{font-weight:700;border-top:2px solid #e5e7eb;padding-top:10px}@media print{body{margin:16px}}</style></head><body><h1>${company} — Timesheet</h1><p class="sub">${workerName} · Exported ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p><table><thead><tr><th>Date</th><th>Project</th><th>Time</th><th>Break</th><th>Hours</th><th>Wage</th><th>Status</th></tr></thead><tbody>${rows}<tr class="total"><td colspan="4">Total</td><td>${fmtH(totalHours)}</td><td colspan="2"></td></tr></tbody></table></body></html>`);
+
+    const totalHours = regularHours + prevailingHours;
+    const totalPay = regularPay + prevailingPay;
+
+    // Summary rows
+    const sumRows = [
+      regularHours > 0 ? `<tr><td>Regular Hours</td><td style="text-align:right">${fmtH(regularHours)}</td></tr>` : '',
+      prevailingHours > 0 ? `<tr><td>Prevailing Hours</td><td style="text-align:right">${fmtH(prevailingHours)}</td></tr>` : '',
+      `<tr style="border-top:1px solid #e5e7eb;font-weight:600"><td>Total Hours</td><td style="text-align:right">${fmtH(totalHours)}</td></tr>`,
+      workerRate > 0 && regularHours > 0 ? `<tr><td>Regular Pay (${fmtMoney(workerRate)}/hr)</td><td style="text-align:right">${fmtMoney(regularPay)}</td></tr>` : '',
+      prevRate > 0 && prevailingHours > 0 ? `<tr><td>Prevailing Pay (${fmtMoney(prevRate)}/hr)</td><td style="text-align:right">${fmtMoney(prevailingPay)}</td></tr>` : '',
+    ].filter(Boolean).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice — ${workerName}</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;color:#111;font-size:13px;padding:40px;background:#fff}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:36px}
+.brand{font-size:22px;font-weight:800;color:#1a56db}
+.brand-sub{font-size:12px;color:#6b7280;margin-top:2px}
+.inv-title{font-size:32px;font-weight:800;color:#111;text-align:right}
+.inv-meta{text-align:right;margin-top:6px;line-height:1.8;font-size:13px;color:#6b7280}
+.inv-meta strong{color:#111;margin-left:6px}
+.parties{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:28px;padding-bottom:24px;border-bottom:2px solid #e5e7eb}
+.party-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:8px}
+.party-name{font-size:15px;font-weight:700;color:#111;margin-bottom:4px}
+.party-detail{font-size:12px;color:#6b7280;line-height:1.7}
+.period-bar{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 16px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center}
+.period-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#3b82f6}
+.period-val{font-size:14px;font-weight:700;color:#1d4ed8}
+table{width:100%;border-collapse:collapse;margin-bottom:28px}
+th{background:#f9fafb;padding:9px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;border-bottom:2px solid #e5e7eb}
+td{padding:9px 10px;border-bottom:1px solid #f3f4f6;font-size:12px;color:#374151;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.summary-wrap{display:grid;grid-template-columns:1fr 320px;gap:32px;margin-bottom:24px}
+.thank-you{font-size:12px;color:#6b7280;line-height:1.8;padding-top:8px}
+.sum-table{border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;font-size:13px}
+.sum-table tr td{padding:9px 14px;border-bottom:1px solid #f3f4f6}
+.sum-table tr:last-child td{border-bottom:none}
+.total-row{background:#1a56db;color:#fff!important;font-weight:700;font-size:14px}
+.total-row td{color:#fff!important;padding:11px 14px}
+.footer{border-top:1px solid #e5e7eb;padding-top:14px;display:flex;justify-content:space-between;font-size:11px;color:#9ca3af}
+@media print{body{padding:20px}}
+</style></head><body>
+
+<div class="header">
+  <div>
+    <div class="brand">Ops Flow Assist</div>
+    <div class="brand-sub">Employee Time Invoice</div>
+  </div>
+  <div>
+    <div class="inv-title">INVOICE</div>
+    <div class="inv-meta">
+      Invoice #:<strong>${invoiceNo}</strong><br>
+      Invoice Date:<strong>${invoiceDate}</strong>
+    </div>
+  </div>
+</div>
+
+<div class="parties">
+  <div>
+    <div class="party-label">From</div>
+    <div class="party-name">${workerName}</div>
+    <div class="party-detail">${workerEmail}</div>
+  </div>
+  <div>
+    <div class="party-label">Bill To</div>
+    <div class="party-detail">${billToLines.map((l, i) => i === 0 ? `<span class="party-name">${l}</span>` : l).join('<br>')}</div>
+  </div>
+</div>
+
+<div class="period-bar">
+  <span class="period-label">Pay Period</span>
+  <span class="period-val">${periodStart} – ${periodEnd}</span>
+</div>
+
+<table>
+  <thead><tr>
+    <th>Date</th><th>Project</th><th>Description</th><th>Clock In</th><th>Clock Out</th><th>Rate Type</th><th style="text-align:right">Hours</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+
+<div class="summary-wrap">
+  <div class="thank-you">
+    Thank you for reviewing this invoice.<br>
+    Please approve all time entries in OpsFloa<br>
+    and process payment at your earliest convenience.
+  </div>
+  <div class="sum-table">
+    <table style="width:100%;border-collapse:collapse">
+      ${sumRows}
+      <tr class="total-row"><td>Total Due</td><td style="text-align:right">${totalPay > 0 ? fmtMoney(totalPay) : '—'}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="footer">
+  <span>Generated by Ops Flow Assist</span>
+  <span>${invoiceDate}</span>
+</div>
+
+</body></html>`;
+
+    win.document.write(html);
     win.document.close();
     win.print();
   };

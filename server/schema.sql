@@ -394,4 +394,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_time_entries_user_client_id ON time_entrie
 ALTER TABLE users ADD COLUMN IF NOT EXISTS overtime_rule VARCHAR(10) NOT NULL DEFAULT 'daily';
 -- Per-project prevailing wage rate (overrides company setting when set)
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS prevailing_wage_rate DECIMAL(10,2);
+-- Company contact info for invoices
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS phone VARCHAR(30);
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS contact_email VARCHAR(200);
 
