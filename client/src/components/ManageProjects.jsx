@@ -3,17 +3,19 @@ import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { useT } from '../hooks/useT';
 
-export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true, showGeofenceBudget = true }) {
+export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true, showGeofenceBudget = true, defaultPrevailingRate = '', currency = 'USD' }) {
   const toast = useToast();
   const t = useT();
   const [name, setName] = useState('');
   const [wageType, setWageType] = useState('regular');
+  const [prevailingRate, setPrevailingRate] = useState('');
   const [error, setError] = useState('');
   const [archivedConflict, setArchivedConflict] = useState(null); // { id, name }
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editWageType, setEditWageType] = useState('regular');
+  const [editPrevailingRate, setEditPrevailingRate] = useState('');
   const [editGeoLat, setEditGeoLat] = useState('');
   const [editGeoLng, setEditGeoLng] = useState('');
   const [editGeoRadius, setEditGeoRadius] = useState('');
@@ -43,10 +45,13 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     setArchivedConflict(null);
     setSaving(true);
     try {
-      const r = await api.post('/admin/projects', { name, wage_type: wageType });
+      const payload = { name, wage_type: wageType };
+      if (wageType === 'prevailing' && prevailingRate !== '') payload.prevailing_wage_rate = parseFloat(prevailingRate);
+      const r = await api.post('/admin/projects', payload);
       onProjectAdded(r.data);
       setName('');
       setWageType('regular');
+      setPrevailingRate('');
     } catch (err) {
       const data = err.response?.data;
       if (data?.archived_id) {
@@ -65,6 +70,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     const payload = {};
     if (nameEditable) payload.name = editName.trim();
     if (showWageType) payload.wage_type = editWageType;
+    payload.prevailing_wage_rate = editWageType === 'prevailing' && editPrevailingRate !== '' ? parseFloat(editPrevailingRate) : null;
     if (editGeoLat && editGeoLng && editGeoRadius) {
       payload.geo_lat = editGeoLat;
       payload.geo_lng = editGeoLng;
@@ -166,10 +172,13 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
           required
         />
         {showWageType && (
-          <select style={styles.select} value={wageType} onChange={e => setWageType(e.target.value)}>
+          <select style={styles.select} value={wageType} onChange={e => { setWageType(e.target.value); setPrevailingRate(''); }}>
             <option value="regular">{t.regularWages}</option>
             <option value="prevailing">{t.prevailingWages}</option>
           </select>
+        )}
+        {showWageType && wageType === 'prevailing' && (
+          <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder={`Rate (${defaultPrevailingRate || '45.00'})`} value={prevailingRate} onChange={e => setPrevailingRate(e.target.value)} />
         )}
         <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? t.adding : t.add}</button>
       </form>
@@ -214,10 +223,13 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                         : <span style={{ flex: 2, fontWeight: 600, fontSize: 13 }}>{editName}</span>
                       }
                       {showWageType && (
-                        <select style={styles.editInput} value={editWageType} onChange={e => setEditWageType(e.target.value)}>
+                        <select style={styles.editInput} value={editWageType} onChange={e => { setEditWageType(e.target.value); setEditPrevailingRate(''); }}>
                           <option value="regular">{t.regularWages}</option>
                           <option value="prevailing">{t.prevailingWages}</option>
                         </select>
+                      )}
+                      {editWageType === 'prevailing' && (
+                        <input style={{ ...styles.editInput, width: 100 }} type="number" min="0" step="0.01" placeholder={`Rate (${defaultPrevailingRate || '45.00'})`} value={editPrevailingRate} onChange={e => setEditPrevailingRate(e.target.value)} />
                       )}
                       <button style={styles.saveBtn} onClick={() => handleEditSave(p.id)}>{t.save}</button>
                       <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
@@ -270,6 +282,9 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                     <span style={{ ...styles.wageBadge, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                       {p.wage_type === 'prevailing' ? t.prevailingWages : t.regularWages}
                     </span>
+                    {p.wage_type === 'prevailing' && p.prevailing_wage_rate != null && (
+                      <span style={styles.rateTag}>${parseFloat(p.prevailing_wage_rate).toFixed(2)}/hr</span>
+                    )}
                   </td>
                 )}
                 <td style={styles.tdAction}>
@@ -277,6 +292,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                     setEditingId(p.id);
                     setEditName(p.name);
                     setEditWageType(p.wage_type);
+                    setEditPrevailingRate(p.prevailing_wage_rate != null ? String(p.prevailing_wage_rate) : '');
                     setEditGeoLat(p.geo_lat || '');
                     setEditGeoLng(p.geo_lng || '');
                     setEditGeoRadius(p.geo_radius_ft || '');
@@ -351,6 +367,7 @@ const styles = {
   tdAction: { padding: '10px 8px', textAlign: 'right', whiteSpace: 'nowrap' },
   editInput: { padding: '5px 8px', border: '1px solid #c7d2fe', borderRadius: 6, fontSize: 13, width: '100%' },
   wageBadge: { color: '#fff', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' },
+  rateTag: { fontSize: 11, color: '#6b7280', marginLeft: 6, whiteSpace: 'nowrap' },
   removeBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   editBtn: { background: 'none', border: '1px solid #93c5fd', color: '#2563eb', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', marginRight: 6 },
   saveBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
