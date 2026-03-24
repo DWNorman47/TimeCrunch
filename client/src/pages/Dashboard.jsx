@@ -273,8 +273,8 @@ tr:last-child td{border-bottom:none}
           {isPwa && <button style={styles.headerBtn} className="header-btn" onClick={() => window.location.reload()}>↻</button>}
           <span style={styles.userName} className="header-username">{user.full_name}</span>
           <select style={styles.langSelect} value={user?.language || 'English'} onChange={e => handleLanguageChange(e.target.value)}>
-            <option value="English">EN</option>
-            <option value="Spanish">ES</option>
+            <option value="English" style={{ color: '#111827', background: '#fff' }}>EN</option>
+            <option value="Spanish" style={{ color: '#111827', background: '#fff' }}>ES</option>
           </select>
           <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
         </div>
