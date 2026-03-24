@@ -156,7 +156,7 @@ ALTER TABLE inbox ALTER COLUMN company_id SET NOT NULL;
 -- ---------------------------------------------------------------------------
 -- Step 5: Swap companies primary key to UUID
 -- ---------------------------------------------------------------------------
-ALTER TABLE companies DROP CONSTRAINT companies_pkey;
+ALTER TABLE companies DROP CONSTRAINT companies_pkey CASCADE;  -- CASCADE drops any remaining FK refs
 ALTER TABLE companies DROP COLUMN id;
 ALTER TABLE companies RENAME COLUMN new_id TO id;
 ALTER TABLE companies ADD PRIMARY KEY (id);
