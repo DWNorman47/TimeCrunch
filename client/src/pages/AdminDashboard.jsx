@@ -120,6 +120,8 @@ function UpgradePrompt({ requiredPlan, feature }) {
   );
 }
 
+const isPwa = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
 export default function AdminDashboard() {
   const { logout, user } = useAuth();
   const plan = usePlan();
@@ -183,6 +185,7 @@ export default function AdminDashboard() {
         </div>
         <div style={styles.headerRight}>
           <NotificationBell />
+          {isPwa && <button style={styles.headerBtn} onClick={() => window.location.reload()}>↻</button>}
           <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
         </div>
       </header>
