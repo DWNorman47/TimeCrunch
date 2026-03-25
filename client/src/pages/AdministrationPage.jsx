@@ -10,6 +10,7 @@ import ManageProjects from '../components/ManageProjects';
 import ManageRates from '../components/ManageRates';
 import AuditLog from '../components/AuditLog';
 import QuickBooks from '../components/QuickBooks';
+import MFASetup from '../components/MFASetup';
 import { usePlan } from '../hooks/usePlan';
 
 function RoleBadge({ role }) {
@@ -245,6 +246,8 @@ function AccountTab() {
           </form>
         )}
       </div>
+
+      <MFASetup />
 
       <div style={styles.card}>
         <div style={{ padding: '16px 20px 0' }}>

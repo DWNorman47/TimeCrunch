@@ -18,7 +18,6 @@ import LiveKPIs from '../components/LiveKPIs';
 import BroadcastMessage from '../components/BroadcastMessage';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
-import MFASetup from '../components/MFASetup';
 import api from '../api';
 
 function FeatureToggle({ name, desc, serverEnabled, onToggle }) {
@@ -297,7 +296,6 @@ export default function AdminDashboard() {
           <>
             <h2 style={styles.heading}>{t.tabSettings}</h2>
             <FeatureToggles settings={settings} onSettingsUpdated={setSettings} />
-            <MFASetup />
             <div style={styles.supportNote}>
               {t.helpText.split('info@opsfloa.com')[0]}<a href="mailto:info@opsfloa.com" style={{ color: '#1a56db' }}>info@opsfloa.com</a>
             </div>
