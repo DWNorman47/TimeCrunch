@@ -172,6 +172,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
 
   return (
     <div style={styles.form}>
+      <style>{`@media (max-width: 520px) { .invoice-sig-row { flex-wrap: wrap !important; } .invoice-sig-row select { width: 100% !important; margin-top: 6px; } }`}</style>
 
       {/* ── Wages ── */}
       <div style={styles.section}>
@@ -360,7 +361,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={{ ...styles.toggleKnob, transform: form.feature_field ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
-          <div style={styles.row}>
+          <div className="invoice-sig-row" style={styles.row}>
             <div>
               <div style={styles.label}>Invoice Digital Signature</div>
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Whether workers must sign invoices before exporting</div>
