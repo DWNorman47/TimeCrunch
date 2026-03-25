@@ -101,7 +101,18 @@ export default function Dashboard() {
     const win = window.open('', '_blank');
     const workerName = user?.full_name || '';
     const workerEmail = user?.email || '';
-    const sorted = [...entries].sort((a, b) => a.work_date.localeCompare(b.work_date));
+    let sorted = [...entries].sort((a, b) => a.work_date.localeCompare(b.work_date));
+
+    // Free plan: export is limited to the latest completed Mon–Sun week
+    if (settings?.plan === 'free' && settings?.subscription_status !== 'trial') {
+      const today = new Date();
+      const dow = today.getDay();
+      const lastSun = new Date(today); lastSun.setDate(today.getDate() - (dow === 0 ? 7 : dow));
+      const lastMon = new Date(lastSun); lastMon.setDate(lastSun.getDate() - 6);
+      const ws = lastMon.toISOString().substring(0, 10);
+      const we = lastSun.toISOString().substring(0, 10);
+      sorted = sorted.filter(e => { const d = String(e.work_date).substring(0, 10); return d >= ws && d <= we; });
+    }
 
     const fmtTime = s => { const [h, m] = s.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`; };
     const fmtDate = d => new Date(d.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
