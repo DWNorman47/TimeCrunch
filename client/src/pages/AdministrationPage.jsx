@@ -209,6 +209,8 @@ function AccountTab() {
         </div>
       </div>
 
+      <MFASetup />
+
       <div style={styles.card}>
         <button
           style={styles.accordionTrigger}
@@ -246,8 +248,6 @@ function AccountTab() {
           </form>
         )}
       </div>
-
-      <MFASetup />
 
       <div style={styles.card}>
         <div style={{ padding: '16px 20px 0' }}>
