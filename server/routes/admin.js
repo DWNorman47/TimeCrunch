@@ -1548,4 +1548,21 @@ router.get('/certified-payroll', requireAdmin, requirePermission('view_reports')
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+router.post('/support', requireAdmin, async (req, res) => {
+  const { subject, message } = req.body;
+  if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
+  const { sendEmail } = require('../email');
+  const companyName = req.user.company_name || 'Unknown company';
+  const userName = req.user.full_name || req.user.username || 'Unknown user';
+  const userEmail = req.user.email || '';
+  const subjectLine = subject?.trim() ? subject.trim() : 'Support Request';
+  const body = '<p><strong>From:</strong> ' + userName + ' (' + userEmail + ')</p>' +
+    '<p><strong>Company:</strong> ' + companyName + '</p>' +
+    '<p><strong>Subject:</strong> ' + subjectLine + '</p><hr/>' +
+    '<p>' + message.trim().replace(/
+/g, '<br/>') + '</p>';
+  await sendEmail('support@opsfloa.com', '[OpsFloa Support] ' + subjectLine + ' — ' + companyName, body);
+  res.json({ ok: true });
+});
+
 module.exports = router;

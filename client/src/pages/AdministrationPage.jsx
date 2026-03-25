@@ -157,6 +157,23 @@ function AccountTab() {
   const [msg, setMsg] = useState('');
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const [supportForm, setSupportForm] = useState({ subject: '', message: '' });
+  const [supportSending, setSupportSending] = useState(false);
+  const [supportMsg, setSupportMsg] = useState({ text: '', ok: false });
+
+  const sendSupport = async e => {
+    e.preventDefault();
+    if (!supportForm.message.trim()) return;
+    setSupportSending(true); setSupportMsg({ text: '', ok: false });
+    try {
+      await api.post('/admin/support', supportForm);
+      setSupportForm({ subject: '', message: '' });
+      setSupportMsg({ text: "Message sent! We'll be in touch soon.", ok: true });
+    } catch (err) {
+      setSupportMsg({ text: err.response?.data?.error || 'Failed to send. Please email support@opsfloa.com directly.', ok: false });
+    } finally { setSupportSending(false); }
+  };
+
   const changePassword = async e => {
     e.preventDefault();
     if (form.new_password.length < 6) { setMsg(t.newPasswordMin); return; }
@@ -227,6 +244,37 @@ function AccountTab() {
             </div>
           </form>
         )}
+      </div>
+
+      <div style={styles.card}>
+        <div style={{ padding: '16px 20px 0' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 2 }}>Support</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 14 }}>Send a message to our team for help or suggestions.</div>
+        </div>
+        <form onSubmit={sendSupport} style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <input
+            style={styles.input}
+            type="text"
+            placeholder="Subject (optional)"
+            value={supportForm.subject}
+            onChange={e => setSupportForm(f => ({ ...f, subject: e.target.value }))}
+          />
+          <textarea
+            style={{ ...styles.input, minHeight: 90, resize: 'vertical', fontFamily: 'inherit' }}
+            placeholder="Describe your issue or suggestion..."
+            value={supportForm.message}
+            onChange={e => setSupportForm(f => ({ ...f, message: e.target.value }))}
+            required
+          />
+          {supportMsg.text && (
+            <p style={{ ...styles.feedback, color: supportMsg.ok ? '#059669' : '#dc2626', margin: 0 }}>{supportMsg.text}</p>
+          )}
+          <div>
+            <button style={styles.saveBtn} type="submit" disabled={supportSending || !supportForm.message.trim()}>
+              {supportSending ? 'Sending...' : 'Send Message'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
