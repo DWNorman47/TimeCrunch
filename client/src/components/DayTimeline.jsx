@@ -178,7 +178,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
     setSaving(true);
     try {
       const [patchRes, postRes] = await Promise.all([
-        api.patch(`/time-entries/${entry.id}`, { end_time: breakStart }),
+        api.patch(`/time-entries/${entry.id}`, { start_time: entry.start_time, end_time: breakStart, notes: entry.notes, break_minutes: entry.break_minutes, mileage: entry.mileage }),
         api.post('/time-entries', {
           project_id: entry.project_id,
           work_date: today,
@@ -207,7 +207,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
     setSaving(true);
     try {
       const [patchRes, postRes] = await Promise.all([
-        api.patch(`/time-entries/${entry.id}`, { end_time: at }),
+        api.patch(`/time-entries/${entry.id}`, { start_time: entry.start_time, end_time: at, notes: entry.notes, break_minutes: entry.break_minutes, mileage: entry.mileage }),
         api.post('/time-entries', {
           project_id,
           work_date: today,
