@@ -58,7 +58,7 @@ const CURRENCIES = [
 export default function ManageRates({ settings, onSettingsUpdated }) {
   const t = useT();
   const [form, setForm] = useState({
-    prevailing_wage_rate: String(settings?.prevailing_wage_rate ?? 45),
+    prevailing_wage_rate: String(settings?.prevailing_wage_rate ?? 0),
     default_hourly_rate: String(settings?.default_hourly_rate ?? 30),
     overtime_multiplier: String(settings?.overtime_multiplier ?? 1.5),
     overtime_rule: settings?.overtime_rule ?? 'daily',
@@ -80,7 +80,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
   useEffect(() => {
     if (!settings) return;
     setForm({
-      prevailing_wage_rate: String(settings.prevailing_wage_rate ?? 45),
+      prevailing_wage_rate: String(settings.prevailing_wage_rate ?? 0),
       default_hourly_rate: String(settings.default_hourly_rate ?? 30),
       overtime_multiplier: String(settings.overtime_multiplier ?? 1.5),
       overtime_rule: settings.overtime_rule ?? 'daily',
@@ -174,11 +174,14 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
           <div style={styles.row}>
             <label style={styles.label}>{t.ratesPrevailingWage}</label>
-            <div style={styles.inputGroup}>
-              <span style={styles.prefix}>{currencySymbol(form.currency)}</span>
-              <input style={styles.input} type="number" min="0" step="0.01" value={form.prevailing_wage_rate} onChange={e => set('prevailing_wage_rate', e.target.value)} required />
-              <span style={styles.suffix}>/hr</span>
-            </div>
+            {parseFloat(form.prevailing_wage_rate) === 0
+              ? <button style={styles.addPrevBtn} type="button" onClick={() => set('prevailing_wage_rate', '1')}>+ Add</button>
+              : <div style={styles.inputGroup}>
+                  <span style={styles.prefix}>{currencySymbol(form.currency)}</span>
+                  <input style={styles.input} type="number" min="0" step="0.01" value={form.prevailing_wage_rate} onChange={e => set('prevailing_wage_rate', e.target.value)} required />
+                  <span style={styles.suffix}>/hr</span>
+                </div>
+            }
           </div>
           <div style={styles.row}>
             <label style={styles.label}>{t.ratesDefaultWage}</label>
@@ -353,4 +356,5 @@ const styles = {
   savedMsg: { color: '#059669', fontSize: 13, fontWeight: 600 },
   errorMsg: { color: '#e53e3e', fontSize: 13 },
   saveBtn: { padding: '7px 18px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  addPrevBtn: { padding: '6px 14px', background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
 };

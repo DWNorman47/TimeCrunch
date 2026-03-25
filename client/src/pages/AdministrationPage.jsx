@@ -383,6 +383,7 @@ export default function AdministrationPage() {
               onProjectRestored={handleProjectRestored}
               nameEditable={true}
               defaultPrevailingRate={settings?.prevailing_wage_rate}
+              showWageType={(settings?.prevailing_wage_rate ?? 0) > 0}
               currency={settings?.currency ?? 'USD'}
             />
           </div>

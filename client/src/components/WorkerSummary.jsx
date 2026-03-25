@@ -65,7 +65,7 @@ function computeOT(entries, rule, threshold) {
   };
 }
 
-export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly', overtimeMultiplier = 1.5, prevailingRate = 45, overtimeRule = 'daily', overtimeThreshold = 8, showWages = false, currency = 'USD' }) {
+export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly', overtimeMultiplier = 1.5, prevailingRate = 0, overtimeRule = 'daily', overtimeThreshold = 8, showWages = false, currency = 'USD' }) {
   const [range, setRange] = useState('this_week');
   const { from, to } = getDateRange(range);
 
