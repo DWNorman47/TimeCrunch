@@ -163,7 +163,7 @@ router.post('/register', authLimiter, async (req, res) => {
   );
   const priorCount = parseInt(ipQuery.rows[0].count);
   if (priorCount >= TRIAL_LIMIT) {
-    return res.status(429).json({ error: 'Too many trial accounts created from this network. Please contact support.' });
+    return res.status(429).json({ error: 'This IP address has been flagged for suspicious activity. Further registration attempts from this network are being logged and reviewed by our trust and safety team.' });
   }
   // Alert on second registration from same IP (priorCount >= 1 means this is #2+)
   if (priorCount >= 1) {
