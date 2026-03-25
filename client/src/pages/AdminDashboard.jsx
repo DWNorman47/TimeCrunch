@@ -266,8 +266,8 @@ export default function AdminDashboard() {
             <ProjectReports currency={settings?.currency ?? 'USD'} />
             <h3 style={styles.subheading}>{t.overtimeReport}</h3>
             {plan.isStarter ? <OvertimeReport currency={settings?.currency ?? 'USD'} /> : <UpgradePrompt requiredPlan="starter" feature={t.overtimeReport} />}
-            <h3 style={styles.subheading}>{t.certifiedPayroll}</h3>
-            {plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature={t.certifiedPayroll} />}
+            <h3 style={styles.subheading}>Payroll</h3>
+            {plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature="Payroll" />}
             <h3 style={styles.subheading}>{t.export}</h3>
             {plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />}
           </>
