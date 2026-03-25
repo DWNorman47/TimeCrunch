@@ -413,4 +413,7 @@ CREATE INDEX IF NOT EXISTS idx_time_entries_pending       ON time_entries(compan
 CREATE INDEX IF NOT EXISTS idx_time_entries_company_wage  ON time_entries(company_id, wage_type, user_id);
 CREATE INDEX IF NOT EXISTS idx_entry_messages_company_id  ON entry_messages(company_id);
 CREATE INDEX IF NOT EXISTS idx_entry_messages_unread      ON entry_messages(company_id, sender_id, read_at) WHERE read_at IS NULL;
+-- QBO sync tracking on time entries (duplicate prevention)
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS qbo_activity_id VARCHAR(50);
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS qbo_synced_at   TIMESTAMP;
 

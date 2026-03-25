@@ -247,7 +247,10 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </div>
           </div>
           <div style={styles.row}>
-            <label style={styles.label}>Alert outside work hours</label>
+            <div>
+              <div style={styles.label}>Work hours window</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Only send inactive alerts during these hours</div>
+            </div>
             <label style={styles.toggle}>
               <input type="checkbox" checked={form.notification_use_work_hours} onChange={e => set('notification_use_work_hours', e.target.checked)} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleTrack, background: form.notification_use_work_hours ? '#1a56db' : '#d1d5db' }}>
@@ -257,7 +260,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
           {form.notification_use_work_hours && (
             <div style={styles.row}>
-              <label style={styles.label}>{t.ratesWorkHours}</label>
+              <label style={styles.label}>Hours range</label>
               <div style={styles.inputGroup}>
                 <select style={styles.input} value={form.notification_start_hour} onChange={e => set('notification_start_hour', e.target.value)}>
                   {Array.from({ length: 24 }, (_, h) => (

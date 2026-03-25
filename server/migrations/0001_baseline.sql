@@ -1,0 +1,2 @@
+-- Baseline: all tables and columns defined in schema.sql as of 2026-03-24.
+-- Nothing to run here — this file marks the starting point for migration tracking.
