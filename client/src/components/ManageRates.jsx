@@ -69,11 +69,12 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
     feature_overtime: settings?.feature_overtime ?? true,
-    feature_field: settings?.feature_field ?? true,
+    feature_field: settings?.feature_field ?? false,
     feature_scheduling: settings?.feature_scheduling ?? true,
     feature_analytics: settings?.feature_analytics ?? true,
     feature_chat: settings?.feature_chat ?? true,
     feature_geolocation: settings?.feature_geolocation ?? true,
+    feature_timeclock: settings?.feature_timeclock ?? true,
     feature_inactive_alerts: settings?.feature_inactive_alerts ?? true,
     feature_broadcast: settings?.feature_broadcast ?? true,
     show_worker_wages: settings?.show_worker_wages ?? false,
@@ -109,11 +110,12 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       notification_end_hour: String(settings.notification_end_hour ?? 20),
       chat_retention_days: String(settings.chat_retention_days ?? 3),
       feature_overtime: settings.feature_overtime ?? true,
-      feature_field: settings.feature_field ?? true,
+      feature_field: settings.feature_field ?? false,
       feature_scheduling: settings.feature_scheduling ?? true,
       feature_analytics: settings.feature_analytics ?? true,
       feature_chat: settings.feature_chat ?? true,
       feature_geolocation: settings.feature_geolocation ?? true,
+      feature_timeclock: settings.feature_timeclock ?? true,
       feature_inactive_alerts: settings.feature_inactive_alerts ?? true,
       feature_broadcast: settings.feature_broadcast ?? true,
       show_worker_wages: settings.show_worker_wages ?? false,
@@ -145,6 +147,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_analytics: form.feature_analytics,
         feature_chat: form.feature_chat,
         feature_geolocation: form.feature_geolocation,
+        feature_timeclock: form.feature_timeclock,
         feature_inactive_alerts: form.feature_inactive_alerts,
         feature_broadcast: form.feature_broadcast,
         show_worker_wages: form.show_worker_wages,
@@ -367,16 +370,6 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={{ ...styles.toggleKnob, transform: form.show_worker_wages ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>{t.featField}</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featFieldDesc}</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.feature_field ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_field} onChange={e => set('feature_field', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_field ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
           <div className="invoice-sig-row" style={styles.row}>
             <div>
               <div style={styles.label}>Invoice Digital Signature</div>
@@ -407,6 +400,26 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <span style={styles.collapseChevron}>{collapsed.features ? '▶' : '▼'}</span>
         </div>
         {!collapsed.features && <div style={styles.sectionBody}>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Time Clock</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show the Time Clock app in the app switcher</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_timeclock ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_timeclock} onChange={e => set('feature_timeclock', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_timeclock ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featField}</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featFieldDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_field ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_field} onChange={e => set('feature_field', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_field ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
           <div style={styles.row}>
             <div>
               <div style={styles.label}>{t.featScheduling}</div>
