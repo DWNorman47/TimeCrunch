@@ -129,42 +129,87 @@ export default function Dashboard() {
       ci.contact_email || '',
     ].filter(Boolean);
 
+    // Feature flags
+    const showProject = settings?.feature_projects !== false;
+    const overtimeEnabled = settings?.feature_overtime !== false;
+
     // Rates
     const workerRate = parseFloat(user?.hourly_rate) || parseFloat(settings?.default_hourly_rate) || 0;
     const prevRate = parseFloat(settings?.prevailing_wage_rate) || 0;
+    const showRateType = prevRate > 0;
+    const otMultiplier = parseFloat(settings?.overtime_multiplier) || 1.5;
+    const otRule = settings?.overtime_rule || 'daily';
+    const otThreshold = parseFloat(settings?.overtime_threshold) || 8;
+
+    // For weekly OT: track cumulative regular hours per ISO week
+    const weeklyAccum = {};
+    const getWeekKey = dateStr => {
+      const d = new Date(dateStr.substring(0, 10) + 'T00:00:00');
+      const day = d.getDay();
+      const monday = new Date(d); monday.setDate(d.getDate() - ((day + 6) % 7));
+      return monday.toISOString().substring(0, 10);
+    };
 
     // Build table rows + accumulate totals
-    let regularHours = 0, prevailingHours = 0, regularPay = 0, prevailingPay = 0;
+    let regularHours = 0, overtimeHours = 0, prevailingHours = 0;
+    let regularPay = 0, overtimePay = 0, prevailingPay = 0;
+
     const rows = sorted.map(e => {
       let ms = new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`);
       if (ms < 0) ms += 86400000;
       const h = Math.max(0, ms / 3600000 - (e.break_minutes || 0) / 60);
       const isPrev = e.wage_type === 'prevailing';
-      if (isPrev) { prevailingHours += h; prevailingPay += h * prevRate; }
-      else { regularHours += h; regularPay += h * workerRate; }
+
+      if (isPrev) {
+        prevailingHours += h;
+        prevailingPay += h * prevRate;
+      } else if (overtimeEnabled) {
+        let regH = 0, otH = 0;
+        if (otRule === 'daily') {
+          regH = Math.min(h, otThreshold);
+          otH = Math.max(0, h - otThreshold);
+        } else {
+          const wk = getWeekKey(e.work_date);
+          const prior = weeklyAccum[wk] || 0;
+          weeklyAccum[wk] = prior + h;
+          if (prior >= otThreshold) { otH = h; }
+          else if (prior + h > otThreshold) { regH = otThreshold - prior; otH = h - regH; }
+          else { regH = h; }
+        }
+        regularHours += regH;
+        overtimeHours += otH;
+        regularPay += regH * workerRate;
+        overtimePay += otH * workerRate * otMultiplier;
+      } else {
+        regularHours += h;
+        regularPay += h * workerRate;
+      }
+
       const badge = isPrev
         ? `<span style="background:#d97706;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">Prevailing</span>`
         : `<span style="background:#2563eb;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">Regular</span>`;
       return `<tr>
         <td>${fmtDate(e.work_date)}</td>
-        <td>${e.project_name || '—'}</td>
+        ${showProject ? `<td>${e.project_name || '—'}</td>` : ''}
         <td style="color:#6b7280">${e.notes || ''}</td>
         <td>${fmtTime(e.start_time)}</td>
         <td>${fmtTime(e.end_time)}</td>
-        <td>${badge}</td>
+        ${showRateType ? `<td>${badge}</td>` : ''}
         <td style="text-align:right;font-weight:600">${fmtH(h)}</td>
       </tr>`;
     }).join('');
 
-    const totalHours = regularHours + prevailingHours;
-    const totalPay = regularPay + prevailingPay;
+    const totalHours = regularHours + overtimeHours + prevailingHours;
+    const totalPay = regularPay + overtimePay + prevailingPay;
 
     // Summary rows
     const sumRows = [
       regularHours > 0 ? `<tr><td>Regular Hours</td><td style="text-align:right">${fmtH(regularHours)}</td></tr>` : '',
+      overtimeEnabled && overtimeHours > 0 ? `<tr><td>Overtime Hours</td><td style="text-align:right">${fmtH(overtimeHours)}</td></tr>` : '',
       prevailingHours > 0 ? `<tr><td>Prevailing Hours</td><td style="text-align:right">${fmtH(prevailingHours)}</td></tr>` : '',
       `<tr style="border-top:1px solid #e5e7eb;font-weight:600"><td>Total Hours</td><td style="text-align:right">${fmtH(totalHours)}</td></tr>`,
       workerRate > 0 && regularHours > 0 ? `<tr><td>Regular Pay (${fmtMoney(workerRate)}/hr)</td><td style="text-align:right">${fmtMoney(regularPay)}</td></tr>` : '',
+      overtimeEnabled && overtimeHours > 0 && workerRate > 0 ? `<tr><td>Overtime Pay (${otMultiplier}×)</td><td style="text-align:right">${fmtMoney(overtimePay)}</td></tr>` : '',
       prevRate > 0 && prevailingHours > 0 ? `<tr><td>Prevailing Pay (${fmtMoney(prevRate)}/hr)</td><td style="text-align:right">${fmtMoney(prevailingPay)}</td></tr>` : '',
     ].filter(Boolean).join('');
 
@@ -232,7 +277,7 @@ tr:last-child td{border-bottom:none}
 
 <table>
   <thead><tr>
-    <th>Date</th><th>Project</th><th>Description</th><th>Clock In</th><th>Clock Out</th><th>Rate Type</th><th style="text-align:right">Hours</th>
+    <th>Date</th>${showProject ? '<th>Project</th>' : ''}<th>Description</th><th>Clock In</th><th>Clock Out</th>${showRateType ? '<th>Rate Type</th>' : ''}<th style="text-align:right">Hours</th>
   </tr></thead>
   <tbody>${rows}</tbody>
 </table>
