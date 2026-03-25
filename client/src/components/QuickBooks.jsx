@@ -90,10 +90,14 @@ export default function QuickBooks({ workers, projects }) {
         {status.connected ? (
           <div style={styles.connectedBox}>
             <span style={styles.connectedDot} />
-            <span style={{ fontWeight: 600, color: '#166534' }}>Connected to QuickBooks</span>
-            {status.connected_at && (
-              <span style={styles.connectedSince}>since {new Date(status.connected_at).toLocaleDateString()}</span>
-            )}
+            <div style={{ flex: 1 }}>
+              <span style={{ fontWeight: 600, color: '#166534' }}>
+                {status.qbo_company_name ? status.qbo_company_name : 'Connected to QuickBooks'}
+              </span>
+              {status.connected_at && (
+                <span style={styles.connectedSince}> · Connected {new Date(status.connected_at).toLocaleDateString()}</span>
+              )}
+            </div>
             <button style={styles.disconnectBtn} onClick={handleDisconnect}>Disconnect</button>
           </div>
         ) : (

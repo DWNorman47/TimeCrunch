@@ -123,6 +123,13 @@ async function qboPost(companyId, path, body) {
   throw lastErr;
 }
 
+async function getCompanyInfo(companyId) {
+  const realmResult = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
+  const realmId = decrypt(realmResult.rows[0].qbo_realm_id);
+  const data = await qboGet(companyId, `/companyinfo/${realmId}?minorversion=65`);
+  return data.CompanyInfo || null;
+}
+
 async function listEmployees(companyId) {
   const data = await qboGet(companyId, '/query?query=SELECT * FROM Employee WHERE Active = true MAXRESULTS 1000&minorversion=65');
   return data.QueryResponse?.Employee || [];
@@ -147,4 +154,4 @@ async function pushTimeActivity(companyId, { employeeId, customerId, workDate, h
   return data.TimeActivity;
 }
 
-module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, listEmployees, listCustomers, pushTimeActivity };
+module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getCompanyInfo, listEmployees, listCustomers, pushTimeActivity };

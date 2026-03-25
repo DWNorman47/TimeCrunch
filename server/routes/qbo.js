@@ -13,11 +13,24 @@ router.get('/status', requireAdmin, async (req, res) => {
       [req.user.company_id]
     );
     const row = result.rows[0];
+    const connected = !!row?.qbo_realm_id;
+
+    let qbo_company_name = null;
+    if (connected && !row?.qbo_disconnected) {
+      try {
+        const info = await qbo.getCompanyInfo(req.user.company_id);
+        qbo_company_name = info?.CompanyName || null;
+      } catch {
+        // Non-fatal — connection display still works without the name
+      }
+    }
+
     res.json({
-      connected: !!row?.qbo_realm_id,
+      connected,
       disconnected: row?.qbo_disconnected || false,
       connected_at: row?.qbo_connected_at || null,
       token_expires_at: row?.qbo_token_expires_at || null,
+      qbo_company_name,
     });
   } catch (err) {
     console.error(err);
