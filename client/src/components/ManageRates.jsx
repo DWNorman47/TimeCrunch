@@ -76,6 +76,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     invoice_signature: settings?.invoice_signature ?? 'optional',
   });
   const [prevailingEnabled, setPrevailingEnabled] = useState(() => (settings?.prevailing_wage_rate ?? 0) > 0);
+  const [collapsed, setCollapsed] = useState({});
+  const toggleCollapse = key => setCollapsed(c => ({ ...c, [key]: !c[key] }));
   const [saving, setSaving] = useState(null); // section key or null
   const [saved, setSaved] = useState(null);   // section key or null
   const [error, setError] = useState('');
@@ -155,14 +157,15 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
 
       {/* ── Wages ── */}
       <div style={styles.section}>
-        <div style={styles.sectionHeader}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('wages')}>
           <span style={styles.sectionIcon}>💰</span>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={styles.sectionTitle}>{t.ratesWages}</div>
             <div style={styles.sectionSub}>{t.ratesWagesDesc}</div>
           </div>
+          <span style={styles.collapseChevron}>{collapsed.wages ? '▶' : '▼'}</span>
         </div>
-        <div style={styles.sectionBody}>
+        {!collapsed.wages && <div style={styles.sectionBody}>
           <div style={styles.row}>
             <label style={styles.label}>{t.ratesCurrency}</label>
             <div style={styles.inputGroup}>
@@ -209,20 +212,21 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={{ ...styles.toggleKnob, transform: form.feature_overtime ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
-        </div>
-        <SectionFooter section="wages" />
+        </div>}
+        {!collapsed.wages && <SectionFooter section="wages" />}
       </div>
 
       {/* ── Overtime ── */}
       {form.feature_overtime && <div style={styles.section}>
-        <div style={styles.sectionHeader}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('overtime')}>
           <span style={styles.sectionIcon}>⏱️</span>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={styles.sectionTitle}>{t.ratesOvertime}</div>
             <div style={styles.sectionSub}>{t.ratesOvertimeDesc}</div>
           </div>
+          <span style={styles.collapseChevron}>{collapsed.overtime ? '▶' : '▼'}</span>
         </div>
-        <div style={styles.sectionBody}>
+        {!collapsed.overtime && <div style={styles.sectionBody}>
           <div style={styles.row}>
             <label style={styles.label}>{t.ratesOTRate}</label>
             <div style={styles.inputGroup}>
@@ -246,20 +250,21 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={styles.suffix}>{t.ratesHrs}</span>
             </div>
           </div>
-        </div>
-        <SectionFooter section="overtime" />
+        </div>}
+        {!collapsed.overtime && <SectionFooter section="overtime" />}
       </div>}
 
       {/* ── Notifications ── */}
       <div style={styles.section}>
-        <div style={styles.sectionHeader}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('notifications')}>
           <span style={styles.sectionIcon}>🔔</span>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={styles.sectionTitle}>{t.ratesNotifications}</div>
             <div style={styles.sectionSub}>{t.ratesNotificationsDesc}</div>
           </div>
+          <span style={styles.collapseChevron}>{collapsed.notifications ? '▶' : '▼'}</span>
         </div>
-        <div style={styles.sectionBody}>
+        {!collapsed.notifications && <div style={styles.sectionBody}>
           <div style={styles.row}>
             <label style={styles.label}>{t.ratesAlertInactive}</label>
             <div style={styles.inputGroup}>
@@ -302,20 +307,21 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={styles.suffix}>{t.ratesDays}</span>
             </div>
           </div>
-        </div>
-        <SectionFooter section="notifications" />
+        </div>}
+        {!collapsed.notifications && <SectionFooter section="notifications" />}
       </div>
 
       {/* ── Worker Access ── */}
       <div style={styles.section}>
-        <div style={styles.sectionHeader}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('access')}>
           <span style={styles.sectionIcon}>👁️</span>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={styles.sectionTitle}>{t.ratesWorkerAccess}</div>
             <div style={styles.sectionSub}>{t.ratesWorkerAccessDesc}</div>
           </div>
+          <span style={styles.collapseChevron}>{collapsed.access ? '▶' : '▼'}</span>
         </div>
-        <div style={styles.sectionBody}>
+        {!collapsed.access && <div style={styles.sectionBody}>
           <div style={styles.row}>
             <div>
               <div style={styles.label}>{t.ratesShowWages}</div>
@@ -351,8 +357,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <option value="required">Required — must sign to export</option>
             </select>
           </div>
-        </div>
-        <SectionFooter section="access" />
+        </div>}
+        {!collapsed.access && <SectionFooter section="access" />}
       </div>
 
     </div>
@@ -380,4 +386,5 @@ const styles = {
   errorMsg: { color: '#e53e3e', fontSize: 13 },
   saveBtn: { padding: '7px 18px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   addPrevBtn: { padding: '6px 14px', background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  collapseChevron: { fontSize: 11, color: '#6b7280' },
 };
