@@ -149,7 +149,7 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
             <div style={{ ...s.field, flex: 2 }}>
               <label style={s.label}>Switch to project</label>
               <select style={s.input} value={switchForm.project_id} onChange={e => setSwitchForm(f => ({ ...f, project_id: e.target.value }))}>
-                <option value="">Select project\u2026</option>
+                <option value="">Select project…</option>
                 {projects.filter(p => p.active !== false).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>

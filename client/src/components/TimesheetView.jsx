@@ -78,13 +78,13 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
     <div style={styles.card} className="mobile-card">
       <div style={styles.header}>
         <div style={styles.navGroup}>
-          <button style={styles.navBtn} onClick={prevWeek}>\u2039</button>
+          <button style={styles.navBtn} onClick={prevWeek}>‹</button>
           <span style={styles.weekLabel}>{weekLabel}</span>
-          <button style={styles.navBtn} onClick={nextWeek}>\u203a</button>
+          <button style={styles.navBtn} onClick={nextWeek}>›</button>
         </div>
         <div style={styles.headerRight}>
           <span style={styles.weekTotal}>{fmtHours(weekTotalHours)}</span>
-          {weekTotalMiles > 0 && <span style={styles.weekMiles}>\uD83D\uDE97 {weekTotalMiles.toFixed(1)} mi</span>}
+          {weekTotalMiles > 0 && <span style={styles.weekMiles}>🚗 {weekTotalMiles.toFixed(1)} mi</span>}
           <button style={styles.todayBtn} onClick={goToday}>Today</button>
         </div>
       </div>
@@ -132,10 +132,10 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
                       onClick={() => setSelectedEntry(selectedEntry?.id === e.id ? null : e)}
                     >
                       <div style={styles.pillProject}>{e.project_name}</div>
-                      <div style={styles.pillTimes}>{formatTime(e.start_time)}\u2013{formatTime(e.end_time)}</div>
+                      <div style={styles.pillTimes}>{formatTime(e.start_time)}–{formatTime(e.end_time)}</div>
                       <div style={styles.pillHours}>{fmtHours(netHours(e.start_time, e.end_time, e.break_minutes))}</div>
-                      {e.break_minutes > 0 && <div style={styles.pillBreak}>\u2615 {e.break_minutes}m</div>}
-                      {e.mileage > 0 && <div style={styles.pillMileage}>\uD83D\uDE97 {parseFloat(e.mileage).toFixed(1)} mi</div>}
+                      {e.break_minutes > 0 && <div style={styles.pillBreak}>☕ {e.break_minutes}m</div>}
+                      {e.mileage > 0 && <div style={styles.pillMileage}>🚗 {parseFloat(e.mileage).toFixed(1)} mi</div>}
                     </div>
                   ))
                 )}
@@ -155,8 +155,8 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
       {selectedEntry && (
         <div style={styles.selectedPanel}>
           <div style={styles.selectedHeader}>
-            <span style={styles.selectedTitle}>{selectedEntry.project_name} \u2014 {formatTime(selectedEntry.start_time)}\u2013{formatTime(selectedEntry.end_time)}</span>
-            <button style={styles.closeBtn} onClick={() => setSelectedEntry(null)}>\u2715</button>
+            <span style={styles.selectedTitle}>{selectedEntry.project_name} — {formatTime(selectedEntry.start_time)}–{formatTime(selectedEntry.end_time)}</span>
+            <button style={styles.closeBtn} onClick={() => setSelectedEntry(null)}>✕</button>
           </div>
           <EntryPanel
             entry={selectedEntry}

@@ -110,23 +110,23 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                       />
                     )}
                     <div style={styles.entryInfo}>
-                      <span style={styles.project}>{e.project_name || '\u2014'}</span>
+                      <span style={styles.project}>{e.project_name || '—'}</span>
                       <span style={styles.times}>
-                        {formatTime(e.start_time)} \u2013 {formatTime(e.end_time)}
+                        {formatTime(e.start_time)} – {formatTime(e.end_time)}
                         {crosses && <span style={styles.plus1}>+1</span>}
-                        <span style={styles.dur}> \u00b7 {fmtHours(netHours(e.start_time, e.end_time, e.break_minutes))}</span>
+                        <span style={styles.dur}> · {fmtHours(netHours(e.start_time, e.end_time, e.break_minutes))}</span>
                       </span>
                     </div>
                     <div style={styles.entryRight}>
                       {e.status === 'approved' && <span style={styles.badgeGreen}>Approved</span>}
                       {e.status === 'rejected' && <span style={styles.badgeRed}>Rejected</span>}
-                      {e.locked && <span style={styles.badgeLock}>\uD83D\uDD12</span>}
-                      {e.pending && <span style={styles.badgePending}>\u23F3</span>}
+                      {e.locked && <span style={styles.badgeLock}>🔒</span>}
+                      {e.pending && <span style={styles.badgePending}>⏳</span>}
                       {!e.pending && (!e.status || e.status === 'pending') && <span style={styles.badgePending}>Pending</span>}
                       <span style={{ ...styles.wageChip, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                         {e.wage_type === 'prevailing' ? t.prevailing : t.regular}
                       </span>
-                      <span style={{ ...styles.chevron, transform: isExpanded ? 'rotate(180deg)' : 'none' }}>\u25be</span>
+                      <span style={{ ...styles.chevron, transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▾</span>
                     </div>
                   </div>
 
@@ -134,8 +134,8 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                     <>
                       {(e.break_minutes > 0 || e.mileage > 0 || e.notes) && (
                         <div style={styles.entryMeta}>
-                          {e.break_minutes > 0 && <span style={styles.metaTag}>\u2615 {e.break_minutes}m break</span>}
-                          {e.mileage > 0 && <span style={styles.metaTag}>\uD83D\uDE97 {parseFloat(e.mileage).toFixed(1)} mi</span>}
+                          {e.break_minutes > 0 && <span style={styles.metaTag}>☕ {e.break_minutes}m break</span>}
+                          {e.mileage > 0 && <span style={styles.metaTag}>🚗 {parseFloat(e.mileage).toFixed(1)} mi</span>}
                           {e.notes && <span style={styles.notes}>{e.notes}</span>}
                         </div>
                       )}
@@ -150,7 +150,7 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                         style={styles.msgBtn}
                         onClick={ev => { ev.stopPropagation(); setOpenMessageId(openMessageId === e.id ? null : e.id); }}
                       >
-                        \uD83D\uDCAC {openMessageId === e.id ? t.hideComments : t.comments}
+                        💬 {openMessageId === e.id ? t.hideComments : t.comments}
                       </button>
                       {openMessageId === e.id && <MessageThread entryId={e.id} currentUserId={currentUserId} />}
                     </>
