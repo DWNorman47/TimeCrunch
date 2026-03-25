@@ -135,6 +135,8 @@ export default function AdminDashboard() {
   const [loadError, setLoadError] = useState(false);
   const [billing, setBilling] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
+  const [collapsedSections, setCollapsedSections] = useState({});
+  const toggleSection = key => setCollapsedSections(s => ({ ...s, [key]: !s[key] }));
 
   useEffect(() => {
     api.get('/stripe/status').then(r => setBilling(r.data)).catch(() => {});
@@ -257,19 +259,34 @@ export default function AdminDashboard() {
         ) : tab === 'reports' ? (
           <>
             <h2 style={styles.heading}>{t.tabReports}</h2>
-            <h3 style={styles.subheading}>{t.workerReports}</h3>
-            {workers.length === 0
+            <button style={styles.sectionToggle} onClick={() => toggleSection('workers')}>
+              <span>{t.workerReports}</span>
+              <span style={styles.chevron}>{collapsedSections.workers ? '▶' : '▼'}</span>
+            </button>
+            {!collapsedSections.workers && (workers.length === 0
               ? <p style={{ color: '#666' }}>{t.noWorkersYet}</p>
               : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} />)
-            }
-            <h3 style={styles.subheading}>{t.projectReports}</h3>
-            <ProjectReports currency={settings?.currency ?? 'USD'} />
-            <h3 style={styles.subheading}>{t.overtimeReport}</h3>
-            {plan.isStarter ? <OvertimeReport currency={settings?.currency ?? 'USD'} /> : <UpgradePrompt requiredPlan="starter" feature={t.overtimeReport} />}
-            <h3 style={styles.subheading}>Payroll</h3>
-            {plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature="Payroll" />}
-            <h3 style={styles.subheading}>{t.export}</h3>
-            {plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />}
+            )}
+            <button style={styles.sectionToggle} onClick={() => toggleSection('projects')}>
+              <span>{t.projectReports}</span>
+              <span style={styles.chevron}>{collapsedSections.projects ? '▶' : '▼'}</span>
+            </button>
+            {!collapsedSections.projects && <ProjectReports currency={settings?.currency ?? 'USD'} />}
+            <button style={styles.sectionToggle} onClick={() => toggleSection('overtime')}>
+              <span>{t.overtimeReport}</span>
+              <span style={styles.chevron}>{collapsedSections.overtime ? '▶' : '▼'}</span>
+            </button>
+            {!collapsedSections.overtime && (plan.isStarter ? <OvertimeReport currency={settings?.currency ?? 'USD'} /> : <UpgradePrompt requiredPlan="starter" feature={t.overtimeReport} />)}
+            <button style={styles.sectionToggle} onClick={() => toggleSection('payroll')}>
+              <span>Payroll</span>
+              <span style={styles.chevron}>{collapsedSections.payroll ? '▶' : '▼'}</span>
+            </button>
+            {!collapsedSections.payroll && (plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature="Payroll" />)}
+            <button style={styles.sectionToggle} onClick={() => toggleSection('export')}>
+              <span>{t.export}</span>
+              <span style={styles.chevron}>{collapsedSections.export ? '▶' : '▼'}</span>
+            </button>
+            {!collapsedSections.export && (plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />)}
           </>
         ) : tab === 'manage' ? (
           <>
@@ -306,6 +323,8 @@ const styles = {
   tabActive: { flex: 1, padding: '9px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', whiteSpace: 'nowrap', textAlign: 'center' },
   heading: { marginBottom: 20, fontSize: 22 },
   subheading: { fontSize: 18, fontWeight: 600, margin: '32px 0 16px' },
+  sectionToggle: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 16px', fontSize: 16, fontWeight: 600, color: '#111827', cursor: 'pointer', marginTop: 24, marginBottom: 4, textAlign: 'left' },
+  chevron: { fontSize: 11, color: '#6b7280' },
   trialBanner: { padding: '10px 24px', border: '1px solid', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 },
   trialUpgradeBtn: { background: 'none', border: 'none', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', fontSize: 14, color: 'inherit', padding: 0 },
   liveLayout: { display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' },
