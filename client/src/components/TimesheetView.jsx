@@ -181,7 +181,7 @@ const styles = {
   weekTotal: { fontWeight: 700, fontSize: 16, color: '#1a56db' },
   weekMiles: { fontSize: 13, color: '#6b7280' },
   todayBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: '#374151' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, overflowX: 'auto' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(7, minmax(80px, 1fr))', gap: 4, overflowX: 'auto', WebkitOverflowScrolling: 'touch' },
   dayCol: { borderRadius: 8, padding: '8px 6px', minHeight: 120, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 80 },
   dayHeader: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 6 },
   dayName: { fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' },
