@@ -156,12 +156,37 @@ router.post('/register', authLimiter, async (req, res) => {
 
   // Block IPs that have registered too many trials recently
   const TRIAL_LIMIT = parseInt(process.env.TRIAL_LIMIT_PER_IP) || 3;
-  const ipCount = await pool.query(
-    `SELECT COUNT(*) FROM companies WHERE registration_ip = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+  const ipQuery = await pool.query(
+    `SELECT COUNT(*), array_agg(name ORDER BY created_at) as company_names
+     FROM companies WHERE registration_ip = $1 AND created_at > NOW() - INTERVAL '30 days'`,
     [registrationIp]
   );
-  if (parseInt(ipCount.rows[0].count) >= TRIAL_LIMIT) {
+  const priorCount = parseInt(ipQuery.rows[0].count);
+  if (priorCount >= TRIAL_LIMIT) {
     return res.status(429).json({ error: 'Too many trial accounts created from this network. Please contact support.' });
+  }
+  // Alert on second registration from same IP (priorCount >= 1 means this is #2+)
+  if (priorCount >= 1) {
+    const priorNames = ipQuery.rows[0].company_names || [];
+    sgMail.send({
+      from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
+      to: 'info@opsfloa.com',
+      subject: `⚠️ Multiple trial registrations from IP ${registrationIp}`,
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px">
+          <h2 style="color:#dc2626;margin-bottom:8px">Multiple trial registrations</h2>
+          <p style="color:#444">A new company is being registered from an IP address that has already signed up for a trial in the last 30 days.</p>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px">
+            <tr><td style="padding:6px 0;color:#6b7280;width:140px">IP Address</td><td style="padding:6px 0;font-weight:600">${registrationIp}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280">New company</td><td style="padding:6px 0;font-weight:600">${company_name}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280">New email</td><td style="padding:6px 0">${email}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280">Prior registrations</td><td style="padding:6px 0">${priorNames.join(', ')}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280">Total from this IP</td><td style="padding:6px 0">${priorCount + 1} in last 30 days</td></tr>
+          </table>
+          <p style="color:#9ca3af;font-size:12px">Registration was allowed (limit is ${TRIAL_LIMIT}). You'll receive another alert if they register again.</p>
+        </div>
+      `,
+    }).catch(err => console.error('Trial abuse alert email failed:', err));
   }
 
   const slug = company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
