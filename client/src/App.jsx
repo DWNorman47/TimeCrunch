@@ -59,13 +59,22 @@ function PrivateRoute({ children, adminOnly = false, superAdminOnly = false }) {
   return children;
 }
 
+function adminHome(userId) {
+  const key = `admin_welcomed_${userId}`;
+  if (!localStorage.getItem(key)) {
+    localStorage.setItem(key, '1');
+    return '/administration';
+  }
+  return '/admin';
+}
+
 function AppRoutes() {
   const { user, loading } = useAuth();
   if (loading) return <div style={{ padding: 40 }}>Loading...</div>;
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Login />} />
-      <Route path="/register" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Register />} />
+      <Route path="/login" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Login />} />
+      <Route path="/register" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Register />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/eula" element={<EULA />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -77,8 +86,8 @@ function AppRoutes() {
       <Route path="/field" element={<PrivateRoute><FieldPage /></PrivateRoute>} />
       <Route path="/administration" element={<PrivateRoute adminOnly><AdministrationPage /></PrivateRoute>} />
       <Route path="/superadmin" element={<PrivateRoute superAdminOnly><SuperAdmin /></PrivateRoute>} />
-      <Route path="/" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Landing />} />
-      <Route path="*" element={<Navigate to={user ? (user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/admin' : '/dashboard') : '/'} replace />} />
+      <Route path="/" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Landing />} />
+      <Route path="*" element={<Navigate to={user ? (user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard') : '/'} replace />} />
     </Routes>
   );
 }
