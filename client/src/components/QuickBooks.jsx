@@ -12,6 +12,7 @@ export default function QuickBooks({ workers, projects }) {
   const [pushTo, setPushTo] = useState('');
   const [pushResult, setPushResult] = useState(null);
   const [pushing, setPushing] = useState(false);
+  const [forcePush, setForcePush] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -66,7 +67,7 @@ export default function QuickBooks({ workers, projects }) {
     setPushResult(null);
     setError('');
     try {
-      const r = await api.post('/qbo/push', { from: pushFrom || undefined, to: pushTo || undefined });
+      const r = await api.post('/qbo/push', { from: pushFrom || undefined, to: pushTo || undefined, force: forcePush || undefined });
       setPushResult(r.data);
     } catch (err) {
       setError(err.response?.data?.error || 'Push failed');
@@ -178,7 +179,7 @@ export default function QuickBooks({ workers, projects }) {
 
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Push Time Entries</h3>
-            <p style={styles.hint}>Push entries to QuickBooks as Time Activities. Only mapped workers and projects will be included.</p>
+            <p style={styles.hint}>Push entries to QuickBooks as Time Activities. Only mapped workers and projects will be included. Entries already synced are skipped unless you enable re-push.</p>
             <div style={styles.pushRow}>
               <div>
                 <label style={styles.label}>From</label>
@@ -192,11 +193,20 @@ export default function QuickBooks({ workers, projects }) {
                 {pushing ? 'Pushing...' : 'Push to QuickBooks'}
               </button>
             </div>
+            <label style={styles.forceLabel}>
+              <input type="checkbox" checked={forcePush} onChange={e => setForcePush(e.target.checked)} style={{ marginRight: 6 }} />
+              Re-push already synced entries
+            </label>
             {pushResult && (
               <div style={styles.resultBox}>
                 <p style={{ margin: 0, fontWeight: 600, color: '#166534' }}>
                   {pushResult.pushed} {pushResult.pushed === 1 ? 'entry' : 'entries'} pushed successfully.
                 </p>
+                {pushResult.already_synced > 0 && (
+                  <p style={{ margin: '6px 0 0', fontSize: 13, color: '#6b7280' }}>
+                    {pushResult.already_synced} already synced (skipped).
+                  </p>
+                )}
                 {pushResult.skipped.length > 0 && (
                   <details style={{ marginTop: 8 }}>
                     <summary style={{ cursor: 'pointer', color: '#92400e', fontWeight: 600 }}>
@@ -239,4 +249,5 @@ const styles = {
   pushBtn: { background: '#2CA01C', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontWeight: 700, fontSize: 14, cursor: 'pointer' },
   resultBox: { marginTop: 16, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '14px 16px' },
   reconnectBanner: { background: '#fffbeb', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 14 },
+  forceLabel: { display: 'flex', alignItems: 'center', fontSize: 13, color: '#6b7280', marginTop: 10, cursor: 'pointer' },
 };

@@ -142,8 +142,9 @@ router.patch('/projects/:id/mapping', requireAdmin, async (req, res) => {
 });
 
 // POST /api/qbo/push — push time entries to QBO for a date range
+// Body: { from, to, force } — force=true re-pushes already-synced entries
 router.post('/push', requireAdmin, async (req, res) => {
-  const { from, to } = req.body;
+  const { from, to, force } = req.body;
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -161,8 +162,14 @@ router.post('/push', requireAdmin, async (req, res) => {
     const entries = result.rows;
     const skipped = [];
     const pushed = [];
+    let alreadySynced = 0;
 
     for (const entry of entries) {
+      // Skip already-synced entries unless force re-push requested
+      if (entry.qbo_activity_id && !force) {
+        alreadySynced++;
+        continue;
+      }
       if (!entry.qbo_employee_id) {
         skipped.push({ entry_id: entry.id, reason: `Worker "${entry.worker_name}" has no QBO mapping` });
         continue;
@@ -171,26 +178,33 @@ router.post('/push', requireAdmin, async (req, res) => {
         skipped.push({ entry_id: entry.id, reason: `Project "${entry.project_name || 'unknown'}" has no QBO mapping` });
         continue;
       }
-      const start = new Date(`1970-01-01T${entry.start_time}`);
-      const end = new Date(`1970-01-01T${entry.end_time}`);
-      const hours = (end - start) / 3600000;
+
+      // Correct hours: handle midnight-crossing and subtract break minutes
+      let ms = new Date(`1970-01-01T${entry.end_time}`) - new Date(`1970-01-01T${entry.start_time}`);
+      if (ms < 0) ms += 86400000;
+      const hours = Math.max(0, ms / 3600000 - (entry.break_minutes || 0) / 60);
       const workDate = entry.work_date.toISOString().substring(0, 10);
 
       try {
-        await qbo.pushTimeActivity(companyId, {
+        const activity = await qbo.pushTimeActivity(companyId, {
           employeeId: entry.qbo_employee_id,
           customerId: entry.qbo_customer_id,
           workDate,
           hours,
           description: entry.notes || '',
         });
+        // Record the QB activity ID to prevent future duplicates
+        await pool.query(
+          'UPDATE time_entries SET qbo_activity_id = $1, qbo_synced_at = NOW() WHERE id = $2',
+          [activity?.Id || 'synced', entry.id]
+        );
         pushed.push(entry.id);
       } catch (pushErr) {
         skipped.push({ entry_id: entry.id, reason: pushErr.message });
       }
     }
 
-    res.json({ pushed: pushed.length, skipped });
+    res.json({ pushed: pushed.length, skipped, already_synced: alreadySynced });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

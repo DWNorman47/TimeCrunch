@@ -98,12 +98,29 @@ async function qboPost(companyId, path, body) {
   const token = await getAccessToken(companyId);
   const realmResult = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
   const realmId = decrypt(realmResult.rows[0].qbo_realm_id);
-  const r = await axios.post(`${QBO_BASE}/v3/company/${realmId}${path}`, body, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
-  });
-  const tid = r.headers['intuit_tid'];
-  if (tid) console.log(`[QBO] intuit_tid=${tid} path=${path}`);
-  return r.data;
+
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await axios.post(`${QBO_BASE}/v3/company/${realmId}${path}`, body, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+      });
+      const tid = r.headers['intuit_tid'];
+      if (tid) console.log(`[QBO] intuit_tid=${tid} path=${path}`);
+      return r.data;
+    } catch (err) {
+      lastErr = err;
+      if (err.response?.status === 429) {
+        // Respect Retry-After header if present, otherwise exponential backoff
+        const retryAfter = parseInt(err.response.headers['retry-after'] || '0', 10);
+        const delay = retryAfter > 0 ? retryAfter * 1000 : (attempt + 1) * 2000;
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 async function listEmployees(companyId) {
