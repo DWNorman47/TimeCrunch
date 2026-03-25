@@ -49,6 +49,15 @@ export function isFresh(record, key) {
   return Date.now() - record.ts < ttl;
 }
 
+export async function clearCache() {
+  try {
+    const db = await getDb();
+    await db.clear(STORE);
+  } catch {
+    // ignore
+  }
+}
+
 export async function getOrFetch(key, fetchFn) {
   const cached = await getCached(key);
   if (isFresh(cached, key)) return cached.data;

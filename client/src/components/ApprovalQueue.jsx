@@ -58,7 +58,7 @@ function formatHours(start, end) {
   return fmtHours((e - s) / 3600000);
 }
 
-export default function ApprovalQueue() {
+export default function ApprovalQueue({ onCountChange }) {
   const { user } = useAuth();
   const t = useT();
   const [entries, setEntries] = useState([]);
@@ -83,6 +83,7 @@ export default function ApprovalQueue() {
   };
 
   useEffect(() => { fetch(); }, []);
+  useEffect(() => { if (onCountChange) onCountChange(entries.length); }, [entries]);
 
   const approve = async id => {
     setWorking(id);

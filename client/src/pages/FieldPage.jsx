@@ -218,6 +218,7 @@ export default function FieldPage() {
   const [reports, setReports] = useState([]);
   const [projects, setProjects] = useState([]);
   const [workers, setWorkers] = useState([]);
+  const [features, setFeatures] = useState({});
   const [loading, setLoading] = useState(true);
   const FIELD_TABS = ['notes', 'daily', 'punchlist', 'safety'];
   const hashTab = window.location.hash.replace('#', '');
@@ -236,9 +237,10 @@ export default function FieldPage() {
 
   useEffect(() => {
     const init = async () => {
-      const promises = [api.get('/projects')];
+      const promises = [api.get('/projects'), api.get('/settings')];
       if (isAdmin) promises.push(api.get('/admin/workers'));
-      const [p, w] = await Promise.all(promises);
+      const [p, s, w] = await Promise.all(promises);
+      setFeatures(s.data);
       setProjects(p.data);
       if (w) setWorkers(w.data);
       await loadReports();
@@ -263,7 +265,7 @@ export default function FieldPage() {
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.logoGroup}>
-          <AppSwitcher currentApp="field" userRole={user?.role} />
+          <AppSwitcher currentApp="field" userRole={user?.role} features={features} />
           {user?.company_name && <span style={styles.companyName}>{user.company_name}</span>}
         </div>
         <div style={styles.headerRight}>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { fmtHours } from '../utils';
+import EntryPanel from './EntryPanel';
 
 function startOfWeek(date) {
   const d = new Date(date);
@@ -42,8 +43,9 @@ function netHours(start, end, breakMinutes) {
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export default function TimesheetView({ entries, language }) {
+export default function TimesheetView({ entries, language, projects = [], onRefresh }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [selectedEntry, setSelectedEntry] = useState(null);
 
   const prevWeek = () => setWeekStart(d => addDays(d, -7));
   const nextWeek = () => setWeekStart(d => addDays(d, 7));
@@ -60,7 +62,7 @@ export default function TimesheetView({ entries, language }) {
     byDate[key].push(e);
   });
 
-  const weekLabel = `${formatMonthDay(days[0])} – ${formatMonthDay(days[6])}, ${days[6].getFullYear()}`;
+  const weekLabel = `${formatMonthDay(days[0])} \u2013 ${formatMonthDay(days[6])}, ${days[6].getFullYear()}`;
 
   const weekTotalHours = days.reduce((sum, d) => {
     const key = toDateKey(d);
@@ -119,7 +121,16 @@ export default function TimesheetView({ entries, language }) {
                   <div style={styles.emptyDay} />
                 ) : (
                   dayEntries.map(e => (
-                    <div key={e.id} style={{ ...styles.entryPill, borderLeft: `3px solid ${e.wage_type === 'prevailing' ? '#d97706' : '#1a56db'}` }}>
+                    <div
+                      key={e.id}
+                      style={{
+                        ...styles.entryPill,
+                        borderLeft: `3px solid ${e.wage_type === 'prevailing' ? '#d97706' : '#1a56db'}`,
+                        cursor: 'pointer',
+                        outline: selectedEntry?.id === e.id ? '2px solid #1a56db' : 'none',
+                      }}
+                      onClick={() => setSelectedEntry(selectedEntry?.id === e.id ? null : e)}
+                    >
                       <div style={styles.pillProject}>{e.project_name}</div>
                       <div style={styles.pillTimes}>{formatTime(e.start_time)}–{formatTime(e.end_time)}</div>
                       <div style={styles.pillHours}>{fmtHours(netHours(e.start_time, e.end_time, e.break_minutes))}</div>
@@ -140,6 +151,22 @@ export default function TimesheetView({ entries, language }) {
           );
         })}
       </div>
+
+      {selectedEntry && (
+        <div style={styles.selectedPanel}>
+          <div style={styles.selectedHeader}>
+            <span style={styles.selectedTitle}>{selectedEntry.project_name} — {formatTime(selectedEntry.start_time)}–{formatTime(selectedEntry.end_time)}</span>
+            <button style={styles.closeBtn} onClick={() => setSelectedEntry(null)}>✕</button>
+          </div>
+          <EntryPanel
+            entry={selectedEntry}
+            projects={projects}
+            onRefresh={async () => { setSelectedEntry(null); if (onRefresh) await onRefresh(); }}
+            onDeleted={() => setSelectedEntry(null)}
+            onClose={() => setSelectedEntry(null)}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -170,4 +197,8 @@ const styles = {
   dayFooter: { borderTop: '1px solid #e5e7eb', paddingTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   dayTotal: { fontWeight: 700, fontSize: 12, color: '#1a56db' },
   dayMiles: { fontSize: 10, color: '#9ca3af' },
+  selectedPanel: { marginTop: 16, padding: 16, background: '#f8faff', borderRadius: 10, border: '1px solid #93c5fd' },
+  selectedHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  selectedTitle: { fontWeight: 700, fontSize: 14, color: '#1e3a5f' },
+  closeBtn: { background: 'none', border: 'none', color: '#6b7280', fontSize: 16, cursor: 'pointer', lineHeight: 1, padding: '2px 6px' },
 };

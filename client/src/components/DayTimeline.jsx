@@ -63,6 +63,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
   const [splitSwitchForm, setSplitSwitchForm] = useState({ at: '', project_id: '' });
 
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     api.get('/clock/status')
@@ -156,6 +157,19 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
     } finally { setSaving(false); }
   }
 
+  // ── Entry delete ─────────────────────────────────────────────────────────────
+  async function doDelete(entry) {
+    if (!confirm(`Delete this entry (${entry.project_name || 'No project'}, ${minToDisplay(strToMin(entry.start_time))}–${minToDisplay(strToMin(entry.end_time))})?`)) return;
+    setDeletingId(entry.id);
+    try {
+      await api.delete(`/time-entries/${entry.id}`);
+      toast('Entry deleted', 'success');
+      onRefresh();
+    } catch (err) {
+      toast(err.response?.data?.error || 'Failed to delete entry', 'error');
+    } finally { setDeletingId(null); }
+  }
+
   // ── Entry split actions ──────────────────────────────────────────────────────
   function openSplit(entry) {
     setActiveGapKey(null);
@@ -178,7 +192,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
     setSaving(true);
     try {
       const [patchRes, postRes] = await Promise.all([
-        api.patch(`/time-entries/${entry.id}`, { end_time: breakStart }),
+        api.patch(`/time-entries/${entry.id}`, { start_time: entry.start_time, end_time: breakStart, notes: entry.notes, break_minutes: entry.break_minutes, mileage: entry.mileage }),
         api.post('/time-entries', {
           project_id: entry.project_id,
           work_date: today,
@@ -189,10 +203,9 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       ]);
-      onEntryUpdated(patchRes.data);
-      onEntryAdded(postRes.data);
       closeSplit();
       toast('Break inserted', 'success');
+      onRefresh();
     } catch (err) {
       toast(err.response?.data?.error || 'Failed to split entry', 'error');
     } finally { setSaving(false); }
@@ -207,7 +220,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
     setSaving(true);
     try {
       const [patchRes, postRes] = await Promise.all([
-        api.patch(`/time-entries/${entry.id}`, { end_time: at }),
+        api.patch(`/time-entries/${entry.id}`, { start_time: entry.start_time, end_time: at, notes: entry.notes, break_minutes: entry.break_minutes, mileage: entry.mileage }),
         api.post('/time-entries', {
           project_id,
           work_date: today,
@@ -217,10 +230,9 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       ]);
-      onEntryUpdated(patchRes.data);
-      onEntryAdded(postRes.data);
       closeSplit();
       toast('Project switch inserted', 'success');
+      onRefresh();
     } catch (err) {
       toast(err.response?.data?.error || 'Failed to split entry', 'error');
     } finally { setSaving(false); }
@@ -265,9 +277,12 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                           {seg.entry.status === 'rejected' && <span style={s.badgeRed}>Rejected</span>}
                         </div>
                         {!seg.entry.locked && (
-                          <button style={s.splitBtn} onClick={() => isSplitting ? closeSplit() : openSplit(seg.entry)}>
-                            {isSplitting ? 'Cancel' : '✂ Split'}
-                          </button>
+                          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                            <button style={s.splitBtn} onClick={() => isSplitting ? closeSplit() : openSplit(seg.entry)}>
+                              {isSplitting ? 'Cancel' : '✂ Split'}
+                            </button>
+                            <button style={s.deleteBtn} onClick={() => doDelete(seg.entry)} disabled={deletingId === seg.entry.id}>✕</button>
+                          </div>
                         )}
                       </div>
 
@@ -466,6 +481,7 @@ const s = {
   badgeGreen: { display: 'inline-block', marginTop: 4, fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, background: '#d1fae5', color: '#065f46' },
   badgeRed: { display: 'inline-block', marginTop: 4, fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, background: '#fee2e2', color: '#991b1b' },
   splitBtn: { flexShrink: 0, padding: '3px 10px', background: 'none', border: '1px solid #d1d5db', color: '#6b7280', borderRadius: 6, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' },
+  deleteBtn: { flexShrink: 0, padding: '3px 8px', background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   splitPanel: { marginTop: 10, paddingTop: 10, borderTop: '1px solid #e5e7eb' },
   gapChip: { display: 'block', width: '100%', textAlign: 'left', background: 'none', border: '1px dashed #d1d5db', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#9ca3af', cursor: 'pointer' },
   gapExpanded: { border: '1px solid #d1d5db', borderRadius: 8, padding: 12, background: '#f9fafb' },
