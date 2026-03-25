@@ -51,8 +51,14 @@ export default function AdminDashboard() {
   const [loadError, setLoadError] = useState(false);
   const [billing, setBilling] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
-  const [collapsedSections, setCollapsedSections] = useState({});
-  const toggleSection = key => setCollapsedSections(s => ({ ...s, [key]: !s[key] }));
+  const [collapsedSections, setCollapsedSections] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('opsfloa_report_sections') || '{}'); } catch { return {}; }
+  });
+  const toggleSection = key => setCollapsedSections(s => {
+    const next = { ...s, [key]: !s[key] };
+    localStorage.setItem('opsfloa_report_sections', JSON.stringify(next));
+    return next;
+  });
 
   useEffect(() => {
     api.get('/stripe/status').then(r => setBilling(r.data)).catch(() => {});

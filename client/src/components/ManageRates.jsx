@@ -80,8 +80,14 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     invoice_signature: settings?.invoice_signature ?? 'optional',
   });
   const [prevailingEnabled, setPrevailingEnabled] = useState(() => (settings?.prevailing_wage_rate ?? 0) > 0);
-  const [collapsed, setCollapsed] = useState({});
-  const toggleCollapse = key => setCollapsed(c => ({ ...c, [key]: !c[key] }));
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('opsfloa_company_sections') || '{}'); } catch { return {}; }
+  });
+  const toggleCollapse = key => setCollapsed(c => {
+    const next = { ...c, [key]: !c[key] };
+    localStorage.setItem('opsfloa_company_sections', JSON.stringify(next));
+    return next;
+  });
   const [saving, setSaving] = useState(null); // section key or null
   const [saved, setSaved] = useState(null);   // section key or null
   const [error, setError] = useState('');
