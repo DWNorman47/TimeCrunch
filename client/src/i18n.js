@@ -98,6 +98,8 @@ const translations = {
     featPrevailingWageDesc: 'Show prevailing wage type on projects and entries',
     featField: 'Field Module',
     featFieldDesc: 'Allow workers to access the Field module from the app switcher',
+    featGeolocation: 'Geolocation',
+    featGeolocationDesc: 'Capture GPS location when workers clock in and out',
     upgradePlanPrompt: 'Upgrade your subscription to unlock this feature.',
     viewPlans: 'View Plans →',
 
@@ -486,6 +488,8 @@ const translations = {
     featPrevailingWageDesc: 'Muestra el tipo de salario prevaleciente en proyectos y entradas',
     featField: 'Módulo de Campo',
     featFieldDesc: 'Permite a los trabajadores acceder al módulo de campo desde el selector de aplicaciones',
+    featGeolocation: 'Geolocalización',
+    featGeolocationDesc: 'Captura la ubicación GPS cuando los trabajadores fichan entrada y salida',
     upgradePlanPrompt: 'Actualiza tu suscripción para desbloquear esta función.',
     viewPlans: 'Ver Planes →',
 

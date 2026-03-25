@@ -73,6 +73,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     feature_scheduling: settings?.feature_scheduling ?? true,
     feature_analytics: settings?.feature_analytics ?? true,
     feature_chat: settings?.feature_chat ?? true,
+    feature_geolocation: settings?.feature_geolocation ?? false,
     show_worker_wages: settings?.show_worker_wages ?? false,
     currency: settings?.currency ?? 'USD',
     company_timezone: settings?.company_timezone ?? '',
@@ -104,6 +105,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       feature_scheduling: settings.feature_scheduling ?? true,
       feature_analytics: settings.feature_analytics ?? true,
       feature_chat: settings.feature_chat ?? true,
+      feature_geolocation: settings.feature_geolocation ?? false,
       show_worker_wages: settings.show_worker_wages ?? false,
       currency: settings.currency ?? 'USD',
       company_timezone: settings.company_timezone ?? '',
@@ -132,6 +134,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_scheduling: form.feature_scheduling,
         feature_analytics: form.feature_analytics,
         feature_chat: form.feature_chat,
+        feature_geolocation: form.feature_geolocation,
         show_worker_wages: form.show_worker_wages,
         currency: form.currency,
         company_timezone: form.company_timezone,
@@ -409,6 +412,16 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <label style={{ ...styles.toggle, background: form.feature_chat ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_chat} onChange={e => set('feature_chat', e.target.checked)} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleKnob, transform: form.feature_chat ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featGeolocation}</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featGeolocationDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_geolocation ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_geolocation} onChange={e => set('feature_geolocation', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_geolocation ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
         </div>}
