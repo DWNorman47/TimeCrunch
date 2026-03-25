@@ -389,17 +389,17 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         {!collapsed.access && <SectionFooter section="access" />}
       </div>
 
-      {/* ── Features ── */}
+      {/* ── Modules ── */}
       <div style={styles.section}>
-        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('features')}>
-          <span style={styles.sectionIcon}>🧩</span>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('modules')}>
+          <span style={styles.sectionIcon}>📦</span>
           <div style={{ flex: 1 }}>
-            <div style={styles.sectionTitle}>{t.featuresTitle}</div>
-            <div style={styles.sectionSub}>{t.featuresSubtitle}</div>
+            <div style={styles.sectionTitle}>Modules</div>
+            <div style={styles.sectionSub}>Enable or disable entire app modules for all users</div>
           </div>
-          <span style={styles.collapseChevron}>{collapsed.features ? '▶' : '▼'}</span>
+          <span style={styles.collapseChevron}>{collapsed.modules ? '▶' : '▼'}</span>
         </div>
-        {!collapsed.features && <div style={styles.sectionBody}>
+        {!collapsed.modules && <div style={styles.sectionBody}>
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Time Clock</div>
@@ -420,6 +420,21 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={{ ...styles.toggleKnob, transform: form.feature_field ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
+        </div>}
+        {!collapsed.modules && <SectionFooter section="modules" />}
+      </div>
+
+      {/* ── Features ── */}
+      <div style={styles.section}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('features')}>
+          <span style={styles.sectionIcon}>🧩</span>
+          <div style={{ flex: 1 }}>
+            <div style={styles.sectionTitle}>{t.featuresTitle}</div>
+            <div style={styles.sectionSub}>{t.featuresSubtitle}</div>
+          </div>
+          <span style={styles.collapseChevron}>{collapsed.features ? '▶' : '▼'}</span>
+        </div>
+        {!collapsed.features && <div style={styles.sectionBody}>
           <div style={styles.row}>
             <div>
               <div style={styles.label}>{t.featScheduling}</div>
