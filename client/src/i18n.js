@@ -82,7 +82,7 @@ const translations = {
     tabAnalytics: 'Analytics',
     tabApprovals: 'Approvals',
     tabReports: 'Reports',
-    tabManage: 'Manage',
+    tabManage: 'Scheduling',
     tabSettings: 'Settings',
 
     // Feature toggles
