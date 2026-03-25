@@ -68,6 +68,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     notification_start_hour: String(settings?.notification_start_hour ?? 6),
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
+    feature_overtime: settings?.feature_overtime ?? true,
     show_worker_wages: settings?.show_worker_wages ?? false,
     currency: settings?.currency ?? 'USD',
     company_timezone: settings?.company_timezone ?? '',
@@ -92,6 +93,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       notification_start_hour: String(settings.notification_start_hour ?? 6),
       notification_end_hour: String(settings.notification_end_hour ?? 20),
       chat_retention_days: String(settings.chat_retention_days ?? 3),
+      feature_overtime: settings.feature_overtime ?? true,
       show_worker_wages: settings.show_worker_wages ?? false,
       currency: settings.currency ?? 'USD',
       company_timezone: settings.company_timezone ?? '',
@@ -115,6 +117,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         notification_start_hour: parseFloat(form.notification_start_hour),
         notification_end_hour: parseFloat(form.notification_end_hour),
         chat_retention_days: parseFloat(form.chat_retention_days),
+        feature_overtime: form.feature_overtime,
         show_worker_wages: form.show_worker_wages,
         currency: form.currency,
         company_timezone: form.company_timezone,
@@ -177,7 +180,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <div style={styles.row}>
             <label style={styles.label}>{t.ratesPrevailingWage}</label>
             {!prevailingEnabled
-              ? <button style={styles.addPrevBtn} type="button" onClick={() => { setPrevailingEnabled(true); set('prevailing_wage_rate', '1'); }}>+ Add</button>
+              ? <button style={styles.addPrevBtn} type="button" onClick={() => { setPrevailingEnabled(true); set('prevailing_wage_rate', '0'); }}>+ Add</button>
               : <div style={styles.inputGroup}>
                   <span style={styles.prefix}>{currencySymbol(form.currency)}</span>
                   <input style={styles.input} type="number" min="0" step="0.01" value={form.prevailing_wage_rate} onChange={e => set('prevailing_wage_rate', e.target.value)} required />
@@ -193,12 +196,24 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={styles.suffix}>/hr</span>
             </div>
           </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Allow Overtime</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Track and display overtime hours and pay</div>
+            </div>
+            <label style={styles.toggle}>
+              <input type="checkbox" checked={form.feature_overtime} onChange={e => set('feature_overtime', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleTrack, background: form.feature_overtime ? '#1a56db' : '#d1d5db' }}>
+                <span style={{ ...styles.toggleThumb, transform: form.feature_overtime ? 'translateX(18px)' : 'translateX(2px)' }} />
+              </span>
+            </label>
+          </div>
         </div>
         <SectionFooter section="wages" />
       </div>
 
       {/* ── Overtime ── */}
-      <div style={styles.section}>
+      {form.feature_overtime && <div style={styles.section}>
         <div style={styles.sectionHeader}>
           <span style={styles.sectionIcon}>⏱️</span>
           <div>
@@ -232,7 +247,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
         </div>
         <SectionFooter section="overtime" />
-      </div>
+      </div>}
 
       {/* ── Notifications ── */}
       <div style={styles.section}>

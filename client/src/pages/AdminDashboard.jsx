@@ -264,18 +264,20 @@ export default function AdminDashboard() {
             </button>
             {!collapsedSections.workers && (workers.length === 0
               ? <p style={{ color: '#666' }}>{t.noWorkersYet}</p>
-              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} />)
+              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} overtimeEnabled={settings?.feature_overtime !== false} />)
             )}
             <button style={styles.sectionToggle} onClick={() => toggleSection('projects')}>
               <span>{t.projectReports}</span>
               <span style={styles.chevron}>{collapsedSections.projects ? '▶' : '▼'}</span>
             </button>
             {!collapsedSections.projects && <ProjectReports currency={settings?.currency ?? 'USD'} />}
-            <button style={styles.sectionToggle} onClick={() => toggleSection('overtime')}>
-              <span>{t.overtimeReport}</span>
-              <span style={styles.chevron}>{collapsedSections.overtime ? '▶' : '▼'}</span>
-            </button>
-            {!collapsedSections.overtime && (plan.isStarter ? <OvertimeReport currency={settings?.currency ?? 'USD'} /> : <UpgradePrompt requiredPlan="starter" feature={t.overtimeReport} />)}
+            {settings?.feature_overtime !== false && <>
+              <button style={styles.sectionToggle} onClick={() => toggleSection('overtime')}>
+                <span>{t.overtimeReport}</span>
+                <span style={styles.chevron}>{collapsedSections.overtime ? '▶' : '▼'}</span>
+              </button>
+              {!collapsedSections.overtime && (plan.isStarter ? <OvertimeReport currency={settings?.currency ?? 'USD'} /> : <UpgradePrompt requiredPlan="starter" feature={t.overtimeReport} />)}
+            </>}
             <button style={styles.sectionToggle} onClick={() => toggleSection('payroll')}>
               <span>Payroll</span>
               <span style={styles.chevron}>{collapsedSections.payroll ? '▶' : '▼'}</span>
