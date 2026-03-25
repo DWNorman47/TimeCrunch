@@ -108,7 +108,7 @@ const translations = {
     noWorkersYet: 'No workers yet. Add one in the Manage tab.',
     projectReports: 'Project Reports',
     overtimeReport: 'Overtime Report',
-    certifiedPayroll: 'Certified Payroll',
+    certifiedPayroll: 'Payroll',
     export: 'Export',
     fullAnalytics: 'Full Analytics',
     generateBill: 'Generate Bill',
@@ -271,7 +271,7 @@ const translations = {
     workersActive: 'workers active',
 
     // ── Certified Payroll ────────────────────────────────────────────────────
-    certifiedPayrollTitle: 'Certified Payroll',
+    certifiedPayrollTitle: 'Payroll',
     certPayrollDesc: 'Weekly hours by worker and classification for prevailing wage compliance reporting.',
     weekEnding: 'Week ending',
     projectOptional: 'Project (optional)',
