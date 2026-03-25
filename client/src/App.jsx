@@ -64,8 +64,8 @@ function AppRoutes() {
   if (loading) return <div style={{ padding: 40 }}>Loading...</div>;
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/administration' : '/dashboard'} replace /> : <Login />} />
-      <Route path="/register" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/administration' : '/dashboard'} replace /> : <Register />} />
+      <Route path="/login" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Login />} />
+      <Route path="/register" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Register />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/eula" element={<EULA />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -77,8 +77,8 @@ function AppRoutes() {
       <Route path="/field" element={<PrivateRoute><FieldPage /></PrivateRoute>} />
       <Route path="/administration" element={<PrivateRoute adminOnly><AdministrationPage /></PrivateRoute>} />
       <Route path="/superadmin" element={<PrivateRoute superAdminOnly><SuperAdmin /></PrivateRoute>} />
-      <Route path="/" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/administration' : '/dashboard'} replace /> : <Landing />} />
-      <Route path="*" element={<Navigate to={user ? (user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/administration' : '/dashboard') : '/'} replace />} />
+      <Route path="/" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Landing />} />
+      <Route path="*" element={<Navigate to={user ? (user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? '/admin' : '/dashboard') : '/'} replace />} />
     </Routes>
   );
 }
