@@ -73,12 +73,14 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     company_timezone: settings?.company_timezone ?? '',
     invoice_signature: settings?.invoice_signature ?? 'optional',
   });
+  const [prevailingEnabled, setPrevailingEnabled] = useState(() => (settings?.prevailing_wage_rate ?? 0) > 0);
   const [saving, setSaving] = useState(null); // section key or null
   const [saved, setSaved] = useState(null);   // section key or null
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!settings) return;
+    setPrevailingEnabled((settings.prevailing_wage_rate ?? 0) > 0);
     setForm({
       prevailing_wage_rate: String(settings.prevailing_wage_rate ?? 0),
       default_hourly_rate: String(settings.default_hourly_rate ?? 30),
@@ -174,8 +176,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
           <div style={styles.row}>
             <label style={styles.label}>{t.ratesPrevailingWage}</label>
-            {parseFloat(form.prevailing_wage_rate) === 0
-              ? <button style={styles.addPrevBtn} type="button" onClick={() => set('prevailing_wage_rate', '1')}>+ Add</button>
+            {!prevailingEnabled
+              ? <button style={styles.addPrevBtn} type="button" onClick={() => { setPrevailingEnabled(true); set('prevailing_wage_rate', '1'); }}>+ Add</button>
               : <div style={styles.inputGroup}>
                   <span style={styles.prefix}>{currencySymbol(form.currency)}</span>
                   <input style={styles.input} type="number" min="0" step="0.01" value={form.prevailing_wage_rate} onChange={e => set('prevailing_wage_rate', e.target.value)} required />
