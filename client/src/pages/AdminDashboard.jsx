@@ -189,11 +189,13 @@ export default function AdminDashboard() {
               ? <p style={{ color: '#666' }}>{t.noWorkersYet}</p>
               : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} overtimeEnabled={settings?.feature_overtime !== false} />)
             )}
-            <button style={styles.sectionToggle} onClick={() => toggleSection('projects')}>
-              <span>{t.projectReports}</span>
-              <span style={styles.chevron}>{collapsedSections.projects ? '▶' : '▼'}</span>
-            </button>
-            {!collapsedSections.projects && <ProjectReports currency={settings?.currency ?? 'USD'} />}
+            {settings?.feature_projects !== false && <>
+              <button style={styles.sectionToggle} onClick={() => toggleSection('projects')}>
+                <span>{t.projectReports}</span>
+                <span style={styles.chevron}>{collapsedSections.projects ? '▶' : '▼'}</span>
+              </button>
+              {!collapsedSections.projects && <ProjectReports currency={settings?.currency ?? 'USD'} />}
+            </>}
             {settings?.feature_overtime !== false && <>
               <button style={styles.sectionToggle} onClick={() => toggleSection('overtime')}>
                 <span>{t.overtimeReport}</span>

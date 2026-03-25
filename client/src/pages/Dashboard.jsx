@@ -311,8 +311,8 @@ ${signatureDataUrl ? `
 
         {tab === 'clock' && (
           <>
-            <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} geolocationEnabled={settings?.feature_geolocation ?? false} />
-            <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} prefill={shiftPrefill} />
+            <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} geolocationEnabled={settings?.feature_geolocation ?? false} projectsEnabled={settings?.feature_projects !== false} />
+            <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} prefill={shiftPrefill} projectsEnabled={settings?.feature_projects !== false} />
           </>
         )}
 

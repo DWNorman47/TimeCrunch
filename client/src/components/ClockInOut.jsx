@@ -22,7 +22,7 @@ function formatElapsed(seconds) {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
-export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabled = true }) {
+export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabled = true, projectsEnabled = true }) {
   const { isOffline, queueCount, onSync } = useOffline() || {};
   const [status, setStatus] = useState(null); // null = loading, false = not clocked in, object = clocked in
   const [clockInForm, setClockInForm] = useState({ selectedProject: '', notes: '' });
@@ -75,7 +75,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
   };
 
   const handleClockIn = async () => {
-    if (!selectedProject) { setError(t.selectProjectFirst); return; }
+    if (projectsEnabled && !selectedProject) { setError(t.selectProjectFirst); return; }
     setError('');
     setLoading(true);
     const { lat, lng } = geolocationEnabled ? await getLocation() : { lat: null, lng: null };
@@ -257,7 +257,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
       {offlineBanner}
       <h2 style={styles.heading}>{t.clockIn}</h2>
       <div style={styles.form}>
-        <div>
+        {projectsEnabled && <div>
           <label style={styles.label}>{t.project}</label>
           <select
             style={styles.input}
@@ -271,7 +271,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
               </option>
             ))}
           </select>
-        </div>
+        </div>}
         <div>
           <label style={styles.label}>{t.notesOptional}</label>
           <input

@@ -75,6 +75,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     feature_chat: settings?.feature_chat ?? true,
     feature_geolocation: settings?.feature_geolocation ?? true,
     feature_timeclock: settings?.feature_timeclock ?? true,
+    feature_projects: settings?.feature_projects ?? true,
     feature_inactive_alerts: settings?.feature_inactive_alerts ?? true,
     feature_broadcast: settings?.feature_broadcast ?? true,
     show_worker_wages: settings?.show_worker_wages ?? false,
@@ -116,6 +117,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       feature_chat: settings.feature_chat ?? true,
       feature_geolocation: settings.feature_geolocation ?? true,
       feature_timeclock: settings.feature_timeclock ?? true,
+      feature_projects: settings.feature_projects ?? true,
       feature_inactive_alerts: settings.feature_inactive_alerts ?? true,
       feature_broadcast: settings.feature_broadcast ?? true,
       show_worker_wages: settings.show_worker_wages ?? false,
@@ -148,6 +150,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_chat: form.feature_chat,
         feature_geolocation: form.feature_geolocation,
         feature_timeclock: form.feature_timeclock,
+        feature_projects: form.feature_projects,
         feature_inactive_alerts: form.feature_inactive_alerts,
         feature_broadcast: form.feature_broadcast,
         show_worker_wages: form.show_worker_wages,
@@ -435,6 +438,16 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <span style={styles.collapseChevron}>{collapsed.features ? '▶' : '▼'}</span>
         </div>
         {!collapsed.features && <div style={styles.sectionBody}>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Projects</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Require project selection on time entries and clock-in</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_projects ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_projects} onChange={e => set('feature_projects', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_projects ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
           <div style={styles.row}>
             <div>
               <div style={styles.label}>{t.featScheduling}</div>

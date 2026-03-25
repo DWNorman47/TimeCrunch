@@ -28,33 +28,43 @@ const { validCoords } = require('../utils/geoUtils');
 // POST /api/clock/in
 router.post('/in', requireAuth, async (req, res) => {
   const { project_id, notes, lat, lng, local_work_date, timezone } = req.body;
-  if (!project_id) return res.status(400).json({ error: 'project_id required' });
   if ((lat != null || lng != null) && !validCoords(lat, lng)) {
     return res.status(400).json({ error: 'Invalid coordinates' });
   }
   const companyId = req.user.company_id;
   try {
-    // Verify project belongs to this company and fetch geofence
-    const proj = await pool.query(
-      'SELECT id, geo_lat, geo_lng, geo_radius_ft FROM projects WHERE id = $1 AND company_id = $2 AND active = true',
-      [project_id, companyId]
+    // Check if projects feature is enabled for this company
+    const featRow = await pool.query(
+      `SELECT value FROM settings WHERE company_id = $1 AND key = 'feature_projects'`,
+      [companyId]
     );
-    if (proj.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
+    const projectsEnabled = featRow.rows[0]?.value !== '0';
 
-    // Geofence check
-    const { geo_lat, geo_lng, geo_radius_ft } = proj.rows[0];
-    if (geo_lat && geo_lng && geo_radius_ft) {
-      if (!lat || !lng) {
-        return res.status(403).json({ error: 'This job site requires location access to clock in. Please enable GPS and try again.', geofence: true });
-      }
-      const distanceFt = Math.round(haversineDistanceFt(lat, lng, parseFloat(geo_lat), parseFloat(geo_lng)));
-      if (distanceFt > geo_radius_ft) {
-        return res.status(403).json({
-          error: `You are ${distanceFt.toLocaleString()} ft from the job site. Must be within ${geo_radius_ft.toLocaleString()} ft to clock in.`,
-          geofence: true,
-          distance_ft: distanceFt,
-          radius_ft: geo_radius_ft,
-        });
+    if (!project_id && projectsEnabled) return res.status(400).json({ error: 'project_id required' });
+
+    // Verify project belongs to this company and fetch geofence (only when project provided)
+    if (project_id) {
+      const proj = await pool.query(
+        'SELECT id, geo_lat, geo_lng, geo_radius_ft FROM projects WHERE id = $1 AND company_id = $2 AND active = true',
+        [project_id, companyId]
+      );
+      if (proj.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
+
+      // Geofence check
+      const { geo_lat, geo_lng, geo_radius_ft } = proj.rows[0];
+      if (geo_lat && geo_lng && geo_radius_ft) {
+        if (!lat || !lng) {
+          return res.status(403).json({ error: 'This job site requires location access to clock in. Please enable GPS and try again.', geofence: true });
+        }
+        const distanceFt = Math.round(haversineDistanceFt(lat, lng, parseFloat(geo_lat), parseFloat(geo_lng)));
+        if (distanceFt > geo_radius_ft) {
+          return res.status(403).json({
+            error: `You are ${distanceFt.toLocaleString()} ft from the job site. Must be within ${geo_radius_ft.toLocaleString()} ft to clock in.`,
+            geofence: true,
+            distance_ft: distanceFt,
+            radius_ft: geo_radius_ft,
+          });
+        }
       }
     }
 
@@ -75,7 +85,9 @@ router.post('/in', requireAuth, async (req, res) => {
     );
 
     const row = result.rows[0];
-    const projName = await pool.query('SELECT name, wage_type FROM projects WHERE id = $1', [project_id]);
+    const projName = project_id
+      ? await pool.query('SELECT name, wage_type FROM projects WHERE id = $1', [project_id])
+      : { rows: [{ name: null, wage_type: 'regular' }] };
 
     // Check if clock-in is outside configured hours — notify admin if so
     try {
@@ -133,12 +145,11 @@ router.post('/out', requireAuth, async (req, res) => {
     if (clockResult.rowCount === 0) return res.status(400).json({ error: 'Not clocked in' });
     const clock = clockResult.rows[0];
 
-    // Get project wage_type
-    const projResult = await pool.query(
-      'SELECT wage_type, name FROM projects WHERE id = $1',
-      [clock.project_id]
-    );
-    if (projResult.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
+    // Get project wage_type (project may be null if projects feature is off)
+    const projResult = clock.project_id
+      ? await pool.query('SELECT wage_type, name FROM projects WHERE id = $1', [clock.project_id])
+      : { rows: [{ wage_type: 'regular', name: null }] };
+    if (clock.project_id && projResult.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
     const { wage_type, name: project_name } = projResult.rows[0];
 
     // Use client-supplied local times if available (avoids UTC offset issues on server)
