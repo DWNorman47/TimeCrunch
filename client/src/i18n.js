@@ -412,7 +412,7 @@ const translations = {
     logTime: 'Registrar Tiempo',
     project: 'Proyecto',
     selectProject: 'Seleccionar proyecto...',
-    regular: 'Regular',
+    regular: 'Salario Regular',
     prevailing: 'Salario Prevaleciente',
     date: 'Fecha',
     startTime: 'Hora de Entrada',
