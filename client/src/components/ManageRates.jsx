@@ -70,6 +70,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
     feature_overtime: settings?.feature_overtime ?? true,
     feature_field: settings?.feature_field ?? true,
+    feature_scheduling: settings?.feature_scheduling ?? true,
+    feature_analytics: settings?.feature_analytics ?? true,
+    feature_chat: settings?.feature_chat ?? true,
     show_worker_wages: settings?.show_worker_wages ?? false,
     currency: settings?.currency ?? 'USD',
     company_timezone: settings?.company_timezone ?? '',
@@ -98,6 +101,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       chat_retention_days: String(settings.chat_retention_days ?? 3),
       feature_overtime: settings.feature_overtime ?? true,
       feature_field: settings.feature_field ?? true,
+      feature_scheduling: settings.feature_scheduling ?? true,
+      feature_analytics: settings.feature_analytics ?? true,
+      feature_chat: settings.feature_chat ?? true,
       show_worker_wages: settings.show_worker_wages ?? false,
       currency: settings.currency ?? 'USD',
       company_timezone: settings.company_timezone ?? '',
@@ -123,6 +129,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         chat_retention_days: parseFloat(form.chat_retention_days),
         feature_overtime: form.feature_overtime,
         feature_field: form.feature_field,
+        feature_scheduling: form.feature_scheduling,
+        feature_analytics: form.feature_analytics,
+        feature_chat: form.feature_chat,
         show_worker_wages: form.show_worker_wages,
         currency: form.currency,
         company_timezone: form.company_timezone,
@@ -359,6 +368,51 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
         </div>}
         {!collapsed.access && <SectionFooter section="access" />}
+      </div>
+
+      {/* ── Features ── */}
+      <div style={styles.section}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('features')}>
+          <span style={styles.sectionIcon}>🧩</span>
+          <div style={{ flex: 1 }}>
+            <div style={styles.sectionTitle}>{t.featuresTitle}</div>
+            <div style={styles.sectionSub}>{t.featuresSubtitle}</div>
+          </div>
+          <span style={styles.collapseChevron}>{collapsed.features ? '▶' : '▼'}</span>
+        </div>
+        {!collapsed.features && <div style={styles.sectionBody}>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featScheduling}</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featSchedulingDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_scheduling ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_scheduling} onChange={e => set('feature_scheduling', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_scheduling ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featAnalytics}</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featAnalyticsDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_analytics ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_analytics} onChange={e => set('feature_analytics', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_analytics ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featChat}</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featChatDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_chat ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_chat} onChange={e => set('feature_chat', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_chat ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+        </div>}
+        {!collapsed.features && <SectionFooter section="features" />}
       </div>
 
     </div>

@@ -20,87 +20,6 @@ import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
 import api from '../api';
 
-function FeatureToggle({ name, desc, serverEnabled, onToggle }) {
-  const [enabled, setEnabled] = useState(serverEnabled);
-  const [saving, setSaving] = useState(false);
-
-  // Sync if server value changes from outside (e.g. initial load)
-  useEffect(() => { setEnabled(serverEnabled); }, [serverEnabled]);
-
-  const handleClick = async () => {
-    const newVal = !enabled;
-    setEnabled(newVal);         // optimistic: update immediately
-    setSaving(true);
-    try {
-      await onToggle(newVal);
-    } catch {
-      setEnabled(!newVal);      // revert on failure
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div style={ftStyles.row}>
-      <div style={ftStyles.info}>
-        <span style={ftStyles.label}>{name}</span>
-        <span style={ftStyles.desc}>{desc}</span>
-      </div>
-      <button
-        style={{ ...ftStyles.toggle, background: enabled ? '#1a56db' : '#d1d5db', opacity: saving ? 0.6 : 1 }}
-        onClick={handleClick}
-        aria-pressed={enabled}
-      >
-        <span style={{ ...ftStyles.knob, transform: enabled ? 'translateX(46px)' : 'translateX(0)' }} />
-      </button>
-    </div>
-  );
-}
-
-function FeatureToggles({ settings, onSettingsUpdated }) {
-  const t = useT();
-  const handleToggle = async (key, newVal) => {
-    const r = await api.patch('/admin/settings', { [key]: newVal });
-    onSettingsUpdated(r.data);
-  };
-
-  const featureDefs = [
-    { key: 'feature_scheduling',      label: t.featScheduling,    desc: t.featSchedulingDesc },
-    { key: 'feature_analytics',       label: t.featAnalytics,     desc: t.featAnalyticsDesc },
-    { key: 'feature_chat',            label: t.featChat,          desc: t.featChatDesc },
-  ];
-
-  return (
-    <div style={ftStyles.card}>
-      <h3 style={ftStyles.title}>{t.featuresTitle}</h3>
-      <p style={ftStyles.subtitle}>{t.featuresSubtitle}</p>
-      <div style={ftStyles.list}>
-        {featureDefs.map(({ key, label, desc }) => (
-          <FeatureToggle
-            key={key}
-            name={label}
-            desc={desc}
-            serverEnabled={settings?.[key] !== false}
-            onToggle={newVal => handleToggle(key, newVal)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const ftStyles = {
-  card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 24 },
-  title: { fontSize: 17, fontWeight: 700, margin: '0 0 4px' },
-  subtitle: { fontSize: 13, color: '#6b7280', margin: '0 0 12px' },
-  list: { display: 'flex', flexDirection: 'column', gap: 0 },
-  row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '10px 0', borderTop: '1px solid #f3f4f6' },
-  info: { display: 'flex', flexDirection: 'column', gap: 1 },
-  label: { fontSize: 14, fontWeight: 600, color: '#111827' },
-  desc: { fontSize: 12, color: '#9ca3af' },
-  toggle: { display: 'flex', alignItems: 'center', width: 70, height: 40, borderRadius: 7, border: 'none', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, padding: 4 },
-  knob: { display: 'block', width: 16, height: 32, borderRadius: 5, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s', flexShrink: 0 },
-};
 
 function UpgradePrompt({ requiredPlan, feature }) {
   const t = useT();
@@ -150,7 +69,7 @@ export default function AdminDashboard() {
   // Permission helper — null admin_permissions means full access
   const canDo = key => !user?.admin_permissions || user.admin_permissions[key] === true;
 
-  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'manage', 'settings'];
+  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'manage'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
 
@@ -218,7 +137,6 @@ export default function AdminDashboard() {
             ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
             { id: 'manage', label: t.tabManage },
-            ...(canDo('manage_settings') ? [{ id: 'settings', label: t.tabSettings }] : []),
           ]}
         />
 
@@ -292,16 +210,7 @@ export default function AdminDashboard() {
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
             {canDo('approve_entries') && <ManagePayPeriods />}
           </>
-        ) : (
-          <>
-            <h2 style={styles.heading}>{t.tabSettings}</h2>
-            <FeatureToggles settings={settings} onSettingsUpdated={setSettings} />
-            <div style={styles.supportNote}>
-              {t.helpText.split('info@opsfloa.com')[0]}<a href="mailto:info@opsfloa.com" style={{ color: '#1a56db' }}>info@opsfloa.com</a>
-            </div>
-            <p style={{ fontSize: 13, color: '#6b7280' }}>{t.qboNote.split('Administration app')[0]}<a href="/administration#integrations" style={{ color: '#1a56db' }}>Administration app</a>.</p>
-          </>
-        )}
+        ) : null}
       </main>
     </div>
   );
