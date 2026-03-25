@@ -21,7 +21,7 @@ function defaultDates() {
   return { from: fmt(from), to: fmt(today) };
 }
 
-export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = {}, overtimeEnabled = true }) {
+export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = {}, overtimeEnabled = true, projectsEnabled = true }) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [from, setFrom] = useState(defaultDates().from);
@@ -100,7 +100,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
                   downloadCSV([headers, ...rows], `${worker.username}-${from||'all'}-to-${to||'all'}.csv`);
                 }}>{t.exportCSV}</button>
                 <PDFDownloadLink
-                  document={<BillPDF data={billData} currency={currency} companyInfo={companyInfo} />}
+                  document={<BillPDF data={billData} currency={currency} companyInfo={companyInfo} overtimeEnabled={overtimeEnabled} showProject={projectsEnabled} showRateType={(companyInfo?.prevailing_wage_rate ?? 0) > 0} />}
                   fileName={`bill-${worker.username}-${from || 'all'}-to-${to || 'all'}.pdf`}
                   style={styles.pdfBtn}
                 >
@@ -109,7 +109,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
               </div>
               {showPreview && (
                 <PDFViewer style={styles.pdfViewer}>
-                  <BillPDF data={billData} currency={currency} companyInfo={companyInfo} />
+                  <BillPDF data={billData} currency={currency} companyInfo={companyInfo} overtimeEnabled={overtimeEnabled} showProject={projectsEnabled} showRateType={(companyInfo?.prevailing_wage_rate ?? 0) > 0} />
                 </PDFViewer>
               )}
             </div>
