@@ -296,7 +296,7 @@ export default function AdministrationPage() {
     { id: 'company',      label: t.adminTabCompany      },
     { id: 'team',         label: t.adminTabTeam         },
     { id: 'projects',     label: t.adminTabProjects     },
-    { id: 'integrations', label: t.adminTabIntegrations },
+    ...(plan.hasQbo ? [{ id: 'integrations', label: t.adminTabIntegrations }] : []),
     { id: 'billing',      label: t.adminTabBilling      },
     { id: 'account',      label: t.adminTabAccount      },
   ];
@@ -391,15 +391,7 @@ export default function AdministrationPage() {
         {tab === 'integrations' && (
           <div style={styles.tabContent}>
             <h2 style={styles.tabTitle}>{t.integrations}</h2>
-            {plan.hasQbo
-              ? <QuickBooks workers={workers} projects={projects} />
-              : <div style={{ background: '#f9fafb', border: '2px dashed #d1d5db', borderRadius: 10, padding: '32px 24px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 6 }}>{t.qboRequired}</div>
-                  <button style={{ background: '#1a56db', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', marginTop: 8 }}
-                    onClick={() => switchTab('billing')}>{t.viewPlans}</button>
-                </div>
-            }
+            <QuickBooks workers={workers} projects={projects} />
           </div>
         )}
         {tab === 'billing'  && <BillingTab />}
