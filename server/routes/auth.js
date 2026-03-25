@@ -150,6 +150,20 @@ router.post('/register', authLimiter, async (req, res) => {
   if (username.length > 50) return res.status(400).json({ error: 'Username must be 50 characters or fewer' });
   const pwErr = validatePassword(password, username);
   if (pwErr) return res.status(400).json({ error: pwErr });
+
+  // Capture real client IP (req.ip respects trust proxy setting)
+  const registrationIp = req.ip || 'unknown';
+
+  // Block IPs that have registered too many trials recently
+  const TRIAL_LIMIT = parseInt(process.env.TRIAL_LIMIT_PER_IP) || 3;
+  const ipCount = await pool.query(
+    `SELECT COUNT(*) FROM companies WHERE registration_ip = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+    [registrationIp]
+  );
+  if (parseInt(ipCount.rows[0].count) >= TRIAL_LIMIT) {
+    return res.status(429).json({ error: 'Too many trial accounts created from this network. Please contact support.' });
+  }
+
   const slug = company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
   const client = await pool.connect();
   try {
@@ -161,9 +175,9 @@ router.post('/register', authLimiter, async (req, res) => {
     }
     const trialDays = parseInt(process.env.TRIAL_DAYS) || 14;
     const companyResult = await client.query(
-      `INSERT INTO companies (name, slug, subscription_status, trial_ends_at)
-       VALUES ($1, $2, 'trial', NOW() + ($3 || ' days')::INTERVAL) RETURNING id`,
-      [company_name, slug, trialDays]
+      `INSERT INTO companies (name, slug, subscription_status, trial_ends_at, registration_ip)
+       VALUES ($1, $2, 'trial', NOW() + ($3 || ' days')::INTERVAL, $4) RETURNING id`,
+      [company_name, slug, trialDays, registrationIp]
     );
     const companyId = companyResult.rows[0].id;
     const defaults = [['prevailing_wage_rate', 45], ['default_hourly_rate', 30], ['overtime_multiplier', 1.5]];

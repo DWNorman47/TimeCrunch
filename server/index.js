@@ -14,6 +14,7 @@ const { requireAuth, requirePlan, requireProAddon } = require('./middleware/auth
 const pool = require('./db');
 
 const app = express();
+app.set('trust proxy', 1); // trust first proxy (Render) so req.ip is the real client IP
 app.use(helmet());
 app.use(cors());
 
