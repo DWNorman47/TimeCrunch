@@ -295,6 +295,7 @@ ${signatureDataUrl ? `
         <SignatureModal
           onConfirm={sig => { setShowSignatureModal(false); handleExportPDF(sig); }}
           onCancel={() => setShowSignatureModal(false)}
+          required={(settings?.invoice_signature ?? 'optional') === 'required'}
         />
       )}
 
@@ -326,7 +327,10 @@ ${signatureDataUrl ? `
                 <button style={entryView === 'list' ? styles.toggleActive : styles.toggleBtn} onClick={() => setEntryView('list')}>{t.listView}</button>
               </div>
               {!loading && entries.length > 0 && (
-                <button style={styles.exportBtn} onClick={() => setShowSignatureModal(true)}>⬇ Export PDF</button>
+                <button style={styles.exportBtn} onClick={() => {
+                  if ((settings?.invoice_signature ?? 'optional') === 'none') handleExportPDF(null);
+                  else setShowSignatureModal(true);
+                }}>⬇ Export PDF</button>
               )}
             </div>
             {loadError ? <p style={{ color: '#dc2626', padding: '12px' }}>{t.loadError} <button onClick={fetchData} style={{ textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}>{t.retry}</button></p> : loading ? <p>{t.loadingEntries}</p> : entryView === 'timesheet' ? (

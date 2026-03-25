@@ -71,6 +71,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     show_worker_wages: settings?.show_worker_wages ?? false,
     currency: settings?.currency ?? 'USD',
     company_timezone: settings?.company_timezone ?? '',
+    invoice_signature: settings?.invoice_signature ?? 'optional',
   });
   const [saving, setSaving] = useState(null); // section key or null
   const [saved, setSaved] = useState(null);   // section key or null
@@ -92,6 +93,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       show_worker_wages: settings.show_worker_wages ?? false,
       currency: settings.currency ?? 'USD',
       company_timezone: settings.company_timezone ?? '',
+      invoice_signature: settings.invoice_signature ?? 'optional',
     });
   }, [settings]);
 
@@ -114,6 +116,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         show_worker_wages: form.show_worker_wages,
         currency: form.currency,
         company_timezone: form.company_timezone,
+        invoice_signature: form.invoice_signature,
       });
       onSettingsUpdated(r.data);
       setSaved(section);
@@ -302,6 +305,21 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
                 <div style={{ ...styles.toggleThumb, transform: form.show_worker_wages ? 'translateX(20px)' : 'translateX(2px)' }} />
               </div>
             </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Invoice Digital Signature</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Whether workers must sign invoices before exporting</div>
+            </div>
+            <select
+              style={{ ...styles.input, width: 'auto', textAlign: 'left' }}
+              value={form.invoice_signature}
+              onChange={e => set('invoice_signature', e.target.value)}
+            >
+              <option value="none">None — export without prompt</option>
+              <option value="optional">Optional — worker can skip</option>
+              <option value="required">Required — must sign to export</option>
+            </select>
           </div>
         </div>
         <SectionFooter section="access" />

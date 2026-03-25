@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 
-export default function SignatureModal({ onConfirm, onCancel }) {
+export default function SignatureModal({ onConfirm, onCancel, required = false }) {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [isEmpty, setIsEmpty] = useState(true);
@@ -82,9 +82,11 @@ export default function SignatureModal({ onConfirm, onCancel }) {
           <button style={styles.confirmBtn} onClick={confirm} disabled={isEmpty}>
             Sign & Export
           </button>
-          <button style={styles.skipBtn} onClick={() => onConfirm(null)}>
-            Export without signature
-          </button>
+          {!required && (
+            <button style={styles.skipBtn} onClick={() => onConfirm(null)}>
+              Export without signature
+            </button>
+          )}
           <button style={styles.cancelBtn} onClick={onCancel}>
             Cancel
           </button>
