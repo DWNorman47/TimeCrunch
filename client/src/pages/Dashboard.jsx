@@ -83,7 +83,6 @@ export default function Dashboard() {
 
   const handleEntryAdded = entry => {
     setEntries(prev => [entry, ...prev]);
-    setTab('timesheet');
   };
   const handleEntryDeleted = id => setEntries(prev => prev.filter(e => e.id !== id));
   const handleEntryUpdated = entry => setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, ...entry } : e));
