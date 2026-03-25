@@ -252,7 +252,7 @@ export default function AdminDashboard() {
         ) : tab === 'approvals' ? (
           <>
             <h2 style={styles.heading}>{t.tabApprovals}</h2>
-            <ApprovalQueue />
+            <ApprovalQueue onCountChange={setPendingCount} />
           </>
         ) : tab === 'reports' ? (
           <>
