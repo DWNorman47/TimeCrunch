@@ -155,7 +155,7 @@ router.post('/register', authLimiter, async (req, res) => {
   const registrationIp = req.ip || 'unknown';
 
   // Block IPs that have registered too many trials recently
-  const TRIAL_LIMIT = parseInt(process.env.TRIAL_LIMIT_PER_IP) || 3;
+  const TRIAL_LIMIT = parseInt(process.env.TRIAL_LIMIT_PER_IP) || 5;
   const ipQuery = await pool.query(
     `SELECT COUNT(*), array_agg(name ORDER BY created_at) as company_names
      FROM companies WHERE registration_ip = $1 AND created_at > NOW() - INTERVAL '30 days'`,
