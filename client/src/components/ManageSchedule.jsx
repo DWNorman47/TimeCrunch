@@ -30,60 +30,21 @@ function PillContent({ s }) {
   );
 }
 
-function DraggableShift({ s, projects, editingId, editForm, setEditForm, editSaving, startEdit, setEditingId, saveEdit, deleteShift, deleting, onDuplicate, dragMode }) {
+function DraggableShift({ s, editingId, startEdit, setEditingId, dragMode }) {
   const t = useT();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: String(s.id) });
+  const isEditing = editingId === s.id;
 
   return (
     <div ref={setNodeRef}>
-      <div style={{ ...styles.shiftPill, opacity: isDragging ? 0.35 : 1, cursor: dragMode ? 'grab' : 'default' }} {...(dragMode ? { ...listeners, ...attributes } : {})}>
+      <div style={{ ...styles.shiftPill, ...(isEditing ? styles.shiftPillActive : {}), opacity: isDragging ? 0.35 : 1, cursor: dragMode ? 'grab' : 'default' }} {...(dragMode ? { ...listeners, ...attributes } : {})}>
         <PillContent s={s} />
         <div style={styles.pillActions} onPointerDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
-          <button style={styles.editPillBtn} onClick={() => editingId === s.id ? setEditingId(null) : startEdit(s)}>{editingId === s.id ? t.cancel : t.edit}</button>
+          <button style={isEditing ? styles.editPillBtnActive : styles.editPillBtn} onClick={() => isEditing ? setEditingId(null) : startEdit(s)}>
+            {isEditing ? t.cancel : t.edit}
+          </button>
         </div>
       </div>
-
-      {editingId === s.id && (
-        <div style={styles.editPanel}>
-          <div style={styles.editGrid}>
-            <div style={styles.editField}>
-              <label style={styles.editLabel}>{t.date}</label>
-              <input style={styles.editInput} type="date" value={editForm.shift_date} onChange={ev => setEditForm(f => ({ ...f, shift_date: ev.target.value }))} />
-            </div>
-            <div style={styles.editField}>
-              <label style={styles.editLabel}>{t.start}</label>
-              <input style={styles.editInput} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} />
-            </div>
-            <div style={styles.editField}>
-              <label style={styles.editLabel}>{t.end}</label>
-              <input style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
-            </div>
-            <div style={styles.editField}>
-              <label style={styles.editLabel}>{t.project}</label>
-              <select style={styles.editInput} value={editForm.project_id} onChange={ev => setEditForm(f => ({ ...f, project_id: ev.target.value }))}>
-                <option value="">{t.none}</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div style={{ ...styles.editField, flex: 2 }}>
-              <label style={styles.editLabel}>{t.notes}</label>
-              <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} />
-            </div>
-          </div>
-          <div style={styles.editActions}>
-            <div style={styles.editActionsLeft}>
-              <button style={styles.saveBtn} onClick={() => saveEdit(s.id)} disabled={editSaving}>{editSaving ? '…' : t.save}</button>
-              <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
-            </div>
-            <div style={styles.editActionsRight}>
-              <button style={styles.dupBtn} onClick={() => onDuplicate(s)}>{t.copy}</button>
-              <button style={styles.deleteBtn} onClick={() => deleteShift(s.id)} disabled={deleting === s.id}>
-                {deleting === s.id ? '…' : t.del}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -279,7 +240,8 @@ export default function ManageSchedule({ workers, projects }) {
     if (shiftsByDay[key]) shiftsByDay[key].push(s);
   });
 
-  const shiftProps = { projects, editingId, editForm, setEditForm, editSaving, startEdit, setEditingId, saveEdit, deleteShift, deleting, onDuplicate: duplicateShift, dragMode };
+  const shiftProps = { editingId, startEdit, setEditingId, dragMode };
+  const editingShift = editingId ? shifts.find(s => s.id === editingId) : null;
 
   return (
     <div style={styles.card}>
@@ -376,6 +338,51 @@ export default function ManageSchedule({ workers, projects }) {
           </DragOverlay>
         </DndContext>
       )}
+
+      {editingShift && (
+        <div style={styles.editPanel}>
+          <div style={styles.editPanelHeader}>
+            <span style={styles.editPanelTitle}>Editing: {editingShift.worker_name} · {fmtDay(new Date(editingShift.shift_date + 'T00:00:00'))}</span>
+          </div>
+          <div style={styles.editGrid}>
+            <div style={styles.editField}>
+              <label style={styles.editLabel}>{t.date}</label>
+              <input style={styles.editInput} type="date" value={editForm.shift_date} onChange={ev => setEditForm(f => ({ ...f, shift_date: ev.target.value }))} />
+            </div>
+            <div style={styles.editField}>
+              <label style={styles.editLabel}>{t.start}</label>
+              <input style={styles.editInput} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} />
+            </div>
+            <div style={styles.editField}>
+              <label style={styles.editLabel}>{t.end}</label>
+              <input style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
+            </div>
+            <div style={styles.editField}>
+              <label style={styles.editLabel}>{t.project}</label>
+              <select style={styles.editInput} value={editForm.project_id} onChange={ev => setEditForm(f => ({ ...f, project_id: ev.target.value }))}>
+                <option value="">{t.none}</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div style={{ ...styles.editField, flex: 2 }}>
+              <label style={styles.editLabel}>{t.notes}</label>
+              <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} />
+            </div>
+          </div>
+          <div style={styles.editActions}>
+            <div style={styles.editActionsLeft}>
+              <button style={styles.saveBtn} onClick={() => saveEdit(editingShift.id)} disabled={editSaving}>{editSaving ? '…' : t.save}</button>
+              <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
+            </div>
+            <div style={styles.editActionsRight}>
+              <button style={styles.dupBtn} onClick={() => duplicateShift(editingShift)}>{t.copy}</button>
+              <button style={styles.deleteBtn} onClick={() => deleteShift(editingShift.id)} disabled={deleting === editingShift.id}>
+                {deleting === editingShift.id ? '…' : t.del}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -408,18 +415,22 @@ const styles = {
   pillProject: { color: '#6b7280', fontSize: 10 },
   pillTime: { fontWeight: 600, color: '#1a56db', marginTop: 2 },
   pillNotes: { color: '#9ca3af', fontSize: 10, fontStyle: 'italic' },
+  shiftPillActive: { background: '#dbeafe', borderLeftColor: '#1d4ed8' },
   pillActions: { display: 'flex', gap: 4, marginTop: 6 },
   editPillBtn: { flex: 1, background: '#dbeafe', border: 'none', color: '#1d4ed8', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 9px', borderRadius: 5, lineHeight: 1 },
-  editPanel: { background: '#f8faff', border: '1px solid #dbeafe', borderRadius: 6, padding: 10, marginTop: 4 },
-  editGrid: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 },
-  editField: { display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 80 },
-  editLabel: { fontSize: 10, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
-  editInput: { padding: '5px 7px', border: '1px solid #ddd', borderRadius: 5, fontSize: 12 },
-  editActions: { display: 'flex', justifyContent: 'space-between', gap: 6 },
-  editActionsLeft: { display: 'flex', gap: 6 },
-  editActionsRight: { display: 'flex', gap: 6 },
-  saveBtn: { background: '#059669', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
-  cancelBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '5px 12px', borderRadius: 5, fontSize: 11, cursor: 'pointer' },
-  dupBtn: { background: '#d1fae5', border: 'none', color: '#065f46', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '5px 10px', borderRadius: 5 },
-  deleteBtn: { background: '#fee2e2', border: 'none', color: '#b91c1c', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '5px 10px', borderRadius: 5 },
+  editPillBtnActive: { flex: 1, background: '#bfdbfe', border: 'none', color: '#1e40af', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 9px', borderRadius: 5, lineHeight: 1 },
+  editPanel: { background: '#f8faff', border: '1px solid #dbeafe', borderRadius: 8, padding: 16, marginTop: 16 },
+  editPanelHeader: { marginBottom: 12 },
+  editPanelTitle: { fontSize: 13, fontWeight: 700, color: '#1e3a5f' },
+  editGrid: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 },
+  editField: { display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 100 },
+  editLabel: { fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
+  editInput: { padding: '7px 9px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13 },
+  editActions: { display: 'flex', justifyContent: 'space-between', gap: 8 },
+  editActionsLeft: { display: 'flex', gap: 8 },
+  editActionsRight: { display: 'flex', gap: 8 },
+  saveBtn: { background: '#059669', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  cancelBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '7px 18px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
+  dupBtn: { background: '#d1fae5', border: 'none', color: '#065f46', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 16px', borderRadius: 6 },
+  deleteBtn: { background: '#fee2e2', border: 'none', color: '#b91c1c', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 16px', borderRadius: 6 },
 };
