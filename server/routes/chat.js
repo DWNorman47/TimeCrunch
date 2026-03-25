@@ -117,7 +117,7 @@ router.post('/', requireAuth, async (req, res) => {
     const snippet = body.trim().substring(0, 100);
     if (req.user.role === 'admin') {
       // Admin messaging a worker — notify that worker
-      sendPushToUser(parseInt(targetWorkerId), {
+      sendPushToUser(targetWorkerId, {
         title: `Message from ${req.user.full_name}`,
         body: snippet,
         url: '/dashboard',
