@@ -153,6 +153,7 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
   const allowed = [...numericKeys, ...stringKeys, ...FEATURE_KEYS];
   const companyId = req.user.company_id;
   try {
+    const current = await getSettings(companyId);
     const changed = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
@@ -162,7 +163,8 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
             'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
             [companyId, key, val]
           );
-          changed[key] = val === '1';
+          const newVal = val === '1';
+          if (current[key] !== newVal) changed[key] = newVal;
         } else if (stringKeys.includes(key)) {
           const val = req.body[key];
           if (key === 'overtime_rule' && !['daily', 'weekly'].includes(val))
@@ -177,7 +179,7 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
             'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
             [companyId, key, val]
           );
-          changed[key] = val;
+          if (current[key] !== val) changed[key] = val;
         } else {
           const val = parseFloat(req.body[key]);
           if (isNaN(val)) return res.status(400).json({ error: `Invalid value for ${key}` });
@@ -188,10 +190,11 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
             'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
             [companyId, key, val]
           );
-          changed[key] = val;
+          if (current[key] !== val) changed[key] = val;
         }
       }
     }
+    if (Object.keys(changed).length === 0) { const s = await getSettings(companyId); return res.json(s); }
     await logAudit(companyId, req.user.id, req.user.full_name, 'settings.updated', 'settings', null, 'Settings', changed);
     const s = await getSettings(companyId);
     res.json(s);
