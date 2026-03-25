@@ -1559,8 +1559,7 @@ router.post('/support', requireAdmin, async (req, res) => {
   const body = '<p><strong>From:</strong> ' + userName + ' (' + userEmail + ')</p>' +
     '<p><strong>Company:</strong> ' + companyName + '</p>' +
     '<p><strong>Subject:</strong> ' + subjectLine + '</p><hr/>' +
-    '<p>' + message.trim().replace(/
-/g, '<br/>') + '</p>';
+    '<p>' + message.trim().replace(/\n/g, '<br/>') + '</p>';
   await sendEmail('support@opsfloa.com', '[OpsFloa Support] ' + subjectLine + ' — ' + companyName, body);
   res.json({ ok: true });
 });
