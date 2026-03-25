@@ -74,6 +74,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     feature_analytics: settings?.feature_analytics ?? true,
     feature_chat: settings?.feature_chat ?? true,
     feature_geolocation: settings?.feature_geolocation ?? true,
+    feature_inactive_alerts: settings?.feature_inactive_alerts ?? true,
+    feature_broadcast: settings?.feature_broadcast ?? true,
     show_worker_wages: settings?.show_worker_wages ?? false,
     currency: settings?.currency ?? 'USD',
     company_timezone: settings?.company_timezone ?? '',
@@ -112,6 +114,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       feature_analytics: settings.feature_analytics ?? true,
       feature_chat: settings.feature_chat ?? true,
       feature_geolocation: settings.feature_geolocation ?? true,
+      feature_inactive_alerts: settings.feature_inactive_alerts ?? true,
+      feature_broadcast: settings.feature_broadcast ?? true,
       show_worker_wages: settings.show_worker_wages ?? false,
       currency: settings.currency ?? 'USD',
       company_timezone: settings.company_timezone ?? '',
@@ -141,6 +145,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_analytics: form.feature_analytics,
         feature_chat: form.feature_chat,
         feature_geolocation: form.feature_geolocation,
+        feature_inactive_alerts: form.feature_inactive_alerts,
+        feature_broadcast: form.feature_broadcast,
         show_worker_wages: form.show_worker_wages,
         currency: form.currency,
         company_timezone: form.company_timezone,
@@ -285,13 +291,23 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         </div>
         {!collapsed.notifications && <div style={styles.sectionBody}>
           <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Track Inactive Workers</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Send alerts when workers haven't submitted entries</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_inactive_alerts ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_inactive_alerts} onChange={e => set('feature_inactive_alerts', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_inactive_alerts ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          {form.feature_inactive_alerts && <div style={styles.row}>
             <label style={styles.label}>{t.ratesAlertInactive}</label>
             <div style={styles.inputGroup}>
               <input style={styles.input} type="number" min="1" max="30" step="1" value={form.notification_inactive_days} onChange={e => set('notification_inactive_days', e.target.value)} required />
               <span style={styles.suffix}>{t.ratesDays}</span>
             </div>
-          </div>
-          <div style={styles.row}>
+          </div>}
+          {form.feature_inactive_alerts && <div style={styles.row}>
             <div>
               <div style={styles.label}>Work hours window</div>
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Only send inactive alerts during these hours</div>
@@ -300,8 +316,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <input type="checkbox" checked={form.notification_use_work_hours} onChange={e => set('notification_use_work_hours', e.target.checked)} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleKnob, transform: form.notification_use_work_hours ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
-          </div>
-          {form.notification_use_work_hours && (
+          </div>}
+          {form.feature_inactive_alerts && form.notification_use_work_hours && (
             <div style={styles.row}>
               <label style={styles.label}>Hours range</label>
               <div style={styles.inputGroup}>
@@ -429,6 +445,16 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <label style={{ ...styles.toggle, background: form.feature_geolocation ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_geolocation} onChange={e => set('feature_geolocation', e.target.checked)} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleKnob, transform: form.feature_geolocation ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Announce to All Workers</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show broadcast message tool on the Live tab</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_broadcast ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_broadcast} onChange={e => set('feature_broadcast', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_broadcast ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
         </div>}

@@ -6,19 +6,24 @@ const { createInboxItem } = require('../routes/inbox');
 
 async function checkInactiveWorkers() {
   try {
-    // Get all active companies with their inactive_days threshold
+    // Get all active companies with their inactive_days threshold and alert toggle
     const companies = await pool.query(`
       SELECT c.id, c.name,
              COALESCE(
                (SELECT value::int FROM settings WHERE company_id = c.id AND key = 'notification_inactive_days'),
                3
-             ) as inactive_days
+             ) as inactive_days,
+             COALESCE(
+               (SELECT value FROM settings WHERE company_id = c.id AND key = 'feature_inactive_alerts'),
+               '1'
+             ) as feature_inactive_alerts
       FROM companies c
       WHERE c.subscription_status IN ('trial', 'active')
     `);
 
     for (const company of companies.rows) {
-      const { id: companyId, name: companyName, inactive_days } = company;
+      const { id: companyId, name: companyName, inactive_days, feature_inactive_alerts } = company;
+      if (feature_inactive_alerts === '0') continue;
 
       // Workers with no entry or last entry older than threshold
       const inactive = await pool.query(`

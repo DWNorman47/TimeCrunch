@@ -142,7 +142,7 @@ export default function AdminDashboard() {
             ...(settings?.feature_analytics !== false && canDo('view_reports') ? [{ id: 'analytics', label: t.tabAnalytics }] : []),
             ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
-            { id: 'manage', label: t.tabManage },
+            ...(settings?.feature_scheduling !== false ? [{ id: 'manage', label: t.tabManage }] : []),
           ]}
         />
 
@@ -154,7 +154,7 @@ export default function AdminDashboard() {
         ) : tab === 'live' ? (
           <>
             <LiveKPIs />
-            {plan.isBusiness ? <BroadcastMessage /> : null}
+            {plan.isBusiness && settings?.feature_broadcast !== false ? <BroadcastMessage /> : null}
             {settings?.feature_chat !== false ? (
               <div style={styles.liveLayout} className="live-layout">
                 <div style={styles.liveMain}><LiveWorkers timezone={settings?.company_timezone ?? ''} /></div>
