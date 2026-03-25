@@ -71,9 +71,10 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     show_worker_wages: settings?.show_worker_wages ?? false,
     currency: settings?.currency ?? 'USD',
     company_timezone: settings?.company_timezone ?? '',
+    invoice_signature: settings?.invoice_signature ?? 'optional',
   });
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(null); // section key or null
+  const [saved, setSaved] = useState(null);   // section key or null
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -92,15 +93,14 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       show_worker_wages: settings.show_worker_wages ?? false,
       currency: settings.currency ?? 'USD',
       company_timezone: settings.company_timezone ?? '',
+      invoice_signature: settings.invoice_signature ?? 'optional',
     });
   }, [settings]);
 
-  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); setError(''); };
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setSaved(null); setError(''); };
 
-  const handleSave = async e => {
-    e.preventDefault();
-    setSaving(true);
-    setError('');
+  const saveSection = async (section) => {
+    setSaving(section); setError('');
     try {
       const r = await api.patch('/admin/settings', {
         prevailing_wage_rate: parseFloat(form.prevailing_wage_rate),
@@ -116,18 +116,34 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         show_worker_wages: form.show_worker_wages,
         currency: form.currency,
         company_timezone: form.company_timezone,
+        invoice_signature: form.invoice_signature,
       });
       onSettingsUpdated(r.data);
-      setSaved(true);
+      setSaved(section);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save settings');
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   };
 
+  const SectionFooter = ({ section }) => (
+    <div style={styles.sectionFooter}>
+      {saved === section && <span style={styles.savedMsg}>{t.ratesSettingsSaved}</span>}
+      {error && saving === null && <span style={styles.errorMsg}>{error}</span>}
+      <button
+        style={styles.saveBtn}
+        type="button"
+        disabled={saving === section}
+        onClick={() => saveSection(section)}
+      >
+        {saving === section ? t.saving : t.ratesSaveSettings}
+      </button>
+    </div>
+  );
+
   return (
-    <form onSubmit={handleSave} style={styles.form}>
+    <div style={styles.form}>
 
       {/* ── Wages ── */}
       <div style={styles.section}>
@@ -173,6 +189,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </div>
           </div>
         </div>
+        <SectionFooter section="wages" />
       </div>
 
       {/* ── Overtime ── */}
@@ -209,6 +226,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </div>
           </div>
         </div>
+        <SectionFooter section="overtime" />
       </div>
 
       {/* ── Notifications ── */}
@@ -263,6 +281,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </div>
           </div>
         </div>
+        <SectionFooter section="notifications" />
       </div>
 
       {/* ── Worker Access ── */}
@@ -287,17 +306,26 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               </div>
             </label>
           </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Invoice Digital Signature</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Whether workers must sign invoices before exporting</div>
+            </div>
+            <select
+              style={{ ...styles.input, width: 'auto', textAlign: 'left' }}
+              value={form.invoice_signature}
+              onChange={e => set('invoice_signature', e.target.value)}
+            >
+              <option value="none">None — export without prompt</option>
+              <option value="optional">Optional — worker can skip</option>
+              <option value="required">Required — must sign to export</option>
+            </select>
+          </div>
         </div>
+        <SectionFooter section="access" />
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
-      <div style={styles.footer}>
-        {saved && <span style={styles.savedMsg}>{t.ratesSettingsSaved}</span>}
-        <button style={styles.saveBtn} type="submit" disabled={saving}>
-          {saving ? t.saving : t.ratesSaveSettings}
-        </button>
-      </div>
-    </form>
+    </div>
   );
 }
 
@@ -309,6 +337,7 @@ const styles = {
   sectionTitle: { fontSize: 14, fontWeight: 700, color: '#111827' },
   sectionSub: { fontSize: 12, color: '#9ca3af', marginTop: 1 },
   sectionBody: { display: 'flex', flexDirection: 'column' },
+  sectionFooter: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, padding: '12px 20px', borderTop: '1px solid #f3f4f6', background: '#fafafa' },
   row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 20px', borderBottom: '1px solid #f9fafb' },
   label: { fontSize: 13, fontWeight: 500, color: '#374151' },
   inputGroup: { display: 'flex', alignItems: 'center', gap: 6 },
@@ -318,8 +347,7 @@ const styles = {
   toggleTrack: { width: 44, height: 24, borderRadius: 12, transition: 'background 0.2s', position: 'relative' },
   toggleThumb: { position: 'absolute', top: 2, width: 20, height: 20, borderRadius: 10, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s' },
   input: { width: 90, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, textAlign: 'right' },
-  error: { color: '#e53e3e', fontSize: 13 },
-  footer: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, paddingTop: 4 },
   savedMsg: { color: '#059669', fontSize: 13, fontWeight: 600 },
-  saveBtn: { padding: '9px 22px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
+  errorMsg: { color: '#e53e3e', fontSize: 13 },
+  saveBtn: { padding: '7px 18px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
 };

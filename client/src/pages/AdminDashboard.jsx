@@ -70,6 +70,7 @@ function FeatureToggles({ settings, onSettingsUpdated }) {
     { key: 'feature_analytics',       label: t.featAnalytics,     desc: t.featAnalyticsDesc },
     { key: 'feature_chat',            label: t.featChat,          desc: t.featChatDesc },
     { key: 'feature_prevailing_wage', label: t.featPrevailingWage, desc: t.featPrevailingWageDesc },
+    { key: 'feature_field',           label: t.featField,          desc: t.featFieldDesc },
   ];
 
   return (
@@ -180,7 +181,7 @@ export default function AdminDashboard() {
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.logoGroup}>
-          <AppSwitcher currentApp="timeclock" userRole={user?.role} />
+          <AppSwitcher currentApp="timeclock" userRole={user?.role} features={settings} />
           {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         </div>
         <div style={styles.headerRight}>
@@ -251,7 +252,7 @@ export default function AdminDashboard() {
         ) : tab === 'approvals' ? (
           <>
             <h2 style={styles.heading}>{t.tabApprovals}</h2>
-            <ApprovalQueue />
+            <ApprovalQueue onCountChange={setPendingCount} />
           </>
         ) : tab === 'reports' ? (
           <>

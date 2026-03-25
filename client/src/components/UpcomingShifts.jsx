@@ -46,11 +46,6 @@ export default function UpcomingShifts({ onFillEntry }) {
               {s.project_name && <div style={styles.project}>{s.project_name}</div>}
               {s.notes && <div style={styles.notes}>{s.notes}</div>}
             </div>
-            {onFillEntry && (
-              <button style={styles.fillBtn} onClick={() => onFillEntry(s)} title="Pre-fill time entry from this shift">
-                + Log
-              </button>
-            )}
           </div>
         ))}
       </div>

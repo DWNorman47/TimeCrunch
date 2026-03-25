@@ -238,6 +238,20 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
     );
   }
 
+  if (!projects || projects.length === 0) {
+    return (
+      <div style={styles.card}>
+        {offlineBanner}
+        <h2 style={styles.heading}>{t.clockIn}</h2>
+        <div style={styles.noProjects}>
+          <div style={styles.noProjectsIcon}>📋</div>
+          <div style={styles.noProjectsTitle}>No projects available</div>
+          <div style={styles.noProjectsText}>Your admin needs to add a project before you can clock in. Contact your manager to get set up.</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.card}>
       {offlineBanner}
@@ -301,6 +315,10 @@ const styles = {
   clockInBtn: { padding: '13px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 700 },
   clockOutBtn: { width: '100%', padding: '13px', background: 'rgba(255,255,255,0.2)', color: '#fff', border: '2px solid rgba(255,255,255,0.5)', borderRadius: 8, fontSize: 16, fontWeight: 700, cursor: 'pointer' },
   cancelClockInBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: '2px 0', alignSelf: 'center' },
+  noProjects: { textAlign: 'center', padding: '24px 16px' },
+  noProjectsIcon: { fontSize: 36, marginBottom: 10 },
+  noProjectsTitle: { fontWeight: 700, fontSize: 16, color: '#374151', marginBottom: 6 },
+  noProjectsText: { fontSize: 13, color: '#9ca3af', lineHeight: 1.5 },
   offlineBanner: { background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 7, padding: '8px 12px', fontSize: 13, fontWeight: 500, marginBottom: 12 },
   offlineBannerDark: { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', borderRadius: 7, padding: '8px 12px', fontSize: 12, fontWeight: 500 },
 };
