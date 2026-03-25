@@ -176,6 +176,7 @@ export default function AdminDashboard() {
           <>
             <h2 style={styles.heading}>{t.tabApprovals}</h2>
             <ApprovalQueue onCountChange={setPendingCount} />
+            {canDo('approve_entries') && <ManagePayPeriods />}
           </>
         ) : tab === 'reports' ? (
           <>
@@ -214,7 +215,6 @@ export default function AdminDashboard() {
         ) : tab === 'manage' ? (
           <>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
-            {canDo('approve_entries') && <ManagePayPeriods />}
           </>
         ) : null}
       </main>
