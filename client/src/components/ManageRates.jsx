@@ -69,6 +69,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
     feature_overtime: settings?.feature_overtime ?? true,
+    feature_field: settings?.feature_field ?? true,
     show_worker_wages: settings?.show_worker_wages ?? false,
     currency: settings?.currency ?? 'USD',
     company_timezone: settings?.company_timezone ?? '',
@@ -94,6 +95,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       notification_end_hour: String(settings.notification_end_hour ?? 20),
       chat_retention_days: String(settings.chat_retention_days ?? 3),
       feature_overtime: settings.feature_overtime ?? true,
+      feature_field: settings.feature_field ?? true,
       show_worker_wages: settings.show_worker_wages ?? false,
       currency: settings.currency ?? 'USD',
       company_timezone: settings.company_timezone ?? '',
@@ -118,6 +120,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         notification_end_hour: parseFloat(form.notification_end_hour),
         chat_retention_days: parseFloat(form.chat_retention_days),
         feature_overtime: form.feature_overtime,
+        feature_field: form.feature_field,
         show_worker_wages: form.show_worker_wages,
         currency: form.currency,
         company_timezone: form.company_timezone,
@@ -321,6 +324,16 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <label style={{ ...styles.toggle, background: form.show_worker_wages ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.show_worker_wages} onChange={e => set('show_worker_wages', e.target.checked)} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleKnob, transform: form.show_worker_wages ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featField}</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featFieldDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_field ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_field} onChange={e => set('feature_field', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_field ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
           <div style={styles.row}>

@@ -68,8 +68,6 @@ function FeatureToggles({ settings, onSettingsUpdated }) {
     { key: 'feature_scheduling',      label: t.featScheduling,    desc: t.featSchedulingDesc },
     { key: 'feature_analytics',       label: t.featAnalytics,     desc: t.featAnalyticsDesc },
     { key: 'feature_chat',            label: t.featChat,          desc: t.featChatDesc },
-    { key: 'feature_prevailing_wage', label: t.featPrevailingWage, desc: t.featPrevailingWageDesc },
-    { key: 'feature_field',           label: t.featField,          desc: t.featFieldDesc },
   ];
 
   return (
