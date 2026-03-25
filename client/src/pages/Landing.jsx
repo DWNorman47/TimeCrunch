@@ -60,22 +60,24 @@ const plans = [
   },
 ];
 
-const testimonials = [
-  {
-    quote: "We used to chase down paper timesheets every Friday. Now payroll takes twenty minutes. The GPS clock-in alone was worth it.",
-    name: "Marcus T.",
-    role: "Owner, 6-man concrete crew",
-  },
-  {
-    quote: "Our GC started requiring daily reports and we were ready. My super logs everything from the field, I review from the truck. It's exactly what we needed.",
-    name: "Sandra R.",
-    role: "Project Manager, commercial framing",
-  },
-  {
-    quote: "Prevailing wage jobs were a nightmare to track manually. OpsFloa keeps regular and prevailing hours separate automatically. No more spreadsheets.",
-    name: "Derek V.",
-    role: "Foreman, 14-worker union crew",
-  },
+const compareRows = [
+  { feature: 'Workers',              free: 'Up to 3',     starter: 'Up to 10',  business: '15 included (+$2 after)' },
+  { feature: 'GPS Time Clock',       free: '✓',           starter: '✓',         business: '✓' },
+  { feature: 'Crew Scheduling',      free: '1 week ahead',starter: '1 week ahead', business: '✓' },
+  { feature: 'Timesheet PDF',        free: 'Latest week', starter: '✓',         business: '✓' },
+  { feature: 'CSV Export',           free: '—',           starter: '✓',         business: '✓' },
+  { feature: 'Full History',         free: '90 days',     starter: '✓',         business: '✓' },
+  { feature: 'Entry Approvals',      free: '—',           starter: '✓',         business: '✓' },
+  { feature: 'Pay Period Lock',      free: '—',           starter: '✓',         business: '✓' },
+  { feature: 'Overtime Reports',     free: '—',           starter: '✓',         business: '✓' },
+  { feature: 'Mileage & Breaks',     free: '—',           starter: '✓',         business: '✓' },
+  { feature: 'Daily Reports',        free: '—',           starter: '—',         business: '✓' },
+  { feature: 'Field Photos',         free: '—',           starter: '—',         business: '✓' },
+  { feature: 'Punchlist',            free: '—',           starter: '—',         business: '✓' },
+  { feature: 'Safety Talks',         free: '—',           starter: '—',         business: '✓' },
+  { feature: 'Analytics Dashboard',  free: '—',           starter: '—',         business: '✓' },
+  { feature: 'Team Messaging',       free: '—',           starter: '—',         business: '✓' },
+  { feature: 'Monthly Price',        free: '$0',          starter: '$20',       business: '$35' },
 ];
 
 const faqs = [
@@ -145,8 +147,8 @@ export default function Landing() {
         {/* Trust stats */}
         <div style={styles.heroStats}>
           <div style={styles.heroStat}>
-            <span style={styles.heroStatNum}>11+</span>
-            <span style={styles.heroStatLabel}>Features Built for the Field</span>
+            <span style={styles.heroStatNum}>Offline</span>
+            <span style={styles.heroStatLabel}>Works Without Internet — Syncs When Back Online</span>
           </div>
           <div style={styles.heroStatDivider} />
           <div style={styles.heroStat}>
@@ -163,7 +165,7 @@ export default function Landing() {
 
       {/* Social proof bar */}
       <div style={styles.proofBar}>
-        {['GPS Time Clock', 'Daily Reports', 'Field Photos', 'Punchlist', 'Safety Talks', 'Certified Payroll', 'QuickBooks Sync'].map(t => (
+        {['GPS Time Clock', 'Daily Reports', 'Field Photos', 'Punchlist', 'Safety Talks', 'Payroll', 'QuickBooks Sync'].map(t => (
           <span key={t} style={styles.proofItem}>✓ {t}</span>
         ))}
       </div>
@@ -202,25 +204,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section style={styles.testimonialsSection} className="landing-section">
-        <div style={styles.sectionInner}>
-          <h2 style={styles.sectionTitle}>Contractors Are Already Using It</h2>
-          <p style={styles.sectionSub}>From small owner-operators to multi-crew foremen.</p>
-          <div style={styles.testimonialsGrid}>
-            {testimonials.map((t, i) => (
-              <div key={i} style={styles.testimonialCard}>
-                <p style={styles.testimonialQuote}>"{t.quote}"</p>
-                <div style={styles.testimonialAuthor}>
-                  <span style={styles.testimonialName}>{t.name}</span>
-                  <span style={styles.testimonialRole}>{t.role}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Pricing */}
       <section id="pricing" style={styles.section} className="landing-section">
         <div style={styles.sectionInner}>
@@ -253,6 +236,33 @@ export default function Landing() {
             ))}
           </div>
           <p style={styles.annualNote}>Annual plans available with 2 months free — choose at checkout.</p>
+
+          {/* Comparison table */}
+          <div style={styles.compareWrap}>
+            <h3 style={styles.compareTitle}>Full Feature Comparison</h3>
+            <div style={styles.tableScroll}>
+              <table style={styles.compareTable}>
+                <thead>
+                  <tr>
+                    <th style={styles.compareTh}>Feature</th>
+                    <th style={styles.compareTh}>Free</th>
+                    <th style={styles.compareTh}>Starter</th>
+                    <th style={{ ...styles.compareTh, ...styles.compareThBusiness }}>Business</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {compareRows.map((row, i) => (
+                    <tr key={i} style={i % 2 === 0 ? styles.compareRowEven : {}}>
+                      <td style={styles.compareTdFeature}>{row.feature}</td>
+                      <td style={styles.compareTd}>{row.free}</td>
+                      <td style={styles.compareTd}>{row.starter}</td>
+                      <td style={{ ...styles.compareTd, ...styles.compareTdBusiness }}>{row.business}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -272,7 +282,7 @@ export default function Landing() {
         <div style={styles.finalCtaInner}>
           <div style={styles.finalCtaBrand}>OpsFloA · Ops Flow Assist</div>
           <h2 style={styles.finalCtaTitle}>Your crew is already on the job site.<br />Give them the tools to match.</h2>
-          <p style={styles.finalCtaSub}>One login. Every tool your field team needs — from clock-in to certified payroll.</p>
+          <p style={styles.finalCtaSub}>One login. Every tool your field team needs — from clock-in to payroll.</p>
           <Link to="/register" style={styles.finalCtaBtn}>Create Your Free Account →</Link>
         </div>
       </section>
@@ -368,14 +378,17 @@ const styles = {
   planBtnHighlight: { background: '#1a56db', color: '#fff' },
   annualNote: { textAlign: 'center', fontSize: 13, color: '#9ca3af', marginTop: 28 },
 
-  // Testimonials
-  testimonialsSection: { padding: '88px 24px', background: '#fff' },
-  testimonialsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 },
-  testimonialCard: { background: '#f8faff', borderRadius: 16, padding: '32px 28px', border: '1px solid #e8edf5', display: 'flex', flexDirection: 'column', gap: 20 },
-  testimonialQuote: { fontSize: 15, color: '#374151', lineHeight: 1.75, fontStyle: 'italic', margin: 0, flex: 1 },
-  testimonialAuthor: { display: 'flex', flexDirection: 'column', gap: 2 },
-  testimonialName: { fontSize: 14, fontWeight: 700, color: '#111827' },
-  testimonialRole: { fontSize: 12, color: '#9ca3af' },
+  // Comparison table
+  compareWrap: { marginTop: 52 },
+  compareTitle: { fontSize: 18, fontWeight: 700, color: '#111827', textAlign: 'center', marginBottom: 20 },
+  tableScroll: { overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 12, border: '1px solid #e5e7eb' },
+  compareTable: { width: '100%', borderCollapse: 'collapse', minWidth: 500 },
+  compareTh: { padding: '12px 16px', textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#f9fafb', borderBottom: '2px solid #e5e7eb' },
+  compareThBusiness: { background: '#eff6ff', color: '#1a56db' },
+  compareTdFeature: { padding: '11px 16px', fontSize: 13, fontWeight: 600, color: '#374151', textAlign: 'left', borderBottom: '1px solid #f3f4f6' },
+  compareTd: { padding: '11px 16px', fontSize: 13, color: '#374151', textAlign: 'center', borderBottom: '1px solid #f3f4f6' },
+  compareTdBusiness: { background: '#fafcff', fontWeight: 600, color: '#1a56db' },
+  compareRowEven: { background: '#fafafa' },
 
   // FAQ
   faqList: { display: 'flex', flexDirection: 'column', gap: 0, border: '1px solid #e8edf5', borderRadius: 12, overflow: 'hidden' },
