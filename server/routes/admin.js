@@ -16,10 +16,11 @@ const WORKER_LIMITS = { free: 3, starter: 10, business: null };
 
 async function checkWorkerLimit(companyId) {
   const company = await pool.query(
-    'SELECT plan, subscription_status FROM companies WHERE id = $1', [companyId]
+    'SELECT plan, subscription_status, trial_ends_at FROM companies WHERE id = $1', [companyId]
   );
-  const { plan, subscription_status } = company.rows[0] || {};
-  if (subscription_status === 'trial') return null; // trial = unlimited
+  const { plan, subscription_status, trial_ends_at } = company.rows[0] || {};
+  const trialActive = subscription_status === 'trial' && (!trial_ends_at || new Date(trial_ends_at) >= new Date());
+  if (trialActive) return null; // active trial = unlimited
   const limit = WORKER_LIMITS[plan || 'free'];
   if (limit === null) return null; // business = unlimited
   const count = await pool.query(

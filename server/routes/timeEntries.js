@@ -8,11 +8,12 @@ const { createInboxItem } = require('./inbox');
 router.get('/', requireAuth, async (req, res) => {
   try {
     const co = await pool.query(
-      'SELECT plan, subscription_status FROM companies WHERE id = $1',
+      'SELECT plan, subscription_status, trial_ends_at FROM companies WHERE id = $1',
       [req.user.company_id]
     );
-    const { plan, subscription_status } = co.rows[0] || {};
-    const isFree = plan === 'free' && subscription_status !== 'trial';
+    const { plan, subscription_status, trial_ends_at } = co.rows[0] || {};
+    const trialActive = subscription_status === 'trial' && (!trial_ends_at || new Date(trial_ends_at) >= new Date());
+    const isFree = plan === 'free' && !trialActive;
     const dateClause = isFree ? `AND te.work_date >= CURRENT_DATE - INTERVAL '90 days'` : '';
 
     const result = await pool.query(

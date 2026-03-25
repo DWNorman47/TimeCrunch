@@ -110,11 +110,12 @@ router.delete('/admin/:id', requireAdmin, async (req, res) => {
 router.get('/mine', requireAuth, async (req, res) => {
   try {
     const co = await pool.query(
-      'SELECT plan, subscription_status FROM companies WHERE id = $1',
+      'SELECT plan, subscription_status, trial_ends_at FROM companies WHERE id = $1',
       [req.user.company_id]
     );
-    const { plan, subscription_status } = co.rows[0] || {};
-    const isFree = plan === 'free' && subscription_status !== 'trial';
+    const { plan, subscription_status, trial_ends_at } = co.rows[0] || {};
+    const trialActive = subscription_status === 'trial' && (!trial_ends_at || new Date(trial_ends_at) >= new Date());
+    const isFree = plan === 'free' && !trialActive;
     // Free plan: current week only (Mon–Sun). Starter+: any future shift.
     const dateClause = isFree
       ? `AND s.shift_date >= date_trunc('week', CURRENT_DATE) AND s.shift_date < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'`
