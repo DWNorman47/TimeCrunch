@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 const features = [
@@ -60,6 +60,46 @@ const plans = [
   },
 ];
 
+const testimonials = [
+  {
+    quote: "We used to chase down paper timesheets every Friday. Now payroll takes twenty minutes. The GPS clock-in alone was worth it.",
+    name: "Marcus T.",
+    role: "Owner, 6-man concrete crew",
+  },
+  {
+    quote: "Our GC started requiring daily reports and we were ready. My super logs everything from the field, I review from the truck. It's exactly what we needed.",
+    name: "Sandra R.",
+    role: "Project Manager, commercial framing",
+  },
+  {
+    quote: "Prevailing wage jobs were a nightmare to track manually. OpsFloa keeps regular and prevailing hours separate automatically. No more spreadsheets.",
+    name: "Derek V.",
+    role: "Foreman, 14-worker union crew",
+  },
+];
+
+const faqs = [
+  { q: "Is the free plan actually free?", a: "Yes — no credit card required, no trial period, no catch. The Free plan supports up to 3 workers with GPS time clock and scheduling. Upgrade when your crew grows." },
+  { q: "Do my workers need to download an app?", a: "No download required. OpsFloa works in any mobile browser. Workers can also install it to their home screen as a PWA for a native app feel — no App Store, no IT department." },
+  { q: "Does it work without internet or in poor signal areas?", a: "Yes. Workers can clock in and submit entries offline. Everything syncs automatically when they're back online." },
+  { q: "Can I track prevailing wage and regular hours separately?", a: "Yes. Every time entry is tagged as regular or prevailing wage. Rates, overtime multipliers, and daily vs. weekly OT rules are all configurable per worker and per project." },
+  { q: "How does the QuickBooks integration work?", a: "Connect your QuickBooks Online account in one click. Map your workers and projects to their QB counterparts. When ready, push approved time entries directly to QuickBooks as Time Activities — no manual re-entry." },
+  { q: "Can I cancel anytime?", a: "Yes. No contracts, no cancellation fees. Cancel from your billing page at any time. Your data stays accessible through the end of your current billing period." },
+];
+
+function FAQItem({ q, a }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={styles.faqItem}>
+      <button style={styles.faqQ} onClick={() => setOpen(o => !o)}>
+        <span>{q}</span>
+        <span style={{ ...styles.faqChevron, transform: open ? 'rotate(180deg)' : 'none' }}>▾</span>
+      </button>
+      {open && <p style={styles.faqA}>{a}</p>}
+    </div>
+  );
+}
+
 export default function Landing() {
   return (
     <div id="top" style={styles.page}>
@@ -73,6 +113,7 @@ export default function Landing() {
           <a href="#features" style={styles.navLink}>Features</a>
           <a href="#how-it-works" style={styles.navLink}>How It Works</a>
           <a href="#pricing" style={styles.navLink}>Pricing</a>
+          <a href="#faq" style={styles.navLink}>FAQ</a>
         </nav>
         <div style={styles.headerRight}>
           <Link to="/login" style={styles.loginLink}>Log In</Link>
@@ -85,6 +126,7 @@ export default function Landing() {
         <a href="#features" style={styles.subnavLink}>Features</a>
         <a href="#how-it-works" style={styles.subnavLink}>How It Works</a>
         <a href="#pricing" style={styles.subnavLink}>Pricing</a>
+        <a href="#faq" style={styles.subnavLink}>FAQ</a>
       </nav>
 
       {/* Hero */}
@@ -160,6 +202,25 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Testimonials */}
+      <section style={styles.testimonialsSection} className="landing-section">
+        <div style={styles.sectionInner}>
+          <h2 style={styles.sectionTitle}>Contractors Are Already Using It</h2>
+          <p style={styles.sectionSub}>From small owner-operators to multi-crew foremen.</p>
+          <div style={styles.testimonialsGrid}>
+            {testimonials.map((t, i) => (
+              <div key={i} style={styles.testimonialCard}>
+                <p style={styles.testimonialQuote}>"{t.quote}"</p>
+                <div style={styles.testimonialAuthor}>
+                  <span style={styles.testimonialName}>{t.name}</span>
+                  <span style={styles.testimonialRole}>{t.role}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Pricing */}
       <section id="pricing" style={styles.section} className="landing-section">
         <div style={styles.sectionInner}>
@@ -192,6 +253,17 @@ export default function Landing() {
             ))}
           </div>
           <p style={styles.annualNote}>Annual plans available with 2 months free — choose at checkout.</p>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" style={styles.howSection} className="landing-section">
+        <div style={{ ...styles.sectionInner, maxWidth: 720 }}>
+          <h2 style={styles.sectionTitle}>Frequently Asked Questions</h2>
+          <p style={styles.sectionSub}>Everything you need to know before you sign up.</p>
+          <div style={styles.faqList}>
+            {faqs.map((f, i) => <FAQItem key={i} q={f.q} a={f.a} />)}
+          </div>
         </div>
       </section>
 
@@ -295,6 +367,22 @@ const styles = {
   planBtn: { display: 'block', textAlign: 'center', border: '2px solid #1a56db', color: '#1a56db', padding: '11px', borderRadius: 8, fontWeight: 700, fontSize: 14, textDecoration: 'none' },
   planBtnHighlight: { background: '#1a56db', color: '#fff' },
   annualNote: { textAlign: 'center', fontSize: 13, color: '#9ca3af', marginTop: 28 },
+
+  // Testimonials
+  testimonialsSection: { padding: '88px 24px', background: '#fff' },
+  testimonialsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 },
+  testimonialCard: { background: '#f8faff', borderRadius: 16, padding: '32px 28px', border: '1px solid #e8edf5', display: 'flex', flexDirection: 'column', gap: 20 },
+  testimonialQuote: { fontSize: 15, color: '#374151', lineHeight: 1.75, fontStyle: 'italic', margin: 0, flex: 1 },
+  testimonialAuthor: { display: 'flex', flexDirection: 'column', gap: 2 },
+  testimonialName: { fontSize: 14, fontWeight: 700, color: '#111827' },
+  testimonialRole: { fontSize: 12, color: '#9ca3af' },
+
+  // FAQ
+  faqList: { display: 'flex', flexDirection: 'column', gap: 0, border: '1px solid #e8edf5', borderRadius: 12, overflow: 'hidden' },
+  faqItem: { borderBottom: '1px solid #e8edf5' },
+  faqQ: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', background: '#fff', border: 'none', textAlign: 'left', fontSize: 15, fontWeight: 600, color: '#111827', cursor: 'pointer', gap: 16 },
+  faqChevron: { fontSize: 16, color: '#9ca3af', flexShrink: 0, transition: 'transform 0.2s' },
+  faqA: { margin: 0, padding: '0 24px 20px', fontSize: 14, color: '#6b7280', lineHeight: 1.7 },
 
   // Final CTA
   finalCta: { background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)', color: '#fff', textAlign: 'center', padding: '96px 24px' },
