@@ -34,7 +34,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [tab, setTab] = useState('clock');
+  const TABS = ['clock', 'messages', 'timeline', 'timesheet', 'account'];
+  const hashTab = window.location.hash.replace('#', '');
+  const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'clock');
   const [entryView, setEntryView] = useState('list');
   const [shiftPrefill, setShiftPrefill] = useState(null);
 
@@ -284,11 +286,11 @@ tr:last-child td{border-bottom:none}
 
       <main style={styles.main} className="mobile-main">
         <div style={styles.tabs} className="tab-bar">
-          <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => setTab('clock')}>🕐 Clock</button>
-          <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => setTab('messages')}>💬 Messages</button>
-          <button style={tab === 'timeline' ? styles.tabActive : styles.tab} onClick={() => setTab('timeline')}>📅 Timeline</button>
-          <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => setTab('timesheet')}>📋 Timesheet</button>
-          <button style={tab === 'account' ? styles.tabActive : styles.tab} onClick={() => setTab('account')}>👤 Account</button>
+          <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); window.location.hash = 'clock'; }}>🕐 Clock</button>
+          <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => { setTab('messages'); window.location.hash = 'messages'; }}>💬 Messages</button>
+          <button style={tab === 'timeline' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeline'); window.location.hash = 'timeline'; }}>📅 Timeline</button>
+          <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); window.location.hash = 'timesheet'; }}>📋 Timesheet</button>
+          <button style={tab === 'account' ? styles.tabActive : styles.tab} onClick={() => { setTab('account'); window.location.hash = 'account'; }}>👤 Account</button>
         </div>
 
         {tab === 'messages' && <CompanyChat />}
