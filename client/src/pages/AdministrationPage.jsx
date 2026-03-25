@@ -292,14 +292,6 @@ export default function AdministrationPage() {
   const plan = usePlan();
   const t = useT();
 
-  const tabs = [
-    { id: 'company',      label: t.adminTabCompany      },
-    { id: 'team',         label: t.adminTabTeam         },
-    ...(settings?.feature_projects !== false ? [{ id: 'projects', label: t.adminTabProjects }] : []),
-    ...(plan.hasQbo ? [{ id: 'integrations', label: t.adminTabIntegrations }] : []),
-    { id: 'billing',      label: t.adminTabBilling      },
-    { id: 'account',      label: t.adminTabAccount      },
-  ];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ADMIN_TABS.includes(hashTab) ? hashTab : 'company');
   const switchTab = t => { setTab(t); window.location.hash = t; };
@@ -308,6 +300,15 @@ export default function AdministrationPage() {
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
+
+  const tabs = [
+    { id: 'company',      label: t.adminTabCompany      },
+    { id: 'team',         label: t.adminTabTeam         },
+    ...(settings?.feature_projects !== false ? [{ id: 'projects', label: t.adminTabProjects }] : []),
+    ...(plan.hasQbo ? [{ id: 'integrations', label: t.adminTabIntegrations }] : []),
+    { id: 'billing',      label: t.adminTabBilling      },
+    { id: 'account',      label: t.adminTabAccount      },
+  ];
 
   useEffect(() => {
     Promise.all([
