@@ -201,11 +201,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <div style={styles.label}>Allow Overtime</div>
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Track and display overtime hours and pay</div>
             </div>
-            <label style={styles.toggle}>
+            <label style={{ ...styles.toggle, background: form.feature_overtime ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_overtime} onChange={e => set('feature_overtime', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleTrack, background: form.feature_overtime ? '#1a56db' : '#d1d5db' }}>
-                <span style={{ ...styles.toggleThumb, transform: form.feature_overtime ? 'translateX(18px)' : 'translateX(2px)' }} />
-              </span>
+              <span style={{ ...styles.toggleKnob, transform: form.feature_overtime ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
         </div>
@@ -271,11 +269,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <div style={styles.label}>Work hours window</div>
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Only send inactive alerts during these hours</div>
             </div>
-            <label style={styles.toggle}>
+            <label style={{ ...styles.toggle, background: form.notification_use_work_hours ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.notification_use_work_hours} onChange={e => set('notification_use_work_hours', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleTrack, background: form.notification_use_work_hours ? '#1a56db' : '#d1d5db' }}>
-                <span style={{ ...styles.toggleThumb, transform: form.notification_use_work_hours ? 'translateX(18px)' : 'translateX(2px)' }} />
-              </span>
+              <span style={{ ...styles.toggleKnob, transform: form.notification_use_work_hours ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
           {form.notification_use_work_hours && (
@@ -322,11 +318,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <div style={styles.label}>{t.ratesShowWages}</div>
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.ratesShowWagesDesc}</div>
             </div>
-            <label style={styles.toggle}>
+            <label style={{ ...styles.toggle, background: form.show_worker_wages ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.show_worker_wages} onChange={e => set('show_worker_wages', e.target.checked)} style={{ display: 'none' }} />
-              <div style={{ ...styles.toggleTrack, background: form.show_worker_wages ? '#1a56db' : '#e5e7eb' }}>
-                <div style={{ ...styles.toggleThumb, transform: form.show_worker_wages ? 'translateX(20px)' : 'translateX(2px)' }} />
-              </div>
+              <span style={{ ...styles.toggleKnob, transform: form.show_worker_wages ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
           <div style={styles.row}>
@@ -366,9 +360,8 @@ const styles = {
   inputGroup: { display: 'flex', alignItems: 'center', gap: 6 },
   prefix: { fontSize: 14, color: '#6b7280' },
   suffix: { fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap' },
-  toggle: { cursor: 'pointer', flexShrink: 0 },
-  toggleTrack: { width: 44, height: 24, borderRadius: 12, transition: 'background 0.2s', position: 'relative' },
-  toggleThumb: { position: 'absolute', top: 2, width: 20, height: 20, borderRadius: 10, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s' },
+  toggle: { display: 'flex', alignItems: 'center', width: 70, height: 40, borderRadius: 7, border: 'none', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, padding: 4 },
+  toggleKnob: { display: 'block', width: 16, height: 32, borderRadius: 5, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s', flexShrink: 0 },
   input: { width: 90, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, textAlign: 'right' },
   savedMsg: { color: '#059669', fontSize: 13, fontWeight: 600 },
   errorMsg: { color: '#e53e3e', fontSize: 13 },
