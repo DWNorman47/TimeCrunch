@@ -51,10 +51,13 @@ async function refreshAccessToken(companyId) {
     );
     return r.data.access_token;
   } catch (err) {
-    // Expired refresh token or revoked access — clear connection and prompt user to reconnect
+    // Any auth failure from the token endpoint means we can't recover — mark disconnected
     const status = err.response?.status;
     const errorCode = err.response?.data?.error;
-    if (status === 400 && (errorCode === 'invalid_grant' || errorCode === 'Token expired')) {
+    const isAuthFailure = status === 400 && (errorCode === 'invalid_grant' || errorCode === 'Token expired')
+      || status === 401
+      || status === 403;
+    if (isAuthFailure) {
       await pool.query(
         `UPDATE companies
          SET qbo_access_token = NULL, qbo_refresh_token = NULL,
@@ -62,7 +65,9 @@ async function refreshAccessToken(companyId) {
          WHERE id = $1`,
         [companyId]
       );
-      throw new Error('QuickBooks authorization expired. Please reconnect your QuickBooks account.');
+      const authErr = new Error('QuickBooks authorization expired. Please reconnect your QuickBooks account.');
+      authErr.code = 'qbo_auth_expired';
+      throw authErr;
     }
     throw err;
   }
@@ -86,12 +91,26 @@ async function qboGet(companyId, path) {
   const token = await getAccessToken(companyId);
   const realmResult = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
   const realmId = decrypt(realmResult.rows[0].qbo_realm_id);
-  const r = await axios.get(`${QBO_BASE}/v3/company/${realmId}${path}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  });
-  const tid = r.headers['intuit_tid'];
-  if (tid) console.log(`[QBO] intuit_tid=${tid} path=${path}`);
-  return r.data;
+  try {
+    const r = await axios.get(`${QBO_BASE}/v3/company/${realmId}${path}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    });
+    const tid = r.headers['intuit_tid'];
+    if (tid) console.log(`[QBO] intuit_tid=${tid} path=${path}`);
+    return r.data;
+  } catch (err) {
+    if (err.response?.status === 401 || err.response?.status === 403) {
+      await pool.query(
+        `UPDATE companies SET qbo_access_token = NULL, qbo_refresh_token = NULL,
+         qbo_token_expires_at = NULL, qbo_disconnected = true WHERE id = $1`,
+        [companyId]
+      );
+      const authErr = new Error('QuickBooks authorization expired. Please reconnect your QuickBooks account.');
+      authErr.code = 'qbo_auth_expired';
+      throw authErr;
+    }
+    throw err;
+  }
 }
 
 async function qboPost(companyId, path, body) {

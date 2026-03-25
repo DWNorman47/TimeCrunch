@@ -109,7 +109,8 @@ router.get('/employees', requireAdmin, async (req, res) => {
     res.json(employees);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || 'Server error' });
+    const status = err.code === 'qbo_auth_expired' ? 401 : 500;
+    res.status(status).json({ error: err.message || 'Server error', code: err.code });
   }
 });
 
@@ -120,7 +121,8 @@ router.get('/customers', requireAdmin, async (req, res) => {
     res.json(customers);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || 'Server error' });
+    const status = err.code === 'qbo_auth_expired' ? 401 : 500;
+    res.status(status).json({ error: err.message || 'Server error', code: err.code });
   }
 });
 

@@ -24,7 +24,15 @@ export default function QuickBooks({ workers, projects }) {
     setLoadingMappings(true);
     Promise.all([api.get('/qbo/employees'), api.get('/qbo/customers')])
       .then(([e, c]) => { setQboEmployees(e.data); setQboCustomers(c.data); })
-      .catch(err => setError(err.response?.data?.error || 'Failed to load QuickBooks data'))
+      .catch(err => {
+        const code = err.response?.data?.code;
+        if (code === 'qbo_auth_expired') {
+          // Token expired — flip the UI to the reconnect banner
+          setStatus(s => ({ ...s, connected: false, disconnected: true }));
+        } else {
+          setError(err.response?.data?.error || 'Failed to load QuickBooks data');
+        }
+      })
       .finally(() => setLoadingMappings(false));
 
     // Pre-populate existing mappings from workers/projects
