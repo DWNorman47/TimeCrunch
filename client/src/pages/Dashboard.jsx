@@ -12,7 +12,6 @@ import PayStubView from '../components/PayStubView';
 import NotificationSetup from '../components/NotificationSetup';
 import TimesheetSignOff from '../components/TimesheetSignOff';
 import CompanyChat from '../components/CompanyChat';
-import DayTimeline from '../components/DayTimeline';
 import AppSwitcher from '../components/AppSwitcher';
 import NotificationBell from '../components/NotificationBell';
 import { getT } from '../i18n';
@@ -34,7 +33,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const TABS = ['clock', 'messages', 'timeline', 'timesheet', 'account'];
+  const TABS = ['clock', 'messages', 'timesheet', 'account'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'clock');
   const [entryView, setEntryView] = useState('list');
@@ -286,24 +285,13 @@ tr:last-child td{border-bottom:none}
 
       <main style={styles.main} className="mobile-main">
         <div style={styles.tabs} className="tab-bar">
-          <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); window.location.hash = 'clock'; }}>🕐 Clock</button>
-          <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => { setTab('messages'); window.location.hash = 'messages'; }}>💬 Messages</button>
-          <button style={tab === 'timeline' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeline'); window.location.hash = 'timeline'; }}>📅 Timeline</button>
-          <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); window.location.hash = 'timesheet'; }}>📋 Timesheet</button>
-          <button style={tab === 'account' ? styles.tabActive : styles.tab} onClick={() => { setTab('account'); window.location.hash = 'account'; }}>👤 Account</button>
+          <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); window.location.hash = 'clock'; }}>\uD83D\uDD50 Clock</button>
+          <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => { setTab('messages'); window.location.hash = 'messages'; }}>\uD83D\uDCAC Messages</button>
+          <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); window.location.hash = 'timesheet'; }}>\uD83D\uDCCB Timesheet</button>
+          <button style={tab === 'account' ? styles.tabActive : styles.tab} onClick={() => { setTab('account'); window.location.hash = 'account'; }}>\uD83D\uDC64 Account</button>
         </div>
 
         {tab === 'messages' && <CompanyChat />}
-
-        {tab === 'timeline' && (
-          <DayTimeline
-            entries={entries}
-            projects={projects}
-            onEntryAdded={entry => setEntries(prev => [entry, ...prev])}
-            onEntryUpdated={handleEntryUpdated}
-            onRefresh={refreshEntries}
-          />
-        )}
 
         {tab === 'clock' && (
           <>
@@ -327,9 +315,9 @@ tr:last-child td{border-bottom:none}
               )}
             </div>
             {loadError ? <p style={{ color: '#dc2626', padding: '12px' }}>{t.loadError} <button onClick={fetchData} style={{ textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}>{t.retry}</button></p> : loading ? <p>{t.loadingEntries}</p> : entryView === 'timesheet' ? (
-              <TimesheetView entries={entries} language={user?.language} />
+              <TimesheetView entries={entries} language={user?.language} projects={projects} onRefresh={refreshEntries} />
             ) : (
-              <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} currentUserId={user?.id} />
+              <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} currentUserId={user?.id} projects={projects} onRefresh={refreshEntries} />
             )}
           </>
         )}

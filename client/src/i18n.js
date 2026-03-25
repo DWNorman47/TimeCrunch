@@ -6,8 +6,8 @@ const translations = {
     loadingEntries: 'Loading entries...',
     loadError: 'Failed to load data.',
     retry: 'Retry',
-    timesheetView: '📅 Timesheet',
-    listView: '☰ List',
+    timesheetView: '📅 Timeline',
+    listView: '☰ Entry List',
 
     // Clock In/Out
     clockIn: 'Clock In',
@@ -394,8 +394,8 @@ const translations = {
     loadingEntries: 'Cargando entradas...',
     loadError: 'Error al cargar los datos.',
     retry: 'Reintentar',
-    timesheetView: '📅 Planilla',
-    listView: '☰ Lista',
+    timesheetView: '📅 Línea de tiempo',
+    listView: '☰ Lista de entradas',
 
     // Clock In/Out
     clockIn: 'Registrar Entrada',
