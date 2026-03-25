@@ -181,7 +181,7 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
         } else {
           const val = parseFloat(req.body[key]);
           if (isNaN(val)) return res.status(400).json({ error: `Invalid value for ${key}` });
-          if (rateKeys.includes(key) && val <= 0) return res.status(400).json({ error: `Invalid value for ${key}` });
+          if (rateKeys.includes(key) && (key === 'prevailing_wage_rate' ? val < 0 : val <= 0)) return res.status(400).json({ error: `Invalid value for ${key}` });
           if ([...notifKeys, 'overtime_threshold'].includes(key) && val < 0) return res.status(400).json({ error: `Invalid value for ${key}` });
           await pool.query(
             'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
