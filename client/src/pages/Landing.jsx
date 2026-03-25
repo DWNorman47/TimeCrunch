@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 const features = [
@@ -60,6 +60,48 @@ const plans = [
   },
 ];
 
+const compareRows = [
+  { feature: 'Workers',              free: 'Up to 3',     starter: 'Up to 10',  business: '15 included (+$2 after)' },
+  { feature: 'GPS Time Clock',       free: '✓',           starter: '✓',         business: '✓' },
+  { feature: 'Crew Scheduling',      free: '1 week ahead',starter: '1 week ahead', business: '✓' },
+  { feature: 'Timesheet PDF',        free: 'Latest week', starter: '✓',         business: '✓' },
+  { feature: 'CSV Export',           free: '—',           starter: '✓',         business: '✓' },
+  { feature: 'Full History',         free: '90 days',     starter: '✓',         business: '✓' },
+  { feature: 'Entry Approvals',      free: '—',           starter: '✓',         business: '✓' },
+  { feature: 'Pay Period Lock',      free: '—',           starter: '✓',         business: '✓' },
+  { feature: 'Overtime Reports',     free: '—',           starter: '✓',         business: '✓' },
+  { feature: 'Mileage & Breaks',     free: '—',           starter: '✓',         business: '✓' },
+  { feature: 'Daily Reports',        free: '—',           starter: '—',         business: '✓' },
+  { feature: 'Field Photos',         free: '—',           starter: '—',         business: '✓' },
+  { feature: 'Punchlist',            free: '—',           starter: '—',         business: '✓' },
+  { feature: 'Safety Talks',         free: '—',           starter: '—',         business: '✓' },
+  { feature: 'Analytics Dashboard',  free: '—',           starter: '—',         business: '✓' },
+  { feature: 'Team Messaging',       free: '—',           starter: '—',         business: '✓' },
+  { feature: 'Monthly Price',        free: '$0',          starter: '$20',       business: '$35' },
+];
+
+const faqs = [
+  { q: "Is the free plan actually free?", a: "Yes — no credit card required, no trial period, no catch. The Free plan supports up to 3 workers with GPS time clock and scheduling. Upgrade when your crew grows." },
+  { q: "Do my workers need to download an app?", a: "No download required. OpsFloa works in any mobile browser. Workers can also install it to their home screen as a PWA for a native app feel — no App Store, no IT department." },
+  { q: "Does it work without internet or in poor signal areas?", a: "Yes. Workers can clock in and submit entries offline. Everything syncs automatically when they're back online." },
+  { q: "Can I track prevailing wage and regular hours separately?", a: "Yes. Every time entry is tagged as regular or prevailing wage. Rates, overtime multipliers, and daily vs. weekly OT rules are all configurable per worker and per project." },
+  { q: "How does the QuickBooks integration work?", a: "Connect your QuickBooks Online account in one click. Map your workers and projects to their QB counterparts. When ready, push approved time entries directly to QuickBooks as Time Activities — no manual re-entry." },
+  { q: "Can I cancel anytime?", a: "Yes. No contracts, no cancellation fees. Cancel from your billing page at any time. Your data stays accessible through the end of your current billing period." },
+];
+
+function FAQItem({ q, a }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={styles.faqItem}>
+      <button style={styles.faqQ} onClick={() => setOpen(o => !o)}>
+        <span>{q}</span>
+        <span style={{ ...styles.faqChevron, transform: open ? 'rotate(180deg)' : 'none' }}>▾</span>
+      </button>
+      {open && <p style={styles.faqA}>{a}</p>}
+    </div>
+  );
+}
+
 export default function Landing() {
   return (
     <div id="top" style={styles.page}>
@@ -73,6 +115,7 @@ export default function Landing() {
           <a href="#features" style={styles.navLink}>Features</a>
           <a href="#how-it-works" style={styles.navLink}>How It Works</a>
           <a href="#pricing" style={styles.navLink}>Pricing</a>
+          <a href="#faq" style={styles.navLink}>FAQ</a>
         </nav>
         <div style={styles.headerRight}>
           <Link to="/login" style={styles.loginLink}>Log In</Link>
@@ -85,6 +128,7 @@ export default function Landing() {
         <a href="#features" style={styles.subnavLink}>Features</a>
         <a href="#how-it-works" style={styles.subnavLink}>How It Works</a>
         <a href="#pricing" style={styles.subnavLink}>Pricing</a>
+        <a href="#faq" style={styles.subnavLink}>FAQ</a>
       </nav>
 
       {/* Hero */}
@@ -103,8 +147,8 @@ export default function Landing() {
         {/* Trust stats */}
         <div style={styles.heroStats}>
           <div style={styles.heroStat}>
-            <span style={styles.heroStatNum}>11+</span>
-            <span style={styles.heroStatLabel}>Features Built for the Field</span>
+            <span style={styles.heroStatNum}>Offline</span>
+            <span style={styles.heroStatLabel}>Works Without Internet — Syncs When Back Online</span>
           </div>
           <div style={styles.heroStatDivider} />
           <div style={styles.heroStat}>
@@ -121,7 +165,7 @@ export default function Landing() {
 
       {/* Social proof bar */}
       <div style={styles.proofBar}>
-        {['GPS Time Clock', 'Daily Reports', 'Field Photos', 'Punchlist', 'Safety Talks', 'Certified Payroll', 'QuickBooks Sync'].map(t => (
+        {['GPS Time Clock', 'Daily Reports', 'Field Photos', 'Punchlist', 'Safety Talks', 'Payroll', 'QuickBooks Sync'].map(t => (
           <span key={t} style={styles.proofItem}>✓ {t}</span>
         ))}
       </div>
@@ -192,6 +236,44 @@ export default function Landing() {
             ))}
           </div>
           <p style={styles.annualNote}>Annual plans available with 2 months free — choose at checkout.</p>
+
+          {/* Comparison table */}
+          <div style={styles.compareWrap}>
+            <h3 style={styles.compareTitle}>Full Feature Comparison</h3>
+            <div style={styles.tableScroll}>
+              <table style={styles.compareTable}>
+                <thead>
+                  <tr>
+                    <th style={styles.compareTh}>Feature</th>
+                    <th style={styles.compareTh}>Free</th>
+                    <th style={styles.compareTh}>Starter</th>
+                    <th style={{ ...styles.compareTh, ...styles.compareThBusiness }}>Business</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {compareRows.map((row, i) => (
+                    <tr key={i} style={i % 2 === 0 ? styles.compareRowEven : {}}>
+                      <td style={styles.compareTdFeature}>{row.feature}</td>
+                      <td style={styles.compareTd}>{row.free}</td>
+                      <td style={styles.compareTd}>{row.starter}</td>
+                      <td style={{ ...styles.compareTd, ...styles.compareTdBusiness }}>{row.business}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" style={styles.howSection} className="landing-section">
+        <div style={{ ...styles.sectionInner, maxWidth: 720 }}>
+          <h2 style={styles.sectionTitle}>Frequently Asked Questions</h2>
+          <p style={styles.sectionSub}>Everything you need to know before you sign up.</p>
+          <div style={styles.faqList}>
+            {faqs.map((f, i) => <FAQItem key={i} q={f.q} a={f.a} />)}
+          </div>
         </div>
       </section>
 
@@ -200,7 +282,7 @@ export default function Landing() {
         <div style={styles.finalCtaInner}>
           <div style={styles.finalCtaBrand}>OpsFloA · Ops Flow Assist</div>
           <h2 style={styles.finalCtaTitle}>Your crew is already on the job site.<br />Give them the tools to match.</h2>
-          <p style={styles.finalCtaSub}>One login. Every tool your field team needs — from clock-in to certified payroll.</p>
+          <p style={styles.finalCtaSub}>One login. Every tool your field team needs — from clock-in to payroll.</p>
           <Link to="/register" style={styles.finalCtaBtn}>Create Your Free Account →</Link>
         </div>
       </section>
@@ -295,6 +377,25 @@ const styles = {
   planBtn: { display: 'block', textAlign: 'center', border: '2px solid #1a56db', color: '#1a56db', padding: '11px', borderRadius: 8, fontWeight: 700, fontSize: 14, textDecoration: 'none' },
   planBtnHighlight: { background: '#1a56db', color: '#fff' },
   annualNote: { textAlign: 'center', fontSize: 13, color: '#9ca3af', marginTop: 28 },
+
+  // Comparison table
+  compareWrap: { marginTop: 52 },
+  compareTitle: { fontSize: 18, fontWeight: 700, color: '#111827', textAlign: 'center', marginBottom: 20 },
+  tableScroll: { overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 12, border: '1px solid #e5e7eb' },
+  compareTable: { width: '100%', borderCollapse: 'collapse', minWidth: 500 },
+  compareTh: { padding: '12px 16px', textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#f9fafb', borderBottom: '2px solid #e5e7eb' },
+  compareThBusiness: { background: '#eff6ff', color: '#1a56db' },
+  compareTdFeature: { padding: '11px 16px', fontSize: 13, fontWeight: 600, color: '#374151', textAlign: 'left', borderBottom: '1px solid #f3f4f6' },
+  compareTd: { padding: '11px 16px', fontSize: 13, color: '#374151', textAlign: 'center', borderBottom: '1px solid #f3f4f6' },
+  compareTdBusiness: { background: '#fafcff', fontWeight: 600, color: '#1a56db' },
+  compareRowEven: { background: '#fafafa' },
+
+  // FAQ
+  faqList: { display: 'flex', flexDirection: 'column', gap: 0, border: '1px solid #e8edf5', borderRadius: 12, overflow: 'hidden' },
+  faqItem: { borderBottom: '1px solid #e8edf5' },
+  faqQ: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', background: '#fff', border: 'none', textAlign: 'left', fontSize: 15, fontWeight: 600, color: '#111827', cursor: 'pointer', gap: 16 },
+  faqChevron: { fontSize: 16, color: '#9ca3af', flexShrink: 0, transition: 'transform 0.2s' },
+  faqA: { margin: 0, padding: '0 24px 20px', fontSize: 14, color: '#6b7280', lineHeight: 1.7 },
 
   // Final CTA
   finalCta: { background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)', color: '#fff', textAlign: 'center', padding: '96px 24px' },

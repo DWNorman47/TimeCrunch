@@ -175,7 +175,7 @@ const styles = {
   entry: { border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 12px', cursor: 'default' },
   entryExpanded: { borderColor: '#93c5fd', background: '#f8faff' },
   entryRow: { display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' },
-  checkbox: { flexShrink: 0, width: 15, height: 15, cursor: 'pointer' },
+  checkbox: { flexShrink: 0, width: 22, height: 22, cursor: 'pointer' },
   entryInfo: { flex: 1, minWidth: 0 },
   project: { display: 'block', fontWeight: 700, fontSize: 14, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   times: { display: 'block', fontSize: 12, color: '#6b7280', marginTop: 2 },
