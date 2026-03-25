@@ -131,6 +131,7 @@ const translations = {
     adminTabProjects: '📋 Projects',
     adminTabIntegrations: 'QuickBooks',
     adminTabBilling: '💳 Billing',
+    adminTabLog: '📋 Log',
     adminTabAccount: '👤 Account',
 
     // Section titles
@@ -521,6 +522,7 @@ const translations = {
     adminTabProjects: '📋 Proyectos',
     adminTabIntegrations: 'QuickBooks',
     adminTabBilling: '💳 Facturación',
+    adminTabLog: '📋 Registro',
     adminTabAccount: '👤 Cuenta',
 
     // Section titles

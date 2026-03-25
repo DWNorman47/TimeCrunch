@@ -285,7 +285,7 @@ function AccountTab() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const ADMIN_TABS = ['company', 'team', 'projects', 'integrations', 'billing', 'account'];
+const ADMIN_TABS = ['company', 'team', 'projects', 'integrations', 'billing', 'log', 'account'];
 
 export default function AdministrationPage() {
   const { user, logout } = useAuth();
@@ -307,6 +307,7 @@ export default function AdministrationPage() {
     ...(settings?.feature_projects !== false ? [{ id: 'projects', label: t.adminTabProjects }] : []),
     ...(plan.hasQbo ? [{ id: 'integrations', label: t.adminTabIntegrations }] : []),
     { id: 'billing',      label: t.adminTabBilling      },
+    { id: 'log',          label: t.adminTabLog          },
     { id: 'account',      label: t.adminTabAccount      },
   ];
 
@@ -369,7 +370,11 @@ export default function AdministrationPage() {
               currency={settings?.currency ?? 'USD'}
               currentUser={user}
             />
-            <h3 style={styles.sectionTitle}>{t.auditLog}</h3>
+          </div>
+        )}
+        {tab === 'log'      && (
+          <div style={styles.tabContent}>
+            <h2 style={styles.tabTitle}>{t.auditLog}</h2>
             <AuditLog timezone={settings?.company_timezone ?? ''} />
           </div>
         )}
