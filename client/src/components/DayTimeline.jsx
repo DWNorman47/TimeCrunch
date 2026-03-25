@@ -189,10 +189,9 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       ]);
-      onEntryUpdated(patchRes.data);
-      onEntryAdded(postRes.data);
       closeSplit();
       toast('Break inserted', 'success');
+      onRefresh();
     } catch (err) {
       toast(err.response?.data?.error || 'Failed to split entry', 'error');
     } finally { setSaving(false); }
@@ -217,10 +216,9 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       ]);
-      onEntryUpdated(patchRes.data);
-      onEntryAdded(postRes.data);
       closeSplit();
       toast('Project switch inserted', 'success');
+      onRefresh();
     } catch (err) {
       toast(err.response?.data?.error || 'Failed to split entry', 'error');
     } finally { setSaving(false); }
