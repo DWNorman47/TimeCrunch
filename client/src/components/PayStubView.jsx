@@ -43,9 +43,10 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen }) {
   const workerRate = parseFloat(user?.hourly_rate) || parseFloat(settings?.default_hourly_rate) || 0;
   const prevRate = parseFloat(settings?.prevailing_wage_rate) || 0;
   const otMult = parseFloat(settings?.overtime_multiplier) || 1.5;
+  const overtimeEnabled = settings?.feature_overtime !== false;
 
   const regularPay = regular_hours * workerRate;
-  const overtimePay = overtime_hours * workerRate * otMult;
+  const overtimePay = overtimeEnabled ? overtime_hours * workerRate * otMult : 0;
   const prevailingPay = prevailing_hours * prevRate;
   const totalPay = regularPay + overtimePay + prevailingPay;
   const showPay = workerRate > 0 || prevRate > 0;
@@ -159,7 +160,7 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen }) {
                   <span>{fmtH(regular_hours)}</span>
                 </div>
               )}
-              {overtime_hours > 0 && (
+              {overtimeEnabled && overtime_hours > 0 && (
                 <div style={s.sumRow}>
                   <span>Overtime Hours</span>
                   <span>{fmtH(overtime_hours)}</span>
@@ -183,7 +184,7 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen }) {
                       <span>{fmtMoney(regularPay)}</span>
                     </div>
                   )}
-                  {overtime_hours > 0 && workerRate > 0 && (
+                  {overtimeEnabled && overtime_hours > 0 && workerRate > 0 && (
                     <div style={s.sumRow}>
                       <span>Overtime Pay ({otMult}×)</span>
                       <span>{fmtMoney(overtimePay)}</span>

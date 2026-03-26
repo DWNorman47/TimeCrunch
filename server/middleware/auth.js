@@ -43,11 +43,17 @@ function requirePlan(minPlan) {
   return async (req, res, next) => {
     try {
       const r = await pool.query(
-        'SELECT plan, subscription_status, addon_qbo FROM companies WHERE id = $1',
+        'SELECT plan, subscription_status, addon_qbo, trial_ends_at FROM companies WHERE id = $1',
         [req.user.company_id]
       );
       const company = r.rows[0];
       if (!company) return res.status(403).json({ error: 'Company not found' });
+
+      // Real-time trial expiry check — don't wait for the cron job
+      if (company.subscription_status === 'trial' && company.trial_ends_at && new Date(company.trial_ends_at) < new Date()) {
+        await pool.query('UPDATE companies SET subscription_status = $1 WHERE id = $2', ['trial_expired', req.user.company_id]);
+        return res.status(403).json({ error: 'Trial expired', code: 'subscription_required' });
+      }
 
       if (company.subscription_status === 'canceled' || company.subscription_status === 'trial_expired') {
         return res.status(403).json({ error: 'Subscription required', code: 'subscription_required' });
@@ -79,11 +85,17 @@ function requirePlan(minPlan) {
 async function requireProAddon(req, res, next) {
   try {
     const r = await pool.query(
-      'SELECT plan, subscription_status, addon_qbo FROM companies WHERE id = $1',
+      'SELECT plan, subscription_status, addon_qbo, trial_ends_at FROM companies WHERE id = $1',
       [req.user.company_id]
     );
     const company = r.rows[0];
     if (!company) return res.status(403).json({ error: 'Company not found' });
+
+    // Real-time trial expiry check
+    if (company.subscription_status === 'trial' && company.trial_ends_at && new Date(company.trial_ends_at) < new Date()) {
+      await pool.query('UPDATE companies SET subscription_status = $1 WHERE id = $2', ['trial_expired', req.user.company_id]);
+      return res.status(403).json({ error: 'Trial expired', code: 'subscription_required' });
+    }
 
     if (company.subscription_status === 'canceled' || company.subscription_status === 'trial_expired') {
       return res.status(403).json({ error: 'Subscription required', code: 'subscription_required' });

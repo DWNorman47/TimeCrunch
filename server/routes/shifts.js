@@ -109,10 +109,22 @@ router.delete('/admin/:id', requireAdmin, async (req, res) => {
 // GET /shifts/mine — worker's upcoming shifts
 router.get('/mine', requireAuth, async (req, res) => {
   try {
+    const co = await pool.query(
+      'SELECT plan, subscription_status, trial_ends_at FROM companies WHERE id = $1',
+      [req.user.company_id]
+    );
+    const { plan, subscription_status, trial_ends_at } = co.rows[0] || {};
+    const trialActive = subscription_status === 'trial' && (!trial_ends_at || new Date(trial_ends_at) >= new Date());
+    const isFree = plan === 'free' && !trialActive;
+    // Free plan: current week only (Mon–Sun). Starter+: any future shift.
+    const dateClause = isFree
+      ? `AND s.shift_date >= date_trunc('week', CURRENT_DATE) AND s.shift_date < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'`
+      : `AND s.shift_date >= CURRENT_DATE`;
+
     const result = await pool.query(
       `SELECT s.*, p.name as project_name
        FROM shifts s LEFT JOIN projects p ON s.project_id = p.id
-       WHERE s.user_id = $1 AND s.shift_date >= CURRENT_DATE
+       WHERE s.user_id = $1 ${dateClause}
        ORDER BY s.shift_date ASC, s.start_time ASC
        LIMIT 14`,
       [req.user.id]

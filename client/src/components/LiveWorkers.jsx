@@ -32,7 +32,7 @@ function ElapsedTimer({ clockInTime }) {
   return <span style={styles.elapsed}>{formatElapsed(clockInTime)}</span>;
 }
 
-export default function LiveWorkers({ timezone = '' }) {
+export default function LiveWorkers({ timezone = '', showInactiveAlerts = true }) {
   const t = useT();
   const [workers, setWorkers] = useState([]);
   const [inactiveWorkers, setInactiveWorkers] = useState([]);
@@ -95,7 +95,7 @@ export default function LiveWorkers({ timezone = '' }) {
 
   return (
     <div style={styles.wrap}>
-      {inactiveWorkers.length > 0 && !dismissedInactive && (
+      {showInactiveAlerts && inactiveWorkers.length > 0 && !dismissedInactive && (
         <div style={styles.inactiveBanner}>
           <div style={styles.inactiveBannerLeft}>
             <span style={styles.inactiveIcon}>⚠️</span>

@@ -47,30 +47,33 @@ function ActionBadge({ action }) {
 export default function AuditLog({ timezone = '' }) {
   const [entries, setEntries] = useState([]);
   const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const LIMIT = 30;
+  const LIMIT = 25;
 
-  const load = async (off = 0, reset = false) => {
+  const load = async (pg) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: LIMIT, offset: off });
+      const params = new URLSearchParams({ limit: LIMIT, offset: pg * LIMIT });
       if (group) params.set('group', group);
       if (from) params.set('from', from);
       if (to) params.set('to', to);
       const r = await api.get(`/admin/audit-log?${params}`);
-      setEntries(prev => off === 0 || reset ? r.data.entries : [...prev, ...r.data.entries]);
+      setEntries(r.data.entries);
       setTotal(r.data.total);
-      setOffset(off);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(0, true); }, [group, from, to]);
+  useEffect(() => { setPage(0); }, [group, from, to]);
+  useEffect(() => { load(page); }, [page, group, from, to]);
+
+  const totalPages = Math.ceil(total / LIMIT);
+  const goTo = pg => setPage(pg);
 
   return (
     <div style={styles.card}>
@@ -126,10 +129,14 @@ export default function AuditLog({ timezone = '' }) {
             })}
           </div>
 
-          {entries.length < total && (
-            <button style={styles.loadMore} onClick={() => load(offset + LIMIT)} disabled={loading}>
-              {loading ? 'Loading...' : `Load more (${total - entries.length} remaining)`}
-            </button>
+          {totalPages > 1 && (
+            <div style={styles.pagination}>
+              <button style={styles.pageBtn} onClick={() => goTo(0)} disabled={page === 0 || loading}>«</button>
+              <button style={styles.pageBtn} onClick={() => goTo(page - 1)} disabled={page === 0 || loading}>‹ Prev</button>
+              <span style={styles.pageInfo}>Page {page + 1} of {totalPages}</span>
+              <button style={styles.pageBtn} onClick={() => goTo(page + 1)} disabled={page >= totalPages - 1 || loading}>Next ›</button>
+              <button style={styles.pageBtn} onClick={() => goTo(totalPages - 1)} disabled={page >= totalPages - 1 || loading}>»</button>
+            </div>
           )}
         </>
       )}
@@ -158,5 +165,7 @@ const styles = {
   rowActor: { fontSize: 12, color: '#9ca3af' },
   details: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 },
   detailChip: { fontSize: 11, background: '#f9fafb', border: '1px solid #e5e7eb', color: '#6b7280', padding: '1px 7px', borderRadius: 4 },
-  loadMore: { marginTop: 16, background: 'none', border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 16px', fontSize: 13, color: '#374151', cursor: 'pointer', width: '100%' },
+  pagination: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 16, justifyContent: 'center' },
+  pageBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 7, padding: '6px 12px', fontSize: 13, color: '#374151', cursor: 'pointer' },
+  pageInfo: { fontSize: 13, color: '#6b7280', padding: '0 8px' },
 };

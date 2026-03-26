@@ -22,7 +22,7 @@ function formatElapsed(seconds) {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
-export default function ClockInOut({ projects, onEntryAdded, t }) {
+export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabled = true, projectsEnabled = true }) {
   const { isOffline, queueCount, onSync } = useOffline() || {};
   const [status, setStatus] = useState(null); // null = loading, false = not clocked in, object = clocked in
   const [clockInForm, setClockInForm] = useState({ selectedProject: '', notes: '' });
@@ -75,10 +75,10 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
   };
 
   const handleClockIn = async () => {
-    if (!selectedProject) { setError(t.selectProjectFirst); return; }
+    if (projectsEnabled && !selectedProject) { setError(t.selectProjectFirst); return; }
     setError('');
     setLoading(true);
-    const { lat, lng } = await getLocation();
+    const { lat, lng } = geolocationEnabled ? await getLocation() : { lat: null, lng: null };
     const local_work_date = new Date().toLocaleDateString('en-CA');
     try {
       const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
@@ -122,7 +122,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
   const handleClockOut = async () => {
     setError('');
     setLoading(true);
-    const { lat, lng } = await getLocation();
+    const { lat, lng } = geolocationEnabled ? await getLocation() : { lat: null, lng: null };
     const local_clock_in = status.clock_in_time ? toLocalTime(new Date(status.clock_in_time)) : toLocalTime(new Date());
     const local_clock_out = toLocalTime(new Date());
     try {
@@ -257,7 +257,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
       {offlineBanner}
       <h2 style={styles.heading}>{t.clockIn}</h2>
       <div style={styles.form}>
-        <div>
+        {projectsEnabled && <div>
           <label style={styles.label}>{t.project}</label>
           <select
             style={styles.input}
@@ -271,7 +271,7 @@ export default function ClockInOut({ projects, onEntryAdded, t }) {
               </option>
             ))}
           </select>
-        </div>
+        </div>}
         <div>
           <label style={styles.label}>{t.notesOptional}</label>
           <input

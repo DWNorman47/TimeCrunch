@@ -18,92 +18,8 @@ import LiveKPIs from '../components/LiveKPIs';
 import BroadcastMessage from '../components/BroadcastMessage';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
-import MFASetup from '../components/MFASetup';
 import api from '../api';
 
-function FeatureToggle({ name, desc, serverEnabled, onToggle }) {
-  const [enabled, setEnabled] = useState(serverEnabled);
-  const [saving, setSaving] = useState(false);
-
-  // Sync if server value changes from outside (e.g. initial load)
-  useEffect(() => { setEnabled(serverEnabled); }, [serverEnabled]);
-
-  const handleClick = async () => {
-    const newVal = !enabled;
-    setEnabled(newVal);         // optimistic: update immediately
-    setSaving(true);
-    try {
-      await onToggle(newVal);
-    } catch {
-      setEnabled(!newVal);      // revert on failure
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div style={ftStyles.row}>
-      <div style={ftStyles.info}>
-        <span style={ftStyles.label}>{name}</span>
-        <span style={ftStyles.desc}>{desc}</span>
-      </div>
-      <button
-        style={{ ...ftStyles.toggle, background: enabled ? '#1a56db' : '#d1d5db', opacity: saving ? 0.6 : 1 }}
-        onClick={handleClick}
-        aria-pressed={enabled}
-      >
-        <span style={{ ...ftStyles.knob, transform: enabled ? 'translateX(46px)' : 'translateX(0)' }} />
-      </button>
-    </div>
-  );
-}
-
-function FeatureToggles({ settings, onSettingsUpdated }) {
-  const t = useT();
-  const handleToggle = async (key, newVal) => {
-    const r = await api.patch('/admin/settings', { [key]: newVal });
-    onSettingsUpdated(r.data);
-  };
-
-  const featureDefs = [
-    { key: 'feature_scheduling',      label: t.featScheduling,    desc: t.featSchedulingDesc },
-    { key: 'feature_analytics',       label: t.featAnalytics,     desc: t.featAnalyticsDesc },
-    { key: 'feature_chat',            label: t.featChat,          desc: t.featChatDesc },
-    { key: 'feature_prevailing_wage', label: t.featPrevailingWage, desc: t.featPrevailingWageDesc },
-    { key: 'feature_field',           label: t.featField,          desc: t.featFieldDesc },
-  ];
-
-  return (
-    <div style={ftStyles.card}>
-      <h3 style={ftStyles.title}>{t.featuresTitle}</h3>
-      <p style={ftStyles.subtitle}>{t.featuresSubtitle}</p>
-      <div style={ftStyles.list}>
-        {featureDefs.map(({ key, label, desc }) => (
-          <FeatureToggle
-            key={key}
-            name={label}
-            desc={desc}
-            serverEnabled={settings?.[key] !== false}
-            onToggle={newVal => handleToggle(key, newVal)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const ftStyles = {
-  card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 24 },
-  title: { fontSize: 17, fontWeight: 700, margin: '0 0 4px' },
-  subtitle: { fontSize: 13, color: '#6b7280', margin: '0 0 12px' },
-  list: { display: 'flex', flexDirection: 'column', gap: 0 },
-  row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '10px 0', borderTop: '1px solid #f3f4f6' },
-  info: { display: 'flex', flexDirection: 'column', gap: 1 },
-  label: { fontSize: 14, fontWeight: 600, color: '#111827' },
-  desc: { fontSize: 12, color: '#9ca3af' },
-  toggle: { display: 'flex', alignItems: 'center', width: 70, height: 40, borderRadius: 7, border: 'none', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, padding: 4 },
-  knob: { display: 'block', width: 16, height: 32, borderRadius: 5, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'transform 0.2s', flexShrink: 0 },
-};
 
 function UpgradePrompt({ requiredPlan, feature }) {
   const t = useT();
@@ -135,6 +51,14 @@ export default function AdminDashboard() {
   const [loadError, setLoadError] = useState(false);
   const [billing, setBilling] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
+  const [collapsedSections, setCollapsedSections] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('opsfloa_report_sections') || '{}'); } catch { return {}; }
+  });
+  const toggleSection = key => setCollapsedSections(s => {
+    const next = { ...s, [key]: !s[key] };
+    localStorage.setItem('opsfloa_report_sections', JSON.stringify(next));
+    return next;
+  });
 
   useEffect(() => {
     api.get('/stripe/status').then(r => setBilling(r.data)).catch(() => {});
@@ -151,7 +75,7 @@ export default function AdminDashboard() {
   // Permission helper — null admin_permissions means full access
   const canDo = key => !user?.admin_permissions || user.admin_permissions[key] === true;
 
-  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'manage', 'settings'];
+  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'manage'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
 
@@ -218,8 +142,7 @@ export default function AdminDashboard() {
             ...(settings?.feature_analytics !== false && canDo('view_reports') ? [{ id: 'analytics', label: t.tabAnalytics }] : []),
             ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
-            { id: 'manage', label: t.tabManage },
-            ...(canDo('manage_settings') ? [{ id: 'settings', label: t.tabSettings }] : []),
+            ...(settings?.feature_scheduling !== false ? [{ id: 'manage', label: t.tabManage }] : []),
           ]}
         />
 
@@ -231,14 +154,14 @@ export default function AdminDashboard() {
         ) : tab === 'live' ? (
           <>
             <LiveKPIs />
-            {plan.isBusiness ? <BroadcastMessage /> : null}
+            {plan.isBusiness && settings?.feature_broadcast !== false ? <BroadcastMessage /> : null}
             {settings?.feature_chat !== false ? (
               <div style={styles.liveLayout} className="live-layout">
-                <div style={styles.liveMain}><LiveWorkers timezone={settings?.company_timezone ?? ''} /></div>
+                <div style={styles.liveMain}><LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} /></div>
                 <div style={styles.liveChat}><CompanyChat workers={workers} /></div>
               </div>
             ) : (
-              <LiveWorkers timezone={settings?.company_timezone ?? ''} />
+              <LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} />
             )}
           </>
         ) : tab === 'analytics' ? (
@@ -253,40 +176,49 @@ export default function AdminDashboard() {
           <>
             <h2 style={styles.heading}>{t.tabApprovals}</h2>
             <ApprovalQueue onCountChange={setPendingCount} />
+            {canDo('approve_entries') && <ManagePayPeriods />}
           </>
         ) : tab === 'reports' ? (
           <>
             <h2 style={styles.heading}>{t.tabReports}</h2>
-            <h3 style={styles.subheading}>{t.workerReports}</h3>
-            {workers.length === 0
+            <button style={styles.sectionToggle} onClick={() => toggleSection('workers')}>
+              <span>{t.workerReports}</span>
+              <span style={styles.chevron}>{collapsedSections.workers ? '▶' : '▼'}</span>
+            </button>
+            {!collapsedSections.workers && (workers.length === 0
               ? <p style={{ color: '#666' }}>{t.noWorkersYet}</p>
-              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} />)
-            }
-            <h3 style={styles.subheading}>{t.projectReports}</h3>
-            <ProjectReports currency={settings?.currency ?? 'USD'} />
-            <h3 style={styles.subheading}>{t.overtimeReport}</h3>
-            {plan.isStarter ? <OvertimeReport currency={settings?.currency ?? 'USD'} /> : <UpgradePrompt requiredPlan="starter" feature={t.overtimeReport} />}
-            <h3 style={styles.subheading}>Payroll</h3>
-            {plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature="Payroll" />}
-            <h3 style={styles.subheading}>{t.export}</h3>
-            {plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />}
+              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} overtimeEnabled={settings?.feature_overtime !== false} projectsEnabled={settings?.feature_projects !== false} />)
+            )}
+            {settings?.feature_projects !== false && <>
+              <button style={styles.sectionToggle} onClick={() => toggleSection('projects')}>
+                <span>{t.projectReports}</span>
+                <span style={styles.chevron}>{collapsedSections.projects ? '▶' : '▼'}</span>
+              </button>
+              {!collapsedSections.projects && <ProjectReports currency={settings?.currency ?? 'USD'} />}
+            </>}
+            {settings?.feature_overtime !== false && <>
+              <button style={styles.sectionToggle} onClick={() => toggleSection('overtime')}>
+                <span>{t.overtimeReport}</span>
+                <span style={styles.chevron}>{collapsedSections.overtime ? '▶' : '▼'}</span>
+              </button>
+              {!collapsedSections.overtime && (plan.isStarter ? <OvertimeReport currency={settings?.currency ?? 'USD'} /> : <UpgradePrompt requiredPlan="starter" feature={t.overtimeReport} />)}
+            </>}
+            <button style={styles.sectionToggle} onClick={() => toggleSection('payroll')}>
+              <span>Payroll</span>
+              <span style={styles.chevron}>{collapsedSections.payroll ? '▶' : '▼'}</span>
+            </button>
+            {!collapsedSections.payroll && (plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature="Payroll" />)}
+            <button style={styles.sectionToggle} onClick={() => toggleSection('export')}>
+              <span>{t.export}</span>
+              <span style={styles.chevron}>{collapsedSections.export ? '▶' : '▼'}</span>
+            </button>
+            {!collapsedSections.export && (plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />)}
           </>
         ) : tab === 'manage' ? (
           <>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
-            {canDo('approve_entries') && <ManagePayPeriods />}
           </>
-        ) : (
-          <>
-            <h2 style={styles.heading}>{t.tabSettings}</h2>
-            <FeatureToggles settings={settings} onSettingsUpdated={setSettings} />
-            <MFASetup />
-            <div style={styles.supportNote}>
-              {t.helpText.split('info@opsfloa.com')[0]}<a href="mailto:info@opsfloa.com" style={{ color: '#1a56db' }}>info@opsfloa.com</a>
-            </div>
-            <p style={{ fontSize: 13, color: '#6b7280' }}>{t.qboNote.split('Administration app')[0]}<a href="/administration#integrations" style={{ color: '#1a56db' }}>Administration app</a>.</p>
-          </>
-        )}
+        ) : null}
       </main>
     </div>
   );
@@ -306,6 +238,8 @@ const styles = {
   tabActive: { flex: 1, padding: '9px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', whiteSpace: 'nowrap', textAlign: 'center' },
   heading: { marginBottom: 20, fontSize: 22 },
   subheading: { fontSize: 18, fontWeight: 600, margin: '32px 0 16px' },
+  sectionToggle: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 16px', fontSize: 16, fontWeight: 600, color: '#111827', cursor: 'pointer', marginTop: 24, marginBottom: 4, textAlign: 'left' },
+  chevron: { fontSize: 11, color: '#6b7280' },
   trialBanner: { padding: '10px 24px', border: '1px solid', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 },
   trialUpgradeBtn: { background: 'none', border: 'none', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', fontSize: 14, color: 'inherit', padding: 0 },
   liveLayout: { display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' },

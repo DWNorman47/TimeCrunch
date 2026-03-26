@@ -14,6 +14,7 @@ const { requireAuth, requirePlan, requireProAddon } = require('./middleware/auth
 const pool = require('./db');
 
 const app = express();
+app.set('trust proxy', 1); // trust first proxy (Render) so req.ip is the real client IP
 app.use(helmet());
 app.use(cors());
 
@@ -58,8 +59,13 @@ app.use('/api/inbox', require('./routes/inbox'));
 const { SETTINGS_DEFAULTS, applySettingsRows } = require('./settingsDefaults');
 app.get('/api/settings', requireAuth, async (req, res) => {
   try {
-    const result = await pool.query('SELECT key, value FROM settings WHERE company_id = $1', [req.user.company_id]);
-    res.json(applySettingsRows(result.rows, SETTINGS_DEFAULTS));
+    const [settingsResult, coResult] = await Promise.all([
+      pool.query('SELECT key, value FROM settings WHERE company_id = $1', [req.user.company_id]),
+      pool.query('SELECT plan, subscription_status FROM companies WHERE id = $1', [req.user.company_id]),
+    ]);
+    const settings = applySettingsRows(settingsResult.rows, SETTINGS_DEFAULTS);
+    const { plan, subscription_status } = coResult.rows[0] || {};
+    res.json({ ...settings, plan: plan || 'free', subscription_status: subscription_status || 'trial' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

@@ -10,6 +10,7 @@ import ManageProjects from '../components/ManageProjects';
 import ManageRates from '../components/ManageRates';
 import AuditLog from '../components/AuditLog';
 import QuickBooks from '../components/QuickBooks';
+import MFASetup from '../components/MFASetup';
 import { usePlan } from '../hooks/usePlan';
 
 function RoleBadge({ role }) {
@@ -208,6 +209,8 @@ function AccountTab() {
         </div>
       </div>
 
+      <MFASetup />
+
       <div style={styles.card}>
         <button
           style={styles.accordionTrigger}
@@ -282,21 +285,13 @@ function AccountTab() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const ADMIN_TABS = ['company', 'team', 'projects', 'integrations', 'billing', 'account'];
+const ADMIN_TABS = ['company', 'team', 'projects', 'integrations', 'billing', 'log', 'account'];
 
 export default function AdministrationPage() {
   const { user, logout } = useAuth();
   const plan = usePlan();
   const t = useT();
 
-  const tabs = [
-    { id: 'company',      label: t.adminTabCompany      },
-    { id: 'team',         label: t.adminTabTeam         },
-    { id: 'projects',     label: t.adminTabProjects     },
-    { id: 'integrations', label: t.adminTabIntegrations },
-    { id: 'billing',      label: t.adminTabBilling      },
-    { id: 'account',      label: t.adminTabAccount      },
-  ];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ADMIN_TABS.includes(hashTab) ? hashTab : 'company');
   const switchTab = t => { setTab(t); window.location.hash = t; };
@@ -305,6 +300,16 @@ export default function AdministrationPage() {
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
+
+  const tabs = [
+    { id: 'company',      label: t.adminTabCompany      },
+    { id: 'team',         label: t.adminTabTeam         },
+    ...(settings?.feature_projects !== false ? [{ id: 'projects', label: t.adminTabProjects }] : []),
+    ...(plan.hasQbo ? [{ id: 'integrations', label: t.adminTabIntegrations }] : []),
+    { id: 'billing',      label: t.adminTabBilling      },
+    { id: 'log',          label: t.adminTabLog          },
+    { id: 'account',      label: t.adminTabAccount      },
+  ];
 
   useEffect(() => {
     Promise.all([
@@ -365,7 +370,11 @@ export default function AdministrationPage() {
               currency={settings?.currency ?? 'USD'}
               currentUser={user}
             />
-            <h3 style={styles.sectionTitle}>{t.auditLog}</h3>
+          </div>
+        )}
+        {tab === 'log'      && (
+          <div style={styles.tabContent}>
+            <h2 style={styles.tabTitle}>{t.auditLog}</h2>
             <AuditLog timezone={settings?.company_timezone ?? ''} />
           </div>
         )}
@@ -380,6 +389,7 @@ export default function AdministrationPage() {
               onProjectRestored={handleProjectRestored}
               nameEditable={true}
               defaultPrevailingRate={settings?.prevailing_wage_rate}
+              showWageType={(settings?.prevailing_wage_rate ?? 0) > 0}
               currency={settings?.currency ?? 'USD'}
             />
           </div>
@@ -387,15 +397,7 @@ export default function AdministrationPage() {
         {tab === 'integrations' && (
           <div style={styles.tabContent}>
             <h2 style={styles.tabTitle}>{t.integrations}</h2>
-            {plan.hasQbo
-              ? <QuickBooks workers={workers} projects={projects} />
-              : <div style={{ background: '#f9fafb', border: '2px dashed #d1d5db', borderRadius: 10, padding: '32px 24px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 6 }}>{t.qboRequired}</div>
-                  <button style={{ background: '#1a56db', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', marginTop: 8 }}
-                    onClick={() => switchTab('billing')}>{t.viewPlans}</button>
-                </div>
-            }
+            <QuickBooks workers={workers} projects={projects} />
           </div>
         )}
         {tab === 'billing'  && <BillingTab />}

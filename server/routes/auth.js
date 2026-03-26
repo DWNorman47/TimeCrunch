@@ -150,6 +150,45 @@ router.post('/register', authLimiter, async (req, res) => {
   if (username.length > 50) return res.status(400).json({ error: 'Username must be 50 characters or fewer' });
   const pwErr = validatePassword(password, username);
   if (pwErr) return res.status(400).json({ error: pwErr });
+
+  // Capture real client IP (req.ip respects trust proxy setting)
+  const registrationIp = req.ip || 'unknown';
+
+  // Block IPs that have registered too many trials recently
+  const TRIAL_LIMIT = parseInt(process.env.TRIAL_LIMIT_PER_IP) || 5;
+  const ipQuery = await pool.query(
+    `SELECT COUNT(*), array_agg(name ORDER BY created_at) as company_names
+     FROM companies WHERE registration_ip = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+    [registrationIp]
+  );
+  const priorCount = parseInt(ipQuery.rows[0].count);
+  if (priorCount >= TRIAL_LIMIT) {
+    return res.status(429).json({ error: 'This IP address has been flagged for suspicious activity. Further registration attempts from this network are being logged and reviewed by our trust and safety team.' });
+  }
+  // Alert on second registration from same IP (priorCount >= 1 means this is #2+)
+  if (priorCount >= 1) {
+    const priorNames = ipQuery.rows[0].company_names || [];
+    sgMail.send({
+      from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
+      to: 'info@opsfloa.com',
+      subject: `⚠️ Multiple trial registrations from IP ${registrationIp}`,
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px">
+          <h2 style="color:#dc2626;margin-bottom:8px">Multiple trial registrations</h2>
+          <p style="color:#444">A new company is being registered from an IP address that has already signed up for a trial in the last 30 days.</p>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px">
+            <tr><td style="padding:6px 0;color:#6b7280;width:140px">IP Address</td><td style="padding:6px 0;font-weight:600">${registrationIp}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280">New company</td><td style="padding:6px 0;font-weight:600">${company_name}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280">New email</td><td style="padding:6px 0">${email}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280">Prior registrations</td><td style="padding:6px 0">${priorNames.join(', ')}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280">Total from this IP</td><td style="padding:6px 0">${priorCount + 1} in last 30 days</td></tr>
+          </table>
+          <p style="color:#9ca3af;font-size:12px">Registration was allowed (limit is ${TRIAL_LIMIT}). You'll receive another alert if they register again.</p>
+        </div>
+      `,
+    }).catch(err => console.error('Trial abuse alert email failed:', err));
+  }
+
   const slug = company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
   const client = await pool.connect();
   try {
@@ -161,9 +200,9 @@ router.post('/register', authLimiter, async (req, res) => {
     }
     const trialDays = parseInt(process.env.TRIAL_DAYS) || 14;
     const companyResult = await client.query(
-      `INSERT INTO companies (name, slug, subscription_status, trial_ends_at)
-       VALUES ($1, $2, 'trial', NOW() + ($3 || ' days')::INTERVAL) RETURNING id`,
-      [company_name, slug, trialDays]
+      `INSERT INTO companies (name, slug, subscription_status, trial_ends_at, registration_ip)
+       VALUES ($1, $2, 'trial', NOW() + ($3 || ' days')::INTERVAL, $4) RETURNING id`,
+      [company_name, slug, trialDays, registrationIp]
     );
     const companyId = companyResult.rows[0].id;
     const defaults = [['prevailing_wage_rate', 45], ['default_hourly_rate', 30], ['overtime_multiplier', 1.5]];
