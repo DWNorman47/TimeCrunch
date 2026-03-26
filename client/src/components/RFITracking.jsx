@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { RFIDownloadLink } from './RFIPdf';
 
 function today() { return new Date().toISOString().substring(0, 10); }
 
@@ -121,7 +122,7 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
 
 // ── RFI Card ──────────────────────────────────────────────────────────────────
 
-function RFICard({ rfi, isAdmin, onEdit, onDeleted }) {
+function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -183,14 +184,17 @@ function RFICard({ rfi, isAdmin, onEdit, onDeleted }) {
             <p style={styles.noResponse}>No response yet.</p>
           ) : null}
 
-          {isAdmin && (
-            <div style={styles.cardActions}>
-              <button style={styles.editBtn} onClick={() => onEdit(rfi)}>
-                {rfi.status === 'open' && !rfi.response ? '+ Add Response' : 'Edit'}
-              </button>
-              <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : 'Delete'}</button>
-            </div>
-          )}
+          <div style={styles.cardActions}>
+            <RFIDownloadLink rfi={rfi} companyName={companyName} />
+            {isAdmin && (
+              <>
+                <button style={styles.editBtn} onClick={() => onEdit(rfi)}>
+                  {rfi.status === 'open' && !rfi.response ? '+ Add Response' : 'Edit'}
+                </button>
+                <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : 'Delete'}</button>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -208,6 +212,7 @@ export default function RFITracking({ projects }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [filters, setFilters] = useState({});
+  const [companyName, setCompanyName] = useState('');
 
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
@@ -219,7 +224,10 @@ export default function RFITracking({ projects }) {
     } catch {}
   };
 
-  useEffect(() => { loadRFIs().finally(() => setLoading(false)); }, []);
+  useEffect(() => {
+    loadRFIs().finally(() => setLoading(false));
+    api.get('/company-info').then(r => setCompanyName(r.data.name || '')).catch(() => {});
+  }, []);
   useEffect(() => { if (!loading) loadRFIs(filters); }, [filters]);
 
   const handleSaved = (rfi, isEdit) => {
@@ -292,6 +300,7 @@ export default function RFITracking({ projects }) {
               key={r.id}
               rfi={r}
               isAdmin={isAdmin}
+              companyName={companyName}
               onEdit={r => { setEditing(r); setShowForm(false); }}
               onDeleted={id => setRfis(prev => prev.filter(r => r.id !== id))}
             />
