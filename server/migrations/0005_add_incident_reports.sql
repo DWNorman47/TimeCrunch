@@ -1,7 +1,7 @@
 -- Incident / near-miss reporting
 CREATE TABLE IF NOT EXISTS incident_reports (
   id SERIAL PRIMARY KEY,
-  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id UUID NOT NULL,  -- no FK: companies.id may be INTEGER on some environments (see 0003)
   user_id INTEGER NOT NULL REFERENCES users(id),
   project_id INTEGER REFERENCES projects(id),
   incident_date DATE NOT NULL,
