@@ -10,6 +10,8 @@ import SafetyTalks from '../components/SafetyTalks';
 import IncidentReports from '../components/IncidentReports';
 import PhotoGallery from '../components/PhotoGallery';
 import SubReports from '../components/SubReports';
+import EquipmentLog from '../components/EquipmentLog';
+import RFITracking from '../components/RFITracking';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -223,7 +225,7 @@ export default function FieldPage() {
   const [workers, setWorkers] = useState([]);
   const [features, setFeatures] = useState({});
   const [loading, setLoading] = useState(true);
-  const FIELD_TABS = ['notes', 'daily', 'punchlist', 'safety', 'incident', 'gallery', 'subs'];
+  const FIELD_TABS = ['notes', 'daily', 'punchlist', 'safety', 'incident', 'gallery', 'subs', 'equip', 'rfi'];
   const hashTab = window.location.hash.replace('#', '');
   const [fieldTab, setFieldTab] = useState(FIELD_TABS.includes(hashTab) ? hashTab : 'notes');
   const switchTab = t => { setFieldTab(t); window.location.hash = t; };
@@ -290,6 +292,8 @@ export default function FieldPage() {
             { id: 'incident', label: '🚨 Incidents' },
             { id: 'gallery', label: '🖼️ Gallery' },
             ...(isAdmin ? [{ id: 'subs', label: '🏗️ Subs' }] : []),
+            { id: 'equip', label: '🚜 Equipment' },
+            { id: 'rfi', label: '📝 RFIs' },
           ]}
         />
 
@@ -305,6 +309,10 @@ export default function FieldPage() {
           <PhotoGallery projects={projects} />
         ) : fieldTab === 'subs' ? (
           <SubReports projects={projects} />
+        ) : fieldTab === 'equip' ? (
+          <EquipmentLog projects={projects} />
+        ) : fieldTab === 'rfi' ? (
+          <RFITracking projects={projects} />
         ) : (
         <>
         <div style={styles.topRow}>

@@ -52,6 +52,8 @@ app.use('/api/chat', require('./routes/chat'));
 app.use('/api/field-reports', requireAuth, requirePlan('business'), require('./routes/fieldReports'));
 app.use('/api/incidents', requireAuth, requirePlan('business'), require('./routes/incidents'));
 app.use('/api/sub-reports', requireAuth, requirePlan('business'), require('./routes/subReports'));
+app.use('/api/equipment', requireAuth, requirePlan('business'), require('./routes/equipment'));
+app.use('/api/rfis', requireAuth, requirePlan('business'), require('./routes/rfis'));
 app.use('/api/daily-reports', requireAuth, requirePlan('business'), require('./routes/dailyReports'));
 app.use('/api/punchlist', requireAuth, requirePlan('business'), require('./routes/punchlist'));
 app.use('/api/safety-talks', requireAuth, requirePlan('business'), require('./routes/safetyTalks'));
