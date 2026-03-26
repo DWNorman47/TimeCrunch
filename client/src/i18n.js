@@ -82,7 +82,7 @@ const translations = {
     tabAnalytics: 'Analytics',
     tabApprovals: 'Approvals',
     tabReports: 'Reports',
-    tabManage: 'Manage',
+    tabManage: 'Scheduling',
     tabSettings: 'Settings',
 
     // Feature toggles
@@ -98,6 +98,8 @@ const translations = {
     featPrevailingWageDesc: 'Show prevailing wage type on projects and entries',
     featField: 'Field Module',
     featFieldDesc: 'Allow workers to access the Field module from the app switcher',
+    featGeolocation: 'Geolocation',
+    featGeolocationDesc: 'Capture GPS location when workers clock in and out',
     upgradePlanPrompt: 'Upgrade your subscription to unlock this feature.',
     viewPlans: 'View Plans →',
 
@@ -106,7 +108,7 @@ const translations = {
     noWorkersYet: 'No workers yet. Add one in the Manage tab.',
     projectReports: 'Project Reports',
     overtimeReport: 'Overtime Report',
-    certifiedPayroll: 'Certified Payroll',
+    certifiedPayroll: 'Payroll',
     export: 'Export',
     fullAnalytics: 'Full Analytics',
     generateBill: 'Generate Bill',
@@ -127,15 +129,16 @@ const translations = {
     adminTabCompany: '🏢 Company',
     adminTabTeam: '👥 Team',
     adminTabProjects: '📋 Projects',
-    adminTabIntegrations: '🔗 Integrations',
+    adminTabIntegrations: 'QuickBooks',
     adminTabBilling: '💳 Billing',
+    adminTabLog: '📋 Log',
     adminTabAccount: '👤 Account',
 
     // Section titles
     company: 'Company',
     team: 'Team',
     projects: 'Projects',
-    integrations: 'Integrations',
+    integrations: 'QuickBooks',
     billing: 'Billing',
     account: 'Account',
     settings: 'Settings',
@@ -269,7 +272,7 @@ const translations = {
     workersActive: 'workers active',
 
     // ── Certified Payroll ────────────────────────────────────────────────────
-    certifiedPayrollTitle: 'Certified Payroll',
+    certifiedPayrollTitle: 'Payroll',
     certPayrollDesc: 'Weekly hours by worker and classification for prevailing wage compliance reporting.',
     weekEnding: 'Week ending',
     projectOptional: 'Project (optional)',
@@ -486,6 +489,8 @@ const translations = {
     featPrevailingWageDesc: 'Muestra el tipo de salario prevaleciente en proyectos y entradas',
     featField: 'Módulo de Campo',
     featFieldDesc: 'Permite a los trabajadores acceder al módulo de campo desde el selector de aplicaciones',
+    featGeolocation: 'Geolocalización',
+    featGeolocationDesc: 'Captura la ubicación GPS cuando los trabajadores fichan entrada y salida',
     upgradePlanPrompt: 'Actualiza tu suscripción para desbloquear esta función.',
     viewPlans: 'Ver Planes →',
 
@@ -515,15 +520,16 @@ const translations = {
     adminTabCompany: '🏢 Empresa',
     adminTabTeam: '👥 Equipo',
     adminTabProjects: '📋 Proyectos',
-    adminTabIntegrations: '🔗 Integraciones',
+    adminTabIntegrations: 'QuickBooks',
     adminTabBilling: '💳 Facturación',
+    adminTabLog: '📋 Registro',
     adminTabAccount: '👤 Cuenta',
 
     // Section titles
     company: 'Empresa',
     team: 'Equipo',
     projects: 'Proyectos',
-    integrations: 'Integraciones',
+    integrations: 'QuickBooks',
     billing: 'Facturación',
     account: 'Cuenta',
     settings: 'Configuración',

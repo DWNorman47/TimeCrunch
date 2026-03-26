@@ -7,11 +7,20 @@ const { createInboxItem } = require('./inbox');
 // Get current user's entries
 router.get('/', requireAuth, async (req, res) => {
   try {
+    const co = await pool.query(
+      'SELECT plan, subscription_status, trial_ends_at FROM companies WHERE id = $1',
+      [req.user.company_id]
+    );
+    const { plan, subscription_status, trial_ends_at } = co.rows[0] || {};
+    const trialActive = subscription_status === 'trial' && (!trial_ends_at || new Date(trial_ends_at) >= new Date());
+    const isFree = plan === 'free' && !trialActive;
+    const dateClause = isFree ? `AND te.work_date >= CURRENT_DATE - INTERVAL '90 days'` : '';
+
     const result = await pool.query(
       `SELECT te.*, p.name as project_name
        FROM time_entries te
        LEFT JOIN projects p ON te.project_id = p.id
-       WHERE te.user_id = $1
+       WHERE te.user_id = $1 ${dateClause}
        ORDER BY te.work_date DESC, te.start_time DESC`,
       [req.user.id]
     );

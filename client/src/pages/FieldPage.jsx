@@ -7,6 +7,7 @@ import PhotoCapture from '../components/PhotoCapture';
 import DailyReports from '../components/DailyReports';
 import Punchlist from '../components/Punchlist';
 import SafetyTalks from '../components/SafetyTalks';
+import IncidentReports from '../components/IncidentReports';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -220,7 +221,7 @@ export default function FieldPage() {
   const [workers, setWorkers] = useState([]);
   const [features, setFeatures] = useState({});
   const [loading, setLoading] = useState(true);
-  const FIELD_TABS = ['notes', 'daily', 'punchlist', 'safety'];
+  const FIELD_TABS = ['notes', 'daily', 'punchlist', 'safety', 'incident'];
   const hashTab = window.location.hash.replace('#', '');
   const [fieldTab, setFieldTab] = useState(FIELD_TABS.includes(hashTab) ? hashTab : 'notes');
   const switchTab = t => { setFieldTab(t); window.location.hash = t; };
@@ -284,6 +285,7 @@ export default function FieldPage() {
             { id: 'daily', label: '📋 Daily' },
             { id: 'punchlist', label: '✅ Punch' },
             { id: 'safety', label: '🦺 Safety' },
+            { id: 'incident', label: '🚨 Incidents' },
           ]}
         />
 
@@ -293,6 +295,8 @@ export default function FieldPage() {
           <Punchlist projects={projects} />
         ) : fieldTab === 'safety' ? (
           <SafetyTalks projects={projects} />
+        ) : fieldTab === 'incident' ? (
+          <IncidentReports projects={projects} />
         ) : (
         <>
         <div style={styles.topRow}>

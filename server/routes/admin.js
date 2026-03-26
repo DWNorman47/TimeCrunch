@@ -16,10 +16,11 @@ const WORKER_LIMITS = { free: 3, starter: 10, business: null };
 
 async function checkWorkerLimit(companyId) {
   const company = await pool.query(
-    'SELECT plan, subscription_status FROM companies WHERE id = $1', [companyId]
+    'SELECT plan, subscription_status, trial_ends_at FROM companies WHERE id = $1', [companyId]
   );
-  const { plan, subscription_status } = company.rows[0] || {};
-  if (subscription_status === 'trial') return null; // trial = unlimited
+  const { plan, subscription_status, trial_ends_at } = company.rows[0] || {};
+  const trialActive = subscription_status === 'trial' && (!trial_ends_at || new Date(trial_ends_at) >= new Date());
+  if (trialActive) return null; // active trial = unlimited
   const limit = WORKER_LIMITS[plan || 'free'];
   if (limit === null) return null; // business = unlimited
   const count = await pool.query(
@@ -153,6 +154,7 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
   const allowed = [...numericKeys, ...stringKeys, ...FEATURE_KEYS];
   const companyId = req.user.company_id;
   try {
+    const current = await getSettings(companyId);
     const changed = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
@@ -162,7 +164,8 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
             'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
             [companyId, key, val]
           );
-          changed[key] = val === '1';
+          const newVal = val === '1';
+          if (current[key] !== newVal) changed[key] = newVal;
         } else if (stringKeys.includes(key)) {
           const val = req.body[key];
           if (key === 'overtime_rule' && !['daily', 'weekly'].includes(val))
@@ -177,20 +180,22 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
             'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
             [companyId, key, val]
           );
-          changed[key] = val;
+          if (current[key] !== val) changed[key] = val;
         } else {
           const val = parseFloat(req.body[key]);
           if (isNaN(val)) return res.status(400).json({ error: `Invalid value for ${key}` });
-          if (rateKeys.includes(key) && val <= 0) return res.status(400).json({ error: `Invalid value for ${key}` });
+          const allowZero = ['prevailing_wage_rate', 'overtime_multiplier'];
+          if (rateKeys.includes(key) && (allowZero.includes(key) ? val < 0 : val <= 0)) return res.status(400).json({ error: `Invalid value for ${key}` });
           if ([...notifKeys, 'overtime_threshold'].includes(key) && val < 0) return res.status(400).json({ error: `Invalid value for ${key}` });
           await pool.query(
             'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
             [companyId, key, val]
           );
-          changed[key] = val;
+          if (current[key] !== val) changed[key] = val;
         }
       }
     }
+    if (Object.keys(changed).length === 0) { const s = await getSettings(companyId); return res.json(s); }
     await logAudit(companyId, req.user.id, req.user.full_name, 'settings.updated', 'settings', null, 'Settings', changed);
     const s = await getSettings(companyId);
     res.json(s);

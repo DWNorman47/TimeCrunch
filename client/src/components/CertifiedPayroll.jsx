@@ -77,7 +77,7 @@ export default function CertifiedPayroll({ projects }) {
 
     win.document.write(`<!DOCTYPE html><html><head>
       <meta charset="utf-8">
-      <title>Certified Payroll — Week Ending ${data.week_end}</title>
+      <title>Payroll — Week Ending ${data.week_end}</title>
       <style>
         body { font-family: system-ui, sans-serif; margin: 24px; color: #111; font-size: 12px; }
         h1 { font-size: 16px; margin: 0 0 4px; }
@@ -93,7 +93,7 @@ export default function CertifiedPayroll({ projects }) {
         @media print { body { margin: 12px; } }
       </style>
     </head><body>
-      <h1>Certified Payroll Report</h1>
+      <h1>Payroll Report</h1>
       <div class="meta">
         <div><strong>Contractor:</strong> ${data.contractor}</div>
         <div><strong>Week ending:</strong> ${fmtDate(data.week_end)}</div>

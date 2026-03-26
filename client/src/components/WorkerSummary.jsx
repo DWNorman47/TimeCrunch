@@ -65,7 +65,7 @@ function computeOT(entries, rule, threshold) {
   };
 }
 
-export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly', overtimeMultiplier = 1.5, prevailingRate = 45, overtimeRule = 'daily', overtimeThreshold = 8, showWages = false, currency = 'USD' }) {
+export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly', overtimeMultiplier = 1.5, prevailingRate = 0, overtimeRule = 'daily', overtimeThreshold = 8, showWages = false, currency = 'USD', overtimeEnabled = true }) {
   const [range, setRange] = useState('this_week');
   const { from, to } = getDateRange(range);
 
@@ -128,7 +128,7 @@ export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly'
               <div style={styles.statValue}>{fmtHours(regularHours)}</div>
               <div style={styles.statLabel}>Regular</div>
             </div>
-            {overtimeHours > 0 && (
+            {overtimeEnabled && overtimeHours > 0 && (
               <div style={{ ...styles.stat, borderColor: '#fbbf24' }}>
                 <div style={{ ...styles.statValue, color: '#d97706' }}>{fmtHours(overtimeHours)}</div>
                 <div style={styles.statLabel}>Overtime</div>
