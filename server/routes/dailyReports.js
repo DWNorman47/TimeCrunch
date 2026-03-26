@@ -215,6 +215,23 @@ router.patch('/:id', requireAuth, async (req, res) => {
   } finally { client.release(); }
 });
 
+// PATCH /daily-reports/:id/review — admin marks a submitted report as reviewed
+router.patch('/:id/review', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const reviewerName = req.body.reviewer_name || req.user.full_name || 'Admin';
+  try {
+    const result = await pool.query(
+      `UPDATE daily_reports
+       SET status = 'reviewed', reviewed_by = $1, reviewed_at = NOW()
+       WHERE id = $2 AND company_id = $3 AND status = 'submitted'
+       RETURNING *`,
+      [reviewerName, req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Report not found or not in submitted status' });
+    res.json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // DELETE /daily-reports/:id
 router.delete('/:id', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;

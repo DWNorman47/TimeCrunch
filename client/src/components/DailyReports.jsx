@@ -328,8 +328,10 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
 
 // ── Report list row ────────────────────────────────────────────────────────────
 
-function ReportRow({ report, onEdit, onDelete, companyName, fieldPhotos }) {
+function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyName, fieldPhotos }) {
+  const [report, setReport] = useState(initialReport);
   const [deleting, setDeleting] = useState(false);
+  const [approving, setApproving] = useState(false);
   const weather = report.weather_condition ? WEATHER_LABELS[report.weather_condition] : null;
 
   const handleDelete = async () => {
@@ -340,6 +342,18 @@ function ReportRow({ report, onEdit, onDelete, companyName, fieldPhotos }) {
     finally { setDeleting(false); }
   };
 
+  const handleApprove = async () => {
+    setApproving(true);
+    try {
+      const r = await api.patch(`/daily-reports/${report.id}/review`);
+      setReport(r.data);
+    } catch { alert('Failed to approve report'); }
+    finally { setApproving(false); }
+  };
+
+  const isReviewed = report.status === 'reviewed';
+  const isSubmitted = report.status === 'submitted';
+
   return (
     <div style={styles.reportRow}>
       <div style={styles.rowLeft} onClick={() => onEdit(report)}>
@@ -347,18 +361,29 @@ function ReportRow({ report, onEdit, onDelete, companyName, fieldPhotos }) {
         <div style={styles.rowProject}>{report.project_name || 'No project'}</div>
         {weather && <div style={styles.rowMeta}>{weather}{report.weather_temp != null ? ` · ${report.weather_temp}°F` : ''}</div>}
         {report.manpower_count > 0 && <div style={styles.rowMeta}>{report.manpower_count} crew entr{report.manpower_count !== 1 ? 'ies' : 'y'}</div>}
+        {isReviewed && report.reviewed_by && (
+          <div style={styles.reviewedMeta}>
+            ✓ Reviewed by {report.reviewed_by}
+            {report.reviewed_at && ` · ${new Date(report.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+          </div>
+        )}
       </div>
       <div style={styles.rowRight}>
-        <span style={report.status === 'submitted' ? styles.badgeSubmitted : styles.badgeDraft}>
-          {report.status === 'submitted' ? 'Submitted' : 'Draft'}
+        <span style={isReviewed ? styles.badgeReviewed : isSubmitted ? styles.badgeSubmitted : styles.badgeDraft}>
+          {isReviewed ? 'Reviewed' : isSubmitted ? 'Submitted' : 'Draft'}
         </span>
-        {report.status === 'submitted' && (
+        {(isSubmitted || isReviewed) && (
           <PDFButton
             report={report}
             companyName={companyName}
             fieldPhotos={fieldPhotos}
             style={styles.pdfBtnSmall}
           />
+        )}
+        {isAdmin && isSubmitted && (
+          <button style={styles.approveBtn} onClick={handleApprove} disabled={approving}>
+            {approving ? '...' : '✓ Approve'}
+          </button>
         )}
         <button style={styles.editRowBtn} onClick={() => onEdit(report)}>Edit</button>
         <button style={styles.deleteRowBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : '✕'}</button>
@@ -371,6 +396,7 @@ function ReportRow({ report, onEdit, onDelete, companyName, fieldPhotos }) {
 
 export default function DailyReports({ projects }) {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // null=list, 'new'=new form, report=edit form
@@ -465,6 +491,7 @@ export default function DailyReports({ projects }) {
                 report={r}
                 onEdit={handleEdit}
                 onDelete={id => setReports(prev => prev.filter(r => r.id !== id))}
+                isAdmin={isAdmin}
                 companyName={user?.company_name}
                 fieldPhotos={getPhotos(r)}
               />
@@ -492,6 +519,9 @@ const styles = {
   rowRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' },
   badgeDraft: { fontSize: 11, fontWeight: 700, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 10 },
   badgeSubmitted: { fontSize: 11, fontWeight: 700, color: '#065f46', background: '#d1fae5', padding: '2px 8px', borderRadius: 10 },
+  badgeReviewed: { fontSize: 11, fontWeight: 700, color: '#fff', background: '#1a56db', padding: '2px 8px', borderRadius: 10 },
+  reviewedMeta: { fontSize: 11, color: '#1a56db', fontWeight: 600, marginTop: 2 },
+  approveBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   editRowBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#374151', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   deleteRowBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' },
   pdfBtnSmall: { fontSize: 11, fontWeight: 600, color: '#1a56db', background: '#eff6ff', border: 'none', padding: '4px 10px', borderRadius: 6, textDecoration: 'none', cursor: 'pointer' },
