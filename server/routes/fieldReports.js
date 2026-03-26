@@ -139,4 +139,39 @@ router.delete('/:id', requireAuth, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// GET /field-reports/photos — aggregated photo gallery for the company
+router.get('/photos', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
+  const { project_id, from, to } = req.query;
+
+  const conditions = ['r.company_id = $1'];
+  const params = [companyId];
+
+  if (!isAdmin) {
+    params.push(req.user.id);
+    conditions.push(`r.user_id = $${params.length}`);
+  }
+  if (project_id) { params.push(project_id); conditions.push(`r.project_id = $${params.length}`); }
+  if (from) { params.push(from); conditions.push(`r.reported_at >= $${params.length}`); }
+  if (to) { params.push(to); conditions.push(`r.reported_at < ($${params.length}::date + interval '1 day')`); }
+
+  try {
+    const result = await pool.query(
+      `SELECT ph.id, ph.url, ph.caption,
+              r.id as report_id, r.reported_at, r.title as report_title,
+              r.project_id, r.lat, r.lng,
+              p.name as project_name, u.full_name as worker_name
+       FROM field_report_photos ph
+       JOIN field_reports r ON ph.report_id = r.id
+       JOIN users u ON r.user_id = u.id
+       LEFT JOIN projects p ON r.project_id = p.id
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY r.reported_at DESC, ph.id ASC`,
+      params
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 module.exports = router;
