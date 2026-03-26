@@ -103,7 +103,7 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
     if (tab === 'entries') {
       setEntriesLoading(true);
       api.get(`/admin/projects/${project.id}/entries`)
-        .then(r => setEntries(r.data))
+        .then(r => setEntries(r.data.entries || []))
         .catch(() => {})
         .finally(() => setEntriesLoading(false));
     }

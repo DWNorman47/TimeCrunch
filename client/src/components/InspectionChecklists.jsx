@@ -351,7 +351,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
 
 // ── Inspection Card ────────────────────────────────────────────────────────────
 
-function InspectionCard({ ins, isAdmin, onEdit, onDeleted }) {
+function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -365,6 +365,13 @@ function InspectionCard({ ins, isAdmin, onEdit, onDeleted }) {
 
   const statusStyle = STATUS_STYLES[ins.status] || STATUS_STYLES.pending;
   const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+
+  // Build a label lookup map from the template this inspection was based on
+  const template = templates?.find(t => t.id === ins.template_id);
+  const itemLabels = {};
+  if (template?.items) {
+    template.items.forEach(i => { itemLabels[i.id] = i.label; });
+  }
 
   // Count pass/fail items
   const results = ins.results || {};
@@ -412,7 +419,7 @@ function InspectionCard({ ins, isAdmin, onEdit, onDeleted }) {
                   return (
                     <div key={itemId} style={{ ...styles.resultRow, ...(isFail ? styles.resultRowFail : {}) }}>
                       <span style={styles.resultDot}>{isPass ? '✓' : isFail ? '✗' : '—'}</span>
-                      <span style={styles.resultLabel}>{itemId}</span>
+                      <span style={styles.resultLabel}>{itemLabels[itemId] || itemId}</span>
                       {res.note && <span style={styles.resultNote}>{res.note}</span>}
                       {typeof res.value === 'string' && res.value !== 'pass' && res.value !== 'fail' && (
                         <span style={styles.resultValue}>{res.value}</span>
@@ -598,6 +605,7 @@ export default function InspectionChecklists({ projects }) {
               key={ins.id}
               ins={ins}
               isAdmin={isAdmin}
+              templates={templates}
               onEdit={ins => { setEditing(ins); setShowForm(false); }}
               onDeleted={id => setInspections(prev => prev.filter(i => i.id !== id))}
             />
