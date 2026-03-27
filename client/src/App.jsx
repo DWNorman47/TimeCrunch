@@ -18,6 +18,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import EULA from './pages/EULA';
 import InstallPrompt from './components/InstallPrompt';
 import WelcomeModal from './components/WelcomeModal';
+import Tests from './pages/Tests';
 import { ToastProvider } from './contexts/ToastContext';
 import { OfflineProvider } from './contexts/OfflineContext';
 
@@ -82,6 +83,7 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/confirm-email" element={<ConfirmEmail />} />
+      <Route path="/__tests__" element={<Tests />} />
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/admin" element={<PrivateRoute adminOnly><AdminDashboard /></PrivateRoute>} />
       <Route path="/field" element={<PrivateRoute><FieldPage /></PrivateRoute>} />

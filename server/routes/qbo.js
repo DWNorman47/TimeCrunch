@@ -1,9 +1,11 @@
 const router = require('express').Router();
 const pool = require('../db');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const qbo = require('../services/qbo');
 const { encrypt } = require('../services/encryption');
+const { applySettingsRows, ADMIN_SETTINGS_DEFAULTS } = require('../settingsDefaults');
 
 // GET /api/qbo/status — connection status for this company
 router.get('/status', requireAdmin, async (req, res) => {
@@ -126,14 +128,33 @@ router.get('/customers', requireAdmin, async (req, res) => {
   }
 });
 
-// PATCH /api/qbo/workers/:id/mapping — save QBO employee ID for a worker
-router.patch('/workers/:id/mapping', requireAdmin, async (req, res) => {
-  const { qbo_employee_id } = req.body;
+// GET /api/qbo/vendors — list QBO vendors (for contractor/subcontractor mapping)
+router.get('/vendors', requireAdmin, async (req, res) => {
   try {
-    await pool.query(
-      'UPDATE users SET qbo_employee_id = $1 WHERE id = $2 AND company_id = $3',
-      [qbo_employee_id || null, req.params.id, req.user.company_id]
-    );
+    const vendors = await qbo.listVendors(req.user.company_id);
+    res.json(vendors);
+  } catch (err) {
+    console.error(err);
+    const status = err.code === 'qbo_auth_expired' ? 401 : 500;
+    res.status(status).json({ error: err.message || 'Server error', code: err.code });
+  }
+});
+
+// PATCH /api/qbo/workers/:id/mapping — save QBO employee or vendor ID for a worker
+router.patch('/workers/:id/mapping', requireAdmin, async (req, res) => {
+  const { qbo_employee_id, qbo_vendor_id } = req.body;
+  try {
+    if (qbo_vendor_id !== undefined) {
+      await pool.query(
+        'UPDATE users SET qbo_vendor_id = $1 WHERE id = $2 AND company_id = $3',
+        [qbo_vendor_id || null, req.params.id, req.user.company_id]
+      );
+    } else {
+      await pool.query(
+        'UPDATE users SET qbo_employee_id = $1 WHERE id = $2 AND company_id = $3',
+        [qbo_employee_id || null, req.params.id, req.user.company_id]
+      );
+    }
     res.json({ saved: true });
   } catch (err) {
     console.error(err);
@@ -163,7 +184,7 @@ router.post('/push', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
-      `SELECT te.*, u.qbo_employee_id, p.qbo_customer_id,
+      `SELECT te.*, u.qbo_employee_id, u.qbo_vendor_id, u.worker_type, p.qbo_customer_id,
               u.full_name as worker_name, p.name as project_name
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
@@ -185,7 +206,9 @@ router.post('/push', requireAdmin, async (req, res) => {
         alreadySynced++;
         continue;
       }
-      if (!entry.qbo_employee_id) {
+      const usesVendor = entry.worker_type === 'contractor' || entry.worker_type === 'subcontractor';
+      const mappedId = usesVendor ? entry.qbo_vendor_id : entry.qbo_employee_id;
+      if (!mappedId) {
         skipped.push({ entry_id: entry.id, reason: `Worker "${entry.worker_name}" has no QBO mapping` });
         continue;
       }
@@ -202,7 +225,7 @@ router.post('/push', requireAdmin, async (req, res) => {
 
       try {
         const activity = await qbo.pushTimeActivity(companyId, {
-          employeeId: entry.qbo_employee_id,
+          ...(usesVendor ? { vendorId: entry.qbo_vendor_id } : { employeeId: entry.qbo_employee_id }),
           customerId: entry.qbo_customer_id,
           workDate,
           hours,
@@ -224,6 +247,86 @@ router.post('/push', requireAdmin, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// POST /api/qbo/import/workers — create OpsFloa workers from QB employees/vendors
+router.post('/import/workers', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { workers } = req.body; // [{ display_name, email, qbo_employee_id, qbo_vendor_id, worker_type }]
+  if (!Array.isArray(workers) || workers.length === 0) return res.status(400).json({ error: 'workers array required' });
+
+  // Get company default temp password from settings
+  const settingsRows = await pool.query('SELECT key, value FROM settings WHERE company_id = $1', [companyId]);
+  const settings = applySettingsRows(settingsRows.rows, ADMIN_SETTINGS_DEFAULTS);
+  const tempPassword = settings.default_temp_password || crypto.randomBytes(5).toString('hex');
+  const hash = await bcrypt.hash(tempPassword, 10);
+
+  const VALID_WORKER_TYPES = ['employee', 'contractor', 'subcontractor', 'owner'];
+  const imported = [];
+  const skipped = [];
+
+  for (const w of workers) {
+    const displayName = (w.display_name || '').trim();
+    if (!displayName) { skipped.push({ display_name: displayName, reason: 'Missing name' }); continue; }
+
+    const workerType = VALID_WORKER_TYPES.includes(w.worker_type) ? w.worker_type : 'employee';
+    const email = w.email?.trim() || null;
+
+    // Generate username from display name
+    const parts = displayName.split(/\s+/);
+    const base = ((parts[0]?.[0] || '') + (parts[parts.length - 1] || '')).toLowerCase().replace(/[^a-z0-9]/g, '') || 'worker';
+    let username = base;
+    let suffix = 2;
+    while (true) {
+      const conflict = await pool.query('SELECT id FROM users WHERE username = $1 AND company_id = $2', [username, companyId]);
+      if (conflict.rowCount === 0) break;
+      username = `${base}${suffix++}`;
+    }
+
+    try {
+      const result = await pool.query(
+        `INSERT INTO users (company_id, username, password_hash, full_name, role, language, email, email_confirmed, must_change_password, worker_type, qbo_employee_id, qbo_vendor_id)
+         VALUES ($1, $2, $3, $4, 'worker', 'English', $5, true, true, $6, $7, $8)
+         RETURNING id, username, full_name, worker_type`,
+        [companyId, username, hash, displayName, email, workerType,
+         w.qbo_employee_id || null, w.qbo_vendor_id || null]
+      );
+      imported.push({ ...result.rows[0], temp_password: tempPassword });
+    } catch (err) {
+      skipped.push({ display_name: displayName, reason: err.message });
+    }
+  }
+
+  res.json({ imported, skipped, temp_password: tempPassword });
+});
+
+// POST /api/qbo/import/projects — create OpsFloa projects from QB customers
+router.post('/import/projects', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { projects } = req.body; // [{ name, qbo_customer_id }]
+  if (!Array.isArray(projects) || projects.length === 0) return res.status(400).json({ error: 'projects array required' });
+
+  const imported = [];
+  const skipped = [];
+
+  for (const p of projects) {
+    const name = (p.name || '').trim();
+    if (!name) { skipped.push({ name, reason: 'Missing name' }); continue; }
+    try {
+      const result = await pool.query(
+        `INSERT INTO projects (company_id, name, wage_type, qbo_customer_id)
+         VALUES ($1, $2, 'regular', $3)
+         RETURNING id, name, qbo_customer_id`,
+        [companyId, name, p.qbo_customer_id || null]
+      );
+      imported.push(result.rows[0]);
+    } catch (err) {
+      if (err.code === '23505') skipped.push({ name, reason: 'Project with this name already exists' });
+      else skipped.push({ name, reason: err.message });
+    }
+  }
+
+  res.json({ imported, skipped });
 });
 
 module.exports = router;

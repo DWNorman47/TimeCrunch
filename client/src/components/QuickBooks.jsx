@@ -1,12 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 
-export default function QuickBooks({ workers, projects }) {
+const VENDOR_TYPES = ['contractor', 'subcontractor'];
+const EMPLOYEE_TYPES = ['employee', 'owner'];
+
+const TYPE_LABELS = {
+  employee: 'Employees (W-2)',
+  owner: 'Owners / Officers',
+  contractor: 'Independent Contractors (1099-NEC)',
+  subcontractor: 'Subcontractors (1099-NEC)',
+};
+
+export default function QuickBooks({ workers, projects, onWorkersImported, onProjectsImported }) {
   const [status, setStatus] = useState(null);
   const [qboEmployees, setQboEmployees] = useState([]);
+  const [qboVendors, setQboVendors] = useState([]);
   const [qboCustomers, setQboCustomers] = useState([]);
   const [loadingMappings, setLoadingMappings] = useState(false);
-  const [workerMappings, setWorkerMappings] = useState({});
+  const [employeeMappings, setEmployeeMappings] = useState({});
+  const [vendorMappings, setVendorMappings] = useState({});
   const [projectMappings, setProjectMappings] = useState({});
   const [pushFrom, setPushFrom] = useState('');
   const [pushTo, setPushTo] = useState('');
@@ -15,6 +27,14 @@ export default function QuickBooks({ workers, projects }) {
   const [forcePush, setForcePush] = useState(false);
   const [error, setError] = useState('');
 
+  // Import state
+  const [selectedWorkers, setSelectedWorkers] = useState(new Set());
+  const [selectedVendors, setSelectedVendors] = useState(new Set());
+  const [vendorTypes, setVendorTypes] = useState({});       // qboId → worker_type
+  const [selectedProjects, setSelectedProjects] = useState(new Set());
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+
   useEffect(() => {
     api.get('/qbo/status').then(r => setStatus(r.data)).catch(() => {});
   }, []);
@@ -22,12 +42,15 @@ export default function QuickBooks({ workers, projects }) {
   useEffect(() => {
     if (!status?.connected) return;
     setLoadingMappings(true);
-    Promise.all([api.get('/qbo/employees'), api.get('/qbo/customers')])
-      .then(([e, c]) => { setQboEmployees(e.data); setQboCustomers(c.data); })
+    Promise.all([api.get('/qbo/employees'), api.get('/qbo/vendors'), api.get('/qbo/customers')])
+      .then(([e, v, c]) => {
+        setQboEmployees(e.data);
+        setQboVendors(v.data);
+        setQboCustomers(c.data);
+      })
       .catch(err => {
         const code = err.response?.data?.code;
         if (code === 'qbo_auth_expired') {
-          // Token expired — flip the UI to the reconnect banner
           setStatus(s => ({ ...s, connected: false, disconnected: true }));
         } else {
           setError(err.response?.data?.error || 'Failed to load QuickBooks data');
@@ -35,10 +58,14 @@ export default function QuickBooks({ workers, projects }) {
       })
       .finally(() => setLoadingMappings(false));
 
-    // Pre-populate existing mappings from workers/projects
-    const wm = {};
-    workers.forEach(w => { if (w.qbo_employee_id) wm[w.id] = w.qbo_employee_id; });
-    setWorkerMappings(wm);
+    const em = {};
+    const vm = {};
+    workers.forEach(w => {
+      if (VENDOR_TYPES.includes(w.worker_type) && w.qbo_vendor_id) vm[w.id] = w.qbo_vendor_id;
+      else if (w.qbo_employee_id) em[w.id] = w.qbo_employee_id;
+    });
+    setEmployeeMappings(em);
+    setVendorMappings(vm);
 
     const pm = {};
     projects.forEach(p => { if (p.qbo_customer_id) pm[p.id] = p.qbo_customer_id; });
@@ -60,9 +87,14 @@ export default function QuickBooks({ workers, projects }) {
     setStatus({ connected: false });
   };
 
-  const saveWorkerMapping = async (workerId, qboEmployeeId) => {
-    setWorkerMappings(m => ({ ...m, [workerId]: qboEmployeeId }));
+  const saveEmployeeMapping = async (workerId, qboEmployeeId) => {
+    setEmployeeMappings(m => ({ ...m, [workerId]: qboEmployeeId }));
     await api.patch(`/qbo/workers/${workerId}/mapping`, { qbo_employee_id: qboEmployeeId || null });
+  };
+
+  const saveVendorMapping = async (workerId, qboVendorId) => {
+    setVendorMappings(m => ({ ...m, [workerId]: qboVendorId }));
+    await api.patch(`/qbo/workers/${workerId}/mapping`, { qbo_vendor_id: qboVendorId || null });
   };
 
   const saveProjectMapping = async (projectId, qboCustomerId) => {
@@ -84,7 +116,66 @@ export default function QuickBooks({ workers, projects }) {
     }
   };
 
+  const handleImport = async () => {
+    setImporting(true);
+    setImportResult(null);
+    setError('');
+    try {
+      const workerPayload = [
+        ...qboEmployees
+          .filter(e => selectedWorkers.has(e.Id))
+          .map(e => ({
+            display_name: e.DisplayName,
+            email: e.PrimaryEmailAddr?.Address || null,
+            qbo_employee_id: e.Id,
+            worker_type: 'employee',
+          })),
+        ...qboVendors
+          .filter(v => selectedVendors.has(v.Id))
+          .map(v => ({
+            display_name: v.DisplayName,
+            email: v.PrimaryEmailAddr?.Address || null,
+            qbo_vendor_id: v.Id,
+            worker_type: vendorTypes[v.Id] || 'contractor',
+          })),
+      ];
+      const projectPayload = qboCustomers
+        .filter(c => selectedProjects.has(c.Id))
+        .map(c => ({ name: c.DisplayName, qbo_customer_id: c.Id }));
+
+      const results = {};
+      if (workerPayload.length > 0) {
+        const r = await api.post('/qbo/import/workers', { workers: workerPayload });
+        results.workers = r.data;
+        if (r.data.imported.length > 0 && onWorkersImported) onWorkersImported(r.data.imported);
+      }
+      if (projectPayload.length > 0) {
+        const r = await api.post('/qbo/import/projects', { projects: projectPayload });
+        results.projects = r.data;
+        if (r.data.imported.length > 0 && onProjectsImported) onProjectsImported(r.data.imported);
+      }
+      setImportResult(results);
+      setSelectedWorkers(new Set());
+      setSelectedVendors(new Set());
+      setSelectedProjects(new Set());
+    } catch (err) {
+      setError(err.response?.data?.error || 'Import failed');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   if (!status) return <p style={{ color: '#666' }}>Loading...</p>;
+
+  // Group workers by type, only include types that have at least one worker
+  const workersByType = {};
+  workers.forEach(w => {
+    const t = w.worker_type || 'employee';
+    if (!workersByType[t]) workersByType[t] = [];
+    workersByType[t].push(w);
+  });
+  const typeOrder = ['employee', 'owner', 'contractor', 'subcontractor'];
+  const presentTypes = typeOrder.filter(t => workersByType[t]?.length > 0);
 
   return (
     <div style={styles.wrap}>
@@ -121,39 +212,54 @@ export default function QuickBooks({ workers, projects }) {
 
       {status.connected && (
         <>
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Worker Mappings</h3>
-            <p style={styles.hint}>Link each worker to their corresponding employee in QuickBooks.</p>
-            {loadingMappings ? <p>Loading QuickBooks employees...</p> : (
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>OpsFloa Worker</th>
-                    <th style={styles.th}>QuickBooks Employee</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {workers.map(w => (
-                    <tr key={w.id}>
-                      <td style={styles.td}>{w.full_name}</td>
-                      <td style={styles.td}>
-                        <select
-                          style={styles.select}
-                          value={workerMappings[w.id] || ''}
-                          onChange={e => saveWorkerMapping(w.id, e.target.value)}
-                        >
-                          <option value="">— Not mapped —</option>
-                          {qboEmployees.map(e => (
-                            <option key={e.Id} value={e.Id}>{e.DisplayName}</option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          {/* Worker mapping sections — one per worker type present */}
+          {presentTypes.map(type => {
+            const isVendorType = VENDOR_TYPES.includes(type);
+            const qboList = isVendorType ? qboVendors : qboEmployees;
+            const qboLabel = isVendorType ? 'QuickBooks Vendor' : 'QuickBooks Employee';
+            const mappings = isVendorType ? vendorMappings : employeeMappings;
+            const saveFn = isVendorType ? saveVendorMapping : saveEmployeeMapping;
+            const typeWorkers = workersByType[type];
+            return (
+              <div key={type} style={styles.section}>
+                <h3 style={styles.sectionTitle}>{TYPE_LABELS[type]}</h3>
+                <p style={styles.hint}>
+                  {isVendorType
+                    ? `Link each ${type} to their corresponding vendor in QuickBooks for 1099 reporting.`
+                    : `Link each ${type === 'owner' ? 'owner/officer' : 'employee'} to their corresponding employee in QuickBooks.`}
+                </p>
+                {loadingMappings ? <p>Loading QuickBooks data...</p> : (
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={styles.th}>OpsFloa Worker</th>
+                        <th style={styles.th}>{qboLabel}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {typeWorkers.map(w => (
+                        <tr key={w.id}>
+                          <td style={styles.td}>{w.full_name}</td>
+                          <td style={styles.td}>
+                            <select
+                              style={styles.select}
+                              value={mappings[w.id] || ''}
+                              onChange={e => saveFn(w.id, e.target.value)}
+                            >
+                              <option value="">— Not mapped —</option>
+                              {qboList.map(e => (
+                                <option key={e.Id} value={e.Id}>{e.DisplayName}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            );
+          })}
 
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Project Mappings</h3>
@@ -188,6 +294,119 @@ export default function QuickBooks({ workers, projects }) {
               </table>
             )}
           </div>
+
+          {/* ── Import from QuickBooks ── */}
+          {(() => {
+            const mappedEmployeeIds = new Set(Object.values(employeeMappings));
+            const mappedVendorIds = new Set(Object.values(vendorMappings));
+            const mappedCustomerIds = new Set(Object.values(projectMappings));
+            const unmappedEmployees = qboEmployees.filter(e => !mappedEmployeeIds.has(e.Id));
+            const unmappedVendors = qboVendors.filter(v => !mappedVendorIds.has(v.Id));
+            const unmappedCustomers = qboCustomers.filter(c => !mappedCustomerIds.has(c.Id));
+            const totalSelections = selectedWorkers.size + selectedVendors.size + selectedProjects.size;
+            if (loadingMappings || (unmappedEmployees.length === 0 && unmappedVendors.length === 0 && unmappedCustomers.length === 0)) return null;
+            return (
+              <div style={styles.section}>
+                <h3 style={styles.sectionTitle}>Import from QuickBooks</h3>
+                <p style={styles.hint}>Select QuickBooks records to create as new OpsFloa workers or projects. Already-mapped records are hidden. Imported workers will be set to must-change-password on first login.</p>
+
+                {unmappedEmployees.length > 0 && (
+                  <div style={styles.importGroup}>
+                    <div style={styles.importGroupLabel}>
+                      Employees
+                      <button style={styles.selectAllBtn} onClick={() => setSelectedWorkers(s => s.size === unmappedEmployees.length ? new Set() : new Set(unmappedEmployees.map(e => e.Id)))}>
+                        {selectedWorkers.size === unmappedEmployees.length ? 'Deselect all' : 'Select all'}
+                      </button>
+                    </div>
+                    {unmappedEmployees.map(e => (
+                      <label key={e.Id} style={styles.importRow}>
+                        <input type="checkbox" checked={selectedWorkers.has(e.Id)} onChange={() => setSelectedWorkers(s => { const n = new Set(s); n.has(e.Id) ? n.delete(e.Id) : n.add(e.Id); return n; })} />
+                        <span style={styles.importName}>{e.DisplayName}</span>
+                        {e.PrimaryEmailAddr?.Address && <span style={styles.importEmail}>{e.PrimaryEmailAddr.Address}</span>}
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {unmappedVendors.length > 0 && (
+                  <div style={styles.importGroup}>
+                    <div style={styles.importGroupLabel}>
+                      Vendors (Contractors / Subcontractors)
+                      <button style={styles.selectAllBtn} onClick={() => setSelectedVendors(s => s.size === unmappedVendors.length ? new Set() : new Set(unmappedVendors.map(v => v.Id)))}>
+                        {selectedVendors.size === unmappedVendors.length ? 'Deselect all' : 'Select all'}
+                      </button>
+                    </div>
+                    {unmappedVendors.map(v => (
+                      <label key={v.Id} style={styles.importRow}>
+                        <input type="checkbox" checked={selectedVendors.has(v.Id)} onChange={() => setSelectedVendors(s => { const n = new Set(s); n.has(v.Id) ? n.delete(v.Id) : n.add(v.Id); return n; })} />
+                        <span style={styles.importName}>{v.DisplayName}</span>
+                        {v.PrimaryEmailAddr?.Address && <span style={styles.importEmail}>{v.PrimaryEmailAddr.Address}</span>}
+                        <select
+                          style={styles.importTypeSelect}
+                          value={vendorTypes[v.Id] || 'contractor'}
+                          onChange={e => setVendorTypes(t => ({ ...t, [v.Id]: e.target.value }))}
+                          onClick={e => e.preventDefault()}
+                        >
+                          <option value="contractor">Contractor</option>
+                          <option value="subcontractor">Subcontractor</option>
+                          <option value="owner">Owner / Officer</option>
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {unmappedCustomers.length > 0 && (
+                  <div style={styles.importGroup}>
+                    <div style={styles.importGroupLabel}>
+                      Customers → Projects
+                      <button style={styles.selectAllBtn} onClick={() => setSelectedProjects(s => s.size === unmappedCustomers.length ? new Set() : new Set(unmappedCustomers.map(c => c.Id)))}>
+                        {selectedProjects.size === unmappedCustomers.length ? 'Deselect all' : 'Select all'}
+                      </button>
+                    </div>
+                    {unmappedCustomers.map(c => (
+                      <label key={c.Id} style={styles.importRow}>
+                        <input type="checkbox" checked={selectedProjects.has(c.Id)} onChange={() => setSelectedProjects(s => { const n = new Set(s); n.has(c.Id) ? n.delete(c.Id) : n.add(c.Id); return n; })} />
+                        <span style={styles.importName}>{c.DisplayName}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                <button style={{ ...styles.pushBtn, marginTop: 16, opacity: totalSelections === 0 ? 0.5 : 1 }} onClick={handleImport} disabled={importing || totalSelections === 0}>
+                  {importing ? 'Importing...' : `Import Selected (${totalSelections})`}
+                </button>
+
+                {importResult && (
+                  <div style={styles.resultBox}>
+                    {importResult.workers && (
+                      <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#166534' }}>
+                        {importResult.workers.imported.length} worker{importResult.workers.imported.length !== 1 ? 's' : ''} imported.
+                        {importResult.workers.temp_password && <span style={{ fontWeight: 400, color: '#374151' }}> Temp password: <code>{importResult.workers.temp_password}</code></span>}
+                      </p>
+                    )}
+                    {importResult.projects && (
+                      <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#166534' }}>
+                        {importResult.projects.imported.length} project{importResult.projects.imported.length !== 1 ? 's' : ''} imported.
+                      </p>
+                    )}
+                    {(importResult.workers?.skipped?.length > 0 || importResult.projects?.skipped?.length > 0) && (
+                      <details style={{ marginTop: 6 }}>
+                        <summary style={{ cursor: 'pointer', color: '#92400e', fontWeight: 600, fontSize: 13 }}>
+                          {(importResult.workers?.skipped?.length || 0) + (importResult.projects?.skipped?.length || 0)} skipped
+                        </summary>
+                        <ul style={{ marginTop: 4, paddingLeft: 18 }}>
+                          {[...(importResult.workers?.skipped || []), ...(importResult.projects?.skipped || [])].map((s, i) => (
+                            <li key={i} style={{ fontSize: 13, color: '#666' }}>{s.display_name || s.name}: {s.reason}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Push Time Entries</h3>
@@ -262,4 +481,11 @@ const styles = {
   resultBox: { marginTop: 16, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '14px 16px' },
   reconnectBanner: { background: '#fffbeb', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 14 },
   forceLabel: { display: 'flex', alignItems: 'center', fontSize: 13, color: '#6b7280', marginTop: 10, cursor: 'pointer' },
+  importGroup: { marginBottom: 16 },
+  importGroupLabel: { fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 12 },
+  selectAllBtn: { background: 'none', border: 'none', color: '#1a56db', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 },
+  importRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', fontSize: 14 },
+  importName: { flex: 1, fontWeight: 500, color: '#111827' },
+  importEmail: { fontSize: 12, color: '#9ca3af' },
+  importTypeSelect: { padding: '4px 8px', border: '1px solid #ddd', borderRadius: 6, fontSize: 12, minHeight: 'unset' },
 };
