@@ -27,6 +27,9 @@ export function AuthProvider({ children }) {
     if (r.data.mfa_required) {
       return { mfa_required: true, mfa_token: r.data.mfa_token };
     }
+    if (r.data.must_change_password) {
+      return { must_change_password: true, setup_token: r.data.setup_token };
+    }
     localStorage.setItem('tc_token', r.data.token);
     const me = await api.get('/auth/me');
     setUser(me.data.user);
