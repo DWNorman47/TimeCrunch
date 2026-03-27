@@ -3,7 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { RFIDownloadLink } from './RFIPdf';
 
-function today() { return new Date().toISOString().substring(0, 10); }
+function today() { return new Date().toLocaleDateString('en-CA'); }
 
 const STATUS_STYLES = {
   open:     { color: '#92400e', background: '#fef3c7' },

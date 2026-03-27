@@ -17,7 +17,7 @@ function defaultDates() {
   const today = new Date();
   const from = new Date(today);
   from.setDate(today.getDate() - 10);
-  const fmt = d => d.toISOString().split('T')[0];
+  const fmt = d => d.toLocaleDateString('en-CA');
   return { from: fmt(from), to: fmt(today) };
 }
 

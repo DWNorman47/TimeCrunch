@@ -3,7 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 
 function today() {
-  return new Date().toISOString().substring(0, 10);
+  return new Date().toLocaleDateString('en-CA');
 }
 
 const BLANK = {

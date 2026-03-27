@@ -74,7 +74,7 @@ export default function AnalyticsDashboard() {
   for (let i = 11; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - d.getDay() - i * 7); // Monday of each week
-    const key = d.toISOString().substring(0, 10);
+    const key = d.toLocaleDateString('en-CA');
     weeklyFilled.push({ week_start: key, hours: weeklyMap[key] || 0 });
   }
 
@@ -84,7 +84,7 @@ export default function AnalyticsDashboard() {
   for (let i = 13; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const key = d.toISOString().substring(0, 10);
+    const key = d.toLocaleDateString('en-CA');
     dailyFilled.push({ date: key, hours: dailyMap[key] || 0 });
   }
 
