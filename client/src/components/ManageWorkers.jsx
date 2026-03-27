@@ -6,6 +6,13 @@ import { useT } from '../hooks/useT';
 
 const LANGUAGES = ['English', 'Spanish'];
 
+const WORKER_TYPE_LABELS = {
+  employee: 'Employee (W-2)',
+  contractor: 'Independent Contractor (1099-NEC)',
+  subcontractor: 'Subcontractor (1099-NEC)',
+  owner: 'Owner / Officer',
+};
+
 const PERM_LABELS = [
   { key: 'approve_entries', label: 'Approve entries' },
   { key: 'manage_workers', label: 'Manage workers' },
@@ -46,7 +53,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   // Add form state
   const [showForm, setShowForm] = useState(false);
   const [addMode, setAddMode] = useState('manual');
-  const [form, setForm] = useState({ first_name: '', last_name: '', username: '', password: defaultTempPassword, email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
+  const [form, setForm] = useState({ first_name: '', last_name: '', username: '', password: defaultTempPassword, email: '', role: 'worker', worker_type: 'employee', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
   const [inviteForm, setInviteForm] = useState({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
   const [error, setError] = useState('');
   const [inviteError, setInviteError] = useState('');
@@ -124,7 +131,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const full_name = [form.first_name, form.last_name].filter(Boolean).join(' ');
       const r = await api.post('/admin/workers', { ...form, full_name });
       onWorkerAdded(r.data);
-      setForm({ first_name: '', last_name: '', username: '', password: defaultTempPassword, email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
+      setForm({ first_name: '', last_name: '', username: '', password: defaultTempPassword, email: '', role: 'worker', worker_type: 'employee', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
       setUsernameEdited(false); setUsernameTaken(false); setShowForm(false);
     } catch (err) {
       const data = err.response?.data;
@@ -168,7 +175,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
   const startEditInfo = w => {
     setEditingId(w.id); setEditSection('info');
-    setEditInfoForm({ full_name: w.full_name, email: w.email || '', role: w.role, language: w.language || 'English' });
+    setEditInfoForm({ full_name: w.full_name, email: w.email || '', role: w.role, language: w.language || 'English', worker_type: w.worker_type || 'employee' });
   };
 
   const startEditUsername = w => {
@@ -340,6 +347,15 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   </select>
                 </div>
                 <div style={s.fieldGroup}>
+                  <label style={s.label}>Worker Type</label>
+                  <select style={s.input} value={form.worker_type} onChange={e => set('worker_type', e.target.value)}>
+                    <option value="employee">Employee (W-2)</option>
+                    <option value="contractor">Independent Contractor (1099-NEC)</option>
+                    <option value="subcontractor">Subcontractor (1099-NEC)</option>
+                    <option value="owner">Owner / Officer</option>
+                  </select>
+                </div>
+                <div style={s.fieldGroup}>
                   <label style={s.label}>{t.language}</label>
                   <select style={s.input} value={form.language} onChange={e => set('language', e.target.value)}>
                     {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
@@ -474,6 +490,15 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 </select>
                               </div>
                               <div style={s.fieldGroup}>
+                                <label style={s.label}>Worker Type</label>
+                                <select style={s.input} value={editInfoForm.worker_type || 'employee'} onChange={e => setEditInfoForm(f => ({ ...f, worker_type: e.target.value }))}>
+                                  <option value="employee">Employee (W-2)</option>
+                                  <option value="contractor">Independent Contractor (1099-NEC)</option>
+                                  <option value="subcontractor">Subcontractor (1099-NEC)</option>
+                                  <option value="owner">Owner / Officer</option>
+                                </select>
+                              </div>
+                              <div style={s.fieldGroup}>
                                 <label style={s.label}>{t.language}</label>
                                 <select style={s.input} value={editInfoForm.language} onChange={e => setEditInfoForm(f => ({ ...f, language: e.target.value }))}>
                                   {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
@@ -495,6 +520,8 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                             <span style={s.infoValue}>{w.language || 'English'}</span>
                             <span style={s.infoLabel}>Role</span>
                             <span style={s.infoValue}><RoleBadge role={w.role} /></span>
+                            <span style={s.infoLabel}>Worker Type</span>
+                            <span style={s.infoValue}>{WORKER_TYPE_LABELS[w.worker_type || 'employee']}</span>
                           </div>
                         )}
                       </div>
