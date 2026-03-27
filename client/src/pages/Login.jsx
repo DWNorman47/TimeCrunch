@@ -148,6 +148,7 @@ export default function Login() {
                   placeholder="Enter company name"
                   value={otherText}
                   onChange={e => setOtherText(e.target.value)}
+                  onBlur={e => setOtherText(e.target.value.trim())}
                   autoFocus
                   required
                 />
@@ -159,6 +160,7 @@ export default function Login() {
               type="text"
               value={otherText}
               onChange={e => setOtherText(e.target.value)}
+              onBlur={e => setOtherText(e.target.value.trim())}
               autoFocus
               required
             />
@@ -169,6 +171,7 @@ export default function Login() {
             type="text"
             value={form.username}
             onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+            onBlur={e => setForm(f => ({ ...f, username: e.target.value.trim() }))}
             required
           />
           <label style={styles.label}>Password</label>

@@ -1,3 +1,11 @@
+/**
+ * Returns today's date as "YYYY-MM-DD" in the user's LOCAL timezone.
+ * Use this instead of new Date().toISOString().substring(0,10) which gives UTC date.
+ */
+export function localDateStr(d = new Date()) {
+  return d.toLocaleDateString('en-CA'); // en-CA produces YYYY-MM-DD
+}
+
 // Maps ISO 4217 currency codes to a locale that produces the correct local symbol
 const CURRENCY_LOCALES = {
   USD: 'en-US', CAD: 'en-CA', EUR: 'de-DE', GBP: 'en-GB',

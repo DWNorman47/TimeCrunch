@@ -3,7 +3,7 @@ import api from '../api';
 import { useT } from '../hooks/useT';
 
 function today() {
-  return new Date().toISOString().substring(0, 10);
+  return new Date().toLocaleDateString('en-CA');
 }
 function monthStart() {
   const d = new Date();

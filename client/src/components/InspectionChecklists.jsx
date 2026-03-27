@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 
-function today() { return new Date().toISOString().substring(0, 10); }
+function today() { return new Date().toLocaleDateString('en-CA'); }
 
 const STATUS_STYLES = {
   pass:    { color: '#065f46', background: '#d1fae5' },

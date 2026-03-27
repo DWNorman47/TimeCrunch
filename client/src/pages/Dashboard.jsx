@@ -109,8 +109,8 @@ export default function Dashboard() {
       const dow = today.getDay();
       const lastSun = new Date(today); lastSun.setDate(today.getDate() - (dow === 0 ? 7 : dow));
       const lastMon = new Date(lastSun); lastMon.setDate(lastSun.getDate() - 6);
-      const ws = lastMon.toISOString().substring(0, 10);
-      const we = lastSun.toISOString().substring(0, 10);
+      const ws = lastMon.toLocaleDateString('en-CA');
+      const we = lastSun.toLocaleDateString('en-CA');
       sorted = sorted.filter(e => { const d = String(e.work_date).substring(0, 10); return d >= ws && d <= we; });
     }
 
@@ -158,7 +158,7 @@ export default function Dashboard() {
       const d = new Date(dateStr.substring(0, 10) + 'T00:00:00');
       const day = d.getDay();
       const monday = new Date(d); monday.setDate(d.getDate() - ((day + 6) % 7));
-      return monday.toISOString().substring(0, 10);
+      return monday.toLocaleDateString('en-CA');
     };
 
     // Build table rows + accumulate totals

@@ -17,7 +17,7 @@ function addDays(date, n) {
 }
 
 function toDateKey(date) {
-  return date.toISOString().substring(0, 10);
+  return date.toLocaleDateString('en-CA');
 }
 
 function formatMonthDay(date) {

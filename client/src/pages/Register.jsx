@@ -86,6 +86,7 @@ export default function Register() {
             placeholder="Acme Construction"
             value={form.company_name}
             onChange={e => set('company_name', e.target.value)}
+            onBlur={e => set('company_name', e.target.value.trim())}
             required
           />
           <label style={styles.label}>First name</label>
@@ -118,6 +119,7 @@ export default function Register() {
             placeholder="you@example.com"
             value={form.email}
             onChange={e => set('email', e.target.value)}
+            onBlur={e => set('email', e.target.value.trim())}
             required
           />
           <label style={styles.label}>Username</label>
@@ -127,6 +129,7 @@ export default function Register() {
             value={form.username}
             autoComplete="off"
             onChange={e => { setUsernameEdited(!!e.target.value); set('username', e.target.value); }}
+            onBlur={e => set('username', e.target.value.trim())}
             required
           />
           <label style={styles.label}>Password</label>

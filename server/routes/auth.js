@@ -44,7 +44,9 @@ function signToken(user) {
 
 // Login
 router.post('/login', loginLimiter, async (req, res) => {
-  const { username, password, company_name } = req.body;
+  const { password } = req.body;
+  const username = req.body.username?.trim();
+  const company_name = req.body.company_name?.trim();
   if (!username || !password || !company_name) {
     return res.status(400).json({ error: 'Company name, username, and password required' });
   }
@@ -52,7 +54,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     const result = await pool.query(
       `SELECT u.*, c.name as company_name FROM users u
        JOIN companies c ON c.id = u.company_id
-       WHERE u.username = $1 AND u.active = true AND LOWER(c.name) = LOWER($2)`,
+       WHERE LOWER(u.username) = LOWER($1) AND u.active = true AND LOWER(c.name) = LOWER($2)`,
       [username, company_name]
     );
     const user = result.rows[0];
@@ -140,8 +142,14 @@ router.get('/me', requireAuth, async (req, res) => {
 
 // Register — creates a new company and its first admin user
 router.post('/register', authLimiter, async (req, res) => {
-  const { full_name, first_name, middle_name, last_name, username, password, email, timezone } = req.body;
+  const { password, timezone } = req.body;
   const company_name = req.body.company_name?.trim();
+  const full_name = req.body.full_name?.trim();
+  const first_name = req.body.first_name?.trim() || null;
+  const middle_name = req.body.middle_name?.trim() || null;
+  const last_name = req.body.last_name?.trim() || null;
+  const username = req.body.username?.trim();
+  const email = req.body.email?.trim();
   if (!company_name || !full_name || !username || !password || !email) {
     return res.status(400).json({ error: 'company_name, full_name, email, username, and password are required' });
   }

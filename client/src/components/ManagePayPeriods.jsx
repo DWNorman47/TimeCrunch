@@ -13,7 +13,7 @@ function defaultPeriod() {
   startOfWeek.setDate(today.getDate() - day);
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(startOfWeek.getDate() + 6);
-  const toISO = d => d.toISOString().substring(0, 10);
+  const toISO = d => d.toLocaleDateString('en-CA');
   return { from: toISO(startOfWeek), to: toISO(endOfWeek) };
 }
 
