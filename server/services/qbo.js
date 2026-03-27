@@ -159,10 +159,18 @@ async function listCustomers(companyId) {
   return data.QueryResponse?.Customer || [];
 }
 
-async function pushTimeActivity(companyId, { employeeId, customerId, workDate, hours, description }) {
+async function listVendors(companyId) {
+  const data = await qboGet(companyId, '/query?query=SELECT * FROM Vendor WHERE Active = true MAXRESULTS 1000&minorversion=65');
+  return data.QueryResponse?.Vendor || [];
+}
+
+async function pushTimeActivity(companyId, { employeeId, vendorId, customerId, workDate, hours, description }) {
+  const useVendor = !!vendorId;
   const body = {
-    NameOf: 'Employee',
-    EmployeeRef: { value: String(employeeId) },
+    NameOf: useVendor ? 'Vendor' : 'Employee',
+    ...(useVendor
+      ? { VendorRef: { value: String(vendorId) } }
+      : { EmployeeRef: { value: String(employeeId) } }),
     CustomerRef: { value: String(customerId) },
     TxnDate: workDate,
     Hours: Math.floor(hours),
@@ -173,4 +181,4 @@ async function pushTimeActivity(companyId, { employeeId, customerId, workDate, h
   return data.TimeActivity;
 }
 
-module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getCompanyInfo, listEmployees, listCustomers, pushTimeActivity };
+module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getCompanyInfo, listEmployees, listCustomers, listVendors, pushTimeActivity };
