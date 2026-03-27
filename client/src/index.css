@@ -131,11 +131,13 @@ input, select, textarea {
   /* Company name drops to its own row below the AppSwitcher + action buttons */
   .company-name {
     order: 3 !important;
-    width: 100% !important;
-    max-width: 100% !important;
+    width: calc(100% + 48px) !important;
+    max-width: calc(100% + 48px) !important;
+    margin: 6px -24px 0 -24px !important;
+    padding: 5px 24px !important;
+    background: rgba(0, 0, 0, 0.18) !important;
     font-size: 12px !important;
-    opacity: 0.7 !important;
-    margin-top: 6px !important;
+    opacity: 1 !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
