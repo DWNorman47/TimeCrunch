@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { localDateStr, formatCurrency, currencySymbol, fmtHours } from '../utils';
-import api from '../api';
+
+// Use raw fetch for all API tests — avoids the axios 401 interceptor which would log the user out
+const BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+const get  = (path, token) => fetch(`${BASE}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+const post = (path, body)  => fetch(`${BASE}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 // ── Tiny test runner ───────────────────────────────────────────────────────────
 
@@ -111,13 +115,11 @@ const SUITES = [
       {
         name: 'Returns 200 with valid token, or 401 without',
         run: async () => {
-          try {
-            const r = await api.get('/auth/me');
-            assert(r.status === 200, `Expected 200, got ${r.status}`);
-            assert(r.data?.user?.id, 'Response should have user.id');
-          } catch (err) {
-            if (err.response?.status === 401) return; // no token — expected
-            throw err;
+          const r = await get('/auth/me', localStorage.getItem('tc_token'));
+          assert(r.status === 200 || r.status === 401, `Unexpected status ${r.status}`);
+          if (r.status === 200) {
+            const data = await r.json();
+            assert(data?.user?.id, 'Response should have user.id');
           }
         },
       },
@@ -130,23 +132,15 @@ const SUITES = [
       {
         name: 'Missing fields returns 400',
         run: async () => {
-          try {
-            await api.post('/auth/login', {});
-            throw new Error('Should have returned 400');
-          } catch (err) {
-            assertEqual(err.response?.status, 400, 'Status');
-          }
+          const r = await post('/auth/login', {});
+          assertEqual(r.status, 400, 'Status');
         },
       },
       {
         name: 'Wrong credentials return 401',
         run: async () => {
-          try {
-            await api.post('/auth/login', { username: '__test_nonexistent__', password: 'wrong', company_name: '__test__' });
-            throw new Error('Should have returned 401');
-          } catch (err) {
-            assertEqual(err.response?.status, 401, 'Status');
-          }
+          const r = await post('/auth/login', { username: '__test_nonexistent__', password: 'wrong', company_name: '__test__' });
+          assertEqual(r.status, 401, 'Status');
         },
       },
     ],
@@ -158,9 +152,7 @@ const SUITES = [
       {
         name: 'Returns 401 without token',
         run: async () => {
-          // Use raw fetch to avoid the axios 401 interceptor which would log the user out
-          const baseURL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
-          const r = await fetch(`${baseURL}/admin/workers`);
+          const r = await get('/admin/workers');
           assertEqual(r.status, 401, 'Status');
         },
       },
