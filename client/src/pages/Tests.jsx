@@ -158,16 +158,10 @@ const SUITES = [
       {
         name: 'Returns 401 without token',
         run: async () => {
-          const token = localStorage.getItem('tc_token');
-          localStorage.removeItem('tc_token');
-          try {
-            await api.get('/admin/workers');
-            throw new Error('Should have returned 401');
-          } catch (err) {
-            assertEqual(err.response?.status, 401, 'Status');
-          } finally {
-            if (token) localStorage.setItem('tc_token', token);
-          }
+          // Use raw fetch to avoid the axios 401 interceptor which would log the user out
+          const baseURL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+          const r = await fetch(`${baseURL}/admin/workers`);
+          assertEqual(r.status, 401, 'Status');
         },
       },
     ],
