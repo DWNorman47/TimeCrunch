@@ -337,11 +337,11 @@ ${signatureDataUrl ? `
   return (
     <div style={styles.page}>
       <OfflineBanner />
-      <header style={styles.header}>
+      <header style={styles.header} className="app-header">
         <div style={styles.logoGroup}>
           <AppSwitcher currentApp="timeclock" userRole={user?.role} features={settings} />
-          {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         </div>
+        {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
         <div style={styles.headerRight} className="header-right">
           <NotificationBell />
           {isPwa && <button style={styles.headerBtn} className="header-btn" onClick={() => window.location.reload()}>↻</button>}
