@@ -83,6 +83,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     currency: settings?.currency ?? 'USD',
     company_timezone: settings?.company_timezone ?? '',
     invoice_signature: settings?.invoice_signature ?? 'optional',
+    default_temp_password: settings?.default_temp_password ?? '',
   });
   const [prevailingEnabled, setPrevailingEnabled] = useState(() => (settings?.prevailing_wage_rate ?? 0) > 0);
   const [collapsed, setCollapsed] = useState(() => {
@@ -126,6 +127,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       currency: settings.currency ?? 'USD',
       company_timezone: settings.company_timezone ?? '',
       invoice_signature: settings.invoice_signature ?? 'optional',
+      default_temp_password: settings.default_temp_password ?? '',
     });
   }, [settings]);
 
@@ -160,6 +162,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         currency: form.currency,
         company_timezone: form.company_timezone,
         invoice_signature: form.invoice_signature,
+        default_temp_password: form.default_temp_password,
       });
       onSettingsUpdated(r.data);
       setSaved(section);
@@ -385,6 +388,19 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <input type="checkbox" checked={form.show_worker_wages} onChange={e => set('show_worker_wages', e.target.checked)} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleKnob, transform: form.show_worker_wages ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Default Temporary Password</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Auto-filled when creating a new worker</div>
+            </div>
+            <input
+              style={{ ...styles.input, width: 180, textAlign: 'right' }}
+              type="text"
+              placeholder="e.g. Welcome1!"
+              value={form.default_temp_password}
+              onChange={e => set('default_temp_password', e.target.value)}
+            />
           </div>
           <div className="invoice-sig-row" style={styles.row}>
             <div>

@@ -224,7 +224,7 @@ router.post('/register', authLimiter, async (req, res) => {
       [company_name, slug, trialDays, registrationIp]
     );
     const companyId = companyResult.rows[0].id;
-    const defaults = [['prevailing_wage_rate', 45], ['default_hourly_rate', 30], ['overtime_multiplier', 1.5], ['feature_projects', '0']];
+    const defaults = [['prevailing_wage_rate', 45], ['default_hourly_rate', 30], ['overtime_multiplier', 1.5]];
     for (const [key, value] of defaults) {
       await client.query('INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3)', [companyId, key, value]);
     }

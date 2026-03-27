@@ -366,6 +366,7 @@ export default function AdministrationPage() {
               onWorkerUpdated={handleWorkerUpdated}
               onWorkerRestored={handleWorkerRestored}
               defaultRate={settings?.default_hourly_rate ?? 0}
+              defaultTempPassword={settings?.default_temp_password ?? ''}
               showRate={true}
               identityEditable={true}
               currency={settings?.currency ?? 'USD'}
