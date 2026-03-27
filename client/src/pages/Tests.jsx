@@ -715,6 +715,44 @@ const SUITES = [
 export default function Tests() {
   const [results, setResults] = useState(null);
   const [running, setRunning] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const buildReport = (suiteResults) => {
+    const allTests = suiteResults.flatMap(s => s.tests);
+    const passed = allTests.filter(t => t.status === 'pass').length;
+    const failed = allTests.length - passed;
+    const lines = [];
+    lines.push(`OpsFloa Test Report — ${new Date().toLocaleString()}`);
+    lines.push(`${passed}/${allTests.length} passed · ${failed} failed`);
+    lines.push('');
+    for (const suite of suiteResults) {
+      const sp = suite.tests.filter(t => t.status === 'pass').length;
+      lines.push(`── ${suite.name} (${sp}/${suite.tests.length})`);
+      for (const t of suite.tests) {
+        const icon = t.status === 'pass' ? '✓' : '✗';
+        lines.push(`  ${icon} ${t.name}${t.error ? `\n      ERROR: ${t.error}` : ''}`);
+      }
+      lines.push('');
+    }
+    return lines.join('\n');
+  };
+
+  const copyReport = () => {
+    if (!results) return;
+    navigator.clipboard.writeText(buildReport(results)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const printReport = () => {
+    if (!results) return;
+    const text = buildReport(results);
+    const w = window.open('', '_blank');
+    w.document.write(`<pre style="font-family:monospace;font-size:13px;padding:24px;white-space:pre-wrap">${text.replace(/</g,'&lt;')}</pre>`);
+    w.document.close();
+    w.print();
+  };
 
   const runAll = async () => {
     setRunning(true);
@@ -750,9 +788,17 @@ export default function Tests() {
           <h1 style={s.title}>Unit Tests</h1>
           <p style={s.subtitle}>{SUITES.length} suites · {totalTests} tests</p>
         </div>
-        <button style={s.runBtn} onClick={runAll} disabled={running}>
-          {running ? 'Running…' : '▶ Run All'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {results && (
+            <>
+              <button style={s.outlineBtn} onClick={copyReport}>{copied ? '✓ Copied' : '⎘ Copy'}</button>
+              <button style={s.outlineBtn} onClick={printReport}>⎙ Print</button>
+            </>
+          )}
+          <button style={s.runBtn} onClick={runAll} disabled={running}>
+            {running ? 'Running…' : '▶ Run All'}
+          </button>
+        </div>
       </div>
 
       {results && (
@@ -807,6 +853,7 @@ const s = {
   title:     { fontSize: 24, fontWeight: 700, color: '#111827', margin: 0 },
   subtitle:  { fontSize: 13, color: '#9ca3af', margin: '4px 0 0' },
   runBtn:    { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  outlineBtn:{ background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
   summary:   { display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid', borderRadius: 10, padding: '14px 18px', marginBottom: 24 },
   suites:    { display: 'flex', flexDirection: 'column', gap: 16 },
   suiteCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' },
