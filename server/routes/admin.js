@@ -498,7 +498,12 @@ router.post('/workers/invite', requireAdmin, requirePermission('manage_workers')
 
 // Create a worker or admin
 router.post('/workers', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
-  const { username, password, full_name, first_name, middle_name, last_name, role } = req.body;
+  const { password, role } = req.body;
+  const username = req.body.username?.trim();
+  const full_name = req.body.full_name?.trim();
+  const first_name = req.body.first_name?.trim() || null;
+  const middle_name = req.body.middle_name?.trim() || null;
+  const last_name = req.body.last_name?.trim() || null;
   if (!username || !password || !full_name) {
     return res.status(400).json({ error: 'username, password, and full_name required' });
   }
@@ -510,7 +515,7 @@ router.post('/workers', requireAdmin, requirePermission('manage_workers'), async
     return res.status(400).json({ error: 'hourly_rate must be a non-negative number' });
   }
   const assignedRate = (!isNaN(rateVal) && rateVal >= 0) ? rateVal : 30;
-  const assignedEmail = req.body.email || null;
+  const assignedEmail = req.body.email?.trim() || null;
   const VALID_OT_RULES = ['daily', 'weekly', 'none'];
   const assignedRateType = ['hourly', 'daily'].includes(req.body.rate_type) ? req.body.rate_type : 'hourly';
   const assignedOTRule = VALID_OT_RULES.includes(req.body.overtime_rule) ? req.body.overtime_rule : 'daily';
@@ -884,7 +889,8 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
 
 // Create a project
 router.post('/projects', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
-  const { name, wage_type, prevailing_wage_rate } = req.body;
+  const { wage_type, prevailing_wage_rate } = req.body;
+  const name = req.body.name?.trim();
   if (!name) return res.status(400).json({ error: 'Project name required' });
   const companyId = req.user.company_id;
   const wt = wage_type === 'prevailing' ? 'prevailing' : 'regular';
