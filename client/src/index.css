@@ -115,7 +115,8 @@ input, select, textarea {
     min-height: calc(56px + env(safe-area-inset-top));
     flex-wrap: wrap !important;
     align-items: center !important;
-    padding-bottom: 6px !important;
+    padding-top: max(env(safe-area-inset-top), 10px) !important;
+    padding-bottom: 8px !important;
   }
   .header-right {
     gap: 6px !important;
@@ -134,7 +135,7 @@ input, select, textarea {
     max-width: 100% !important;
     font-size: 12px !important;
     opacity: 0.7 !important;
-    padding-bottom: 2px !important;
+    margin-top: 2px !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
