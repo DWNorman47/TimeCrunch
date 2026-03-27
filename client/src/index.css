@@ -109,12 +109,9 @@ input, select, textarea {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 
-  /* App header — wraps to two rows on small screens */
+  /* App header — two explicit rows on small screens */
   .app-header {
     height: auto !important;
-    min-height: calc(56px + env(safe-area-inset-top));
-    flex-wrap: wrap !important;
-    align-items: center !important;
     padding-top: max(env(safe-area-inset-top), 10px) !important;
     padding-bottom: 0 !important;
   }
@@ -128,16 +125,16 @@ input, select, textarea {
     padding: 5px 10px !important;
     font-size: 12px !important;
   }
-  /* Company name drops to its own row below the AppSwitcher + action buttons */
-  .company-name {
-    order: 3 !important;
-    width: calc(100% + 48px) !important;
-    max-width: calc(100% + 48px) !important;
-    margin: 6px -24px 0 -24px !important;
+  /* Company name — second row, darker band edge-to-edge */
+  .company-name-row {
+    margin: 8px -24px 0 -24px !important;
     padding: 5px 24px !important;
     background: rgba(0, 0, 0, 0.18) !important;
+  }
+  .company-name {
+    display: block !important;
     font-size: 12px !important;
-    opacity: 1 !important;
+    opacity: 0.9 !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
