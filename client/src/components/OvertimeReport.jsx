@@ -6,7 +6,7 @@ function monthStart() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
 }
-function today() { return new Date().toISOString().substring(0, 10); }
+function today() { return new Date().toLocaleDateString('en-CA'); }
 function fmt(n) { return n == null ? '—' : fmtHours(n); }
 
 export default function OvertimeReport({ currency = 'USD' }) {

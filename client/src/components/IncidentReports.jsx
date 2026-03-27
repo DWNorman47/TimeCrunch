@@ -18,7 +18,7 @@ const TREATMENT_LABELS = {
 };
 
 function today() {
-  return new Date().toISOString().substring(0, 10);
+  return new Date().toLocaleDateString('en-CA');
 }
 
 // ── Incident Form ─────────────────────────────────────────────────────────────

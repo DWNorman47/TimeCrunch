@@ -19,7 +19,7 @@ function fmtDate(d) {
 function lastSunday() {
   const d = new Date();
   d.setDate(d.getDate() - (d.getDay() === 0 ? 0 : d.getDay()));
-  return d.toISOString().substring(0, 10);
+  return d.toLocaleDateString('en-CA');
 }
 
 export default function CertifiedPayroll({ projects }) {

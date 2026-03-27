@@ -3,7 +3,7 @@ import api from '../api';
 import { useFormPersist } from '../hooks/useFormPersist';
 
 export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, projectsEnabled = true }) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA');
   const [form, setForm] = useState({
     project_id: '',
     work_date: today,

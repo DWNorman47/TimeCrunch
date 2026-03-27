@@ -14,7 +14,7 @@ function startOfWeek(date) {
   return d;
 }
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
-function toISO(d) { return d.toISOString().substring(0, 10); }
+function toISO(d) { return d.toLocaleDateString('en-CA'); }
 function fmtDay(d) { return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
 function fmtTime(t) { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m}${hr < 12 ? 'a' : 'p'}`; }
 

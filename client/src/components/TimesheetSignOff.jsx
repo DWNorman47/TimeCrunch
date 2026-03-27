@@ -7,7 +7,7 @@ function weekBounds() {
   const day = today.getDay(); // 0=Sun
   const mon = new Date(today); mon.setDate(today.getDate() - ((day + 6) % 7));
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-  const fmt = d => d.toISOString().substring(0, 10);
+  const fmt = d => d.toLocaleDateString('en-CA');
   return { from: fmt(mon), to: fmt(sun) };
 }
 
