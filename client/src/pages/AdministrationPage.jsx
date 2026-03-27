@@ -399,7 +399,12 @@ export default function AdministrationPage() {
         {tab === 'integrations' && (
           <div style={styles.tabContent}>
             <h2 style={styles.tabTitle}>{t.integrations}</h2>
-            <QuickBooks workers={workers} projects={projects} />
+            <QuickBooks
+              workers={workers}
+              projects={projects}
+              onWorkersImported={imported => setWorkers(prev => [...prev, ...imported.map(w => ({ ...w, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 }))])}
+              onProjectsImported={imported => setProjects(prev => [...prev, ...imported])}
+            />
           </div>
         )}
         {tab === 'billing'  && <BillingTab />}
