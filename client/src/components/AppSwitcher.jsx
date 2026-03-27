@@ -39,7 +39,6 @@ const APPS = [
       </svg>
     ),
     path: '/projects',
-    soon: true,
   },
   {
     id: 'inventory',

@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
+import PasswordInput from '../components/PasswordInput';
 
 function getSavedCompanies() {
   try { return JSON.parse(localStorage.getItem('tc_companies') || '[]'); } catch { return []; }
@@ -171,9 +172,8 @@ export default function Login() {
             required
           />
           <label style={styles.label}>Password</label>
-          <input
+          <PasswordInput
             style={styles.input}
-            type="password"
             value={form.password}
             onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
             required

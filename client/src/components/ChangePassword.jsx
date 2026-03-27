@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import api from '../api';
+import PasswordInput from './PasswordInput';
 
 export default function ChangePassword({ onClose, t }) {
   const [form, setForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
@@ -37,11 +38,11 @@ export default function ChangePassword({ onClose, t }) {
         <h3 style={styles.title}>{t.changePasswordTitle}</h3>
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>{t.currentPassword}</label>
-          <input style={styles.input} type="password" value={form.current_password} onChange={e => set('current_password', e.target.value)} required autoFocus />
+          <PasswordInput style={styles.input} value={form.current_password} onChange={e => set('current_password', e.target.value)} required autoFocus />
           <label style={styles.label}>{t.newPassword}</label>
-          <input style={styles.input} type="password" value={form.new_password} onChange={e => set('new_password', e.target.value)} required minLength={6} />
+          <PasswordInput style={styles.input} value={form.new_password} onChange={e => set('new_password', e.target.value)} required minLength={6} />
           <label style={styles.label}>{t.confirmNewPassword}</label>
-          <input style={styles.input} type="password" value={form.confirm_password} onChange={e => set('confirm_password', e.target.value)} required />
+          <PasswordInput style={styles.input} value={form.confirm_password} onChange={e => set('confirm_password', e.target.value)} required />
           {error && <p style={styles.error}>{error}</p>}
           {success && <p style={styles.success}>{t.passwordChanged}</p>}
           <div style={styles.buttons}>

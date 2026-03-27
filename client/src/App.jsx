@@ -11,6 +11,7 @@ import ConfirmEmail from './pages/ConfirmEmail';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import FieldPage from './pages/FieldPage';
+import ProjectsPage from './pages/ProjectsPage';
 import AdministrationPage from './pages/AdministrationPage';
 import SuperAdmin from './pages/SuperAdmin';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -84,6 +85,7 @@ function AppRoutes() {
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/admin" element={<PrivateRoute adminOnly><AdminDashboard /></PrivateRoute>} />
       <Route path="/field" element={<PrivateRoute><FieldPage /></PrivateRoute>} />
+      <Route path="/projects" element={<PrivateRoute adminOnly><ProjectsPage /></PrivateRoute>} />
       <Route path="/administration" element={<PrivateRoute adminOnly><AdministrationPage /></PrivateRoute>} />
       <Route path="/superadmin" element={<PrivateRoute superAdminOnly><SuperAdmin /></PrivateRoute>} />
       <Route path="/" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Landing />} />

@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import api from '../api';
 import AppSwitcher from '../components/AppSwitcher';
+import PasswordInput from '../components/PasswordInput';
 import TabBar from '../components/TabBar';
 import BillingPanel from '../components/BillingPanel';
 import ManageWorkers from '../components/ManageWorkers';
@@ -224,15 +225,15 @@ function AccountTab() {
           <form onSubmit={changePassword} style={styles.accordionBody}>
             <div style={styles.fieldGroup}>
               <label style={styles.label}>{t.currentPassword}</label>
-              <input style={styles.input} type="password" value={form.current_password} onChange={e => set('current_password', e.target.value)} autoFocus />
+              <PasswordInput style={styles.input} value={form.current_password} onChange={e => set('current_password', e.target.value)} autoFocus />
             </div>
             <div style={styles.fieldGroup}>
               <label style={styles.label}>{t.newPassword}</label>
-              <input style={styles.input} type="password" value={form.new_password} onChange={e => set('new_password', e.target.value)} />
+              <PasswordInput style={styles.input} value={form.new_password} onChange={e => set('new_password', e.target.value)} />
             </div>
             <div style={styles.fieldGroup}>
               <label style={styles.label}>{t.confirmNewPassword}</label>
-              <input style={styles.input} type="password" value={form.confirm} onChange={e => set('confirm', e.target.value)} />
+              <PasswordInput style={styles.input} value={form.confirm} onChange={e => set('confirm', e.target.value)} />
             </div>
             {msg && (
               <p style={{ ...styles.feedback, color: msg.includes('success') || msg.includes('exitosamente') ? '#059669' : '#dc2626' }}>{msg}</p>

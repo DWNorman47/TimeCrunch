@@ -77,6 +77,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     feature_timeclock: settings?.feature_timeclock ?? true,
     feature_projects: settings?.feature_projects ?? true,
     feature_inactive_alerts: settings?.feature_inactive_alerts ?? true,
+    feature_overtime_alerts: settings?.feature_overtime_alerts ?? true,
     feature_broadcast: settings?.feature_broadcast ?? true,
     show_worker_wages: settings?.show_worker_wages ?? false,
     currency: settings?.currency ?? 'USD',
@@ -119,6 +120,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       feature_timeclock: settings.feature_timeclock ?? true,
       feature_projects: settings.feature_projects ?? true,
       feature_inactive_alerts: settings.feature_inactive_alerts ?? true,
+      feature_overtime_alerts: settings.feature_overtime_alerts ?? true,
       feature_broadcast: settings.feature_broadcast ?? true,
       show_worker_wages: settings.show_worker_wages ?? false,
       currency: settings.currency ?? 'USD',
@@ -152,6 +154,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_timeclock: form.feature_timeclock,
         feature_projects: form.feature_projects,
         feature_inactive_alerts: form.feature_inactive_alerts,
+        feature_overtime_alerts: form.feature_overtime_alerts,
         feature_broadcast: form.feature_broadcast,
         show_worker_wages: form.show_worker_wages,
         currency: form.currency,
@@ -341,6 +344,16 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               </div>
             </div>
           )}
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Overtime Alerts</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Notify admins when a worker crosses the overtime threshold</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_overtime_alerts ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_overtime_alerts} onChange={e => set('feature_overtime_alerts', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_overtime_alerts ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
           <div style={styles.row}>
             <label style={styles.label}>{t.ratesClearChat}</label>
             <div style={styles.inputGroup}>

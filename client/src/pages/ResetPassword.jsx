@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import api from '../api';
+import PasswordInput from '../components/PasswordInput';
 
 export default function ResetPassword() {
   const [params] = useSearchParams();
@@ -44,9 +45,8 @@ export default function ResetPassword() {
         <h2 style={styles.title}>Set a new password</h2>
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>New password</label>
-          <input
+          <PasswordInput
             style={styles.input}
-            type="password"
             placeholder="At least 6 characters"
             value={password}
             onChange={e => setPassword(e.target.value)}
@@ -55,9 +55,8 @@ export default function ResetPassword() {
             autoFocus
           />
           <label style={styles.label}>Confirm password</label>
-          <input
+          <PasswordInput
             style={styles.input}
-            type="password"
             placeholder="Repeat password"
             value={confirm}
             onChange={e => setConfirm(e.target.value)}
