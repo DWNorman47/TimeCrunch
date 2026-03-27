@@ -154,21 +154,26 @@ router.post('/register', authLimiter, async (req, res) => {
   // Capture real client IP (req.ip respects trust proxy setting)
   const registrationIp = req.ip || 'unknown';
 
-  // Block IPs that have registered too many trials recently
+  // Owner/dev IPs bypass all trial-limit checks
+  const whitelistedIps = (process.env.WHITELISTED_IPS || '').split(',').map(s => s.trim()).filter(Boolean);
+  const ipIsWhitelisted = whitelistedIps.includes(registrationIp);
+
+  // Block IPs that have registered too many trials recently (skipped for whitelisted IPs)
   const TRIAL_LIMIT = parseInt(process.env.TRIAL_LIMIT_PER_IP) || 5;
-  const ipQuery = await pool.query(
-    `SELECT COUNT(*), array_agg(name ORDER BY created_at) as company_names
-     FROM companies WHERE registration_ip = $1 AND created_at > NOW() - INTERVAL '30 days'`,
-    [registrationIp]
-  );
-  const priorCount = parseInt(ipQuery.rows[0].count);
-  if (priorCount >= TRIAL_LIMIT) {
-    return res.status(429).json({ error: 'This IP address has been flagged for suspicious activity. Further registration attempts from this network are being logged and reviewed by our trust and safety team.' });
-  }
-  // Alert on second registration from same IP (priorCount >= 1 means this is #2+)
-  if (priorCount >= 1) {
-    const priorNames = ipQuery.rows[0].company_names || [];
-    sgMail.send({
+  if (!ipIsWhitelisted) {
+    const ipQuery = await pool.query(
+      `SELECT COUNT(*), array_agg(name ORDER BY created_at) as company_names
+       FROM companies WHERE registration_ip = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+      [registrationIp]
+    );
+    const priorCount = parseInt(ipQuery.rows[0].count);
+    if (priorCount >= TRIAL_LIMIT) {
+      return res.status(429).json({ error: 'This IP address has been flagged for suspicious activity. Further registration attempts from this network are being logged and reviewed by our trust and safety team.' });
+    }
+    // Alert on second registration from same IP (priorCount >= 1 means this is #2+)
+    if (priorCount >= 1) {
+      const priorNames = ipQuery.rows[0].company_names || [];
+      sgMail.send({
       from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
       to: 'info@opsfloa.com',
       subject: `⚠️ Multiple trial registrations from IP ${registrationIp}`,
@@ -188,6 +193,7 @@ router.post('/register', authLimiter, async (req, res) => {
       `,
     }).catch(err => console.error('Trial abuse alert email failed:', err));
   }
+  } // end if (!ipIsWhitelisted)
 
   const slug = company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
   const client = await pool.connect();
@@ -215,39 +221,39 @@ router.post('/register', authLimiter, async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
     const confirmToken = crypto.randomBytes(32).toString('hex');
     const confirmExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const userResult = await client.query(
+    await client.query(
       `INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, email,
         email_confirmed, email_confirm_token, email_confirm_token_expires)
        VALUES ($1,$2,$3,$4,$5,$6,$7,'admin',$8,false,$9,$10)
        RETURNING id, username, full_name, role, company_id, email`,
       [companyId, username, hash, full_name, first_name||null, middle_name||null, last_name||null, email, confirmToken, confirmExpires]
     );
-    await client.query('COMMIT');
 
-    // Send confirmation email — non-fatal: account is created regardless
+    // Send confirmation email — COMMIT only after success so email failure rolls back the account
     const confirmUrl = `${process.env.APP_URL}/confirm-email?token=${confirmToken}`;
-    try {
-      await sgMail.send({
-        from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
-        to: email,
-        subject: 'Confirm your OpsFloa email',
-        html: `
-          <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
-            <h2 style="color:#1a56db;margin-bottom:8px">Confirm your email</h2>
-            <p style="color:#444;margin-bottom:24px">Hi ${full_name}, click below to confirm your email and activate your OpsFloa account.</p>
-            <a href="${confirmUrl}" style="display:inline-block;background:#1a56db;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700">Confirm email</a>
-            <p style="color:#999;font-size:13px;margin-top:24px">This link expires in 24 hours.</p>
-          </div>
-        `,
-      });
-    } catch (emailErr) {
-      console.error('Confirmation email failed (account still created):', emailErr?.response?.body || emailErr.message);
-    }
+    await sgMail.send({
+      from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
+      to: email,
+      subject: 'Confirm your OpsFloa email',
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+          <h2 style="color:#1a56db;margin-bottom:8px">Confirm your email</h2>
+          <p style="color:#444;margin-bottom:24px">Hi ${full_name}, click below to confirm your email and activate your OpsFloa account.</p>
+          <a href="${confirmUrl}" style="display:inline-block;background:#1a56db;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700">Confirm email</a>
+          <p style="color:#999;font-size:13px;margin-top:24px">This link expires in 24 hours.</p>
+        </div>
+      `,
+    });
 
+    await client.query('COMMIT');
     res.status(201).json({ pending_confirmation: true, email });
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === '23505') return res.status(409).json({ error: 'Username already taken at this company' });
+    if (err.response) {
+      console.error('Confirmation email failed — account not created:', err.response.body);
+      return res.status(500).json({ error: 'Failed to send confirmation email. Please check your email address and try again.' });
+    }
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   } finally {
