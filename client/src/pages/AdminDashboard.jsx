@@ -104,15 +104,17 @@ export default function AdminDashboard() {
   return (
     <div style={styles.page}>
       <header style={styles.header} className="app-header">
-        <div style={styles.logoGroup}>
-          <AppSwitcher currentApp="timeclock" userRole={user?.role} features={settings} />
+        <div style={styles.headerTopRow}>
+          <div style={styles.logoGroup}>
+            <AppSwitcher currentApp="timeclock" userRole={user?.role} features={settings} />
+          </div>
+          <div style={styles.headerRight}>
+            <NotificationBell />
+            {isPwa && <button style={styles.headerBtn} onClick={() => window.location.reload()}>↻</button>}
+            <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
+          </div>
         </div>
-        {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
-        <div style={styles.headerRight}>
-          <NotificationBell />
-          {isPwa && <button style={styles.headerBtn} onClick={() => window.location.reload()}>↻</button>}
-          <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
-        </div>
+        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
       {billing?.subscription_status === 'trial_expired' && (
@@ -226,7 +228,8 @@ export default function AdminDashboard() {
 
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9' },
-  header: { background: '#1a56db', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', height: 'calc(56px + env(safe-area-inset-top))', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  header: { background: '#1a56db', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', height: 'calc(56px + env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
+  headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
   logo: { fontWeight: 700, fontSize: 20 },
   companyName: { fontSize: 14, fontWeight: 400, opacity: 0.75 },

@@ -338,20 +338,22 @@ ${signatureDataUrl ? `
     <div style={styles.page}>
       <OfflineBanner />
       <header style={styles.header} className="app-header">
-        <div style={styles.logoGroup}>
-          <AppSwitcher currentApp="timeclock" userRole={user?.role} features={settings} />
+        <div style={styles.headerTopRow}>
+          <div style={styles.logoGroup}>
+            <AppSwitcher currentApp="timeclock" userRole={user?.role} features={settings} />
+          </div>
+          <div style={styles.headerRight} className="header-right">
+            <NotificationBell />
+            {isPwa && <button style={styles.headerBtn} className="header-btn" onClick={() => window.location.reload()}>↻</button>}
+            <span style={styles.userName} className="header-username">{user.full_name}</span>
+            <select style={styles.langSelect} value={user?.language || 'English'} onChange={e => handleLanguageChange(e.target.value)}>
+              <option value="English" style={{ color: '#111827', background: '#fff' }}>EN</option>
+              <option value="Spanish" style={{ color: '#111827', background: '#fff' }}>ES</option>
+            </select>
+            <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
+          </div>
         </div>
-        {user?.company_name && <span style={styles.companyName} className="company-name">{user.company_name}</span>}
-        <div style={styles.headerRight} className="header-right">
-          <NotificationBell />
-          {isPwa && <button style={styles.headerBtn} className="header-btn" onClick={() => window.location.reload()}>↻</button>}
-          <span style={styles.userName} className="header-username">{user.full_name}</span>
-          <select style={styles.langSelect} value={user?.language || 'English'} onChange={e => handleLanguageChange(e.target.value)}>
-            <option value="English" style={{ color: '#111827', background: '#fff' }}>EN</option>
-            <option value="Spanish" style={{ color: '#111827', background: '#fff' }}>ES</option>
-          </select>
-          <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
-        </div>
+        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
@@ -431,7 +433,8 @@ ${signatureDataUrl ? `
 
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9' },
-  header: { background: '#1a56db', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', height: 'calc(56px + env(safe-area-inset-top))', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  header: { background: '#1a56db', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', height: 'calc(56px + env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
+  headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
   logo: { fontWeight: 700, fontSize: 20 },
   companyName: { fontSize: 14, fontWeight: 400, opacity: 0.75 },
