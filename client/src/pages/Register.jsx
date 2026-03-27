@@ -1,3 +1,4 @@
+import PasswordInput from '../components/PasswordInput';
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -129,9 +130,8 @@ export default function Register() {
             required
           />
           <label style={styles.label}>Password</label>
-          <input
+          <PasswordInput
             style={styles.input}
-            type="password"
             placeholder="At least 6 characters"
             value={form.password}
             onChange={e => set('password', e.target.value)}
