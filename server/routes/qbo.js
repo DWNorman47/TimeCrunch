@@ -126,14 +126,33 @@ router.get('/customers', requireAdmin, async (req, res) => {
   }
 });
 
-// PATCH /api/qbo/workers/:id/mapping — save QBO employee ID for a worker
-router.patch('/workers/:id/mapping', requireAdmin, async (req, res) => {
-  const { qbo_employee_id } = req.body;
+// GET /api/qbo/vendors — list QBO vendors (for contractor/subcontractor mapping)
+router.get('/vendors', requireAdmin, async (req, res) => {
   try {
-    await pool.query(
-      'UPDATE users SET qbo_employee_id = $1 WHERE id = $2 AND company_id = $3',
-      [qbo_employee_id || null, req.params.id, req.user.company_id]
-    );
+    const vendors = await qbo.listVendors(req.user.company_id);
+    res.json(vendors);
+  } catch (err) {
+    console.error(err);
+    const status = err.code === 'qbo_auth_expired' ? 401 : 500;
+    res.status(status).json({ error: err.message || 'Server error', code: err.code });
+  }
+});
+
+// PATCH /api/qbo/workers/:id/mapping — save QBO employee or vendor ID for a worker
+router.patch('/workers/:id/mapping', requireAdmin, async (req, res) => {
+  const { qbo_employee_id, qbo_vendor_id } = req.body;
+  try {
+    if (qbo_vendor_id !== undefined) {
+      await pool.query(
+        'UPDATE users SET qbo_vendor_id = $1 WHERE id = $2 AND company_id = $3',
+        [qbo_vendor_id || null, req.params.id, req.user.company_id]
+      );
+    } else {
+      await pool.query(
+        'UPDATE users SET qbo_employee_id = $1 WHERE id = $2 AND company_id = $3',
+        [qbo_employee_id || null, req.params.id, req.user.company_id]
+      );
+    }
     res.json({ saved: true });
   } catch (err) {
     console.error(err);
@@ -163,7 +182,7 @@ router.post('/push', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
-      `SELECT te.*, u.qbo_employee_id, p.qbo_customer_id,
+      `SELECT te.*, u.qbo_employee_id, u.qbo_vendor_id, u.worker_type, p.qbo_customer_id,
               u.full_name as worker_name, p.name as project_name
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
@@ -185,7 +204,9 @@ router.post('/push', requireAdmin, async (req, res) => {
         alreadySynced++;
         continue;
       }
-      if (!entry.qbo_employee_id) {
+      const usesVendor = entry.worker_type === 'contractor' || entry.worker_type === 'subcontractor';
+      const mappedId = usesVendor ? entry.qbo_vendor_id : entry.qbo_employee_id;
+      if (!mappedId) {
         skipped.push({ entry_id: entry.id, reason: `Worker "${entry.worker_name}" has no QBO mapping` });
         continue;
       }
@@ -202,7 +223,7 @@ router.post('/push', requireAdmin, async (req, res) => {
 
       try {
         const activity = await qbo.pushTimeActivity(companyId, {
-          employeeId: entry.qbo_employee_id,
+          ...(usesVendor ? { vendorId: entry.qbo_vendor_id } : { employeeId: entry.qbo_employee_id }),
           customerId: entry.qbo_customer_id,
           workDate,
           hours,

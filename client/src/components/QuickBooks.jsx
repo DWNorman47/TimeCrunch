@@ -1,12 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 
+const VENDOR_TYPES = ['contractor', 'subcontractor'];
+const EMPLOYEE_TYPES = ['employee', 'owner'];
+
+const TYPE_LABELS = {
+  employee: 'Employees (W-2)',
+  owner: 'Owners / Officers',
+  contractor: 'Independent Contractors (1099-NEC)',
+  subcontractor: 'Subcontractors (1099-NEC)',
+};
+
 export default function QuickBooks({ workers, projects }) {
   const [status, setStatus] = useState(null);
   const [qboEmployees, setQboEmployees] = useState([]);
+  const [qboVendors, setQboVendors] = useState([]);
   const [qboCustomers, setQboCustomers] = useState([]);
   const [loadingMappings, setLoadingMappings] = useState(false);
-  const [workerMappings, setWorkerMappings] = useState({});
+  const [employeeMappings, setEmployeeMappings] = useState({});  // worker_type: employee/owner → qbo_employee_id
+  const [vendorMappings, setVendorMappings] = useState({});       // worker_type: contractor/subcontractor → qbo_vendor_id
   const [projectMappings, setProjectMappings] = useState({});
   const [pushFrom, setPushFrom] = useState('');
   const [pushTo, setPushTo] = useState('');
@@ -22,12 +34,15 @@ export default function QuickBooks({ workers, projects }) {
   useEffect(() => {
     if (!status?.connected) return;
     setLoadingMappings(true);
-    Promise.all([api.get('/qbo/employees'), api.get('/qbo/customers')])
-      .then(([e, c]) => { setQboEmployees(e.data); setQboCustomers(c.data); })
+    Promise.all([api.get('/qbo/employees'), api.get('/qbo/vendors'), api.get('/qbo/customers')])
+      .then(([e, v, c]) => {
+        setQboEmployees(e.data);
+        setQboVendors(v.data);
+        setQboCustomers(c.data);
+      })
       .catch(err => {
         const code = err.response?.data?.code;
         if (code === 'qbo_auth_expired') {
-          // Token expired — flip the UI to the reconnect banner
           setStatus(s => ({ ...s, connected: false, disconnected: true }));
         } else {
           setError(err.response?.data?.error || 'Failed to load QuickBooks data');
@@ -35,10 +50,14 @@ export default function QuickBooks({ workers, projects }) {
       })
       .finally(() => setLoadingMappings(false));
 
-    // Pre-populate existing mappings from workers/projects
-    const wm = {};
-    workers.forEach(w => { if (w.qbo_employee_id) wm[w.id] = w.qbo_employee_id; });
-    setWorkerMappings(wm);
+    const em = {};
+    const vm = {};
+    workers.forEach(w => {
+      if (VENDOR_TYPES.includes(w.worker_type) && w.qbo_vendor_id) vm[w.id] = w.qbo_vendor_id;
+      else if (w.qbo_employee_id) em[w.id] = w.qbo_employee_id;
+    });
+    setEmployeeMappings(em);
+    setVendorMappings(vm);
 
     const pm = {};
     projects.forEach(p => { if (p.qbo_customer_id) pm[p.id] = p.qbo_customer_id; });
@@ -60,9 +79,14 @@ export default function QuickBooks({ workers, projects }) {
     setStatus({ connected: false });
   };
 
-  const saveWorkerMapping = async (workerId, qboEmployeeId) => {
-    setWorkerMappings(m => ({ ...m, [workerId]: qboEmployeeId }));
+  const saveEmployeeMapping = async (workerId, qboEmployeeId) => {
+    setEmployeeMappings(m => ({ ...m, [workerId]: qboEmployeeId }));
     await api.patch(`/qbo/workers/${workerId}/mapping`, { qbo_employee_id: qboEmployeeId || null });
+  };
+
+  const saveVendorMapping = async (workerId, qboVendorId) => {
+    setVendorMappings(m => ({ ...m, [workerId]: qboVendorId }));
+    await api.patch(`/qbo/workers/${workerId}/mapping`, { qbo_vendor_id: qboVendorId || null });
   };
 
   const saveProjectMapping = async (projectId, qboCustomerId) => {
@@ -85,6 +109,16 @@ export default function QuickBooks({ workers, projects }) {
   };
 
   if (!status) return <p style={{ color: '#666' }}>Loading...</p>;
+
+  // Group workers by type, only include types that have at least one worker
+  const workersByType = {};
+  workers.forEach(w => {
+    const t = w.worker_type || 'employee';
+    if (!workersByType[t]) workersByType[t] = [];
+    workersByType[t].push(w);
+  });
+  const typeOrder = ['employee', 'owner', 'contractor', 'subcontractor'];
+  const presentTypes = typeOrder.filter(t => workersByType[t]?.length > 0);
 
   return (
     <div style={styles.wrap}>
@@ -121,39 +155,54 @@ export default function QuickBooks({ workers, projects }) {
 
       {status.connected && (
         <>
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Worker Mappings</h3>
-            <p style={styles.hint}>Link each worker to their corresponding employee in QuickBooks.</p>
-            {loadingMappings ? <p>Loading QuickBooks employees...</p> : (
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>OpsFloa Worker</th>
-                    <th style={styles.th}>QuickBooks Employee</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {workers.map(w => (
-                    <tr key={w.id}>
-                      <td style={styles.td}>{w.full_name}</td>
-                      <td style={styles.td}>
-                        <select
-                          style={styles.select}
-                          value={workerMappings[w.id] || ''}
-                          onChange={e => saveWorkerMapping(w.id, e.target.value)}
-                        >
-                          <option value="">— Not mapped —</option>
-                          {qboEmployees.map(e => (
-                            <option key={e.Id} value={e.Id}>{e.DisplayName}</option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          {/* Worker mapping sections — one per worker type present */}
+          {presentTypes.map(type => {
+            const isVendorType = VENDOR_TYPES.includes(type);
+            const qboList = isVendorType ? qboVendors : qboEmployees;
+            const qboLabel = isVendorType ? 'QuickBooks Vendor' : 'QuickBooks Employee';
+            const mappings = isVendorType ? vendorMappings : employeeMappings;
+            const saveFn = isVendorType ? saveVendorMapping : saveEmployeeMapping;
+            const typeWorkers = workersByType[type];
+            return (
+              <div key={type} style={styles.section}>
+                <h3 style={styles.sectionTitle}>{TYPE_LABELS[type]}</h3>
+                <p style={styles.hint}>
+                  {isVendorType
+                    ? `Link each ${type} to their corresponding vendor in QuickBooks for 1099 reporting.`
+                    : `Link each ${type === 'owner' ? 'owner/officer' : 'employee'} to their corresponding employee in QuickBooks.`}
+                </p>
+                {loadingMappings ? <p>Loading QuickBooks data...</p> : (
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={styles.th}>OpsFloa Worker</th>
+                        <th style={styles.th}>{qboLabel}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {typeWorkers.map(w => (
+                        <tr key={w.id}>
+                          <td style={styles.td}>{w.full_name}</td>
+                          <td style={styles.td}>
+                            <select
+                              style={styles.select}
+                              value={mappings[w.id] || ''}
+                              onChange={e => saveFn(w.id, e.target.value)}
+                            >
+                              <option value="">— Not mapped —</option>
+                              {qboList.map(e => (
+                                <option key={e.Id} value={e.Id}>{e.DisplayName}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            );
+          })}
 
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Project Mappings</h3>
