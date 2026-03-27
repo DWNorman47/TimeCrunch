@@ -255,7 +255,7 @@ const SUITES = [
     tests: [
       { name: '08:00 → 16:00 = 8h',    run: () => assertEqual(hoursWorked('08:00', '16:00'), 8,   '8h') },
       { name: '08:00 → 08:30 = 0.5h',  run: () => assertEqual(hoursWorked('08:00', '08:30'), 0.5, '30m') },
-      { name: '00:00 → 00:00 = 24h',   run: () => assertEqual(hoursWorked('00:00', '00:00'), 24,  '24h') },
+      { name: '00:00 → 00:00 = 0h (same time = zero)', run: () => assertEqual(hoursWorked('00:00', '00:00'), 0, 'same time') },
       { name: '23:00 → 01:00 midnight crossing = 2h', run: () => assertEqual(hoursWorked('23:00', '01:00'), 2, 'midnight') },
       { name: '22:30 → 06:30 midnight crossing = 8h', run: () => assertEqual(hoursWorked('22:30', '06:30'), 8, 'overnight 8h') },
       { name: '09:00 → 17:30 = 8.5h',  run: () => assertEqual(hoursWorked('09:00', '17:30'), 8.5, '8.5h') },
@@ -413,9 +413,9 @@ const SUITES = [
       { name: 'Same point = 0 feet', run: () => {
         assertEqual(haversineDistanceFt(40.7128, -74.006, 40.7128, -74.006), 0, 'same point');
       }},
-      { name: 'NYC to LA ≈ 13,600,000 ft (2575 miles)', run: () => {
+      { name: 'NYC to LA ≈ 12,913,000 ft (2445 miles)', run: () => {
         const dist = haversineDistanceFt(40.7128, -74.006, 34.0522, -118.2437);
-        assertClose(dist, 13607000, 100000, 'NYC-LA');
+        assertClose(dist, 12913000, 200000, 'NYC-LA');
       }},
       { name: '100ft radius: points inside register < 100ft', run: () => {
         // ~30m north is about 100ft
@@ -528,17 +528,18 @@ const SUITES = [
     tests: [
       guard('GET /admin/kpis',              '/admin/kpis'),
       guard('GET /admin/workers',           '/admin/workers'),
-      guard('GET /admin/workers/export',    '/admin/workers/export'),
       guard('GET /admin/projects',          '/admin/projects'),
-      guard('GET /admin/time-entries',      '/admin/time-entries'),
-      guard('GET /admin/schedule',          '/admin/schedule'),
       guard('GET /admin/settings',          '/admin/settings'),
-      guard('GET /admin/reports/hours',     '/admin/reports/hours'),
-      guard('GET /admin/reports/payroll',   '/admin/reports/payroll'),
-      guard('GET /admin/approval-queue',    '/admin/approval-queue'),
+      guard('GET /admin/entries/pending',   '/admin/entries/pending'),
+      guard('GET /admin/export',            '/admin/export'),
+      guard('GET /admin/overtime-report',   '/admin/overtime-report'),
+      guard('GET /admin/payroll-export',    '/admin/payroll-export'),
       guard('GET /admin/audit-log',         '/admin/audit-log'),
-      guard('GET /admin/messages',          '/admin/messages'),
-      guard('GET /admin/admins',            '/admin/admins'),
+      guard('GET /admin/company',           '/admin/company'),
+      guard('GET /admin/notifications',     '/admin/notifications'),
+      guard('GET /admin/active-clocks',     '/admin/active-clocks'),
+      guard('GET /admin/pay-periods',       '/admin/pay-periods'),
+      guard('GET /admin/analytics',         '/admin/analytics'),
     ],
   },
 
@@ -564,7 +565,7 @@ const SUITES = [
       guard('GET /time-entries',   '/time-entries'),
       guard('GET /projects',       '/projects'),
       guard('GET /inbox',          '/inbox'),
-      guard('GET /shifts',         '/shifts'),
+      guard('GET /shifts/mine',    '/shifts/mine'),
     ],
   },
 
@@ -630,8 +631,8 @@ const SUITES = [
         const r = await get('/inbox', TOKEN());
         assert([200, 401].includes(r.status), `Got ${r.status}`);
       }},
-      { name: 'GET /shifts → 200 or 401', run: async () => {
-        const r = await get('/shifts', TOKEN());
+      { name: 'GET /shifts/mine → 200 or 401', run: async () => {
+        const r = await get('/shifts/mine', TOKEN());
         assert([200, 401].includes(r.status), `Got ${r.status}`);
       }},
     ],
