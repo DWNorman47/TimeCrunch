@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api';
+import PasswordInput from '../components/PasswordInput';
 
 export default function AcceptInvite() {
   const [params] = useSearchParams();
@@ -54,8 +55,8 @@ export default function AcceptInvite() {
         <h2 style={styles.title}>Set your password</h2>
         <p style={styles.sub}>Welcome to OpsFloa. Create a password to activate your account.</p>
         <form onSubmit={handleSubmit} style={styles.form}>
-          <input style={styles.input} type="password" placeholder="New password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
-          <input style={styles.input} type="password" placeholder="Confirm password" value={confirm} onChange={e => setConfirm(e.target.value)} required />
+          <PasswordInput style={styles.input} placeholder="New password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+          <PasswordInput style={styles.input} placeholder="Confirm password" value={confirm} onChange={e => setConfirm(e.target.value)} required />
           {error && <p style={styles.error}>{error}</p>}
           <button style={styles.btn} type="submit" disabled={loading}>{loading ? 'Saving...' : 'Set password'}</button>
         </form>

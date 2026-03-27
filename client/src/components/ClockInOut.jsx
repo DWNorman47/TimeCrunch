@@ -74,11 +74,15 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
     return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   };
 
+  const selectedProjectData = projects?.find(p => String(p.id) === String(selectedProject));
+  const projectHasGeofence = !!(selectedProjectData?.geo_lat && selectedProjectData?.geo_lng && selectedProjectData?.geo_radius_ft);
+
   const handleClockIn = async () => {
     if (projectsEnabled && !selectedProject) { setError(t.selectProjectFirst); return; }
     setError('');
     setLoading(true);
-    const { lat, lng } = geolocationEnabled ? await getLocation() : { lat: null, lng: null };
+    // Always fetch GPS when the selected project has a geofence, even if geolocation feature is off globally
+    const { lat, lng } = (geolocationEnabled || projectHasGeofence) ? await getLocation() : { lat: null, lng: null };
     const local_work_date = new Date().toLocaleDateString('en-CA');
     try {
       const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
@@ -282,6 +286,11 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
             onChange={e => setNotes(e.target.value)}
           />
         </div>
+        {projectHasGeofence && (
+          <div style={styles.geofenceHint}>
+            📍 This job site requires location verification to clock in.
+          </div>
+        )}
         {error && <p style={styles.error}>{error}</p>}
         <button style={styles.clockInBtn} className="clock-btn" onClick={handleClockIn} disabled={loading}>
           {loading ? t.clockingIn : t.clockIn}
@@ -310,6 +319,7 @@ const styles = {
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   label: { fontSize: 13, fontWeight: 600, color: '#555', display: 'block', marginBottom: 4 },
   input: { padding: '9px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, width: '100%' },
+  geofenceHint: { fontSize: 12, color: '#0369a1', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 6, padding: '7px 11px' },
   error: { color: '#ef4444', fontSize: 13, margin: 0, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px' },
   errorDark: { fontSize: 13, margin: 0, background: 'rgba(255,255,255,0.15)', borderRadius: 6, padding: '8px 12px', color: '#fff' },
   clockInBtn: { padding: '13px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 700 },

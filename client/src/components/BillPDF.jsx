@@ -55,14 +55,6 @@ const s = StyleSheet.create({
   tableRow: { flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 4, borderBottomWidth: 0.5, borderBottomColor: '#f3f4f6', borderBottomStyle: 'solid' },
   td: { fontSize: 9, color: '#374151' },
 
-  colDate:    { width: '13%' },
-  colProject: { width: '18%' },
-  colDesc:    { width: '20%' },
-  colIn:      { width: '11%' },
-  colOut:     { width: '11%' },
-  colType:    { width: '14%' },
-  colHours:   { width: '13%', textAlign: 'right' },
-
   summaryWrap: { flexDirection: 'row', marginTop: 20 },
   thankYou: { flex: 1, fontSize: 9, color: '#9ca3af', lineHeight: 1.8, marginRight: 20 },
   sumTable: { width: 230, borderWidth: 1, borderColor: '#e5e7eb', borderStyle: 'solid', borderRadius: 6, overflow: 'hidden' },
@@ -75,7 +67,7 @@ const s = StyleSheet.create({
   sumTotalText: { fontSize: 11, fontWeight: 'bold', color: '#fff' },
 });
 
-export default function BillPDF({ data, companyInfo = {} }) {
+export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true, showProject = true, showRateType = true }) {
   const { worker, entries, summary, period } = data;
 
   const periodStr = period.from || period.to
@@ -87,6 +79,19 @@ export default function BillPDF({ data, companyInfo = {} }) {
 
   const ci = companyInfo || {};
   const billToLines = [ci.name, ci.address, ci.phone, ci.contact_email].filter(Boolean);
+
+  // Build column widths dynamically based on what's shown
+  // Base: Date 13%, Desc 20%, In 11%, Out 11%, Hours 13% = 68% used
+  // Project: 18%, RateType: 14%
+  const extraPct = (!showProject ? 18 : 0) + (!showRateType ? 14 : 0);
+  // Distribute extra space to Description
+  const colDesc  = `${20 + extraPct}%`;
+  const colDate  = '13%';
+  const colIn    = '11%';
+  const colOut   = '11%';
+  const colHours = '13%';
+  const colProject = '18%';
+  const colType  = '14%';
 
   return (
     <Document>
@@ -128,28 +133,30 @@ export default function BillPDF({ data, companyInfo = {} }) {
 
         {/* Entry table */}
         <View style={s.tableHeader}>
-          <Text style={[s.th, s.colDate]}>Date</Text>
-          <Text style={[s.th, s.colProject]}>Project</Text>
-          <Text style={[s.th, s.colDesc]}>Description</Text>
-          <Text style={[s.th, s.colIn]}>Clock In</Text>
-          <Text style={[s.th, s.colOut]}>Clock Out</Text>
-          <Text style={[s.th, s.colType]}>Rate Type</Text>
-          <Text style={[s.th, s.colHours]}>Hours</Text>
+          <Text style={[s.th, { width: colDate }]}>Date</Text>
+          {showProject && <Text style={[s.th, { width: colProject }]}>Project</Text>}
+          <Text style={[s.th, { width: colDesc }]}>Description</Text>
+          <Text style={[s.th, { width: colIn }]}>Clock In</Text>
+          <Text style={[s.th, { width: colOut }]}>Clock Out</Text>
+          {showRateType && <Text style={[s.th, { width: colType }]}>Rate Type</Text>}
+          <Text style={[s.th, { width: colHours, textAlign: 'right' }]}>Hours</Text>
         </View>
         {entries.map(e => {
           const h = netHours(e.start_time, e.end_time, e.break_minutes);
           const isPrev = e.wage_type === 'prevailing';
           return (
             <View key={e.id} style={s.tableRow}>
-              <Text style={[s.td, s.colDate]}>{fmtDate(e.work_date_str || e.work_date)}</Text>
-              <Text style={[s.td, s.colProject]}>{e.project_name || '—'}</Text>
-              <Text style={[s.td, s.colDesc, { color: '#6b7280' }]}>{e.notes || ''}</Text>
-              <Text style={[s.td, s.colIn]}>{fmtTime(e.start_time)}</Text>
-              <Text style={[s.td, s.colOut]}>{fmtTime(e.end_time)}</Text>
-              <Text style={[s.td, s.colType, { color: isPrev ? '#d97706' : '#2563eb', fontWeight: 'bold' }]}>
-                {isPrev ? 'Prevailing' : 'Regular'}
-              </Text>
-              <Text style={[s.td, s.colHours, { fontWeight: 'bold' }]}>{fmtH(h)}</Text>
+              <Text style={[s.td, { width: colDate }]}>{fmtDate(e.work_date_str || e.work_date)}</Text>
+              {showProject && <Text style={[s.td, { width: colProject }]}>{e.project_name || '—'}</Text>}
+              <Text style={[s.td, { width: colDesc, color: '#6b7280' }]}>{e.notes || ''}</Text>
+              <Text style={[s.td, { width: colIn }]}>{fmtTime(e.start_time)}</Text>
+              <Text style={[s.td, { width: colOut }]}>{fmtTime(e.end_time)}</Text>
+              {showRateType && (
+                <Text style={[s.td, { width: colType, color: isPrev ? '#d97706' : '#2563eb', fontWeight: 'bold' }]}>
+                  {isPrev ? 'Prevailing' : 'Regular'}
+                </Text>
+              )}
+              <Text style={[s.td, { width: colHours, textAlign: 'right', fontWeight: 'bold' }]}>{fmtH(h)}</Text>
             </View>
           );
         })}
@@ -166,7 +173,7 @@ export default function BillPDF({ data, companyInfo = {} }) {
                 <Text style={s.sumVal}>{fmtH(summary.regular_hours)}</Text>
               </View>
             )}
-            {summary.overtime_hours > 0 && (
+            {overtimeEnabled && summary.overtime_hours > 0 && (
               <View style={s.sumRow}>
                 <Text style={s.sumLabel}>Overtime Hours</Text>
                 <Text style={s.sumVal}>{fmtH(summary.overtime_hours)}</Text>
@@ -188,7 +195,7 @@ export default function BillPDF({ data, companyInfo = {} }) {
                 <Text style={s.sumVal}>{fmtMoney(summary.regular_cost)}</Text>
               </View>
             )}
-            {summary.overtime_hours > 0 && summary.rate > 0 && (
+            {overtimeEnabled && summary.overtime_hours > 0 && summary.rate > 0 && (
               <View style={s.sumRow}>
                 <Text style={s.sumLabel}>Overtime Pay ({summary.overtime_multiplier}×)</Text>
                 <Text style={s.sumVal}>{fmtMoney(summary.overtime_cost)}</Text>

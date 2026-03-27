@@ -78,6 +78,7 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [] }) {
   const weatherStr = [weather, report.weather_temp != null ? `${report.weather_temp}°F` : null].filter(Boolean).join(', ');
   const dateStr = new Date(report.report_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const isSubmitted = report.status === 'submitted';
+  const isReviewed = report.status === 'reviewed';
 
   return (
     <Document>
@@ -93,11 +94,18 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [] }) {
             {report.project_name && <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>Project: </Text>{report.project_name}</Text>}
             {report.superintendent && <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>Superintendent: </Text>{report.superintendent}</Text>}
             {weatherStr && <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>Weather: </Text>{weatherStr}</Text>}
-            <View style={{ ...pdf.statusBadge, backgroundColor: isSubmitted ? '#d1fae5' : '#fef3c7' }}>
-              <Text style={{ ...pdf.statusText, color: isSubmitted ? '#065f46' : '#92400e' }}>
-                {isSubmitted ? 'SUBMITTED' : 'DRAFT'}
+            <View style={{ ...pdf.statusBadge, backgroundColor: isReviewed ? '#1a56db' : isSubmitted ? '#d1fae5' : '#fef3c7' }}>
+              <Text style={{ ...pdf.statusText, color: isReviewed ? '#fff' : isSubmitted ? '#065f46' : '#92400e' }}>
+                {isReviewed ? 'REVIEWED' : isSubmitted ? 'SUBMITTED' : 'DRAFT'}
               </Text>
             </View>
+            {isReviewed && report.reviewed_by && (
+              <Text style={{ ...pdf.headerMeta, marginTop: 4, color: '#1a56db' }}>
+                <Text style={pdf.headerMetaBold}>Reviewed by: </Text>
+                {report.reviewed_by}
+                {report.reviewed_at ? ` · ${new Date(report.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+              </Text>
+            )}
           </View>
         </View>
 
