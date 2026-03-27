@@ -50,14 +50,28 @@ router.post('/login', loginLimiter, async (req, res) => {
   if (!username || !password || !company_name) {
     return res.status(400).json({ error: 'Company name, username, and password required' });
   }
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress;
+  const logFailure = (reason) => pool.query(
+    'INSERT INTO login_failures (attempted_company, attempted_username, failure_reason, ip) VALUES ($1, $2, $3, $4)',
+    [company_name, username, reason, ip]
+  ).catch(() => {});
   try {
-    const result = await pool.query(
-      `SELECT u.*, c.name as company_name FROM users u
-       JOIN companies c ON c.id = u.company_id
-       WHERE LOWER(u.username) = LOWER($1) AND u.active = true AND LOWER(c.name) = LOWER($2)`,
-      [username, company_name]
+    // Step 1: check company name
+    const companyRes = await pool.query(
+      'SELECT id FROM companies WHERE LOWER(name) = LOWER($1)', [company_name]
     );
-    const user = result.rows[0];
+    if (!companyRes.rows[0]) {
+      await logFailure('company_not_found');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const companyId = companyRes.rows[0].id;
+
+    // Step 2: check username within that company
+    const userRes = await pool.query(
+      'SELECT u.*, $2::text as company_name FROM users u WHERE LOWER(u.username) = LOWER($1) AND u.company_id = $3 AND u.active = true',
+      [username, company_name, companyId]
+    );
+    const user = userRes.rows[0];
 
     // Check lockout before verifying password (don't reveal whether user exists)
     if (user && user.locked_until && new Date(user.locked_until) > new Date()) {
@@ -65,19 +79,23 @@ router.post('/login', loginLimiter, async (req, res) => {
       return res.status(423).json({ error: `Account locked due to too many failed attempts. Try again in ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.` });
     }
 
-    const passwordMatch = user && await bcrypt.compare(password, user.password_hash);
-    if (!user || !passwordMatch) {
+    if (!user) {
+      await logFailure('user_not_found');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password_hash);
+    if (!passwordMatch) {
+      await logFailure('wrong_password');
       // Increment failed attempts and lock if threshold reached
-      if (user) {
-        const newCount = (user.failed_login_attempts || 0) + 1;
-        if (newCount >= 10) {
-          await pool.query(
-            'UPDATE users SET failed_login_attempts = $1, locked_until = NOW() + INTERVAL \'24 hours\' WHERE id = $2',
-            [newCount, user.id]
-          );
-        } else {
-          await pool.query('UPDATE users SET failed_login_attempts = $1 WHERE id = $2', [newCount, user.id]);
-        }
+      const newCount = (user.failed_login_attempts || 0) + 1;
+      if (newCount >= 10) {
+        await pool.query(
+          'UPDATE users SET failed_login_attempts = $1, locked_until = NOW() + INTERVAL \'24 hours\' WHERE id = $2',
+          [newCount, user.id]
+        );
+      } else {
+        await pool.query('UPDATE users SET failed_login_attempts = $1 WHERE id = $2', [newCount, user.id]);
       }
       return res.status(401).json({ error: 'Invalid credentials' });
     }
