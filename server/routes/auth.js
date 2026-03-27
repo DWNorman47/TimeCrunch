@@ -54,7 +54,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     const result = await pool.query(
       `SELECT u.*, c.name as company_name FROM users u
        JOIN companies c ON c.id = u.company_id
-       WHERE u.username = $1 AND u.active = true AND LOWER(c.name) = LOWER($2)`,
+       WHERE LOWER(u.username) = LOWER($1) AND u.active = true AND LOWER(c.name) = LOWER($2)`,
       [username, company_name]
     );
     const user = result.rows[0];
