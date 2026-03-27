@@ -16,7 +16,7 @@ function saveCompany(name) {
 const OTHER = '__other__';
 
 export default function Login() {
-  const { login, confirmMfa } = useAuth();
+  const { login, confirmMfa, loginWithToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionExpired = searchParams.get('session') === 'expired';
@@ -31,6 +31,8 @@ export default function Login() {
   const [mfaToken, setMfaToken] = useState(null);
   const [mfaCode, setMfaCode] = useState('');
   const mfaInputRef = useRef(null);
+  const [setupToken, setSetupToken] = useState(null);
+  const [setupForm, setSetupForm] = useState({ password: '', confirm: '' });
 
   const companyName = selected === OTHER ? otherText : selected;
 
@@ -53,6 +55,10 @@ export default function Login() {
     setLoading(true);
     try {
       const result = await login(form.username, form.password, companyName.trim());
+      if (result?.must_change_password) {
+        setSetupToken(result.setup_token);
+        return;
+      }
       if (result?.mfa_required) {
         setMfaToken(result.mfa_token);
         setTimeout(() => mfaInputRef.current?.focus(), 50);
@@ -88,6 +94,59 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  if (setupToken) {
+    const handleSetup = async e => {
+      e.preventDefault();
+      if (setupForm.password !== setupForm.confirm) { setError('Passwords do not match'); return; }
+      setError('');
+      setLoading(true);
+      try {
+        const r = await api.post('/auth/complete-setup', { setup_token: setupToken, new_password: setupForm.password });
+        await loginWithToken(r.data.token);
+        navigateAfterLogin(r.data.user);
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to set password');
+      } finally {
+        setLoading(false);
+      }
+    };
+    return (
+      <div style={styles.container}>
+        <div style={styles.card}>
+          <h1 style={styles.title}>OpsFloa</h1>
+          <p style={styles.subtitle}>Set your password</p>
+          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16, textAlign: 'center' }}>
+            You're using a temporary password. Please set a permanent one to continue.
+          </p>
+          <form onSubmit={handleSetup} style={styles.form}>
+            <label style={styles.label}>New password</label>
+            <PasswordInput
+              style={styles.input}
+              placeholder="At least 6 characters"
+              value={setupForm.password}
+              onChange={e => setSetupForm(f => ({ ...f, password: e.target.value }))}
+              required
+              minLength={6}
+              autoFocus
+            />
+            <label style={styles.label}>Confirm password</label>
+            <PasswordInput
+              style={styles.input}
+              placeholder="Repeat password"
+              value={setupForm.confirm}
+              onChange={e => setSetupForm(f => ({ ...f, confirm: e.target.value }))}
+              required
+            />
+            {error && <p style={styles.error}>{error}</p>}
+            <button style={styles.button} type="submit" disabled={loading}>
+              {loading ? 'Saving...' : 'Set password & sign in'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   if (mfaToken) {
     return (

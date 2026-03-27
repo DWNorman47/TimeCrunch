@@ -1,5 +1,5 @@
 const FEATURE_KEYS = ['feature_scheduling', 'feature_analytics', 'feature_chat', 'feature_prevailing_wage', 'feature_field', 'feature_timeclock', 'feature_projects', 'feature_overtime', 'feature_geolocation', 'feature_inactive_alerts', 'feature_overtime_alerts', 'feature_broadcast', 'show_worker_wages', 'notification_use_work_hours'];
-const STRING_KEYS = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature'];
+const STRING_KEYS = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password'];
 
 // Defaults available to all authenticated users
 const SETTINGS_DEFAULTS = {
@@ -7,7 +7,7 @@ const SETTINGS_DEFAULTS = {
   overtime_rule: 'daily', overtime_threshold: 8,
   feature_scheduling: true, feature_analytics: true, feature_chat: true, feature_prevailing_wage: true, feature_field: false, feature_timeclock: true, feature_projects: true, feature_overtime: true, feature_geolocation: true, feature_inactive_alerts: true, feature_overtime_alerts: true, feature_broadcast: true,
   show_worker_wages: false, notification_use_work_hours: true,
-  currency: 'USD', invoice_signature: 'optional',
+  currency: 'USD', invoice_signature: 'optional', default_temp_password: '',
 };
 
 // Admin-only defaults (superset of SETTINGS_DEFAULTS)

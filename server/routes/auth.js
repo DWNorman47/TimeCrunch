@@ -99,6 +99,11 @@ router.post('/login', loginLimiter, async (req, res) => {
     if (!user.email_confirmed) {
       return res.status(403).json({ error: 'email_not_confirmed', email: user.email });
     }
+    // If worker must change their temporary password, issue a short-lived setup token
+    if (user.must_change_password) {
+      const setupToken = jwt.sign({ id: user.id, setup_pending: true }, process.env.JWT_SECRET, { expiresIn: '15m' });
+      return res.json({ must_change_password: true, setup_token: setupToken });
+    }
     // If MFA is enabled, issue a short-lived MFA token instead of the full JWT
     if (user.mfa_enabled) {
       const mfaToken = jwt.sign({ id: user.id, mfa_pending: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
@@ -285,6 +290,41 @@ router.post('/confirm-email', async (req, res) => {
       [user.id]
     );
     res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Complete setup — worker sets a permanent password after first login
+router.post('/complete-setup', async (req, res) => {
+  const { setup_token, new_password } = req.body;
+  if (!setup_token || !new_password) return res.status(400).json({ error: 'setup_token and new_password required' });
+  let payload;
+  try {
+    payload = jwt.verify(setup_token, process.env.JWT_SECRET);
+  } catch {
+    return res.status(400).json({ error: 'Setup session expired. Please sign in again.' });
+  }
+  if (!payload.setup_pending) return res.status(400).json({ error: 'Invalid setup token' });
+  const pwErr = validatePassword(new_password);
+  if (pwErr) return res.status(400).json({ error: pwErr });
+  try {
+    const userRes = await pool.query(
+      `SELECT u.*, c.name as company_name FROM users u
+       JOIN companies c ON c.id = u.company_id
+       WHERE u.id = $1 AND u.active = true`,
+      [payload.id]
+    );
+    const user = userRes.rows[0];
+    if (!user) return res.status(400).json({ error: 'User not found' });
+    const hash = await bcrypt.hash(new_password, 10);
+    await pool.query(
+      'UPDATE users SET password_hash = $1, must_change_password = false WHERE id = $2',
+      [hash, user.id]
+    );
+    const token = signToken(user);
+    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

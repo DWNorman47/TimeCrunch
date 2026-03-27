@@ -276,7 +276,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         FROM daily_regular
         GROUP BY user_id, date_trunc('week', work_date)
       )
-      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids,
+      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE(
@@ -298,7 +298,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1 ${accessFilter}
-      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids
+      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
       queryParams
@@ -519,6 +519,8 @@ router.post('/workers', requireAdmin, requirePermission('manage_workers'), async
   const VALID_OT_RULES = ['daily', 'weekly', 'none'];
   const assignedRateType = ['hourly', 'daily'].includes(req.body.rate_type) ? req.body.rate_type : 'hourly';
   const assignedOTRule = VALID_OT_RULES.includes(req.body.overtime_rule) ? req.body.overtime_rule : 'daily';
+  const VALID_WORKER_TYPES = ['employee', 'contractor', 'subcontractor', 'owner'];
+  const assignedWorkerType = VALID_WORKER_TYPES.includes(req.body.worker_type) ? req.body.worker_type : 'employee';
 
   // Enforce worker count limit (admins don't count against the limit)
   if (assignedRole === 'worker') {
@@ -537,8 +539,8 @@ router.post('/workers', requireAdmin, requirePermission('manage_workers'), async
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      'INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, language, hourly_rate, rate_type, overtime_rule, email, email_confirmed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true) RETURNING id, username, full_name, first_name, middle_name, last_name, role, language, hourly_rate, rate_type, overtime_rule, email',
-      [companyId, username, hash, full_name, first_name || null, middle_name || null, last_name || null, assignedRole, assignedLanguage, assignedRate, assignedRateType, assignedOTRule, assignedEmail]
+      'INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, language, hourly_rate, rate_type, overtime_rule, email, email_confirmed, must_change_password, worker_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true, true, $14) RETURNING id, username, full_name, first_name, middle_name, last_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type',
+      [companyId, username, hash, full_name, first_name || null, middle_name || null, last_name || null, assignedRole, assignedLanguage, assignedRate, assignedRateType, assignedOTRule, assignedEmail, assignedWorkerType]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.created', 'worker', result.rows[0].id, full_name, { role: assignedRole });
     res.status(201).json(result.rows[0]);
@@ -556,16 +558,17 @@ router.post('/workers', requireAdmin, requirePermission('manage_workers'), async
   }
 });
 
-// Update a worker (full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, email)
+// Update a worker (full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, email, worker_type)
 router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
-  const { full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, overtime_rule, email } = req.body;
-  if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && rate_type === undefined && overtime_rule === undefined && email === undefined) {
+  const { full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type } = req.body;
+  if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && rate_type === undefined && overtime_rule === undefined && email === undefined && worker_type === undefined) {
     return res.status(400).json({ error: 'At least one field required' });
   }
   const companyId = req.user.company_id;
   const assignedRole = role ? (role === 'admin' ? 'admin' : 'worker') : undefined;
   const VALID_RATE_TYPES = ['hourly', 'daily'];
   const VALID_OT_RULES = ['daily', 'weekly', 'none'];
+  const VALID_WORKER_TYPES = ['employee', 'contractor', 'subcontractor', 'owner'];
   try {
     if (username) {
       const clean = username.toLowerCase().trim();
@@ -577,6 +580,9 @@ router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), 
     }
     if (overtime_rule !== undefined && !VALID_OT_RULES.includes(overtime_rule)) {
       return res.status(400).json({ error: 'Invalid overtime_rule' });
+    }
+    if (worker_type !== undefined && !VALID_WORKER_TYPES.includes(worker_type)) {
+      return res.status(400).json({ error: 'Invalid worker_type' });
     }
     const fields = [];
     const values = [];
@@ -596,10 +602,11 @@ router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), 
     if (rate_type !== undefined) { fields.push(`rate_type = $${idx++}`); values.push(rate_type); }
     if (overtime_rule !== undefined) { fields.push(`overtime_rule = $${idx++}`); values.push(overtime_rule); }
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email || null); }
+    if (worker_type !== undefined) { fields.push(`worker_type = $${idx++}`); values.push(worker_type); }
     values.push(req.params.id);
     values.push(companyId);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, role, language, hourly_rate, rate_type, overtime_rule, email`,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
