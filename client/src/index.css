@@ -116,7 +116,7 @@ input, select, textarea {
     flex-wrap: wrap !important;
     align-items: center !important;
     padding-top: max(env(safe-area-inset-top), 10px) !important;
-    padding-bottom: 8px !important;
+    padding-bottom: 0 !important;
   }
   .header-right {
     gap: 6px !important;
