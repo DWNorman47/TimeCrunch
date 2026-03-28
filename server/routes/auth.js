@@ -480,7 +480,9 @@ router.post('/accept-invite', authLimiter, async (req, res) => {
   if (pwErr) return res.status(400).json({ error: pwErr });
   try {
     const result = await pool.query(
-      'SELECT * FROM users WHERE invite_token = $1 AND invite_token_expires > NOW() AND invite_pending = true',
+      `SELECT u.*, c.name as company_name FROM users u
+       JOIN companies c ON c.id = u.company_id
+       WHERE u.invite_token = $1 AND u.invite_token_expires > NOW() AND u.invite_pending = true`,
       [token]
     );
     if (result.rowCount === 0) return res.status(400).json({ error: 'Invite link is invalid or has expired' });
@@ -490,7 +492,7 @@ router.post('/accept-invite', authLimiter, async (req, res) => {
       'UPDATE users SET password_hash = $1, invite_token = NULL, invite_token_expires = NULL, invite_pending = false, email_confirmed = true WHERE id = $2',
       [hash, user.id]
     );
-    res.json({ success: true, username: user.username });
+    res.json({ success: true, username: user.username, company_name: user.company_name });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

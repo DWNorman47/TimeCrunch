@@ -13,6 +13,7 @@ export default function AcceptInvite() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [username, setUsername] = useState('');
+  const [companyName, setCompanyName] = useState('');
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -23,6 +24,7 @@ export default function AcceptInvite() {
     try {
       const r = await api.post('/auth/accept-invite', { token, password });
       setUsername(r.data.username);
+      setCompanyName(r.data.company_name || '');
       setDone(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong');
@@ -44,7 +46,7 @@ export default function AcceptInvite() {
       <div style={styles.card}>
         <h2 style={styles.title}>You're all set!</h2>
         <p style={styles.sub}>Your password has been set. Your username is <strong>{username}</strong>.</p>
-        <button style={styles.btn} onClick={() => navigate('/login')}>Go to login</button>
+        <button style={styles.btn} onClick={() => navigate(`/login${companyName ? `?company=${encodeURIComponent(companyName)}` : ''}`)}>Go to login</button>
       </div>
     </div>
   );
