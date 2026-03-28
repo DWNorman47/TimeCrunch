@@ -114,6 +114,7 @@ function guard(label, path, method = 'GET') {
     run: async () => {
       const r = method === 'GET' ? await get(path)
               : method === 'DELETE' ? await del(path)
+              : method === 'PATCH' ? await patch(path, {})
               : await post(path, {});
       assertIs(r.status, 401, label);
     },
@@ -745,15 +746,19 @@ const SUITES = [
         if (r.status !== 200) return;
         assert(Array.isArray(await r.json()), 'Expected array');
       }},
-      { name: '/admin/entries/pending → array', run: async () => {
+      { name: '/admin/entries/pending → {entries:[], has_more}', run: async () => {
         const r = await get('/admin/entries/pending', TOKEN());
         if (r.status !== 200) return;
-        assert(Array.isArray(await r.json()), 'Expected array');
+        const d = await r.json();
+        assert(Array.isArray(d.entries), 'entries array');
+        assert(typeof d.has_more === 'boolean', 'has_more boolean');
       }},
-      { name: '/admin/audit-log → array', run: async () => {
+      { name: '/admin/audit-log → {entries:[], total}', run: async () => {
         const r = await get('/admin/audit-log', TOKEN());
         if (r.status !== 200) return;
-        assert(Array.isArray(await r.json()), 'Expected array');
+        const d = await r.json();
+        assert(Array.isArray(d.entries), 'entries array');
+        assert(typeof d.total === 'number', 'total number');
       }},
     ],
   },
