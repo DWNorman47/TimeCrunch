@@ -69,7 +69,7 @@ async function broadcastQueueCount() {
   clients.forEach(c => c.postMessage({ type: 'QUEUE_COUNT', count }));
 }
 
-// ── Offline request handler (clock + time entries) ─────────────────────────────
+// ── Offline request handler (clock, time entries, field modules) ───────────────
 
 async function handleOfflineableRequest(event, type) {
   try {
@@ -185,6 +185,19 @@ self.addEventListener('fetch', event => {
       event.respondWith(handleOfflineableRequest(event, 'time-entry'));
       return;
     }
+    if (
+      url.includes('/api/field-reports') ||
+      url.includes('/api/daily-reports') ||
+      url.includes('/api/punchlist') ||
+      url.includes('/api/incidents') ||
+      url.includes('/api/safety-talks') ||
+      url.includes('/api/equipment') ||
+      url.includes('/api/rfis') ||
+      url.includes('/api/sub-reports')
+    ) {
+      event.respondWith(handleOfflineableRequest(event, 'field'));
+      return;
+    }
   }
 });
 
@@ -202,7 +215,7 @@ self.addEventListener('message', event => {
 // ── Background Sync (Chrome/Edge) ──────────────────────────────────────────────
 
 self.addEventListener('sync', event => {
-  if (event.tag === 'clock-queue-replay') {
+  if (event.tag === 'clock-queue-replay' || event.tag === 'field-queue-replay') {
     event.waitUntil(replayQueue());
   }
 });

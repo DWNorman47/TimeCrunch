@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useOffline } from '../contexts/OfflineContext';
 import { PDFButton } from './DailyReportPDF';
 
 const WEATHER_OPTIONS = [
@@ -133,6 +134,10 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       let r;
       if (isNew) {
         r = await api.post('/daily-reports', payload);
+        if (r.data?.offline) {
+          onSaved({ id: 'pending-' + Date.now(), pending: true, ...form, report_date: form.report_date, manpower, equipment, materials });
+          return;
+        }
       } else {
         r = await api.patch(`/daily-reports/${initial.id}`, payload);
       }
@@ -356,8 +361,8 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
 
   return (
     <div style={styles.reportRow}>
-      <div style={styles.rowLeft} onClick={() => onEdit(report)}>
-        <div style={styles.rowDate}>{fmtDate(report.report_date)}</div>
+      <div style={styles.rowLeft} onClick={() => !report.pending && onEdit(report)}>
+        <div style={styles.rowDate}>{fmtDate(report.report_date)}{report.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}</div>
         <div style={styles.rowProject}>{report.project_name || 'No project'}</div>
         {weather && <div style={styles.rowMeta}>{weather}{report.weather_temp != null ? ` · ${report.weather_temp}°F` : ''}</div>}
         {report.manpower_count > 0 && <div style={styles.rowMeta}>{report.manpower_count} crew entr{report.manpower_count !== 1 ? 'ies' : 'y'}</div>}
@@ -385,8 +390,8 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
             {approving ? '...' : '✓ Approve'}
           </button>
         )}
-        <button style={styles.editRowBtn} onClick={() => onEdit(report)}>Edit</button>
-        <button style={styles.deleteRowBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : '✕'}</button>
+        {!report.pending && <button style={styles.editRowBtn} onClick={() => onEdit(report)}>Edit</button>}
+        {!report.pending && <button style={styles.deleteRowBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : '✕'}</button>}
       </div>
     </div>
   );
@@ -397,6 +402,7 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
 export default function DailyReports({ projects }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const { onSync } = useOffline() || {};
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // null=list, 'new'=new form, report=edit form
@@ -427,6 +433,7 @@ export default function DailyReports({ projects }) {
   };
 
   useEffect(() => { loadReports(); }, [filterProject]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadReports(); }); }, [onSync]);
 
   const handleSaved = report => {
     setReports(prev => {
@@ -517,6 +524,7 @@ const styles = {
   rowProject: { fontSize: 13, color: '#059669', fontWeight: 600, marginBottom: 2 },
   rowMeta: { fontSize: 12, color: '#6b7280' },
   rowRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  pendingBadge: { fontSize: 10, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 6, marginLeft: 6, verticalAlign: 'middle' },
   badgeDraft: { fontSize: 11, fontWeight: 700, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 10 },
   badgeSubmitted: { fontSize: 11, fontWeight: 700, color: '#065f46', background: '#d1fae5', padding: '2px 8px', borderRadius: 10 },
   badgeReviewed: { fontSize: 11, fontWeight: 700, color: '#fff', background: '#1a56db', padding: '2px 8px', borderRadius: 10 },

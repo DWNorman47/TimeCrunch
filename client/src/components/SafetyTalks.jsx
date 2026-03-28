@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useOffline } from '../contexts/OfflineContext';
+import { SafetyTalkPDFButton } from './SafetyTalkPDF';
 
 const TALK_LIBRARY = [
   { title: 'Fall Protection', content: 'Key Points:\n• Workers at 6 ft or more must be protected from falls\n• Fall protection methods: guardrails, safety nets, personal fall arrest systems (PFAS)\n• Inspect all harnesses and lanyards before each use — retire any that has been in a fall\n• Keep work areas clear of tripping hazards\n\nHazards to watch for:\n• Unprotected floor openings and roof edges without guardrails\n• Scaffolding without toe boards\n\nAction: Report missing or damaged fall protection immediately. Do not work at heights without protection in place.' },
@@ -47,7 +49,11 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
     setSaving(true); setError('');
     try {
       const r = await api.post('/safety-talks', form);
-      onAdded(r.data);
+      if (r.data?.offline) {
+        onAdded({ id: 'pending-' + Date.now(), pending: true, ...form, signoff_count: 0 });
+      } else {
+        onAdded(r.data);
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save');
     } finally { setSaving(false); }
@@ -154,7 +160,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
         <div style={styles.cardLeft}>
           <div style={styles.talkIcon}>🦺</div>
           <div>
-            <div style={styles.talkTitle}>{talk.title}</div>
+            <div style={styles.talkTitle}>{talk.title}{talk.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}</div>
             <div style={styles.talkMeta}>
               {fmtDate(talk.talk_date)}
               {talk.project_name && <span style={styles.projectTag}>{talk.project_name}</span>}
@@ -220,6 +226,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
 export default function SafetyTalks({ projects }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const { onSync } = useOffline() || {};
   const [talks, setTalks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -236,6 +243,7 @@ export default function SafetyTalks({ projects }) {
 
   useEffect(() => { load(); }, []);
   useEffect(() => { if (!loading) load(filterProject); }, [filterProject]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(); }); }, [onSync]);
 
   const totalSignoffs = talks.reduce((s, t) => s + parseInt(t.signoff_count || 0), 0);
 
@@ -248,7 +256,10 @@ export default function SafetyTalks({ projects }) {
             <p style={styles.summary}>{talks.length} talk{talks.length !== 1 ? 's' : ''} · {totalSignoffs} total sign-offs</p>
           )}
         </div>
-        {isAdmin && <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ New Talk</button>}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {talks.length > 0 && <SafetyTalkPDFButton talks={talks} companyName={user?.company_name} style={styles.pdfBtn} />}
+          {isAdmin && <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ New Talk</button>}
+        </div>
       </div>
 
       {showForm && (
@@ -302,6 +313,7 @@ const styles = {
   heading: { fontSize: 22, fontWeight: 800, color: '#111827', margin: 0 },
   summary: { fontSize: 13, color: '#6b7280', margin: '4px 0 0' },
   newBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
+  pdfBtn: { fontSize: 13, fontWeight: 600, color: '#1a56db', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '9px 16px', borderRadius: 8, textDecoration: 'none', cursor: 'pointer', flexShrink: 0 },
   filters: { marginBottom: 14 },
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', minWidth: 160 },
   list: { display: 'flex', flexDirection: 'column', gap: 10 },
@@ -328,6 +340,7 @@ const styles = {
   signoffTime: { color: '#9ca3af', fontWeight: 400 },
   cardActions: { display: 'flex', gap: 8 },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  pendingBadge: { fontSize: 10, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 6, marginLeft: 6, verticalAlign: 'middle' },
   // Form
   formCard: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 20 },
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
