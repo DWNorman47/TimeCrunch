@@ -133,7 +133,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   };
 
   const handleRemove = async (id, projectName) => {
-    if (!confirm(`Remove project "${projectName}"? Its time entries will be kept. You can restore it from History.`)) return;
+    if (!confirm(`Deactivate project "${projectName}"? Its time entries will be kept. You can restore it from Inactive.`)) return;
     try {
       await api.delete(`/admin/projects/${id}`);
       onProjectDeleted(id);

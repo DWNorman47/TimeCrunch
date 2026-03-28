@@ -274,7 +274,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   };
 
   const handleRemove = async (id, name) => {
-    if (!confirm(`Remove "${name}"? Their time entries will be kept. You can restore them from History.`)) return;
+    if (!confirm(`Deactivate "${name}"? Their time entries will be kept. You can restore them from Inactive.`)) return;
     try {
       await api.delete(`/admin/workers/${id}`);
       onWorkerDeleted(id);
