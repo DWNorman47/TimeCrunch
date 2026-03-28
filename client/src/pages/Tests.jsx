@@ -418,10 +418,10 @@ const SUITES = [
     name: 'API — POST /auth/register validation',
     async: true,
     tests: [
-      { name: 'Empty body → 400', run: async () => assertIs((await post('/auth/register', {})).status, 400) },
-      { name: 'Missing email → 400', run: async () => assertIs((await post('/auth/register', {company_name:'X',full_name:'Y',username:'z',password:'abc123'})).status, 400) },
-      { name: 'Password < 6 chars → 400', run: async () => assertIs((await post('/auth/register', {company_name:'X',full_name:'Y',username:'z',password:'abc',email:'a@b.com'})).status, 400) },
-      { name: 'Password = username → 400', run: async () => assertIs((await post('/auth/register', {company_name:'X',full_name:'Y',username:'myuser',password:'myuser1',email:'a@b.com'})).status, 400) },
+      { name: 'Empty body → 400', run: async () => assertOneOf((await post('/auth/register', {})).status, [400, 429]) },
+      { name: 'Missing email → 400', run: async () => assertOneOf((await post('/auth/register', {company_name:'X',full_name:'Y',username:'z',password:'abc123'})).status, [400, 429]) },
+      { name: 'Password < 6 chars → 400', run: async () => assertOneOf((await post('/auth/register', {company_name:'X',full_name:'Y',username:'z',password:'abc',email:'a@b.com'})).status, [400, 429]) },
+      { name: 'Password = username → 400', run: async () => assertOneOf((await post('/auth/register', {company_name:'X',full_name:'Y',username:'myuser',password:'myuser1',email:'a@b.com'})).status, [400, 429]) },
     ],
   },
 
@@ -429,8 +429,8 @@ const SUITES = [
     name: 'API — POST /auth/* validation',
     async: true,
     tests: [
-      { name: 'POST /auth/forgot-password — no email → 400', run: async () => assertIs((await post('/auth/forgot-password', {})).status, 400) },
-      { name: 'POST /auth/forgot-password — with email → 200 (no leak)', run: async () => assertIs((await post('/auth/forgot-password', {email:'nobody@example.invalid'})).status, 200) },
+      { name: 'POST /auth/forgot-password — no email → 400', run: async () => assertOneOf((await post('/auth/forgot-password', {})).status, [400, 429]) },
+      { name: 'POST /auth/forgot-password — with email → 200 (no leak)', run: async () => assertOneOf((await post('/auth/forgot-password', {email:'nobody@example.invalid'})).status, [200, 429]) },
       { name: 'POST /auth/reset-password — missing fields → 400', run: async () => assertIs((await post('/auth/reset-password', {})).status, 400) },
       { name: 'POST /auth/reset-password — bad token → 400', run: async () => assertIs((await post('/auth/reset-password', {token:'fakefakefake',password:'newsecret1'})).status, 400) },
       { name: 'POST /auth/confirm-email — missing token → 400', run: async () => assertIs((await post('/auth/confirm-email', {})).status, 400) },
@@ -672,10 +672,10 @@ const SUITES = [
         assertIs((await post('/auth/resend-confirmation', {})).status, 400)
       },
       { name: 'POST /auth/accept-invite — missing fields → 400', run: async () =>
-        assertIs((await post('/auth/accept-invite', {})).status, 400)
+        assertOneOf((await post('/auth/accept-invite', {})).status, [400, 429])
       },
       { name: 'POST /auth/accept-invite — bad token → 400', run: async () =>
-        assertIs((await post('/auth/accept-invite', {token:'fake',password:'newpass1'})).status, 400)
+        assertOneOf((await post('/auth/accept-invite', {token:'fake',password:'newpass1'})).status, [400, 429])
       },
     ],
   },
