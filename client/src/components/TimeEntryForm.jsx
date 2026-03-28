@@ -4,6 +4,7 @@ import { useFormPersist } from '../hooks/useFormPersist';
 
 export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, projectsEnabled = true }) {
   const today = new Date().toLocaleDateString('en-CA');
+  const [collapsed, setCollapsed] = useState(true);
   const [form, setForm] = useState({
     project_id: '',
     work_date: today,
@@ -78,8 +79,11 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
 
   return (
     <div style={styles.card} className="mobile-card">
-      <h2 style={styles.heading}>{t.logTime}</h2>
-      <form onSubmit={handleSubmit} style={styles.form}>
+      <button style={styles.toggleHeader} onClick={() => setCollapsed(v => !v)}>
+        <h2 style={styles.heading}>{t.logTime}</h2>
+        <span style={{ ...styles.chevron, transform: collapsed ? 'none' : 'rotate(180deg)' }}>▾</span>
+      </button>
+      {!collapsed && <form onSubmit={handleSubmit} style={styles.form}>
         <div style={styles.row} className="form-row">
           {projectsEnabled && <div style={styles.field}>
             <label style={styles.label}>{t.project}</label>
@@ -131,15 +135,17 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
         {error && <p style={styles.error}>{error}</p>}
         {success && <p style={styles.success}>{t.entrySaved}</p>}
         <button style={styles.button} type="submit" disabled={saving}>{saving ? t.saving : t.logEntry}</button>
-      </form>
+      </form>}
     </div>
   );
 }
 
 const styles = {
   card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' },
-  heading: { marginBottom: 20, fontSize: 18, fontWeight: 700 },
-  form: { display: 'flex', flexDirection: 'column', gap: 14 },
+  toggleHeader: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' },
+  heading: { margin: 0, fontSize: 18, fontWeight: 700 },
+  chevron: { fontSize: 16, color: '#9ca3af', transition: 'transform 0.2s', display: 'inline-block', marginBottom: 0 },
+  form: { display: 'flex', flexDirection: 'column', gap: 14, marginTop: 20 },
   row: { display: 'flex', gap: 12 },
   field: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1 },
   label: { fontSize: 13, fontWeight: 600, color: '#555' },

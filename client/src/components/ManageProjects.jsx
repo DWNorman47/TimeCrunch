@@ -10,9 +10,9 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   const [wageType, setWageType] = useState('regular');
   const [prevailingRate, setPrevailingRate] = useState('');
   const [error, setError] = useState('');
-  const [archivedConflict, setArchivedConflict] = useState(null); // { id, name }
+  const [archivedConflict, setArchivedConflict] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [editingId, setEditingId] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editWageType, setEditWageType] = useState('regular');
   const [editPrevailingRate, setEditPrevailingRate] = useState('');
@@ -65,6 +65,24 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     }
   };
 
+  const toggleExpand = (p) => {
+    if (expandedId === p.id) {
+      setExpandedId(null);
+      setGeoError('');
+    } else {
+      setExpandedId(p.id);
+      setGeoError('');
+      setEditName(p.name);
+      setEditWageType(p.wage_type);
+      setEditPrevailingRate(p.prevailing_wage_rate != null ? String(p.prevailing_wage_rate) : '');
+      setEditGeoLat(p.geo_lat || '');
+      setEditGeoLng(p.geo_lng || '');
+      setEditGeoRadius(p.geo_radius_ft || '');
+      setEditBudgetHours(p.budget_hours || '');
+      setEditBudgetDollars(p.budget_dollars || '');
+    }
+  };
+
   const handleEditSave = async (id) => {
     if (nameEditable && !editName.trim()) return;
     const payload = {};
@@ -81,7 +99,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     try {
       const r = await api.patch(`/admin/projects/${id}`, payload);
       onProjectUpdated(r.data);
-      setEditingId(null);
+      setExpandedId(null);
     } catch {
       toast('Failed to update project', 'error');
     }
@@ -92,6 +110,9 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     try {
       const r = await api.patch(`/admin/projects/${id}`, { clear_geofence: true });
       onProjectUpdated(r.data);
+      setEditGeoLat('');
+      setEditGeoLng('');
+      setEditGeoRadius('');
     } catch {
       toast('Failed to remove geofence', 'error');
     }
@@ -102,6 +123,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     try {
       const r = await api.patch(`/admin/projects/${id}`, { budget_hours: null, budget_dollars: null });
       onProjectUpdated(r.data);
+      setEditBudgetHours('');
+      setEditBudgetDollars('');
     } catch {
       toast('Failed to remove budget', 'error');
     }
@@ -137,6 +160,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     try {
       await api.delete(`/admin/projects/${id}`);
       onProjectDeleted(id);
+      if (expandedId === id) setExpandedId(null);
       loadArchived();
     } catch {
       toast('Failed to remove project', 'error');
@@ -161,32 +185,32 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   };
 
   return (
-    <div style={styles.card}>
-      <h3 style={styles.cardTitle}>{t.manageProjects}</h3>
-      <form onSubmit={handleAdd} style={styles.form} className="manage-projects-form">
+    <div style={s.card}>
+      <h3 style={s.cardTitle}>{t.manageProjects}</h3>
+      <form onSubmit={handleAdd} style={s.form} className="manage-projects-form">
         <input
-          style={styles.input}
+          style={s.input}
           placeholder={t.projectNamePlaceholder}
           value={name}
           onChange={e => { setName(e.target.value); setError(''); setArchivedConflict(null); }}
           required
         />
         {showWageType && (
-          <select style={styles.select} value={wageType} onChange={e => { setWageType(e.target.value); setPrevailingRate(''); }}>
+          <select style={s.select} value={wageType} onChange={e => { setWageType(e.target.value); setPrevailingRate(''); }}>
             <option value="regular">{t.regularWages}</option>
             <option value="prevailing">{t.prevailingWages}</option>
           </select>
         )}
         {showWageType && wageType === 'prevailing' && (
-          <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder={`Rate (${defaultPrevailingRate || '45.00'})`} value={prevailingRate} onChange={e => setPrevailingRate(e.target.value)} />
+          <input style={{ ...s.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder={`Rate (${defaultPrevailingRate || '45.00'})`} value={prevailingRate} onChange={e => setPrevailingRate(e.target.value)} />
         )}
-        <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? t.adding : t.add}</button>
+        <button style={s.addBtn} type="submit" disabled={saving}>{saving ? t.adding : t.add}</button>
       </form>
       {error && (
-        <div style={styles.errorBox}>
-          <p style={styles.errorText}>{error}</p>
+        <div style={s.errorBox}>
+          <p style={s.errorText}>{error}</p>
           {archivedConflict && (
-            <button type="button" style={styles.restoreInlineBtn} onClick={handleRestoreConflict}>
+            <button type="button" style={s.restoreInlineBtn} onClick={handleRestoreConflict}>
               Restore "{archivedConflict.name}"
             </button>
           )}
@@ -194,153 +218,134 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       )}
 
       {projects.length === 0 ? (
-        <p style={styles.empty}>{t.noProjects}</p>
+        <p style={s.empty}>{t.noProjects}</p>
       ) : (
-        <div className="table-scroll">
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>{t.name}</th>
-              {showWageType && <th style={styles.th}>{t.wageType}</th>}
-              <th style={styles.th}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map(p => editingId === p.id ? (
-              <tr key={p.id} style={{ ...styles.tr, background: '#f0f4ff' }}>
-                <td style={styles.td} colSpan={3}>
-                  <div style={styles.editBlock}>
-                    <div style={styles.editRow}>
-                      {nameEditable
-                        ? <input
-                            style={{ ...styles.editInput, flex: 2 }}
-                            value={editName}
-                            onChange={e => setEditName(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Escape') setEditingId(null); }}
-                            autoFocus
-                            placeholder="Project name"
-                          />
-                        : <span style={{ flex: 2, fontWeight: 600, fontSize: 13 }}>{editName}</span>
-                      }
-                      {showWageType && (
-                        <select style={styles.editInput} value={editWageType} onChange={e => { setEditWageType(e.target.value); setEditPrevailingRate(''); }}>
-                          <option value="regular">{t.regularWages}</option>
-                          <option value="prevailing">{t.prevailingWages}</option>
-                        </select>
-                      )}
-                      {editWageType === 'prevailing' && (
-                        <input style={{ ...styles.editInput, width: 100 }} type="number" min="0" step="0.01" placeholder={`Rate (${defaultPrevailingRate || '45.00'})`} value={editPrevailingRate} onChange={e => setEditPrevailingRate(e.target.value)} />
-                      )}
-                      <button style={styles.saveBtn} onClick={() => handleEditSave(p.id)}>{t.save}</button>
-                      <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
-                    </div>
-                    {showGeofenceBudget && (
-                      <div style={styles.geoSection}>
-                        <span style={styles.geoLabel}>{t.geofenceOptional}</span>
-                        <div style={styles.geoFields}>
-                          <input style={styles.geoInput} type="number" step="0.000001" placeholder={t.latitude} value={editGeoLat} onChange={e => setEditGeoLat(e.target.value)} />
-                          <input style={styles.geoInput} type="number" step="0.000001" placeholder={t.longitude} value={editGeoLng} onChange={e => setEditGeoLng(e.target.value)} />
-                          <input style={styles.geoInput} type="number" min="50" step="50" placeholder={t.radiusFt} value={editGeoRadius} onChange={e => setEditGeoRadius(e.target.value)} />
-                          <button style={styles.geoLocBtn} type="button" onClick={useMyLocation} disabled={geoLocating}>
-                            {geoLocating ? '...' : t.myLocation}
-                          </button>
-                        </div>
-                        {geoError && <p style={styles.geoErrorText}>{geoError}</p>}
-                        <p style={styles.geoHint}>{t.geofenceNote}</p>
-                      </div>
+        <div style={s.list}>
+          {projects.map(p => {
+            const isExpanded = expandedId === p.id;
+            return (
+              <div key={p.id} style={s.item}>
+                <button style={s.itemBar} onClick={() => toggleExpand(p)}>
+                  <div style={s.itemLeft}>
+                    <span style={s.itemName}>{p.name}</span>
+                    {p.geo_radius_ft && <span style={s.indicatorBadge} title={`Geofence: ${p.geo_radius_ft.toLocaleString()} ft radius`}>📍</span>}
+                    {hasBudget(p) && <span style={s.indicatorBadge} title={[parseFloat(p.budget_hours) > 0 && `${p.budget_hours} hrs`, parseFloat(p.budget_dollars) > 0 && `$${Number(p.budget_dollars).toLocaleString()}`].filter(Boolean).join(' / ')}>💰</span>}
+                    {showWageType && (
+                      <span style={{ ...s.wageBadge, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
+                        {p.wage_type === 'prevailing' ? t.prevailingWages : t.regularWages}
+                      </span>
                     )}
-                    {showGeofenceBudget && (
-                      <div style={styles.budgetSection}>
-                        <span style={styles.budgetLabel}>{t.budgetOptional}</span>
-                        <div style={styles.budgetFields}>
-                          <div style={styles.budgetField}>
-                            <label style={styles.budgetFieldLabel}>{t.hours}</label>
-                            <input style={styles.geoInput} type="number" min="0" step="0.5" placeholder="e.g. 200" value={editBudgetHours} onChange={e => setEditBudgetHours(e.target.value)} />
-                          </div>
-                          <div style={styles.budgetField}>
-                            <label style={styles.budgetFieldLabel}>Dollars ($)</label>
-                            <input style={styles.geoInput} type="number" min="0" step="100" placeholder="e.g. 15000" value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
-                          </div>
-                        </div>
-                        <p style={styles.geoHint}>{t.budgetNote}</p>
-                      </div>
+                    {showWageType && p.wage_type === 'prevailing' && p.prevailing_wage_rate != null && (
+                      <span style={s.rateTag}>${parseFloat(p.prevailing_wage_rate).toFixed(2)}/hr</span>
                     )}
                   </div>
-                </td>
-              </tr>
-            ) : (
-              <tr key={p.id} style={styles.tr}>
-                <td style={styles.td}>
-                  <span style={styles.projectName}>{p.name}</span>
-                  <span style={styles.projectIndicators}>
-                    {p.geo_radius_ft && <span style={styles.indicatorBadge} title={`Geofence: ${p.geo_radius_ft.toLocaleString()} ft radius`}>📍</span>}
-                    {hasBudget(p) && <span style={styles.indicatorBadge} title={[parseFloat(p.budget_hours) > 0 && `${p.budget_hours} hrs`, parseFloat(p.budget_dollars) > 0 && `$${Number(p.budget_dollars).toLocaleString()}`].filter(Boolean).join(' / ')}>💰</span>}
-                  </span>
-                </td>
-                {showWageType && (
-                  <td style={styles.td}>
-                    <span style={{ ...styles.wageBadge, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
-                      {p.wage_type === 'prevailing' ? t.prevailingWages : t.regularWages}
-                    </span>
-                    {p.wage_type === 'prevailing' && p.prevailing_wage_rate != null && (
-                      <span style={styles.rateTag}>${parseFloat(p.prevailing_wage_rate).toFixed(2)}/hr</span>
+                  <span style={{ ...s.chevron, transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▾</span>
+                </button>
+
+                {isExpanded && (
+                  <div style={s.panel}>
+                    {/* Name + wage type */}
+                    <div style={s.section}>
+                      <div style={s.sectionTitle}>Details</div>
+                      <div style={s.editRow}>
+                        {nameEditable
+                          ? <input
+                              style={{ ...s.editInput, flex: 2 }}
+                              value={editName}
+                              onChange={e => setEditName(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Escape') setExpandedId(null); }}
+                              autoFocus
+                              placeholder="Project name"
+                            />
+                          : <span style={{ flex: 2, fontWeight: 600, fontSize: 13 }}>{editName}</span>
+                        }
+                        {showWageType && (
+                          <select style={s.editInput} value={editWageType} onChange={e => { setEditWageType(e.target.value); setEditPrevailingRate(''); }}>
+                            <option value="regular">{t.regularWages}</option>
+                            <option value="prevailing">{t.prevailingWages}</option>
+                          </select>
+                        )}
+                        {editWageType === 'prevailing' && (
+                          <input style={{ ...s.editInput, width: 100 }} type="number" min="0" step="0.01" placeholder={`Rate (${defaultPrevailingRate || '45.00'})`} value={editPrevailingRate} onChange={e => setEditPrevailingRate(e.target.value)} />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Geofence */}
+                    {showGeofenceBudget && (
+                      <div style={s.section}>
+                        <div style={s.sectionTitle}>{t.geofenceOptional}</div>
+                        <div style={s.geoFields}>
+                          <input style={s.geoInput} type="number" step="0.000001" placeholder={t.latitude} value={editGeoLat} onChange={e => setEditGeoLat(e.target.value)} />
+                          <input style={s.geoInput} type="number" step="0.000001" placeholder={t.longitude} value={editGeoLng} onChange={e => setEditGeoLng(e.target.value)} />
+                          <input style={s.geoInput} type="number" min="50" step="50" placeholder={t.radiusFt} value={editGeoRadius} onChange={e => setEditGeoRadius(e.target.value)} />
+                          <button style={s.geoLocBtn} type="button" onClick={useMyLocation} disabled={geoLocating}>
+                            {geoLocating ? '...' : t.myLocation}
+                          </button>
+                          {p.geo_radius_ft && (
+                            <button style={s.clearBtn} type="button" onClick={() => handleClearGeofence(p.id)}>✕ Clear</button>
+                          )}
+                        </div>
+                        {geoError && <p style={s.geoErrorText}>{geoError}</p>}
+                        <p style={s.hint}>{t.geofenceNote}</p>
+                      </div>
                     )}
-                  </td>
+
+                    {/* Budget */}
+                    {showGeofenceBudget && (
+                      <div style={s.section}>
+                        <div style={s.sectionTitle}>{t.budgetOptional}</div>
+                        <div style={s.geoFields}>
+                          <div style={s.budgetField}>
+                            <label style={s.budgetLabel}>{t.hours}</label>
+                            <input style={s.geoInput} type="number" min="0" step="0.5" placeholder="e.g. 200" value={editBudgetHours} onChange={e => setEditBudgetHours(e.target.value)} />
+                          </div>
+                          <div style={s.budgetField}>
+                            <label style={s.budgetLabel}>Dollars ($)</label>
+                            <input style={s.geoInput} type="number" min="0" step="100" placeholder="e.g. 15000" value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
+                          </div>
+                          {hasBudget(p) && (
+                            <button style={{ ...s.clearBtn, alignSelf: 'flex-end' }} type="button" onClick={() => handleClearBudget(p.id)}>✕ Clear</button>
+                          )}
+                        </div>
+                        <p style={s.hint}>{t.budgetNote}</p>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div style={s.actionRow}>
+                      <button style={s.saveBtn} onClick={() => handleEditSave(p.id)}>{t.save}</button>
+                      <button style={s.cancelBtn} onClick={() => setExpandedId(null)}>{t.cancel}</button>
+                      <button style={s.removeBtn} onClick={() => handleRemove(p.id, p.name)}>{t.remove}</button>
+                    </div>
+                  </div>
                 )}
-                <td style={styles.tdAction}>
-                  <button style={styles.editBtn} onClick={() => {
-                    setEditingId(p.id);
-                    setEditName(p.name);
-                    setEditWageType(p.wage_type);
-                    setEditPrevailingRate(p.prevailing_wage_rate != null ? String(p.prevailing_wage_rate) : '');
-                    setEditGeoLat(p.geo_lat || '');
-                    setEditGeoLng(p.geo_lng || '');
-                    setEditGeoRadius(p.geo_radius_ft || '');
-                    setEditBudgetHours(p.budget_hours || '');
-                    setEditBudgetDollars(p.budget_dollars || '');
-                  }}>{t.edit}</button>
-                  {p.geo_radius_ft && <button style={styles.clearGeoBtn} onClick={() => handleClearGeofence(p.id)}>✕ Fence</button>}
-                  {hasBudget(p) && <button style={styles.clearGeoBtn} onClick={() => handleClearBudget(p.id)}>✕ Budget</button>}
-                  <button style={styles.removeBtn} onClick={() => handleRemove(p.id, p.name)}>{t.remove}</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      <div style={styles.historyFooter}>
-        <button style={styles.historyToggle} onClick={() => setShowHistory(s => !s)}>
+      <div style={s.historyFooter}>
+        <button style={s.historyToggle} onClick={() => setShowHistory(v => !v)}>
           {showHistory ? '▾' : '▸'} {t.history} {archived.length > 0 ? `(${archived.length})` : ''}
         </button>
         {showHistory && (
-          <div style={styles.historySection}>
+          <div style={s.historyList}>
             {loadingArchived ? (
-              <p style={styles.empty}>{t.loading}</p>
+              <p style={s.empty}>{t.loading}</p>
             ) : archived.length === 0 ? (
-              <p style={styles.empty}>{t.noRemovedProjects}</p>
+              <p style={s.empty}>{t.noRemovedProjects}</p>
             ) : (
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>{t.name}</th>
-                    {showWageType && <th style={styles.th}>{t.wageType}</th>}
-                    <th style={styles.th}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {archived.map(p => (
-                    <tr key={p.id} style={{ ...styles.tr, color: '#888' }}>
-                      <td style={styles.td}>{p.name}</td>
-                      {showWageType && <td style={styles.td}>{p.wage_type === 'prevailing' ? t.prevailingWages : t.regularWages}</td>}
-                      <td style={styles.tdAction}>
-                        <button style={styles.restoreBtn} onClick={() => handleRestore(p.id)}>{t.restore}</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              archived.map(p => (
+                <div key={p.id} style={s.historyItem}>
+                  <div style={s.itemLeft}>
+                    <span style={{ ...s.itemName, color: '#9ca3af' }}>{p.name}</span>
+                    {showWageType && <span style={{ fontSize: 12, color: '#d1d5db' }}>{p.wage_type === 'prevailing' ? t.prevailingWages : t.regularWages}</span>}
+                  </div>
+                  <button style={s.restoreBtn} onClick={() => handleRestore(p.id)}>{t.restore}</button>
+                </div>
+              ))
             )}
           </div>
         )}
@@ -349,49 +354,46 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   );
 }
 
-const styles = {
+const s = {
   card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 24 },
   cardTitle: { fontSize: 17, fontWeight: 700, marginBottom: 14 },
   form: { display: 'flex', gap: 10, marginBottom: 12 },
   input: { flex: 1, padding: '8px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 },
   select: { padding: '8px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 },
-  addBtn: { padding: '8px 18px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14 },
+  addBtn: { padding: '8px 18px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
   errorBox: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 },
   errorText: { color: '#e53e3e', fontSize: 13, margin: 0 },
   restoreInlineBtn: { background: '#059669', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-  empty: { color: '#888', fontSize: 14 },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', fontSize: 12, color: '#999', fontWeight: 600, textTransform: 'uppercase', padding: '6px 8px', borderBottom: '1px solid #eee' },
-  tr: { borderBottom: '1px solid #f5f5f5' },
-  td: { padding: '10px 8px', fontSize: 14 },
-  tdAction: { padding: '10px 8px', textAlign: 'right', whiteSpace: 'nowrap' },
-  editInput: { padding: '5px 8px', border: '1px solid #c7d2fe', borderRadius: 6, fontSize: 13, width: '100%' },
-  wageBadge: { color: '#fff', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' },
-  rateTag: { fontSize: 11, color: '#6b7280', marginLeft: 6, whiteSpace: 'nowrap' },
-  removeBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
-  editBtn: { background: 'none', border: '1px solid #93c5fd', color: '#2563eb', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', marginRight: 6 },
-  saveBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-  cancelBtn: { background: 'none', border: '1px solid #ddd', color: '#666', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
-  historyFooter: { marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 12 },
-  historyToggle: { background: 'none', border: 'none', color: '#666', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '2px 0' },
-  historySection: { marginTop: 10 },
-  restoreBtn: { background: 'none', border: '1px solid #6ee7b7', color: '#059669', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 },
-  editBlock: { display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' },
+  empty: { color: '#9ca3af', fontSize: 14, margin: 0 },
+  list: { display: 'flex', flexDirection: 'column', gap: 2 },
+  item: { border: '1px solid #f3f4f6', borderRadius: 8, overflow: 'hidden' },
+  itemBar: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 10 },
+  itemLeft: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  itemName: { fontSize: 14, fontWeight: 600, color: '#111827' },
+  chevron: { fontSize: 14, color: '#9ca3af', transition: 'transform 0.2s', flexShrink: 0, display: 'inline-block' },
+  panel: { padding: '4px 16px 16px', borderTop: '1px solid #f3f4f6', background: '#f9fafb', display: 'flex', flexDirection: 'column', gap: 0 },
+  section: { borderBottom: '1px solid #eeeeee', paddingBottom: 12, paddingTop: 12 },
+  sectionTitle: { fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   editRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  geoSection: { background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 },
-  geoLabel: { fontSize: 12, fontWeight: 700, color: '#0369a1' },
-  geoFields: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
-  geoInput: { padding: '5px 8px', border: '1px solid #bae6fd', borderRadius: 6, fontSize: 13, width: 130 },
-  geoLocBtn: { padding: '5px 10px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
-  geoHint: { fontSize: 11, color: '#0369a1', margin: 0, opacity: 0.8 },
-  geoErrorText: { fontSize: 11, color: '#dc2626', margin: 0, fontWeight: 600 },
-  projectName: { verticalAlign: 'middle' },
-  projectIndicators: { display: 'inline-flex', gap: 4, marginLeft: 6, verticalAlign: 'middle' },
+  editInput: { padding: '6px 9px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, width: '100%' },
+  wageBadge: { color: '#fff', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' },
+  rateTag: { fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' },
   indicatorBadge: { fontSize: 13, lineHeight: 1, cursor: 'default' },
-  clearGeoBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#9ca3af', padding: '3px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', marginRight: 4 },
-  budgetSection: { background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 },
-  budgetLabel: { fontSize: 12, fontWeight: 700, color: '#92400e' },
-  budgetFields: { display: 'flex', gap: 12, flexWrap: 'wrap' },
+  geoFields: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
+  geoInput: { padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, width: 120 },
+  geoLocBtn: { padding: '5px 10px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
+  clearBtn: { padding: '5px 10px', background: 'none', border: '1px solid #e5e7eb', color: '#9ca3af', borderRadius: 6, fontSize: 11, cursor: 'pointer', flexShrink: 0 },
+  geoErrorText: { fontSize: 11, color: '#dc2626', margin: '4px 0 0', fontWeight: 600 },
+  hint: { fontSize: 11, color: '#6b7280', margin: '4px 0 0', opacity: 0.8 },
   budgetField: { display: 'flex', flexDirection: 'column', gap: 3 },
-  budgetFieldLabel: { fontSize: 11, color: '#92400e', fontWeight: 600 },
+  budgetLabel: { fontSize: 11, color: '#92400e', fontWeight: 600 },
+  actionRow: { display: 'flex', gap: 8, alignItems: 'center', paddingTop: 14, flexWrap: 'wrap' },
+  saveBtn: { padding: '7px 16px', background: '#059669', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  cancelBtn: { padding: '7px 14px', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
+  removeBtn: { padding: '6px 14px', background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: 6, fontSize: 13, cursor: 'pointer', marginLeft: 'auto' },
+  historyFooter: { marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 12 },
+  historyToggle: { background: 'none', border: 'none', color: '#6b7280', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '2px 0' },
+  historyList: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 },
+  historyItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#f9fafb', borderRadius: 7 },
+  restoreBtn: { padding: '4px 12px', background: 'none', border: '1px solid #6ee7b7', color: '#059669', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
 };
