@@ -20,9 +20,10 @@ export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionExpired = searchParams.get('session') === 'expired';
+  const inviteCompany = searchParams.get('company') || '';
   const savedCompanies = getSavedCompanies();
-  const [selected, setSelected] = useState(savedCompanies[0] || OTHER);
-  const [otherText, setOtherText] = useState('');
+  const [selected, setSelected] = useState(inviteCompany ? OTHER : (savedCompanies[0] || OTHER));
+  const [otherText, setOtherText] = useState(inviteCompany);
   const [form, setForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [unconfirmedEmail, setUnconfirmedEmail] = useState('');

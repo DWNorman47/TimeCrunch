@@ -276,7 +276,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         FROM daily_regular
         GROUP BY user_id, date_trunc('week', work_date)
       )
-      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type,
+      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE(
@@ -298,7 +298,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1 ${accessFilter}
-      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type
+      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
       queryParams
@@ -490,6 +490,53 @@ router.post('/workers/invite', requireAdmin, requirePermission('manage_workers')
       emailSent = false;
     }
     res.status(201).json({ ...result.rows[0], email_sent: emailSent });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Send invite email to an existing worker who hasn't signed in yet
+router.post('/workers/:id/send-invite', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      'SELECT id, full_name, username, email, must_change_password FROM users WHERE id = $1 AND company_id = $2 AND active = true',
+      [req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
+    const worker = result.rows[0];
+    if (!worker.email) return res.status(400).json({ error: 'Worker has no email address' });
+    if (!worker.must_change_password) return res.status(400).json({ error: 'Worker has already signed in' });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    await pool.query(
+      'UPDATE users SET invite_token = $1, invite_token_expires = $2, invite_pending = true WHERE id = $3',
+      [token, expires, worker.id]
+    );
+    const inviteUrl = `${process.env.APP_URL}/accept-invite?token=${token}`;
+    let emailSent = true;
+    try {
+      await sgMail.send({
+        from: { name: 'OpsFloA', email: process.env.SENDGRID_FROM_EMAIL },
+        to: worker.email,
+        subject: `You've been invited to OpsFloA`,
+        html: `
+          <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+            <h2 style="color:#1a56db;margin-bottom:8px">You're invited!</h2>
+            <p style="color:#444;margin-bottom:8px">Hi ${worker.full_name}, ${req.user.full_name} has invited you to join OpsFloA.</p>
+            <p style="color:#444;margin-bottom:24px">Your username is: <strong>${worker.username}</strong></p>
+            <a href="${inviteUrl}" style="display:inline-block;background:#1a56db;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700">Set your password</a>
+            <p style="color:#999;font-size:13px;margin-top:24px">This invite expires in 7 days.</p>
+          </div>
+        `,
+      });
+    } catch (emailErr) {
+      console.error('Send invite email failed:', emailErr?.response?.body || emailErr.message);
+      emailSent = false;
+    }
+    res.json({ email_sent: emailSent });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

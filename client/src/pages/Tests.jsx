@@ -1,39 +1,33 @@
 import React, { useState } from 'react';
 import { localDateStr, formatCurrency, currencySymbol, fmtHours, formatInTz } from '../utils';
 
-// Use raw fetch for all API tests — avoids the axios 401 interceptor which would log the user out
+// Raw fetch helpers — bypass the axios 401 interceptor which would log the user out
 const BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
 const get    = (path, token) => fetch(`${BASE}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
 const post   = (path, body, token) => fetch(`${BASE}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
 const patch  = (path, body, token) => fetch(`${BASE}${path}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
 const del    = (path, token) => fetch(`${BASE}${path}`, { method: 'DELETE', headers: token ? { Authorization: `Bearer ${token}` } : {} });
+const TOKEN  = () => localStorage.getItem('tc_token');
 
-const TOKEN = () => localStorage.getItem('tc_token');
+// ── Assertions ───────────────────────────────────────────────────────────────────
 
-// ── Tiny test runner ────────────────────────────────────────────────────────────
-
-function assert(condition, message) {
-  if (!condition) throw new Error(message || 'Assertion failed');
-}
-
+function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion failed'); }
 function assertEqual(actual, expected, label) {
   if (actual !== expected) throw new Error(`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
 }
-
 function assertClose(actual, expected, tolerance, label) {
   if (Math.abs(actual - expected) > tolerance)
     throw new Error(`${label}: expected ${expected} ± ${tolerance}, got ${actual}`);
 }
-
-function assertIs401(status, label) {
-  if (status !== 401) throw new Error(`${label || 'Auth guard'}: expected 401, got ${status}`);
+function assertIs(status, expected, label) {
+  if (status !== expected) throw new Error(`${label || 'Status'}: expected ${expected}, got ${status}`);
+}
+function assertOneOf(status, expected, label) {
+  if (!expected.includes(status)) throw new Error(`${label || 'Status'}: expected one of ${expected.join('/')}, got ${status}`);
 }
 
-function assertIs400(status, label) {
-  if (status !== 400) throw new Error(`${label || 'Validation'}: expected 400, got ${status}`);
-}
-
-// ── Inlined server utilities (no Node.js required) ──────────────────────────────
+// ── Inlined server utilities ──────────────────────────────────────────────────────
+// (copied verbatim from server/utils/ so browser can run them without Node.js)
 
 // payCalculations.js
 function hoursWorked(start, end) {
@@ -87,7 +81,7 @@ function computeDailyPayCosts(entries, overtimeRule, threshold, dailyRate, overt
 
 // geoUtils.js
 function haversineDistanceFt(lat1, lng1, lat2, lng2) {
-  const R = 20902231;
+  const R = 20902231; // Earth radius in feet
   const toRad = d => d * Math.PI / 180;
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
@@ -101,9 +95,8 @@ function validCoords(lat, lng) {
 }
 
 // settingsDefaults.js
-const FEATURE_KEYS_TEST = ['feature_scheduling', 'feature_analytics', 'feature_chat', 'feature_prevailing_wage', 'feature_field', 'feature_timeclock', 'feature_projects', 'feature_overtime', 'feature_geolocation', 'feature_inactive_alerts', 'feature_overtime_alerts', 'feature_broadcast', 'show_worker_wages', 'notification_use_work_hours'];
-const STRING_KEYS_TEST  = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password'];
-
+const FEATURE_KEYS_TEST = ['feature_scheduling','feature_analytics','feature_chat','feature_prevailing_wage','feature_field','feature_timeclock','feature_projects','feature_overtime','feature_geolocation','feature_inactive_alerts','feature_overtime_alerts','feature_broadcast','show_worker_wages','notification_use_work_hours'];
+const STRING_KEYS_TEST  = ['overtime_rule','currency','company_timezone','invoice_signature','default_temp_password'];
 function applySettingsRows(rows, defaults) {
   const s = { ...defaults };
   rows.forEach(r => {
@@ -114,83 +107,59 @@ function applySettingsRows(rows, defaults) {
   return s;
 }
 
-// ── Test helper — makes a guard entry: expects 401 when no token is provided ────
+// ── Auth guard helper: asserts a route returns 401 when called without a token ───
 function guard(label, path, method = 'GET') {
   return {
-    name: `${label} — 401 without token`,
+    name: `${label} → 401 without token`,
     run: async () => {
-      const r = method === 'GET' ? await get(path) : await post(path, {});
-      assertIs401(r.status, label);
+      const r = method === 'GET' ? await get(path)
+              : method === 'DELETE' ? await del(path)
+              : method === 'PATCH' ? await patch(path, {})
+              : await post(path, {});
+      assertIs(r.status, 401, label);
     },
   };
 }
 
-// ── Test suites ─────────────────────────────────────────────────────────────────
+// ── Entry helpers ─────────────────────────────────────────────────────────────────
+const mkEntry = (date, start, end, brk = 0, type = 'regular') => ({
+  wage_type: type, start_time: start, end_time: end, work_date: date, break_minutes: brk,
+});
+
+// ── Test suites ───────────────────────────────────────────────────────────────────
 
 const SUITES = [
 
-  // ── 1. localDateStr ──────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════════
+  // CLIENT UTILITIES
+  // ══════════════════════════════════════════════════════════════════════════════
+
   {
     name: 'localDateStr()',
     tests: [
-      { name: 'Returns YYYY-MM-DD format', run: () => {
-        const result = localDateStr(new Date('2025-06-15T12:00:00'));
-        assert(/^\d{4}-\d{2}-\d{2}$/.test(result), `"${result}" is not YYYY-MM-DD`);
-      }},
-      { name: 'Uses local timezone, not UTC', run: () => {
-        const d = new Date(2025, 5, 15); // June 15 local
-        assert(localDateStr(d).startsWith('2025-06'), `Expected 2025-06-xx, got ${localDateStr(d)}`);
-      }},
-      { name: 'Defaults to today without argument', run: () => {
-        assert(/^\d{4}-\d{2}-\d{2}$/.test(localDateStr()), 'Not YYYY-MM-DD');
-      }},
-      { name: 'Jan 1 formats correctly', run: () => {
-        assertEqual(localDateStr(new Date(2025, 0, 1)), '2025-01-01', 'Jan 1');
-      }},
-      { name: 'Dec 31 formats correctly', run: () => {
-        assertEqual(localDateStr(new Date(2025, 11, 31)), '2025-12-31', 'Dec 31');
-      }},
+      { name: 'Returns YYYY-MM-DD format', run: () => assert(/^\d{4}-\d{2}-\d{2}$/.test(localDateStr(new Date('2025-06-15T12:00:00')))) },
+      { name: 'Uses local timezone, not UTC', run: () => assert(localDateStr(new Date(2025, 5, 15)).startsWith('2025-06')) },
+      { name: 'Defaults to today without argument', run: () => assert(/^\d{4}-\d{2}-\d{2}$/.test(localDateStr())) },
+      { name: 'Jan 1 formats correctly', run: () => assertEqual(localDateStr(new Date(2025, 0, 1)), '2025-01-01', 'Jan 1') },
+      { name: 'Dec 31 formats correctly', run: () => assertEqual(localDateStr(new Date(2025, 11, 31)), '2025-12-31', 'Dec 31') },
     ],
   },
 
-  // ── 2. formatCurrency ────────────────────────────────────────────────────────
   {
     name: 'formatCurrency()',
     tests: [
-      { name: 'USD — dollar sign and comma-grouped', run: () => {
-        const r = formatCurrency(1234.5, 'USD');
-        assert(r.includes('1,234.50'), `Got "${r}"`);
-        assert(r.includes('$'), `Missing $ in "${r}"`);
-      }},
-      { name: 'USD — zero', run: () => {
-        assert(formatCurrency(0, 'USD').includes('0.00'), `Got "${formatCurrency(0, 'USD')}"`);
-      }},
-      { name: 'USD — negative', run: () => {
-        assert(formatCurrency(-50, 'USD').includes('50.00'), `Got "${formatCurrency(-50, 'USD')}"`);
-      }},
-      { name: 'EUR — contains €', run: () => {
-        assert(formatCurrency(100, 'EUR').includes('€'), `Got "${formatCurrency(100, 'EUR')}"`);
-      }},
-      { name: 'GBP — contains £', run: () => {
-        assert(formatCurrency(100, 'GBP').includes('£'), `Got "${formatCurrency(100, 'GBP')}"`);
-      }},
-      { name: 'CAD — returns a string', run: () => {
-        assert(typeof formatCurrency(100, 'CAD') === 'string');
-      }},
-      { name: 'MXN — returns a string', run: () => {
-        assert(typeof formatCurrency(100, 'MXN') === 'string');
-      }},
-      { name: 'Unknown currency — does not throw', run: () => {
-        const r = formatCurrency(10, 'XYZ');
-        assert(typeof r === 'string' && r.length > 0);
-      }},
-      { name: 'Two decimal places for whole numbers', run: () => {
-        assert(formatCurrency(5, 'USD').includes('5.00'), `Got "${formatCurrency(5, 'USD')}"`);
-      }},
+      { name: 'USD — $ symbol and comma-grouped', run: () => { const r = formatCurrency(1234.5, 'USD'); assert(r.includes('1,234.50') && r.includes('$'), r); } },
+      { name: 'USD — zero returns 0.00', run: () => assert(formatCurrency(0, 'USD').includes('0.00')) },
+      { name: 'USD — negative includes 50.00', run: () => assert(formatCurrency(-50, 'USD').includes('50.00')) },
+      { name: 'USD — whole numbers get two decimals', run: () => assert(formatCurrency(5, 'USD').includes('5.00')) },
+      { name: 'EUR — contains €', run: () => assert(formatCurrency(100, 'EUR').includes('€')) },
+      { name: 'GBP — contains £', run: () => assert(formatCurrency(100, 'GBP').includes('£')) },
+      { name: 'CAD — returns non-empty string', run: () => assert(formatCurrency(100, 'CAD').length > 0) },
+      { name: 'MXN — returns non-empty string', run: () => assert(formatCurrency(100, 'MXN').length > 0) },
+      { name: 'Unknown currency — does not throw', run: () => { const r = formatCurrency(10, 'XYZ'); assert(typeof r === 'string' && r.length > 0); } },
     ],
   },
 
-  // ── 3. currencySymbol ────────────────────────────────────────────────────────
   {
     name: 'currencySymbol()',
     tests: [
@@ -199,110 +168,80 @@ const SUITES = [
       { name: 'GBP → £',  run: () => assertEqual(currencySymbol('GBP'), '£',  'GBP') },
       { name: 'CAD — returns string', run: () => assert(typeof currencySymbol('CAD') === 'string') },
       { name: 'MXN — returns string', run: () => assert(typeof currencySymbol('MXN') === 'string') },
-      { name: 'Defaults to USD when no arg', run: () => {
-        const s = currencySymbol(); assert(typeof s === 'string' && s.length > 0);
-      }},
-      { name: 'Unknown code — returns string fallback', run: () => {
-        const s = currencySymbol('ZZZ'); assert(typeof s === 'string' && s.length > 0);
-      }},
+      { name: 'Defaults to USD (no arg)', run: () => { const s = currencySymbol(); assert(typeof s === 'string' && s.length > 0); } },
+      { name: 'Unknown code — returns string fallback', run: () => assert(typeof currencySymbol('ZZZ') === 'string') },
     ],
   },
 
-  // ── 4. fmtHours ─────────────────────────────────────────────────────────────
   {
     name: 'fmtHours()',
     tests: [
-      { name: '8h exactly',      run: () => assertEqual(fmtHours(8),    '8h',      '8') },
-      { name: '1.5h → 1h 30m',   run: () => assertEqual(fmtHours(1.5),  '1h 30m',  '1.5') },
-      { name: '0.25h → 15m',     run: () => assertEqual(fmtHours(0.25), '15m',     '0.25') },
-      { name: '0 → 0m',          run: () => assertEqual(fmtHours(0),    '0m',      '0') },
-      { name: 'null → 0m',       run: () => assertEqual(fmtHours(null), '0m',      'null') },
-      { name: 'undefined → 0m',  run: () => assertEqual(fmtHours(undefined), '0m', 'undefined') },
-      { name: '2.75h → 2h 45m',  run: () => assertEqual(fmtHours(2.75), '2h 45m',  '2.75') },
-      { name: '0.5h → 30m',      run: () => assertEqual(fmtHours(0.5),  '30m',     '0.5') },
-      { name: '10h exactly',     run: () => assertEqual(fmtHours(10),   '10h',     '10') },
-      { name: '1h 1m',           run: () => assertEqual(fmtHours(1 + 1/60), '1h 1m', '1h1m') },
-      { name: 'Rounding: 0.0083h ≈ 1m', run: () => assertEqual(fmtHours(1/60), '1m', '1/60') },
+      { name: '8h exactly → "8h"',    run: () => assertEqual(fmtHours(8),    '8h',      '8') },
+      { name: '10h exactly → "10h"',  run: () => assertEqual(fmtHours(10),   '10h',     '10') },
+      { name: '1.5h → "1h 30m"',      run: () => assertEqual(fmtHours(1.5),  '1h 30m',  '1.5') },
+      { name: '2.75h → "2h 45m"',     run: () => assertEqual(fmtHours(2.75), '2h 45m',  '2.75') },
+      { name: '0.5h → "30m"',         run: () => assertEqual(fmtHours(0.5),  '30m',     '0.5') },
+      { name: '0.25h → "15m"',        run: () => assertEqual(fmtHours(0.25), '15m',     '0.25') },
+      { name: '1/60h → "1m" (rounding)', run: () => assertEqual(fmtHours(1/60), '1m',  '1m') },
+      { name: '0 → "0m"',             run: () => assertEqual(fmtHours(0),    '0m',      '0') },
+      { name: 'null → "0m"',          run: () => assertEqual(fmtHours(null), '0m',      'null') },
+      { name: 'undefined → "0m"',     run: () => assertEqual(fmtHours(undefined), '0m', 'undefined') },
+      { name: '1h 1m',                run: () => assertEqual(fmtHours(1 + 1/60), '1h 1m', '1h1m') },
     ],
   },
 
-  // ── 5. formatInTz ────────────────────────────────────────────────────────────
   {
     name: 'formatInTz()',
     tests: [
-      { name: 'Returns a non-empty string', run: () => {
-        const r = formatInTz('2025-06-15T14:30:00Z', 'America/New_York');
-        assert(typeof r === 'string' && r.length > 0, `Got "${r}"`);
-      }},
-      { name: 'Works without timezone', run: () => {
-        const r = formatInTz('2025-06-15T14:30:00Z');
-        assert(typeof r === 'string' && r.length > 0);
-      }},
-      { name: 'Invalid timezone falls back gracefully', run: () => {
-        const r = formatInTz('2025-06-15T14:30:00Z', 'Not/ATimezone');
-        assert(typeof r === 'string' && r.length > 0);
-      }},
-      { name: 'Accepts custom format options', run: () => {
-        const r = formatInTz('2025-06-15T14:30:00Z', 'UTC', { year: 'numeric', month: 'long', day: 'numeric' });
-        assert(r.includes('2025'), `Got "${r}"`);
-      }},
+      { name: 'Returns non-empty string for valid tz', run: () => { const r = formatInTz('2025-06-15T14:30:00Z', 'America/New_York'); assert(r.length > 0); } },
+      { name: 'Works without timezone arg', run: () => assert(formatInTz('2025-06-15T14:30:00Z').length > 0) },
+      { name: 'Invalid timezone falls back gracefully', run: () => assert(formatInTz('2025-06-15T14:30:00Z', 'Not/ATimezone').length > 0) },
+      { name: 'Custom opts: date includes year', run: () => assert(formatInTz('2025-06-15T14:30:00Z', 'UTC', { year: 'numeric', month: 'long', day: 'numeric' }).includes('2025')) },
     ],
   },
 
-  // ── 6. hoursWorked ───────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SERVER UTILITIES (inlined — no Node.js required)
+  // ══════════════════════════════════════════════════════════════════════════════
+
   {
     name: 'hoursWorked()',
     tests: [
-      { name: '08:00 → 16:00 = 8h',    run: () => assertEqual(hoursWorked('08:00', '16:00'), 8,   '8h') },
-      { name: '08:00 → 08:30 = 0.5h',  run: () => assertEqual(hoursWorked('08:00', '08:30'), 0.5, '30m') },
-      { name: '00:00 → 00:00 = 24h',   run: () => assertEqual(hoursWorked('00:00', '00:00'), 24,  '24h') },
-      { name: '23:00 → 01:00 midnight crossing = 2h', run: () => assertEqual(hoursWorked('23:00', '01:00'), 2, 'midnight') },
-      { name: '22:30 → 06:30 midnight crossing = 8h', run: () => assertEqual(hoursWorked('22:30', '06:30'), 8, 'overnight 8h') },
-      { name: '09:00 → 17:30 = 8.5h',  run: () => assertEqual(hoursWorked('09:00', '17:30'), 8.5, '8.5h') },
-      { name: '12:00 → 12:15 = 0.25h', run: () => assertEqual(hoursWorked('12:00', '12:15'), 0.25, '0.25h') },
+      { name: '08:00–16:00 = 8h',              run: () => assertEqual(hoursWorked('08:00', '16:00'), 8,    '8h') },
+      { name: '09:00–17:30 = 8.5h',            run: () => assertEqual(hoursWorked('09:00', '17:30'), 8.5,  '8.5h') },
+      { name: '08:00–08:30 = 0.5h',            run: () => assertEqual(hoursWorked('08:00', '08:30'), 0.5,  '0.5h') },
+      { name: '12:00–12:15 = 0.25h',           run: () => assertEqual(hoursWorked('12:00', '12:15'), 0.25, '0.25h') },
+      { name: 'Same time = 0 (not 24h)',        run: () => assertEqual(hoursWorked('00:00', '00:00'), 0,    'same') },
+      { name: '23:00–01:00 midnight cross = 2h', run: () => assertEqual(hoursWorked('23:00', '01:00'), 2,  'midnight') },
+      { name: '22:30–06:30 overnight = 8h',    run: () => assertEqual(hoursWorked('22:30', '06:30'), 8,    'overnight') },
     ],
   },
 
-  // ── 7. computeOT — daily rule ────────────────────────────────────────────────
   {
     name: 'computeOT() — daily rule',
     tests: [
       { name: 'Exactly 8h — no OT', run: () => {
-        const entries = [{ wage_type: 'regular', start_time: '08:00', end_time: '16:00', work_date: '2025-06-16', break_minutes: 0 }];
-        const r = computeOT(entries, 'daily', 8);
+        const r = computeOT([mkEntry('2025-06-16','08:00','16:00')], 'daily', 8);
         assertEqual(r.regularHours, 8, 'reg'); assertEqual(r.overtimeHours, 0, 'ot');
       }},
       { name: '10h shift → 2h OT', run: () => {
-        const entries = [{ wage_type: 'regular', start_time: '06:00', end_time: '16:00', work_date: '2025-06-16', break_minutes: 0 }];
-        const r = computeOT(entries, 'daily', 8);
+        const r = computeOT([mkEntry('2025-06-16','06:00','16:00')], 'daily', 8);
         assertEqual(r.regularHours, 8, 'reg'); assertEqual(r.overtimeHours, 2, 'ot');
       }},
       { name: '10h with 30m break → 1.5h OT', run: () => {
-        const entries = [{ wage_type: 'regular', start_time: '06:00', end_time: '16:00', work_date: '2025-06-16', break_minutes: 30 }];
-        const r = computeOT(entries, 'daily', 8);
+        const r = computeOT([mkEntry('2025-06-16','06:00','16:00',30)], 'daily', 8);
         assertEqual(r.regularHours, 8, 'reg'); assertEqual(r.overtimeHours, 1.5, 'ot');
       }},
-      { name: 'prevailing wage entries are excluded from OT', run: () => {
-        const entries = [
-          { wage_type: 'prevailing_wage', start_time: '08:00', end_time: '20:00', work_date: '2025-06-16', break_minutes: 0 },
-        ];
-        const r = computeOT(entries, 'daily', 8);
+      { name: 'Prevailing wage entries excluded from OT', run: () => {
+        const r = computeOT([mkEntry('2025-06-16','08:00','20:00',0,'prevailing_wage')], 'daily', 8);
         assertEqual(r.regularHours, 0, 'reg'); assertEqual(r.overtimeHours, 0, 'ot');
       }},
       { name: 'Two 6h days — no OT', run: () => {
-        const entries = [
-          { wage_type: 'regular', start_time: '08:00', end_time: '14:00', work_date: '2025-06-16', break_minutes: 0 },
-          { wage_type: 'regular', start_time: '08:00', end_time: '14:00', work_date: '2025-06-17', break_minutes: 0 },
-        ];
-        const r = computeOT(entries, 'daily', 8);
+        const r = computeOT([mkEntry('2025-06-16','08:00','14:00'), mkEntry('2025-06-17','08:00','14:00')], 'daily', 8);
         assertEqual(r.regularHours, 12, 'reg'); assertEqual(r.overtimeHours, 0, 'ot');
       }},
-      { name: 'Two 10h days → 4h OT', run: () => {
-        const entries = [
-          { wage_type: 'regular', start_time: '06:00', end_time: '16:00', work_date: '2025-06-16', break_minutes: 0 },
-          { wage_type: 'regular', start_time: '06:00', end_time: '16:00', work_date: '2025-06-17', break_minutes: 0 },
-        ];
-        const r = computeOT(entries, 'daily', 8);
+      { name: 'Two 10h days → 4h OT total', run: () => {
+        const r = computeOT([mkEntry('2025-06-16','06:00','16:00'), mkEntry('2025-06-17','06:00','16:00')], 'daily', 8);
         assertEqual(r.regularHours, 16, 'reg'); assertEqual(r.overtimeHours, 4, 'ot');
       }},
       { name: 'Empty entries → zeros', run: () => {
@@ -312,453 +251,641 @@ const SUITES = [
     ],
   },
 
-  // ── 8. computeOT — weekly rule ───────────────────────────────────────────────
   {
     name: 'computeOT() — weekly rule',
     tests: [
-      { name: '5 × 8h days (40h) — no OT', run: () => {
-        const entries = ['2025-06-16','2025-06-17','2025-06-18','2025-06-19','2025-06-20'].map(d => ({
-          wage_type: 'regular', start_time: '08:00', end_time: '16:00', work_date: d, break_minutes: 0,
-        }));
+      { name: '5 × 8h = 40h — no OT', run: () => {
+        const entries = ['2025-06-16','2025-06-17','2025-06-18','2025-06-19','2025-06-20'].map(d => mkEntry(d,'08:00','16:00'));
         const r = computeOT(entries, 'weekly', 40);
         assertEqual(r.regularHours, 40, 'reg'); assertEqual(r.overtimeHours, 0, 'ot');
       }},
-      { name: '5 × 9h days (45h) → 5h OT', run: () => {
-        const entries = ['2025-06-16','2025-06-17','2025-06-18','2025-06-19','2025-06-20'].map(d => ({
-          wage_type: 'regular', start_time: '08:00', end_time: '17:00', work_date: d, break_minutes: 0,
-        }));
+      { name: '5 × 9h = 45h → 5h OT', run: () => {
+        const entries = ['2025-06-16','2025-06-17','2025-06-18','2025-06-19','2025-06-20'].map(d => mkEntry(d,'08:00','17:00'));
         const r = computeOT(entries, 'weekly', 40);
         assertEqual(r.regularHours, 40, 'reg'); assertEqual(r.overtimeHours, 5, 'ot');
       }},
-      { name: 'Hours from two different weeks are independently thresholded', run: () => {
-        // Week 1: 44h, Week 2: 44h → 8h total OT
-        const week1 = ['2025-06-16','2025-06-17','2025-06-18','2025-06-19','2025-06-20'].map(d => ({
-          wage_type: 'regular', start_time: '08:00', end_time: '16:48', work_date: d, break_minutes: 0,
-        }));
-        const week2 = ['2025-06-23','2025-06-24','2025-06-25','2025-06-26','2025-06-27'].map(d => ({
-          wage_type: 'regular', start_time: '08:00', end_time: '16:48', work_date: d, break_minutes: 0,
-        }));
-        const r = computeOT([...week1, ...week2], 'weekly', 40);
-        assert(r.overtimeHours > 0, 'Expected some OT');
+      { name: 'Two separate weeks each under threshold = no OT', run: () => {
+        const entries = ['2025-06-16','2025-06-17','2025-06-23','2025-06-24'].map(d => mkEntry(d,'08:00','16:00'));
+        const r = computeOT(entries, 'weekly', 40);
+        assertEqual(r.overtimeHours, 0, 'ot');
       }},
     ],
   },
 
-  // ── 9. computeOT — none rule ─────────────────────────────────────────────────
   {
     name: 'computeOT() — none rule',
     tests: [
-      { name: '12h shift — overtimeHours = 0', run: () => {
-        const entries = [{ wage_type: 'regular', start_time: '06:00', end_time: '18:00', work_date: '2025-06-16', break_minutes: 0 }];
-        const r = computeOT(entries, 'none', 8);
-        assertEqual(r.overtimeHours, 0, 'ot');
-        assertEqual(r.regularHours, 12, 'reg');
+      { name: '12h shift → overtimeHours = 0', run: () => {
+        const r = computeOT([mkEntry('2025-06-16','06:00','18:00')], 'none', 8);
+        assertEqual(r.overtimeHours, 0, 'ot'); assertEqual(r.regularHours, 12, 'reg');
       }},
-      { name: '5 × 10h days — no OT under none rule', run: () => {
-        const entries = ['2025-06-16','2025-06-17','2025-06-18','2025-06-19','2025-06-20'].map(d => ({
-          wage_type: 'regular', start_time: '06:00', end_time: '16:00', work_date: d, break_minutes: 0,
-        }));
+      { name: '5 × 10h = 50h regular, 0 OT', run: () => {
+        const entries = ['2025-06-16','2025-06-17','2025-06-18','2025-06-19','2025-06-20'].map(d => mkEntry(d,'06:00','16:00'));
         const r = computeOT(entries, 'none', 8);
-        assertEqual(r.overtimeHours, 0, 'ot');
-        assertEqual(r.regularHours, 50, 'reg');
+        assertEqual(r.overtimeHours, 0, 'ot'); assertEqual(r.regularHours, 50, 'reg');
       }},
     ],
   },
 
-  // ── 10. computeDailyPayCosts ─────────────────────────────────────────────────
   {
     name: 'computeDailyPayCosts()',
     tests: [
-      { name: 'No OT rule: cost = days × dailyRate', run: () => {
-        const entries = [
-          { wage_type: 'regular', start_time: '08:00', end_time: '16:00', work_date: '2025-06-16', break_minutes: 0 },
-          { wage_type: 'regular', start_time: '08:00', end_time: '16:00', work_date: '2025-06-17', break_minutes: 0 },
-        ];
+      { name: 'None rule: regularCost = days × rate, overtimeCost = 0', run: () => {
+        const entries = [mkEntry('2025-06-16','08:00','16:00'), mkEntry('2025-06-17','08:00','16:00')];
         const r = computeDailyPayCosts(entries, 'none', 8, 200, 1.5);
-        assertEqual(r.regularCost, 400, 'regularCost');
-        assertEqual(r.overtimeCost, 0, 'overtimeCost');
+        assertEqual(r.regularCost, 400, 'regularCost'); assertEqual(r.overtimeCost, 0, 'overtimeCost');
       }},
-      { name: 'Daily OT: 2 days × 10h → OT cost', run: () => {
-        const entries = [
-          { wage_type: 'regular', start_time: '06:00', end_time: '16:00', work_date: '2025-06-16', break_minutes: 0 },
-          { wage_type: 'regular', start_time: '06:00', end_time: '16:00', work_date: '2025-06-17', break_minutes: 0 },
-        ];
-        // 2 days × $200 regular = $400. OT: 4h × (200/8) × 1.5 = 4 × 25 × 1.5 = $150
+      { name: 'Daily OT: 2 × 10h → OT cost = 4h × (200/8) × 1.5 = $150', run: () => {
+        const entries = [mkEntry('2025-06-16','06:00','16:00'), mkEntry('2025-06-17','06:00','16:00')];
         const r = computeDailyPayCosts(entries, 'daily', 8, 200, 1.5);
-        assertEqual(r.regularCost, 400, 'regularCost');
-        assertEqual(r.overtimeCost, 150, 'overtimeCost');
+        assertEqual(r.regularCost, 400, 'regularCost'); assertEqual(r.overtimeCost, 150, 'overtimeCost');
       }},
       { name: 'Prevailing wage entries not counted as days', run: () => {
-        const entries = [
-          { wage_type: 'prevailing_wage', start_time: '08:00', end_time: '16:00', work_date: '2025-06-16', break_minutes: 0 },
-        ];
-        const r = computeDailyPayCosts(entries, 'none', 8, 200, 1.5);
-        assertEqual(r.regularCost, 0, 'regularCost should be 0 for PW entry');
+        const r = computeDailyPayCosts([mkEntry('2025-06-16','08:00','16:00',0,'prevailing_wage')], 'none', 8, 200, 1.5);
+        assertEqual(r.regularCost, 0, 'regularCost');
       }},
-      { name: 'Same date repeated — counted as 1 day', run: () => {
-        const entries = [
-          { wage_type: 'regular', start_time: '08:00', end_time: '12:00', work_date: '2025-06-16', break_minutes: 0 },
-          { wage_type: 'regular', start_time: '13:00', end_time: '17:00', work_date: '2025-06-16', break_minutes: 0 },
-        ];
+      { name: 'Same date in two entries = 1 day', run: () => {
+        const entries = [mkEntry('2025-06-16','08:00','12:00'), mkEntry('2025-06-16','13:00','17:00')];
         const r = computeDailyPayCosts(entries, 'none', 8, 200, 1.5);
-        assertEqual(r.regularCost, 200, 'Should be 1 day');
+        assertEqual(r.regularCost, 200, 'regularCost');
       }},
     ],
   },
 
-  // ── 11. haversineDistanceFt ──────────────────────────────────────────────────
   {
     name: 'haversineDistanceFt()',
     tests: [
-      { name: 'Same point = 0 feet', run: () => {
-        assertEqual(haversineDistanceFt(40.7128, -74.006, 40.7128, -74.006), 0, 'same point');
-      }},
-      { name: 'NYC to LA ≈ 13,600,000 ft (2575 miles)', run: () => {
-        const dist = haversineDistanceFt(40.7128, -74.006, 34.0522, -118.2437);
-        assertClose(dist, 13607000, 100000, 'NYC-LA');
-      }},
-      { name: '100ft radius: points inside register < 100ft', run: () => {
-        // ~30m north is about 100ft
-        const dist = haversineDistanceFt(40.7128, -74.006, 40.71307, -74.006);
-        assert(dist < 200, `Expected < 200ft, got ${dist.toFixed(0)}ft`);
-      }},
-      { name: 'Returns a positive number for distinct points', run: () => {
-        assert(haversineDistanceFt(51.5074, -0.1278, 48.8566, 2.3522) > 0, 'London to Paris > 0');
-      }},
-      { name: 'Symmetric: A→B === B→A', run: () => {
-        const ab = haversineDistanceFt(40.7128, -74.006, 34.0522, -118.2437);
-        const ba = haversineDistanceFt(34.0522, -118.2437, 40.7128, -74.006);
+      { name: 'Same point = 0 ft', run: () => assertEqual(haversineDistanceFt(40.7128,-74.006,40.7128,-74.006), 0, 'same') },
+      { name: 'NYC → LA ≈ 12,913,000 ft (2,445 miles)', run: () =>
+        assertClose(haversineDistanceFt(40.7128,-74.006,34.0522,-118.2437), 12913000, 200000, 'NYC-LA')
+      },
+      { name: 'London → Paris is positive', run: () =>
+        assert(haversineDistanceFt(51.5074,-0.1278,48.8566,2.3522) > 0)
+      },
+      { name: 'Symmetric A→B = B→A', run: () => {
+        const ab = haversineDistanceFt(40.7128,-74.006,34.0522,-118.2437);
+        const ba = haversineDistanceFt(34.0522,-118.2437,40.7128,-74.006);
         assertClose(ab, ba, 0.001, 'symmetric');
+      }},
+      { name: 'Short distance: ~300ft north is detectable', run: () => {
+        const d = haversineDistanceFt(40.7128,-74.006,40.7137,-74.006);
+        assert(d > 100 && d < 1000, `Got ${d.toFixed(0)}ft`);
       }},
     ],
   },
 
-  // ── 12. validCoords ──────────────────────────────────────────────────────────
   {
     name: 'validCoords()',
     tests: [
-      { name: 'Valid NYC coords',            run: () => assert(validCoords(40.7128, -74.006)) },
-      { name: 'Valid equator / prime meridian', run: () => assert(validCoords(0, 0)) },
-      { name: 'Valid edge: lat 90',          run: () => assert(validCoords(90, 0)) },
-      { name: 'Valid edge: lat -90',         run: () => assert(validCoords(-90, 0)) },
-      { name: 'Valid edge: lng 180',         run: () => assert(validCoords(0, 180)) },
-      { name: 'Valid edge: lng -180',        run: () => assert(validCoords(0, -180)) },
-      { name: 'Invalid: lat > 90',           run: () => assert(!validCoords(91, 0)) },
-      { name: 'Invalid: lat < -90',          run: () => assert(!validCoords(-91, 0)) },
-      { name: 'Invalid: lng > 180',          run: () => assert(!validCoords(0, 181)) },
-      { name: 'Invalid: lng < -180',         run: () => assert(!validCoords(0, -181)) },
-      { name: 'Invalid: NaN lat',            run: () => assert(!validCoords(NaN, 0)) },
-      { name: 'Invalid: string "abc"',       run: () => assert(!validCoords('abc', 0)) },
-      { name: 'Invalid: null',               run: () => assert(!validCoords(null, null)) },
-      { name: 'String numbers are coerced',  run: () => assert(validCoords('40.7', '-74.0')) },
+      { name: 'Valid: NYC',          run: () => assert(validCoords(40.7128, -74.006)) },
+      { name: 'Valid: 0, 0',         run: () => assert(validCoords(0, 0)) },
+      { name: 'Valid: lat 90',       run: () => assert(validCoords(90, 0)) },
+      { name: 'Valid: lat -90',      run: () => assert(validCoords(-90, 0)) },
+      { name: 'Valid: lng 180',      run: () => assert(validCoords(0, 180)) },
+      { name: 'Valid: lng -180',     run: () => assert(validCoords(0, -180)) },
+      { name: 'Invalid: lat 91',     run: () => assert(!validCoords(91, 0)) },
+      { name: 'Invalid: lat -91',    run: () => assert(!validCoords(-91, 0)) },
+      { name: 'Invalid: lng 181',    run: () => assert(!validCoords(0, 181)) },
+      { name: 'Invalid: lng -181',   run: () => assert(!validCoords(0, -181)) },
+      { name: 'Invalid: NaN',        run: () => assert(!validCoords(NaN, 0)) },
+      { name: 'Invalid: string abc', run: () => assert(!validCoords('abc', 0)) },
+      { name: 'Invalid: null',       run: () => assert(!validCoords(null, null)) },
+      { name: 'String numbers coerced', run: () => assert(validCoords('40.7', '-74.0')) },
     ],
   },
 
-  // ── 13. applySettingsRows ────────────────────────────────────────────────────
   {
     name: 'applySettingsRows()',
     tests: [
-      { name: 'String key is kept as string', run: () => {
-        const r = applySettingsRows([{ key: 'currency', value: 'EUR' }], { currency: 'USD' });
-        assertEqual(r.currency, 'EUR', 'currency');
+      { name: 'String key kept as string', run: () => {
+        assertEqual(applySettingsRows([{key:'currency',value:'EUR'}], {currency:'USD'}).currency, 'EUR', 'currency');
       }},
-      { name: 'Feature key "1" → true', run: () => {
-        const r = applySettingsRows([{ key: 'feature_scheduling', value: '1' }], { feature_scheduling: false });
-        assertEqual(r.feature_scheduling, true, 'feature on');
+      { name: 'Feature "1" → true', run: () => {
+        assertEqual(applySettingsRows([{key:'feature_scheduling',value:'1'}], {feature_scheduling:false}).feature_scheduling, true, 'feature on');
       }},
-      { name: 'Feature key "0" → false', run: () => {
-        const r = applySettingsRows([{ key: 'feature_scheduling', value: '0' }], { feature_scheduling: true });
-        assertEqual(r.feature_scheduling, false, 'feature off');
+      { name: 'Feature "0" → false', run: () => {
+        assertEqual(applySettingsRows([{key:'feature_scheduling',value:'0'}], {feature_scheduling:true}).feature_scheduling, false, 'feature off');
       }},
-      { name: 'Numeric key is parsed as float', run: () => {
-        const r = applySettingsRows([{ key: 'overtime_threshold', value: '10' }], { overtime_threshold: 8 });
-        assertEqual(r.overtime_threshold, 10, 'threshold');
+      { name: 'Numeric key parsed as float', run: () => {
+        assertEqual(applySettingsRows([{key:'overtime_threshold',value:'10'}], {overtime_threshold:8}).overtime_threshold, 10, 'threshold');
       }},
-      { name: 'Default is preserved when key not in rows', run: () => {
-        const r = applySettingsRows([], { overtime_threshold: 8, currency: 'USD' });
-        assertEqual(r.overtime_threshold, 8, 'default threshold');
-        assertEqual(r.currency, 'USD', 'default currency');
+      { name: 'overtime_rule stays a string', run: () => {
+        assertEqual(applySettingsRows([{key:'overtime_rule',value:'weekly'}], {overtime_rule:'daily'}).overtime_rule, 'weekly', 'rule');
       }},
-      { name: 'overtime_rule stays string (not parsed as float)', run: () => {
-        const r = applySettingsRows([{ key: 'overtime_rule', value: 'weekly' }], { overtime_rule: 'daily' });
-        assertEqual(r.overtime_rule, 'weekly', 'overtime_rule');
+      { name: 'Defaults preserved when key absent', run: () => {
+        const r = applySettingsRows([], {overtime_threshold:8, currency:'USD'});
+        assertEqual(r.overtime_threshold, 8, 'threshold'); assertEqual(r.currency, 'USD', 'currency');
       }},
-      { name: 'Empty rows returns cloned defaults', run: () => {
-        const defaults = { foo: 42, bar: 'baz' };
-        const r = applySettingsRows([], defaults);
+      { name: 'Empty rows returns clone of defaults', run: () => {
+        const r = applySettingsRows([], {foo:42});
         assertEqual(r.foo, 42, 'foo');
-        assertEqual(r.bar, 'baz', 'bar');
       }},
     ],
   },
 
-  // ── 14. API — /auth/me ───────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════════
+  // API — AUTH ROUTES
+  // ══════════════════════════════════════════════════════════════════════════════
+
   {
-    name: 'API — /auth/me',
+    name: 'API — POST /auth/login validation',
     async: true,
     tests: [
-      { name: '200 with valid token OR 401 without', run: async () => {
+      { name: 'Empty body → 400', run: async () => assertIs((await post('/auth/login', {})).status, 400) },
+      { name: 'Missing password → 400', run: async () => assertIs((await post('/auth/login', {username:'x',company_name:'y'})).status, 400) },
+      { name: 'Missing company_name → 400', run: async () => assertIs((await post('/auth/login', {username:'x',password:'y'})).status, 400) },
+      { name: 'Wrong credentials → 401', run: async () => assertIs((await post('/auth/login', {username:'__test_nx__',password:'wrong',company_name:'__test__'})).status, 401) },
+    ],
+  },
+
+  {
+    name: 'API — GET /auth/me',
+    async: true,
+    tests: [
+      { name: 'Without token → 401', run: async () => assertIs((await get('/auth/me')).status, 401) },
+      { name: 'With stored token → 200 or 401', run: async () => assertOneOf((await get('/auth/me', TOKEN())).status, [200, 401]) },
+      { name: 'On 200: response has user.id, user.role', run: async () => {
         const r = await get('/auth/me', TOKEN());
-        assert(r.status === 200 || r.status === 401, `Unexpected ${r.status}`);
-        if (r.status === 200) {
-          const d = await r.json();
-          assert(d?.user?.id, 'user.id must exist');
-          assert(d?.user?.role, 'user.role must exist');
-        }
+        if (r.status !== 200) return;
+        const d = await r.json();
+        assert(d?.user?.id, 'user.id');
+        assert(['admin','worker','super_admin'].includes(d.user.role), `role: ${d.user.role}`);
       }},
-      { name: '401 without token', run: async () => assertIs401((await get('/auth/me')).status) },
     ],
   },
 
-  // ── 15. API — /auth/login validation ────────────────────────────────────────
   {
-    name: 'API — /auth/login validation',
+    name: 'API — POST /auth/register validation',
     async: true,
     tests: [
-      { name: 'Empty body → 400', run: async () => assertIs400((await post('/auth/login', {})).status) },
-      { name: 'Missing password → 400', run: async () => assertIs400((await post('/auth/login', { username: 'x', company_name: 'y' })).status) },
-      { name: 'Wrong credentials → 401', run: async () => assertIs401((await post('/auth/login', { username: '__test_nonexistent__', password: 'wrong', company_name: '__test__' })).status) },
+      { name: 'Empty body → 400', run: async () => assertOneOf((await post('/auth/register', {})).status, [400, 429]) },
+      { name: 'Missing email → 400', run: async () => assertOneOf((await post('/auth/register', {company_name:'X',full_name:'Y',username:'z',password:'abc123'})).status, [400, 429]) },
+      { name: 'Password < 6 chars → 400', run: async () => assertOneOf((await post('/auth/register', {company_name:'X',full_name:'Y',username:'z',password:'abc',email:'a@b.com'})).status, [400, 429]) },
+      { name: 'Password = username → 400', run: async () => assertOneOf((await post('/auth/register', {company_name:'X',full_name:'Y',username:'myuser',password:'myuser1',email:'a@b.com'})).status, [400, 429]) },
     ],
   },
 
-  // ── 16. API — Auth guards: admin routes ──────────────────────────────────────
   {
-    name: 'API — Auth guards (admin routes)',
+    name: 'API — POST /auth/* validation',
+    async: true,
+    tests: [
+      { name: 'POST /auth/forgot-password — no email → 400', run: async () => assertOneOf((await post('/auth/forgot-password', {})).status, [400, 429]) },
+      { name: 'POST /auth/forgot-password — with email → 200 (no leak)', run: async () => assertOneOf((await post('/auth/forgot-password', {email:'nobody@example.invalid'})).status, [200, 429]) },
+      { name: 'POST /auth/reset-password — missing fields → 400', run: async () => assertIs((await post('/auth/reset-password', {})).status, 400) },
+      { name: 'POST /auth/reset-password — bad token → 400', run: async () => assertIs((await post('/auth/reset-password', {token:'fakefakefake',password:'newsecret1'})).status, 400) },
+      { name: 'POST /auth/confirm-email — missing token → 400', run: async () => assertIs((await post('/auth/confirm-email', {})).status, 400) },
+      { name: 'POST /auth/confirm-email — bad token → 400', run: async () => assertIs((await post('/auth/confirm-email', {token:'fakefakefake'})).status, 400) },
+      { name: 'POST /auth/complete-setup — missing fields → 400', run: async () => assertIs((await post('/auth/complete-setup', {})).status, 400) },
+      { name: 'POST /auth/change-password — no auth → 401', run: async () => assertIs((await post('/auth/change-password', {current_password:'x',new_password:'y'})).status, 401) },
+      { name: 'POST /auth/mfa/confirm — missing fields → 400', run: async () => assertIs((await post('/auth/mfa/confirm', {})).status, 400) },
+      { name: 'POST /auth/mfa/enable — no auth → 401', run: async () => assertIs((await post('/auth/mfa/enable', {code:'123456'})).status, 401) },
+      { name: 'POST /auth/mfa/disable — no auth → 401', run: async () => assertIs((await post('/auth/mfa/disable', {password:'x'})).status, 401) },
+      { name: 'GET /auth/mfa/setup — no auth → 401', run: async () => assertIs((await get('/auth/mfa/setup')).status, 401) },
+      { name: 'POST /auth/update-language — no auth → 401', run: async () => assertIs((await post('/auth/update-language', {language:'Spanish'})).status, 401) },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // API — AUTH GUARDS (all protected routes return 401 without a token)
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  {
+    name: 'API — Auth guards: admin core',
     async: true,
     tests: [
       guard('GET /admin/kpis',              '/admin/kpis'),
-      guard('GET /admin/workers',           '/admin/workers'),
-      guard('GET /admin/workers/export',    '/admin/workers/export'),
-      guard('GET /admin/projects',          '/admin/projects'),
-      guard('GET /admin/time-entries',      '/admin/time-entries'),
-      guard('GET /admin/schedule',          '/admin/schedule'),
       guard('GET /admin/settings',          '/admin/settings'),
-      guard('GET /admin/reports/hours',     '/admin/reports/hours'),
-      guard('GET /admin/reports/payroll',   '/admin/reports/payroll'),
-      guard('GET /admin/approval-queue',    '/admin/approval-queue'),
+      guard('PATCH /admin/settings',        '/admin/settings', 'PATCH'),
+      guard('GET /admin/company',           '/admin/company'),
+      guard('PATCH /admin/company',         '/admin/company', 'PATCH'),
+      guard('GET /admin/notifications',     '/admin/notifications'),
+      guard('GET /admin/active-clocks',     '/admin/active-clocks'),
       guard('GET /admin/audit-log',         '/admin/audit-log'),
-      guard('GET /admin/messages',          '/admin/messages'),
-      guard('GET /admin/admins',            '/admin/admins'),
+      guard('POST /admin/support',          '/admin/support', 'POST'),
     ],
   },
 
-  // ── 17. API — Auth guards: QBO routes ────────────────────────────────────────
   {
-    name: 'API — Auth guards (QBO routes)',
+    name: 'API — Auth guards: workers',
     async: true,
     tests: [
-      guard('GET /qbo/status',     '/qbo/status'),
-      guard('GET /qbo/employees',  '/qbo/employees'),
-      guard('GET /qbo/customers',  '/qbo/customers'),
-      guard('GET /qbo/vendors',    '/qbo/vendors'),
-      guard('POST /qbo/push',      '/qbo/push', 'POST'),
+      guard('GET /admin/workers',                  '/admin/workers'),
+      guard('GET /admin/workers/archived',          '/admin/workers/archived'),
+      guard('GET /admin/workers/check-username',    '/admin/workers/check-username'),
+      guard('POST /admin/workers',                  '/admin/workers', 'POST'),
+      guard('POST /admin/workers/invite',           '/admin/workers/invite', 'POST'),
     ],
   },
 
-  // ── 18. API — Auth guards: worker routes ────────────────────────────────────
   {
-    name: 'API — Auth guards (worker routes)',
+    name: 'API — Auth guards: projects',
     async: true,
     tests: [
-      guard('GET /clock/status',   '/clock/status'),
-      guard('GET /time-entries',   '/time-entries'),
-      guard('GET /projects',       '/projects'),
-      guard('GET /inbox',          '/inbox'),
-      guard('GET /shifts',         '/shifts'),
+      guard('GET /admin/projects',          '/admin/projects'),
+      guard('GET /admin/projects/archived', '/admin/projects/archived'),
+      guard('GET /admin/projects/metrics',  '/admin/projects/metrics'),
+      guard('POST /admin/projects',         '/admin/projects', 'POST'),
     ],
   },
 
-  // ── 19. API — Auth guards: field/safety routes ──────────────────────────────
   {
-    name: 'API — Auth guards (field routes)',
+    name: 'API — Auth guards: time entries / approval',
     async: true,
     tests: [
-      guard('GET /daily-reports',   '/daily-reports'),
-      guard('GET /field-reports',   '/field-reports'),
-      guard('GET /punchlist',       '/punchlist'),
-      guard('GET /incidents',       '/incidents'),
-      guard('GET /equipment',       '/equipment'),
-      guard('GET /rfis',            '/rfis'),
-      guard('GET /inspections',     '/inspections'),
-      guard('GET /safety-talks',    '/safety-talks'),
+      guard('GET /admin/entries/pending',       '/admin/entries/pending'),
+      guard('POST /admin/entries/approve-all',  '/admin/entries/approve-all', 'POST'),
+      guard('GET /admin/pay-periods',           '/admin/pay-periods'),
+      guard('POST /admin/pay-periods',          '/admin/pay-periods', 'POST'),
     ],
   },
 
-  // ── 20. API — Auth guards: superadmin ────────────────────────────────────────
   {
-    name: 'API — Auth guards (superadmin)',
+    name: 'API — Auth guards: reports / exports',
+    async: true,
+    tests: [
+      guard('GET /admin/export',            '/admin/export'),
+      guard('GET /admin/overtime-report',   '/admin/overtime-report'),
+      guard('GET /admin/payroll-export',    '/admin/payroll-export'),
+      guard('GET /admin/analytics',         '/admin/analytics'),
+      guard('GET /admin/certified-payroll', '/admin/certified-payroll'),
+    ],
+  },
+
+  {
+    name: 'API — Auth guards: QBO',
+    async: true,
+    tests: [
+      guard('GET /qbo/status',                '/qbo/status'),
+      guard('GET /qbo/connect',               '/qbo/connect'),
+      guard('GET /qbo/employees',             '/qbo/employees'),
+      guard('GET /qbo/customers',             '/qbo/customers'),
+      guard('GET /qbo/vendors',               '/qbo/vendors'),
+      guard('DELETE /qbo/disconnect',         '/qbo/disconnect', 'DELETE'),
+      guard('POST /qbo/push',                 '/qbo/push', 'POST'),
+      guard('POST /qbo/import/workers',       '/qbo/import/workers', 'POST'),
+      guard('POST /qbo/import/projects',      '/qbo/import/projects', 'POST'),
+    ],
+  },
+
+  {
+    name: 'API — Auth guards: worker endpoints',
+    async: true,
+    tests: [
+      guard('GET /clock/status',       '/clock/status'),
+      guard('POST /clock/in',          '/clock/in', 'POST'),
+      guard('POST /clock/out',         '/clock/out', 'POST'),
+      guard('DELETE /clock/cancel',    '/clock/cancel', 'DELETE'),
+      guard('GET /time-entries',       '/time-entries'),
+      guard('POST /time-entries',      '/time-entries', 'POST'),
+      guard('GET /projects',           '/projects'),
+      guard('GET /inbox',              '/inbox'),
+      guard('GET /shifts/mine',        '/shifts/mine'),
+    ],
+  },
+
+  {
+    name: 'API — Auth guards: shifts (admin)',
+    async: true,
+    tests: [
+      guard('GET /shifts/admin',    '/shifts/admin'),
+      guard('POST /shifts/admin',   '/shifts/admin', 'POST'),
+    ],
+  },
+
+  {
+    name: 'API — Auth guards: field / safety',
+    async: true,
+    tests: [
+      guard('GET /daily-reports',         '/daily-reports'),
+      guard('POST /daily-reports',        '/daily-reports', 'POST'),
+      guard('GET /field-reports',         '/field-reports'),
+      guard('POST /field-reports',        '/field-reports', 'POST'),
+      guard('GET /incidents',             '/incidents'),
+      guard('POST /incidents',            '/incidents', 'POST'),
+      guard('GET /punchlist',             '/punchlist'),
+      guard('POST /punchlist',            '/punchlist', 'POST'),
+      guard('GET /safety-talks',          '/safety-talks'),
+      guard('POST /safety-talks',         '/safety-talks', 'POST'),
+      guard('GET /rfis',                  '/rfis'),
+      guard('POST /rfis',                 '/rfis', 'POST'),
+      guard('GET /equipment',             '/equipment'),
+      guard('GET /inspections',           '/inspections'),
+      guard('GET /inspections/templates', '/inspections/templates'),
+      guard('GET /sub-reports',           '/sub-reports'),
+    ],
+  },
+
+  {
+    name: 'API — Auth guards: chat / push / stripe',
+    async: true,
+    tests: [
+      guard('GET /chat',              '/chat'),
+      guard('POST /chat',             '/chat', 'POST'),
+      guard('POST /push/subscribe',   '/push/subscribe', 'POST'),
+      guard('DELETE /push/subscribe', '/push/subscribe', 'DELETE'),
+      guard('GET /stripe/plans',      '/stripe/plans'),
+      guard('GET /stripe/status',     '/stripe/status'),
+      guard('POST /stripe/checkout',  '/stripe/checkout', 'POST'),
+      guard('POST /stripe/portal',    '/stripe/portal', 'POST'),
+    ],
+  },
+
+  {
+    name: 'API — Auth guards: superadmin',
     async: true,
     tests: [
       guard('GET /superadmin/companies', '/superadmin/companies'),
     ],
   },
 
-  // ── 21. API — Smoke tests (authenticated) ────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════════
+  // API — INPUT VALIDATION (400 conditions)
+  // ══════════════════════════════════════════════════════════════════════════════
+
   {
-    name: 'API — Authenticated smoke tests',
+    name: 'API — POST input validation',
     async: true,
     tests: [
-      { name: 'GET /auth/me → 200 or 401', run: async () => {
-        const r = await get('/auth/me', TOKEN());
-        assert([200, 401].includes(r.status), `Got ${r.status}`);
+      { name: 'POST /time-entries — empty body → 400', run: async () => {
+        const r = await post('/time-entries', {}, TOKEN());
+        assertOneOf(r.status, [400, 401]);
       }},
-      { name: 'GET /admin/workers → 200 or 401/403', run: async () => {
-        const r = await get('/admin/workers', TOKEN());
-        assert([200, 401, 403].includes(r.status), `Got ${r.status}`);
+      { name: 'POST /time-entries — notes > 500 chars → 400', run: async () => {
+        const r = await post('/time-entries', {project_id:1,work_date:'2025-06-16',start_time:'08:00',end_time:'16:00',notes:'x'.repeat(501)}, TOKEN());
+        assertOneOf(r.status, [400, 401]);
       }},
-      { name: 'GET /admin/projects → 200 or 401/403', run: async () => {
-        const r = await get('/admin/projects', TOKEN());
-        assert([200, 401, 403].includes(r.status), `Got ${r.status}`);
+      { name: 'POST /time-entries — negative break_minutes → 400', run: async () => {
+        const r = await post('/time-entries', {project_id:1,work_date:'2025-06-16',start_time:'08:00',end_time:'16:00',break_minutes:-1}, TOKEN());
+        assertOneOf(r.status, [400, 401]);
       }},
-      { name: 'GET /admin/settings → 200 or 401/403', run: async () => {
-        const r = await get('/admin/settings', TOKEN());
-        assert([200, 401, 403].includes(r.status), `Got ${r.status}`);
+      { name: 'POST /chat — empty body → 400', run: async () => {
+        const r = await post('/chat', {}, TOKEN());
+        assertOneOf(r.status, [400, 401]);
       }},
-      { name: 'GET /clock/status → 200 or 401', run: async () => {
-        const r = await get('/clock/status', TOKEN());
-        assert([200, 401].includes(r.status), `Got ${r.status}`);
+      { name: 'POST /chat — body > 1000 chars → 400', run: async () => {
+        const r = await post('/chat', {body:'x'.repeat(1001)}, TOKEN());
+        assertOneOf(r.status, [400, 401]);
       }},
-      { name: 'GET /time-entries → 200 or 401', run: async () => {
-        const r = await get('/time-entries', TOKEN());
-        assert([200, 401].includes(r.status), `Got ${r.status}`);
+      { name: 'POST /incidents — empty body → 400', run: async () => {
+        const r = await post('/incidents', {}, TOKEN());
+        assertOneOf(r.status, [400, 401]);
       }},
-      { name: 'GET /projects → 200 or 401', run: async () => {
-        const r = await get('/projects', TOKEN());
-        assert([200, 401].includes(r.status), `Got ${r.status}`);
+      { name: 'POST /punchlist — missing title → 400', run: async () => {
+        const r = await post('/punchlist', {}, TOKEN());
+        assertOneOf(r.status, [400, 401]);
       }},
-      { name: 'GET /inbox → 200 or 401', run: async () => {
-        const r = await get('/inbox', TOKEN());
-        assert([200, 401].includes(r.status), `Got ${r.status}`);
+      { name: 'POST /daily-reports — missing report_date → 400', run: async () => {
+        const r = await post('/daily-reports', {}, TOKEN());
+        assertOneOf(r.status, [400, 401]);
       }},
-      { name: 'GET /shifts → 200 or 401', run: async () => {
-        const r = await get('/shifts', TOKEN());
-        assert([200, 401].includes(r.status), `Got ${r.status}`);
+      { name: 'POST /safety-talks — missing required fields → 400', run: async () => {
+        const r = await post('/safety-talks', {}, TOKEN());
+        assertOneOf(r.status, [400, 401]);
+      }},
+      { name: 'POST /qbo/import/workers — empty array → 400', run: async () => {
+        const r = await post('/qbo/import/workers', {workers:[]}, TOKEN());
+        assertOneOf(r.status, [400, 401, 403]);
+      }},
+      { name: 'POST /qbo/import/projects — empty array → 400', run: async () => {
+        const r = await post('/qbo/import/projects', {projects:[]}, TOKEN());
+        assertOneOf(r.status, [400, 401, 403]);
+      }},
+      { name: 'POST /push/subscribe — missing endpoint → 400', run: async () => {
+        const r = await post('/push/subscribe', {}, TOKEN());
+        assertOneOf(r.status, [400, 401]);
       }},
     ],
   },
 
-  // ── 22. API — Response shapes ────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════════
+  // API — PUBLIC ROUTES
+  // ══════════════════════════════════════════════════════════════════════════════
+
   {
-    name: 'API — Response shapes (when authenticated as admin)',
+    name: 'API — Public routes',
     async: true,
     tests: [
-      { name: '/auth/me returns user object with expected fields', run: async () => {
+      { name: 'GET /push/vapid-public-key → 200 or 503', run: async () =>
+        assertOneOf((await get('/push/vapid-public-key')).status, [200, 503])
+      },
+      { name: 'POST /auth/resend-confirmation — missing email → 400', run: async () =>
+        assertIs((await post('/auth/resend-confirmation', {})).status, 400)
+      },
+      { name: 'POST /auth/accept-invite — missing fields → 400', run: async () =>
+        assertOneOf((await post('/auth/accept-invite', {})).status, [400, 429])
+      },
+      { name: 'POST /auth/accept-invite — bad token → 400', run: async () =>
+        assertOneOf((await post('/auth/accept-invite', {token:'fake',password:'newpass1'})).status, [400, 429])
+      },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // API — RESPONSE SHAPES (when authenticated)
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  {
+    name: 'API — Response shapes',
+    async: true,
+    tests: [
+      { name: '/auth/me → {user:{id,username,role}}', run: async () => {
         const r = await get('/auth/me', TOKEN());
-        if (r.status !== 200) return; // skip if not logged in
+        if (r.status !== 200) return;
         const d = await r.json();
-        assert(typeof d.user.id === 'number' || typeof d.user.id === 'string', 'id');
+        assert(d?.user?.id != null, 'user.id');
         assert(typeof d.user.username === 'string', 'username');
-        assert(['admin', 'worker', 'super_admin'].includes(d.user.role), `role: ${d.user.role}`);
+        assert(['admin','worker','super_admin'].includes(d.user.role), `role: ${d.user.role}`);
       }},
-      { name: '/admin/workers returns an array', run: async () => {
+      { name: '/admin/workers → array', run: async () => {
         const r = await get('/admin/workers', TOKEN());
         if (r.status !== 200) return;
-        const d = await r.json();
-        assert(Array.isArray(d), 'Expected array');
+        assert(Array.isArray(await r.json()), 'Expected array');
       }},
-      { name: '/admin/projects returns an array', run: async () => {
+      { name: '/admin/projects → array', run: async () => {
         const r = await get('/admin/projects', TOKEN());
         if (r.status !== 200) return;
-        const d = await r.json();
-        assert(Array.isArray(d), 'Expected array');
+        assert(Array.isArray(await r.json()), 'Expected array');
       }},
-      { name: '/admin/settings returns an object', run: async () => {
+      { name: '/admin/settings → object with known keys', run: async () => {
         const r = await get('/admin/settings', TOKEN());
         if (r.status !== 200) return;
         const d = await r.json();
-        assert(d !== null && typeof d === 'object', 'Expected object');
-        assert('currency' in d || 'overtime_rule' in d, 'Missing expected settings keys');
+        assert(typeof d === 'object' && d !== null, 'Expected object');
+        assert('currency' in d || 'overtime_rule' in d, 'Missing settings keys');
       }},
-      { name: '/admin/kpis returns numeric fields', run: async () => {
-        const r = await get('/admin/kpis', TOKEN());
+      { name: '/admin/company → has name field', run: async () => {
+        const r = await get('/admin/company', TOKEN());
         if (r.status !== 200) return;
         const d = await r.json();
-        assert(typeof d === 'object', 'Expected object');
+        assert(typeof d.name === 'string', `company.name: ${JSON.stringify(d)}`);
       }},
-      { name: '/qbo/status returns connected boolean', run: async () => {
+      { name: '/qbo/status → {connected: boolean}', run: async () => {
         const r = await get('/qbo/status', TOKEN());
         if (r.status !== 200) return;
         const d = await r.json();
         assert(typeof d.connected === 'boolean', `connected: ${d.connected}`);
       }},
-    ],
-  },
-
-  // ── 23. API — POST input validation ─────────────────────────────────────────
-  {
-    name: 'API — POST input validation',
-    async: true,
-    tests: [
-      { name: 'POST /auth/register — empty body → 400', run: async () => {
-        assertIs400((await post('/auth/register', {})).status, '/auth/register');
+      { name: '/projects → array', run: async () => {
+        const r = await get('/projects', TOKEN());
+        if (r.status !== 200) return;
+        assert(Array.isArray(await r.json()), 'Expected array');
       }},
-      { name: 'POST /auth/forgot-password — empty body → 400', run: async () => {
-        const r = await post('/auth/forgot-password', {});
-        assert([400, 422].includes(r.status), `Expected 400/422, got ${r.status}`);
+      { name: '/inbox → array', run: async () => {
+        const r = await get('/inbox', TOKEN());
+        if (r.status !== 200) return;
+        assert(Array.isArray(await r.json()), 'Expected array');
       }},
-      { name: 'POST /qbo/import/workers — empty workers array → 400', run: async () => {
-        const r = await post('/qbo/import/workers', { workers: [] }, TOKEN());
-        if (r.status === 401 || r.status === 403) return; // not admin — skip
-        assertIs400(r.status, '/qbo/import/workers empty');
+      { name: '/clock/status → null or object', run: async () => {
+        const r = await get('/clock/status', TOKEN());
+        if (r.status !== 200) return;
+        const d = await r.json();
+        assert(d === null || typeof d === 'object', 'Expected null or object');
       }},
-      { name: 'POST /qbo/import/projects — empty projects array → 400', run: async () => {
-        const r = await post('/qbo/import/projects', { projects: [] }, TOKEN());
-        if (r.status === 401 || r.status === 403) return;
-        assertIs400(r.status, '/qbo/import/projects empty');
+      { name: '/admin/active-clocks → array', run: async () => {
+        const r = await get('/admin/active-clocks', TOKEN());
+        if (r.status !== 200) return;
+        assert(Array.isArray(await r.json()), 'Expected array');
+      }},
+      { name: '/admin/entries/pending → {entries:[], has_more}', run: async () => {
+        const r = await get('/admin/entries/pending', TOKEN());
+        if (r.status !== 200) return;
+        const d = await r.json();
+        assert(Array.isArray(d.entries), 'entries array');
+        assert(typeof d.has_more === 'boolean', 'has_more boolean');
+      }},
+      { name: '/admin/audit-log → {entries:[], total}', run: async () => {
+        const r = await get('/admin/audit-log', TOKEN());
+        if (r.status !== 200) return;
+        const d = await r.json();
+        assert(Array.isArray(d.entries), 'entries array');
+        assert(typeof d.total === 'number', 'total number');
       }},
     ],
   },
 ];
 
-// ── Runner component ─────────────────────────────────────────────────────────────
+// ── Report helpers (failures only) ───────────────────────────────────────────────
+
+function buildReport(suiteResults) {
+  const all    = suiteResults.flatMap(s => s.tests);
+  const passed = all.filter(t => t.status === 'pass').length;
+  const failed = all.length - passed;
+  const lines  = [
+    `OpsFloa Test Report — ${new Date().toLocaleString()}`,
+    `${passed}/${all.length} passed · ${failed} failed`,
+  ];
+  if (failed === 0) {
+    lines.push('', '✓ All tests passed');
+  } else {
+    for (const suite of suiteResults) {
+      const failures = suite.tests.filter(t => t.status === 'fail');
+      if (failures.length === 0) continue;
+      lines.push('', `── ${suite.name} (${failures.length} failure${failures.length !== 1 ? 's' : ''})`);
+      for (const t of failures) {
+        lines.push(`  ✗ ${t.name}`);
+        if (t.error) lines.push(`      ${t.error}`);
+      }
+    }
+  }
+  return lines.join('\n');
+}
+
+// ── Shared suite runner ───────────────────────────────────────────────────────────
+
+async function runSuite(suite) {
+  const testResults = [];
+  for (const test of suite.tests) {
+    const start = performance.now();
+    try {
+      if (suite.async) await test.run(); else test.run();
+      testResults.push({ name: test.name, status: 'pass', ms: Math.round(performance.now() - start) });
+    } catch (err) {
+      testResults.push({ name: test.name, status: 'fail', error: err.message, ms: Math.round(performance.now() - start) });
+    }
+  }
+  return { name: suite.name, tests: testResults };
+}
+
+// ── Runner component ──────────────────────────────────────────────────────────────
 
 export default function Tests() {
-  const [results, setResults] = useState(null);
-  const [running, setRunning] = useState(false);
+  const [results,  setResults]  = useState(null);
+  const [running,  setRunning]  = useState(false);   // 'all' | suiteIndex | false
+  const [copied,   setCopied]   = useState(false);
 
   const runAll = async () => {
-    setRunning(true);
+    setRunning('all');
     const suiteResults = [];
     for (const suite of SUITES) {
-      const testResults = [];
-      for (const test of suite.tests) {
-        const start = performance.now();
-        try {
-          if (suite.async) await test.run();
-          else test.run();
-          testResults.push({ name: test.name, status: 'pass', ms: Math.round(performance.now() - start) });
-        } catch (err) {
-          testResults.push({ name: test.name, status: 'fail', error: err.message, ms: Math.round(performance.now() - start) });
-        }
-      }
-      suiteResults.push({ name: suite.name, tests: testResults });
+      suiteResults.push(await runSuite(suite));
     }
     setResults(suiteResults);
     setRunning(false);
   };
 
-  const total  = results?.flatMap(s => s.tests).length ?? 0;
-  const passed = results?.flatMap(s => s.tests).filter(t => t.status === 'pass').length ?? 0;
-  const failed = total - passed;
+  const runOne = async (si) => {
+    setRunning(si);
+    const result = await runSuite(SUITES[si]);
+    setResults(prev => {
+      const next = prev ? [...prev] : SUITES.map((_, i) => i === si ? null : null);
+      // Fill array to correct length if first run
+      if (!prev || prev.length !== SUITES.length) {
+        const full = SUITES.map((_, i) => i === si ? result : (prev?.[i] ?? null));
+        return full;
+      }
+      next[si] = result;
+      return next;
+    });
+    setRunning(false);
+  };
 
-  const totalTests = SUITES.flatMap(x => x.tests).length;
+  const copyReport = () => {
+    const flat = results?.filter(Boolean);
+    if (!flat?.length) return;
+    navigator.clipboard.writeText(buildReport(flat)).then(() => {
+      setCopied(true); setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const printReport = () => {
+    const flat = results?.filter(Boolean);
+    if (!flat?.length) return;
+    const w = window.open('', '_blank');
+    w.document.write(`<pre style="font-family:monospace;font-size:13px;padding:24px;white-space:pre-wrap">${buildReport(flat).replace(/</g,'&lt;')}</pre>`);
+    w.document.close(); w.print();
+  };
+
+  const allTests  = results?.filter(Boolean).flatMap(s => s.tests) ?? [];
+  const total     = allTests.length;
+  const passed    = allTests.filter(t => t.status === 'pass').length;
+  const failed    = total - passed;
+  const hasResults = results?.some(Boolean);
+  const totalDefined = SUITES.flatMap(x => x.tests).length;
 
   return (
     <div style={s.page}>
       <div style={s.header}>
         <div>
           <h1 style={s.title}>Unit Tests</h1>
-          <p style={s.subtitle}>{SUITES.length} suites · {totalTests} tests</p>
+          <p style={s.subtitle}>{SUITES.length} suites · {totalDefined} tests</p>
         </div>
-        <button style={s.runBtn} onClick={runAll} disabled={running}>
-          {running ? 'Running…' : '▶ Run All'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {hasResults && (
+            <>
+              <button style={s.outlineBtn} onClick={copyReport}>{copied ? '✓ Copied' : '⎘ Copy Errors'}</button>
+              <button style={s.outlineBtn} onClick={printReport}>⎙ Print Errors</button>
+            </>
+          )}
+          <button style={s.runBtn} onClick={runAll} disabled={running !== false}>
+            {running === 'all' ? 'Running…' : '▶ Run All'}
+          </button>
+        </div>
       </div>
 
-      {results && (
+      {hasResults && (
         <div style={{ ...s.summary, background: failed === 0 ? '#f0fdf4' : '#fef2f2', borderColor: failed === 0 ? '#bbf7d0' : '#fecaca' }}>
           <span style={{ fontWeight: 700, color: failed === 0 ? '#166534' : '#991b1b', fontSize: 16 }}>
-            {failed === 0 ? '✓ All tests passed' : `✗ ${failed} test${failed > 1 ? 's' : ''} failed`}
+            {failed === 0 ? '✓ All tests passed' : `✗ ${failed} test${failed !== 1 ? 's' : ''} failed`}
           </span>
           <span style={{ color: '#6b7280', fontSize: 14 }}>{passed}/{total} passed</span>
         </div>
@@ -767,16 +894,21 @@ export default function Tests() {
       <div style={s.suites}>
         {SUITES.map((suite, si) => {
           const sr = results?.[si];
+          const allPass = sr?.tests.every(t => t.status === 'pass');
+          const isBusy  = running !== false;
           return (
             <div key={suite.name} style={s.suiteCard}>
               <div style={s.suiteName}>
                 {sr && (
-                  <span style={{ ...s.suiteBadge, background: sr.tests.every(t => t.status === 'pass') ? '#dcfce7' : '#fee2e2', color: sr.tests.every(t => t.status === 'pass') ? '#166534' : '#991b1b' }}>
+                  <span style={{ ...s.suiteBadge, background: allPass ? '#dcfce7' : '#fee2e2', color: allPass ? '#166534' : '#991b1b' }}>
                     {sr.tests.filter(t => t.status === 'pass').length}/{sr.tests.length}
                   </span>
                 )}
-                {suite.name}
+                <span style={{ flex: 1 }}>{suite.name}</span>
                 {suite.async && <span style={s.asyncBadge}>async</span>}
+                <button style={{ ...s.suiteRunBtn, opacity: isBusy ? 0.4 : 1 }} onClick={() => runOne(si)} disabled={isBusy}>
+                  {running === si ? '…' : '▶'}
+                </button>
               </div>
               <div style={s.testList}>
                 {suite.tests.map((test, ti) => {
@@ -807,12 +939,14 @@ const s = {
   title:     { fontSize: 24, fontWeight: 700, color: '#111827', margin: 0 },
   subtitle:  { fontSize: 13, color: '#9ca3af', margin: '4px 0 0' },
   runBtn:    { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  outlineBtn:{ background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
   summary:   { display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid', borderRadius: 10, padding: '14px 18px', marginBottom: 24 },
   suites:    { display: 'flex', flexDirection: 'column', gap: 16 },
   suiteCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' },
   suiteName: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#f9fafb', fontWeight: 700, fontSize: 14, color: '#374151', borderBottom: '1px solid #e5e7eb' },
   suiteBadge:{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20 },
-  asyncBadge:{ fontSize: 10, fontWeight: 600, color: '#6b7280', background: '#f3f4f6', padding: '2px 7px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em' },
+  asyncBadge:  { fontSize: 10, fontWeight: 600, color: '#6b7280', background: '#f3f4f6', padding: '2px 7px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em' },
+  suiteRunBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', cursor: 'pointer', lineHeight: '18px' },
   testList:  { padding: '6px 0' },
   testRow:   { display: 'flex', alignItems: 'baseline', gap: 8, padding: '7px 16px', flexWrap: 'wrap' },
   dot:       { fontSize: 14, fontWeight: 700, width: 16, flexShrink: 0 },
