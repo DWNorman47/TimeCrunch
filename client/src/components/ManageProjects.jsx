@@ -247,26 +247,34 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                     {/* Name + wage type */}
                     <div style={s.section}>
                       <div style={s.sectionTitle}>Details</div>
-                      <div style={s.editRow}>
-                        {nameEditable
-                          ? <input
-                              style={{ ...s.editInput, flex: 2 }}
+                      <div style={s.fieldsGrid}>
+                        {nameEditable && (
+                          <div style={s.fieldGroup}>
+                            <label style={s.fieldLabel}>Name</label>
+                            <input
+                              style={s.editInput}
                               value={editName}
                               onChange={e => setEditName(e.target.value)}
                               onKeyDown={e => { if (e.key === 'Escape') setExpandedId(null); }}
                               autoFocus
                               placeholder="Project name"
                             />
-                          : <span style={{ flex: 2, fontWeight: 600, fontSize: 13 }}>{editName}</span>
-                        }
+                          </div>
+                        )}
                         {showWageType && (
-                          <select style={s.editInput} value={editWageType} onChange={e => { setEditWageType(e.target.value); setEditPrevailingRate(''); }}>
-                            <option value="regular">{t.regularWages}</option>
-                            <option value="prevailing">{t.prevailingWages}</option>
-                          </select>
+                          <div style={s.fieldGroup}>
+                            <label style={s.fieldLabel}>Wage type</label>
+                            <select style={s.editInput} value={editWageType} onChange={e => { setEditWageType(e.target.value); setEditPrevailingRate(''); }}>
+                              <option value="regular">{t.regularWages}</option>
+                              <option value="prevailing">{t.prevailingWages}</option>
+                            </select>
+                          </div>
                         )}
                         {editWageType === 'prevailing' && (
-                          <input style={{ ...s.editInput, width: 100 }} type="number" min="0" step="0.01" placeholder={`Rate (${defaultPrevailingRate || '45.00'})`} value={editPrevailingRate} onChange={e => setEditPrevailingRate(e.target.value)} />
+                          <div style={s.fieldGroup}>
+                            <label style={s.fieldLabel}>Rate ($/hr)</label>
+                            <input style={s.editInput} type="number" min="0" step="0.01" placeholder={defaultPrevailingRate || '45.00'} value={editPrevailingRate} onChange={e => setEditPrevailingRate(e.target.value)} />
+                          </div>
                         )}
                       </div>
                     </div>
@@ -374,8 +382,10 @@ const s = {
   panel: { padding: '4px 16px 16px', borderTop: '1px solid #f3f4f6', background: '#f9fafb', display: 'flex', flexDirection: 'column', gap: 0 },
   section: { borderBottom: '1px solid #eeeeee', paddingBottom: 12, paddingTop: 12 },
   sectionTitle: { fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
-  editRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  editInput: { padding: '6px 9px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, width: '100%' },
+  fieldsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 },
+  fieldGroup: { display: 'flex', flexDirection: 'column', gap: 3 },
+  fieldLabel: { fontSize: 11, fontWeight: 600, color: '#6b7280' },
+  editInput: { padding: '6px 9px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, width: '100%', boxSizing: 'border-box' },
   wageBadge: { color: '#fff', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' },
   rateTag: { fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' },
   indicatorBadge: { fontSize: 13, lineHeight: 1, cursor: 'default' },
