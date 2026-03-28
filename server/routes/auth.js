@@ -489,7 +489,7 @@ router.post('/accept-invite', authLimiter, async (req, res) => {
     const user = result.rows[0];
     const hash = await bcrypt.hash(password, 10);
     await pool.query(
-      'UPDATE users SET password_hash = $1, invite_token = NULL, invite_token_expires = NULL, invite_pending = false, email_confirmed = true WHERE id = $2',
+      'UPDATE users SET password_hash = $1, invite_token = NULL, invite_token_expires = NULL, invite_pending = false, email_confirmed = true, must_change_password = false WHERE id = $2',
       [hash, user.id]
     );
     res.json({ success: true, username: user.username, company_name: user.company_name });

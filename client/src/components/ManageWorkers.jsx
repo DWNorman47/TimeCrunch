@@ -88,6 +88,10 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const [editWorkerAccessForm, setEditWorkerAccessForm] = useState({ all_workers: true, ids: new Set() });
   const [editWorkerAccessSaving, setEditWorkerAccessSaving] = useState(false);
 
+  // Invite
+  const [inviteSending, setInviteSending] = useState(new Set());
+  const [inviteSent, setInviteSent] = useState(new Set());
+
   // History
   const [archived, setArchived] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -261,6 +265,23 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       cancelEdit();
     } catch (err) { toast(err.response?.data?.error || 'Failed to update worker access', 'error'); }
     finally { setEditWorkerAccessSaving(false); }
+  };
+
+  // ── Invite helper ────────────────────────────────────────────────────────────
+  const sendInvite = async (id) => {
+    setInviteSending(s => new Set(s).add(id));
+    try {
+      const r = await api.post(`/admin/workers/${id}/send-invite`);
+      if (r.data.email_sent) {
+        setInviteSent(s => new Set(s).add(id));
+      } else {
+        toast('Worker created, but the invite email failed to send.', 'error');
+      }
+    } catch (err) {
+      toast(err.response?.data?.error || 'Failed to send invite', 'error');
+    } finally {
+      setInviteSending(s => { const n = new Set(s); n.delete(id); return n; });
+    }
   };
 
   // ── Archive helpers ──────────────────────────────────────────────────────────
@@ -511,18 +532,32 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                             </div>
                           </div>
                         ) : (
-                          <div style={s.infoGrid}>
-                            <span style={s.infoLabel}>Name</span>
-                            <span style={s.infoValue}>{w.full_name}</span>
-                            <span style={s.infoLabel}>Email</span>
-                            <span style={s.infoValue}>{w.email || <em style={{ color: '#9ca3af' }}>{t.notSet}</em>}</span>
-                            <span style={s.infoLabel}>Language</span>
-                            <span style={s.infoValue}>{w.language || 'English'}</span>
-                            <span style={s.infoLabel}>Role</span>
-                            <span style={s.infoValue}><RoleBadge role={w.role} /></span>
-                            <span style={s.infoLabel}>Worker Type</span>
-                            <span style={s.infoValue}>{WORKER_TYPE_LABELS[w.worker_type || 'employee']}</span>
-                          </div>
+                          <>
+                            <div style={s.infoGrid}>
+                              <span style={s.infoLabel}>Name</span>
+                              <span style={s.infoValue}>{w.full_name}</span>
+                              <span style={s.infoLabel}>Email</span>
+                              <span style={s.infoValue}>{w.email || <em style={{ color: '#9ca3af' }}>{t.notSet}</em>}</span>
+                              <span style={s.infoLabel}>Language</span>
+                              <span style={s.infoValue}>{w.language || 'English'}</span>
+                              <span style={s.infoLabel}>Role</span>
+                              <span style={s.infoValue}><RoleBadge role={w.role} /></span>
+                              <span style={s.infoLabel}>Worker Type</span>
+                              <span style={s.infoValue}>{WORKER_TYPE_LABELS[w.worker_type || 'employee']}</span>
+                            </div>
+                            {w.must_change_password && w.email && (
+                              <div style={s.inviteBanner}>
+                                <span style={s.inviteBannerText}>Has not signed in yet.</span>
+                                {inviteSent.has(w.id) ? (
+                                  <span style={s.inviteSentLabel}>Invite sent ✓</span>
+                                ) : (
+                                  <button style={s.inviteBtn} onClick={() => sendInvite(w.id)} disabled={inviteSending.has(w.id)}>
+                                    {inviteSending.has(w.id) ? 'Sending...' : 'Send invite email'}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     )}
@@ -806,6 +841,10 @@ const s = {
   editBlock: { display: 'flex', flexDirection: 'column', gap: 10 },
   editActions: { display: 'flex', gap: 8 },
   removeBtn: { padding: '6px 14px', background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
+  inviteBanner: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, padding: '8px 10px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 7 },
+  inviteBannerText: { fontSize: 12, color: '#92400e', flex: 1 },
+  inviteBtn: { padding: '4px 12px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
+  inviteSentLabel: { fontSize: 12, color: '#059669', fontWeight: 600, flexShrink: 0 },
   historyFooter: { marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 12 },
   historyToggle: { background: 'none', border: 'none', color: '#6b7280', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '2px 0' },
   historyList: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 },
