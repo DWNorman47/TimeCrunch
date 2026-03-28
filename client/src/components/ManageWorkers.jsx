@@ -90,7 +90,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
   // Invite
   const [inviteSending, setInviteSending] = useState(new Set());
-  const [inviteSent, setInviteSent] = useState(new Set());
+  const [invitedIds, setInvitedIds] = useState(new Set());
 
   // History
   const [archived, setArchived] = useState([]);
@@ -273,7 +273,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     try {
       const r = await api.post(`/admin/workers/${id}/send-invite`);
       if (r.data.email_sent) {
-        setInviteSent(s => new Set(s).add(id));
+        setInvitedIds(s => new Set(s).add(id));
       } else {
         toast('Worker created, but the invite email failed to send.', 'error');
       }
@@ -548,7 +548,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                             {w.must_change_password && w.email && (
                               <div style={s.inviteBanner}>
                                 <span style={s.inviteBannerText}>Has not signed in yet.</span>
-                                {inviteSent.has(w.id) ? (
+                                {invitedIds.has(w.id) ? (
                                   <span style={s.inviteSentLabel}>Invite sent ✓</span>
                                 ) : (
                                   <button style={s.inviteBtn} onClick={() => sendInvite(w.id)} disabled={inviteSending.has(w.id)}>
