@@ -759,71 +759,102 @@ const SUITES = [
   },
 ];
 
-// ── Report helpers ────────────────────────────────────────────────────────────────
+// ── Report helpers (failures only) ───────────────────────────────────────────────
 
 function buildReport(suiteResults) {
   const all    = suiteResults.flatMap(s => s.tests);
   const passed = all.filter(t => t.status === 'pass').length;
+  const failed = all.length - passed;
   const lines  = [
     `OpsFloa Test Report — ${new Date().toLocaleString()}`,
-    `${passed}/${all.length} passed · ${all.length - passed} failed`,
-    '',
+    `${passed}/${all.length} passed · ${failed} failed`,
   ];
-  for (const suite of suiteResults) {
-    const sp = suite.tests.filter(t => t.status === 'pass').length;
-    lines.push(`── ${suite.name} (${sp}/${suite.tests.length})`);
-    for (const t of suite.tests) {
-      lines.push(`  ${t.status === 'pass' ? '✓' : '✗'} ${t.name}${t.error ? `\n      ERROR: ${t.error}` : ''}`);
+  if (failed === 0) {
+    lines.push('', '✓ All tests passed');
+  } else {
+    for (const suite of suiteResults) {
+      const failures = suite.tests.filter(t => t.status === 'fail');
+      if (failures.length === 0) continue;
+      lines.push('', `── ${suite.name} (${failures.length} failure${failures.length !== 1 ? 's' : ''})`);
+      for (const t of failures) {
+        lines.push(`  ✗ ${t.name}`);
+        if (t.error) lines.push(`      ${t.error}`);
+      }
     }
-    lines.push('');
   }
   return lines.join('\n');
+}
+
+// ── Shared suite runner ───────────────────────────────────────────────────────────
+
+async function runSuite(suite) {
+  const testResults = [];
+  for (const test of suite.tests) {
+    const start = performance.now();
+    try {
+      if (suite.async) await test.run(); else test.run();
+      testResults.push({ name: test.name, status: 'pass', ms: Math.round(performance.now() - start) });
+    } catch (err) {
+      testResults.push({ name: test.name, status: 'fail', error: err.message, ms: Math.round(performance.now() - start) });
+    }
+  }
+  return { name: suite.name, tests: testResults };
 }
 
 // ── Runner component ──────────────────────────────────────────────────────────────
 
 export default function Tests() {
-  const [results, setResults] = useState(null);
-  const [running, setRunning] = useState(false);
-  const [copied,  setCopied]  = useState(false);
+  const [results,  setResults]  = useState(null);
+  const [running,  setRunning]  = useState(false);   // 'all' | suiteIndex | false
+  const [copied,   setCopied]   = useState(false);
 
   const runAll = async () => {
-    setRunning(true);
+    setRunning('all');
     const suiteResults = [];
     for (const suite of SUITES) {
-      const testResults = [];
-      for (const test of suite.tests) {
-        const start = performance.now();
-        try {
-          if (suite.async) await test.run(); else test.run();
-          testResults.push({ name: test.name, status: 'pass', ms: Math.round(performance.now() - start) });
-        } catch (err) {
-          testResults.push({ name: test.name, status: 'fail', error: err.message, ms: Math.round(performance.now() - start) });
-        }
-      }
-      suiteResults.push({ name: suite.name, tests: testResults });
+      suiteResults.push(await runSuite(suite));
     }
     setResults(suiteResults);
     setRunning(false);
   };
 
+  const runOne = async (si) => {
+    setRunning(si);
+    const result = await runSuite(SUITES[si]);
+    setResults(prev => {
+      const next = prev ? [...prev] : SUITES.map((_, i) => i === si ? null : null);
+      // Fill array to correct length if first run
+      if (!prev || prev.length !== SUITES.length) {
+        const full = SUITES.map((_, i) => i === si ? result : (prev?.[i] ?? null));
+        return full;
+      }
+      next[si] = result;
+      return next;
+    });
+    setRunning(false);
+  };
+
   const copyReport = () => {
-    if (!results) return;
-    navigator.clipboard.writeText(buildReport(results)).then(() => {
+    const flat = results?.filter(Boolean);
+    if (!flat?.length) return;
+    navigator.clipboard.writeText(buildReport(flat)).then(() => {
       setCopied(true); setTimeout(() => setCopied(false), 2000);
     });
   };
 
   const printReport = () => {
-    if (!results) return;
+    const flat = results?.filter(Boolean);
+    if (!flat?.length) return;
     const w = window.open('', '_blank');
-    w.document.write(`<pre style="font-family:monospace;font-size:13px;padding:24px;white-space:pre-wrap">${buildReport(results).replace(/</g,'&lt;')}</pre>`);
+    w.document.write(`<pre style="font-family:monospace;font-size:13px;padding:24px;white-space:pre-wrap">${buildReport(flat).replace(/</g,'&lt;')}</pre>`);
     w.document.close(); w.print();
   };
 
-  const total   = results?.flatMap(s => s.tests).length ?? 0;
-  const passed  = results?.flatMap(s => s.tests).filter(t => t.status === 'pass').length ?? 0;
-  const failed  = total - passed;
+  const allTests  = results?.filter(Boolean).flatMap(s => s.tests) ?? [];
+  const total     = allTests.length;
+  const passed    = allTests.filter(t => t.status === 'pass').length;
+  const failed    = total - passed;
+  const hasResults = results?.some(Boolean);
   const totalDefined = SUITES.flatMap(x => x.tests).length;
 
   return (
@@ -834,19 +865,19 @@ export default function Tests() {
           <p style={s.subtitle}>{SUITES.length} suites · {totalDefined} tests</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {results && (
+          {hasResults && (
             <>
-              <button style={s.outlineBtn} onClick={copyReport}>{copied ? '✓ Copied' : '⎘ Copy'}</button>
-              <button style={s.outlineBtn} onClick={printReport}>⎙ Print</button>
+              <button style={s.outlineBtn} onClick={copyReport}>{copied ? '✓ Copied' : '⎘ Copy Errors'}</button>
+              <button style={s.outlineBtn} onClick={printReport}>⎙ Print Errors</button>
             </>
           )}
-          <button style={s.runBtn} onClick={runAll} disabled={running}>
-            {running ? 'Running…' : '▶ Run All'}
+          <button style={s.runBtn} onClick={runAll} disabled={running !== false}>
+            {running === 'all' ? 'Running…' : '▶ Run All'}
           </button>
         </div>
       </div>
 
-      {results && (
+      {hasResults && (
         <div style={{ ...s.summary, background: failed === 0 ? '#f0fdf4' : '#fef2f2', borderColor: failed === 0 ? '#bbf7d0' : '#fecaca' }}>
           <span style={{ fontWeight: 700, color: failed === 0 ? '#166534' : '#991b1b', fontSize: 16 }}>
             {failed === 0 ? '✓ All tests passed' : `✗ ${failed} test${failed !== 1 ? 's' : ''} failed`}
@@ -859,6 +890,7 @@ export default function Tests() {
         {SUITES.map((suite, si) => {
           const sr = results?.[si];
           const allPass = sr?.tests.every(t => t.status === 'pass');
+          const isBusy  = running !== false;
           return (
             <div key={suite.name} style={s.suiteCard}>
               <div style={s.suiteName}>
@@ -867,8 +899,11 @@ export default function Tests() {
                     {sr.tests.filter(t => t.status === 'pass').length}/{sr.tests.length}
                   </span>
                 )}
-                {suite.name}
+                <span style={{ flex: 1 }}>{suite.name}</span>
                 {suite.async && <span style={s.asyncBadge}>async</span>}
+                <button style={{ ...s.suiteRunBtn, opacity: isBusy ? 0.4 : 1 }} onClick={() => runOne(si)} disabled={isBusy}>
+                  {running === si ? '…' : '▶'}
+                </button>
               </div>
               <div style={s.testList}>
                 {suite.tests.map((test, ti) => {
@@ -905,7 +940,8 @@ const s = {
   suiteCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' },
   suiteName: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#f9fafb', fontWeight: 700, fontSize: 14, color: '#374151', borderBottom: '1px solid #e5e7eb' },
   suiteBadge:{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20 },
-  asyncBadge:{ fontSize: 10, fontWeight: 600, color: '#6b7280', background: '#f3f4f6', padding: '2px 7px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em' },
+  asyncBadge:  { fontSize: 10, fontWeight: 600, color: '#6b7280', background: '#f3f4f6', padding: '2px 7px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em' },
+  suiteRunBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', cursor: 'pointer', lineHeight: '18px' },
   testList:  { padding: '6px 0' },
   testRow:   { display: 'flex', alignItems: 'baseline', gap: 8, padding: '7px 16px', flexWrap: 'wrap' },
   dot:       { fontSize: 14, fontWeight: 700, width: 16, flexShrink: 0 },
