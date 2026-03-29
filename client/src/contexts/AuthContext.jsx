@@ -12,7 +12,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem('tc_token');
     if (token) {
-      api.get('/auth/me')
+      api.get('/auth/me', { timeout: 10000 })
         .then(r => setUser(r.data.user))
         .catch(() => localStorage.removeItem('tc_token'))
         .finally(() => setLoading(false));
