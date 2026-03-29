@@ -2,7 +2,7 @@ const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToCompanyAdmins } = require('../push');
-const { uploadBase64 } = require('../r2');
+const { uploadBase64, getPresignedUploadUrl } = require('../r2');
 
 // GET /field-reports — worker gets own; admin gets full company feed
 router.get('/', requireAuth, async (req, res) => {
@@ -56,13 +56,17 @@ router.post('/', requireAuth, async (req, res) => {
     if (photos.length > 0) {
       // Upload base64 data URLs to R2; pass through any already-hosted URLs
       const uploaded = await Promise.all(
-        photos.map(p => uploadBase64(p.url).then(url => ({ url, caption: p.caption || null })))
+        photos.map(p => uploadBase64(p.url).then(url => ({
+          url,
+          caption: p.caption || null,
+          media_type: p.media_type || 'photo',
+        })))
       );
-      const photoValues = uploaded.map((p, i) => `($1, $${i * 2 + 2}, $${i * 2 + 3})`).join(', ');
+      const photoValues = uploaded.map((p, i) => `($1, $${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`).join(', ');
       const photoParams = [report.id];
-      uploaded.forEach(p => { photoParams.push(p.url); photoParams.push(p.caption); });
+      uploaded.forEach(p => { photoParams.push(p.url); photoParams.push(p.caption); photoParams.push(p.media_type); });
       await pool.query(
-        `INSERT INTO field_report_photos (report_id, url, caption) VALUES ${photoValues}`,
+        `INSERT INTO field_report_photos (report_id, url, caption, media_type) VALUES ${photoValues}`,
         photoParams
       );
     }
@@ -163,7 +167,7 @@ router.get('/photos', requireAuth, async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT ph.id, ph.url, ph.caption,
+      `SELECT ph.id, ph.url, ph.caption, ph.media_type,
               r.id as report_id, r.reported_at, r.title as report_title,
               r.project_id, r.lat, r.lng,
               p.name as project_name, u.full_name as worker_name
@@ -177,6 +181,16 @@ router.get('/photos', requireAuth, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /field-reports/upload-url — presigned URL for direct browser→R2 video upload
+router.get('/upload-url', requireAuth, async (req, res) => {
+  const { contentType = 'video/mp4' } = req.query;
+  const ext = contentType.split('/')[1]?.split(';')[0] || 'mp4';
+  try {
+    const { uploadUrl, publicUrl } = await getPresignedUploadUrl('videos', ext, contentType);
+    res.json({ uploadUrl, publicUrl });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to generate upload URL' }); }
 });
 
 module.exports = router;

@@ -64,10 +64,16 @@ function getLocation() {
 
 function Lightbox({ photos, startIndex, onClose }) {
   const [idx, setIdx] = useState(startIndex);
+  const item = photos[idx];
+  const isVid = item.media_type === 'video' || /\.(mp4|mov|webm|avi|m4v)$/i.test(item.url || '');
   return (
     <div style={s.lbBackdrop} onClick={onClose}>
-      <img src={photos[idx].url} style={s.lbImg} alt="" onClick={e => e.stopPropagation()} />
-      {photos[idx].caption && <div style={s.lbCaption}>{photos[idx].caption}</div>}
+      {isVid ? (
+        <video key={item.url} src={item.url} style={s.lbImg} controls autoPlay playsInline onClick={e => e.stopPropagation()} />
+      ) : (
+        <img src={item.url} style={s.lbImg} alt="" onClick={e => e.stopPropagation()} />
+      )}
+      {item.caption && <div style={s.lbCaption}>{item.caption}</div>}
       <div style={s.lbNav} onClick={e => e.stopPropagation()}>
         <button style={s.lbBtn} onClick={() => setIdx(i => i - 1)} disabled={idx === 0}>‹</button>
         <span style={s.lbCount}>{idx + 1} / {photos.length}</span>
@@ -89,8 +95,12 @@ export default function FieldDayLog({ projects, isAdmin }) {
 
   const [photoOpen, setPhotoOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
   const [capturePhotos, setCapturePhotos] = useState([]);
   const [captureNote, setCaptureNote] = useState('');
+  const [captureVideo, setCaptureVideo] = useState(null); // { file, previewUrl }
+  const [videoCaption, setVideoCaption] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -123,18 +133,21 @@ export default function FieldDayLog({ projects, isAdmin }) {
   useEffect(() => { if (project !== '' || projects.length === 0) load(); }, [project, date]);
   useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(); }); }, [onSync]);
 
+  const closeAll = () => { setPhotoOpen(false); setNoteOpen(false); setVideoOpen(false); };
+
   const selectProject = id => {
     setProject(id);
     localStorage.setItem('field-last-project', id);
     markProjectUsed(id);
-    setPhotoOpen(false); setNoteOpen(false);
+    closeAll();
   };
 
-  const prevDay = () => { setDate(d => shiftDate(d, -1)); setPhotoOpen(false); setNoteOpen(false); };
-  const nextDay = () => { if (!isToday) { setDate(d => shiftDate(d, 1)); setPhotoOpen(false); setNoteOpen(false); } };
+  const prevDay = () => { setDate(d => shiftDate(d, -1)); closeAll(); };
+  const nextDay = () => { if (!isToday) { setDate(d => shiftDate(d, 1)); closeAll(); } };
 
-  const openPhoto = () => { setPhotoOpen(o => !o); setNoteOpen(false); setError(''); };
-  const openNote  = () => { setNoteOpen(o => !o); setPhotoOpen(false); setError(''); };
+  const openPhoto = () => { setPhotoOpen(o => !o); setNoteOpen(false); setVideoOpen(false); setError(''); };
+  const openNote  = () => { setNoteOpen(o => !o); setPhotoOpen(false); setVideoOpen(false); setError(''); };
+  const openVideo = () => { setVideoOpen(o => !o); setPhotoOpen(false); setNoteOpen(false); setError(''); };
 
   const submitPhotos = async () => {
     if (capturePhotos.length === 0) { setError('Add at least one photo.'); return; }
@@ -178,6 +191,40 @@ export default function FieldDayLog({ projects, isAdmin }) {
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to submit');
     } finally { setSaving(false); }
+  };
+
+  const submitVideo = async () => {
+    if (!captureVideo) { setError('Select a video first.'); return; }
+    setSaving(true); setError(''); setUploadProgress(0);
+    try {
+      const contentType = captureVideo.file.type || 'video/mp4';
+      const { data: { uploadUrl, publicUrl } } = await api.get('/field-reports/upload-url', { params: { contentType } });
+
+      // Upload directly to R2 with progress
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.onprogress = e => { if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100)); };
+        xhr.onload = () => xhr.status < 300 ? resolve() : reject(new Error('Upload failed'));
+        xhr.onerror = reject;
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', contentType);
+        xhr.send(captureVideo.file);
+      });
+
+      const { lat, lng } = await getLocation();
+      const r = await api.post('/field-reports', {
+        project_id: project || undefined,
+        photos: [{ url: publicUrl, caption: videoCaption, media_type: 'video' }],
+        lat, lng,
+        report_date: date,
+      });
+      setDayReports(prev => [r.data, ...prev]);
+      setCaptureVideo(null);
+      setVideoCaption('');
+      setVideoOpen(false);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Upload failed');
+    } finally { setSaving(false); setUploadProgress(0); }
   };
 
   const handleReview = async (id) => {
@@ -233,17 +280,14 @@ export default function FieldDayLog({ projects, isAdmin }) {
       {/* Action row — today only */}
       {isToday && (
         <div style={s.actionRow}>
-          <button
-            style={photoOpen ? { ...s.actionBtn, ...s.actionBtnOn } : s.actionBtn}
-            onClick={openPhoto}
-          >
-            📷 Add Photos
+          <button style={photoOpen ? { ...s.actionBtn, ...s.actionBtnOn } : s.actionBtn} onClick={openPhoto}>
+            📷 Photos
           </button>
-          <button
-            style={noteOpen ? { ...s.actionBtn, ...s.actionBtnOn } : s.actionBtn}
-            onClick={openNote}
-          >
-            📝 Add Note
+          <button style={videoOpen ? { ...s.actionBtn, ...s.actionBtnOn } : s.actionBtn} onClick={openVideo}>
+            🎥 Video
+          </button>
+          <button style={noteOpen ? { ...s.actionBtn, ...s.actionBtnOn } : s.actionBtn} onClick={openNote}>
+            📝 Note
           </button>
         </div>
       )}
@@ -285,6 +329,52 @@ export default function FieldDayLog({ projects, isAdmin }) {
         </div>
       )}
 
+      {/* Video capture panel */}
+      {videoOpen && (
+        <div style={s.capturePanel}>
+          {captureVideo ? (
+            <div style={s.videoPreviewWrap}>
+              <video src={captureVideo.previewUrl} style={s.videoPreview} controls playsInline />
+              <button style={s.removeBtnSm} onClick={() => { URL.revokeObjectURL(captureVideo.previewUrl); setCaptureVideo(null); }}>✕ Remove</button>
+            </div>
+          ) : (
+            <label style={s.videoPickerLabel}>
+              <input
+                type="file"
+                accept="video/*"
+                style={{ display: 'none' }}
+                onChange={e => {
+                  const file = e.target.files[0];
+                  if (file) setCaptureVideo({ file, previewUrl: URL.createObjectURL(file) });
+                  e.target.value = '';
+                }}
+              />
+              <span style={s.videoPickerIcon}>🎥</span>
+              <span style={s.videoPickerText}>Tap to select or record a video</span>
+            </label>
+          )}
+          <input
+            style={{ ...s.noteTextarea, marginTop: 10, height: 'auto', resize: 'none', rows: 1 }}
+            placeholder="Caption (optional)"
+            value={videoCaption}
+            onChange={e => setVideoCaption(e.target.value)}
+          />
+          {uploadProgress > 0 && uploadProgress < 100 && (
+            <div style={s.progressBar}>
+              <div style={{ ...s.progressFill, width: `${uploadProgress}%` }} />
+              <span style={s.progressLabel}>{uploadProgress}%</span>
+            </div>
+          )}
+          {error && <p style={s.error}>{error}</p>}
+          <div style={s.captureActions}>
+            <button style={s.submitBtn} onClick={submitVideo} disabled={saving || !captureVideo}>
+              {saving ? (uploadProgress > 0 ? `Uploading ${uploadProgress}%…` : 'Saving…') : 'Submit Video'}
+            </button>
+            <button style={s.cancelBtn} onClick={() => { if (captureVideo) URL.revokeObjectURL(captureVideo.previewUrl); setCaptureVideo(null); setVideoCaption(''); setVideoOpen(false); setError(''); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
       {/* Day content */}
       {loading ? (
         <p style={s.hint}>Loading…</p>
@@ -307,14 +397,24 @@ export default function FieldDayLog({ projects, isAdmin }) {
                 <span style={s.sectionCount}>{allPhotos.length}</span>
               </div>
               <div style={s.photoGrid}>
-                {allPhotos.map((p, i) => (
-                  <div key={i} style={s.photoCell} onClick={() => setLightbox({ photos: allPhotos, index: i })}>
-                    <img src={p.url} style={s.photoThumb} alt={p.caption || `photo ${i + 1}`} />
-                    {p.caption && <div style={s.photoCaption}>{p.caption}</div>}
-                    {isAdmin && p.worker_name && <div style={s.photoWorker}>{p.worker_name}</div>}
-                    {p.pending && <div style={s.pendingDot}>⏳</div>}
-                  </div>
-                ))}
+                {allPhotos.map((p, i) => {
+                  const vid = p.media_type === 'video' || /\.(mp4|mov|webm|avi|m4v)$/i.test(p.url || '');
+                  return (
+                    <div key={i} style={s.photoCell} onClick={() => setLightbox({ photos: allPhotos, index: i })}>
+                      {vid ? (
+                        <>
+                          <video src={p.url} style={s.photoThumb} preload="metadata" muted playsInline />
+                          <div style={s.playOverlay}>▶</div>
+                        </>
+                      ) : (
+                        <img src={p.url} style={s.photoThumb} alt={p.caption || `photo ${i + 1}`} />
+                      )}
+                      {p.caption && <div style={s.photoCaption}>{p.caption}</div>}
+                      {isAdmin && p.worker_name && <div style={s.photoWorker}>{p.worker_name}</div>}
+                      {p.pending && <div style={s.pendingDot}>⏳</div>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -404,6 +504,16 @@ const s = {
   photoCaption: { position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 10, padding: '3px 5px', lineHeight: 1.3 },
   photoWorker: { position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4, textTransform: 'uppercase' },
   pendingDot: { position: 'absolute', top: 4, right: 4, fontSize: 13 },
+  playOverlay: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: '#fff', background: 'rgba(0,0,0,0.3)', pointerEvents: 'none' },
+  videoPreviewWrap: { display: 'flex', flexDirection: 'column', gap: 8 },
+  videoPreview: { width: '100%', maxHeight: 240, borderRadius: 8, background: '#111', outline: 'none' },
+  removeBtnSm: { alignSelf: 'flex-start', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  videoPickerLabel: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, border: '2px dashed #d1d5db', borderRadius: 10, padding: '32px 16px', cursor: 'pointer', background: '#fafafa' },
+  videoPickerIcon: { fontSize: 32 },
+  videoPickerText: { fontSize: 13, color: '#6b7280', textAlign: 'center' },
+  progressBar: { position: 'relative', height: 8, background: '#e5e7eb', borderRadius: 4, marginTop: 10, overflow: 'hidden' },
+  progressFill: { height: '100%', background: '#059669', borderRadius: 4, transition: 'width 0.2s' },
+  progressLabel: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#374151', fontWeight: 700 },
   notesList: { display: 'flex', flexDirection: 'column', gap: 8 },
   noteCard: { background: '#fff', borderRadius: 10, padding: '12px 14px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' },
   noteCardHead: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' },

@@ -1,4 +1,5 @@
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { randomUUID } = require('crypto');
 
 const client = new S3Client({
@@ -35,4 +36,20 @@ async function uploadBase64(dataUrl, folder = 'photos') {
   return `${process.env.R2_PUBLIC_URL}/${key}`;
 }
 
-module.exports = { uploadBase64 };
+/**
+ * Generate a short-lived presigned PUT URL for direct browser→R2 uploads.
+ * Returns { uploadUrl, publicUrl, key }.
+ */
+async function getPresignedUploadUrl(folder, ext, contentType) {
+  const key = `${folder}/${randomUUID()}.${ext}`;
+  const command = new PutObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+  });
+  const uploadUrl = await getSignedUrl(client, command, { expiresIn: 300 });
+  const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
+  return { uploadUrl, publicUrl, key };
+}
+
+module.exports = { uploadBase64, getPresignedUploadUrl };
