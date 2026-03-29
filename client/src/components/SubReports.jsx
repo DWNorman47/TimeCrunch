@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useOffline } from '../contexts/OfflineContext';
 
 function today() {
   return new Date().toLocaleDateString('en-CA');
@@ -28,6 +29,10 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
       const r = isEdit
         ? await api.patch(`/sub-reports/${initial.id}`, form)
         : await api.post('/sub-reports', form);
+      if (!isEdit && r.data?.offline) {
+        onSaved({ id: 'pending-' + Date.now(), pending: true, ...form, project_name: '' }, false);
+        return;
+      }
       onSaved(r.data, isEdit);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save report');
@@ -109,7 +114,10 @@ function SubCard({ report, onEdit, onDeleted }) {
     <div style={styles.card}>
       <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
         <div style={styles.cardLeft}>
-          <div style={styles.subName}>{report.sub_company}</div>
+          <div style={styles.subName}>
+            {report.sub_company}
+            {report.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}
+          </div>
           <div style={styles.cardMeta}>
             <span>{report.report_date?.toString().substring(0, 10)}</span>
             {report.project_name && <span style={styles.projectTag}>{report.project_name}</span>}
@@ -134,10 +142,12 @@ function SubCard({ report, onEdit, onDeleted }) {
               <p style={styles.sectionText}>{report.notes}</p>
             </div>
           )}
-          <div style={styles.cardActions}>
-            <button style={styles.editBtn} onClick={() => onEdit(report)}>Edit</button>
-            <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : 'Delete'}</button>
-          </div>
+          {!report.pending && (
+            <div style={styles.cardActions}>
+              <button style={styles.editBtn} onClick={() => onEdit(report)}>Edit</button>
+              <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : 'Delete'}</button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -147,6 +157,7 @@ function SubCard({ report, onEdit, onDeleted }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function SubReports({ projects }) {
+  const { onSync } = useOffline() || {};
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -165,6 +176,7 @@ export default function SubReports({ projects }) {
 
   useEffect(() => { loadReports().finally(() => setLoading(false)); }, []);
   useEffect(() => { if (!loading) loadReports(filters); }, [filters]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadReports(); }); }, [onSync]);
 
   const handleSaved = (report, isEdit) => {
     if (isEdit) {
@@ -284,4 +296,5 @@ const styles = {
   formActions: { display: 'flex', gap: 10 },
   submitBtn: { background: '#059669', color: '#fff', border: 'none', padding: '11px 22px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' },
   cancelBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '11px 22px', borderRadius: 8, fontSize: 14, cursor: 'pointer' },
+  pendingBadge: { fontSize: 10, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 6, marginLeft: 8, verticalAlign: 'middle' },
 };

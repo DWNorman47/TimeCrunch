@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useOffline } from '../contexts/OfflineContext';
 import { RFIDownloadLink } from './RFIPdf';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
@@ -40,6 +41,10 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       const r = isEdit
         ? await api.patch(`/rfis/${initial.id}`, form)
         : await api.post('/rfis', form);
+      if (!isEdit && r.data?.offline) {
+        onSaved({ id: 'pending-' + Date.now(), pending: true, ...form, rfi_number: '?', status: 'open' }, false);
+        return;
+      }
       onSaved(r.data, isEdit);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save');
@@ -142,7 +147,10 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
       <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
         <div style={styles.rfiNumber}>#{rfi.rfi_number}</div>
         <div style={styles.cardMiddle}>
-          <div style={styles.subject}>{rfi.subject}</div>
+          <div style={styles.subject}>
+            {rfi.subject}
+            {rfi.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}
+          </div>
           <div style={styles.meta}>
             {rfi.project_name && <span style={styles.projectTag}>{rfi.project_name}</span>}
             {rfi.directed_to && <span>→ {rfi.directed_to}</span>}
@@ -184,17 +192,19 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
             <p style={styles.noResponse}>No response yet.</p>
           ) : null}
 
-          <div style={styles.cardActions}>
-            <RFIDownloadLink rfi={rfi} companyName={companyName} />
-            {isAdmin && (
-              <>
-                <button style={styles.editBtn} onClick={() => onEdit(rfi)}>
-                  {rfi.status === 'open' && !rfi.response ? '+ Add Response' : 'Edit'}
-                </button>
-                <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : 'Delete'}</button>
-              </>
-            )}
-          </div>
+          {!rfi.pending && (
+            <div style={styles.cardActions}>
+              <RFIDownloadLink rfi={rfi} companyName={companyName} />
+              {isAdmin && (
+                <>
+                  <button style={styles.editBtn} onClick={() => onEdit(rfi)}>
+                    {rfi.status === 'open' && !rfi.response ? '+ Add Response' : 'Edit'}
+                  </button>
+                  <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : 'Delete'}</button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -206,6 +216,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
 export default function RFITracking({ projects }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const { onSync } = useOffline() || {};
 
   const [rfis, setRfis] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -229,6 +240,7 @@ export default function RFITracking({ projects }) {
     api.get('/company-info').then(r => setCompanyName(r.data.name || '')).catch(() => {});
   }, []);
   useEffect(() => { if (!loading) loadRFIs(filters); }, [filters]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadRFIs(); }); }, [onSync]);
 
   const handleSaved = (rfi, isEdit) => {
     if (isEdit) {
@@ -368,4 +380,5 @@ const styles = {
   formActions: { display: 'flex', gap: 10 },
   submitBtn: { background: '#059669', color: '#fff', border: 'none', padding: '11px 22px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' },
   cancelBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '11px 22px', borderRadius: 8, fontSize: 14, cursor: 'pointer' },
+  pendingBadge: { fontSize: 10, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 6, marginLeft: 8, verticalAlign: 'middle' },
 };

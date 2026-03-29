@@ -201,7 +201,8 @@ self.addEventListener('fetch', event => {
       url.includes('/api/safety-talks') ||
       url.includes('/api/equipment') ||
       url.includes('/api/rfis') ||
-      url.includes('/api/sub-reports')
+      url.includes('/api/sub-reports') ||
+      url.includes('/api/inspections')
     ) {
       event.respondWith(handleOfflineableRequest(event, 'field'));
       return;
