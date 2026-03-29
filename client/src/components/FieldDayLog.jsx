@@ -127,10 +127,11 @@ export default function FieldDayLog({ projects, isAdmin }) {
     setProject(id);
     localStorage.setItem('field-last-project', id);
     markProjectUsed(id);
+    setPhotoOpen(false); setNoteOpen(false);
   };
 
-  const prevDay = () => setDate(d => shiftDate(d, -1));
-  const nextDay = () => { if (!isToday) setDate(d => shiftDate(d, 1)); };
+  const prevDay = () => { setDate(d => shiftDate(d, -1)); setPhotoOpen(false); setNoteOpen(false); };
+  const nextDay = () => { if (!isToday) { setDate(d => shiftDate(d, 1)); setPhotoOpen(false); setNoteOpen(false); } };
 
   const openPhoto = () => { setPhotoOpen(o => !o); setNoteOpen(false); setError(''); };
   const openNote  = () => { setNoteOpen(o => !o); setPhotoOpen(false); setError(''); };
