@@ -53,11 +53,11 @@ router.post('/', requireAuth, async (req, res) => {
     const report = result.rows[0];
 
     if (photos.length > 0) {
-      const photoValues = photos.map((p, i) => `($1, $${i * 2 + 2}, $${i * 2 + 3})`).join(', ');
-      const photoParams = [report.id];
+      const photoValues = photos.map((p, i) => `($1, $2, $${i * 2 + 3}, $${i * 2 + 4})`).join(', ');
+      const photoParams = [report.id, companyId];
       photos.forEach(p => { photoParams.push(p.url); photoParams.push(p.caption || null); });
       await pool.query(
-        `INSERT INTO field_report_photos (report_id, url, caption) VALUES ${photoValues}`,
+        `INSERT INTO field_report_photos (report_id, company_id, url, caption) VALUES ${photoValues}`,
         photoParams
       );
     }
