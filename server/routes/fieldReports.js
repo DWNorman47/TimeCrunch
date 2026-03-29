@@ -2,6 +2,7 @@ const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToCompanyAdmins } = require('../push');
+const { uploadBase64 } = require('../r2');
 
 // GET /field-reports — worker gets own; admin gets full company feed
 router.get('/', requireAuth, async (req, res) => {
@@ -53,9 +54,13 @@ router.post('/', requireAuth, async (req, res) => {
     const report = result.rows[0];
 
     if (photos.length > 0) {
-      const photoValues = photos.map((p, i) => `($1, $${i * 2 + 2}, $${i * 2 + 3})`).join(', ');
+      // Upload base64 data URLs to R2; pass through any already-hosted URLs
+      const uploaded = await Promise.all(
+        photos.map(p => uploadBase64(p.url).then(url => ({ url, caption: p.caption || null })))
+      );
+      const photoValues = uploaded.map((p, i) => `($1, $${i * 2 + 2}, $${i * 2 + 3})`).join(', ');
       const photoParams = [report.id];
-      photos.forEach(p => { photoParams.push(p.url); photoParams.push(p.caption || null); });
+      uploaded.forEach(p => { photoParams.push(p.url); photoParams.push(p.caption); });
       await pool.query(
         `INSERT INTO field_report_photos (report_id, url, caption) VALUES ${photoValues}`,
         photoParams
