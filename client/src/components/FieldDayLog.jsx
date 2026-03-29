@@ -144,6 +144,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
         project_id: project || undefined,
         photos: capturePhotos,
         lat, lng,
+        report_date: date,
       });
       const item = r.data?.offline
         ? { id: 'pending-' + Date.now(), pending: true, photos: capturePhotos.map(p => ({ url: p.url, caption: p.caption || '' })), notes: null, reported_at: new Date().toISOString(), project_id: project }
@@ -165,6 +166,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
         project_id: project || undefined,
         notes: captureNote,
         lat, lng,
+        report_date: date,
       });
       const item = r.data?.offline
         ? { id: 'pending-' + Date.now(), pending: true, notes: captureNote, photos: [], reported_at: new Date().toISOString(), project_id: project }
