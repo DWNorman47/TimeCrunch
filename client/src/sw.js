@@ -80,6 +80,7 @@ async function handleOfflineableRequest(event, type) {
     const auth = event.request.headers.get('Authorization') || '';
     await enqueue({
       type,
+      method: event.request.method,
       url: event.request.url,
       body,
       auth,
@@ -103,7 +104,7 @@ async function replayQueue() {
   for (const item of items) {
     try {
       const res = await fetch(item.url, {
-        method: 'POST',
+        method: item.method || 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(item.auth ? { Authorization: item.auth } : {}),
@@ -175,6 +176,13 @@ self.addEventListener('notificationclick', event => {
 
 self.addEventListener('fetch', event => {
   const url = event.request.url;
+
+  if (event.request.method === 'PATCH') {
+    if (url.includes('/api/time-entries/') && !url.includes('/messages') && !url.includes('/sign-off')) {
+      event.respondWith(handleOfflineableRequest(event, 'time-entry'));
+      return;
+    }
+  }
 
   if (event.request.method === 'POST') {
     if (url.includes('/api/clock/in') || url.includes('/api/clock/out')) {
