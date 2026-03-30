@@ -59,7 +59,7 @@ export default function FieldPage() {
           onChange={switchTab}
           tabs={[
             { id: 'notes', label: '📷 Field Notes' },
-            { id: 'daily', label: '📋 Daily' },
+            { id: 'daily', label: '📋 Daily Reports' },
             { id: 'punchlist', label: '✅ Punch' },
             { id: 'safety', label: '🦺 Safety' },
             { id: 'incident', label: '🚨 Incidents' },
