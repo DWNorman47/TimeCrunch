@@ -30,7 +30,7 @@ const { validCoords } = require('../utils/geoUtils');
 
 // POST /api/clock/in
 router.post('/in', requireAuth, async (req, res) => {
-  const { project_id, notes, lat, lng, local_work_date, timezone } = req.body;
+  const { project_id, notes, lat, lng, local_work_date, timezone, location_denied } = req.body;
   if ((lat != null || lng != null) && !validCoords(lat, lng)) {
     return res.status(400).json({ error: 'Invalid coordinates' });
   }
@@ -130,6 +130,23 @@ router.post('/in', requireAuth, async (req, res) => {
     const projName = project_id
       ? await pool.query('SELECT name, wage_type FROM projects WHERE id = $1', [project_id])
       : { rows: [{ name: null, wage_type: 'regular' }] };
+
+    // Notify admin if worker's location permission was denied
+    if (location_denied) {
+      try {
+        const workerName = req.user.full_name || req.user.username;
+        const title = `Location denied: ${workerName}`;
+        const body = `${workerName} clocked in but their browser blocked location access. Their location was not recorded.`;
+        await sendPushToCompanyAdmins(companyId, { title, body, url: '/admin#live' });
+        const adminRows = await pool.query(
+          `SELECT id FROM users WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true`,
+          [companyId]
+        );
+        for (const a of adminRows.rows) {
+          createInboxItem(a.id, companyId, 'location_denied', title, body, '/admin#live');
+        }
+      } catch {} // never block clock-in
+    }
 
     // Check if clock-in is outside configured hours — notify admin if so
     try {
