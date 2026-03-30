@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { sendPushToAllWorkers } = require('../push');
 
 // GET /safety-talks
 router.get('/', requireAuth, async (req, res) => {
@@ -82,6 +83,11 @@ router.post('/', requireAuth, async (req, res) => {
        WHERE st.id = $1`,
       [id]
     );
+    sendPushToAllWorkers(companyId, {
+      title: 'New safety talk: ' + title,
+      body: 'Open the app to read and sign off.',
+      url: '/field#safety',
+    });
     res.status(201).json({ ...full.rows[0], signoffs: [] });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
