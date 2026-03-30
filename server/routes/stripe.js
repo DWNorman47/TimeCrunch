@@ -8,6 +8,17 @@ function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY);
 }
 
+// Sum monthly revenue in cents from Stripe subscription items (normalises annual → monthly)
+function calcMrrCents(items) {
+  return items.reduce((sum, item) => {
+    const amount = item.price?.unit_amount ?? 0;
+    const qty = item.quantity ?? 1;
+    const interval = item.price?.recurring?.interval;
+    const monthly = interval === 'year' ? Math.round(amount / 12) : amount;
+    return sum + monthly * qty;
+  }, 0);
+}
+
 function planFromPrice(priceId) {
   if (priceId === process.env.STRIPE_PRICE_BUSINESS_BASE ||
       priceId === process.env.STRIPE_PRICE_BUSINESS_BASE_ANNUAL) return 'business';
@@ -147,9 +158,10 @@ router.post('/webhook', async (req, res) => {
         // Pro add-on is present if any item matches the addon_qbo price IDs
         const proIds = [process.env.STRIPE_PRICE_QBO, process.env.STRIPE_PRICE_QBO_ANNUAL].filter(Boolean);
         const hasProAddon = items.some(i => proIds.includes(i.price.id));
+        const mrrCents = calcMrrCents(items);
         await pool.query(
-          'UPDATE companies SET stripe_subscription_id = $1, subscription_status = $2, plan = $3, addon_qbo = $4 WHERE id = $5',
-          [obj.subscription, 'active', plan, hasProAddon, companyId]
+          'UPDATE companies SET stripe_subscription_id = $1, subscription_status = $2, plan = $3, addon_qbo = $4, mrr_cents = $5 WHERE id = $6',
+          [obj.subscription, 'active', plan, hasProAddon, mrrCents, companyId]
         );
       }
     } else if (event.type === 'customer.subscription.updated') {
@@ -159,9 +171,10 @@ router.post('/webhook', async (req, res) => {
         const plan = planFromPrice(items[0]?.price?.id);
         const proIds = [process.env.STRIPE_PRICE_QBO, process.env.STRIPE_PRICE_QBO_ANNUAL].filter(Boolean);
         const hasProAddon = items.some(i => proIds.includes(i.price.id));
+        const mrrCents = calcMrrCents(items);
         await pool.query(
-          'UPDATE companies SET subscription_status = $1, plan = $2, addon_qbo = $3 WHERE id = $4',
-          [obj.status, plan, hasProAddon, companyId]
+          'UPDATE companies SET subscription_status = $1, plan = $2, addon_qbo = $3, mrr_cents = $4 WHERE id = $5',
+          [obj.status, plan, hasProAddon, mrrCents, companyId]
         );
       }
     } else if (event.type === 'customer.subscription.deleted') {

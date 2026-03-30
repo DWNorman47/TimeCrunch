@@ -55,6 +55,13 @@ const CURRENCIES = [
   { code: 'PAB', name: 'PAB — Panamanian Balboa' },
 ];
 
+function formatBytes(bytes) {
+  if (!bytes) return '0 MB';
+  if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+  if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(0) + ' MB';
+  return (bytes / 1024).toFixed(0) + ' KB';
+}
+
 export default function ManageRates({ settings, onSettingsUpdated }) {
   const t = useT();
   const [form, setForm] = useState({
@@ -566,6 +573,52 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         </div>}
         {!collapsed.features && <SectionFooter section="features" />}
       </div>
+
+      {/* ── Storage ── */}
+      {(() => {
+        const used = settings?.storage_bytes_used ?? 0;
+        const limit = settings?.storage_limit_bytes ?? (500 * 1024 * 1024);
+        const pct = Math.min(100, Math.round((used / limit) * 100));
+        const nearLimit = pct >= 80;
+        const atLimit = pct >= 100;
+        return (
+          <div style={styles.section}>
+            <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('storage')}>
+              <span style={styles.sectionIcon}>💾</span>
+              <div style={{ flex: 1 }}>
+                <div style={styles.sectionTitle}>Storage</div>
+                <div style={styles.sectionSub}>{formatBytes(used)} of {formatBytes(limit)} used</div>
+              </div>
+              <span style={styles.collapseChevron}>{collapsed.storage ? '▶' : '▼'}</span>
+            </div>
+            {!collapsed.storage && (
+              <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: atLimit ? '#ef4444' : nearLimit ? '#d97706' : '#374151', fontWeight: 600 }}>
+                  <span>{formatBytes(used)} used</span>
+                  <span>{formatBytes(limit)} limit</span>
+                </div>
+                <div style={{ height: 10, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${pct}%`, background: atLimit ? '#ef4444' : nearLimit ? '#f59e0b' : '#1a56db', borderRadius: 99, transition: 'width 0.4s' }} />
+                </div>
+                {atLimit && (
+                  <div style={{ fontSize: 13, color: '#ef4444', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 7, padding: '8px 12px' }}>
+                    Storage limit reached. New photo and file uploads are blocked. Upgrade your plan to continue.
+                  </div>
+                )}
+                {nearLimit && !atLimit && (
+                  <div style={{ fontSize: 13, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 7, padding: '8px 12px' }}>
+                    Approaching storage limit. Consider upgrading your plan or deleting old media.
+                  </div>
+                )}
+                <div style={{ fontSize: 12, color: '#9ca3af' }}>
+                  Media includes field report photos, videos, and safety talk attachments.
+                  Free plan: 500 MB · Starter: 5 GB · Business: 25 GB
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
     </div>
   );

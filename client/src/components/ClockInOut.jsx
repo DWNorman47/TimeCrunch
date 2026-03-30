@@ -8,7 +8,7 @@ function getLocation() {
     if (!navigator.geolocation) return resolve({ lat: null, lng: null });
     navigator.geolocation.getCurrentPosition(
       pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve({ lat: null, lng: null }),
+      err => resolve({ lat: null, lng: null, permissionDenied: err.code === 1 }),
       { timeout: 8000 }
     );
   });
@@ -38,6 +38,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
   const [mileageAdded, setMileageAdded] = useState(false);
   const [breakMinutes, setBreakMinutes] = useState('');
   const [mileage, setMileage] = useState('');
+  const [locationDenied, setLocationDenied] = useState(false);
   const [switchingProject, setSwitchingProject] = useState(false);
   const [switchProject, setSwitchProject] = useState('');
   const [pendingChecklist, setPendingChecklist] = useState(null); // { template_id, items, name }
@@ -85,9 +86,16 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
   const handleClockIn = async () => {
     if (projectsEnabled && !selectedProject) { setError(t.selectProjectFirst); return; }
     setError('');
+    setLocationDenied(false);
     setLoading(true);
     // Always fetch GPS when the selected project has a geofence, even if geolocation feature is off globally
-    const { lat, lng } = (geolocationEnabled || projectHasGeofence) ? await getLocation() : { lat: null, lng: null };
+    const loc = (geolocationEnabled || projectHasGeofence) ? await getLocation() : { lat: null, lng: null };
+    if (loc.permissionDenied) {
+      setLocationDenied(true);
+      setLoading(false);
+      return;
+    }
+    const { lat, lng } = loc;
     const local_work_date = new Date().toLocaleDateString('en-CA');
     try {
       const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
@@ -388,6 +396,21 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
             📍 This job site requires location verification to clock in.
           </div>
         )}
+        {locationDenied && (
+          <div style={styles.locationDenied}>
+            <div style={styles.locationDeniedTitle}>📍 Location access blocked</div>
+            <p style={styles.locationDeniedText}>
+              You previously denied location access. To fix this, re-enable it in your browser:
+            </p>
+            <ul style={styles.locationDeniedList}>
+              <li><strong>iPhone/iPad:</strong> Settings → Privacy → Location Services → Safari (or your browser) → While Using</li>
+              <li><strong>Android:</strong> Tap the lock icon in your browser's address bar → Permissions → Location → Allow</li>
+              <li><strong>Desktop Chrome:</strong> Click the lock icon in the address bar → Site settings → Location → Allow</li>
+              <li><strong>Desktop Firefox:</strong> Click the lock icon → Connection secure → More information → Permissions → Access your location</li>
+            </ul>
+            <p style={styles.locationDeniedText}>After updating the setting, reload this page and try again.</p>
+          </div>
+        )}
         {error && <p style={styles.error}>{error}</p>}
         {pendingChecklist && (
           <div style={styles.checklistGate}>
@@ -460,6 +483,10 @@ const styles = {
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   label: { fontSize: 13, fontWeight: 600, color: '#555', display: 'block', marginBottom: 4 },
   input: { padding: '9px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, width: '100%' },
+  locationDenied: { background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 },
+  locationDeniedTitle: { fontSize: 14, fontWeight: 700, color: '#854d0e' },
+  locationDeniedText: { fontSize: 12, color: '#713f12', margin: 0 },
+  locationDeniedList: { fontSize: 12, color: '#713f12', margin: '2px 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 },
   geofenceHint: { fontSize: 12, color: '#0369a1', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 6, padding: '7px 11px' },
   error: { color: '#ef4444', fontSize: 13, margin: 0, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px' },
   errorDark: { fontSize: 13, margin: 0, background: 'rgba(255,255,255,0.15)', borderRadius: 6, padding: '8px 12px', color: '#fff' },

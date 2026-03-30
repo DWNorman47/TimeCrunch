@@ -3,6 +3,7 @@ const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToCompanyAdmins } = require('../push');
 const { uploadBase64, getPresignedUploadUrl } = require('../r2');
+const { checkStorageLimit, incrementStorage, decrementStorage } = require('../storage');
 
 // GET /field-reports — worker gets own; admin gets full company feed
 router.get('/', requireAuth, async (req, res) => {
@@ -46,6 +47,25 @@ router.post('/', requireAuth, async (req, res) => {
   const { title, notes, project_id, lat, lng, photos = [], report_date } = req.body;
   const companyId = req.user.company_id;
   try {
+    // Estimate total upload size from base64 payloads for limit check
+    const estimatedBytes = photos.reduce((sum, p) => {
+      if (p.url?.startsWith('data:')) {
+        const b64 = p.url.split(',')[1] || '';
+        return sum + Math.floor(b64.length * 3 / 4);
+      }
+      return sum;
+    }, 0);
+
+    if (estimatedBytes > 0) {
+      const { allowed, used, limit } = await checkStorageLimit(companyId, estimatedBytes);
+      if (!allowed) {
+        return res.status(413).json({
+          error: `Storage limit reached (${(used / (1024 * 1024)).toFixed(0)} MB of ${(limit / (1024 * 1024)).toFixed(0)} MB used). Upgrade your plan to upload more media.`,
+          storage_limit: true,
+        });
+      }
+    }
+
     const result = await pool.query(
       `INSERT INTO field_reports (company_id, user_id, project_id, title, notes, lat, lng, report_date)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
@@ -56,19 +76,29 @@ router.post('/', requireAuth, async (req, res) => {
     if (photos.length > 0) {
       // Upload base64 data URLs to R2; pass through any already-hosted URLs
       const uploaded = await Promise.all(
-        photos.map(p => uploadBase64(p.url).then(url => ({
-          url,
-          caption: p.caption || null,
-          media_type: p.media_type || 'photo',
-        })))
+        photos.map(p => {
+          if (p.url?.startsWith('data:')) {
+            return uploadBase64(p.url).then(({ url, sizeBytes }) => ({
+              url,
+              sizeBytes,
+              caption: p.caption || null,
+              media_type: p.media_type || 'photo',
+            }));
+          }
+          return Promise.resolve({ url: p.url, sizeBytes: 0, caption: p.caption || null, media_type: p.media_type || 'photo' });
+        })
       );
-      const photoValues = uploaded.map((p, i) => `($1, $${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`).join(', ');
+      const photoValues = uploaded.map((p, i) => `($1, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4}, $${i * 4 + 5})`).join(', ');
       const photoParams = [report.id];
-      uploaded.forEach(p => { photoParams.push(p.url); photoParams.push(p.caption); photoParams.push(p.media_type); });
+      uploaded.forEach(p => { photoParams.push(p.url); photoParams.push(p.caption); photoParams.push(p.media_type); photoParams.push(p.sizeBytes || null); });
       await pool.query(
-        `INSERT INTO field_report_photos (report_id, url, caption, media_type) VALUES ${photoValues}`,
+        `INSERT INTO field_report_photos (report_id, url, caption, media_type, size_bytes) VALUES ${photoValues}`,
         photoParams
       );
+
+      // Track storage
+      const totalBytes = uploaded.reduce((sum, p) => sum + (p.sizeBytes || 0), 0);
+      if (totalBytes > 0) incrementStorage(companyId, totalBytes).catch(() => {});
     }
 
     // Notify admins of new field report
@@ -143,7 +173,17 @@ router.delete('/:id', requireAuth, async (req, res) => {
     if (!isAdmin && report.user_id !== req.user.id) return res.status(403).json({ error: 'Not your report' });
     if (!isAdmin && report.status === 'reviewed') return res.status(403).json({ error: 'Reviewed reports cannot be deleted' });
 
+    // Sum photo sizes before deletion for storage decrement
+    const photoSum = await pool.query(
+      'SELECT COALESCE(SUM(size_bytes), 0) AS total FROM field_report_photos WHERE report_id = $1',
+      [req.params.id]
+    );
+    const totalBytes = parseInt(photoSum.rows[0].total);
+
     await pool.query('DELETE FROM field_reports WHERE id = $1', [req.params.id]);
+
+    if (totalBytes > 0) decrementStorage(companyId, totalBytes).catch(() => {});
+
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -185,9 +225,22 @@ router.get('/photos', requireAuth, async (req, res) => {
 
 // GET /field-reports/upload-url — presigned URL for direct browser→R2 video upload
 router.get('/upload-url', requireAuth, async (req, res) => {
-  const { contentType = 'video/mp4' } = req.query;
-  const ext = contentType.split('/')[1]?.split(';')[0] || 'mp4';
+  const { contentType = 'video/mp4', size } = req.query;
+  const companyId = req.user.company_id;
+  const sizeBytes = parseInt(size) || 0;
   try {
+    if (sizeBytes > 0) {
+      const { allowed, used, limit } = await checkStorageLimit(companyId, sizeBytes);
+      if (!allowed) {
+        return res.status(413).json({
+          error: `Storage limit reached (${(used / (1024 * 1024)).toFixed(0)} MB of ${(limit / (1024 * 1024)).toFixed(0)} MB used). Upgrade your plan to upload more media.`,
+          storage_limit: true,
+        });
+      }
+      // Increment optimistically — video is uploaded directly to R2 with no confirmation step
+      incrementStorage(companyId, sizeBytes).catch(() => {});
+    }
+    const ext = contentType.split('/')[1]?.split(';')[0] || 'mp4';
     const { uploadUrl, publicUrl } = await getPresignedUploadUrl('videos', ext, contentType);
     res.json({ uploadUrl, publicUrl });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to generate upload URL' }); }
