@@ -45,10 +45,17 @@ router.post('/in', requireAuth, async (req, res) => {
 
     if (!project_id && projectsEnabled) return res.status(400).json({ error: 'project_id required' });
 
+    // Check global checklist requirement
+    const globalChecklistRow = await pool.query(
+      `SELECT value FROM settings WHERE company_id=$1 AND key='global_required_checklist_template_id'`,
+      [companyId]
+    );
+    const globalChecklistId = globalChecklistRow.rows[0]?.value ? parseInt(globalChecklistRow.rows[0].value) : null;
+
     // Verify project belongs to this company and fetch geofence (only when project provided)
     if (project_id) {
       const proj = await pool.query(
-        'SELECT id, geo_lat, geo_lng, geo_radius_ft FROM projects WHERE id = $1 AND company_id = $2 AND active = true',
+        'SELECT id, geo_lat, geo_lng, geo_radius_ft, required_checklist_template_id FROM projects WHERE id = $1 AND company_id = $2 AND active = true',
         [project_id, companyId]
       );
       if (proj.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
@@ -68,6 +75,38 @@ router.post('/in', requireAuth, async (req, res) => {
             radius_ft: geo_radius_ft,
           });
         }
+      }
+
+      // Checklist requirement (project-level overrides global)
+      const projectChecklistId = proj.rows[0].required_checklist_template_id;
+      const requiredChecklistId = projectChecklistId || globalChecklistId;
+      if (requiredChecklistId) {
+        const sub = await pool.query(
+          `SELECT id FROM safety_checklist_submissions
+           WHERE company_id=$1 AND template_id=$2 AND submitted_by=$3 AND check_date=CURRENT_DATE`,
+          [companyId, requiredChecklistId, req.user.id]
+        );
+        if (sub.rowCount === 0) {
+          return res.status(403).json({
+            error: 'Complete the required safety checklist before clocking in.',
+            checklist_required: true,
+            template_id: requiredChecklistId,
+          });
+        }
+      }
+    } else if (globalChecklistId) {
+      // No project selected but global requirement exists
+      const sub = await pool.query(
+        `SELECT id FROM safety_checklist_submissions
+         WHERE company_id=$1 AND template_id=$2 AND submitted_by=$3 AND check_date=CURRENT_DATE`,
+        [companyId, globalChecklistId, req.user.id]
+      );
+      if (sub.rowCount === 0) {
+        return res.status(403).json({
+          error: 'Complete the required safety checklist before clocking in.',
+          checklist_required: true,
+          template_id: globalChecklistId,
+        });
       }
     }
 
