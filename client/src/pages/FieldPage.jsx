@@ -59,15 +59,17 @@ export default function FieldPage() {
           onChange={switchTab}
           tabs={[
             { id: 'notes', label: '📷 Field Notes' },
-            { id: 'daily', label: '📋 Daily Reports' },
             { id: 'punchlist', label: '✅ Punch' },
             { id: 'safety', label: '🦺 Safety' },
             { id: 'incident', label: '🚨 Incidents' },
-            ...(features.feature_media_gallery ? [{ id: 'gallery', label: '🎬 Media' }] : []),
-            ...(isAdmin ? [{ id: 'subs', label: '🏗️ Subs' }] : []),
             { id: 'equip', label: '🚜 Equipment' },
-            { id: 'rfi', label: '📝 RFIs' },
-            { id: 'inspect', label: '✅ Inspect' },
+            ...(isAdmin ? [
+              { id: 'daily', label: '📋 Daily Reports' },
+              { id: 'rfi', label: '📝 RFIs' },
+              { id: 'inspect', label: '✅ Inspect' },
+              { id: 'subs', label: '🏗️ Subs' },
+              ...(features.feature_media_gallery ? [{ id: 'gallery', label: '🎬 Media' }] : []),
+            ] : []),
           ]}
         />
 
