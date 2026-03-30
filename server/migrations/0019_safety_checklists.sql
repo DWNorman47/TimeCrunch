@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS safety_checklist_templates (
   id SERIAL PRIMARY KEY,
-  company_id INTEGER NOT NULL,
+  company_id UUID NOT NULL,
   name VARCHAR(255) NOT NULL,
   description TEXT,
   -- items: [{label, type: 'check'|'text', required: boolean}]
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS safety_checklist_templates (
 
 CREATE TABLE IF NOT EXISTS safety_checklist_submissions (
   id SERIAL PRIMARY KEY,
-  company_id INTEGER NOT NULL,
+  company_id UUID NOT NULL,
   template_id INTEGER REFERENCES safety_checklist_templates(id) ON DELETE SET NULL,
   template_name VARCHAR(255) NOT NULL,
   project_id INTEGER,
