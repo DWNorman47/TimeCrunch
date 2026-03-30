@@ -58,6 +58,7 @@ app.use('/api/daily-reports', requireAuth, requirePlan('business'), require('./r
 app.use('/api/punchlist', requireAuth, requirePlan('business'), require('./routes/punchlist'));
 app.use('/api/inspections', requireAuth, requirePlan('business'), require('./routes/inspections'));
 app.use('/api/safety-talks', requireAuth, requirePlan('business'), require('./routes/safetyTalks'));
+app.use('/api/safety-checklists', requireAuth, requirePlan('business'), require('./routes/safetyChecklists'));
 app.use('/api/inbox', require('./routes/inbox'));
 
 // Read-only company settings — available to all authenticated users
