@@ -30,6 +30,21 @@ function fmtDate(str) {
   return new Date(str + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function fileIcon(contentType) {
+  if (!contentType) return '📎';
+  if (contentType.startsWith('image/')) return '🖼️';
+  if (contentType === 'application/pdf') return '📄';
+  if (contentType.includes('word')) return '📝';
+  if (contentType.includes('sheet') || contentType.includes('excel')) return '📊';
+  return '📎';
+}
+
 function NewTalkForm({ projects, onAdded, onCancel }) {
   const today = new Date().toLocaleDateString('en-CA');
   const [form, setForm] = useState({ title: '', content: '', given_by: '', talk_date: today, project_id: '' });
@@ -214,15 +229,49 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
   const [deleting, setDeleting] = useState(false);
   const [signoffs, setSignoffs] = useState(null);
   const [questions, setQuestions] = useState(null);
+  const [attachments, setAttachments] = useState(null);
   const [quizAnswers, setQuizAnswers] = useState({});
   const [quizResult, setQuizResult] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = React.useRef(null);
 
   const loadDetail = async () => {
     try {
       const r = await api.get(`/safety-talks/${talk.id}`);
       setSignoffs(r.data.signoffs || []);
       setQuestions(r.data.questions || []);
+      setAttachments(r.data.attachments || []);
     } catch {}
+  };
+
+  const handleAttachmentUpload = async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop().toLowerCase();
+      const { uploadUrl, publicUrl } = (await api.get('/safety-talks/attachment-upload-url', {
+        params: { ext, type: file.type },
+      })).data;
+      await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+      const r = await api.post(`/safety-talks/${talk.id}/attachments`, {
+        name: file.name,
+        url: publicUrl,
+        content_type: file.type,
+        size_bytes: file.size,
+      });
+      setAttachments(prev => [...(prev || []), r.data]);
+    } catch { alert('Upload failed'); }
+    finally { setUploading(false); }
+  };
+
+  const deleteAttachment = async attId => {
+    if (!confirm('Remove this attachment?')) return;
+    try {
+      await api.delete(`/safety-talks/${talk.id}/attachments/${attId}`);
+      setAttachments(prev => prev.filter(a => a.id !== attId));
+    } catch { alert('Failed to remove'); }
   };
 
   const handleExpand = () => {
@@ -332,6 +381,41 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
 
           {quizResult?.passed && (
             <div style={styles.quizPass}>✓ {quizResult.score}/{quizResult.total} correct — you passed!</div>
+          )}
+
+          {/* Attachments */}
+          {((attachments && attachments.length > 0) || isAdmin) && (
+            <div style={styles.attachmentsSection}>
+              <div style={styles.attachmentsHeader}>
+                <span style={styles.attachmentsTitle}>Attachments</span>
+                {isAdmin && (
+                  <>
+                    <button style={styles.attachBtn} onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                      {uploading ? 'Uploading...' : '+ Attach File'}
+                    </button>
+                    <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleAttachmentUpload} />
+                  </>
+                )}
+              </div>
+              {attachments === null ? (
+                <p style={styles.hint}>Loading...</p>
+              ) : attachments.length === 0 ? (
+                <p style={styles.hint}>No attachments yet.</p>
+              ) : (
+                <div style={styles.attachmentList}>
+                  {attachments.map(a => (
+                    <div key={a.id} style={styles.attachmentRow}>
+                      <span style={styles.attachIcon}>{fileIcon(a.content_type)}</span>
+                      <a href={a.url} target="_blank" rel="noopener noreferrer" style={styles.attachName}>{a.name}</a>
+                      {a.size_bytes && <span style={styles.attachSize}>{formatBytes(a.size_bytes)}</span>}
+                      {isAdmin && (
+                        <button style={styles.attachDeleteBtn} onClick={() => deleteAttachment(a.id)}>✕</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           <div style={styles.signoffSection}>
@@ -523,6 +607,17 @@ const styles = {
   emptyText: { color: '#9ca3af', fontSize: 15 },
   hint: { color: '#9ca3af', fontSize: 14 },
   optional: { fontSize: 11, fontWeight: 400, color: '#9ca3af' },
+  // Attachments
+  attachmentsSection: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px', marginBottom: 12 },
+  attachmentsHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 },
+  attachmentsTitle: { fontSize: 12, fontWeight: 700, color: '#6b7280' },
+  attachBtn: { fontSize: 12, fontWeight: 600, color: '#1a56db', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '4px 10px', borderRadius: 6, cursor: 'pointer' },
+  attachmentList: { display: 'flex', flexDirection: 'column', gap: 6 },
+  attachmentRow: { display: 'flex', alignItems: 'center', gap: 8 },
+  attachIcon: { fontSize: 15, flexShrink: 0 },
+  attachName: { flex: 1, fontSize: 13, color: '#1a56db', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  attachSize: { fontSize: 11, color: '#9ca3af', flexShrink: 0 },
+  attachDeleteBtn: { background: 'none', border: 'none', color: '#d1d5db', fontSize: 12, cursor: 'pointer', padding: '0 2px', flexShrink: 0 },
   // Quiz — form
   quizSection: { borderTop: '1px solid #f3f4f6', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 },
   quizSectionHead: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
