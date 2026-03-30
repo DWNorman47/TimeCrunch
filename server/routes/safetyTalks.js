@@ -2,6 +2,7 @@ const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { sendPushToAllWorkers } = require('../push');
+const { getPresignedUploadUrl } = require('../r2');
 
 // GET /safety-talks
 router.get('/', requireAuth, async (req, res) => {
@@ -39,7 +40,7 @@ router.get('/:id', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
   try {
-    const [talk, signoffs, questions] = await Promise.all([
+    const [talk, signoffs, questions, attachments] = await Promise.all([
       pool.query(
         `SELECT st.*, p.name as project_name, u.full_name as created_by_name
          FROM safety_talks st
@@ -64,9 +65,16 @@ router.get('/:id', requireAuth, async (req, res) => {
          ORDER BY order_index`,
         [req.params.id]
       ),
+      pool.query(
+        `SELECT id, name, url, content_type, size_bytes, created_at
+         FROM safety_talk_attachments
+         WHERE talk_id = $1
+         ORDER BY created_at`,
+        [req.params.id]
+      ),
     ]);
     if (talk.rowCount === 0) return res.status(404).json({ error: 'Not found' });
-    res.json({ ...talk.rows[0], signoffs: signoffs.rows, questions: questions.rows });
+    res.json({ ...talk.rows[0], signoffs: signoffs.rows, questions: questions.rows, attachments: attachments.rows });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -246,6 +254,54 @@ router.delete('/:id', requireAuth, async (req, res) => {
     const result = await pool.query(
       'DELETE FROM safety_talks WHERE id=$1 AND company_id=$2 RETURNING id',
       [req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ deleted: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /safety-talks/attachment-upload-url — presigned URL for direct R2 upload (admin)
+router.get('/attachment-upload-url', requireAuth, async (req, res) => {
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
+  if (!isAdmin) return res.status(403).json({ error: 'Admins only' });
+  const { ext, type } = req.query;
+  if (!ext || !type) return res.status(400).json({ error: 'ext and type required' });
+  try {
+    const result = await getPresignedUploadUrl('safety-talk-attachments', ext, type);
+    res.json(result);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /safety-talks/:id/attachments — save attachment metadata after upload (admin)
+router.post('/:id/attachments', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
+  if (!isAdmin) return res.status(403).json({ error: 'Admins only' });
+  const { name, url, content_type, size_bytes } = req.body;
+  if (!name || !url) return res.status(400).json({ error: 'name and url required' });
+  try {
+    const talk = await pool.query('SELECT id FROM safety_talks WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    if (talk.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const result = await pool.query(
+      `INSERT INTO safety_talk_attachments (talk_id, name, url, content_type, size_bytes, uploaded_by)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [req.params.id, name, url, content_type || null, size_bytes || null, req.user.id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /safety-talks/:id/attachments/:attId (admin)
+router.delete('/:id/attachments/:attId', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
+  if (!isAdmin) return res.status(403).json({ error: 'Admins only' });
+  try {
+    const talk = await pool.query('SELECT id FROM safety_talks WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    if (talk.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const result = await pool.query(
+      'DELETE FROM safety_talk_attachments WHERE id=$1 AND talk_id=$2 RETURNING id',
+      [req.params.attId, req.params.id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json({ deleted: true });

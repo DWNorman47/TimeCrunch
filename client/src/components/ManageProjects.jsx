@@ -21,6 +21,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   const [editGeoRadius, setEditGeoRadius] = useState('');
   const [editBudgetHours, setEditBudgetHours] = useState('');
   const [editBudgetDollars, setEditBudgetDollars] = useState('');
+  const [editRequiredChecklist, setEditRequiredChecklist] = useState('');
+  const [checklistTemplates, setChecklistTemplates] = useState([]);
   const [geoLocating, setGeoLocating] = useState(false);
   const [geoError, setGeoError] = useState('');
   const [archived, setArchived] = useState([]);
@@ -37,7 +39,10 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     }
   };
 
-  useEffect(() => { loadArchived(); }, []);
+  useEffect(() => {
+    loadArchived();
+    api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(() => {});
+  }, []);
 
   const handleAdd = async e => {
     e.preventDefault();
@@ -80,6 +85,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       setEditGeoRadius(p.geo_radius_ft || '');
       setEditBudgetHours(p.budget_hours || '');
       setEditBudgetDollars(p.budget_dollars || '');
+      setEditRequiredChecklist(p.required_checklist_template_id ? String(p.required_checklist_template_id) : '');
     }
   };
 
@@ -96,6 +102,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     }
     if (editBudgetHours !== '') payload.budget_hours = editBudgetHours || null;
     if (editBudgetDollars !== '') payload.budget_dollars = editBudgetDollars || null;
+    payload.required_checklist_template_id = editRequiredChecklist ? parseInt(editRequiredChecklist) : null;
     try {
       const r = await api.patch(`/admin/projects/${id}`, payload);
       onProjectUpdated(r.data);
@@ -230,6 +237,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                     <span style={s.itemName}>{p.name}</span>
                     {p.geo_radius_ft && <span style={s.indicatorBadge} title={`Geofence: ${p.geo_radius_ft.toLocaleString()} ft radius`}>📍</span>}
                     {hasBudget(p) && <span style={s.indicatorBadge} title={[parseFloat(p.budget_hours) > 0 && `${p.budget_hours} hrs`, parseFloat(p.budget_dollars) > 0 && `$${Number(p.budget_dollars).toLocaleString()}`].filter(Boolean).join(' / ')}>💰</span>}
+                    {p.required_checklist_template_id && <span style={s.indicatorBadge} title="Checklist required for clock-in">☑</span>}
                     {showWageType && (
                       <span style={{ ...s.wageBadge, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                         {p.wage_type === 'prevailing' ? t.prevailingWages : t.regularWages}
@@ -319,6 +327,22 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                         <p style={s.hint}>{t.budgetNote}</p>
                       </div>
                     )}
+
+                    {/* Clock-in Checklist */}
+                    <div style={s.section}>
+                      <div style={s.sectionTitle}>Clock-in Checklist</div>
+                      <select
+                        style={s.editInput}
+                        value={editRequiredChecklist}
+                        onChange={e => setEditRequiredChecklist(e.target.value)}
+                      >
+                        <option value="">None — no checklist required</option>
+                        {checklistTemplates.map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                      <p style={s.hint}>Workers must complete this checklist before clocking into this project.</p>
+                    </div>
 
                     {/* Actions */}
                     <div style={s.actionRow}>

@@ -81,12 +81,17 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     feature_broadcast: settings?.feature_broadcast ?? true,
     feature_media_gallery: settings?.feature_media_gallery ?? false,
     show_worker_wages: settings?.show_worker_wages ?? false,
+    global_required_checklist_template_id: settings?.global_required_checklist_template_id ?? '',
     currency: settings?.currency ?? 'USD',
     company_timezone: settings?.company_timezone ?? '',
     invoice_signature: settings?.invoice_signature ?? 'optional',
     default_temp_password: settings?.default_temp_password ?? '',
   });
   const [prevailingEnabled, setPrevailingEnabled] = useState(() => (settings?.prevailing_wage_rate ?? 0) > 0);
+  const [checklistTemplates, setChecklistTemplates] = useState([]);
+  useEffect(() => {
+    api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(() => {});
+  }, []);
   const [collapsed, setCollapsed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('opsfloa_company_sections') || '{}'); } catch { return {}; }
   });
@@ -126,6 +131,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       feature_broadcast: settings.feature_broadcast ?? true,
       feature_media_gallery: settings.feature_media_gallery ?? false,
       show_worker_wages: settings.show_worker_wages ?? false,
+      global_required_checklist_template_id: settings.global_required_checklist_template_id ?? '',
       currency: settings.currency ?? 'USD',
       company_timezone: settings.company_timezone ?? '',
       invoice_signature: settings.invoice_signature ?? 'optional',
@@ -162,6 +168,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_broadcast: form.feature_broadcast,
         feature_media_gallery: form.feature_media_gallery,
         show_worker_wages: form.show_worker_wages,
+        global_required_checklist_template_id: form.global_required_checklist_template_id,
         currency: form.currency,
         company_timezone: form.company_timezone,
         invoice_signature: form.invoice_signature,
@@ -539,6 +546,22 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <input type="checkbox" checked={form.feature_media_gallery} onChange={e => set('feature_media_gallery', e.target.checked)} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleKnob, transform: form.feature_media_gallery ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Global Clock-in Checklist</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Require all workers to complete a safety checklist before clocking in (any project)</div>
+            </div>
+            <select
+              style={{ ...styles.input, width: 'auto', textAlign: 'left', minWidth: 160 }}
+              value={form.global_required_checklist_template_id}
+              onChange={e => set('global_required_checklist_template_id', e.target.value)}
+            >
+              <option value="">None</option>
+              {checklistTemplates.map(t => (
+                <option key={t.id} value={String(t.id)}>{t.name}</option>
+              ))}
+            </select>
           </div>
         </div>}
         {!collapsed.features && <SectionFooter section="features" />}

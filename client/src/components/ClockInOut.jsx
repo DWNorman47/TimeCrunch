@@ -40,6 +40,9 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
   const [mileage, setMileage] = useState('');
   const [switchingProject, setSwitchingProject] = useState(false);
   const [switchProject, setSwitchProject] = useState('');
+  const [pendingChecklist, setPendingChecklist] = useState(null); // { template_id, items, name }
+  const [checklistAnswers, setChecklistAnswers] = useState({});
+  const [checklistSubmitting, setChecklistSubmitting] = useState(false);
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -100,9 +103,39 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
       }
     } catch (err) {
       const data = err.response?.data;
-      setError(data?.geofence ? data.error : (data?.error || t.clockInFailed));
+      if (data?.checklist_required) {
+        // Fetch template so we can show inline checklist
+        api.get(`/safety-checklists/templates`).then(r => {
+          const tmpl = r.data.find(t => t.id === data.template_id);
+          if (tmpl) setPendingChecklist(tmpl);
+          else setError('A safety checklist is required — please complete it in the Field app first.');
+        }).catch(() => setError('A safety checklist is required before clocking in.'));
+      } else {
+        setError(data?.geofence ? data.error : (data?.error || t.clockInFailed));
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleChecklistSubmit = async () => {
+    setChecklistSubmitting(true);
+    try {
+      await api.post('/safety-checklists/submissions', {
+        template_id: pendingChecklist.id,
+        template_name: pendingChecklist.name,
+        project_id: selectedProject || null,
+        answers: checklistAnswers,
+        check_date: new Date().toLocaleDateString('en-CA'),
+      });
+      setPendingChecklist(null);
+      setChecklistAnswers({});
+      // Retry clock-in now that checklist is complete
+      handleClockIn();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to submit checklist');
+    } finally {
+      setChecklistSubmitting(false);
     }
   };
 
@@ -356,9 +389,53 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
           </div>
         )}
         {error && <p style={styles.error}>{error}</p>}
-        <button style={styles.clockInBtn} className="clock-btn" onClick={handleClockIn} disabled={loading}>
-          {loading ? t.clockingIn : t.clockIn}
-        </button>
+        {pendingChecklist && (
+          <div style={styles.checklistGate}>
+            <div style={styles.checklistGateTitle}>☑ Required: {pendingChecklist.name}</div>
+            <div style={styles.checklistGateSub}>Complete this checklist to clock in.</div>
+            {(pendingChecklist.items || []).map((item, i) => (
+              <div key={i} style={styles.checklistGateItem}>
+                {item.type === 'text' ? (
+                  <>
+                    <div style={styles.checklistGateLabel}>{item.label}</div>
+                    <input
+                      style={styles.checklistGateTextInput}
+                      type="text"
+                      placeholder="Your answer..."
+                      value={checklistAnswers[i] || ''}
+                      onChange={e => setChecklistAnswers(a => ({ ...a, [i]: e.target.value }))}
+                    />
+                  </>
+                ) : (
+                  <label style={styles.checklistGateCheckRow}>
+                    <input
+                      type="checkbox"
+                      checked={!!checklistAnswers[i]}
+                      onChange={e => setChecklistAnswers(a => ({ ...a, [i]: e.target.checked }))}
+                      style={{ width: 18, height: 18, flexShrink: 0 }}
+                    />
+                    <span style={styles.checklistGateLabel}>{item.label}</span>
+                  </label>
+                )}
+              </div>
+            ))}
+            <button
+              style={styles.checklistGateSubmitBtn}
+              onClick={handleChecklistSubmit}
+              disabled={checklistSubmitting}
+            >
+              {checklistSubmitting ? 'Submitting...' : 'Submit & Clock In'}
+            </button>
+            <button style={styles.checklistGateCancelBtn} onClick={() => { setPendingChecklist(null); setChecklistAnswers({}); }}>
+              Cancel
+            </button>
+          </div>
+        )}
+        {!pendingChecklist && (
+          <button style={styles.clockInBtn} className="clock-btn" onClick={handleClockIn} disabled={loading}>
+            {loading ? t.clockingIn : t.clockIn}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -395,6 +472,15 @@ const styles = {
   switchCancelBtn: { padding: '9px 14px', background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: 'rgba(255,255,255,0.8)', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
   clockOutBtn: { width: '100%', padding: '13px', background: 'rgba(255,255,255,0.2)', color: '#fff', border: '2px solid rgba(255,255,255,0.5)', borderRadius: 8, fontSize: 16, fontWeight: 700, cursor: 'pointer' },
   cancelClockInBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: '2px 0', alignSelf: 'center' },
+  checklistGate: { background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 },
+  checklistGateTitle: { fontSize: 14, fontWeight: 700, color: '#15803d' },
+  checklistGateSub: { fontSize: 12, color: '#166534', marginTop: -6 },
+  checklistGateItem: { display: 'flex', flexDirection: 'column', gap: 4 },
+  checklistGateCheckRow: { display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' },
+  checklistGateLabel: { fontSize: 13, color: '#374151', fontWeight: 500 },
+  checklistGateTextInput: { padding: '7px 10px', border: '1px solid #d1fae5', borderRadius: 6, fontSize: 13, width: '100%' },
+  checklistGateSubmitBtn: { padding: '11px', background: '#15803d', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  checklistGateCancelBtn: { background: 'none', border: 'none', color: '#6b7280', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', alignSelf: 'center' },
   noProjects: { textAlign: 'center', padding: '24px 16px' },
   noProjectsIcon: { fontSize: 36, marginBottom: 10 },
   noProjectsTitle: { fontWeight: 700, fontSize: 16, color: '#374151', marginBottom: 6 },
