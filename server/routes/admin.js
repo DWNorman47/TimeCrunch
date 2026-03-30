@@ -150,7 +150,7 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
   const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
   const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour', 'chat_retention_days'];
   const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold'];
-  const stringKeys = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature'];
+  const stringKeys = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id'];
   const allowed = [...numericKeys, ...stringKeys, ...FEATURE_KEYS];
   const companyId = req.user.company_id;
   try {
@@ -885,7 +885,7 @@ router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
 
 // Update project (name and/or wage_type and/or geofence)
 router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
-  const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence, budget_hours, budget_dollars, prevailing_wage_rate } = req.body;
+  const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence, budget_hours, budget_dollars, prevailing_wage_rate, required_checklist_template_id } = req.body;
   if (wage_type !== undefined && !['regular', 'prevailing'].includes(wage_type)) {
     return res.status(400).json({ error: 'wage_type must be regular or prevailing' });
   }
@@ -924,6 +924,10 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
       const pwr = prevailing_wage_rate === null ? null : parseFloat(prevailing_wage_rate);
       if (pwr !== null && (isNaN(pwr) || pwr < 0)) return res.status(400).json({ error: 'prevailing_wage_rate must be non-negative' });
       fields.push(`prevailing_wage_rate = $${idx++}`); values.push(pwr);
+    }
+    if (required_checklist_template_id !== undefined) {
+      fields.push(`required_checklist_template_id = $${idx++}`);
+      values.push(required_checklist_template_id ? parseInt(required_checklist_template_id) : null);
     }
     if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
     values.push(req.params.id);

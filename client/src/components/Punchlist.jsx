@@ -92,12 +92,27 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin }) {
   );
 }
 
-function PunchItem({ item, isAdmin, workers, onUpdated, onDeleted }) {
+function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted }) {
+  const [item, setItem] = useState(initialItem);
   const [expanded, setExpanded] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [checklist, setChecklist] = useState(null); // null = not loaded
+  const [newCheckText, setNewCheckText] = useState('');
+  const [addingCheck, setAddingCheck] = useState(false);
+
+  useEffect(() => { setItem(initialItem); }, [initialItem]);
 
   const nextStatus = { open: 'done', done: 'verified', verified: 'open' };
   const nextLabel = { open: 'Mark Done', done: 'Verify', verified: 'Reopen' };
+
+  const handleExpand = () => {
+    if (item.pending) return;
+    const next = !expanded;
+    setExpanded(next);
+    if (next && checklist === null) {
+      api.get(`/punchlist/${item.id}/checklist`).then(r => setChecklist(r.data)).catch(() => setChecklist([]));
+    }
+  };
 
   const advance = async () => {
     setUpdating(true);
@@ -119,11 +134,44 @@ function PunchItem({ item, isAdmin, workers, onUpdated, onDeleted }) {
     try { await api.delete(`/punchlist/${item.id}`); onDeleted(item.id); } catch {}
   };
 
+  const toggleCheck = async (checkId, checked) => {
+    try {
+      const r = await api.patch(`/punchlist/${item.id}/checklist/${checkId}`, { checked });
+      setChecklist(prev => prev.map(c => c.id === checkId ? r.data : c));
+      const newDone = checklist.filter(c => c.id === checkId ? checked : c.checked).length;
+      setItem(it => ({ ...it, checked_count: newDone }));
+    } catch {}
+  };
+
+  const deleteCheck = async checkId => {
+    try {
+      await api.delete(`/punchlist/${item.id}/checklist/${checkId}`);
+      const updated = checklist.filter(c => c.id !== checkId);
+      setChecklist(updated);
+      const newDone = updated.filter(c => c.checked).length;
+      setItem(it => ({ ...it, checklist_total: updated.length, checked_count: newDone }));
+    } catch {}
+  };
+
+  const addCheck = async e => {
+    e.preventDefault();
+    if (!newCheckText.trim()) return;
+    setAddingCheck(true);
+    try {
+      const r = await api.post(`/punchlist/${item.id}/checklist`, { text: newCheckText.trim() });
+      setChecklist(prev => [...(prev || []), r.data]);
+      setItem(it => ({ ...it, checklist_total: parseInt(it.checklist_total || 0) + 1 }));
+      setNewCheckText('');
+    } catch {} finally { setAddingCheck(false); }
+  };
+
   const priorityDot = { high: '🔴', normal: '🟡', low: '⚪' }[item.priority] || '🟡';
+  const checkTotal = parseInt(item.checklist_total || 0);
+  const checkDone = parseInt(item.checked_count || 0);
 
   return (
     <div style={{ ...styles.item, opacity: item.status === 'verified' ? 0.65 : 1 }}>
-      <div style={styles.itemRow} onClick={() => !item.pending && setExpanded(e => !e)}>
+      <div style={styles.itemRow} onClick={handleExpand}>
         <span style={styles.priorityDot} title={`Priority: ${item.priority}`}>{priorityDot}</span>
         <div style={styles.itemMain}>
           <span style={{ ...styles.itemTitle, textDecoration: item.status === 'verified' ? 'line-through' : 'none' }}>
@@ -134,6 +182,11 @@ function PunchItem({ item, isAdmin, workers, onUpdated, onDeleted }) {
             {item.project_name && <span style={styles.metaTag}>{item.project_name}</span>}
             {item.location && <span style={styles.metaLoc}>📍 {item.location}</span>}
             {item.assigned_to_name && <span style={styles.metaAssign}>👤 {item.assigned_to_name}</span>}
+            {checkTotal > 0 && (
+              <span style={{ ...styles.checkProgress, ...(checkDone === checkTotal ? styles.checkProgressDone : {}) }}>
+                ☑ {checkDone}/{checkTotal}
+              </span>
+            )}
           </div>
         </div>
         <div style={styles.itemRight}>
@@ -150,6 +203,47 @@ function PunchItem({ item, isAdmin, workers, onUpdated, onDeleted }) {
           {item.resolved_at && item.status === 'verified' && (
             <p style={styles.resolvedNote}>Verified {new Date(item.resolved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
           )}
+
+          {/* Checklist */}
+          <div style={styles.checklistSection}>
+            {checklist === null ? (
+              <p style={styles.checklistLoading}>Loading...</p>
+            ) : (
+              <>
+                {checklist.length > 0 && (
+                  <div style={styles.checklistItems}>
+                    {checklist.map(c => (
+                      <div key={c.id} style={styles.checkRow}>
+                        <input
+                          type="checkbox"
+                          checked={c.checked}
+                          onChange={e => toggleCheck(c.id, e.target.checked)}
+                          style={styles.checkbox}
+                        />
+                        <span style={{ ...styles.checkText, textDecoration: c.checked ? 'line-through' : 'none', color: c.checked ? '#9ca3af' : '#374151' }}>
+                          {c.text}
+                        </span>
+                        <button style={styles.checkDeleteBtn} onClick={() => deleteCheck(c.id)}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <form onSubmit={addCheck} style={styles.addCheckForm}>
+                  <input
+                    style={styles.checkInput}
+                    type="text"
+                    placeholder={checklist.length === 0 ? '+ Add checklist...' : '+ Add item...'}
+                    value={newCheckText}
+                    onChange={e => setNewCheckText(e.target.value)}
+                  />
+                  {newCheckText.trim() && (
+                    <button type="submit" style={styles.checkAddBtn} disabled={addingCheck}>Add</button>
+                  )}
+                </form>
+              </>
+            )}
+          </div>
+
           {isAdmin && (
             <div style={styles.assignRow}>
               <label style={styles.label}>Assign to: </label>
@@ -318,6 +412,19 @@ const styles = {
   formActions: { display: 'flex', gap: 10 },
   submitBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' },
   cancelBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '10px 20px', borderRadius: 8, fontSize: 14, cursor: 'pointer' },
+  // Checklist
+  checkProgress: { fontSize: 11, fontWeight: 600, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
+  checkProgressDone: { color: '#065f46', background: '#d1fae5' },
+  checklistSection: { marginBottom: 12 },
+  checklistLoading: { fontSize: 12, color: '#9ca3af', margin: '8px 0' },
+  checklistItems: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 },
+  checkRow: { display: 'flex', alignItems: 'center', gap: 8 },
+  checkbox: { width: 16, height: 16, cursor: 'pointer', flexShrink: 0, accentColor: '#059669' },
+  checkText: { flex: 1, fontSize: 13, lineHeight: 1.4 },
+  checkDeleteBtn: { background: 'none', border: 'none', color: '#d1d5db', fontSize: 12, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 },
+  addCheckForm: { display: 'flex', gap: 6, alignItems: 'center' },
+  checkInput: { flex: 1, padding: '6px 9px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, background: '#f9fafb' },
+  checkAddBtn: { padding: '6px 12px', background: '#059669', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   // Empty / misc
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
