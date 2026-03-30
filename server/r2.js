@@ -33,7 +33,7 @@ async function uploadBase64(dataUrl, folder = 'photos') {
     ContentType: mimeType,
   }));
 
-  return `${process.env.R2_PUBLIC_URL}/${key}`;
+  return { url: `${process.env.R2_PUBLIC_URL}/${key}`, sizeBytes: buffer.length };
 }
 
 /**

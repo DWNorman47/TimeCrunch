@@ -3,6 +3,7 @@ const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { sendPushToAllWorkers } = require('../push');
 const { getPresignedUploadUrl } = require('../r2');
+const { checkStorageLimit, incrementStorage, decrementStorage } = require('../storage');
 
 // GET /safety-talks
 router.get('/', requireAuth, async (req, res) => {
@@ -264,9 +265,19 @@ router.delete('/:id', requireAuth, async (req, res) => {
 router.get('/attachment-upload-url', requireAuth, async (req, res) => {
   const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
   if (!isAdmin) return res.status(403).json({ error: 'Admins only' });
-  const { ext, type } = req.query;
+  const { ext, type, size } = req.query;
   if (!ext || !type) return res.status(400).json({ error: 'ext and type required' });
   try {
+    const sizeBytes = parseInt(size) || 0;
+    if (sizeBytes > 0) {
+      const { allowed, used, limit } = await checkStorageLimit(req.user.company_id, sizeBytes);
+      if (!allowed) {
+        return res.status(413).json({
+          error: `Storage limit reached (${(used / (1024 * 1024)).toFixed(0)} MB of ${(limit / (1024 * 1024)).toFixed(0)} MB used). Upgrade your plan to upload more files.`,
+          storage_limit: true,
+        });
+      }
+    }
     const result = await getPresignedUploadUrl('safety-talk-attachments', ext, type);
     res.json(result);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
@@ -287,6 +298,7 @@ router.post('/:id/attachments', requireAuth, async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
       [req.params.id, name, url, content_type || null, size_bytes || null, req.user.id]
     );
+    if (size_bytes) incrementStorage(companyId, parseInt(size_bytes)).catch(() => {});
     res.status(201).json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -300,10 +312,12 @@ router.delete('/:id/attachments/:attId', requireAuth, async (req, res) => {
     const talk = await pool.query('SELECT id FROM safety_talks WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
     if (talk.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     const result = await pool.query(
-      'DELETE FROM safety_talk_attachments WHERE id=$1 AND talk_id=$2 RETURNING id',
+      'DELETE FROM safety_talk_attachments WHERE id=$1 AND talk_id=$2 RETURNING id, size_bytes',
       [req.params.attId, req.params.id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const bytes = result.rows[0].size_bytes;
+    if (bytes) decrementStorage(companyId, parseInt(bytes)).catch(() => {});
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
