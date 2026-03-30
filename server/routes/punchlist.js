@@ -20,7 +20,9 @@ router.get('/', requireAuth, async (req, res) => {
     const result = await pool.query(
       `SELECT pi.*, p.name as project_name,
               creator.full_name as created_by_name,
-              assignee.full_name as assigned_to_name
+              assignee.full_name as assigned_to_name,
+              (SELECT COUNT(*) FROM punchlist_checklist_items WHERE punchlist_id = pi.id) as checklist_total,
+              (SELECT COUNT(*) FROM punchlist_checklist_items WHERE punchlist_id = pi.id AND checked = true) as checked_count
        FROM punchlist_items pi
        LEFT JOIN projects p ON pi.project_id = p.id
        LEFT JOIN users creator ON pi.created_by = creator.id
@@ -120,6 +122,72 @@ router.patch('/:id', requireAuth, async (req, res) => {
       });
     }
     res.json(updated);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /punchlist/:id/checklist
+router.get('/:id/checklist', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    // Verify item belongs to company
+    const item = await pool.query('SELECT id FROM punchlist_items WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    if (item.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const result = await pool.query(
+      'SELECT * FROM punchlist_checklist_items WHERE punchlist_id=$1 ORDER BY order_index, created_at',
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /punchlist/:id/checklist
+router.post('/:id/checklist', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { text } = req.body;
+  if (!text?.trim()) return res.status(400).json({ error: 'text required' });
+  try {
+    const item = await pool.query('SELECT id FROM punchlist_items WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    if (item.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const maxOrder = await pool.query('SELECT COALESCE(MAX(order_index),0) as m FROM punchlist_checklist_items WHERE punchlist_id=$1', [req.params.id]);
+    const result = await pool.query(
+      'INSERT INTO punchlist_checklist_items (punchlist_id, text, order_index) VALUES ($1,$2,$3) RETURNING *',
+      [req.params.id, text.trim(), parseInt(maxOrder.rows[0].m) + 1]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// PATCH /punchlist/:id/checklist/:checkId
+router.patch('/:id/checklist/:checkId', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { checked, text } = req.body;
+  try {
+    const item = await pool.query('SELECT id FROM punchlist_items WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    if (item.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const result = await pool.query(
+      `UPDATE punchlist_checklist_items SET
+         checked = CASE WHEN $1::boolean IS NOT NULL THEN $1 ELSE checked END,
+         text = COALESCE($2, text)
+       WHERE id=$3 AND punchlist_id=$4 RETURNING *`,
+      [checked !== undefined ? checked : null, text || null, req.params.checkId, req.params.id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /punchlist/:id/checklist/:checkId
+router.delete('/:id/checklist/:checkId', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const item = await pool.query('SELECT id FROM punchlist_items WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    if (item.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const result = await pool.query(
+      'DELETE FROM punchlist_checklist_items WHERE id=$1 AND punchlist_id=$2 RETURNING id',
+      [req.params.checkId, req.params.id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

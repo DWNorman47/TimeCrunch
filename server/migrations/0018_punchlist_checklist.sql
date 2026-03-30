@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS punchlist_checklist_items (
+  id SERIAL PRIMARY KEY,
+  punchlist_id INTEGER NOT NULL REFERENCES punchlist_items(id) ON DELETE CASCADE,
+  text TEXT NOT NULL,
+  checked BOOLEAN NOT NULL DEFAULT FALSE,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW()
+);
