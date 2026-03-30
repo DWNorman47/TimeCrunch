@@ -38,6 +38,8 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
   const [mileageAdded, setMileageAdded] = useState(false);
   const [breakMinutes, setBreakMinutes] = useState('');
   const [mileage, setMileage] = useState('');
+  const [switchingProject, setSwitchingProject] = useState(false);
+  const [switchProject, setSwitchProject] = useState('');
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -156,6 +158,37 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
     }
   };
 
+  const handleSwitchProject = async () => {
+    if (!switchProject) { setError('Select a project to switch to'); return; }
+    setError('');
+    setLoading(true);
+    const { lat, lng } = geolocationEnabled ? await getLocation() : { lat: null, lng: null };
+    const local_clock_in = status.clock_in_time ? toLocalTime(new Date(status.clock_in_time)) : toLocalTime(new Date());
+    const local_clock_out = toLocalTime(new Date());
+    try {
+      await api.post('/clock/out', {
+        lat, lng,
+        break_minutes: breakMinutes ? parseInt(breakMinutes) : 0,
+        mileage: mileage ? parseFloat(mileage) : null,
+        local_clock_in,
+        local_clock_out,
+      });
+      const local_work_date = new Date().toLocaleDateString('en-CA');
+      const r = await api.post('/clock/in', { project_id: switchProject, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+      setStatus(r.data);
+      setSwitchingProject(false);
+      setSwitchProject('');
+      setBreakAdded(false);
+      setMileageAdded(false);
+      setBreakMinutes('');
+      setMileage('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to switch project');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const offlineBanner = (isOffline || queueCount > 0) && (
     <div style={styles.offlineBanner}>
       {isOffline ? 'You are offline — punches will sync when reconnected.' : null}
@@ -230,6 +263,37 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
             )}
 
             {error && <p style={styles.errorDark}>{error}</p>}
+
+            {switchingProject ? (
+              <div style={styles.switchBox}>
+                <select
+                  style={styles.switchSelect}
+                  value={switchProject}
+                  onChange={e => setSwitchProject(e.target.value)}
+                  autoFocus
+                >
+                  <option value="">Select new project...</option>
+                  {projects?.filter(p => String(p.id) !== String(status.project_id)).map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <div style={styles.switchActions}>
+                  <button style={styles.switchConfirmBtn} onClick={handleSwitchProject} disabled={loading || !switchProject}>
+                    {loading ? '...' : 'Confirm Switch'}
+                  </button>
+                  <button style={styles.switchCancelBtn} onClick={() => { setSwitchingProject(false); setSwitchProject(''); setError(''); }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              projectsEnabled && projects?.length > 1 && (
+                <button style={styles.switchProjectBtn} onClick={() => setSwitchingProject(true)} disabled={loading}>
+                  🔄 Switch Project
+                </button>
+              )
+            )}
+
             <button style={styles.clockOutBtn} className="clock-btn" onClick={handleClockOut} disabled={loading}>
               {loading ? t.clockingOut : t.clockOut}
             </button>
@@ -323,6 +387,12 @@ const styles = {
   error: { color: '#ef4444', fontSize: 13, margin: 0, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px' },
   errorDark: { fontSize: 13, margin: 0, background: 'rgba(255,255,255,0.15)', borderRadius: 6, padding: '8px 12px', color: '#fff' },
   clockInBtn: { padding: '13px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 700 },
+  switchProjectBtn: { width: '100%', padding: '11px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' },
+  switchBox: { background: 'rgba(255,255,255,0.12)', borderRadius: 8, padding: '12px', display: 'flex', flexDirection: 'column', gap: 10 },
+  switchSelect: { padding: '9px 11px', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 7, fontSize: 14, background: 'rgba(255,255,255,0.15)', color: '#fff', width: '100%' },
+  switchActions: { display: 'flex', gap: 8 },
+  switchConfirmBtn: { flex: 1, padding: '9px', background: '#fff', color: '#1a56db', border: 'none', borderRadius: 7, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  switchCancelBtn: { padding: '9px 14px', background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: 'rgba(255,255,255,0.8)', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
   clockOutBtn: { width: '100%', padding: '13px', background: 'rgba(255,255,255,0.2)', color: '#fff', border: '2px solid rgba(255,255,255,0.5)', borderRadius: 8, fontSize: 16, fontWeight: 700, cursor: 'pointer' },
   cancelClockInBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: '2px 0', alignSelf: 'center' },
   noProjects: { textAlign: 'center', padding: '24px 16px' },
