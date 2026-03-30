@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useOffline } from '../contexts/OfflineContext';
+import { IncidentReportPDFButton } from './IncidentReportPDF';
 
 const TYPE_LABELS = {
   'injury': '🤕 Injury',
@@ -53,7 +55,11 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
       if (!payload.project_id) delete payload.project_id;
       if (!payload.incident_time) delete payload.incident_time;
       const r = await api.post('/incidents', payload);
-      onSubmitted(r.data);
+      if (r.data?.offline) {
+        onSubmitted({ id: 'pending-' + Date.now(), pending: true, ...form, incident_date: form.incident_date, status: 'open' });
+      } else {
+        onSubmitted(r.data);
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to submit report');
     } finally { setSaving(false); }
@@ -177,7 +183,7 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
       <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
         <div style={styles.cardLeft}>
           {isAdmin && <div style={styles.workerName}>{incident.reporter_name}</div>}
-          <div style={styles.cardTitle}>{typeLabel}</div>
+          <div style={styles.cardTitle}>{typeLabel}{incident.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}</div>
           <div style={styles.cardMeta}>
             <span>{incident.incident_date?.toString().substring(0, 10)}{incident.incident_time ? ` · ${incident.incident_time.substring(0, 5)}` : ''}</span>
             {incident.project_name && <span style={styles.projectTag}>{incident.project_name}</span>}
@@ -244,6 +250,7 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
 export default function IncidentReports({ projects }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const { onSync } = useOffline() || {};
 
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -260,6 +267,7 @@ export default function IncidentReports({ projects }) {
 
   useEffect(() => { loadIncidents().finally(() => setLoading(false)); }, []);
   useEffect(() => { if (!loading) loadIncidents(filters); }, [filters]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadIncidents(); }); }, [onSync]);
 
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
@@ -274,9 +282,10 @@ export default function IncidentReports({ projects }) {
             <p style={styles.openNote}>{openCount} open incident{openCount !== 1 ? 's' : ''}</p>
           )}
         </div>
-        {!showForm && (
-          <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ New Incident</button>
-        )}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {incidents.length > 0 && <IncidentReportPDFButton incidents={incidents} companyName={user?.company_name} style={styles.pdfBtn} />}
+          {!showForm && <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ New Incident</button>}
+        </div>
       </div>
 
       {showForm && (
@@ -336,6 +345,7 @@ const styles = {
   heading: { fontSize: 22, fontWeight: 800, color: '#111827', margin: 0 },
   openNote: { fontSize: 13, color: '#d97706', fontWeight: 600, margin: '4px 0 0' },
   newBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
+  pdfBtn: { fontSize: 13, fontWeight: 600, color: '#1a56db', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '9px 16px', borderRadius: 8, textDecoration: 'none', cursor: 'pointer', flexShrink: 0 },
   formCard: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 20 },
   filterBar: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 },
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151', flex: 1, minWidth: 120 },
@@ -366,6 +376,7 @@ const styles = {
   cardActions: { display: 'flex', gap: 8, marginTop: 14 },
   closeBtn: { background: '#059669', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  pendingBadge: { fontSize: 10, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 6, marginLeft: 6, verticalAlign: 'middle' },
   // Form
   form: { display: 'flex', flexDirection: 'column', gap: 16 },
   formTitle: { fontSize: 17, fontWeight: 700, margin: 0 },

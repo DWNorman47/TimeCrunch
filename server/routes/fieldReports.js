@@ -2,6 +2,7 @@ const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToCompanyAdmins } = require('../push');
+const { uploadBase64, getPresignedUploadUrl } = require('../r2');
 
 // GET /field-reports — worker gets own; admin gets full company feed
 router.get('/', requireAuth, async (req, res) => {
@@ -21,8 +22,8 @@ router.get('/', requireAuth, async (req, res) => {
     }
     if (project_id) { params.push(project_id); conditions.push(`r.project_id = $${params.length}`); }
     if (status) { params.push(status); conditions.push(`r.status = $${params.length}`); }
-    if (from) { params.push(from); conditions.push(`r.reported_at >= $${params.length}`); }
-    if (to) { params.push(to); conditions.push(`r.reported_at < ($${params.length}::date + interval '1 day')`); }
+    if (from) { params.push(from); conditions.push(`COALESCE(r.report_date, r.reported_at::date) >= $${params.length}::date`); }
+    if (to) { params.push(to); conditions.push(`COALESCE(r.report_date, r.reported_at::date) <= $${params.length}::date`); }
 
     const result = await pool.query(
       `SELECT r.*, u.full_name as worker_name, p.name as project_name,
@@ -42,22 +43,30 @@ router.get('/', requireAuth, async (req, res) => {
 
 // POST /field-reports — create a report with photos
 router.post('/', requireAuth, async (req, res) => {
-  const { title, notes, project_id, lat, lng, photos = [] } = req.body;
+  const { title, notes, project_id, lat, lng, photos = [], report_date } = req.body;
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
-      `INSERT INTO field_reports (company_id, user_id, project_id, title, notes, lat, lng)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [companyId, req.user.id, project_id || null, title || null, notes || null, lat || null, lng || null]
+      `INSERT INTO field_reports (company_id, user_id, project_id, title, notes, lat, lng, report_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [companyId, req.user.id, project_id || null, title || null, notes || null, lat || null, lng || null, report_date || null]
     );
     const report = result.rows[0];
 
     if (photos.length > 0) {
-      const photoValues = photos.map((p, i) => `($1, $2, $${i * 2 + 3}, $${i * 2 + 4})`).join(', ');
-      const photoParams = [report.id, companyId];
-      photos.forEach(p => { photoParams.push(p.url); photoParams.push(p.caption || null); });
+      // Upload base64 data URLs to R2; pass through any already-hosted URLs
+      const uploaded = await Promise.all(
+        photos.map(p => uploadBase64(p.url).then(url => ({
+          url,
+          caption: p.caption || null,
+          media_type: p.media_type || 'photo',
+        })))
+      );
+      const photoValues = uploaded.map((p, i) => `($1, $${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`).join(', ');
+      const photoParams = [report.id];
+      uploaded.forEach(p => { photoParams.push(p.url); photoParams.push(p.caption); photoParams.push(p.media_type); });
       await pool.query(
-        `INSERT INTO field_report_photos (report_id, company_id, url, caption) VALUES ${photoValues}`,
+        `INSERT INTO field_report_photos (report_id, url, caption, media_type) VALUES ${photoValues}`,
         photoParams
       );
     }
@@ -158,7 +167,7 @@ router.get('/photos', requireAuth, async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT ph.id, ph.url, ph.caption,
+      `SELECT ph.id, ph.url, ph.caption, ph.media_type,
               r.id as report_id, r.reported_at, r.title as report_title,
               r.project_id, r.lat, r.lng,
               p.name as project_name, u.full_name as worker_name
@@ -172,6 +181,16 @@ router.get('/photos', requireAuth, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /field-reports/upload-url — presigned URL for direct browser→R2 video upload
+router.get('/upload-url', requireAuth, async (req, res) => {
+  const { contentType = 'video/mp4' } = req.query;
+  const ext = contentType.split('/')[1]?.split(';')[0] || 'mp4';
+  try {
+    const { uploadUrl, publicUrl } = await getPresignedUploadUrl('videos', ext, contentType);
+    res.json({ uploadUrl, publicUrl });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to generate upload URL' }); }
 });
 
 module.exports = router;

@@ -11,14 +11,20 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const token = localStorage.getItem('tc_token');
-    if (token) {
-      api.get('/auth/me')
-        .then(r => setUser(r.data.user))
-        .catch(() => localStorage.removeItem('tc_token'))
-        .finally(() => setLoading(false));
-    } else {
+    if (!token) { setLoading(false); return; }
+
+    // If offline, use cached user so the app works without a network round-trip
+    if (!navigator.onLine) {
+      const cached = localStorage.getItem('tc_user');
+      if (cached) { try { setUser(JSON.parse(cached)); } catch {} }
       setLoading(false);
+      return;
     }
+
+    api.get('/auth/me', { timeout: 10000 })
+      .then(r => { setUser(r.data.user); localStorage.setItem('tc_user', JSON.stringify(r.data.user)); })
+      .catch(() => localStorage.removeItem('tc_token'))
+      .finally(() => setLoading(false));
   }, []);
 
   const login = async (username, password, company_name) => {
@@ -58,6 +64,7 @@ export function AuthProvider({ children }) {
   const logout = () => {
     clearCache();
     localStorage.removeItem('tc_token');
+    localStorage.removeItem('tc_user');
     setUser(null);
     setFirstLogin(false);
   };
