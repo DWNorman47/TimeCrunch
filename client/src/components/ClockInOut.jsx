@@ -289,7 +289,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
             ) : (
               projectsEnabled && projects?.length > 1 && (
                 <button style={styles.switchProjectBtn} onClick={() => setSwitchingProject(true)} disabled={loading}>
-                  🔄 Switch Project
+                  Switch Project
                 </button>
               )
             )}
