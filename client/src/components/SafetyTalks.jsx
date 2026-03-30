@@ -33,6 +33,8 @@ function fmtDate(str) {
 function NewTalkForm({ projects, onAdded, onCancel }) {
   const today = new Date().toLocaleDateString('en-CA');
   const [form, setForm] = useState({ title: '', content: '', given_by: '', talk_date: today, project_id: '' });
+  const [questions, setQuestions] = useState([]);
+  const [passThreshold, setPassThreshold] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showLibrary, setShowLibrary] = useState(false);
@@ -43,14 +45,34 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
     setShowLibrary(false);
   };
 
+  const addQuestion = () => setQuestions(q => [...q, { question: '', options: ['', ''], correct_index: 0 }]);
+  const removeQuestion = i => setQuestions(q => q.filter((_, idx) => idx !== i));
+  const setQuestion = (i, text) => setQuestions(q => q.map((x, idx) => idx === i ? { ...x, question: text } : x));
+  const setOption = (qi, oi, text) => setQuestions(q => q.map((x, idx) => idx === qi ? { ...x, options: x.options.map((o, j) => j === oi ? text : o) } : x));
+  const addOption = i => setQuestions(q => q.map((x, idx) => idx === i && x.options.length < 4 ? { ...x, options: [...x.options, ''] } : x));
+  const removeOption = (qi, oi) => setQuestions(q => q.map((x, idx) => {
+    if (idx !== qi) return x;
+    const opts = x.options.filter((_, j) => j !== oi);
+    return { ...x, options: opts, correct_index: Math.min(x.correct_index, opts.length - 1) };
+  }));
+  const setCorrect = (qi, oi) => setQuestions(q => q.map((x, idx) => idx === qi ? { ...x, correct_index: oi } : x));
+
   const submit = async e => {
     e.preventDefault();
     if (!form.title.trim()) { setError('Title is required'); return; }
+    for (let i = 0; i < questions.length; i++) {
+      if (!questions[i].question.trim()) { setError(`Question ${i + 1} is missing text.`); return; }
+      if (questions[i].options.filter(o => o.trim()).length < 2) { setError(`Question ${i + 1} needs at least 2 answer options.`); return; }
+    }
     setSaving(true); setError('');
     try {
-      const r = await api.post('/safety-talks', form);
+      const r = await api.post('/safety-talks', {
+        ...form,
+        questions,
+        pass_threshold: passThreshold !== '' ? parseInt(passThreshold) : null,
+      });
       if (r.data?.offline) {
-        onAdded({ id: 'pending-' + Date.now(), pending: true, ...form, signoff_count: 0 });
+        onAdded({ id: 'pending-' + Date.now(), pending: true, ...form, signoff_count: 0, question_count: 0 });
       } else {
         onAdded(r.data);
       }
@@ -105,6 +127,76 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
           <textarea style={styles.textarea} rows={5} placeholder="Key points covered, hazards discussed, corrective actions..." value={form.content} onChange={e => set('content', e.target.value)} />
         </div>
       </div>
+
+      {/* Quiz Questions */}
+      <div style={styles.quizSection}>
+        <div style={styles.quizSectionHead}>
+          <div>
+            <div style={styles.quizSectionTitle}>Quiz Questions <span style={styles.optional}>(optional)</span></div>
+            <div style={styles.quizSectionSub}>Workers must answer correctly before signing off</div>
+          </div>
+          <button type="button" style={styles.addQuestionBtn} onClick={addQuestion}>+ Add Question</button>
+        </div>
+
+        {questions.map((q, qi) => (
+          <div key={qi} style={styles.questionCard}>
+            <div style={styles.questionHeader}>
+              <span style={styles.questionNum}>Q{qi + 1}</span>
+              <input
+                style={{ ...styles.input, flex: 1 }}
+                type="text"
+                placeholder="Question text"
+                value={q.question}
+                onChange={e => setQuestion(qi, e.target.value)}
+              />
+              <button type="button" style={styles.removeQuestionBtn} onClick={() => removeQuestion(qi)}>✕</button>
+            </div>
+            <div style={styles.optionsList}>
+              {q.options.map((opt, oi) => (
+                <div key={oi} style={styles.optionRow}>
+                  <input
+                    type="radio"
+                    name={`correct-${qi}`}
+                    checked={q.correct_index === oi}
+                    onChange={() => setCorrect(qi, oi)}
+                    title="Mark as correct answer"
+                  />
+                  <input
+                    style={{ ...styles.input, flex: 1 }}
+                    type="text"
+                    placeholder={`Option ${oi + 1}`}
+                    value={opt}
+                    onChange={e => setOption(qi, oi, e.target.value)}
+                  />
+                  {q.options.length > 2 && (
+                    <button type="button" style={styles.removeOptionBtn} onClick={() => removeOption(qi, oi)}>✕</button>
+                  )}
+                </div>
+              ))}
+              {q.options.length < 4 && (
+                <button type="button" style={styles.addOptionBtn} onClick={() => addOption(qi)}>+ Add option</button>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {questions.length > 0 && (
+          <div style={styles.thresholdRow}>
+            <label style={styles.label}>Pass if at least</label>
+            <input
+              style={{ ...styles.input, width: 64, textAlign: 'center' }}
+              type="number"
+              min={1}
+              max={questions.length}
+              placeholder={String(questions.length)}
+              value={passThreshold}
+              onChange={e => setPassThreshold(e.target.value)}
+            />
+            <label style={styles.label}>of {questions.length} correct</label>
+          </div>
+        )}
+      </div>
+
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
         <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? 'Saving...' : 'Create Talk'}</button>
@@ -120,28 +212,40 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
   const [expanded, setExpanded] = useState(false);
   const [signing, setSigning] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [signoffs, setSignoffs] = useState(null); // loaded on expand
+  const [signoffs, setSignoffs] = useState(null);
+  const [questions, setQuestions] = useState(null);
+  const [quizAnswers, setQuizAnswers] = useState({});
+  const [quizResult, setQuizResult] = useState(null);
 
-  const loadSignoffs = async () => {
+  const loadDetail = async () => {
     try {
       const r = await api.get(`/safety-talks/${talk.id}`);
       setSignoffs(r.data.signoffs || []);
+      setQuestions(r.data.questions || []);
     } catch {}
   };
 
   const handleExpand = () => {
     const next = !expanded;
     setExpanded(next);
-    if (next && signoffs === null) loadSignoffs();
+    if (next && signoffs === null) loadDetail();
   };
 
   const alreadySigned = signoffs?.some(s => s.worker_id === user?.id);
+  const hasQuiz = parseInt(talk.question_count) > 0;
+  const allAnswered = questions?.length > 0 && questions.every((_, i) => quizAnswers[i] !== undefined);
 
   const handleSignoff = async () => {
     setSigning(true);
     try {
-      await api.post(`/safety-talks/${talk.id}/signoff`);
-      await loadSignoffs();
+      const answers = questions?.length > 0 ? questions.map((_, i) => quizAnswers[i]) : undefined;
+      const r = await api.post(`/safety-talks/${talk.id}/signoff`, answers ? { answers } : {});
+      if (r.data.quiz_failed) {
+        setQuizResult({ passed: false, score: r.data.score, needed: r.data.needed, total: r.data.total });
+        return;
+      }
+      setQuizResult(r.data.quiz_score != null ? { passed: true, score: r.data.quiz_score, total: questions.length } : null);
+      await loadDetail();
       setTalk(t => ({ ...t, signoff_count: parseInt(t.signoff_count) + 1 }));
     } finally { setSigning(false); }
   };
@@ -154,6 +258,8 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
     finally { setDeleting(false); }
   };
 
+  const needed = talk.pass_threshold ?? parseInt(talk.question_count);
+
   return (
     <div style={styles.card}>
       <div style={styles.cardHeader} onClick={handleExpand}>
@@ -165,13 +271,12 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
               {fmtDate(talk.talk_date)}
               {talk.project_name && <span style={styles.projectTag}>{talk.project_name}</span>}
               {talk.given_by && <span style={styles.givenBy}>by {talk.given_by}</span>}
+              {hasQuiz && <span style={styles.quizBadge}>📝 {talk.question_count} question{talk.question_count !== '1' ? 's' : ''}</span>}
             </div>
           </div>
         </div>
         <div style={styles.cardRight}>
-          <span style={styles.signoffBadge} title="Workers signed">
-            ✍️ {talk.signoff_count}
-          </span>
+          <span style={styles.signoffBadge} title="Workers signed">✍️ {talk.signoff_count}</span>
           <span style={styles.chevron}>{expanded ? '▲' : '▼'}</span>
         </div>
       </div>
@@ -180,11 +285,65 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
         <div style={styles.cardBody}>
           {talk.content && <p style={styles.content}>{talk.content}</p>}
 
+          {/* Admin: show questions with correct answers */}
+          {isAdmin && questions?.length > 0 && (
+            <div style={styles.adminQuizPreview}>
+              <div style={styles.quizPreviewTitle}>Quiz ({questions.length} question{questions.length !== 1 ? 's' : ''}, pass if {needed}/{questions.length} correct)</div>
+              {questions.map((q, i) => (
+                <div key={i} style={styles.adminQuestion}>
+                  <div style={styles.adminQuestionText}>{i + 1}. {q.question}</div>
+                  {q.options.map((opt, oi) => (
+                    <div key={oi} style={{ ...styles.adminOption, ...(oi === q.correct_index ? styles.adminOptionCorrect : {}) }}>
+                      {oi === q.correct_index ? '✓' : '○'} {opt}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Worker: quiz before sign-off */}
+          {!isAdmin && !alreadySigned && questions?.length > 0 && (
+            <div style={styles.quizBox}>
+              <div style={styles.quizTitle}>📝 Quiz — answer to sign off ({needed}/{questions.length} correct to pass)</div>
+              {questions.map((q, i) => (
+                <div key={i} style={styles.quizQuestion}>
+                  <div style={styles.quizQuestionText}>{i + 1}. {q.question}</div>
+                  {q.options.map((opt, oi) => (
+                    <label key={oi} style={styles.quizOption}>
+                      <input
+                        type="radio"
+                        name={`q${talk.id}-${i}`}
+                        checked={quizAnswers[i] === oi}
+                        onChange={() => { setQuizAnswers(a => ({ ...a, [i]: oi })); setQuizResult(null); }}
+                      />
+                      <span style={styles.quizOptionText}>{opt}</span>
+                    </label>
+                  ))}
+                </div>
+              ))}
+              {quizResult && !quizResult.passed && (
+                <div style={styles.quizFail}>
+                  ✗ {quizResult.score}/{quizResult.total} correct — need {quizResult.needed} to pass. Try again.
+                </div>
+              )}
+            </div>
+          )}
+
+          {quizResult?.passed && (
+            <div style={styles.quizPass}>✓ {quizResult.score}/{quizResult.total} correct — you passed!</div>
+          )}
+
           <div style={styles.signoffSection}>
             <div style={styles.signoffHeader}>
               <span style={styles.signoffTitle}>Sign-offs ({signoffs?.length ?? talk.signoff_count})</span>
               {!isAdmin && !alreadySigned && (
-                <button style={styles.signBtn} onClick={handleSignoff} disabled={signing}>
+                <button
+                  style={styles.signBtn}
+                  onClick={handleSignoff}
+                  disabled={signing || (questions?.length > 0 && !allAnswered)}
+                  title={questions?.length > 0 && !allAnswered ? 'Answer all questions first' : ''}
+                >
                   {signing ? '...' : '✍️ Sign Off'}
                 </button>
               )}
@@ -201,6 +360,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                 {signoffs.map((s, i) => (
                   <span key={i} style={styles.signoffChip}>
                     {s.full_name || s.worker_name}
+                    {s.quiz_score != null && <span style={styles.quizScore}>{s.quiz_score}/{questions?.length ?? '?'}</span>}
                     <span style={styles.signoffTime}>
                       {new Date(s.signed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                     </span>
@@ -362,4 +522,38 @@ const styles = {
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { color: '#9ca3af', fontSize: 15 },
   hint: { color: '#9ca3af', fontSize: 14 },
+  optional: { fontSize: 11, fontWeight: 400, color: '#9ca3af' },
+  // Quiz — form
+  quizSection: { borderTop: '1px solid #f3f4f6', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 },
+  quizSectionHead: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  quizSectionTitle: { fontSize: 13, fontWeight: 700, color: '#374151' },
+  quizSectionSub: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  addQuestionBtn: { fontSize: 12, fontWeight: 600, color: '#059669', background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '6px 12px', borderRadius: 7, cursor: 'pointer', flexShrink: 0 },
+  questionCard: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 },
+  questionHeader: { display: 'flex', alignItems: 'center', gap: 8 },
+  questionNum: { fontSize: 12, fontWeight: 700, color: '#6b7280', flexShrink: 0 },
+  removeQuestionBtn: { fontSize: 11, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4 },
+  optionsList: { display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 20 },
+  optionRow: { display: 'flex', alignItems: 'center', gap: 8 },
+  removeOptionBtn: { fontSize: 11, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4 },
+  addOptionBtn: { fontSize: 12, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textAlign: 'left', textDecoration: 'underline' },
+  thresholdRow: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  // Quiz — admin card preview
+  quizBadge: { background: '#fef3c7', color: '#92400e', padding: '1px 7px', borderRadius: 10, fontWeight: 600, fontSize: 11 },
+  adminQuizPreview: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px', marginBottom: 12 },
+  quizPreviewTitle: { fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 8 },
+  adminQuestion: { marginBottom: 8 },
+  adminQuestionText: { fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 },
+  adminOption: { fontSize: 12, color: '#9ca3af', paddingLeft: 12, lineHeight: 1.6 },
+  adminOptionCorrect: { color: '#059669', fontWeight: 600 },
+  // Quiz — worker card
+  quizBox: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '12px 14px', marginBottom: 12 },
+  quizTitle: { fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 10 },
+  quizQuestion: { marginBottom: 10 },
+  quizQuestionText: { fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 },
+  quizOption: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, cursor: 'pointer' },
+  quizOptionText: { fontSize: 13, color: '#374151' },
+  quizFail: { fontSize: 13, color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', marginTop: 8 },
+  quizPass: { fontSize: 13, color: '#065f46', background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 6, padding: '8px 12px', marginBottom: 10 },
+  quizScore: { fontSize: 11, color: '#6b7280', background: '#f3f4f6', borderRadius: 8, padding: '1px 6px', fontWeight: 500 },
 };
