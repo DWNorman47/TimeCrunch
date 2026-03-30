@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { sendPushToUser } = require('../push');
 
 // GET /punchlist
 router.get('/', requireAuth, async (req, res) => {
@@ -60,7 +61,15 @@ router.post('/', requireAuth, async (req, res) => {
        WHERE pi.id = $1`,
       [id]
     );
-    res.status(201).json(full.rows[0]);
+    const item = full.rows[0];
+    if (assigned_to) {
+      sendPushToUser(assigned_to, {
+        title: 'Punchlist item assigned',
+        body: item.title,
+        url: '/field#punchlist',
+      });
+    }
+    res.status(201).json(item);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -100,7 +109,17 @@ router.patch('/:id', requireAuth, async (req, res) => {
        WHERE pi.id = $1`,
       [req.params.id]
     );
-    res.json(full.rows[0]);
+    const updated = full.rows[0];
+    // Notify newly assigned worker (only if assignment changed)
+    const newAssignee = assigned_to !== undefined ? (assigned_to || null) : existing.rows[0].assigned_to;
+    if (newAssignee && newAssignee !== existing.rows[0].assigned_to) {
+      sendPushToUser(newAssignee, {
+        title: 'Punchlist item assigned',
+        body: updated.title,
+        url: '/field#punchlist',
+      });
+    }
+    res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

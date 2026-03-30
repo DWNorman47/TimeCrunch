@@ -79,6 +79,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     feature_inactive_alerts: settings?.feature_inactive_alerts ?? true,
     feature_overtime_alerts: settings?.feature_overtime_alerts ?? true,
     feature_broadcast: settings?.feature_broadcast ?? true,
+    feature_media_gallery: settings?.feature_media_gallery ?? false,
     show_worker_wages: settings?.show_worker_wages ?? false,
     currency: settings?.currency ?? 'USD',
     company_timezone: settings?.company_timezone ?? '',
@@ -123,6 +124,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       feature_inactive_alerts: settings.feature_inactive_alerts ?? true,
       feature_overtime_alerts: settings.feature_overtime_alerts ?? true,
       feature_broadcast: settings.feature_broadcast ?? true,
+      feature_media_gallery: settings.feature_media_gallery ?? false,
       show_worker_wages: settings.show_worker_wages ?? false,
       currency: settings.currency ?? 'USD',
       company_timezone: settings.company_timezone ?? '',
@@ -158,6 +160,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_inactive_alerts: form.feature_inactive_alerts,
         feature_overtime_alerts: form.feature_overtime_alerts,
         feature_broadcast: form.feature_broadcast,
+        feature_media_gallery: form.feature_media_gallery,
         show_worker_wages: form.show_worker_wages,
         currency: form.currency,
         company_timezone: form.company_timezone,
@@ -525,6 +528,16 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <label style={{ ...styles.toggle, background: form.feature_broadcast ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_broadcast} onChange={e => set('feature_broadcast', e.target.checked)} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleKnob, transform: form.feature_broadcast ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Media Gallery</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show a dedicated Media tab in Field for browsing all photos and videos</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_media_gallery ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_media_gallery} onChange={e => set('feature_media_gallery', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_media_gallery ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
         </div>}

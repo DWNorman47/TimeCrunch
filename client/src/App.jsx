@@ -40,7 +40,7 @@ function WorkerSubscriptionWall() {
 
 function PrivateRoute({ children, adminOnly = false, superAdminOnly = false }) {
   const { user, loading } = useAuth();
-  if (loading) return <div style={{ padding: 40 }}>Loading...</div>;
+  if (loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f6f9', color: '#9ca3af', fontSize: 15 }}>Loading…</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (superAdminOnly && user.role !== 'super_admin') return <Navigate to="/" replace />;
   if (adminOnly && user.role !== 'admin' && user.role !== 'super_admin') return <Navigate to="/dashboard" replace />;
@@ -72,7 +72,7 @@ function adminHome(userId) {
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-  if (loading) return <div style={{ padding: 40 }}>Loading...</div>;
+  if (loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f6f9', color: '#9ca3af', fontSize: 15 }}>Loading…</div>;
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Login />} />

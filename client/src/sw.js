@@ -69,7 +69,7 @@ async function broadcastQueueCount() {
   clients.forEach(c => c.postMessage({ type: 'QUEUE_COUNT', count }));
 }
 
-// ── Offline request handler (clock + time entries) ─────────────────────────────
+// ── Offline request handler (clock, time entries, field modules) ───────────────
 
 async function handleOfflineableRequest(event, type) {
   try {
@@ -80,6 +80,7 @@ async function handleOfflineableRequest(event, type) {
     const auth = event.request.headers.get('Authorization') || '';
     await enqueue({
       type,
+      method: event.request.method,
       url: event.request.url,
       body,
       auth,
@@ -103,7 +104,7 @@ async function replayQueue() {
   for (const item of items) {
     try {
       const res = await fetch(item.url, {
-        method: 'POST',
+        method: item.method || 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(item.auth ? { Authorization: item.auth } : {}),
@@ -176,6 +177,13 @@ self.addEventListener('notificationclick', event => {
 self.addEventListener('fetch', event => {
   const url = event.request.url;
 
+  if (event.request.method === 'PATCH') {
+    if (url.includes('/api/time-entries/') && !url.includes('/messages') && !url.includes('/sign-off')) {
+      event.respondWith(handleOfflineableRequest(event, 'time-entry'));
+      return;
+    }
+  }
+
   if (event.request.method === 'POST') {
     if (url.includes('/api/clock/in') || url.includes('/api/clock/out')) {
       event.respondWith(handleOfflineableRequest(event, 'clock'));
@@ -183,6 +191,20 @@ self.addEventListener('fetch', event => {
     }
     if (url.includes('/api/time-entries') && !url.includes('/messages') && !url.includes('/sign-off')) {
       event.respondWith(handleOfflineableRequest(event, 'time-entry'));
+      return;
+    }
+    if (
+      url.includes('/api/field-reports') ||
+      url.includes('/api/daily-reports') ||
+      url.includes('/api/punchlist') ||
+      url.includes('/api/incidents') ||
+      url.includes('/api/safety-talks') ||
+      url.includes('/api/equipment') ||
+      url.includes('/api/rfis') ||
+      url.includes('/api/sub-reports') ||
+      url.includes('/api/inspections')
+    ) {
+      event.respondWith(handleOfflineableRequest(event, 'field'));
       return;
     }
   }
@@ -202,7 +224,7 @@ self.addEventListener('message', event => {
 // ── Background Sync (Chrome/Edge) ──────────────────────────────────────────────
 
 self.addEventListener('sync', event => {
-  if (event.tag === 'clock-queue-replay') {
+  if (event.tag === 'clock-queue-replay' || event.tag === 'field-queue-replay') {
     event.waitUntil(replayQueue());
   }
 });

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useOffline } from '../contexts/OfflineContext';
+import { PunchlistPDFButton } from './PunchlistPDF';
 
 const STATUSES = [
   { value: 'open', label: 'Open', color: '#92400e', bg: '#fef3c7' },
@@ -30,7 +32,11 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin }) {
     setSaving(true); setError('');
     try {
       const r = await api.post('/punchlist', form);
-      onAdded(r.data);
+      if (r.data?.offline) {
+        onAdded({ id: 'pending-' + Date.now(), pending: true, ...form, status: 'open' });
+      } else {
+        onAdded(r.data);
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save');
     } finally { setSaving(false); }
@@ -117,11 +123,12 @@ function PunchItem({ item, isAdmin, workers, onUpdated, onDeleted }) {
 
   return (
     <div style={{ ...styles.item, opacity: item.status === 'verified' ? 0.65 : 1 }}>
-      <div style={styles.itemRow} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.itemRow} onClick={() => !item.pending && setExpanded(e => !e)}>
         <span style={styles.priorityDot} title={`Priority: ${item.priority}`}>{priorityDot}</span>
         <div style={styles.itemMain}>
           <span style={{ ...styles.itemTitle, textDecoration: item.status === 'verified' ? 'line-through' : 'none' }}>
             {item.title}
+            {item.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}
           </span>
           <div style={styles.itemMeta}>
             {item.project_name && <span style={styles.metaTag}>{item.project_name}</span>}
@@ -167,6 +174,7 @@ function PunchItem({ item, isAdmin, workers, onUpdated, onDeleted }) {
 export default function Punchlist({ projects }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const { onSync } = useOffline() || {};
   const [items, setItems] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -196,6 +204,7 @@ export default function Punchlist({ projects }) {
   }, []);
 
   useEffect(() => { if (!loading) load(filterProject, filterStatus); }, [filterProject, filterStatus]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(); }); }, [onSync]);
 
   const openCount = items.filter(i => i.status === 'open').length;
   const doneCount = items.filter(i => i.status === 'done').length;
@@ -212,7 +221,10 @@ export default function Punchlist({ projects }) {
             </p>
           )}
         </div>
-        <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ Add Item</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {items.length > 0 && <PunchlistPDFButton items={items} companyName={user?.company_name} style={styles.pdfBtn} />}
+          <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ Add Item</button>
+        </div>
       </div>
 
       {showForm && (
@@ -268,6 +280,7 @@ const styles = {
   heading: { fontSize: 22, fontWeight: 800, color: '#111827', margin: 0 },
   summary: { fontSize: 13, color: '#6b7280', margin: '4px 0 0' },
   newBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
+  pdfBtn: { fontSize: 13, fontWeight: 600, color: '#1a56db', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '9px 16px', borderRadius: 8, textDecoration: 'none', cursor: 'pointer', flexShrink: 0 },
   filters: { display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' },
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', flex: 1, minWidth: 140 },
   list: { display: 'flex', flexDirection: 'column', gap: 8 },
@@ -277,6 +290,7 @@ const styles = {
   itemMain: { flex: 1, minWidth: 0 },
   itemTitle: { fontWeight: 600, fontSize: 14, color: '#111827', display: 'block', marginBottom: 4 },
   itemMeta: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
+  pendingBadge: { fontSize: 10, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 6, marginLeft: 6, verticalAlign: 'middle' },
   metaTag: { background: '#ede9fe', color: '#6d28d9', padding: '1px 7px', borderRadius: 10, fontWeight: 600, fontSize: 11 },
   metaLoc: { fontSize: 12, color: '#6b7280' },
   metaAssign: { fontSize: 12, color: '#6b7280' },

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useOffline } from '../contexts/OfflineContext';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
@@ -90,6 +91,10 @@ function LogHoursForm({ item, projects, onLogged, onCancel }) {
     setSaving(true); setError('');
     try {
       const r = await api.post(`/equipment/${item.id}/hours`, form);
+      if (r.data?.offline) {
+        onLogged(item.id, { id: 'pending-' + Date.now(), pending: true, ...form, project_name: '' }, parseFloat(form.hours));
+        return;
+      }
       onLogged(item.id, r.data, parseFloat(form.hours));
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to log hours');
@@ -263,12 +268,15 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
                     {hours.map(h => (
                       <tr key={h.id}>
                         <td style={styles.htd}>{h.log_date?.toString().substring(0, 10)}</td>
-                        <td style={{ ...styles.htd, fontWeight: 700 }}>{parseFloat(h.hours).toFixed(1)}</td>
+                        <td style={{ ...styles.htd, fontWeight: 700 }}>
+                          {parseFloat(h.hours).toFixed(1)}
+                          {h.pending && <span style={styles.pendingBadge}>⏳</span>}
+                        </td>
                         <td style={styles.htd}>{h.operator_name || '—'}</td>
                         <td style={styles.htd}>{h.project_name || '—'}</td>
                         <td style={{ ...styles.htd, color: '#6b7280' }}>{h.notes || ''}</td>
                         <td style={styles.htd}>
-                          <button style={styles.delEntryBtn} onClick={() => handleDeleteEntry(h.id, h.hours)}>✕</button>
+                          {!h.pending && <button style={styles.delEntryBtn} onClick={() => handleDeleteEntry(h.id, h.hours)}>✕</button>}
                         </td>
                       </tr>
                     ))}
@@ -288,6 +296,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
 export default function EquipmentLog({ projects }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const { onSync } = useOffline() || {};
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -297,6 +306,7 @@ export default function EquipmentLog({ projects }) {
   useEffect(() => {
     api.get('/equipment').then(r => setItems(r.data)).finally(() => setLoading(false));
   }, []);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) api.get('/equipment').then(r => setItems(r.data)); }); }, [onSync]);
 
   const handleSaved = (item, isEdit) => {
     if (isEdit) {
@@ -412,6 +422,7 @@ const styles = {
   hth: { textAlign: 'left', fontWeight: 700, color: '#9ca3af', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '4px 8px', borderBottom: '1px solid #e5e7eb' },
   htd: { padding: '6px 8px', borderBottom: '1px solid #f9fafb', color: '#374151' },
   delEntryBtn: { background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: 12, padding: '2px 4px' },
+  pendingBadge: { fontSize: 9, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 5px', borderRadius: 6, marginLeft: 6, verticalAlign: 'middle' },
   // Form
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   formTitle: { fontSize: 17, fontWeight: 700, margin: 0 },

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useOffline } from '../contexts/OfflineContext';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
@@ -218,6 +219,10 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
       const r = isEdit
         ? await api.patch(`/inspections/${initial.id}`, form)
         : await api.post('/inspections', form);
+      if (!isEdit && r.data?.offline) {
+        onSaved({ id: 'pending-' + Date.now(), pending: true, ...form, status: form.status || 'pending', results: form.results || {} }, false);
+        return;
+      }
       onSaved(r.data, isEdit);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save');
@@ -384,7 +389,10 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
     <div style={{ ...styles.card, ...(ins.status === 'fail' ? styles.cardFail : {}) }}>
       <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
         <div style={styles.cardMiddle}>
-          <div style={styles.cardName}>{ins.name}</div>
+          <div style={styles.cardName}>
+            {ins.name}
+            {ins.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}
+          </div>
           <div style={styles.cardMeta}>
             <span>{fmtDate(ins.inspected_at)}</span>
             {ins.project_name && <span style={styles.projectTag}>{ins.project_name}</span>}
@@ -431,7 +439,7 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
             </div>
           )}
 
-          {isAdmin && (
+          {isAdmin && !ins.pending && (
             <div style={styles.cardActions}>
               <button style={styles.editBtn} onClick={() => onEdit(ins)}>Edit</button>
               <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : 'Delete'}</button>
@@ -448,6 +456,7 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
 export default function InspectionChecklists({ projects }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const { onSync } = useOffline() || {};
 
   const [inspections, setInspections] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -692,6 +701,7 @@ const styles = {
   itemRow: { display: 'flex', gap: 8, alignItems: 'center' },
   itemNum: { fontSize: 12, color: '#9ca3af', width: 20, flexShrink: 0, textAlign: 'right' },
   removeItemBtn: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '0 4px' },
+  pendingBadge: { fontSize: 10, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 6, marginLeft: 8, verticalAlign: 'middle' },
   // Checklist
   checklistGrid: { display: 'flex', flexDirection: 'column', gap: 8, background: '#f9fafb', borderRadius: 8, padding: 12 },
   checklistItem: { display: 'flex', flexDirection: 'column', gap: 6 },
