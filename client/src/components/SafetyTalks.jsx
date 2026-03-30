@@ -553,7 +553,7 @@ export default function SafetyTalks({ projects }) {
 }
 
 const styles = {
-  topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12 },
+  topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' },
   heading: { fontSize: 22, fontWeight: 800, color: '#111827', margin: 0 },
   summary: { fontSize: 13, color: '#6b7280', margin: '4px 0 0' },
   newBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
