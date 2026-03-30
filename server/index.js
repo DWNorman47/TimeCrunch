@@ -63,15 +63,23 @@ app.use('/api/inbox', require('./routes/inbox'));
 
 // Read-only company settings — available to all authenticated users
 const { SETTINGS_DEFAULTS, applySettingsRows } = require('./settingsDefaults');
+const { limitForPlan } = require('./storage');
 app.get('/api/settings', requireAuth, async (req, res) => {
   try {
     const [settingsResult, coResult] = await Promise.all([
       pool.query('SELECT key, value FROM settings WHERE company_id = $1', [req.user.company_id]),
-      pool.query('SELECT plan, subscription_status FROM companies WHERE id = $1', [req.user.company_id]),
+      pool.query('SELECT plan, subscription_status, storage_bytes_used FROM companies WHERE id = $1', [req.user.company_id]),
     ]);
     const settings = applySettingsRows(settingsResult.rows, SETTINGS_DEFAULTS);
-    const { plan, subscription_status } = coResult.rows[0] || {};
-    res.json({ ...settings, plan: plan || 'free', subscription_status: subscription_status || 'trial' });
+    const { plan, subscription_status, storage_bytes_used } = coResult.rows[0] || {};
+    const resolvedPlan = plan || 'free';
+    res.json({
+      ...settings,
+      plan: resolvedPlan,
+      subscription_status: subscription_status || 'trial',
+      storage_bytes_used: parseInt(storage_bytes_used ?? 0),
+      storage_limit_bytes: limitForPlan(resolvedPlan),
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

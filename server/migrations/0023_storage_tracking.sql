@@ -1,0 +1,2 @@
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS storage_bytes_used BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE field_report_photos ADD COLUMN IF NOT EXISTS size_bytes BIGINT;
