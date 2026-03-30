@@ -63,7 +63,7 @@ export default function FieldPage() {
             { id: 'punchlist', label: '✅ Punch' },
             { id: 'safety', label: '🦺 Safety' },
             { id: 'incident', label: '🚨 Incidents' },
-            { id: 'gallery', label: '🎬 Media' },
+            ...(features.feature_media_gallery ? [{ id: 'gallery', label: '🎬 Media' }] : []),
             ...(isAdmin ? [{ id: 'subs', label: '🏗️ Subs' }] : []),
             { id: 'equip', label: '🚜 Equipment' },
             { id: 'rfi', label: '📝 RFIs' },
