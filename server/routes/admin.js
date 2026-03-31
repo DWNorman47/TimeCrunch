@@ -266,6 +266,52 @@ router.post('/clock-in', requireAdmin, requirePermission('manage_workers'), asyn
   }
 });
 
+// POST /admin/clock-out/:user_id — admin clocks out a worker
+router.post('/clock-out/:user_id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+  const companyId = req.user.company_id;
+  const { break_minutes, mileage } = req.body;
+  try {
+    const clockResult = await pool.query(
+      `SELECT ac.*, p.wage_type, p.name AS project_name
+       FROM active_clock ac
+       LEFT JOIN projects p ON ac.project_id = p.id
+       WHERE ac.user_id = $1 AND ac.company_id = $2`,
+      [req.params.user_id, companyId]
+    );
+    if (clockResult.rowCount === 0) return res.status(400).json({ error: 'Worker is not clocked in' });
+    const clock = clockResult.rows[0];
+
+    const clockInTime = new Date(clock.clock_in_time);
+    const clockOutTime = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const start_time = `${pad(clockInTime.getUTCHours())}:${pad(clockInTime.getUTCMinutes())}:${pad(clockInTime.getUTCSeconds())}`;
+    const end_time = `${pad(clockOutTime.getUTCHours())}:${pad(clockOutTime.getUTCMinutes())}:${pad(clockOutTime.getUTCSeconds())}`;
+
+    const entryResult = await pool.query(
+      `INSERT INTO time_entries
+         (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
+          clock_in_lat, clock_in_lng, break_minutes, mileage, timezone, clock_source, clocked_in_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       RETURNING *`,
+      [
+        companyId, clock.user_id, clock.project_id, clock.work_date,
+        start_time, end_time, clock.wage_type || 'regular', clock.notes || null,
+        clock.clock_in_lat, clock.clock_in_lng,
+        parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
+        clock.timezone || null,
+        clock.clock_source, clock.clocked_in_by,
+      ]
+    );
+
+    await pool.query('DELETE FROM active_clock WHERE user_id = $1', [clock.user_id]);
+    await logAudit(companyId, req.user.id, req.user.full_name, 'worker.clocked_out_by_admin', 'user', parseInt(req.params.user_id), null);
+    res.json(entryResult.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET /admin/active-clocks — currently clocked-in workers with location
 router.get('/active-clocks', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;

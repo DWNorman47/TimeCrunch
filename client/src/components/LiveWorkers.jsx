@@ -79,6 +79,20 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
       .catch(() => {});
   }, []);
 
+  const [clockingOutId, setClockingOutId] = useState(null);
+
+  const handleAdminClockOut = async (userId) => {
+    setClockingOutId(userId);
+    try {
+      await api.post(`/admin/clock-out/${userId}`, {});
+      fetchActive();
+    } catch {
+      // silently fail
+    } finally {
+      setClockingOutId(null);
+    }
+  };
+
   const handleAdminClockIn = async () => {
     if (!clockInUserId) return;
     setClockInSaving(true);
@@ -200,6 +214,15 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                   {w.clock_source === 'admin' && w.clocked_in_by_name && (
                     <span style={styles.adminBadge}>Clocked in by {w.clocked_in_by_name}</span>
                   )}
+                </div>
+                <div style={styles.cardActions}>
+                  <button
+                    style={styles.clockOutBtn}
+                    onClick={() => handleAdminClockOut(w.user_id)}
+                    disabled={clockingOutId === w.user_id}
+                  >
+                    {clockingOutId === w.user_id ? 'Clocking out…' : 'Clock Out'}
+                  </button>
                 </div>
               </div>
             ))}
@@ -326,6 +349,8 @@ const styles = {
   dismissBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 16, cursor: 'pointer', padding: '0 4px', lineHeight: 1 },
   clockInWorkerBtn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   adminBadge: { fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 4, padding: '2px 7px', fontWeight: 600 },
+  cardActions: { marginTop: 8, display: 'flex', gap: 8 },
+  clockOutBtn: { padding: '5px 14px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   modal: { background: '#fff', borderRadius: 12, padding: 28, minWidth: 340, maxWidth: 440, width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 16 },
   modalTitle: { fontSize: 18, fontWeight: 700, margin: 0 },
