@@ -51,12 +51,12 @@ router.post('/', requireAuth, async (req, res) => {
     if (bm < 0) return res.status(400).json({ error: 'break_minutes must be non-negative' });
     const cid = (typeof client_id === 'string' && client_id.length <= 36) ? client_id : null;
     const result = await pool.query(
-      `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes, break_minutes, mileage, timezone, client_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes, break_minutes, mileage, timezone, client_id, clock_source)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        ON CONFLICT (user_id, client_id) WHERE client_id IS NOT NULL DO NOTHING
        RETURNING *`,
       [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notes || null,
-       bm, mileage != null ? parseFloat(mileage) : null, timezone || null, cid]
+       bm, mileage != null ? parseFloat(mileage) : null, timezone || null, cid, 'log_entry']
     );
     if (result.rowCount === 0) return res.status(409).json({ error: 'Duplicate entry' });
     res.status(201).json(result.rows[0]);

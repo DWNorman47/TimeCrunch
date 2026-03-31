@@ -21,7 +21,7 @@ function defaultDates() {
   return { from: fmt(from), to: fmt(today) };
 }
 
-export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = {}, overtimeEnabled = true, projectsEnabled = true }) {
+export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = {}, overtimeEnabled = true, projectsEnabled = true, projects = [] }) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [from, setFrom] = useState(defaultDates().from);
@@ -29,6 +29,34 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
   const [billData, setBillData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showAddEntry, setShowAddEntry] = useState(false);
+  const [addForm, setAddForm] = useState({ work_date: defaultDates().to, start_time: '08:00', end_time: '17:00', project_id: '', notes: '', break_minutes: '0' });
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState('');
+  const [addSuccess, setAddSuccess] = useState(false);
+
+  const handleAddEntry = async e => {
+    e.preventDefault();
+    setAddSaving(true); setAddError(''); setAddSuccess(false);
+    try {
+      await api.post(`/admin/workers/${worker.id}/entries`, {
+        work_date: addForm.work_date,
+        start_time: addForm.start_time,
+        end_time: addForm.end_time,
+        project_id: addForm.project_id || null,
+        notes: addForm.notes || null,
+        break_minutes: parseInt(addForm.break_minutes) || 0,
+      });
+      setAddSuccess(true);
+      setShowAddEntry(false);
+      setAddForm({ work_date: defaultDates().to, start_time: '08:00', end_time: '17:00', project_id: '', notes: '', break_minutes: '0' });
+      if (billData) fetchBill();
+    } catch (err) {
+      setAddError(err.response?.data?.error || 'Failed to add entry');
+    } finally {
+      setAddSaving(false);
+    }
+  };
 
   const fetchBill = async () => {
     setLoading(true);
@@ -62,7 +90,50 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
 
       {expanded && (
         <div style={styles.billSection}>
-          <h4 style={styles.billHeading}>{t.generateBill}</h4>
+          <div style={styles.sectionHeader}>
+            <h4 style={styles.billHeading}>{t.generateBill}</h4>
+            <button style={styles.addEntryBtn} onClick={() => { setShowAddEntry(v => !v); setAddError(''); setAddSuccess(false); }}>
+              {showAddEntry ? '✕ Cancel' : '+ Add Entry'}
+            </button>
+          </div>
+          {addSuccess && <div style={styles.addSuccess}>Entry added successfully.</div>}
+          {showAddEntry && (
+            <form onSubmit={handleAddEntry} style={styles.addForm}>
+              <div style={styles.addRow}>
+                <div style={styles.addField}>
+                  <label style={styles.label}>Date</label>
+                  <input style={styles.input} type="date" value={addForm.work_date} onChange={e => setAddForm(f => ({ ...f, work_date: e.target.value }))} required />
+                </div>
+                <div style={styles.addField}>
+                  <label style={styles.label}>Start</label>
+                  <input style={styles.input} type="time" value={addForm.start_time} onChange={e => setAddForm(f => ({ ...f, start_time: e.target.value }))} required />
+                </div>
+                <div style={styles.addField}>
+                  <label style={styles.label}>End</label>
+                  <input style={styles.input} type="time" value={addForm.end_time} onChange={e => setAddForm(f => ({ ...f, end_time: e.target.value }))} required />
+                </div>
+                <div style={styles.addField}>
+                  <label style={styles.label}>Break (min)</label>
+                  <input style={{ ...styles.input, width: 70 }} type="number" min="0" value={addForm.break_minutes} onChange={e => setAddForm(f => ({ ...f, break_minutes: e.target.value }))} />
+                </div>
+              </div>
+              {projectsEnabled && projects.length > 0 && (
+                <div style={styles.addField}>
+                  <label style={styles.label}>Project</label>
+                  <select style={styles.input} value={addForm.project_id} onChange={e => setAddForm(f => ({ ...f, project_id: e.target.value }))}>
+                    <option value="">No project</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              )}
+              <div style={styles.addField}>
+                <label style={styles.label}>Notes</label>
+                <input style={{ ...styles.input, width: '100%' }} type="text" maxLength={500} value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
+              </div>
+              {addError && <div style={styles.addError}>{addError}</div>}
+              <button style={styles.fetchBtn} type="submit" disabled={addSaving}>{addSaving ? 'Saving…' : 'Add Entry'}</button>
+            </form>
+          )}
           <div style={styles.dateRow}>
             <div style={styles.dateField}>
               <label style={styles.label}>{t.from}</label>
@@ -140,7 +211,14 @@ const styles = {
   metricLabel: { fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: 0.5 },
   expandBtn: { background: 'none', border: 'none', fontSize: 14, color: '#888', marginLeft: 'auto' },
   billSection: { padding: '16px 20px', borderTop: '1px solid #f0f0f0', background: '#fafafa' },
-  billHeading: { marginBottom: 12, fontSize: 15, fontWeight: 600 },
+  sectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  billHeading: { margin: 0, fontSize: 15, fontWeight: 600 },
+  addEntryBtn: { padding: '5px 14px', background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  addForm: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 9, padding: '14px 16px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 },
+  addRow: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  addField: { display: 'flex', flexDirection: 'column', gap: 4 },
+  addError: { color: '#dc2626', fontSize: 13 },
+  addSuccess: { color: '#059669', fontSize: 13, fontWeight: 600, marginBottom: 8 },
   dateRow: { display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' },
   dateField: { display: 'flex', flexDirection: 'column', gap: 4 },
   label: { fontSize: 12, fontWeight: 600, color: '#666' },

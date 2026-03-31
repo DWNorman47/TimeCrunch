@@ -112,8 +112,8 @@ router.post('/in', requireAuth, async (req, res) => {
 
     // Upsert — replace any existing clock-in (safety valve)
     const result = await pool.query(
-      `INSERT INTO active_clock (user_id, company_id, project_id, clock_in_time, clock_in_lat, clock_in_lng, work_date, notes, timezone)
-       VALUES ($1, $2, $3, NOW(), $4, $5, COALESCE($6::date, CURRENT_DATE), $7, $8)
+      `INSERT INTO active_clock (user_id, company_id, project_id, clock_in_time, clock_in_lat, clock_in_lng, work_date, notes, timezone, clock_source, clocked_in_by)
+       VALUES ($1, $2, $3, NOW(), $4, $5, COALESCE($6::date, CURRENT_DATE), $7, $8, $9, $10)
        ON CONFLICT (user_id) DO UPDATE
          SET project_id = EXCLUDED.project_id,
              clock_in_time = EXCLUDED.clock_in_time,
@@ -121,9 +121,11 @@ router.post('/in', requireAuth, async (req, res) => {
              clock_in_lng = EXCLUDED.clock_in_lng,
              work_date = EXCLUDED.work_date,
              notes = EXCLUDED.notes,
-             timezone = EXCLUDED.timezone
+             timezone = EXCLUDED.timezone,
+             clock_source = EXCLUDED.clock_source,
+             clocked_in_by = EXCLUDED.clocked_in_by
        RETURNING *`,
-      [req.user.id, companyId, project_id, lat || null, lng || null, local_work_date || null, notes || null, timezone || null]
+      [req.user.id, companyId, project_id, lat || null, lng || null, local_work_date || null, notes || null, timezone || null, 'worker', null]
     );
 
     const row = result.rows[0];
@@ -153,12 +155,14 @@ router.post('/in', requireAuth, async (req, res) => {
       const settingsResult = await pool.query(
         'SELECT key, value FROM settings WHERE company_id = $1', [companyId]
       );
-      const s = { notification_start_hour: 6, notification_end_hour: 20, notification_use_work_hours: true };
+      const s = { notification_start_hour: 6, notification_end_hour: 20, notification_use_work_hours: true, company_timezone: '' };
       settingsResult.rows.forEach(r => {
         if (r.key === 'notification_use_work_hours') s[r.key] = r.value === '1';
+        else if (r.key === 'company_timezone') s[r.key] = r.value;
         else s[r.key] = parseFloat(r.value);
       });
-      const nowHour = new Date().getHours();
+      const tz = timezone || s.company_timezone || 'UTC';
+      const nowHour = parseInt(new Date().toLocaleString('en-US', { timeZone: tz, hour: 'numeric', hour12: false })) % 24;
       if (s.notification_use_work_hours && (nowHour < s.notification_start_hour || nowHour >= s.notification_end_hour)) {
         const adminResult = await pool.query(
           `SELECT u.email, u.full_name FROM users u
@@ -167,7 +171,7 @@ router.post('/in', requireAuth, async (req, res) => {
         );
         if (adminResult.rowCount > 0 && process.env.SENDGRID_API_KEY) {
           const admin = adminResult.rows[0];
-          const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+          const timeStr = new Date().toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
           await sgMail.send({
             from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
             to: admin.email,
@@ -198,7 +202,7 @@ router.post('/out', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const clockResult = await pool.query(
-      'SELECT user_id, company_id, project_id, clock_in_time, work_date, notes, timezone FROM active_clock WHERE user_id = $1',
+      'SELECT user_id, company_id, project_id, clock_in_time, work_date, notes, timezone, clock_source, clocked_in_by FROM active_clock WHERE user_id = $1',
       [req.user.id]
     );
     if (clockResult.rowCount === 0) return res.status(400).json({ error: 'Not clocked in' });
@@ -223,8 +227,9 @@ router.post('/out', requireAuth, async (req, res) => {
     const entryResult = await pool.query(
       `INSERT INTO time_entries
          (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
-          clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, break_minutes, mileage, timezone)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+          clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, break_minutes, mileage, timezone,
+          clock_source, clocked_in_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        RETURNING *`,
       [
         companyId, req.user.id, clock.project_id, clock.work_date,
@@ -232,6 +237,7 @@ router.post('/out', requireAuth, async (req, res) => {
         clock.clock_in_lat, clock.clock_in_lng, lat || null, lng || null,
         parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
         clock.timezone || null,
+        clock.clock_source, clock.clocked_in_by,
       ]
     );
 
