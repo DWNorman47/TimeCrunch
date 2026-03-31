@@ -30,6 +30,9 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   const [loadingArchived, setLoadingArchived] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState(null); // { id, name }
   const [archiveDownloading, setArchiveDownloading] = useState(false);
+  const [mergeSource, setMergeSource] = useState(null); // { id, name }
+  const [mergeTargetId, setMergeTargetId] = useState('');
+  const [mergeSaving, setMergeSaving] = useState(false);
 
   const loadArchived = async () => {
     setLoadingArchived(true);
@@ -219,6 +222,23 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     }
   };
 
+  const handleConfirmMerge = async () => {
+    if (!mergeSource || !mergeTargetId) return;
+    setMergeSaving(true);
+    try {
+      await api.post(`/admin/projects/${mergeSource.id}/merge-into/${mergeTargetId}`);
+      onProjectDeleted(mergeSource.id);
+      if (expandedId === mergeSource.id) setExpandedId(null);
+      setMergeSource(null);
+      setMergeTargetId('');
+      toast(`Merged into ${projects.find(p => p.id === parseInt(mergeTargetId))?.name}`, 'success');
+    } catch {
+      toast('Failed to merge projects', 'error');
+    } finally {
+      setMergeSaving(false);
+    }
+  };
+
   const handleRestore = async (id) => {
     try {
       const r = await api.patch(`/admin/projects/${id}/restore`);
@@ -393,6 +413,9 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                     <div style={s.actionRow}>
                       <button style={s.saveBtn} onClick={() => handleEditSave(p.id)}>{t.save}</button>
                       <button style={s.cancelBtn} onClick={() => setExpandedId(null)}>{t.cancel}</button>
+                      {projects.length > 1 && (
+                        <button style={s.mergeBtn} onClick={() => { setMergeSource({ id: p.id, name: p.name }); setMergeTargetId(''); }}>Merge into...</button>
+                      )}
                       <button style={s.removeBtn} onClick={() => handleRemove(p.id, p.name)}>{t.remove}</button>
                     </div>
                   </div>
@@ -400,6 +423,37 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
               </div>
             );
           })}
+        </div>
+      )}
+
+      {mergeSource && (
+        <div style={s.modalOverlay}>
+          <div style={s.modal}>
+            <div style={s.modalTitle}>Merge "{mergeSource.name}"</div>
+            <p style={s.modalBody}>
+              All time entries, field reports, and other data will be moved to the target project.
+              "{mergeSource.name}" will be permanently deleted. This cannot be undone.
+            </p>
+            <div style={s.fieldGroup}>
+              <label style={s.fieldLabel}>Merge into</label>
+              <select
+                style={s.editInput}
+                value={mergeTargetId}
+                onChange={e => setMergeTargetId(e.target.value)}
+              >
+                <option value="">— select project —</option>
+                {projects.filter(p => p.id !== mergeSource.id).map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div style={s.modalActions}>
+              <button style={s.cancelBtn} onClick={() => setMergeSource(null)} disabled={mergeSaving}>Cancel</button>
+              <button style={s.mergeConfirmBtn} onClick={handleConfirmMerge} disabled={!mergeTargetId || mergeSaving}>
+                {mergeSaving ? 'Merging...' : 'Merge & Delete'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -501,6 +555,8 @@ const s = {
   saveBtn: { padding: '7px 16px', background: '#059669', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   cancelBtn: { padding: '7px 14px', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
   removeBtn: { padding: '6px 14px', background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: 6, fontSize: 13, cursor: 'pointer', marginLeft: 'auto' },
+  mergeBtn: { padding: '6px 14px', background: 'none', border: '1px solid #c4b5fd', color: '#7c3aed', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
+  mergeConfirmBtn: { padding: '8px 18px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
   historyFooter: { marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 12 },
   historyToggle: { background: 'none', border: 'none', color: '#6b7280', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '2px 0' },
   historyList: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 },

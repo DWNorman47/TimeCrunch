@@ -1229,6 +1229,59 @@ router.get('/projects/:id/media-zip', requireAdmin, async (req, res) => {
   }
 });
 
+// Merge one project into another — moves all data, deletes source
+router.post('/projects/:id/merge-into/:target_id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
+  const sourceId = parseInt(req.params.id);
+  const targetId = parseInt(req.params.target_id);
+  const companyId = req.user.company_id;
+
+  if (sourceId === targetId) return res.status(400).json({ error: 'Cannot merge a project into itself' });
+
+  try {
+    const check = await pool.query(
+      'SELECT id, name FROM projects WHERE id = ANY($1) AND company_id = $2',
+      [[sourceId, targetId], companyId]
+    );
+    if (check.rowCount < 2) return res.status(404).json({ error: 'One or both projects not found' });
+
+    const sourceName = check.rows.find(r => r.id === sourceId)?.name;
+    const targetName = check.rows.find(r => r.id === targetId)?.name;
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const intTables = [
+        'time_entries', 'active_clock', 'shifts', 'field_reports', 'daily_reports',
+        'punchlist_items', 'safety_talks', 'incident_reports', 'sub_reports',
+        'equipment_hours', 'rfis', 'safety_checklist_submissions',
+      ];
+      for (const table of intTables) {
+        await client.query(`UPDATE ${table} SET project_id = $1 WHERE project_id = $2`, [targetId, sourceId]);
+      }
+      // inspections stores project_id as UUID/text column
+      await client.query(
+        `UPDATE inspections SET project_id = $1::text WHERE project_id::text = $2::text AND company_id = $3`,
+        [targetId, sourceId, companyId]
+      );
+
+      await client.query('DELETE FROM projects WHERE id = $1 AND company_id = $2', [sourceId, companyId]);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    await logAudit(companyId, req.user.id, req.user.full_name, 'project.merged', 'project', sourceId, sourceName, `Merged into "${targetName}" (id ${targetId})`);
+    res.json({ success: true, message: `Merged "${sourceName}" into "${targetName}"` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.delete('/projects/:id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
