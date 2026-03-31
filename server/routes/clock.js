@@ -161,7 +161,7 @@ router.post('/in', requireAuth, async (req, res) => {
         else if (r.key === 'company_timezone') s[r.key] = r.value;
         else s[r.key] = parseFloat(r.value);
       });
-      const tz = s.company_timezone || 'UTC';
+      const tz = timezone || s.company_timezone || 'UTC';
       const nowHour = parseInt(new Date().toLocaleString('en-US', { timeZone: tz, hour: 'numeric', hour12: false })) % 24;
       if (s.notification_use_work_hours && (nowHour < s.notification_start_hour || nowHour >= s.notification_end_hour)) {
         const adminResult = await pool.query(
