@@ -155,12 +155,14 @@ router.post('/in', requireAuth, async (req, res) => {
       const settingsResult = await pool.query(
         'SELECT key, value FROM settings WHERE company_id = $1', [companyId]
       );
-      const s = { notification_start_hour: 6, notification_end_hour: 20, notification_use_work_hours: true };
+      const s = { notification_start_hour: 6, notification_end_hour: 20, notification_use_work_hours: true, company_timezone: '' };
       settingsResult.rows.forEach(r => {
         if (r.key === 'notification_use_work_hours') s[r.key] = r.value === '1';
+        else if (r.key === 'company_timezone') s[r.key] = r.value;
         else s[r.key] = parseFloat(r.value);
       });
-      const nowHour = new Date().getHours();
+      const tz = s.company_timezone || 'UTC';
+      const nowHour = parseInt(new Date().toLocaleString('en-US', { timeZone: tz, hour: 'numeric', hour12: false })) % 24;
       if (s.notification_use_work_hours && (nowHour < s.notification_start_hour || nowHour >= s.notification_end_hour)) {
         const adminResult = await pool.query(
           `SELECT u.email, u.full_name FROM users u
@@ -169,7 +171,7 @@ router.post('/in', requireAuth, async (req, res) => {
         );
         if (adminResult.rowCount > 0 && process.env.SENDGRID_API_KEY) {
           const admin = adminResult.rows[0];
-          const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+          const timeStr = new Date().toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
           await sgMail.send({
             from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
             to: admin.email,
