@@ -976,6 +976,32 @@ router.post('/projects', requireAdmin, requirePermission('manage_projects'), asy
 });
 
 // Remove (soft-delete) a project
+router.get('/projects/:id/media-urls', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const photos = await pool.query(
+      `SELECT p.url FROM field_report_photos p
+       JOIN field_reports r ON p.report_id = r.id
+       WHERE r.company_id = $1 AND r.project_id = $2 AND p.url IS NOT NULL`,
+      [companyId, req.params.id]
+    );
+    const attachments = await pool.query(
+      `SELECT a.url FROM safety_talk_attachments a
+       JOIN safety_talks t ON a.talk_id = t.id
+       WHERE t.company_id = $1 AND t.project_id = $2 AND a.url IS NOT NULL`,
+      [companyId, req.params.id]
+    );
+    const urls = [
+      ...photos.rows.map(r => r.url),
+      ...attachments.rows.map(r => r.url),
+    ];
+    res.json({ urls, count: urls.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.delete('/projects/:id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
