@@ -88,13 +88,15 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
     setError('');
     setLocationDenied(false);
     setLoading(true);
+    // Capture clock-in time immediately before GPS wait — GPS can take several seconds
+    const clock_in_time = new Date().toISOString();
     // Always fetch GPS when the selected project has a geofence, even if geolocation feature is off globally
     const loc = (geolocationEnabled || projectHasGeofence) ? await getLocation() : { lat: null, lng: null };
     if (loc.permissionDenied) setLocationDenied(true);
     const { lat, lng } = loc;
     const local_work_date = new Date().toLocaleDateString('en-CA');
     try {
-      const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, location_denied: loc.permissionDenied || false });
+      const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, location_denied: loc.permissionDenied || false, clock_in_time });
       if (r.data?.offline) {
         // Queued offline — show a pending state
         setStatus({ offline_queued: true, project_name: projects.find(p => p.id == selectedProject)?.name });
@@ -211,7 +213,8 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
         local_clock_out,
       });
       const local_work_date = new Date().toLocaleDateString('en-CA');
-      const r = await api.post('/clock/in', { project_id: switchProject, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+      const switch_clock_in_time = new Date().toISOString();
+      const r = await api.post('/clock/in', { project_id: switchProject, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, clock_in_time: switch_clock_in_time });
       setStatus(r.data);
       setSwitchingProject(false);
       setSwitchProject('');
