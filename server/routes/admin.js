@@ -429,6 +429,47 @@ router.patch('/workers/:id/restore', requireAdmin, async (req, res) => {
 });
 
 // Get a worker's entries for a date range (for bill generation)
+router.post('/workers/:id/entries', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+  const companyId = req.user.company_id;
+  const { work_date, start_time, end_time, project_id, notes, break_minutes, mileage } = req.body;
+  if (!work_date || !start_time || !end_time) {
+    return res.status(400).json({ error: 'work_date, start_time, and end_time are required' });
+  }
+  try {
+    const workerRow = await pool.query(
+      'SELECT id FROM users WHERE id = $1 AND company_id = $2 AND active = true',
+      [req.params.id, companyId]
+    );
+    if (workerRow.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
+
+    let wage_type = 'regular';
+    if (project_id) {
+      const proj = await pool.query('SELECT wage_type FROM projects WHERE id = $1 AND company_id = $2', [project_id, companyId]);
+      if (proj.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
+      wage_type = proj.rows[0].wage_type;
+    }
+
+    const result = await pool.query(
+      `INSERT INTO time_entries
+         (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
+          break_minutes, mileage, clock_source, clocked_in_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'log_entry', $11)
+       RETURNING *`,
+      [
+        companyId, req.params.id, project_id || null, work_date,
+        start_time, end_time, wage_type, notes || null,
+        parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
+        req.user.id,
+      ]
+    );
+    await logAudit(companyId, req.user.id, req.user.full_name, 'entry.admin_added', 'time_entry', result.rows[0].id, null);
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
   const { from, to } = req.query;
   const companyId = req.user.company_id;

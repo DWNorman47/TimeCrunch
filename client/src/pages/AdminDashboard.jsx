@@ -189,7 +189,7 @@ export default function AdminDashboard() {
             </button>
             {!collapsedSections.workers && (workers.length === 0
               ? <p style={{ color: '#666' }}>{t.noWorkersYet}</p>
-              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} overtimeEnabled={settings?.feature_overtime !== false} projectsEnabled={settings?.feature_projects !== false} />)
+              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} overtimeEnabled={settings?.feature_overtime !== false} projectsEnabled={settings?.feature_projects !== false} projects={projects} />)
             )}
             {settings?.feature_projects !== false && <>
               <button style={styles.sectionToggle} onClick={() => toggleSection('projects')}>
