@@ -393,6 +393,7 @@ export default function AdministrationPage() {
               defaultPrevailingRate={settings?.prevailing_wage_rate}
               showWageType={(settings?.prevailing_wage_rate ?? 0) > 0}
               currency={settings?.currency ?? 'USD'}
+              settings={settings}
             />
           </div>
         )}

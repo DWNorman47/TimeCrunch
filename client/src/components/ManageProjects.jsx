@@ -3,7 +3,7 @@ import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { useT } from '../hooks/useT';
 
-export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true, showGeofenceBudget = true, defaultPrevailingRate = '', currency = 'USD' }) {
+export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true, showGeofenceBudget = true, defaultPrevailingRate = '', currency = 'USD', settings = null }) {
   const toast = useToast();
   const t = useT();
   const [name, setName] = useState('');
@@ -28,6 +28,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   const [archived, setArchived] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loadingArchived, setLoadingArchived] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState(null); // { id, name }
+  const [archiveDownloading, setArchiveDownloading] = useState(false);
 
   const loadArchived = async () => {
     setLoadingArchived(true);
@@ -162,15 +164,58 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     );
   };
 
-  const handleRemove = async (id, projectName) => {
-    if (!confirm(`Deactivate project "${projectName}"? Its time entries will be kept. You can restore it from Inactive.`)) return;
+  const handleRemove = (id, projectName) => {
+    setArchiveTarget({ id, name: projectName });
+  };
+
+  const handleConfirmArchive = async () => {
+    if (!archiveTarget) return;
     try {
-      await api.delete(`/admin/projects/${id}`);
-      onProjectDeleted(id);
-      if (expandedId === id) setExpandedId(null);
+      await api.delete(`/admin/projects/${archiveTarget.id}`);
+      onProjectDeleted(archiveTarget.id);
+      if (expandedId === archiveTarget.id) setExpandedId(null);
       loadArchived();
+      setArchiveTarget(null);
     } catch {
       toast('Failed to remove project', 'error');
+    }
+  };
+
+  const handleDownloadMediaUrls = async () => {
+    if (!archiveTarget) return;
+    setArchiveDownloading(true);
+    try {
+      const r = await api.get(`/admin/projects/${archiveTarget.id}/media-urls`);
+      const { urls } = r.data;
+      if (!urls.length) { toast('No media files found for this project', 'info'); return; }
+      const blob = new Blob([urls.join('\n')], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${archiveTarget.name.replace(/[^a-z0-9]/gi, '_')}_media_urls.txt`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      toast('Failed to fetch media list', 'error');
+    } finally {
+      setArchiveDownloading(false);
+    }
+  };
+
+  const handleDownloadZip = async () => {
+    if (!archiveTarget) return;
+    setArchiveDownloading(true);
+    try {
+      const r = await api.get(`/admin/projects/${archiveTarget.id}/media-zip`, { responseType: 'blob' });
+      const blob = new Blob([r.data], { type: 'application/zip' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${archiveTarget.name.replace(/[^a-z0-9]/gi, '_')}_media.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      toast('No media found or download failed', 'error');
+    } finally {
+      setArchiveDownloading(false);
     }
   };
 
@@ -358,6 +403,37 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
         </div>
       )}
 
+      {archiveTarget && (
+        <div style={s.modalOverlay}>
+          <div style={s.modal}>
+            <div style={s.modalTitle}>Archive "{archiveTarget.name}"?</div>
+            <p style={s.modalBody}>
+              Time entries will be kept and the project can be restored later from Inactive.
+            </p>
+            {settings?.media_delete_on_project_archive && (
+              <div style={s.modalWarn}>
+                <strong>Media will be permanently deleted.</strong> The "Delete media on project archive" setting is active. All photos and attachments for this project will be removed from storage and cannot be recovered.
+              </div>
+            )}
+            <div style={s.modalDownload}>
+              <button style={s.downloadBtn} onClick={handleDownloadZip} disabled={archiveDownloading}>
+                {archiveDownloading ? 'Preparing ZIP...' : 'Download media as ZIP'}
+              </button>
+              {!settings?.media_delete_on_project_archive && (
+                <button style={{ ...s.downloadBtn, background: '#6b7280', marginTop: 4 }} onClick={handleDownloadMediaUrls} disabled={archiveDownloading}>
+                  Download media URL list (.txt)
+                </button>
+              )}
+              <span style={s.downloadHint}>Download all photos and attachments for this project before archiving</span>
+            </div>
+            <div style={s.modalActions}>
+              <button style={s.cancelBtn} onClick={() => setArchiveTarget(null)}>Cancel</button>
+              <button style={s.archiveBtn} onClick={handleConfirmArchive}>Archive Project</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={s.historyFooter}>
         <button style={s.historyToggle} onClick={() => setShowHistory(v => !v)}>
           {showHistory ? '▾' : '▸'} {t.history} {archived.length > 0 ? `(${archived.length})` : ''}
@@ -430,4 +506,14 @@ const s = {
   historyList: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 },
   historyItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#f9fafb', borderRadius: 7 },
   restoreBtn: { padding: '4px 12px', background: 'none', border: '1px solid #6ee7b7', color: '#059669', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  modal: { background: '#fff', borderRadius: 14, padding: 24, maxWidth: 440, width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 14 },
+  modalTitle: { fontSize: 16, fontWeight: 700, color: '#111827' },
+  modalBody: { fontSize: 14, color: '#374151', margin: 0 },
+  modalWarn: { fontSize: 13, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '10px 14px' },
+  modalDownload: { display: 'flex', flexDirection: 'column', gap: 5, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px' },
+  downloadBtn: { padding: '6px 14px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-start' },
+  downloadHint: { fontSize: 12, color: '#6b7280' },
+  modalActions: { display: 'flex', gap: 10, justifyContent: 'flex-end' },
+  archiveBtn: { padding: '8px 18px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
 };
