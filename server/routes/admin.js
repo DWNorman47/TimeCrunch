@@ -1002,6 +1002,64 @@ router.get('/projects/:id/media-urls', requireAdmin, async (req, res) => {
   }
 });
 
+router.get('/projects/:id/media-zip', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const projectRow = await pool.query(
+      'SELECT name FROM projects WHERE id = $1 AND company_id = $2',
+      [req.params.id, companyId]
+    );
+    if (projectRow.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
+    const projectName = projectRow.rows[0].name.replace(/[^a-z0-9]/gi, '_');
+
+    const photos = await pool.query(
+      `SELECT p.url FROM field_report_photos p
+       JOIN field_reports r ON p.report_id = r.id
+       WHERE r.company_id = $1 AND r.project_id = $2 AND p.url IS NOT NULL`,
+      [companyId, req.params.id]
+    );
+    const attachments = await pool.query(
+      `SELECT a.url FROM safety_talk_attachments a
+       JOIN safety_talks t ON a.talk_id = t.id
+       WHERE t.company_id = $1 AND t.project_id = $2 AND a.url IS NOT NULL`,
+      [companyId, req.params.id]
+    );
+    const urls = [
+      ...photos.rows.map(r => r.url),
+      ...attachments.rows.map(r => r.url),
+    ];
+
+    if (urls.length === 0) return res.status(404).json({ error: 'No media found for this project' });
+
+    const archiver = require('archiver');
+    const https = require('https');
+    const http = require('http');
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${projectName}_media.zip"`);
+
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    archive.pipe(res);
+    archive.on('error', err => { console.error('[media-zip]', err); });
+
+    // Fetch and append each file; resolve once the http response stream begins
+    await Promise.all(urls.map((url, i) => new Promise(resolve => {
+      const ext = url.split('?')[0].split('.').pop().toLowerCase() || 'bin';
+      const filename = `${String(i + 1).padStart(4, '0')}.${ext}`;
+      const mod = url.startsWith('https') ? https : http;
+      mod.get(url, stream => {
+        archive.append(stream, { name: filename });
+        resolve();
+      }).on('error', resolve);
+    })));
+
+    await archive.finalize();
+  } catch (err) {
+    console.error(err);
+    if (!res.headersSent) res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.delete('/projects/:id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
   const companyId = req.user.company_id;
   try {

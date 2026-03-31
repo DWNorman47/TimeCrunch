@@ -181,7 +181,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     }
   };
 
-  const handleDownloadMedia = async () => {
+  const handleDownloadMediaUrls = async () => {
     if (!archiveTarget) return;
     setArchiveDownloading(true);
     try {
@@ -196,6 +196,24 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       URL.revokeObjectURL(a.href);
     } catch {
       toast('Failed to fetch media list', 'error');
+    } finally {
+      setArchiveDownloading(false);
+    }
+  };
+
+  const handleDownloadZip = async () => {
+    if (!archiveTarget) return;
+    setArchiveDownloading(true);
+    try {
+      const r = await api.get(`/admin/projects/${archiveTarget.id}/media-zip`, { responseType: 'blob' });
+      const blob = new Blob([r.data], { type: 'application/zip' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${archiveTarget.name.replace(/[^a-z0-9]/gi, '_')}_media.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      toast('No media found or download failed', 'error');
     } finally {
       setArchiveDownloading(false);
     }
@@ -398,10 +416,15 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
               </div>
             )}
             <div style={s.modalDownload}>
-              <button style={s.downloadBtn} onClick={handleDownloadMedia} disabled={archiveDownloading}>
-                {archiveDownloading ? 'Fetching...' : 'Download media list (.txt)'}
+              <button style={s.downloadBtn} onClick={handleDownloadZip} disabled={archiveDownloading}>
+                {archiveDownloading ? 'Preparing ZIP...' : 'Download media as ZIP'}
               </button>
-              <span style={s.downloadHint}>Downloads a text file of all photo and attachment URLs for this project</span>
+              {!settings?.media_delete_on_project_archive && (
+                <button style={{ ...s.downloadBtn, background: '#6b7280', marginTop: 4 }} onClick={handleDownloadMediaUrls} disabled={archiveDownloading}>
+                  Download media URL list (.txt)
+                </button>
+              )}
+              <span style={s.downloadHint}>Download all photos and attachments for this project before archiving</span>
             </div>
             <div style={s.modalActions}>
               <button style={s.cancelBtn} onClick={() => setArchiveTarget(null)}>Cancel</button>
