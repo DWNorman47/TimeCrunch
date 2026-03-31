@@ -72,6 +72,10 @@ export default function ApprovalQueue({ onCountChange }) {
   const [fetchError, setFetchError] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [workerFilter, setWorkerFilter] = useState('');
+  const [editingTimesId, setEditingTimesId] = useState(null);
+  const [editStart, setEditStart] = useState('');
+  const [editEnd, setEditEnd] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
 
   const fetch = () => {
     setLoading(true);
@@ -84,6 +88,25 @@ export default function ApprovalQueue({ onCountChange }) {
 
   useEffect(() => { fetch(); }, []);
   useEffect(() => { if (onCountChange) onCountChange(entries.length); }, [entries]);
+
+  const startEditTimes = (e) => {
+    setEditingTimesId(e.id);
+    setEditStart(e.start_time.substring(0, 5));
+    setEditEnd(e.end_time.substring(0, 5));
+  };
+
+  const saveEditTimes = async (id) => {
+    setEditSaving(true);
+    try {
+      const updated = await api.patch(`/admin/entries/${id}/times`, { start_time: editStart, end_time: editEnd });
+      setEntries(prev => prev.map(e => e.id === id ? { ...e, start_time: updated.data.start_time, end_time: updated.data.end_time } : e));
+      setEditingTimesId(null);
+    } catch {
+      // silently fail
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const approve = async id => {
     setWorking(id);
@@ -250,7 +273,24 @@ export default function ApprovalQueue({ onCountChange }) {
                 )}
               </div>
 
-              {rejectingId === e.id ? (
+              {editingTimesId === e.id ? (
+                <div style={styles.editTimesForm}>
+                  <div style={styles.editTimesRow}>
+                    <div>
+                      <div style={styles.editTimesLabel}>Start</div>
+                      <input type="time" style={styles.editTimeInput} value={editStart} onChange={ev => setEditStart(ev.target.value)} />
+                    </div>
+                    <div>
+                      <div style={styles.editTimesLabel}>End</div>
+                      <input type="time" style={styles.editTimeInput} value={editEnd} onChange={ev => setEditEnd(ev.target.value)} />
+                    </div>
+                  </div>
+                  <div style={styles.editTimesActions}>
+                    <button style={styles.saveTimesBtn} onClick={() => saveEditTimes(e.id)} disabled={editSaving}>{editSaving ? '...' : 'Save'}</button>
+                    <button style={styles.cancelBtn} onClick={() => setEditingTimesId(null)}>Cancel</button>
+                  </div>
+                </div>
+              ) : rejectingId === e.id ? (
                 <div style={styles.rejectForm}>
                   <input
                     style={styles.rejectInput}
@@ -266,6 +306,7 @@ export default function ApprovalQueue({ onCountChange }) {
                 </div>
               ) : (
                 <div style={styles.actions}>
+                  <button style={styles.editTimesBtn} onClick={() => startEditTimes(e)}>✏️ Times</button>
                   <button style={styles.approveBtn} onClick={() => approve(e.id)} disabled={working === e.id}>
                     {working === e.id ? '...' : t.approve}
                   </button>
@@ -302,6 +343,13 @@ const styles = {
   notes: { marginTop: 4, fontSize: 12, color: '#9ca3af', fontStyle: 'italic' },
   sourceBadge: { fontSize: 11, color: '#1e40af', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 8px', fontWeight: 600, display: 'inline-block', marginTop: 4 },
   actions: { display: 'flex', gap: 8, alignItems: 'center' },
+  editTimesBtn: { padding: '6px 12px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  editTimesForm: { display: 'flex', flexDirection: 'column', gap: 10, minWidth: 160 },
+  editTimesRow: { display: 'flex', gap: 10 },
+  editTimesLabel: { fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 3 },
+  editTimeInput: { padding: '5px 8px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 },
+  editTimesActions: { display: 'flex', gap: 8 },
+  saveTimesBtn: { padding: '6px 14px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   approveBtn: { background: '#059669', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   rejectBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   rejectForm: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },

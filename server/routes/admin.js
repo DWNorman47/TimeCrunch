@@ -312,6 +312,48 @@ router.post('/clock-out/:user_id', requireAdmin, requirePermission('manage_worke
   }
 });
 
+// PATCH /admin/active-clock/:user_id — admin edits the clock-in time of a running clock
+router.patch('/active-clock/:user_id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+  const companyId = req.user.company_id;
+  const { clock_in_time } = req.body;
+  if (!clock_in_time) return res.status(400).json({ error: 'clock_in_time required' });
+  try {
+    const result = await pool.query(
+      `UPDATE active_clock SET clock_in_time = $1
+       WHERE user_id = $2 AND company_id = $3
+       RETURNING *`,
+      [clock_in_time, req.params.user_id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Active clock not found' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'worker.clock_in_time_edited', 'user', parseInt(req.params.user_id), null);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /admin/entries/:id — admin edits start/end times on a completed entry
+router.patch('/entries/:id/times', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+  const companyId = req.user.company_id;
+  const { start_time, end_time } = req.body;
+  if (!start_time || !end_time) return res.status(400).json({ error: 'start_time and end_time required' });
+  try {
+    const result = await pool.query(
+      `UPDATE time_entries SET start_time = $1, end_time = $2
+       WHERE id = $3 AND company_id = $4
+       RETURNING *`,
+      [start_time, end_time, req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'entry.times_edited', 'time_entry', parseInt(req.params.id), null);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET /admin/active-clocks — currently clocked-in workers with location
 router.get('/active-clocks', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;

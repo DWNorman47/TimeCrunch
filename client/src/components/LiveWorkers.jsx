@@ -80,6 +80,34 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   }, []);
 
   const [clockingOutId, setClockingOutId] = useState(null);
+  const [editingClockInId, setEditingClockInId] = useState(null); // user_id being edited
+  const [editClockInValue, setEditClockInValue] = useState('');   // datetime-local string
+  const [editClockInSaving, setEditClockInSaving] = useState(false);
+
+  // Convert a UTC ISO string to a datetime-local string (in local browser time)
+  const toDatetimeLocal = iso => {
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const startEditClockIn = (w) => {
+    setEditingClockInId(w.user_id);
+    setEditClockInValue(toDatetimeLocal(w.clock_in_time));
+  };
+
+  const handleSaveClockIn = async (userId) => {
+    setEditClockInSaving(true);
+    try {
+      await api.patch(`/admin/active-clock/${userId}`, { clock_in_time: new Date(editClockInValue).toISOString() });
+      setEditingClockInId(null);
+      fetchActive();
+    } catch {
+      // silently fail
+    } finally {
+      setEditClockInSaving(false);
+    }
+  };
 
   const handleAdminClockOut = async (userId) => {
     setClockingOutId(userId);
@@ -216,6 +244,22 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                   )}
                 </div>
                 <div style={styles.cardActions}>
+                  {editingClockInId === w.user_id ? (
+                    <>
+                      <input
+                        type="datetime-local"
+                        style={styles.editTimeInput}
+                        value={editClockInValue}
+                        onChange={e => setEditClockInValue(e.target.value)}
+                      />
+                      <button style={styles.saveTimeBtn} onClick={() => handleSaveClockIn(w.user_id)} disabled={editClockInSaving}>
+                        {editClockInSaving ? 'Saving…' : 'Save'}
+                      </button>
+                      <button style={styles.cancelTimeBtn} onClick={() => setEditingClockInId(null)}>Cancel</button>
+                    </>
+                  ) : (
+                    <button style={styles.editTimeBtn} onClick={() => startEditClockIn(w)}>Edit Clock-In Time</button>
+                  )}
                   <button
                     style={styles.clockOutBtn}
                     onClick={() => handleAdminClockOut(w.user_id)}
@@ -349,8 +393,12 @@ const styles = {
   dismissBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 16, cursor: 'pointer', padding: '0 4px', lineHeight: 1 },
   clockInWorkerBtn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   adminBadge: { fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 4, padding: '2px 7px', fontWeight: 600 },
-  cardActions: { marginTop: 8, display: 'flex', gap: 8 },
+  cardActions: { marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
   clockOutBtn: { padding: '5px 14px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
+  editTimeBtn: { padding: '5px 14px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
+  editTimeInput: { padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 },
+  saveTimeBtn: { padding: '5px 12px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
+  cancelTimeBtn: { padding: '5px 12px', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 7, fontSize: 12, cursor: 'pointer' },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   modal: { background: '#fff', borderRadius: 12, padding: 28, minWidth: 340, maxWidth: 440, width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 16 },
   modalTitle: { fontSize: 18, fontWeight: 700, margin: 0 },
