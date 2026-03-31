@@ -122,7 +122,7 @@ export default function ProjectBillPDF({ data, currency = 'USD' }) {
           </View>
           {entries.map(e => (
             <View key={e.id} style={s.row}>
-              <Text style={s.colWide}>{e.worker_name}</Text>
+              <Text style={s.colWide}>{e.invoice_name || e.worker_name}</Text>
               <Text style={s.col}>{formatDate(e.work_date)}</Text>
               <Text style={s.col}>{formatTime(e.start_time)}</Text>
               <Text style={s.col}>{formatTime(e.end_time)}</Text>

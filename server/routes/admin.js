@@ -917,7 +917,7 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
     if (projectResult.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
 
     const entriesResult = await pool.query(
-      `SELECT te.*, u.full_name as worker_name, u.username, u.hourly_rate, u.rate_type, u.overtime_rule
+      `SELECT te.*, COALESCE(u.invoice_name, u.full_name) as worker_name, u.username, u.hourly_rate, u.rate_type, u.overtime_rule
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
        WHERE te.project_id = $1
@@ -1530,13 +1530,13 @@ router.get('/export', requireAdmin, requirePermission('view_reports'), requirePl
   if (status) { conditions.push(`te.status = $${idx++}`); values.push(status); }
   try {
     const result = await pool.query(
-      `SELECT te.*, u.full_name as worker_name, p.name as project_name,
+      `SELECT te.*, COALESCE(u.invoice_name, u.full_name) as worker_name, p.name as project_name,
               to_char(te.work_date, 'YYYY-MM-DD') as work_date_str
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
        LEFT JOIN projects p ON te.project_id = p.id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY te.work_date, u.full_name, te.start_time`,
+       ORDER BY te.work_date, COALESCE(u.invoice_name, u.full_name), te.start_time`,
       values
     );
     const esc = v => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`;
@@ -1573,7 +1573,7 @@ router.get('/overtime-report', requireAdmin, requirePermission('view_reports'), 
     const prevRate = parseFloat(s.prevailing_wage_rate) || 45;
 
     const workers = await pool.query(
-      `SELECT u.id, u.full_name, u.hourly_rate, u.rate_type, u.overtime_rule FROM users u
+      `SELECT u.id, u.full_name, u.invoice_name, u.hourly_rate, u.rate_type, u.overtime_rule FROM users u
        WHERE u.company_id = $1 AND u.role = 'worker' AND u.active = true
        ORDER BY u.full_name`,
       [companyId]
@@ -1620,7 +1620,7 @@ router.get('/overtime-report', requireAdmin, requirePermission('view_reports'), 
       const totalCost = regularCost + overtimeCost + prevailingCost;
       const mileage = wEntries.reduce((s, e) => s + (parseFloat(e.mileage) || 0), 0);
       return {
-        worker_id: w.id, worker_name: w.full_name, rate, rate_type: w.rate_type || 'hourly', overtime_rule: workerOTRule,
+        worker_id: w.id, worker_name: w.invoice_name || w.full_name, rate, rate_type: w.rate_type || 'hourly', overtime_rule: workerOTRule,
         regular_hours: parseFloat(regularHours.toFixed(2)),
         overtime_hours: parseFloat(overtimeHours.toFixed(2)),
         prevailing_hours: parseFloat(prevHours.toFixed(2)),
@@ -1650,7 +1650,7 @@ router.get('/payroll-export', requireAdmin, requirePermission('view_reports'), r
     const prevRate = parseFloat(s.prevailing_wage_rate) || 45;
 
     const workers = await pool.query(
-      `SELECT u.id, u.full_name, u.hourly_rate, u.rate_type, u.overtime_rule FROM users u
+      `SELECT u.id, u.full_name, u.invoice_name, u.hourly_rate, u.rate_type, u.overtime_rule FROM users u
        WHERE u.company_id = $1 AND u.role = 'worker' AND u.active = true
        ORDER BY u.full_name`,
       [companyId]
@@ -1699,7 +1699,7 @@ router.get('/payroll-export', requireAdmin, requirePermission('view_reports'), r
         overtimeCost = overtimeHours * rate * otMult;
       }
       lines.push([
-        esc(w.full_name), w.rate_type || 'hourly', workerOTRule, rate.toFixed(2),
+        esc(w.invoice_name || w.full_name), w.rate_type || 'hourly', workerOTRule, rate.toFixed(2),
         regularHours.toFixed(2), overtimeHours.toFixed(2), prevHours.toFixed(2),
         (regularHours + overtimeHours + prevHours).toFixed(2),
         mileage.toFixed(1),
@@ -1838,13 +1838,13 @@ router.get('/certified-payroll', requireAdmin, requirePermission('view_reports')
     if (project_id) { conditions.push(`te.project_id = $${idx++}`); values.push(parseInt(project_id)); }
 
     const result = await pool.query(
-      `SELECT te.user_id, u.full_name as worker_name, u.hourly_rate,
+      `SELECT te.user_id, COALESCE(u.invoice_name, u.full_name) as worker_name, u.hourly_rate,
               to_char(te.work_date, 'YYYY-MM-DD') as work_date,
               te.start_time, te.end_time, te.break_minutes, te.wage_type
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY u.full_name, te.work_date, te.start_time`,
+       ORDER BY COALESCE(u.invoice_name, u.full_name), te.work_date, te.start_time`,
       values
     );
 
@@ -1859,7 +1859,7 @@ router.get('/certified-payroll', requireAdmin, requirePermission('view_reports')
       if (!workerMap[row.user_id]) {
         workerMap[row.user_id] = {
           worker_id: row.user_id,
-          worker_name: row.worker_name,
+          worker_name: row.worker_name,  // already COALESCE(invoice_name, full_name) from SQL
           rate: parseFloat(row.hourly_rate) || defaultRate,
           regular_days: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0 },
           prevailing_days: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0 },
