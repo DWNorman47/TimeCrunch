@@ -149,7 +149,7 @@ router.get('/settings', requireAdmin, async (req, res) => {
 router.patch('/settings', requireAdmin, requirePermission('manage_settings'), async (req, res) => {
   const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
   const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour', 'chat_retention_days'];
-  const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold'];
+  const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold', 'media_retention_days'];
   const stringKeys = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id'];
   const allowed = [...numericKeys, ...stringKeys, ...FEATURE_KEYS];
   const companyId = req.user.company_id;
@@ -976,6 +976,90 @@ router.post('/projects', requireAdmin, requirePermission('manage_projects'), asy
 });
 
 // Remove (soft-delete) a project
+router.get('/projects/:id/media-urls', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const photos = await pool.query(
+      `SELECT p.url FROM field_report_photos p
+       JOIN field_reports r ON p.report_id = r.id
+       WHERE r.company_id = $1 AND r.project_id = $2 AND p.url IS NOT NULL`,
+      [companyId, req.params.id]
+    );
+    const attachments = await pool.query(
+      `SELECT a.url FROM safety_talk_attachments a
+       JOIN safety_talks t ON a.talk_id = t.id
+       WHERE t.company_id = $1 AND t.project_id = $2 AND a.url IS NOT NULL`,
+      [companyId, req.params.id]
+    );
+    const urls = [
+      ...photos.rows.map(r => r.url),
+      ...attachments.rows.map(r => r.url),
+    ];
+    res.json({ urls, count: urls.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/projects/:id/media-zip', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const projectRow = await pool.query(
+      'SELECT name FROM projects WHERE id = $1 AND company_id = $2',
+      [req.params.id, companyId]
+    );
+    if (projectRow.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
+    const projectName = projectRow.rows[0].name.replace(/[^a-z0-9]/gi, '_');
+
+    const photos = await pool.query(
+      `SELECT p.url FROM field_report_photos p
+       JOIN field_reports r ON p.report_id = r.id
+       WHERE r.company_id = $1 AND r.project_id = $2 AND p.url IS NOT NULL`,
+      [companyId, req.params.id]
+    );
+    const attachments = await pool.query(
+      `SELECT a.url FROM safety_talk_attachments a
+       JOIN safety_talks t ON a.talk_id = t.id
+       WHERE t.company_id = $1 AND t.project_id = $2 AND a.url IS NOT NULL`,
+      [companyId, req.params.id]
+    );
+    const urls = [
+      ...photos.rows.map(r => r.url),
+      ...attachments.rows.map(r => r.url),
+    ];
+
+    if (urls.length === 0) return res.status(404).json({ error: 'No media found for this project' });
+
+    const archiver = require('archiver');
+    const https = require('https');
+    const http = require('http');
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${projectName}_media.zip"`);
+
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    archive.pipe(res);
+    archive.on('error', err => { console.error('[media-zip]', err); });
+
+    // Fetch and append each file; resolve once the http response stream begins
+    await Promise.all(urls.map((url, i) => new Promise(resolve => {
+      const ext = url.split('?')[0].split('.').pop().toLowerCase() || 'bin';
+      const filename = `${String(i + 1).padStart(4, '0')}.${ext}`;
+      const mod = url.startsWith('https') ? https : http;
+      mod.get(url, stream => {
+        archive.append(stream, { name: filename });
+        resolve();
+      }).on('error', resolve);
+    })));
+
+    await archive.finalize();
+  } catch (err) {
+    console.error(err);
+    if (!res.headersSent) res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.delete('/projects/:id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
@@ -986,6 +1070,19 @@ router.delete('/projects/:id', requireAdmin, requirePermission('manage_projects'
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.deleted', 'project', parseInt(req.params.id), project.rows[0]?.name);
+
+    // Delete project media if setting is enabled — fire and forget
+    try {
+      const settingRow = await pool.query(
+        `SELECT value FROM settings WHERE company_id=$1 AND key='media_delete_on_project_archive'`,
+        [companyId]
+      );
+      if (settingRow.rows[0]?.value === '1') {
+        const { deleteMediaForProject } = require('../jobs/mediaRetention');
+        deleteMediaForProject(companyId, req.params.id).catch(() => {});
+      }
+    } catch {}
+
     res.json({ removed: true });
   } catch (err) {
     console.error(err);

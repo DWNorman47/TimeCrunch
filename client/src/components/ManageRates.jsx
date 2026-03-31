@@ -93,6 +93,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     company_timezone: settings?.company_timezone ?? '',
     invoice_signature: settings?.invoice_signature ?? 'optional',
     default_temp_password: settings?.default_temp_password ?? '',
+    media_retention_days: String(settings?.media_retention_days ?? 0),
+    media_delete_on_project_archive: settings?.media_delete_on_project_archive ?? false,
   });
   const [prevailingEnabled, setPrevailingEnabled] = useState(() => (settings?.prevailing_wage_rate ?? 0) > 0);
   const [checklistTemplates, setChecklistTemplates] = useState([]);
@@ -143,6 +145,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       company_timezone: settings.company_timezone ?? '',
       invoice_signature: settings.invoice_signature ?? 'optional',
       default_temp_password: settings.default_temp_password ?? '',
+      media_retention_days: String(settings.media_retention_days ?? 0),
+      media_delete_on_project_archive: settings.media_delete_on_project_archive ?? false,
     });
   }, [settings]);
 
@@ -180,6 +184,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         company_timezone: form.company_timezone,
         invoice_signature: form.invoice_signature,
         default_temp_password: form.default_temp_password,
+        media_retention_days: parseFloat(form.media_retention_days) || 0,
+        media_delete_on_project_archive: form.media_delete_on_project_archive,
       });
       onSettingsUpdated(r.data);
       setSaved(section);
@@ -615,6 +621,38 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
                   Free plan: 500 MB · Starter: 5 GB · Business: 25 GB
                 </div>
               </div>
+            )}
+            {!collapsed.storage && (
+              <>
+                <div style={styles.row}>
+                  <div>
+                    <div style={styles.label}>Auto-delete media after</div>
+                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Automatically delete photos and attachments older than this many days (0 = disabled)</div>
+                  </div>
+                  <div style={styles.inputGroup}>
+                    <input
+                      style={styles.input}
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={form.media_retention_days}
+                      onChange={e => set('media_retention_days', e.target.value)}
+                    />
+                    <span style={styles.suffix}>days</span>
+                  </div>
+                </div>
+                <div style={styles.row}>
+                  <div>
+                    <div style={styles.label}>Delete media on project archive</div>
+                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>When a project is archived, permanently delete all its photos and attachments</div>
+                  </div>
+                  <label style={{ ...styles.toggle, background: form.media_delete_on_project_archive ? '#1a56db' : '#d1d5db' }}>
+                    <input type="checkbox" checked={form.media_delete_on_project_archive} onChange={e => set('media_delete_on_project_archive', e.target.checked)} style={{ display: 'none' }} />
+                    <span style={{ ...styles.toggleKnob, transform: form.media_delete_on_project_archive ? 'translateX(46px)' : 'translateX(0)' }} />
+                  </label>
+                </div>
+                <SectionFooter section="storage" />
+              </>
             )}
           </div>
         );
