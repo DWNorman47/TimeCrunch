@@ -149,7 +149,7 @@ router.get('/settings', requireAdmin, async (req, res) => {
 router.patch('/settings', requireAdmin, requirePermission('manage_settings'), async (req, res) => {
   const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
   const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour', 'chat_retention_days'];
-  const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold'];
+  const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold', 'media_retention_days'];
   const stringKeys = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id'];
   const allowed = [...numericKeys, ...stringKeys, ...FEATURE_KEYS];
   const companyId = req.user.company_id;
@@ -986,6 +986,19 @@ router.delete('/projects/:id', requireAdmin, requirePermission('manage_projects'
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.deleted', 'project', parseInt(req.params.id), project.rows[0]?.name);
+
+    // Delete project media if setting is enabled — fire and forget
+    try {
+      const settingRow = await pool.query(
+        `SELECT value FROM settings WHERE company_id=$1 AND key='media_delete_on_project_archive'`,
+        [companyId]
+      );
+      if (settingRow.rows[0]?.value === '1') {
+        const { deleteMediaForProject } = require('../jobs/mediaRetention');
+        deleteMediaForProject(companyId, req.params.id).catch(() => {});
+      }
+    } catch {}
+
     res.json({ removed: true });
   } catch (err) {
     console.error(err);
