@@ -184,6 +184,13 @@ export default function ApprovalQueue({ onCountChange }) {
                   <span style={styles.signedTag}>{t.workerSigned}</span>
                 )}
                 {e.notes && <div style={styles.notes}>{e.notes}</div>}
+                {e.clock_source && e.clock_source !== 'worker' && (
+                  <div style={styles.sourceBadge}>
+                    {e.clock_source === 'admin'
+                      ? `Clocked in by admin${e.clocked_in_by_name ? ': ' + e.clocked_in_by_name : ''}`
+                      : 'Log entry'}
+                  </div>
+                )}
                 {(e.clock_in_lat || e.clock_out_lat) && (
                   <div style={styles.locationRow}>
                     <button
@@ -293,6 +300,7 @@ const styles = {
   sep: { color: '#d1d5db' },
   wageTag: { color: '#fff', padding: '1px 7px', borderRadius: 10, fontSize: 11, fontWeight: 700 },
   notes: { marginTop: 4, fontSize: 12, color: '#9ca3af', fontStyle: 'italic' },
+  sourceBadge: { fontSize: 11, color: '#1e40af', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 8px', fontWeight: 600, display: 'inline-block', marginTop: 4 },
   actions: { display: 'flex', gap: 8, alignItems: 'center' },
   approveBtn: { background: '#059669', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   rejectBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },

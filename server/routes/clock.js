@@ -112,8 +112,8 @@ router.post('/in', requireAuth, async (req, res) => {
 
     // Upsert — replace any existing clock-in (safety valve)
     const result = await pool.query(
-      `INSERT INTO active_clock (user_id, company_id, project_id, clock_in_time, clock_in_lat, clock_in_lng, work_date, notes, timezone)
-       VALUES ($1, $2, $3, NOW(), $4, $5, COALESCE($6::date, CURRENT_DATE), $7, $8)
+      `INSERT INTO active_clock (user_id, company_id, project_id, clock_in_time, clock_in_lat, clock_in_lng, work_date, notes, timezone, clock_source, clocked_in_by)
+       VALUES ($1, $2, $3, NOW(), $4, $5, COALESCE($6::date, CURRENT_DATE), $7, $8, $9, $10)
        ON CONFLICT (user_id) DO UPDATE
          SET project_id = EXCLUDED.project_id,
              clock_in_time = EXCLUDED.clock_in_time,
@@ -121,9 +121,11 @@ router.post('/in', requireAuth, async (req, res) => {
              clock_in_lng = EXCLUDED.clock_in_lng,
              work_date = EXCLUDED.work_date,
              notes = EXCLUDED.notes,
-             timezone = EXCLUDED.timezone
+             timezone = EXCLUDED.timezone,
+             clock_source = EXCLUDED.clock_source,
+             clocked_in_by = EXCLUDED.clocked_in_by
        RETURNING *`,
-      [req.user.id, companyId, project_id, lat || null, lng || null, local_work_date || null, notes || null, timezone || null]
+      [req.user.id, companyId, project_id, lat || null, lng || null, local_work_date || null, notes || null, timezone || null, 'worker', null]
     );
 
     const row = result.rows[0];
@@ -198,7 +200,7 @@ router.post('/out', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const clockResult = await pool.query(
-      'SELECT user_id, company_id, project_id, clock_in_time, work_date, notes, timezone FROM active_clock WHERE user_id = $1',
+      'SELECT user_id, company_id, project_id, clock_in_time, work_date, notes, timezone, clock_source, clocked_in_by FROM active_clock WHERE user_id = $1',
       [req.user.id]
     );
     if (clockResult.rowCount === 0) return res.status(400).json({ error: 'Not clocked in' });
@@ -223,8 +225,9 @@ router.post('/out', requireAuth, async (req, res) => {
     const entryResult = await pool.query(
       `INSERT INTO time_entries
          (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
-          clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, break_minutes, mileage, timezone)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+          clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, break_minutes, mileage, timezone,
+          clock_source, clocked_in_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        RETURNING *`,
       [
         companyId, req.user.id, clock.project_id, clock.work_date,
@@ -232,6 +235,7 @@ router.post('/out', requireAuth, async (req, res) => {
         clock.clock_in_lat, clock.clock_in_lng, lat || null, lng || null,
         parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
         clock.timezone || null,
+        clock.clock_source, clock.clocked_in_by,
       ]
     );
 

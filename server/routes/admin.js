@@ -229,16 +229,55 @@ router.get('/notifications', requireAdmin, async (req, res) => {
   }
 });
 
+// POST /admin/clock-in — admin clocks in a worker on their behalf
+router.post('/clock-in', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+  const companyId = req.user.company_id;
+  const { user_id, project_id, notes } = req.body;
+  if (!user_id) return res.status(400).json({ error: 'user_id required' });
+  try {
+    // Verify worker belongs to this company
+    const workerRow = await pool.query(
+      'SELECT id, full_name FROM users WHERE id = $1 AND company_id = $2 AND active = true',
+      [user_id, companyId]
+    );
+    if (workerRow.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
+
+    const result = await pool.query(
+      `INSERT INTO active_clock (user_id, company_id, project_id, clock_in_time, work_date, notes, clock_source, clocked_in_by)
+       VALUES ($1, $2, $3, NOW(), CURRENT_DATE, $4, 'admin', $5)
+       ON CONFLICT (user_id) DO UPDATE
+         SET project_id = EXCLUDED.project_id,
+             clock_in_time = EXCLUDED.clock_in_time,
+             work_date = EXCLUDED.work_date,
+             notes = EXCLUDED.notes,
+             clock_source = EXCLUDED.clock_source,
+             clocked_in_by = EXCLUDED.clocked_in_by
+       RETURNING *`,
+      [user_id, companyId, project_id || null, notes || null, req.user.id]
+    );
+    const projName = project_id
+      ? await pool.query('SELECT name FROM projects WHERE id = $1', [project_id])
+      : { rows: [{ name: null }] };
+    await logAudit(companyId, req.user.id, req.user.full_name, 'worker.clocked_in_by_admin', 'user', parseInt(user_id), workerRow.rows[0].full_name);
+    res.status(201).json({ ...result.rows[0], project_name: projName.rows[0]?.name, clocked_in_by_name: req.user.full_name });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET /admin/active-clocks — currently clocked-in workers with location
 router.get('/active-clocks', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
       `SELECT ac.user_id, ac.clock_in_time, ac.clock_in_lat, ac.clock_in_lng,
-              ac.notes, u.full_name, p.name as project_name, p.wage_type
+              ac.notes, u.full_name, p.name as project_name, p.wage_type,
+              ac.clock_source, ac.clocked_in_by, admin_u.full_name AS clocked_in_by_name
        FROM active_clock ac
        JOIN users u ON ac.user_id = u.id
        LEFT JOIN projects p ON ac.project_id = p.id
+       LEFT JOIN users admin_u ON ac.clocked_in_by = admin_u.id
        WHERE ac.company_id = $1
        ORDER BY ac.clock_in_time ASC`,
       [companyId]
@@ -1170,10 +1209,12 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
     const workerFilter = accessIds && accessIds.length ? `AND te.user_id = ANY($3)` : '';
     const params = accessIds && accessIds.length ? [companyId, LIMIT + 1, accessIds] : [companyId, LIMIT + 1];
     const result = await pool.query(
-      `SELECT te.*, u.full_name as worker_name, u.email as worker_email, p.name as project_name
+      `SELECT te.*, u.full_name as worker_name, u.email as worker_email, p.name as project_name,
+              te.clock_source, te.clocked_in_by, admin_u.full_name AS clocked_in_by_name
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
        LEFT JOIN projects p ON te.project_id = p.id
+       LEFT JOIN users admin_u ON te.clocked_in_by = admin_u.id
        WHERE te.company_id = $1 AND te.status = 'pending' ${workerFilter}
        ORDER BY te.worker_signed_at DESC NULLS LAST, te.work_date DESC, te.start_time DESC
        LIMIT $2`,

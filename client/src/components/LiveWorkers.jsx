@@ -32,7 +32,7 @@ function ElapsedTimer({ clockInTime }) {
   return <span style={styles.elapsed}>{formatElapsed(clockInTime)}</span>;
 }
 
-export default function LiveWorkers({ timezone = '', showInactiveAlerts = true }) {
+export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, projects = [] }) {
   const t = useT();
   const [workers, setWorkers] = useState([]);
   const [inactiveWorkers, setInactiveWorkers] = useState([]);
@@ -41,6 +41,14 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true }
   const [selectedWorker, setSelectedWorker] = useState('');
   const [dismissedInactive, setDismissedInactive] = useState(false);
   const intervalRef = useRef(null);
+
+  // Admin clock-in modal state
+  const [showClockInModal, setShowClockInModal] = useState(false);
+  const [clockInUserId, setClockInUserId] = useState('');
+  const [clockInProjectId, setClockInProjectId] = useState('');
+  const [clockInNotes, setClockInNotes] = useState('');
+  const [clockInSaving, setClockInSaving] = useState(false);
+  const [allWorkers, setAllWorkers] = useState([]);
 
   const fetchActive = () => {
     api.get('/admin/active-clocks')
@@ -64,6 +72,27 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true }
     document.addEventListener('visibilitychange', onVisible);
     return () => { clearInterval(intervalRef.current); document.removeEventListener('visibilitychange', onVisible); };
   }, []);
+
+  useEffect(() => {
+    api.get('/admin/workers')
+      .then(r => setAllWorkers(r.data))
+      .catch(() => {});
+  }, []);
+
+  const handleAdminClockIn = async () => {
+    if (!clockInUserId) return;
+    setClockInSaving(true);
+    try {
+      await api.post('/admin/clock-in', { user_id: clockInUserId, project_id: clockInProjectId || null, notes: clockInNotes || null });
+      setShowClockInModal(false);
+      setClockInUserId(''); setClockInProjectId(''); setClockInNotes('');
+      fetchActive();
+    } catch {
+      // silently fail for now
+    } finally {
+      setClockInSaving(false);
+    }
+  };
 
   // Unique projects from currently clocked-in workers
   const activeProjects = [...new Map(
@@ -122,6 +151,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true }
             <span style={styles.updated}>Updated {formatInTz(lastUpdated.toISOString(), timezone)}</span>
           )}
           <button style={styles.refreshBtn} onClick={fetchActive}>{t.refresh}</button>
+          <button style={styles.clockInWorkerBtn} onClick={() => setShowClockInModal(true)}>+ Clock In Worker</button>
         </div>
       </div>
 
@@ -167,6 +197,9 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true }
                     ? <span style={styles.locationTag}>{t.locationCaptured}</span>
                     : <span style={styles.noLocation}>{t.noLocation}</span>
                   }
+                  {w.clock_source === 'admin' && w.clocked_in_by_name && (
+                    <span style={styles.adminBadge}>Clocked in by {w.clocked_in_by_name}</span>
+                  )}
                 </div>
               </div>
             ))}
@@ -193,6 +226,66 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true }
             </div>
           )}
         </>
+      )}
+      {showClockInModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <h3 style={styles.modalTitle}>Clock In Worker</h3>
+            <div style={styles.modalField}>
+              <label style={styles.modalLabel}>Worker</label>
+              <select
+                style={styles.modalSelect}
+                value={clockInUserId}
+                onChange={e => setClockInUserId(e.target.value)}
+              >
+                <option value="">Select a worker...</option>
+                {allWorkers
+                  .filter(w => !workers.some(aw => String(aw.user_id) === String(w.id)))
+                  .map(w => (
+                    <option key={w.id} value={w.id}>{w.full_name}</option>
+                  ))}
+              </select>
+            </div>
+            <div style={styles.modalField}>
+              <label style={styles.modalLabel}>Project (optional)</label>
+              <select
+                style={styles.modalSelect}
+                value={clockInProjectId}
+                onChange={e => setClockInProjectId(e.target.value)}
+              >
+                <option value="">No project</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div style={styles.modalField}>
+              <label style={styles.modalLabel}>Notes (optional)</label>
+              <textarea
+                style={styles.modalTextarea}
+                value={clockInNotes}
+                onChange={e => setClockInNotes(e.target.value)}
+                rows={3}
+                placeholder="Add a note..."
+              />
+            </div>
+            <div style={styles.modalActions}>
+              <button
+                style={styles.modalClockInBtn}
+                onClick={handleAdminClockIn}
+                disabled={!clockInUserId || clockInSaving}
+              >
+                {clockInSaving ? 'Clocking in...' : 'Clock In'}
+              </button>
+              <button
+                style={styles.modalCancelBtn}
+                onClick={() => { setShowClockInModal(false); setClockInUserId(''); setClockInProjectId(''); setClockInNotes(''); }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -231,4 +324,16 @@ const styles = {
   inactivePill: { background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 13, color: '#78350f', fontWeight: 500 },
   inactiveDays: { color: '#b45309', fontWeight: 700 },
   dismissBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 16, cursor: 'pointer', padding: '0 4px', lineHeight: 1 },
+  clockInWorkerBtn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  adminBadge: { fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 4, padding: '2px 7px', fontWeight: 600 },
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  modal: { background: '#fff', borderRadius: 12, padding: 28, minWidth: 340, maxWidth: 440, width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 16 },
+  modalTitle: { fontSize: 18, fontWeight: 700, margin: 0 },
+  modalField: { display: 'flex', flexDirection: 'column', gap: 4 },
+  modalLabel: { fontSize: 13, fontWeight: 600, color: '#374151' },
+  modalSelect: { padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 14, color: '#374151', background: '#fff' },
+  modalTextarea: { padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 14, color: '#374151', resize: 'vertical' },
+  modalActions: { display: 'flex', gap: 10, justifyContent: 'flex-end' },
+  modalClockInBtn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, padding: '8px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
+  modalCancelBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', borderRadius: 7, padding: '8px 18px', fontSize: 14, cursor: 'pointer' },
 };
