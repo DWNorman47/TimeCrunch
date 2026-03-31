@@ -96,7 +96,7 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen }) {
           <div style={s.parties}>
             <div>
               <div style={s.partyLabel}>From</div>
-              <div style={s.partyName}>{user?.full_name || '—'}</div>
+              <div style={s.partyName}>{user?.invoice_name || user?.full_name || '—'}</div>
               {user?.email && <div style={s.partyDetail}>{user.email}</div>}
             </div>
             <div>
