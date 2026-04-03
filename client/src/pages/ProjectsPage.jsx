@@ -5,6 +5,10 @@ import AppSwitcher from '../components/AppSwitcher';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ProjectBillPDF from '../components/ProjectBillPDF';
 
+function punchColor(status) {
+  return { open: '#f59e0b', in_progress: '#3b82f6', resolved: '#059669', closed: '#9ca3af' }[status] || '#9ca3af';
+}
+
 // ── Project Card ──────────────────────────────────────────────────────────────
 
 function ProjectCard({ project, metrics, settings, onClick }) {
@@ -96,6 +100,9 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
   const [billTo, setBillTo] = useState('');
   const [workers, setWorkers] = useState([]);
   const [workersLoading, setWorkersLoading] = useState(false);
+  const [activity, setActivity] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   const m = metrics || {};
   const fmtHours = h => {
@@ -123,6 +130,11 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
         .then(r => setWorkers(r.data))
         .catch(() => {})
         .finally(() => setWorkersLoading(false));
+      setActivityLoading(true);
+      api.get(`/admin/projects/${project.id}/activity`)
+        .then(r => setActivity(r.data))
+        .catch(() => {})
+        .finally(() => setActivityLoading(false));
     }
   }, [tab, project.id]);
 
@@ -264,6 +276,54 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
               {project.wage_type && project.wage_type !== 'regular' && (
                 <div style={styles.tagRow}>
                   <span style={styles.wageTag}>{project.wage_type === 'prevailing' ? 'Prevailing Wage' : project.wage_type}</span>
+                </div>
+              )}
+
+              {/* Recent Activity accordion */}
+              {(activityLoading || activity.length > 0) && (
+                <div style={{ marginTop: 16 }}>
+                  <button
+                    style={styles.activityToggle}
+                    onClick={() => setActivityOpen(o => !o)}
+                  >
+                    <span>Recent Activity</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {activity.length > 0 && <span style={styles.activityCount}>{activity.length}</span>}
+                      <span style={{ fontSize: 12, color: '#9ca3af' }}>{activityOpen ? '▴' : '▾'}</span>
+                    </span>
+                  </button>
+
+                  {activityOpen && (
+                    activityLoading ? (
+                      <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0' }}>Loading…</p>
+                    ) : (
+                      <div style={styles.activityList}>
+                        {activity.map(item => (
+                          <div key={`${item.type}-${item.id}`} style={styles.activityItem}>
+                            <div style={{ ...styles.activityDot, background: item.type === 'note' ? '#059669' : punchColor(item.status) }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={styles.activityTitle}>
+                                {item.type === 'punch' && (
+                                  <span style={{ ...styles.activityTag, background: punchColor(item.status) + '22', color: punchColor(item.status) }}>
+                                    {item.status}
+                                  </span>
+                                )}
+                                {item.type === 'punch' && item.priority === 'high' && (
+                                  <span style={{ ...styles.activityTag, background: '#fee2e2', color: '#dc2626' }}>high</span>
+                                )}
+                                <span style={styles.activityText}>{item.title}</span>
+                              </div>
+                              <div style={styles.activityMeta}>
+                                {item.type === 'note' ? '📝' : '✅'}
+                                {item.worker_name && <span>{item.worker_name} · </span>}
+                                <span>{new Date(item.event_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {new Date(item.event_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  )}
                 </div>
               )}
             </div>
@@ -529,4 +589,14 @@ const styles = {
   tdWorker: { flex: 2, fontWeight: 600, color: '#111827' },
   tdHours: { width: 50, textAlign: 'right', fontWeight: 700, color: '#374151' },
   moreText: { fontSize: 12, color: '#9ca3af', textAlign: 'center', marginTop: 8 },
+  // Activity
+  activityToggle: { width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '9px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  activityCount: { fontSize: 11, fontWeight: 700, color: '#fff', background: '#9ca3af', padding: '1px 7px', borderRadius: 10 },
+  activityList: { display: 'flex', flexDirection: 'column', gap: 1, marginTop: 6 },
+  activityItem: { display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 10px', borderRadius: 7, background: '#fafafa', border: '1px solid #f3f4f6' },
+  activityDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 4 },
+  activityTitle: { display: 'flex', gap: 4, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 2 },
+  activityTag: { fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 },
+  activityText: { fontSize: 13, color: '#111827', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' },
+  activityMeta: { display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, color: '#9ca3af', flexWrap: 'wrap' },
 };

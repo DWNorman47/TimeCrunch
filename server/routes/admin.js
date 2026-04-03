@@ -1158,6 +1158,53 @@ router.post('/projects', requireAdmin, requirePermission('manage_projects'), asy
   }
 });
 
+// Unified activity feed for a project (field notes + punchlist items)
+router.get('/projects/:id/activity', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `WITH notes AS (
+         SELECT 'note'::text AS type,
+                r.id::text,
+                r.notes AS title,
+                r.reported_at AS event_at,
+                COALESCE(u.invoice_name, u.full_name) AS worker_name,
+                NULL::text AS status,
+                NULL::text AS priority
+         FROM field_reports r
+         JOIN users u ON r.user_id = u.id
+         WHERE r.project_id = $1 AND r.company_id = $2
+           AND r.notes IS NOT NULL AND r.notes <> ''
+         ORDER BY r.reported_at DESC
+         LIMIT 10
+       ),
+       punches AS (
+         SELECT 'punch'::text AS type,
+                pi.id::text,
+                pi.title,
+                pi.created_at AS event_at,
+                NULL::text AS worker_name,
+                pi.status,
+                pi.priority
+         FROM punchlist_items pi
+         WHERE pi.project_id = $1 AND pi.company_id = $2
+         ORDER BY pi.created_at DESC
+         LIMIT 15
+       )
+       SELECT * FROM notes
+       UNION ALL
+       SELECT * FROM punches
+       ORDER BY event_at DESC
+       LIMIT 25`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Workers who have time entries on this project
 router.get('/projects/:id/workers', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
