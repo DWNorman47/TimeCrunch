@@ -160,8 +160,8 @@ export default function AdminDashboard() {
           </div>
         ) : tab === 'live' ? (
           <>
-            {(workers.filter(w => w.role === 'worker').length === 0 || projects.length === 0) && (
-              <OnboardingChecklist workers={workers} projects={projects} />
+            {workers.filter(w => w.role === 'worker').length === 0 && (
+              <OnboardingChecklist workers={workers} projects={projects} settings={settings} />
             )}
             <LiveKPIs />
             {plan.isBusiness && settings?.feature_broadcast !== false ? <BroadcastMessage /> : null}

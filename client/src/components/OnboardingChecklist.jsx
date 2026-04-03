@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 
 const DISMISS_KEY = 'opsfloa_onboarding_dismissed';
 
-export default function OnboardingChecklist({ workers, projects }) {
+export default function OnboardingChecklist({ workers, projects, settings }) {
   const [dismissed, setDismissed] = useState(() => !!localStorage.getItem(DISMISS_KEY));
 
   if (dismissed) return null;
 
   const hasWorkers = workers.some(w => w.role === 'worker');
   const hasProjects = projects.length > 0;
+  const projectsEnabled = settings?.module_projects !== false;
 
   const steps = [
     {
@@ -18,13 +19,13 @@ export default function OnboardingChecklist({ workers, projects }) {
       href: '/administration#workers',
       cta: 'Add Worker',
     },
-    {
+    ...(projectsEnabled ? [{
       done: hasProjects,
       label: 'Create your first project',
       sub: 'Set up a job site so workers can log hours against it.',
       href: '/administration#projects',
       cta: 'Add Project',
-    },
+    }] : []),
     {
       done: false,
       label: 'Configure company rates & settings',
