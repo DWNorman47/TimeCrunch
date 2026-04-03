@@ -36,11 +36,11 @@ router.post('/in', requireAuth, async (req, res) => {
   try {
     // Single query for both settings needed before clock-in
     const settingsRows = await pool.query(
-      `SELECT key, value FROM settings WHERE company_id=$1 AND key IN ('feature_projects','global_required_checklist_template_id')`,
+      `SELECT key, value FROM settings WHERE company_id=$1 AND key IN ('feature_project_integration','global_required_checklist_template_id')`,
       [companyId]
     );
     const settingsMap = Object.fromEntries(settingsRows.rows.map(r => [r.key, r.value]));
-    const projectsEnabled = settingsMap['feature_projects'] !== '0';
+    const projectsEnabled = settingsMap['feature_project_integration'] !== '0';
     const globalChecklistId = settingsMap['global_required_checklist_template_id'] ? parseInt(settingsMap['global_required_checklist_template_id']) : null;
 
     if (!project_id && projectsEnabled) return res.status(400).json({ error: 'project_id required' });

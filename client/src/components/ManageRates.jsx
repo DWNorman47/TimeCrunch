@@ -83,6 +83,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     feature_geolocation: settings?.feature_geolocation ?? true,
     feature_timeclock: settings?.feature_timeclock ?? true,
     feature_projects: settings?.feature_projects ?? true,
+    feature_project_integration: settings?.feature_project_integration ?? true,
     feature_inactive_alerts: settings?.feature_inactive_alerts ?? true,
     feature_overtime_alerts: settings?.feature_overtime_alerts ?? true,
     feature_broadcast: settings?.feature_broadcast ?? true,
@@ -135,6 +136,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       feature_geolocation: settings.feature_geolocation ?? true,
       feature_timeclock: settings.feature_timeclock ?? true,
       feature_projects: settings.feature_projects ?? true,
+      feature_project_integration: settings.feature_project_integration ?? true,
       feature_inactive_alerts: settings.feature_inactive_alerts ?? true,
       feature_overtime_alerts: settings.feature_overtime_alerts ?? true,
       feature_broadcast: settings.feature_broadcast ?? true,
@@ -174,6 +176,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_geolocation: form.feature_geolocation,
         feature_timeclock: form.feature_timeclock,
         feature_projects: form.feature_projects,
+        feature_project_integration: form.feature_project_integration,
         feature_inactive_alerts: form.feature_inactive_alerts,
         feature_overtime_alerts: form.feature_overtime_alerts,
         feature_broadcast: form.feature_broadcast,
@@ -475,6 +478,16 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={{ ...styles.toggleKnob, transform: form.feature_field ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Projects</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show the Projects module in the app switcher</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_projects ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_projects} onChange={e => set('feature_projects', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_projects ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
         </div>}
         {!collapsed.modules && <SectionFooter section="modules" />}
       </div>
@@ -492,12 +505,12 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         {!collapsed.features && <div style={styles.sectionBody}>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Projects</div>
+              <div style={styles.label}>Project Integration</div>
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Require project selection on time entries and clock-in</div>
             </div>
-            <label style={{ ...styles.toggle, background: form.feature_projects ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_projects} onChange={e => set('feature_projects', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_projects ? 'translateX(46px)' : 'translateX(0)' }} />
+            <label style={{ ...styles.toggle, background: form.feature_project_integration ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_project_integration} onChange={e => set('feature_project_integration', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_project_integration ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
           <div style={styles.row}>

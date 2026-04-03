@@ -76,7 +76,7 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
     if (a.adminOnly && !isAdmin) return false;
     if (a.soon) return !isAdmin ? false : true;
     if (a.id === 'field' && features?.feature_field === false) return false;
-    if (a.id === 'projects') return false;
+    if (a.id === 'projects' && features?.feature_projects === false) return false;
     // Only hide Time Clock from admins when toggle is off; workers still need it for Account tab
     if (a.id === 'timeclock' && features?.feature_timeclock === false && isAdmin) return false;
     return true;

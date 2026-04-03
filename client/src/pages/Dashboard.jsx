@@ -141,7 +141,7 @@ export default function Dashboard() {
     ].filter(Boolean);
 
     // Feature flags
-    const showProject = settings?.feature_projects !== false;
+    const showProject = settings?.feature_project_integration !== false;
     const overtimeEnabled = settings?.feature_overtime !== false;
 
     // Rates
@@ -377,8 +377,8 @@ ${signatureDataUrl ? `
 
         {tab === 'clock' && (
           <>
-            <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} geolocationEnabled={settings?.feature_geolocation ?? false} projectsEnabled={settings?.feature_projects !== false} />
-            <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} prefill={shiftPrefill} projectsEnabled={settings?.feature_projects !== false} />
+            <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} geolocationEnabled={settings?.feature_geolocation ?? false} projectsEnabled={settings?.feature_project_integration !== false} />
+            <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} prefill={shiftPrefill} projectsEnabled={settings?.feature_project_integration !== false} />
           </>
         )}
 

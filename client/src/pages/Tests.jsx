@@ -95,7 +95,7 @@ function validCoords(lat, lng) {
 }
 
 // settingsDefaults.js
-const FEATURE_KEYS_TEST = ['feature_scheduling','feature_analytics','feature_chat','feature_prevailing_wage','feature_field','feature_timeclock','feature_projects','feature_overtime','feature_geolocation','feature_inactive_alerts','feature_overtime_alerts','feature_broadcast','show_worker_wages','notification_use_work_hours'];
+const FEATURE_KEYS_TEST = ['feature_scheduling','feature_analytics','feature_chat','feature_prevailing_wage','feature_field','feature_timeclock','feature_projects','feature_project_integration','feature_overtime','feature_geolocation','feature_inactive_alerts','feature_overtime_alerts','feature_broadcast','show_worker_wages','notification_use_work_hours'];
 const STRING_KEYS_TEST  = ['overtime_rule','currency','company_timezone','invoice_signature','default_temp_password'];
 function applySettingsRows(rows, defaults) {
   const s = { ...defaults };
