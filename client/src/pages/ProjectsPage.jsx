@@ -30,12 +30,20 @@ function ProjectCard({ project, metrics, settings, onClick }) {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: settings?.currency || 'USD', maximumFractionDigits: 0 }).format(n);
   };
 
+  const statusColors = { planning: '#dbeafe|#1d4ed8', in_progress: '#d1fae5|#065f46', on_hold: '#fef3c7|#92400e', completed: '#e5e7eb|#374151' };
+  const [statusBg, statusFg] = (statusColors[project.status] || '#f3f4f6|#6b7280').split('|');
+  const statusLabel = { planning: 'Planning', in_progress: 'In Progress', on_hold: 'On Hold', completed: 'Completed' }[project.status];
+
   return (
     <div style={styles.card} onClick={onClick}>
       <div style={styles.cardTop}>
         <div style={styles.cardName}>{project.name}</div>
-        <div style={styles.cardBadge}>{workerCount} worker{workerCount !== 1 ? 's' : ''}</div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0, marginLeft: 8 }}>
+          {statusLabel && <span style={{ fontSize: 10, fontWeight: 700, background: statusBg, color: statusFg, padding: '2px 7px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{statusLabel}</span>}
+          <div style={styles.cardBadge}>{workerCount} worker{workerCount !== 1 ? 's' : ''}</div>
+        </div>
       </div>
+      {project.client_name && <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, marginTop: -4 }}>{project.client_name}{project.job_number ? ` · ${project.job_number}` : ''}</div>}
 
       <div style={styles.statsRow}>
         <div style={styles.statItem}>
@@ -135,7 +143,10 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
         <div style={styles.detailHeader}>
           <div>
             <h2 style={styles.detailTitle}>{project.name}</h2>
-            <p style={styles.detailSub}>{parseInt(m.worker_count || 0)} workers · {parseInt(m.total_entries || 0)} entries</p>
+            <p style={styles.detailSub}>
+              {project.client_name && <>{project.client_name} · </>}
+              {parseInt(m.worker_count || 0)} workers · {parseInt(m.total_entries || 0)} entries
+            </p>
           </div>
           <button style={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
@@ -151,6 +162,25 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
         <div style={styles.detailBody}>
           {tab === 'overview' && (
             <div>
+              {/* Project metadata */}
+              {(project.client_name || project.job_number || project.address || project.start_date || project.end_date || project.description || (project.status && project.status !== 'in_progress')) && (
+                <div style={{ ...styles.budgetSection, marginBottom: 16 }}>
+                  <div style={styles.sectionTitle}>Project Info</div>
+                  {project.status && (() => {
+                    const statusColors = { planning: '#dbeafe|#1d4ed8', in_progress: '#d1fae5|#065f46', on_hold: '#fef3c7|#92400e', completed: '#e5e7eb|#374151' };
+                    const [bg, fg] = (statusColors[project.status] || '#f3f4f6|#6b7280').split('|');
+                    const label = { planning: 'Planning', in_progress: 'In Progress', on_hold: 'On Hold', completed: 'Completed' }[project.status];
+                    return label ? <span style={{ fontSize: 11, fontWeight: 700, background: bg, color: fg, padding: '2px 9px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'inline-block', marginBottom: 8 }}>{label}</span> : null;
+                  })()}
+                  {project.client_name && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Client</span><span style={styles.budgetValue}>{project.client_name}</span></div>}
+                  {project.job_number && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Job #</span><span style={styles.budgetValue}>{project.job_number}</span></div>}
+                  {project.address && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Address</span><span style={{ ...styles.budgetValue, textAlign: 'right', maxWidth: 220 }}>{project.address}</span></div>}
+                  {project.start_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Start</span><span style={styles.budgetValue}>{new Date(project.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
+                  {project.end_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Target End</span><span style={styles.budgetValue}>{new Date(project.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
+                  {project.description && <p style={{ fontSize: 13, color: '#374151', margin: '8px 0 0', lineHeight: 1.5 }}>{project.description}</p>}
+                </div>
+              )}
+
               <div style={styles.metricsGrid}>
                 <div style={styles.metricCard}>
                   <div style={styles.metricValue}>{fmtHours(m.total_hours)}</div>
@@ -294,7 +324,7 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
                 return (
                   <div key={e.id} style={styles.tableRow}>
                     <span style={styles.tdDate}>{new Date(e.work_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                    <span style={styles.tdWorker}>{e.full_name}</span>
+                    <span style={styles.tdWorker}>{e.worker_name}</span>
                     <span style={styles.tdHours}>{hrs.toFixed(1)}h</span>
                   </div>
                 );

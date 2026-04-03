@@ -22,6 +22,13 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   const [editBudgetHours, setEditBudgetHours] = useState('');
   const [editBudgetDollars, setEditBudgetDollars] = useState('');
   const [editRequiredChecklist, setEditRequiredChecklist] = useState('');
+  const [editClientName, setEditClientName] = useState('');
+  const [editJobNumber, setEditJobNumber] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editStatus, setEditStatus] = useState('in_progress');
   const [checklistTemplates, setChecklistTemplates] = useState([]);
   const [geoLocating, setGeoLocating] = useState(false);
   const [geoError, setGeoError] = useState('');
@@ -91,6 +98,13 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       setEditBudgetHours(p.budget_hours || '');
       setEditBudgetDollars(p.budget_dollars || '');
       setEditRequiredChecklist(p.required_checklist_template_id ? String(p.required_checklist_template_id) : '');
+      setEditClientName(p.client_name || '');
+      setEditJobNumber(p.job_number || '');
+      setEditAddress(p.address || '');
+      setEditStartDate(p.start_date ? p.start_date.split('T')[0] : '');
+      setEditEndDate(p.end_date ? p.end_date.split('T')[0] : '');
+      setEditDescription(p.description || '');
+      setEditStatus(p.status || 'in_progress');
     }
   };
 
@@ -108,6 +122,13 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     if (editBudgetHours !== '') payload.budget_hours = editBudgetHours || null;
     if (editBudgetDollars !== '') payload.budget_dollars = editBudgetDollars || null;
     payload.required_checklist_template_id = editRequiredChecklist ? parseInt(editRequiredChecklist) : null;
+    payload.client_name = editClientName || null;
+    payload.job_number = editJobNumber || null;
+    payload.address = editAddress || null;
+    payload.start_date = editStartDate || null;
+    payload.end_date = editEndDate || null;
+    payload.description = editDescription || null;
+    payload.status = editStatus;
     try {
       const r = await api.patch(`/admin/projects/${id}`, payload);
       onProjectUpdated(r.data);
@@ -143,6 +164,13 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   };
 
   const hasBudget = p => parseFloat(p.budget_hours) > 0 || parseFloat(p.budget_dollars) > 0;
+
+  const statusLabel = st => ({ planning: 'Planning', in_progress: 'In Progress', on_hold: 'On Hold', completed: 'Completed' }[st] || st);
+  const statusBadgeStyle = st => ({
+    planning:    { background: '#dbeafe', color: '#1d4ed8' },
+    on_hold:     { background: '#fef3c7', color: '#92400e' },
+    completed:   { background: '#d1fae5', color: '#065f46' },
+  }[st] || {});
 
   const useMyLocation = () => {
     if (!navigator.geolocation) {
@@ -300,6 +328,10 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                 <button style={s.itemBar} onClick={() => toggleExpand(p)}>
                   <div style={s.itemLeft}>
                     <span style={s.itemName}>{p.name}</span>
+                    {p.status && p.status !== 'in_progress' && (
+                      <span style={{ ...s.statusBadge, ...statusBadgeStyle(p.status) }}>{statusLabel(p.status)}</span>
+                    )}
+                    {p.client_name && <span style={s.clientTag}>{p.client_name}</span>}
                     {p.geo_radius_ft && <span style={s.indicatorBadge} title={`Geofence: ${p.geo_radius_ft.toLocaleString()} ft radius`}>📍</span>}
                     {hasBudget(p) && <span style={s.indicatorBadge} title={[parseFloat(p.budget_hours) > 0 && `${p.budget_hours} hrs`, parseFloat(p.budget_dollars) > 0 && `$${Number(p.budget_dollars).toLocaleString()}`].filter(Boolean).join(' / ')}>💰</span>}
                     {p.required_checklist_template_id && <span style={s.indicatorBadge} title="Checklist required for clock-in">☑</span>}
@@ -349,6 +381,46 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                             <input style={s.editInput} type="number" min="0" step="0.01" placeholder={defaultPrevailingRate || '45.00'} value={editPrevailingRate} onChange={e => setEditPrevailingRate(e.target.value)} />
                           </div>
                         )}
+                      </div>
+                    </div>
+
+                    {/* Project Info */}
+                    <div style={s.section}>
+                      <div style={s.sectionTitle}>Project Info</div>
+                      <div style={s.fieldsGrid}>
+                        <div style={s.fieldGroup}>
+                          <label style={s.fieldLabel}>Status</label>
+                          <select style={s.editInput} value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                            <option value="planning">Planning</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="on_hold">On Hold</option>
+                            <option value="completed">Completed</option>
+                          </select>
+                        </div>
+                        <div style={s.fieldGroup}>
+                          <label style={s.fieldLabel}>Client Name</label>
+                          <input style={s.editInput} value={editClientName} onChange={e => setEditClientName(e.target.value)} placeholder="e.g. Acme Corp" />
+                        </div>
+                        <div style={s.fieldGroup}>
+                          <label style={s.fieldLabel}>Job Number</label>
+                          <input style={s.editInput} value={editJobNumber} onChange={e => setEditJobNumber(e.target.value)} placeholder="e.g. JOB-2024-001" />
+                        </div>
+                        <div style={s.fieldGroup}>
+                          <label style={s.fieldLabel}>Start Date</label>
+                          <input style={s.editInput} type="date" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
+                        </div>
+                        <div style={s.fieldGroup}>
+                          <label style={s.fieldLabel}>Target End Date</label>
+                          <input style={s.editInput} type="date" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} />
+                        </div>
+                      </div>
+                      <div style={{ ...s.fieldGroup, marginTop: 8 }}>
+                        <label style={s.fieldLabel}>Address / Location</label>
+                        <input style={s.editInput} value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="123 Main St, City, State" />
+                      </div>
+                      <div style={{ ...s.fieldGroup, marginTop: 8 }}>
+                        <label style={s.fieldLabel}>Description</label>
+                        <textarea style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Brief project description..." />
                       </div>
                     </div>
 
@@ -572,4 +644,6 @@ const s = {
   downloadHint: { fontSize: 12, color: '#6b7280' },
   modalActions: { display: 'flex', gap: 10, justifyContent: 'flex-end' },
   archiveBtn: { padding: '8px 18px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
+  statusBadge: { fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em' },
+  clientTag: { fontSize: 11, color: '#6b7280', fontStyle: 'italic' },
 };

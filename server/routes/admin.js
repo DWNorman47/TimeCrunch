@@ -1012,7 +1012,9 @@ router.get('/projects', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, company_id, name, wage_type, prevailing_wage_rate, geo_lat, geo_lng, geo_radius_ft,
-              budget_hours, budget_dollars, active, created_at
+              budget_hours, budget_dollars, active, created_at,
+              client_name, job_number, address, start_date, end_date, description, status,
+              required_checklist_template_id
        FROM projects WHERE active = true AND company_id = $1 ORDER BY name LIMIT 500`,
       [companyId]
     );
@@ -1054,7 +1056,12 @@ router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
 
 // Update project (name and/or wage_type and/or geofence)
 router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
-  const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence, budget_hours, budget_dollars, prevailing_wage_rate, required_checklist_template_id } = req.body;
+  const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence, budget_hours, budget_dollars, prevailing_wage_rate, required_checklist_template_id,
+          client_name, job_number, address, start_date, end_date, description, status } = req.body;
+  const VALID_STATUSES = ['planning', 'in_progress', 'on_hold', 'completed'];
+  if (status !== undefined && !VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
+  }
   if (wage_type !== undefined && !['regular', 'prevailing'].includes(wage_type)) {
     return res.status(400).json({ error: 'wage_type must be regular or prevailing' });
   }
@@ -1098,6 +1105,13 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
       fields.push(`required_checklist_template_id = $${idx++}`);
       values.push(required_checklist_template_id ? parseInt(required_checklist_template_id) : null);
     }
+    if (client_name !== undefined) { fields.push(`client_name = $${idx++}`); values.push(client_name || null); }
+    if (job_number !== undefined)   { fields.push(`job_number = $${idx++}`);   values.push(job_number || null); }
+    if (address !== undefined)      { fields.push(`address = $${idx++}`);      values.push(address || null); }
+    if (start_date !== undefined)   { fields.push(`start_date = $${idx++}`);   values.push(start_date || null); }
+    if (end_date !== undefined)     { fields.push(`end_date = $${idx++}`);     values.push(end_date || null); }
+    if (description !== undefined)  { fields.push(`description = $${idx++}`);  values.push(description || null); }
+    if (status !== undefined)       { fields.push(`status = $${idx++}`);       values.push(status); }
     if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
     values.push(req.params.id);
     values.push(companyId);
