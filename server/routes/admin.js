@@ -1159,6 +1159,44 @@ router.post('/projects', requireAdmin, requirePermission('manage_projects'), asy
 });
 
 // Unified activity feed for a project (field notes + punchlist items)
+// Project health snapshot — counts + approximate cost in one query
+router.get('/projects/:id/health', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT
+         (SELECT COUNT(*) FROM punchlist_items
+          WHERE project_id=$1 AND company_id=$2 AND status='open')::int             AS open_punchlist,
+         (SELECT COUNT(*) FROM punchlist_items
+          WHERE project_id=$1 AND company_id=$2 AND status!='verified')::int        AS active_punchlist,
+         (SELECT COUNT(*) FROM rfis
+          WHERE project_id=$1 AND company_id=$2 AND status='open')::int             AS open_rfis,
+         (SELECT COUNT(*) FROM field_reports
+          WHERE project_id=$1 AND company_id=$2
+            AND COALESCE(report_date, reported_at::date) >= CURRENT_DATE - 7)::int  AS reports_week,
+         (SELECT ROUND(COALESCE(SUM(
+            EXTRACT(EPOCH FROM (
+              CASE WHEN te.end_time < te.start_time
+                THEN te.end_time + INTERVAL '1 day' - te.start_time
+                ELSE te.end_time - te.start_time
+              END
+            )) / 3600 * COALESCE(u.hourly_rate, (
+              SELECT value::numeric FROM settings
+              WHERE company_id=$2 AND key='default_hourly_rate' LIMIT 1
+            ), 30)
+          ), 0)::numeric, 0)
+          FROM time_entries te
+          JOIN users u ON te.user_id = u.id
+          WHERE te.project_id=$1 AND te.company_id=$2)                              AS approx_cost`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.get('/projects/:id/activity', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {

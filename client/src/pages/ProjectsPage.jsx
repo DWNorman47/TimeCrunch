@@ -103,6 +103,7 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
   const [activity, setActivity] = useState([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [health, setHealth] = useState(null);
 
   const m = metrics || {};
   const fmtHours = h => {
@@ -135,6 +136,9 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
         .then(r => setActivity(r.data))
         .catch(() => {})
         .finally(() => setActivityLoading(false));
+      api.get(`/admin/projects/${project.id}/health`)
+        .then(r => setHealth(r.data))
+        .catch(() => {});
     }
   }, [tab, project.id]);
 
@@ -223,6 +227,30 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
                 </div>
               </div>
 
+              {/* Health counts */}
+              {health && (health.open_punchlist > 0 || health.open_rfis > 0 || health.reports_week > 0) && (
+                <div style={styles.healthRow}>
+                  {health.open_punchlist > 0 && (
+                    <div style={styles.healthChip}>
+                      <span style={{ ...styles.healthDot, background: '#f59e0b' }} />
+                      <span>{health.open_punchlist} open punch{health.open_punchlist !== 1 ? 'list items' : 'list item'}</span>
+                    </div>
+                  )}
+                  {health.open_rfis > 0 && (
+                    <div style={styles.healthChip}>
+                      <span style={{ ...styles.healthDot, background: '#3b82f6' }} />
+                      <span>{health.open_rfis} open RFI{health.open_rfis !== 1 ? 's' : ''}</span>
+                    </div>
+                  )}
+                  {health.reports_week > 0 && (
+                    <div style={styles.healthChip}>
+                      <span style={{ ...styles.healthDot, background: '#059669' }} />
+                      <span>{health.reports_week} field report{health.reports_week !== 1 ? 's' : ''} this week</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Worker roster */}
               {(workersLoading || workers.length > 0) && (
                 <div style={{ ...styles.budgetSection, marginBottom: 16 }}>
@@ -264,7 +292,25 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
                       <div style={{ ...styles.progressLabel, color: hourColor }}>{hoursUsedPct.toFixed(0)}% used</div>
                     </div>
                   )}
-                  {project.budget_dollars > 0 && (
+                  {project.budget_dollars > 0 && health && (() => {
+                    const cost = parseFloat(health.approx_cost || 0);
+                    const budget = parseFloat(project.budget_dollars);
+                    const pct = Math.min(100, (cost / budget) * 100);
+                    const color = pct >= 100 ? '#ef4444' : pct >= 85 ? '#f59e0b' : '#1a56db';
+                    return (
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={styles.budgetRow}>
+                          <span style={styles.budgetLabel}>Est. Cost</span>
+                          <span style={{ ...styles.budgetValue, color }}>{fmtMoney(cost)} / {fmtMoney(budget)}</span>
+                        </div>
+                        <div style={styles.progressBar}>
+                          <div style={{ ...styles.progressFill, width: `${pct}%`, background: color }} />
+                        </div>
+                        <div style={{ ...styles.progressLabel, color }}>{pct.toFixed(0)}% of budget used</div>
+                      </div>
+                    );
+                  })()}
+                  {project.budget_dollars > 0 && !health && (
                     <div style={styles.budgetRow}>
                       <span style={styles.budgetLabel}>Dollar Budget</span>
                       <span style={styles.budgetValue}>{fmtMoney(project.budget_dollars)}</span>
@@ -589,6 +635,10 @@ const styles = {
   tdWorker: { flex: 2, fontWeight: 600, color: '#111827' },
   tdHours: { width: 50, textAlign: 'right', fontWeight: 700, color: '#374151' },
   moreText: { fontSize: 12, color: '#9ca3af', textAlign: 'center', marginTop: 8 },
+  // Health
+  healthRow: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 },
+  healthChip: { display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: '#374151', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 20, padding: '4px 10px' },
+  healthDot: { width: 7, height: 7, borderRadius: '50%', flexShrink: 0 },
   // Activity
   activityToggle: { width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '9px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.06em' },
   activityCount: { fontSize: 11, fontWeight: 700, color: '#fff', background: '#9ca3af', padding: '1px 7px', borderRadius: 10 },
