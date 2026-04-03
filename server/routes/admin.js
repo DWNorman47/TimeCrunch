@@ -2336,4 +2336,55 @@ router.post('/support', requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
+// GET /admin/audit-log — recent audit events for this company
+router.get('/audit-log', requireAdmin, async (req, res) => {
+  const { limit = 25, offset = 0, group = '', from = '', to = '' } = req.query;
+  const companyId = req.user.company_id;
+  try {
+    const safeLimit = Math.min(parseInt(limit) || 25, 100);
+    const safeOffset = parseInt(offset) || 0;
+    const conditions = ['company_id = $1'];
+    const params = [companyId];
+    if (group) { params.push(`${group}.%`); conditions.push(`action LIKE $${params.length}`); }
+    if (from)  { params.push(from); conditions.push(`created_at >= $${params.length}::date`); }
+    if (to)    { params.push(to);   conditions.push(`created_at < ($${params.length}::date + INTERVAL '1 day')`); }
+    const where = conditions.join(' AND ');
+    const [dataRes, countRes] = await Promise.all([
+      pool.query(
+        `SELECT id, actor_name, action, entity_type, entity_name, details, created_at
+         FROM audit_log WHERE ${where}
+         ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, safeLimit, safeOffset]
+      ),
+      pool.query(`SELECT COUNT(*) FROM audit_log WHERE ${where}`, params),
+    ]);
+    res.json({ entries: dataRes.rows, total: parseInt(countRes.rows[0].count) });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /admin/projects/:id/rfis — create a new RFI
+router.post('/projects/:id/rfis', requireAdmin, async (req, res) => {
+  const { subject, directed_to, description, date_submitted, date_due } = req.body;
+  if (!subject?.trim()) return res.status(400).json({ error: 'subject is required' });
+  const companyId = req.user.company_id;
+  try {
+    const projCheck = await pool.query('SELECT id FROM projects WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
+    if (projCheck.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
+    const maxNum = await pool.query(
+      'SELECT COALESCE(MAX(rfi_number), 0) + 1 AS next FROM rfis WHERE project_id = $1 AND company_id = $2',
+      [req.params.id, companyId]
+    );
+    const rfi_number = maxNum.rows[0].next;
+    const today = new Date().toLocaleDateString('en-CA');
+    const result = await pool.query(
+      `INSERT INTO rfis (company_id, project_id, rfi_number, subject, description, directed_to, submitted_by, date_submitted, date_due, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'open')
+       RETURNING id, rfi_number, subject, status, directed_to, date_submitted, date_due`,
+      [companyId, req.params.id, rfi_number, subject.trim(), description || null,
+       directed_to || null, req.user.full_name, date_submitted || today, date_due || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 module.exports = router;

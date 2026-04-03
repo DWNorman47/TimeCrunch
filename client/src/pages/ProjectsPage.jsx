@@ -124,6 +124,9 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
   const [rfis, setRfis] = useState([]);
   const [rfisOpen, setRfisOpen] = useState(false);
   const [rfisLoaded, setRfisLoaded] = useState(false);
+  const [rfiFormOpen, setRfiFormOpen] = useState(false);
+  const [rfiForm, setRfiForm] = useState({ subject: '', directed_to: '', description: '', date_due: '' });
+  const [rfiSaving, setRfiSaving] = useState(false);
   const [docs, setDocs] = useState([]);
   const [docsOpen, setDocsOpen] = useState(false);
   const [docsLoaded, setDocsLoaded] = useState(false);
@@ -180,6 +183,19 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
     api.get(`/admin/projects/${project.id}/rfis`)
       .then(r => setRfis(r.data))
       .catch(() => {});
+  };
+
+  const submitRfi = async (e) => {
+    e.preventDefault();
+    if (!rfiForm.subject.trim()) return;
+    setRfiSaving(true);
+    try {
+      const { data: newRfi } = await api.post(`/admin/projects/${project.id}/rfis`, rfiForm);
+      setRfis(prev => [newRfi, ...prev]);
+      setRfiForm({ subject: '', directed_to: '', description: '', date_due: '' });
+      setRfiFormOpen(false);
+    } catch {}
+    setRfiSaving(false);
   };
 
   const loadDocs = () => {
@@ -559,32 +575,77 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
                 </button>
 
                 {rfisOpen && (
-                  rfisLoaded && rfis.length === 0 ? (
-                    <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0' }}>No RFIs for this project.</p>
-                  ) : (
-                    <div style={styles.activityList}>
-                      {rfis.map(r => {
-                        const statusColor = r.status === 'open' ? '#3b82f6' : r.status === 'answered' ? '#f59e0b' : '#9ca3af';
-                        return (
-                          <div key={r.id} style={styles.activityItem}>
-                            <div style={{ ...styles.activityDot, background: statusColor }} />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={styles.activityTitle}>
-                                <span style={{ ...styles.activityTag, background: statusColor + '22', color: statusColor }}>{r.status}</span>
-                                <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>RFI #{r.rfi_number}</span>
-                                <span style={styles.activityText}>{r.subject}</span>
-                              </div>
-                              <div style={styles.activityMeta}>
-                                {r.directed_to && <span>{r.directed_to} · </span>}
-                                <span>{new Date(r.date_submitted).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                                {r.date_due && <span> · Due {new Date(r.date_due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                  <div>
+                    {rfisLoaded && rfis.length === 0 && !rfiFormOpen && (
+                      <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 6px' }}>No RFIs for this project.</p>
+                    )}
+                    {rfis.length > 0 && (
+                      <div style={{ ...styles.activityList, marginBottom: 8 }}>
+                        {rfis.map(r => {
+                          const statusColor = r.status === 'open' ? '#3b82f6' : r.status === 'answered' ? '#f59e0b' : '#9ca3af';
+                          return (
+                            <div key={r.id} style={styles.activityItem}>
+                              <div style={{ ...styles.activityDot, background: statusColor }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={styles.activityTitle}>
+                                  <span style={{ ...styles.activityTag, background: statusColor + '22', color: statusColor }}>{r.status}</span>
+                                  <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>RFI #{r.rfi_number}</span>
+                                  <span style={styles.activityText}>{r.subject}</span>
+                                </div>
+                                <div style={styles.activityMeta}>
+                                  {r.directed_to && <span>{r.directed_to} · </span>}
+                                  <span>{new Date(r.date_submitted).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                  {r.date_due && <span> · Due {new Date(r.date_due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )
+                          );
+                        })}
+                      </div>
+                    )}
+                    {rfiFormOpen ? (
+                      <form onSubmit={submitRfi} style={styles.rfiForm}>
+                        <input
+                          style={styles.rfiInput}
+                          type="text"
+                          placeholder="Subject *"
+                          value={rfiForm.subject}
+                          onChange={e => setRfiForm(f => ({ ...f, subject: e.target.value }))}
+                          required
+                        />
+                        <input
+                          style={styles.rfiInput}
+                          type="text"
+                          placeholder="Directed to"
+                          value={rfiForm.directed_to}
+                          onChange={e => setRfiForm(f => ({ ...f, directed_to: e.target.value }))}
+                        />
+                        <input
+                          style={styles.rfiInput}
+                          type="date"
+                          title="Due date"
+                          value={rfiForm.date_due}
+                          onChange={e => setRfiForm(f => ({ ...f, date_due: e.target.value }))}
+                        />
+                        <textarea
+                          style={{ ...styles.rfiInput, resize: 'vertical', minHeight: 60, fontFamily: 'inherit' }}
+                          placeholder="Description"
+                          value={rfiForm.description}
+                          onChange={e => setRfiForm(f => ({ ...f, description: e.target.value }))}
+                        />
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button type="submit" style={styles.rfiSubmitBtn} disabled={rfiSaving}>
+                            {rfiSaving ? 'Saving…' : 'Create RFI'}
+                          </button>
+                          <button type="button" style={styles.rfiCancelBtn} onClick={() => setRfiFormOpen(false)}>
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <button style={styles.uploadBtn} onClick={() => setRfiFormOpen(true)}>+ New RFI</button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -902,6 +963,10 @@ const styles = {
   docSize: { fontSize: 11, color: '#9ca3af' },
   docDelete: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '2px 4px', lineHeight: 1 },
   uploadBtn: { display: 'inline-block', marginTop: 6, background: '#f3f4f6', border: '1px dashed #d1d5db', borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, color: '#6b7280' },
+  rfiForm: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, padding: '12px', background: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' },
+  rfiInput: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, background: '#fff', width: '100%', boxSizing: 'border-box' },
+  rfiSubmitBtn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  rfiCancelBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 12px', fontSize: 13, color: '#6b7280', cursor: 'pointer' },
   photoGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 4, marginTop: 6 },
   photoThumb: { width: '100%', aspectRatio: '1', padding: 0, border: 'none', background: '#f3f4f6', borderRadius: 6, cursor: 'pointer', overflow: 'hidden' },
   lightboxOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' },

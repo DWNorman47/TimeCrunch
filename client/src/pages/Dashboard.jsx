@@ -21,6 +21,7 @@ import { useOffline } from '../contexts/OfflineContext';
 import OfflineBanner from '../components/OfflineBanner';
 import SignatureModal from '../components/SignatureModal';
 import TimeOffTab from '../components/TimeOffTab';
+import WorkerSchedule from '../components/WorkerSchedule';
 
 const isPwa = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
@@ -36,7 +37,7 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
-  const TABS = ['clock', 'messages', 'timesheet', 'timeoff', 'account'];
+  const TABS = ['clock', 'messages', 'timesheet', 'timeoff', 'schedule', 'account'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'clock');
   const [entryView, setEntryView] = useState('list');
@@ -372,6 +373,7 @@ ${signatureDataUrl ? `
           {settings?.module_timeclock !== false && <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => { setTab('messages'); window.location.hash = 'messages'; }}>💬 Messages</button>}
           {settings?.module_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); window.location.hash = 'timesheet'; }}>📋 Timesheet</button>}
           <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); window.location.hash = 'timeoff'; }}>🏖 Time Off</button>
+          {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); window.location.hash = 'schedule'; }}>📅 Schedule</button>}
           <button style={tab === 'account' ? styles.tabActive : styles.tab} onClick={() => { setTab('account'); window.location.hash = 'account'; }}>👤 Account</button>
         </div>
 
@@ -410,6 +412,8 @@ ${signatureDataUrl ? `
         )}
 
         {tab === 'timeoff' && <TimeOffTab />}
+
+        {tab === 'schedule' && <WorkerSchedule />}
 
         {tab === 'account' && (
           <>
