@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { fmtHours } from '../utils';
 import EntryPanel from './EntryPanel';
+import api from '../api';
 
 function startOfWeek(date) {
   const d = new Date(date);
@@ -46,10 +47,27 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export default function TimesheetView({ entries, language, projects = [], onRefresh }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selectedEntry, setSelectedEntry] = useState(null);
+  const [copying, setCopying] = useState(false);
+  const [copyMsg, setCopyMsg] = useState('');
 
   const prevWeek = () => setWeekStart(d => addDays(d, -7));
   const nextWeek = () => setWeekStart(d => addDays(d, 7));
   const goToday = () => setWeekStart(startOfWeek(new Date()));
+
+  const copyLastWeek = async () => {
+    setCopying(true);
+    setCopyMsg('');
+    try {
+      const r = await api.post('/time-entries/copy-last-week');
+      const { created, skipped } = r.data;
+      setCopyMsg(`${created} entr${created === 1 ? 'y' : 'ies'} copied${skipped > 0 ? `, ${skipped} skipped` : ''}`);
+      if (created > 0 && onRefresh) await onRefresh();
+    } catch {
+      setCopyMsg('Failed to copy');
+    } finally {
+      setCopying(false);
+    }
+  };
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const todayKey = toDateKey(new Date());
@@ -86,6 +104,10 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
           <span style={styles.weekTotal}>{fmtHours(weekTotalHours)}</span>
           {weekTotalMiles > 0 && <span style={styles.weekMiles}>🚗 {weekTotalMiles.toFixed(1)} mi</span>}
           <button style={styles.todayBtn} onClick={goToday}>Today</button>
+          <button style={{ ...styles.todayBtn, borderColor: '#1a56db', color: '#1a56db' }} onClick={copyLastWeek} disabled={copying}>
+            {copying ? '…' : 'Copy Last Week'}
+          </button>
+          {copyMsg && <span style={{ fontSize: 12, color: '#6b7280' }}>{copyMsg}</span>}
         </div>
       </div>
 

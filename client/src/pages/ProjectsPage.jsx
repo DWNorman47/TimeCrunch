@@ -124,6 +124,10 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
   const [rfis, setRfis] = useState([]);
   const [rfisOpen, setRfisOpen] = useState(false);
   const [rfisLoaded, setRfisLoaded] = useState(false);
+  const [docs, setDocs] = useState([]);
+  const [docsOpen, setDocsOpen] = useState(false);
+  const [docsLoaded, setDocsLoaded] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const m = metrics || {};
   const fmtHours = h => {
@@ -176,6 +180,34 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
     api.get(`/admin/projects/${project.id}/rfis`)
       .then(r => setRfis(r.data))
       .catch(() => {});
+  };
+
+  const loadDocs = () => {
+    if (docsLoaded) return;
+    setDocsLoaded(true);
+    api.get(`/admin/projects/${project.id}/documents`)
+      .then(r => setDocs(r.data))
+      .catch(() => {});
+  };
+
+  const uploadDoc = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { data: { uploadUrl, fileUrl } } = await api.get(
+        `/admin/projects/${project.id}/documents/upload-url`,
+        { params: { name: file.name, type: file.type } }
+      );
+      await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+      const { data: doc } = await api.post(`/admin/projects/${project.id}/documents`, {
+        name: file.name, url: fileUrl, size_bytes: file.size,
+      });
+      setDocs(d => [...d, doc]);
+    } catch (err) {
+      console.error('Upload failed', err);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const loadBilling = () => {
@@ -468,6 +500,48 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
                       ))}
                     </div>
                   )
+                )}
+              </div>
+
+              {/* Documents */}
+              <div style={{ marginTop: 16 }}>
+                <button
+                  style={styles.activityToggle}
+                  onClick={() => { setDocsOpen(o => !o); if (!docsOpen) loadDocs(); }}
+                >
+                  <span>Documents</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {docs.length > 0 && <span style={styles.activityCount}>{docs.length}</span>}
+                    <span style={{ fontSize: 12, color: '#9ca3af' }}>{docsOpen ? '▴' : '▾'}</span>
+                  </span>
+                </button>
+
+                {docsOpen && (
+                  <div style={{ marginTop: 6 }}>
+                    {docsLoaded && docs.length === 0 && !uploading && (
+                      <p style={{ fontSize: 12, color: '#9ca3af', margin: '0 0 8px' }}>No documents yet.</p>
+                    )}
+                    {docs.map(doc => (
+                      <div key={doc.id} style={styles.docRow}>
+                        <a href={doc.url} target="_blank" rel="noopener noreferrer" style={styles.docName}>{doc.name}</a>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                          {doc.size_bytes > 0 && <span style={styles.docSize}>{(doc.size_bytes / 1024).toFixed(0)} KB</span>}
+                          <button
+                            style={styles.docDelete}
+                            onClick={async () => {
+                              if (!window.confirm(`Delete "${doc.name}"?`)) return;
+                              await api.delete(`/admin/projects/${project.id}/documents/${doc.id}`);
+                              setDocs(d => d.filter(x => x.id !== doc.id));
+                            }}
+                          >✕</button>
+                        </div>
+                      </div>
+                    ))}
+                    <label style={{ ...styles.uploadBtn, opacity: uploading ? 0.6 : 1, cursor: uploading ? 'not-allowed' : 'pointer' }}>
+                      {uploading ? 'Uploading…' : '+ Attach File'}
+                      <input type="file" style={{ display: 'none' }} disabled={uploading} onChange={e => { uploadDoc(e.target.files[0]); e.target.value = ''; }} />
+                    </label>
+                  </div>
                 )}
               </div>
 
@@ -823,6 +897,11 @@ const styles = {
   activityTag: { fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 },
   activityText: { fontSize: 13, color: '#111827', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' },
   activityMeta: { display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, color: '#9ca3af', flexWrap: 'wrap' },
+  docRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', borderRadius: 7, background: '#fafafa', border: '1px solid #f3f4f6', marginBottom: 4 },
+  docName: { fontSize: 13, color: '#1a56db', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0, textDecoration: 'none' },
+  docSize: { fontSize: 11, color: '#9ca3af' },
+  docDelete: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '2px 4px', lineHeight: 1 },
+  uploadBtn: { display: 'inline-block', marginTop: 6, background: '#f3f4f6', border: '1px dashed #d1d5db', borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, color: '#6b7280' },
   photoGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 4, marginTop: 6 },
   photoThumb: { width: '100%', aspectRatio: '1', padding: 0, border: 'none', background: '#f3f4f6', borderRadius: 6, cursor: 'pointer', overflow: 'hidden' },
   lightboxOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' },

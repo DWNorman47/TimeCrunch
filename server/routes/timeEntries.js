@@ -3,6 +3,7 @@ const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem } = require('./inbox');
+const { sendEmail } = require('../email');
 
 // Get current user's entries
 router.get('/', requireAuth, async (req, res) => {
@@ -59,7 +60,25 @@ router.post('/', requireAuth, async (req, res) => {
        bm, mileage != null ? parseFloat(mileage) : null, timezone || null, cid, 'log_entry']
     );
     if (result.rowCount === 0) return res.status(409).json({ error: 'Duplicate entry' });
-    res.status(201).json(result.rows[0]);
+    const entry = result.rows[0];
+    res.status(201).json(entry);
+    // Optionally notify admins on submission
+    setImmediate(async () => {
+      try {
+        const notifSetting = await pool.query(
+          `SELECT value FROM settings WHERE company_id = $1 AND key = 'notify_entry_submitted'`,
+          [companyId]
+        );
+        if (notifSetting.rows[0]?.value !== '1') return;
+        const admins = await pool.query(
+          `SELECT email FROM users WHERE company_id = $1 AND role = 'admin' AND email IS NOT NULL`,
+          [companyId]
+        );
+        const subject = `Time entry submitted: ${req.user.full_name}`;
+        const body = `<p><b>${req.user.full_name}</b> submitted a time entry for <b>${work_date}</b> (${start_time}–${end_time}).</p><p>— OpsFloa</p>`;
+        for (const admin of admins.rows) sendEmail(admin.email, subject, body);
+      } catch {}
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -297,6 +316,60 @@ router.post('/sign-off', requireAuth, async (req, res) => {
       createInboxItem(adminId, req.user.company_id, 'signoff', signTitle, signBody, '/admin#approvals');
     }
     res.json({ signed: result.rowCount });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /time-entries/copy-last-week
+// Copies last week's entries (Mon–Sun) to the same weekday this week. Skips days that already have entries.
+router.post('/copy-last-week', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const today = new Date();
+    const dow = today.getDay();
+    const thisMon = new Date(today);
+    thisMon.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+    thisMon.setHours(0, 0, 0, 0);
+    const lastMon = new Date(thisMon);
+    lastMon.setDate(thisMon.getDate() - 7);
+    const lastSun = new Date(lastMon);
+    lastSun.setDate(lastMon.getDate() + 6);
+    const toISO = d => d.toLocaleDateString('en-CA');
+
+    const lastWeek = await pool.query(
+      `SELECT start_time, end_time, break_minutes, project_id, notes, wage_type, work_date
+       FROM time_entries
+       WHERE user_id=$1 AND company_id=$2 AND work_date BETWEEN $3 AND $4
+       ORDER BY work_date`,
+      [req.user.id, companyId, toISO(lastMon), toISO(lastSun)]
+    );
+    if (lastWeek.rowCount === 0) return res.json({ created: 0, skipped: 0, entries: [] });
+
+    const thisSun = new Date(thisMon);
+    thisSun.setDate(thisMon.getDate() + 6);
+    const existing = await pool.query(
+      `SELECT DISTINCT work_date FROM time_entries
+       WHERE user_id=$1 AND company_id=$2 AND work_date BETWEEN $3 AND $4`,
+      [req.user.id, companyId, toISO(thisMon), toISO(thisSun)]
+    );
+    const existingDates = new Set(existing.rows.map(r => r.work_date?.toString().substring(0, 10)));
+
+    const created = [];
+    for (const e of lastWeek.rows) {
+      const lastDate = new Date(e.work_date.toString().substring(0, 10) + 'T00:00:00');
+      const thisDate = new Date(lastDate);
+      thisDate.setDate(lastDate.getDate() + 7);
+      const thisDateStr = toISO(thisDate);
+      if (existingDates.has(thisDateStr)) continue;
+      const result = await pool.query(
+        `INSERT INTO time_entries (user_id, company_id, work_date, start_time, end_time, break_minutes, project_id, notes, wage_type, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'submitted') RETURNING *`,
+        [req.user.id, companyId, thisDateStr, e.start_time, e.end_time, e.break_minutes || 0,
+         e.project_id || null, e.notes || null, e.wage_type || 'regular']
+      );
+      created.push(result.rows[0]);
+      existingDates.add(thisDateStr);
+    }
+    res.json({ created: created.length, skipped: lastWeek.rowCount - created.length, entries: created });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

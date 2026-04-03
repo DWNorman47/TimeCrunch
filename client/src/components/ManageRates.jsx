@@ -96,6 +96,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     default_temp_password: settings?.default_temp_password ?? '',
     media_retention_days: String(settings?.media_retention_days ?? 0),
     media_delete_on_project_archive: settings?.media_delete_on_project_archive ?? false,
+    notify_timeoff_requests: settings?.notify_timeoff_requests ?? true,
+    notify_budget_alerts: settings?.notify_budget_alerts ?? true,
+    notify_entry_submitted: settings?.notify_entry_submitted ?? false,
   });
   const [prevailingEnabled, setPrevailingEnabled] = useState(() => (settings?.prevailing_wage_rate ?? 0) > 0);
   const [checklistTemplates, setChecklistTemplates] = useState([]);
@@ -149,6 +152,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       default_temp_password: settings.default_temp_password ?? '',
       media_retention_days: String(settings.media_retention_days ?? 0),
       media_delete_on_project_archive: settings.media_delete_on_project_archive ?? false,
+      notify_timeoff_requests: settings.notify_timeoff_requests ?? true,
+      notify_budget_alerts: settings.notify_budget_alerts ?? true,
+      notify_entry_submitted: settings.notify_entry_submitted ?? false,
     });
   }, [settings]);
 
@@ -189,6 +195,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         default_temp_password: form.default_temp_password,
         media_retention_days: parseFloat(form.media_retention_days) || 0,
         media_delete_on_project_archive: form.media_delete_on_project_archive,
+        notify_timeoff_requests: form.notify_timeoff_requests,
+        notify_budget_alerts: form.notify_budget_alerts,
+        notify_entry_submitted: form.notify_entry_submitted,
       });
       onSettingsUpdated(r.data);
       setSaved(section);
@@ -381,6 +390,36 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <label style={{ ...styles.toggle, background: form.feature_overtime_alerts ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_overtime_alerts} onChange={e => set('feature_overtime_alerts', e.target.checked)} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleKnob, transform: form.feature_overtime_alerts ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Time Off Request Notifications</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Email admins when a worker submits a time off request</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.notify_timeoff_requests ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.notify_timeoff_requests} onChange={e => set('notify_timeoff_requests', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.notify_timeoff_requests ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Budget Alert Notifications</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Email admins when a project reaches 90% or 100% of its hour budget</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.notify_budget_alerts ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.notify_budget_alerts} onChange={e => set('notify_budget_alerts', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.notify_budget_alerts ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Entry Submitted Notifications</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Email admins each time a worker submits a time entry</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.notify_entry_submitted ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.notify_entry_submitted} onChange={e => set('notify_entry_submitted', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.notify_entry_submitted ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
           <div style={styles.row}>

@@ -21,6 +21,11 @@ router.post('/', requireAuth, async (req, res) => {
     // Notify admins
     setImmediate(async () => {
       try {
+        const setting = await pool.query(
+          `SELECT value FROM settings WHERE company_id = $1 AND key = 'notify_timeoff_requests'`,
+          [companyId]
+        );
+        if (setting.rows[0]?.value === '0') return;
         const admins = await pool.query(
           `SELECT email FROM users WHERE company_id = $1 AND role = 'admin' AND email IS NOT NULL`,
           [companyId]

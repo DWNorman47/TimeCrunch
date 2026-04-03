@@ -1190,6 +1190,68 @@ router.get('/projects/:id/photos', requireAdmin, async (req, res) => {
   }
 });
 
+// Project documents
+router.get('/projects/:id/documents/upload-url', requireAdmin, async (req, res) => {
+  const { filename, contentType } = req.query;
+  if (!filename || !contentType) return res.status(400).json({ error: 'filename and contentType required' });
+  const ALLOWED = ['application/pdf', 'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/jpeg', 'image/png', 'image/webp', 'text/plain', 'text/csv'];
+  if (!ALLOWED.includes(contentType)) return res.status(400).json({ error: 'File type not allowed' });
+  try {
+    const ext = filename.split('.').pop().toLowerCase();
+    const { getPresignedUploadUrl } = require('../r2');
+    const { uploadUrl, publicUrl } = await getPresignedUploadUrl('documents', ext, contentType);
+    res.json({ uploadUrl, publicUrl });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to generate upload URL' }); }
+});
+
+router.post('/projects/:id/documents', requireAdmin, async (req, res) => {
+  const { name, url, size_bytes } = req.body;
+  if (!name || !url) return res.status(400).json({ error: 'name and url required' });
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `INSERT INTO project_documents (company_id, project_id, name, url, size_bytes, uploaded_by)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [companyId, req.params.id, name.trim(), url, size_bytes || null, req.user.id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.get('/projects/:id/documents', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT d.*, COALESCE(u.full_name, '') AS uploader_name
+       FROM project_documents d
+       LEFT JOIN users u ON d.uploaded_by = u.id
+       WHERE d.project_id = $1 AND d.company_id = $2
+       ORDER BY d.created_at DESC`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.delete('/projects/:id/documents/:docId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const doc = await pool.query(
+      'SELECT url FROM project_documents WHERE id=$1 AND project_id=$2 AND company_id=$3',
+      [req.params.docId, req.params.id, companyId]
+    );
+    if (doc.rowCount === 0) return res.status(404).json({ error: 'Document not found' });
+    const { deleteByUrl } = require('../r2');
+    await deleteByUrl(doc.rows[0].url).catch(() => {});
+    await pool.query('DELETE FROM project_documents WHERE id=$1', [req.params.docId]);
+    res.json({ deleted: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // RFIs for a project
 router.get('/projects/:id/rfis', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
@@ -1668,10 +1730,15 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
           else if (pct >= 90 && (alertedPct === null || alertedPct < 90)) threshold = 90;
           if (!threshold) return;
 
+          const notifSetting = await pool.query(
+            `SELECT value FROM settings WHERE company_id = $1 AND key = 'notify_budget_alerts'`,
+            [companyId]
+          );
           await pool.query(
             `UPDATE projects SET budget_alert_pct = $1 WHERE id = $2`,
             [threshold, pid]
           );
+          if (notifSetting.rows[0]?.value === '0') return;
 
           const admins = await pool.query(
             `SELECT email, full_name FROM users WHERE company_id = $1 AND role = 'admin' AND email IS NOT NULL`,
