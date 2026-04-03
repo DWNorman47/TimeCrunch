@@ -1090,6 +1090,8 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
       const bh = budget_hours === null ? null : parseFloat(budget_hours);
       if (bh !== null && (isNaN(bh) || bh < 0)) return res.status(400).json({ error: 'budget_hours must be non-negative' });
       fields.push(`budget_hours = $${idx++}`); values.push(bh);
+      // Reset alert tracker so new budget gets fresh alerts
+      fields.push(`budget_alert_pct = NULL`);
     }
     if (budget_dollars !== undefined) {
       const bd = budget_dollars === null ? null : parseFloat(budget_dollars);
@@ -1159,6 +1161,29 @@ router.post('/projects', requireAdmin, requirePermission('manage_projects'), asy
 });
 
 // Unified activity feed for a project (field notes + punchlist items)
+// Recent photos for a project (across all field reports)
+router.get('/projects/:id/photos', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT ph.url, ph.caption, ph.media_type, ph.created_at,
+              COALESCE(r.report_date, r.reported_at::date) AS report_date,
+              COALESCE(u.invoice_name, u.full_name) AS worker_name
+       FROM field_report_photos ph
+       JOIN field_reports r ON ph.report_id = r.id
+       JOIN users u ON r.user_id = u.id
+       WHERE r.project_id = $1 AND r.company_id = $2 AND ph.url IS NOT NULL
+       ORDER BY COALESCE(r.report_date, r.reported_at::date) DESC, ph.created_at DESC
+       LIMIT 60`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Project health snapshot — counts + approximate cost in one query
 router.get('/projects/:id/health', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
@@ -1590,6 +1615,57 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
     createInboxItem(entry.user_id, companyId, 'approval', 'Time entry approved ✓',
       `Your entry for ${entry.work_date?.toString().substring(0,10)} (${entry.start_time}–${entry.end_time}) was approved.`, '/dashboard');
     res.json(entry);
+
+    // Budget alert — fire-and-forget after response is sent
+    if (entry.project_id) {
+      setImmediate(async () => {
+        try {
+          const proj = await pool.query(
+            `SELECT id, name, budget_hours, budget_alert_pct FROM projects WHERE id = $1 AND company_id = $2`,
+            [entry.project_id, companyId]
+          );
+          if (!proj.rows[0] || !proj.rows[0].budget_hours) return;
+          const { id: pid, name: pname, budget_hours: budgetH, budget_alert_pct: alertedPct } = proj.rows[0];
+
+          const totals = await pool.query(
+            `SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (
+               CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time
+                    ELSE end_time - start_time END)) / 3600), 0) AS approved_hours
+             FROM time_entries
+             WHERE project_id = $1 AND company_id = $2 AND status = 'approved'`,
+            [pid, companyId]
+          );
+          const approvedH = parseFloat(totals.rows[0].approved_hours);
+          const pct = (approvedH / budgetH) * 100;
+
+          let threshold = null;
+          if (pct >= 100 && (alertedPct === null || alertedPct < 100)) threshold = 100;
+          else if (pct >= 90 && (alertedPct === null || alertedPct < 90)) threshold = 90;
+          if (!threshold) return;
+
+          await pool.query(
+            `UPDATE projects SET budget_alert_pct = $1 WHERE id = $2`,
+            [threshold, pid]
+          );
+
+          const admins = await pool.query(
+            `SELECT email, full_name FROM users WHERE company_id = $1 AND role = 'admin' AND email IS NOT NULL`,
+            [companyId]
+          );
+          const subject = threshold === 100
+            ? `Budget exceeded: ${pname}`
+            : `Budget alert (${threshold}%): ${pname}`;
+          const body = threshold === 100
+            ? `<p>The project <b>${pname}</b> has exceeded its hour budget.</p><p>Approved: <b>${approvedH.toFixed(1)} hrs</b> / Budget: <b>${budgetH} hrs</b></p><p>— OpsFloa</p>`
+            : `<p>The project <b>${pname}</b> has reached ${threshold}% of its hour budget.</p><p>Approved: <b>${approvedH.toFixed(1)} hrs</b> / Budget: <b>${budgetH} hrs</b></p><p>— OpsFloa</p>`;
+          for (const admin of admins.rows) {
+            sendEmail(admin.email, subject, body);
+          }
+        } catch (alertErr) {
+          console.error('Budget alert error:', alertErr);
+        }
+      });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

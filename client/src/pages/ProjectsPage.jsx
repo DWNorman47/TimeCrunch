@@ -104,6 +104,10 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [health, setHealth] = useState(null);
+  const [photos, setPhotos] = useState([]);
+  const [photosOpen, setPhotosOpen] = useState(false);
+  const [photosLoaded, setPhotosLoaded] = useState(false);
+  const [lightboxPhoto, setLightboxPhoto] = useState(null);
 
   const m = metrics || {};
   const fmtHours = h => {
@@ -141,6 +145,14 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
         .catch(() => {});
     }
   }, [tab, project.id]);
+
+  const loadPhotos = () => {
+    if (photosLoaded) return;
+    setPhotosLoaded(true);
+    api.get(`/admin/projects/${project.id}/photos`)
+      .then(r => setPhotos(r.data))
+      .catch(() => {});
+  };
 
   const loadBilling = () => {
     setBillLoading(true);
@@ -372,6 +384,46 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
                   )}
                 </div>
               )}
+
+              {/* Photos */}
+              <div style={{ marginTop: 16 }}>
+                <button
+                  style={styles.activityToggle}
+                  onClick={() => { setPhotosOpen(o => !o); if (!photosOpen) loadPhotos(); }}
+                >
+                  <span>Photos</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {photos.length > 0 && <span style={styles.activityCount}>{photos.length}</span>}
+                    <span style={{ fontSize: 12, color: '#9ca3af' }}>{photosOpen ? '▴' : '▾'}</span>
+                  </span>
+                </button>
+
+                {photosOpen && (
+                  photosLoaded && photos.length === 0 ? (
+                    <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0' }}>No photos yet.</p>
+                  ) : (
+                    <div style={styles.photoGrid}>
+                      {photos.map((ph, i) => (
+                        <button key={i} style={styles.photoThumb} onClick={() => setLightboxPhoto(ph)}>
+                          <img src={ph.url} alt={ph.caption || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 6 }} />
+                        </button>
+                      ))}
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Lightbox */}
+          {lightboxPhoto && (
+            <div style={styles.lightboxOverlay} onClick={() => setLightboxPhoto(null)}>
+              <div style={styles.lightboxContent} onClick={e => e.stopPropagation()}>
+                <img src={lightboxPhoto.url} alt={lightboxPhoto.caption || ''} style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: 8 }} />
+                {lightboxPhoto.caption && <p style={{ color: '#f3f4f6', marginTop: 8, fontSize: 14 }}>{lightboxPhoto.caption}</p>}
+                {lightboxPhoto.worker_name && <p style={{ color: '#9ca3af', fontSize: 12, margin: '2px 0 0' }}>{lightboxPhoto.worker_name} · {lightboxPhoto.report_date}</p>}
+                <button style={styles.lightboxClose} onClick={() => setLightboxPhoto(null)}>✕</button>
+              </div>
             </div>
           )}
 
@@ -649,4 +701,9 @@ const styles = {
   activityTag: { fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 },
   activityText: { fontSize: 13, color: '#111827', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' },
   activityMeta: { display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, color: '#9ca3af', flexWrap: 'wrap' },
+  photoGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 4, marginTop: 6 },
+  photoThumb: { width: '100%', aspectRatio: '1', padding: 0, border: 'none', background: '#f3f4f6', borderRadius: 6, cursor: 'pointer', overflow: 'hidden' },
+  lightboxOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  lightboxContent: { position: 'relative', maxWidth: '90vw', textAlign: 'center', padding: 16 },
+  lightboxClose: { position: 'absolute', top: -8, right: -8, background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' },
 };
