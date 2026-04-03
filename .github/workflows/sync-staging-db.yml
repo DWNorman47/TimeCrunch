@@ -9,7 +9,7 @@ on:
 
 jobs:
   sync:
-    name: prod → staging
+    name: prod -> staging
     runs-on: ubuntu-latest
 
     steps:
