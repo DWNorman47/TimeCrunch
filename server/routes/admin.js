@@ -1392,7 +1392,7 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
     const workerFilter = accessIds && accessIds.length ? `AND te.user_id = ANY($3)` : '';
     const params = accessIds && accessIds.length ? [companyId, LIMIT + 1, accessIds] : [companyId, LIMIT + 1];
     const result = await pool.query(
-      `SELECT te.*, u.full_name as worker_name, u.email as worker_email, p.name as project_name,
+      `SELECT te.*, COALESCE(u.invoice_name, u.full_name) as worker_name, u.email as worker_email, p.name as project_name,
               te.clock_source, te.clocked_in_by, admin_u.full_name AS clocked_in_by_name
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
