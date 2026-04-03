@@ -127,6 +127,12 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
   const [rfiFormOpen, setRfiFormOpen] = useState(false);
   const [rfiForm, setRfiForm] = useState({ subject: '', directed_to: '', description: '', date_due: '' });
   const [rfiSaving, setRfiSaving] = useState(false);
+  const [punch, setPunch] = useState([]);
+  const [punchOpen, setPunchOpen] = useState(false);
+  const [punchLoaded, setPunchLoaded] = useState(false);
+  const [punchFormOpen, setPunchFormOpen] = useState(false);
+  const [punchForm, setPunchForm] = useState({ title: '', description: '', location: '', priority: 'normal' });
+  const [punchSaving, setPunchSaving] = useState(false);
   const [docs, setDocs] = useState([]);
   const [docsOpen, setDocsOpen] = useState(false);
   const [docsLoaded, setDocsLoaded] = useState(false);
@@ -196,6 +202,27 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
       setRfiFormOpen(false);
     } catch {}
     setRfiSaving(false);
+  };
+
+  const loadPunch = () => {
+    if (punchLoaded) return;
+    setPunchLoaded(true);
+    api.get('/punchlist', { params: { project_id: project.id } })
+      .then(r => setPunch(r.data))
+      .catch(() => {});
+  };
+
+  const submitPunch = async (e) => {
+    e.preventDefault();
+    if (!punchForm.title.trim()) return;
+    setPunchSaving(true);
+    try {
+      const { data: item } = await api.post('/punchlist', { ...punchForm, project_id: project.id });
+      setPunch(prev => [item, ...prev]);
+      setPunchForm({ title: '', description: '', location: '', priority: 'normal' });
+      setPunchFormOpen(false);
+    } catch {}
+    setPunchSaving(false);
   };
 
   const loadDocs = () => {
@@ -358,6 +385,104 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
                   )}
                 </div>
               )}
+
+              {/* Punchlist */}
+              <div style={{ marginBottom: 16 }}>
+                <button
+                  style={styles.activityToggle}
+                  onClick={() => { setPunchOpen(o => !o); if (!punchOpen) loadPunch(); }}
+                >
+                  <span>Punchlist</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {punch.filter(p => p.status === 'open').length > 0 && (
+                      <span style={{ ...styles.activityCount, background: '#f59e0b' }}>
+                        {punch.filter(p => p.status === 'open').length} open
+                      </span>
+                    )}
+                    {punch.length > 0 && punch.filter(p => p.status === 'open').length === 0 && (
+                      <span style={styles.activityCount}>{punch.length}</span>
+                    )}
+                    <span style={{ fontSize: 12, color: '#9ca3af' }}>{punchOpen ? '▴' : '▾'}</span>
+                  </span>
+                </button>
+
+                {punchOpen && (
+                  <div>
+                    {punchLoaded && punch.length === 0 && !punchFormOpen && (
+                      <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 6px' }}>No punchlist items.</p>
+                    )}
+                    {punch.length > 0 && (
+                      <div style={{ ...styles.activityList, marginBottom: 8 }}>
+                        {punch.map(item => {
+                          const statusColor = item.status === 'open' ? '#f59e0b' : item.status === 'in_progress' ? '#3b82f6' : item.status === 'resolved' ? '#059669' : '#9ca3af';
+                          const priorityColor = item.priority === 'high' ? '#ef4444' : item.priority === 'low' ? '#9ca3af' : '#374151';
+                          return (
+                            <div key={item.id} style={styles.activityItem}>
+                              <div style={{ ...styles.activityDot, background: statusColor }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={styles.activityTitle}>
+                                  <span style={{ ...styles.activityTag, background: statusColor + '22', color: statusColor }}>{item.status}</span>
+                                  {item.priority === 'high' && <span style={{ ...styles.activityTag, background: '#fee2e2', color: '#ef4444' }}>high</span>}
+                                  <span style={styles.activityText}>{item.title}</span>
+                                </div>
+                                <div style={styles.activityMeta}>
+                                  {item.location && <span>{item.location} · </span>}
+                                  {item.assigned_to_name && <span>→ {item.assigned_to_name} · </span>}
+                                  <span>{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {punchFormOpen ? (
+                      <form onSubmit={submitPunch} style={styles.rfiForm}>
+                        <input
+                          style={styles.rfiInput}
+                          type="text"
+                          placeholder="Title *"
+                          value={punchForm.title}
+                          onChange={e => setPunchForm(f => ({ ...f, title: e.target.value }))}
+                          required
+                        />
+                        <input
+                          style={styles.rfiInput}
+                          type="text"
+                          placeholder="Location"
+                          value={punchForm.location}
+                          onChange={e => setPunchForm(f => ({ ...f, location: e.target.value }))}
+                        />
+                        <select
+                          style={styles.rfiInput}
+                          value={punchForm.priority}
+                          onChange={e => setPunchForm(f => ({ ...f, priority: e.target.value }))}
+                        >
+                          <option value="low">Low priority</option>
+                          <option value="normal">Normal priority</option>
+                          <option value="high">High priority</option>
+                        </select>
+                        <textarea
+                          style={{ ...styles.rfiInput, resize: 'vertical', minHeight: 56, fontFamily: 'inherit' }}
+                          placeholder="Description"
+                          value={punchForm.description}
+                          onChange={e => setPunchForm(f => ({ ...f, description: e.target.value }))}
+                        />
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button type="submit" style={styles.rfiSubmitBtn} disabled={punchSaving}>
+                            {punchSaving ? 'Saving…' : 'Add Item'}
+                          </button>
+                          <button type="button" style={styles.rfiCancelBtn} onClick={() => setPunchFormOpen(false)}>
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <button style={styles.uploadBtn} onClick={() => setPunchFormOpen(true)}>+ Add Item</button>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Worker roster */}
               {(workersLoading || workers.length > 0) && (
