@@ -1,13 +1,11 @@
 const router = require('express').Router();
 const pool = require('../db');
-const sgMail = require('@sendgrid/mail');
 const { requireAuth } = require('../middleware/auth');
 const { haversineDistanceFt } = require('../utils/geoUtils');
 const { sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem } = require('./inbox');
 const { applySettingsRows, SETTINGS_DEFAULTS } = require('../settingsDefaults');
-
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const { sendEmail } = require('../email');
 
 // GET /api/clock/status — returns active clock-in for this user, if any
 router.get('/status', requireAuth, async (req, res) => {
@@ -167,19 +165,18 @@ router.post('/in', requireAuth, async (req, res) => {
              WHERE u.company_id = $1 AND u.role = 'admin' AND u.active = true AND u.email IS NOT NULL
              LIMIT 1`, [companyId]
           );
-          if (adminResult.rowCount > 0 && process.env.SENDGRID_API_KEY) {
+          if (adminResult.rowCount > 0) {
             const admin = adminResult.rows[0];
             const timeStr = new Date().toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
-            await sgMail.send({
-              from: { name: 'OpsFloa', email: process.env.SENDGRID_FROM_EMAIL },
-              to: admin.email,
-              subject: `Unusual clock-in: ${req.user.full_name}`,
-              html: `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px">
+            await sendEmail(
+              admin.email,
+              `Unusual clock-in: ${req.user.full_name}`,
+              `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px">
                 <h3 style="color:#d97706">Unusual clock-in detected</h3>
                 <p><strong>${req.user.full_name}</strong> clocked in at <strong>${timeStr}</strong> on project <strong>${projName}</strong>.</p>
                 <p style="color:#888;font-size:13px">This is outside your configured work hours (${s.notification_start_hour}:00–${s.notification_end_hour}:00).</p>
-              </div>`,
-            }).catch(() => {});
+              </div>`
+            );
           }
         }
       } catch {} // never throw from background work
