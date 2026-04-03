@@ -1,0 +1,38 @@
+name: Sync Staging DB from Production
+
+# Runs nightly at 4 AM UTC.
+# Can also be triggered manually from the Actions tab (useful for on-demand refreshes).
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    name: prod → staging
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install postgresql-client
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Dump production database
+        run: |
+          pg_dump "${{ secrets.PROD_DATABASE_URL }}" \
+            --no-owner \
+            --no-acl \
+            --format=custom \
+            --file=/tmp/prod.pgc
+
+      - name: Restore to staging database
+        run: |
+          pg_restore \
+            --dbname "${{ secrets.STAGING_DATABASE_URL }}" \
+            --no-owner \
+            --no-acl \
+            --clean \
+            --if-exists \
+            /tmp/prod.pgc
+
+      - name: Done
+        run: echo "Staging DB refreshed from production at $(date -u)"
