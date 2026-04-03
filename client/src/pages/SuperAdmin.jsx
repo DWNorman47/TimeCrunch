@@ -11,42 +11,59 @@ function formatMrr(cents) {
   return '$' + (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function planTag(plan, status) {
-  if (status === 'exempt') return (
-    <span style={{ background: '#fefce8', color: '#854d0e', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>
-      Exempt
-    </span>
-  );
-  if (!plan || plan === 'free') return null;
-  const colors = { starter: ['#dbeafe', '#1e40af'], business: ['#f3e8ff', '#6b21a8'] };
-  const [bg, color] = colors[plan] || ['#f3f4f6', '#374151'];
-  const inactive = status === 'canceled' || status === 'past_due';
-  return (
-    <span style={{ background: inactive ? '#fee2e2' : bg, color: inactive ? '#dc2626' : color, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>
-      {plan}{inactive ? ` (${status})` : ''}
-    </span>
-  );
+function statusTag(status, plan) {
+  if (status === 'exempt')       return <span style={tag('#fef3c7','#92400e')}>Exempt</span>;
+  if (status === 'trial')        return <span style={tag('#dbeafe','#1e40af')}>Trial</span>;
+  if (status === 'active') {
+    const colors = { starter: ['#dbeafe','#1e40af'], business: ['#f3e8ff','#6b21a8'] };
+    const [bg, c] = colors[plan] || ['#dcfce7','#166534'];
+    return <span style={tag(bg, c)}>{plan || 'active'}</span>;
+  }
+  if (status === 'canceled')      return <span style={tag('#fee2e2','#dc2626')}>Canceled</span>;
+  if (status === 'trial_expired') return <span style={tag('#fee2e2','#dc2626')}>Trial expired</span>;
+  if (status === 'past_due')      return <span style={tag('#fef3c7','#92400e')}>Past due</span>;
+  return <span style={tag('#f3f4f6','#374151')}>{status}</span>;
 }
+
+function tag(bg, color) {
+  return { background: bg, color, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 };
+}
+
+const STATUSES = ['trial','active','past_due','canceled','trial_expired','exempt'];
+const PLANS    = ['free','starter','business'];
 
 export default function SuperAdmin() {
   const { logout, user } = useAuth();
   const [tab, setTab] = useState('companies');
 
   // ── Companies state ──
-  const [companies, setCompanies] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [working, setWorking] = useState(null);
+  const [companies, setCompanies]   = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [working, setWorking]       = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [companyUsers, setCompanyUsers] = useState({});
   const [affiliates, setAffiliates] = useState([]);
 
+  // inline rename
+  const [renamingId, setRenamingId]   = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameSaving, setRenameSaving] = useState(false);
+
+  // delete confirm
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteWorking, setDeleteWorking] = useState(false);
+
+  // impersonate
+  const [impersonating, setImpersonating] = useState(null); // companyId
+
   // ── Affiliates state ──
   const [afLoading, setAfLoading] = useState(false);
-  const [afList, setAfList] = useState([]);
+  const [afList, setAfList]       = useState([]);
   const [afExpanded, setAfExpanded] = useState(null);
-  const [afForm, setAfForm] = useState(null); // null | { id?, name, email, phone, notes }
-  const [afSaving, setAfSaving] = useState(false);
-  const [afError, setAfError] = useState('');
+  const [afForm, setAfForm]         = useState(null);
+  const [afSaving, setAfSaving]     = useState(false);
+  const [afError, setAfError]       = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -71,32 +88,64 @@ export default function SuperAdmin() {
   }, [tab]);
 
   // ── Companies handlers ──
-  const toggleActive = async (company) => {
-    setWorking(company.id);
+  const patchCompany = async (id, patch) => {
+    setWorking(id);
     try {
-      const r = await api.patch(`/superadmin/companies/${company.id}`, { active: !company.active });
-      setCompanies(prev => prev.map(c => c.id === company.id ? { ...c, ...r.data } : c));
+      const r = await api.patch(`/superadmin/companies/${id}`, patch);
+      setCompanies(prev => prev.map(c => c.id === id ? { ...c, ...r.data } : c));
     } finally { setWorking(null); }
   };
 
+  const toggleActive = (company) => patchCompany(company.id, { active: !company.active });
+
   const assignAffiliate = async (companyId, affiliateId) => {
     try {
-      await api.patch(`/superadmin/companies/${companyId}`, { affiliate_id: affiliateId || null });
+      const r = await api.patch(`/superadmin/companies/${companyId}`, { affiliate_id: affiliateId || null });
       setCompanies(prev => prev.map(c => {
         if (c.id !== companyId) return c;
         const af = affiliates.find(a => String(a.id) === String(affiliateId));
-        return { ...c, affiliate_id: affiliateId || null, affiliate_name: af?.name || null };
+        return { ...c, ...r.data, affiliate_name: af?.name || null };
       }));
     } catch {}
   };
 
-  const toggleExempt = async (company) => {
-    setWorking(company.id);
+  const startRename = (company) => {
+    setRenamingId(company.id);
+    setRenameValue(company.name);
+  };
+
+  const saveRename = async (id) => {
+    if (!renameValue.trim()) return;
+    setRenameSaving(true);
     try {
-      const newStatus = company.subscription_status === 'exempt' ? 'active' : 'exempt';
-      const r = await api.patch(`/superadmin/companies/${company.id}`, { subscription_status: newStatus });
-      setCompanies(prev => prev.map(c => c.id === company.id ? { ...c, ...r.data } : c));
-    } finally { setWorking(null); }
+      const r = await api.patch(`/superadmin/companies/${id}`, { name: renameValue.trim() });
+      setCompanies(prev => prev.map(c => c.id === id ? { ...c, ...r.data } : c));
+      setRenamingId(null);
+    } finally { setRenameSaving(false); }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleteConfirm !== deleteTarget.name) return;
+    setDeleteWorking(true);
+    try {
+      await api.delete(`/superadmin/companies/${deleteTarget.id}`);
+      setCompanies(prev => prev.filter(c => c.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      setDeleteConfirm('');
+    } finally { setDeleteWorking(false); }
+  };
+
+  const handleImpersonate = async (company) => {
+    setImpersonating(company.id);
+    try {
+      const r = await api.post(`/superadmin/companies/${company.id}/impersonate`);
+      // Store token in sessionStorage under a known key, then open a new tab
+      // The new tab reads it once via ?impersonate=1 and clears it
+      sessionStorage.setItem('impersonate_token', r.data.token);
+      window.open('/?impersonate=1', '_blank');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Could not impersonate');
+    } finally { setImpersonating(null); }
   };
 
   const toggleExpand = async (id) => {
@@ -151,8 +200,40 @@ export default function SuperAdmin() {
         </div>
       </header>
 
+      {/* Delete confirm modal */}
+      {deleteTarget && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <div style={styles.modalTitle}>Delete company</div>
+            <p style={styles.modalBody}>
+              This will permanently delete <strong>{deleteTarget.name}</strong> and all of its data
+              (workers, projects, time entries, reports, settings). This cannot be undone.
+            </p>
+            <p style={styles.modalBody}>Type the company name to confirm:</p>
+            <input
+              style={styles.modalInput}
+              value={deleteConfirm}
+              onChange={e => setDeleteConfirm(e.target.value)}
+              placeholder={deleteTarget.name}
+              autoFocus
+            />
+            <div style={styles.modalActions}>
+              <button
+                style={{ ...styles.deleteConfirmBtn, opacity: deleteConfirm === deleteTarget.name ? 1 : 0.4 }}
+                onClick={confirmDelete}
+                disabled={deleteConfirm !== deleteTarget.name || deleteWorking}
+              >
+                {deleteWorking ? 'Deleting...' : 'Delete permanently'}
+              </button>
+              <button style={styles.modalCancelBtn} onClick={() => { setDeleteTarget(null); setDeleteConfirm(''); }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main style={styles.main}>
-        {/* Tab bar */}
         <div style={styles.tabs}>
           <button style={{ ...styles.tabBtn, ...(tab === 'companies' ? styles.tabActive : {}) }} onClick={() => setTab('companies')}>
             Companies {companies.length > 0 && <span style={styles.tabCount}>{companies.length}</span>}
@@ -175,14 +256,33 @@ export default function SuperAdmin() {
                   <div key={c.id} style={{ ...styles.card, opacity: c.active ? 1 : 0.6 }}>
                     <div style={styles.cardTop}>
                       <div style={styles.cardLeft}>
+
+                        {/* Company name / rename */}
                         <div style={styles.companyName}>
-                          {c.name}
-                          {!c.active && <span style={styles.inactiveTag}>Deactivated</span>}
-                          {planTag(c.plan, c.subscription_status)}
-                          {c.affiliate_name && (
-                            <span style={styles.affiliateTag}>via {c.affiliate_name}</span>
+                          {renamingId === c.id ? (
+                            <>
+                              <input
+                                style={styles.renameInput}
+                                value={renameValue}
+                                onChange={e => setRenameValue(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') saveRename(c.id); if (e.key === 'Escape') setRenamingId(null); }}
+                                autoFocus
+                              />
+                              <button style={styles.renameSaveBtn} onClick={() => saveRename(c.id)} disabled={renameSaving}>
+                                {renameSaving ? '...' : 'Save'}
+                              </button>
+                              <button style={styles.renameCancelBtn} onClick={() => setRenamingId(null)}>Cancel</button>
+                            </>
+                          ) : (
+                            <>
+                              {c.name}
+                              {!c.active && <span style={styles.inactiveTag}>Deactivated</span>}
+                              {statusTag(c.subscription_status, c.plan)}
+                              {c.affiliate_name && <span style={styles.affiliateTag}>via {c.affiliate_name}</span>}
+                            </>
                           )}
                         </div>
+
                         <div style={styles.meta}>
                           <span>slug: <code style={styles.slug}>{c.slug}</code></span>
                           <span style={styles.sep}>·</span>
@@ -192,34 +292,77 @@ export default function SuperAdmin() {
                             <span style={{ color: '#059669', fontWeight: 600 }}>MRR {formatMrr(c.mrr_cents)}</span>
                           </>}
                         </div>
+
                         <div style={styles.stats}>
                           <span style={styles.stat}><strong>{c.worker_count}</strong> workers</span>
                           <span style={styles.stat}><strong>{c.admin_count}</strong> admins</span>
                           <span style={styles.stat}><strong>{c.entry_count}</strong> entries</span>
                           {c.last_entry_at && <span style={styles.stat}>Last entry: {formatDate(c.last_entry_at)}</span>}
                         </div>
-                        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 12, color: '#9ca3af' }}>Affiliate:</span>
-                          <select
-                            style={styles.affiliateSelect}
-                            value={c.affiliate_id || ''}
-                            onChange={e => assignAffiliate(c.id, e.target.value)}
-                          >
-                            <option value="">None</option>
-                            {affiliates.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                          </select>
+
+                        {/* Controls row */}
+                        <div style={styles.controlsRow}>
+                          <div style={styles.controlGroup}>
+                            <span style={styles.controlLabel}>Status</span>
+                            <select
+                              style={styles.controlSelect}
+                              value={c.subscription_status || 'trial'}
+                              onChange={e => patchCompany(c.id, { subscription_status: e.target.value })}
+                              disabled={working === c.id}
+                            >
+                              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </div>
+                          <div style={styles.controlGroup}>
+                            <span style={styles.controlLabel}>Plan</span>
+                            <select
+                              style={styles.controlSelect}
+                              value={c.plan || 'free'}
+                              onChange={e => patchCompany(c.id, { plan: e.target.value })}
+                              disabled={working === c.id}
+                            >
+                              {PLANS.map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                          </div>
+                          {(c.subscription_status === 'trial' || c.trial_ends_at) && (
+                            <div style={styles.controlGroup}>
+                              <span style={styles.controlLabel}>Trial ends</span>
+                              <input
+                                type="date"
+                                style={styles.controlSelect}
+                                value={c.trial_ends_at ? c.trial_ends_at.substring(0, 10) : ''}
+                                onChange={e => patchCompany(c.id, { trial_ends_at: e.target.value || null })}
+                                disabled={working === c.id}
+                              />
+                            </div>
+                          )}
+                          <div style={styles.controlGroup}>
+                            <span style={styles.controlLabel}>Affiliate</span>
+                            <select
+                              style={styles.controlSelect}
+                              value={c.affiliate_id || ''}
+                              onChange={e => assignAffiliate(c.id, e.target.value)}
+                            >
+                              <option value="">None</option>
+                              {affiliates.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                            </select>
+                          </div>
                         </div>
                       </div>
+
                       <div style={styles.cardActions}>
                         <button style={styles.expandBtn} onClick={() => toggleExpand(c.id)}>
-                          {expandedId === c.id ? 'Hide users' : 'View users'}
+                          {expandedId === c.id ? 'Hide users' : 'Users'}
+                        </button>
+                        <button style={styles.actionBtn} onClick={() => startRename(c)} disabled={working === c.id}>
+                          Rename
                         </button>
                         <button
-                          style={c.subscription_status === 'exempt' ? styles.exemptActiveBtn : styles.exemptBtn}
-                          onClick={() => toggleExempt(c)}
-                          disabled={working === c.id}
+                          style={styles.actionBtn}
+                          onClick={() => handleImpersonate(c)}
+                          disabled={impersonating === c.id}
                         >
-                          {working === c.id ? '...' : c.subscription_status === 'exempt' ? 'Remove Exempt' : 'Set Exempt'}
+                          {impersonating === c.id ? '...' : 'Login as'}
                         </button>
                         <button
                           style={c.active ? styles.deactivateBtn : styles.activateBtn}
@@ -227,6 +370,12 @@ export default function SuperAdmin() {
                           disabled={working === c.id}
                         >
                           {working === c.id ? '...' : c.active ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          style={styles.deleteBtn}
+                          onClick={() => { setDeleteTarget({ id: c.id, name: c.name }); setDeleteConfirm(''); }}
+                        >
+                          Delete
                         </button>
                       </div>
                     </div>
@@ -288,7 +437,6 @@ export default function SuperAdmin() {
               </button>
             </div>
 
-            {/* New / Edit form */}
             {afForm && (
               <div style={styles.afFormCard}>
                 <div style={styles.afFormTitle}>{afForm.id ? 'Edit Affiliate' : 'New Affiliate'}</div>
@@ -355,8 +503,8 @@ export default function SuperAdmin() {
                           <button style={styles.expandBtn} onClick={() => setAfExpanded(afExpanded === a.id ? null : a.id)}>
                             {afExpanded === a.id ? 'Hide' : 'Companies'}
                           </button>
-                          <button style={styles.expandBtn} onClick={() => { setAfForm({ ...a }); setAfError(''); }}>Edit</button>
-                          <button style={styles.deactivateBtn} onClick={() => deleteAffiliate(a.id)}>Delete</button>
+                          <button style={styles.actionBtn} onClick={() => { setAfForm({ ...a }); setAfError(''); }}>Edit</button>
+                          <button style={styles.deleteBtn} onClick={() => deleteAffiliate(a.id)}>Delete</button>
                         </div>
                       </div>
 
@@ -440,20 +588,35 @@ const styles = {
   meta: { fontSize: 13, color: '#9ca3af', display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' },
   slug: { fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 4px', borderRadius: 4, fontSize: 12 },
   sep: { color: '#d1d5db' },
-  stats: { display: 'flex', gap: 12, flexWrap: 'wrap' },
+  stats: { display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10 },
   stat: { fontSize: 13, color: '#555' },
-  affiliateSelect: { fontSize: 12, padding: '3px 7px', border: '1px solid #d1d5db', borderRadius: 6, color: '#374151', background: '#fff' },
-  cardActions: { display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' },
-  expandBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
-  deactivateBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  activateBtn: { background: '#059669', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  exemptBtn: { background: 'none', border: '1px solid #fcd34d', color: '#92400e', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  exemptActiveBtn: { background: '#fef3c7', border: '1px solid #f59e0b', color: '#92400e', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  controlsRow: { display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 4 },
+  controlGroup: { display: 'flex', flexDirection: 'column', gap: 3 },
+  controlLabel: { fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  controlSelect: { fontSize: 12, padding: '4px 7px', border: '1px solid #d1d5db', borderRadius: 6, color: '#374151', background: '#fff' },
+  cardActions: { display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch', minWidth: 110 },
+  expandBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer', textAlign: 'center' },
+  actionBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer', textAlign: 'center' },
+  deactivateBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'center' },
+  activateBtn: { background: '#059669', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'center' },
+  deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#dc2626', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'center' },
+  renameInput: { flex: 1, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 15, fontWeight: 700 },
+  renameSaveBtn: { padding: '4px 12px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  renameCancelBtn: { padding: '4px 10px', background: 'none', border: '1px solid #d1d5db', color: '#6b7280', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   userTable: { marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 16 },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
   th: { textAlign: 'left', padding: '6px 10px', color: '#6b7280', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', borderBottom: '1px solid #e5e7eb' },
   td: { padding: '8px 10px', borderBottom: '1px solid #f3f4f6', color: '#374151' },
   roleTag: { padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 },
+  // Delete modal
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  modal: { background: '#fff', borderRadius: 12, padding: 28, maxWidth: 440, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' },
+  modalTitle: { fontWeight: 700, fontSize: 17, marginBottom: 12, color: '#dc2626' },
+  modalBody: { fontSize: 14, color: '#374151', marginBottom: 10, lineHeight: 1.5 },
+  modalInput: { width: '100%', padding: '9px 11px', border: '2px solid #fca5a5', borderRadius: 8, fontSize: 14, marginBottom: 16 },
+  modalActions: { display: 'flex', gap: 10 },
+  deleteConfirmBtn: { flex: 1, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  modalCancelBtn: { padding: '10px 18px', background: 'none', border: '1px solid #d1d5db', color: '#374151', borderRadius: 8, fontSize: 14, cursor: 'pointer' },
   // Affiliate form
   afFormCard: { background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', marginBottom: 16 },
   afFormTitle: { fontWeight: 700, fontSize: 15, marginBottom: 14 },
@@ -462,7 +625,6 @@ const styles = {
   afInput: { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 },
   afSaveBtn: { padding: '8px 20px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   afCancelBtn: { padding: '8px 16px', background: 'none', border: '1px solid #d1d5db', color: '#374151', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
-  // Affiliate summary stats
   afSummary: { display: 'flex', gap: 24, marginTop: 10, flexWrap: 'wrap' },
   afStat: { display: 'flex', flexDirection: 'column', gap: 2 },
   afStatLabel: { fontSize: 11, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' },

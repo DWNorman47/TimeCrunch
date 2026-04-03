@@ -96,6 +96,18 @@ function AppRoutes() {
   );
 }
 
+// If this tab was opened via "Login as" from SuperAdmin, swap in the impersonate token
+// before React even mounts so AuthProvider picks it up on first render.
+(function applyImpersonateToken() {
+  if (!window.location.search.includes('impersonate=1')) return;
+  const token = sessionStorage.getItem('impersonate_token');
+  if (!token) return;
+  sessionStorage.removeItem('impersonate_token');
+  localStorage.setItem('tc_token', token);
+  // Strip the query param so normal auth flow runs from here
+  window.history.replaceState({}, '', window.location.pathname);
+})();
+
 export default function App() {
   return (
     <AuthProvider>
