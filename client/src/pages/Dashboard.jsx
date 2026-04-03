@@ -79,7 +79,7 @@ export default function Dashboard() {
 
   // When timeclock feature is off, redirect away from clock-only tabs
   useEffect(() => {
-    if (settings && settings.feature_timeclock === false && tab !== 'account') {
+    if (settings && settings.module_timeclock === false && tab !== 'account') {
       setTab('account');
       window.location.hash = 'account';
     }
@@ -367,9 +367,9 @@ ${signatureDataUrl ? `
 
       <main style={styles.main} className="mobile-main">
         <div style={styles.tabs} className="tab-bar">
-          {settings?.feature_timeclock !== false && <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); window.location.hash = 'clock'; }}>🕐 Clock</button>}
-          {settings?.feature_timeclock !== false && <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => { setTab('messages'); window.location.hash = 'messages'; }}>💬 Messages</button>}
-          {settings?.feature_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); window.location.hash = 'timesheet'; }}>📋 Timesheet</button>}
+          {settings?.module_timeclock !== false && <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); window.location.hash = 'clock'; }}>🕐 Clock</button>}
+          {settings?.module_timeclock !== false && <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => { setTab('messages'); window.location.hash = 'messages'; }}>💬 Messages</button>}
+          {settings?.module_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); window.location.hash = 'timesheet'; }}>📋 Timesheet</button>}
           <button style={tab === 'account' ? styles.tabActive : styles.tab} onClick={() => { setTab('account'); window.location.hash = 'account'; }}>👤 Account</button>
         </div>
 

@@ -76,13 +76,13 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
     feature_overtime: settings?.feature_overtime ?? true,
-    feature_field: settings?.feature_field ?? false,
+    module_field: settings?.module_field ?? false,
     feature_scheduling: settings?.feature_scheduling ?? true,
     feature_analytics: settings?.feature_analytics ?? true,
     feature_chat: settings?.feature_chat ?? true,
     feature_geolocation: settings?.feature_geolocation ?? true,
-    feature_timeclock: settings?.feature_timeclock ?? true,
-    feature_projects: settings?.feature_projects ?? true,
+    module_timeclock: settings?.module_timeclock ?? true,
+    module_projects: settings?.module_projects ?? true,
     feature_project_integration: settings?.feature_project_integration ?? true,
     feature_inactive_alerts: settings?.feature_inactive_alerts ?? true,
     feature_overtime_alerts: settings?.feature_overtime_alerts ?? true,
@@ -129,13 +129,13 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       notification_end_hour: String(settings.notification_end_hour ?? 20),
       chat_retention_days: String(settings.chat_retention_days ?? 3),
       feature_overtime: settings.feature_overtime ?? true,
-      feature_field: settings.feature_field ?? false,
+      module_field: settings.module_field ?? false,
       feature_scheduling: settings.feature_scheduling ?? true,
       feature_analytics: settings.feature_analytics ?? true,
       feature_chat: settings.feature_chat ?? true,
       feature_geolocation: settings.feature_geolocation ?? true,
-      feature_timeclock: settings.feature_timeclock ?? true,
-      feature_projects: settings.feature_projects ?? true,
+      module_timeclock: settings.module_timeclock ?? true,
+      module_projects: settings.module_projects ?? true,
       feature_project_integration: settings.feature_project_integration ?? true,
       feature_inactive_alerts: settings.feature_inactive_alerts ?? true,
       feature_overtime_alerts: settings.feature_overtime_alerts ?? true,
@@ -169,13 +169,13 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         notification_end_hour: parseFloat(form.notification_end_hour),
         chat_retention_days: parseFloat(form.chat_retention_days),
         feature_overtime: form.feature_overtime,
-        feature_field: form.feature_field,
+        module_field: form.module_field,
         feature_scheduling: form.feature_scheduling,
         feature_analytics: form.feature_analytics,
         feature_chat: form.feature_chat,
         feature_geolocation: form.feature_geolocation,
-        feature_timeclock: form.feature_timeclock,
-        feature_projects: form.feature_projects,
+        module_timeclock: form.module_timeclock,
+        module_projects: form.module_projects,
         feature_project_integration: form.feature_project_integration,
         feature_inactive_alerts: form.feature_inactive_alerts,
         feature_overtime_alerts: form.feature_overtime_alerts,
@@ -463,9 +463,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <div style={styles.label}>Time Clock</div>
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show the Time Clock app in the app switcher</div>
             </div>
-            <label style={{ ...styles.toggle, background: form.feature_timeclock ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_timeclock} onChange={e => set('feature_timeclock', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_timeclock ? 'translateX(46px)' : 'translateX(0)' }} />
+            <label style={{ ...styles.toggle, background: form.module_timeclock ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_timeclock} onChange={e => set('module_timeclock', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_timeclock ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
           <div style={styles.row}>
@@ -473,9 +473,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <div style={styles.label}>{t.featField}</div>
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featFieldDesc}</div>
             </div>
-            <label style={{ ...styles.toggle, background: form.feature_field ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_field} onChange={e => set('feature_field', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_field ? 'translateX(46px)' : 'translateX(0)' }} />
+            <label style={{ ...styles.toggle, background: form.module_field ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_field} onChange={e => set('module_field', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_field ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
           <div style={styles.row}>
@@ -483,9 +483,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <div style={styles.label}>Projects</div>
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show the Projects module in the app switcher</div>
             </div>
-            <label style={{ ...styles.toggle, background: form.feature_projects ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_projects} onChange={e => set('feature_projects', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_projects ? 'translateX(46px)' : 'translateX(0)' }} />
+            <label style={{ ...styles.toggle, background: form.module_projects ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_projects} onChange={e => set('module_projects', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_projects ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
         </div>}

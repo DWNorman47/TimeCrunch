@@ -305,7 +305,7 @@ export default function AdministrationPage() {
   const tabs = [
     { id: 'company',      label: t.adminTabCompany      },
     { id: 'team',         label: t.adminTabTeam         },
-    ...(settings?.feature_projects !== false ? [{ id: 'projects', label: t.adminTabProjects }] : []),
+    ...(settings?.module_projects !== false ? [{ id: 'projects', label: t.adminTabProjects }] : []),
     ...(plan.hasQbo ? [{ id: 'integrations', label: t.adminTabIntegrations }] : []),
     { id: 'billing',      label: t.adminTabBilling      },
     { id: 'log',          label: t.adminTabLog          },

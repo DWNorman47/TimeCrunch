@@ -75,10 +75,10 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
   const visibleApps = APPS.filter(a => {
     if (a.adminOnly && !isAdmin) return false;
     if (a.soon) return !isAdmin ? false : true;
-    if (a.id === 'field' && features?.feature_field === false) return false;
-    if (a.id === 'projects' && features?.feature_projects === false) return false;
+    if (a.id === 'field' && features?.module_field === false) return false;
+    if (a.id === 'projects' && features?.module_projects === false) return false;
     // Only hide Time Clock from admins when toggle is off; workers still need it for Account tab
-    if (a.id === 'timeclock' && features?.feature_timeclock === false && isAdmin) return false;
+    if (a.id === 'timeclock' && features?.module_timeclock === false && isAdmin) return false;
     return true;
   });
   const current = APPS.find(a => a.id === currentApp) || APPS[0];
