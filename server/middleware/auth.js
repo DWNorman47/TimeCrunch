@@ -59,8 +59,8 @@ function requirePlan(minPlan) {
         return res.status(403).json({ error: 'Subscription required', code: 'subscription_required' });
       }
 
-      // Trial users get full access
-      if (company.subscription_status === 'trial') {
+      // Exempt and trial companies get full access to all features
+      if (company.subscription_status === 'exempt' || company.subscription_status === 'trial') {
         req.company = company;
         return next();
       }
@@ -101,8 +101,8 @@ async function requireProAddon(req, res, next) {
       return res.status(403).json({ error: 'Subscription required', code: 'subscription_required' });
     }
 
-    // Trial users get full access
-    if (company.subscription_status === 'trial' || company.addon_qbo) {
+    // Exempt and trial users get full access
+    if (company.subscription_status === 'exempt' || company.subscription_status === 'trial' || company.addon_qbo) {
       req.company = company;
       return next();
     }

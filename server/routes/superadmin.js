@@ -28,20 +28,30 @@ router.get('/companies', requireSuperAdmin, async (req, res) => {
   }
 });
 
-// PATCH /superadmin/companies/:id — activate/deactivate or assign affiliate
+// PATCH /superadmin/companies/:id — activate/deactivate, assign affiliate, or set subscription status/plan
 router.patch('/companies/:id', requireSuperAdmin, async (req, res) => {
-  const { active, affiliate_id } = req.body;
-  if (active === undefined && affiliate_id === undefined)
-    return res.status(400).json({ error: 'active or affiliate_id required' });
+  const { active, affiliate_id, subscription_status, plan } = req.body;
+  if (active === undefined && affiliate_id === undefined && subscription_status === undefined && plan === undefined)
+    return res.status(400).json({ error: 'No fields to update' });
+
+  const VALID_STATUSES = ['trial', 'active', 'past_due', 'canceled', 'trial_expired', 'exempt'];
+  const VALID_PLANS = ['free', 'starter', 'business'];
+  if (subscription_status !== undefined && !VALID_STATUSES.includes(subscription_status))
+    return res.status(400).json({ error: 'Invalid subscription_status' });
+  if (plan !== undefined && !VALID_PLANS.includes(plan))
+    return res.status(400).json({ error: 'Invalid plan' });
+
   try {
     const fields = [];
     const values = [];
     let idx = 1;
     if (active !== undefined) { fields.push(`active = $${idx++}`); values.push(active); }
     if (affiliate_id !== undefined) { fields.push(`affiliate_id = $${idx++}`); values.push(affiliate_id || null); }
+    if (subscription_status !== undefined) { fields.push(`subscription_status = $${idx++}`); values.push(subscription_status); }
+    if (plan !== undefined) { fields.push(`plan = $${idx++}`); values.push(plan); }
     values.push(req.params.id);
     const result = await pool.query(
-      `UPDATE companies SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, name, slug, active, affiliate_id`,
+      `UPDATE companies SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, name, slug, active, affiliate_id, subscription_status, plan`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Company not found' });

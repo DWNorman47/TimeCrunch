@@ -12,6 +12,11 @@ function formatMrr(cents) {
 }
 
 function planTag(plan, status) {
+  if (status === 'exempt') return (
+    <span style={{ background: '#fefce8', color: '#854d0e', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>
+      Exempt
+    </span>
+  );
   if (!plan || plan === 'free') return null;
   const colors = { starter: ['#dbeafe', '#1e40af'], business: ['#f3e8ff', '#6b21a8'] };
   const [bg, color] = colors[plan] || ['#f3f4f6', '#374151'];
@@ -83,6 +88,15 @@ export default function SuperAdmin() {
         return { ...c, affiliate_id: affiliateId || null, affiliate_name: af?.name || null };
       }));
     } catch {}
+  };
+
+  const toggleExempt = async (company) => {
+    setWorking(company.id);
+    try {
+      const newStatus = company.subscription_status === 'exempt' ? 'active' : 'exempt';
+      const r = await api.patch(`/superadmin/companies/${company.id}`, { subscription_status: newStatus });
+      setCompanies(prev => prev.map(c => c.id === company.id ? { ...c, ...r.data } : c));
+    } finally { setWorking(null); }
   };
 
   const toggleExpand = async (id) => {
@@ -199,6 +213,13 @@ export default function SuperAdmin() {
                       <div style={styles.cardActions}>
                         <button style={styles.expandBtn} onClick={() => toggleExpand(c.id)}>
                           {expandedId === c.id ? 'Hide users' : 'View users'}
+                        </button>
+                        <button
+                          style={c.subscription_status === 'exempt' ? styles.exemptActiveBtn : styles.exemptBtn}
+                          onClick={() => toggleExempt(c)}
+                          disabled={working === c.id}
+                        >
+                          {working === c.id ? '...' : c.subscription_status === 'exempt' ? 'Remove Exempt' : 'Set Exempt'}
                         </button>
                         <button
                           style={c.active ? styles.deactivateBtn : styles.activateBtn}
@@ -426,6 +447,8 @@ const styles = {
   expandBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   deactivateBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   activateBtn: { background: '#059669', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  exemptBtn: { background: 'none', border: '1px solid #fcd34d', color: '#92400e', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  exemptActiveBtn: { background: '#fef3c7', border: '1px solid #f59e0b', color: '#92400e', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   userTable: { marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 16 },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
   th: { textAlign: 'left', padding: '6px 10px', color: '#6b7280', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', borderBottom: '1px solid #e5e7eb' },
