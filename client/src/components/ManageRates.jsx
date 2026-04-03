@@ -523,7 +523,10 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show the Projects module in the app switcher</div>
             </div>
             <label style={{ ...styles.toggle, background: form.module_projects ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.module_projects} onChange={e => set('module_projects', e.target.checked)} style={{ display: 'none' }} />
+              <input type="checkbox" checked={form.module_projects} onChange={e => {
+                set('module_projects', e.target.checked);
+                if (!e.target.checked) set('feature_project_integration', false);
+              }} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleKnob, transform: form.module_projects ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
@@ -542,10 +545,14 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <span style={styles.collapseChevron}>{collapsed.features ? '▶' : '▼'}</span>
         </div>
         {!collapsed.features && <div style={styles.sectionBody}>
-          <div style={styles.row}>
+          <div style={{ ...styles.row, opacity: form.module_projects ? 1 : 0.45, pointerEvents: form.module_projects ? 'auto' : 'none' }}>
             <div>
               <div style={styles.label}>Project Integration</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Require project selection on time entries and clock-in</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>
+                {form.module_projects
+                  ? 'Require project selection on time entries and clock-in'
+                  : 'Enable the Projects module to use this feature'}
+              </div>
             </div>
             <label style={{ ...styles.toggle, background: form.feature_project_integration ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_project_integration} onChange={e => set('feature_project_integration', e.target.checked)} style={{ display: 'none' }} />

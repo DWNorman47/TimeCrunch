@@ -9,7 +9,7 @@ export default function OnboardingChecklist({ workers, projects, settings }) {
 
   const hasWorkers = workers.some(w => w.role === 'worker');
   const hasProjects = projects.length > 0;
-  const projectsEnabled = settings?.module_projects !== false;
+  const projectsEnabled = settings?.feature_project_integration !== false;
 
   const steps = [
     {
