@@ -1014,9 +1014,9 @@ router.get('/projects', requireAdmin, async (req, res) => {
       `SELECT id, company_id, name, wage_type, prevailing_wage_rate, geo_lat, geo_lng, geo_radius_ft,
               budget_hours, budget_dollars, active, created_at,
               client_name, job_number, address, start_date, end_date, description, status,
-              required_checklist_template_id
-       FROM projects WHERE active = true AND company_id = $1 ORDER BY name LIMIT 500`,
-      [companyId]
+              required_checklist_template_id, progress_pct
+       FROM projects WHERE (active = true OR $2 = true) AND company_id = $1 ORDER BY active DESC, name LIMIT 500`,
+      [companyId, req.query.include_archived === 'true']
     );
     res.json(result.rows);
   } catch (err) {
@@ -1057,7 +1057,7 @@ router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
 // Update project (name and/or wage_type and/or geofence)
 router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
   const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence, budget_hours, budget_dollars, prevailing_wage_rate, required_checklist_template_id,
-          client_name, job_number, address, start_date, end_date, description, status } = req.body;
+          client_name, job_number, address, start_date, end_date, description, status, progress_pct, active } = req.body;
   const VALID_STATUSES = ['planning', 'in_progress', 'on_hold', 'completed'];
   if (status !== undefined && !VALID_STATUSES.includes(status)) {
     return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
@@ -1114,6 +1114,12 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
     if (end_date !== undefined)     { fields.push(`end_date = $${idx++}`);     values.push(end_date || null); }
     if (description !== undefined)  { fields.push(`description = $${idx++}`);  values.push(description || null); }
     if (status !== undefined)       { fields.push(`status = $${idx++}`);       values.push(status); }
+    if (progress_pct !== undefined) {
+      const pp = progress_pct === null ? null : parseInt(progress_pct, 10);
+      if (pp !== null && (isNaN(pp) || pp < 0 || pp > 100)) return res.status(400).json({ error: 'progress_pct must be 0–100' });
+      fields.push(`progress_pct = $${idx++}`); values.push(pp);
+    }
+    if (active !== undefined) { fields.push(`active = $${idx++}`); values.push(!!active); }
     if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
     values.push(req.params.id);
     values.push(companyId);
@@ -1175,6 +1181,25 @@ router.get('/projects/:id/photos', requireAdmin, async (req, res) => {
        WHERE r.project_id = $1 AND r.company_id = $2 AND ph.url IS NOT NULL
        ORDER BY COALESCE(r.report_date, r.reported_at::date) DESC, ph.created_at DESC
        LIMIT 60`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// RFIs for a project
+router.get('/projects/:id/rfis', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT id, rfi_number, subject, status, directed_to, date_submitted, date_due
+       FROM rfis
+       WHERE project_id = $1 AND company_id = $2
+       ORDER BY rfi_number DESC
+       LIMIT 100`,
       [req.params.id, companyId]
     );
     res.json(result.rows);

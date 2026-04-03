@@ -39,7 +39,10 @@ function ProjectCard({ project, metrics, settings, onClick }) {
   const statusLabel = { planning: 'Planning', in_progress: 'In Progress', on_hold: 'On Hold', completed: 'Completed' }[project.status];
 
   return (
-    <div style={styles.card} onClick={onClick}>
+    <div style={{ ...styles.card, opacity: project.active === false ? 0.6 : 1 }} onClick={onClick}>
+      {project.active === false && (
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Archived</div>
+      )}
       <div style={styles.cardTop}>
         <div style={styles.cardName}>{project.name}</div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0, marginLeft: 8 }}>
@@ -84,6 +87,16 @@ function ProjectCard({ project, metrics, settings, onClick }) {
           </div>
         </div>
       )}
+      {project.progress_pct != null && (
+        <div style={{ ...styles.progressWrap, marginTop: budgetHours > 0 ? 6 : 8 }}>
+          <div style={styles.progressBar}>
+            <div style={{ ...styles.progressFill, width: `${project.progress_pct}%`, background: '#7c3aed' }} />
+          </div>
+          <div style={{ ...styles.progressLabel, color: '#7c3aed' }}>
+            {project.progress_pct}% complete
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -108,6 +121,9 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
   const [photosOpen, setPhotosOpen] = useState(false);
   const [photosLoaded, setPhotosLoaded] = useState(false);
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
+  const [rfis, setRfis] = useState([]);
+  const [rfisOpen, setRfisOpen] = useState(false);
+  const [rfisLoaded, setRfisLoaded] = useState(false);
 
   const m = metrics || {};
   const fmtHours = h => {
@@ -154,6 +170,14 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
       .catch(() => {});
   };
 
+  const loadRfis = () => {
+    if (rfisLoaded) return;
+    setRfisLoaded(true);
+    api.get(`/admin/projects/${project.id}/rfis`)
+      .then(r => setRfis(r.data))
+      .catch(() => {});
+  };
+
   const loadBilling = () => {
     setBillLoading(true);
     const params = {};
@@ -168,6 +192,30 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
   useEffect(() => {
     if (tab === 'billing' && !billData) loadBilling();
   }, [tab]);
+
+  const exportCsv = () => {
+    if (!billData?.entries?.length) return;
+    const rows = [['Worker', 'Date', 'Start', 'End', 'Regular Hours', 'Overtime Hours', 'Cost']];
+    billData.entries.forEach(e => {
+      rows.push([
+        e.worker_name || '',
+        e.work_date?.toString().substring(0, 10) || '',
+        e.start_time || '',
+        e.end_time || '',
+        parseFloat(e.regular_hours || 0).toFixed(2),
+        parseFloat(e.overtime_hours || 0).toFixed(2),
+        parseFloat(e.total_cost || 0).toFixed(2),
+      ]);
+    });
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.name.replace(/[^a-z0-9]/gi, '_')}_billing.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const budgetHours = parseFloat(project.budget_hours || 0);
   const totalHours = parseFloat(m.total_hours || 0);
@@ -331,6 +379,16 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
                 </div>
               )}
 
+              {project.progress_pct != null && (
+                <div style={{ ...styles.budgetSection, marginBottom: 16 }}>
+                  <div style={styles.sectionTitle}>Progress</div>
+                  <div style={styles.progressBar}>
+                    <div style={{ ...styles.progressFill, width: `${project.progress_pct}%`, background: '#7c3aed' }} />
+                  </div>
+                  <div style={{ ...styles.progressLabel, color: '#7c3aed', marginTop: 4 }}>{project.progress_pct}% complete</div>
+                </div>
+              )}
+
               {project.wage_type && project.wage_type !== 'regular' && (
                 <div style={styles.tagRow}>
                   <span style={styles.wageTag}>{project.wage_type === 'prevailing' ? 'Prevailing Wage' : project.wage_type}</span>
@@ -412,6 +470,49 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
                   )
                 )}
               </div>
+
+              {/* RFIs */}
+              <div style={{ marginTop: 16 }}>
+                <button
+                  style={styles.activityToggle}
+                  onClick={() => { setRfisOpen(o => !o); if (!rfisOpen) loadRfis(); }}
+                >
+                  <span>RFIs</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {rfis.length > 0 && <span style={styles.activityCount}>{rfis.length}</span>}
+                    <span style={{ fontSize: 12, color: '#9ca3af' }}>{rfisOpen ? '▴' : '▾'}</span>
+                  </span>
+                </button>
+
+                {rfisOpen && (
+                  rfisLoaded && rfis.length === 0 ? (
+                    <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0' }}>No RFIs for this project.</p>
+                  ) : (
+                    <div style={styles.activityList}>
+                      {rfis.map(r => {
+                        const statusColor = r.status === 'open' ? '#3b82f6' : r.status === 'answered' ? '#f59e0b' : '#9ca3af';
+                        return (
+                          <div key={r.id} style={styles.activityItem}>
+                            <div style={{ ...styles.activityDot, background: statusColor }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={styles.activityTitle}>
+                                <span style={{ ...styles.activityTag, background: statusColor + '22', color: statusColor }}>{r.status}</span>
+                                <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>RFI #{r.rfi_number}</span>
+                                <span style={styles.activityText}>{r.subject}</span>
+                              </div>
+                              <div style={styles.activityMeta}>
+                                {r.directed_to && <span>{r.directed_to} · </span>}
+                                <span>{new Date(r.date_submitted).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                {r.date_due && <span> · Due {new Date(r.date_due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                )}
+              </div>
             </div>
           )}
 
@@ -441,6 +542,11 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
                 <button style={styles.generateBtn} onClick={loadBilling} disabled={billLoading}>
                   {billLoading ? 'Loading…' : 'Generate'}
                 </button>
+                {billData?.entries?.length > 0 && (
+                  <button style={{ ...styles.generateBtn, background: '#059669' }} onClick={exportCsv}>
+                    Export CSV
+                  </button>
+                )}
               </div>
 
               {billData && billData.summary && (
@@ -541,10 +647,12 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [features, setFeatures] = useState({});
+  const [showArchived, setShowArchived] = useState(false);
 
-  useEffect(() => {
+  const loadProjects = (archived) => {
+    setLoading(true);
     Promise.all([
-      api.get('/admin/projects'),
+      api.get('/admin/projects', { params: archived ? { include_archived: 'true' } : {} }),
       api.get('/admin/projects/metrics'),
       api.get('/settings'),
     ]).then(([pRes, mRes, sRes]) => {
@@ -555,10 +663,12 @@ export default function ProjectsPage() {
       setSettings(sRes.data);
       setFeatures(sRes.data);
     }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  };
 
+  useEffect(() => { loadProjects(showArchived); }, [showArchived]);
+
+  const activeProjects = projects.filter(p => p.active).length;
   const totalHours = Object.values(metrics).reduce((s, m) => s + parseFloat(m.total_hours || 0), 0);
-  const activeProjects = projects.length;
 
   return (
     <div style={styles.page}>
@@ -574,11 +684,19 @@ export default function ProjectsPage() {
 
       <main style={styles.main}>
         <div style={styles.pageHeader}>
-          <h1 style={styles.pageTitle}>Projects</h1>
-          <p style={styles.pageSub}>
-            {activeProjects} active project{activeProjects !== 1 ? 's' : ''}
-            {totalHours > 0 && ` · ${totalHours.toFixed(0)} total hours`}
-          </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h1 style={styles.pageTitle}>Projects</h1>
+              <p style={styles.pageSub}>
+                {activeProjects} active project{activeProjects !== 1 ? 's' : ''}
+                {totalHours > 0 && ` · ${totalHours.toFixed(0)} total hours`}
+              </p>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer', marginTop: 4 }}>
+              <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} style={{ cursor: 'pointer' }} />
+              Show archived
+            </label>
+          </div>
         </div>
 
         {loading ? (

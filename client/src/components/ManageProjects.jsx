@@ -29,6 +29,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   const [editEndDate, setEditEndDate] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editStatus, setEditStatus] = useState('in_progress');
+  const [editProgressPct, setEditProgressPct] = useState('');
   const [checklistTemplates, setChecklistTemplates] = useState([]);
   const [geoLocating, setGeoLocating] = useState(false);
   const [geoError, setGeoError] = useState('');
@@ -105,6 +106,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       setEditEndDate(p.end_date ? p.end_date.split('T')[0] : '');
       setEditDescription(p.description || '');
       setEditStatus(p.status || 'in_progress');
+      setEditProgressPct(p.progress_pct != null ? String(p.progress_pct) : '');
     }
   };
 
@@ -129,6 +131,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     payload.end_date = editEndDate || null;
     payload.description = editDescription || null;
     payload.status = editStatus;
+    payload.progress_pct = editProgressPct !== '' ? parseInt(editProgressPct, 10) : null;
     try {
       const r = await api.patch(`/admin/projects/${id}`, payload);
       onProjectUpdated(r.data);
@@ -421,6 +424,10 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
                         <label style={s.fieldLabel}>Description</label>
                         <textarea style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Brief project description..." />
+                      </div>
+                      <div style={{ ...s.fieldGroup, marginTop: 8 }}>
+                        <label style={s.fieldLabel}>Progress % (0–100)</label>
+                        <input style={s.editInput} type="number" min="0" max="100" value={editProgressPct} onChange={e => setEditProgressPct(e.target.value)} placeholder="e.g. 45" />
                       </div>
                     </div>
 
