@@ -2169,6 +2169,90 @@ router.get('/certified-payroll', requireAdmin, requirePermission('view_reports')
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// Analytics dashboard — summary, weekly trend, by-project, top workers
+router.get('/analytics', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const hoursExpr = `EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END))/3600`;
+  try {
+    const [summaryRes, weeklyRes, byProjectRes, topWorkersRes, statusRes] = await Promise.all([
+      pool.query(`
+        SELECT
+          ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN ${hoursExpr} END), 0)::numeric, 1) AS month_hours,
+          ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
+                                   AND work_date < date_trunc('month', CURRENT_DATE) THEN ${hoursExpr} END), 0)::numeric, 1) AS prev_month_hours,
+          COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN user_id END) AS month_workers,
+          COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
+                               AND work_date < date_trunc('month', CURRENT_DATE) THEN user_id END) AS prev_month_workers,
+          COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN project_id END) AS month_projects,
+          COUNT(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN 1 END) AS month_entries
+        FROM time_entries
+        WHERE company_id = $1 AND status = 'approved'
+          AND work_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
+      `, [companyId]),
+
+      pool.query(`
+        SELECT
+          date_trunc('week', work_date::timestamp)::date AS week_start,
+          ROUND(COALESCE(SUM(${hoursExpr}), 0)::numeric, 1) AS hours,
+          COUNT(DISTINCT user_id) AS workers,
+          COUNT(*) AS entries
+        FROM time_entries
+        WHERE company_id = $1 AND status = 'approved'
+          AND work_date >= CURRENT_DATE - INTERVAL '56 days'
+        GROUP BY week_start
+        ORDER BY week_start
+      `, [companyId]),
+
+      pool.query(`
+        SELECT
+          p.name AS project_name,
+          ROUND(COALESCE(SUM(${hoursExpr}), 0)::numeric, 1) AS hours,
+          COUNT(DISTINCT te.user_id) AS workers
+        FROM time_entries te
+        JOIN projects p ON te.project_id = p.id
+        WHERE te.company_id = $1 AND te.status = 'approved'
+          AND te.work_date >= date_trunc('month', CURRENT_DATE)
+          AND te.project_id IS NOT NULL
+        GROUP BY p.id, p.name
+        ORDER BY hours DESC
+        LIMIT 10
+      `, [companyId]),
+
+      pool.query(`
+        SELECT
+          COALESCE(u.invoice_name, u.full_name) AS worker_name,
+          ROUND(COALESCE(SUM(${hoursExpr}), 0)::numeric, 1) AS hours,
+          COUNT(*) AS entries
+        FROM time_entries te
+        JOIN users u ON te.user_id = u.id
+        WHERE te.company_id = $1 AND te.status = 'approved'
+          AND te.work_date >= date_trunc('month', CURRENT_DATE)
+        GROUP BY u.id, u.invoice_name, u.full_name
+        ORDER BY hours DESC
+        LIMIT 10
+      `, [companyId]),
+
+      pool.query(`
+        SELECT status, COUNT(*) AS count
+        FROM projects
+        WHERE company_id = $1 AND active = true
+        GROUP BY status
+      `, [companyId]),
+    ]);
+
+    res.json({
+      summary: summaryRes.rows[0],
+      weekly: weeklyRes.rows,
+      by_project: byProjectRes.rows,
+      top_workers: topWorkersRes.rows,
+      project_statuses: statusRes.rows,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.post('/support', requireAdmin, async (req, res) => {
   const { subject, message } = req.body;
   if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
