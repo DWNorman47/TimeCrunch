@@ -18,6 +18,7 @@ import LiveKPIs from '../components/LiveKPIs';
 import BroadcastMessage from '../components/BroadcastMessage';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
+import AdminTimeOff from '../components/AdminTimeOff';
 import api from '../api';
 
 
@@ -75,7 +76,7 @@ export default function AdminDashboard() {
   // Permission helper — null admin_permissions means full access
   const canDo = key => !user?.admin_permissions || user.admin_permissions[key] === true;
 
-  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'manage'];
+  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'timeoff', 'manage'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
 
@@ -144,6 +145,7 @@ export default function AdminDashboard() {
             ...(settings?.feature_analytics !== false && canDo('view_reports') ? [{ id: 'analytics', label: t.tabAnalytics }] : []),
             ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
+            { id: 'timeoff', label: '🏖 Time Off' },
             ...(settings?.feature_scheduling !== false ? [{ id: 'manage', label: t.tabManage }] : []),
           ]}
         />
@@ -216,6 +218,8 @@ export default function AdminDashboard() {
             </button>
             {!collapsedSections.export && (plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />)}
           </>
+        ) : tab === 'timeoff' ? (
+          <AdminTimeOff />
         ) : tab === 'manage' ? (
           <>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}

@@ -103,7 +103,7 @@ function ProjectCard({ project, metrics, settings, onClick }) {
 
 // ── Project Detail Panel ──────────────────────────────────────────────────────
 
-function ProjectDetail({ project, metrics, settings, onClose }) {
+function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }) {
   const [tab, setTab] = useState('overview');
   const [entries, setEntries] = useState([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
@@ -591,11 +591,11 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
                   </div>
 
                   <PDFDownloadLink
-                    document={<ProjectBillPDF data={billData} currency={settings?.currency || 'USD'} />}
-                    fileName={`${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-billing.pdf`}
+                    document={<ProjectBillPDF data={billData} currency={settings?.currency || 'USD'} companyInfo={companyInfo} project={project} />}
+                    fileName={`invoice-${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`}
                     style={styles.pdfLink}
                   >
-                    {({ loading }) => (loading ? 'Preparing PDF…' : '⬇ Download PDF Report')}
+                    {({ loading }) => (loading ? 'Preparing PDF…' : '⬇ Download Invoice')}
                   </PDFDownloadLink>
                 </div>
               )}
@@ -648,6 +648,7 @@ export default function ProjectsPage() {
   const [selected, setSelected] = useState(null);
   const [features, setFeatures] = useState({});
   const [showArchived, setShowArchived] = useState(false);
+  const [companyInfo, setCompanyInfo] = useState({});
 
   const loadProjects = (archived) => {
     setLoading(true);
@@ -655,13 +656,15 @@ export default function ProjectsPage() {
       api.get('/admin/projects', { params: archived ? { include_archived: 'true' } : {} }),
       api.get('/admin/projects/metrics'),
       api.get('/settings'),
-    ]).then(([pRes, mRes, sRes]) => {
+      api.get('/company-info'),
+    ]).then(([pRes, mRes, sRes, ciRes]) => {
       setProjects(pRes.data);
       const metricsMap = {};
       mRes.data.forEach(m => { metricsMap[m.id] = m; });
       setMetrics(metricsMap);
       setSettings(sRes.data);
       setFeatures(sRes.data);
+      setCompanyInfo(ciRes.data || {});
     }).catch(() => {}).finally(() => setLoading(false));
   };
 
@@ -725,6 +728,7 @@ export default function ProjectsPage() {
             project={selected}
             metrics={metrics[selected.id]}
             settings={settings}
+            companyInfo={companyInfo}
             onClose={() => setSelected(null)}
           />
         )}
