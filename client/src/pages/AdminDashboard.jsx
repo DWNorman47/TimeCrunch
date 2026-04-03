@@ -20,6 +20,7 @@ import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
 import AdminTimeOff from '../components/AdminTimeOff';
 import AuditLog from '../components/AuditLog';
+import OnboardingChecklist from '../components/OnboardingChecklist';
 import api from '../api';
 
 
@@ -159,6 +160,9 @@ export default function AdminDashboard() {
           </div>
         ) : tab === 'live' ? (
           <>
+            {(workers.filter(w => w.role === 'worker').length === 0 || projects.length === 0) && (
+              <OnboardingChecklist workers={workers} projects={projects} />
+            )}
             <LiveKPIs />
             {plan.isBusiness && settings?.feature_broadcast !== false ? <BroadcastMessage /> : null}
             {settings?.feature_chat !== false ? (
