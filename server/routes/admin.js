@@ -1158,6 +1158,37 @@ router.post('/projects', requireAdmin, requirePermission('manage_projects'), asy
   }
 });
 
+// Workers who have time entries on this project
+router.get('/projects/:id/workers', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT u.id,
+              COALESCE(u.invoice_name, u.full_name) AS worker_name,
+              COUNT(te.id)::int AS entry_count,
+              ROUND(
+                COALESCE(SUM(EXTRACT(EPOCH FROM (
+                  CASE WHEN te.end_time < te.start_time
+                    THEN te.end_time + INTERVAL '1 day' - te.start_time
+                    ELSE te.end_time - te.start_time
+                  END
+                )) / 3600), 0)::numeric, 1
+              ) AS total_hours,
+              MAX(te.work_date) AS last_worked
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       WHERE te.project_id = $1 AND te.company_id = $2
+       GROUP BY u.id, COALESCE(u.invoice_name, u.full_name)
+       ORDER BY total_hours DESC`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Remove (soft-delete) a project
 router.get('/projects/:id/media-urls', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;

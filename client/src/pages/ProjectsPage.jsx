@@ -94,6 +94,8 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
   const [billLoading, setBillLoading] = useState(false);
   const [billFrom, setBillFrom] = useState('');
   const [billTo, setBillTo] = useState('');
+  const [workers, setWorkers] = useState([]);
+  const [workersLoading, setWorkersLoading] = useState(false);
 
   const m = metrics || {};
   const fmtHours = h => {
@@ -114,6 +116,13 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
         .then(r => setEntries(r.data.entries || []))
         .catch(() => {})
         .finally(() => setEntriesLoading(false));
+    }
+    if (tab === 'overview' && workers.length === 0) {
+      setWorkersLoading(true);
+      api.get(`/admin/projects/${project.id}/workers`)
+        .then(r => setWorkers(r.data))
+        .catch(() => {})
+        .finally(() => setWorkersLoading(false));
     }
   }, [tab, project.id]);
 
@@ -201,6 +210,32 @@ function ProjectDetail({ project, metrics, settings, onClose }) {
                   <div style={styles.metricLabel}>Workers</div>
                 </div>
               </div>
+
+              {/* Worker roster */}
+              {(workersLoading || workers.length > 0) && (
+                <div style={{ ...styles.budgetSection, marginBottom: 16 }}>
+                  <div style={styles.sectionTitle}>Workers ({workers.length})</div>
+                  {workersLoading ? (
+                    <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>Loading…</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {workers.map(w => (
+                        <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 13, color: '#374151', fontWeight: 600 }}>{w.worker_name}</span>
+                          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                            <span style={{ fontSize: 12, color: '#6b7280' }}>
+                              {parseFloat(w.total_hours).toFixed(1)}h
+                            </span>
+                            <span style={{ fontSize: 11, color: '#9ca3af' }}>
+                              {new Date(w.last_worked).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {(budgetHours > 0 || project.budget_dollars > 0) && (
                 <div style={styles.budgetSection}>
