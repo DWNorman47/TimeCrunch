@@ -308,14 +308,14 @@ router.get('/locations', requireAuth, async (req, res) => {
 
 // POST /api/inventory/locations
 router.post('/locations', requireAdmin, async (req, res) => {
-  const { name, type = 'warehouse', project_id, notes } = req.body;
+  const { name, type = 'warehouse', project_id, notes, address } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name required' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
-      `INSERT INTO inventory_locations (company_id, name, type, project_id, notes)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [companyId, name.trim(), type, project_id || null, notes?.trim() || null]
+      `INSERT INTO inventory_locations (company_id, name, type, project_id, notes, address)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [companyId, name.trim(), type, project_id || null, notes?.trim() || null, address?.trim() || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
@@ -324,7 +324,7 @@ router.post('/locations', requireAdmin, async (req, res) => {
 // PATCH /api/inventory/locations/:id
 router.patch('/locations/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
-  const { name, type, project_id, notes, active, photo_urls } = req.body;
+  const { name, type, project_id, notes, address, active, photo_urls } = req.body;
   try {
     const existing = await pool.query('SELECT id FROM inventory_locations WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Location not found' });
@@ -333,6 +333,7 @@ router.patch('/locations/:id', requireAdmin, async (req, res) => {
     if (type !== undefined) { sets.push(`type=$${idx++}`); vals.push(type); }
     if (project_id !== undefined) { sets.push(`project_id=$${idx++}`); vals.push(project_id || null); }
     if (notes !== undefined) { sets.push(`notes=$${idx++}`); vals.push(notes?.trim() || null); }
+    if (address !== undefined) { sets.push(`address=$${idx++}`); vals.push(address?.trim() || null); }
     if (active !== undefined) { sets.push(`active=$${idx++}`); vals.push(!!active); }
     if (photo_urls !== undefined) {
       const processed = await processPhotos(photo_urls, companyId);

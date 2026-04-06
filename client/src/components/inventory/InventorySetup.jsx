@@ -114,6 +114,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
   const [form, setForm] = useState({
     name:       item?.name       || '',
     notes:      item?.notes      || '',
+    address:    item?.address    || '',
     type:       item?.type       || 'warehouse',
     project_id: item?.project_id || '',
     [level.parentKey]: parentId || item?.[level.parentKey] || '',
@@ -135,7 +136,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
         name:       form.name.trim(),
         notes:      form.notes.trim() || null,
         photo_urls: photos,
-        ...(isLocation ? { type: form.type, project_id: form.project_id || null } : {}),
+        ...(isLocation ? { type: form.type, project_id: form.project_id || null, address: form.address.trim() || null } : {}),
         ...(!isLocation && item == null ? { [level.parentKey]: parseInt(form[level.parentKey]) } : {}),
       };
       if (item) {
@@ -189,12 +190,23 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       </div>
 
       {isLocation && (
-        <div style={ef.field}>
-          <label style={ef.label}>Type</label>
-          <select style={ef.input} value={form.type} onChange={e => set('type', e.target.value)}>
-            {level.typeOptions.map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
-          </select>
-        </div>
+        <>
+          <div style={ef.field}>
+            <label style={ef.label}>Type</label>
+            <select style={ef.input} value={form.type} onChange={e => set('type', e.target.value)}>
+              {level.typeOptions.map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
+            </select>
+          </div>
+          <div style={ef.field}>
+            <label style={ef.label}>Address <span style={ef.labelHint}>(optional)</span></label>
+            <textarea
+              style={{ ...ef.input, minHeight: 56, resize: 'vertical' }}
+              value={form.address}
+              onChange={e => set('address', e.target.value)}
+              placeholder="123 Main St, City, State 12345"
+            />
+          </div>
+        </>
       )}
 
       <div style={ef.field}>
@@ -457,6 +469,7 @@ export default function InventorySetup({ projects }) {
                       {item.parent_name && (
                         <div style={s.cardParent}>in {item.parent_name}</div>
                       )}
+                      {item.address && <div style={s.cardAddress}>{item.address}</div>}
                       {item.notes && <div style={s.cardNotes}>{item.notes}</div>}
                     </div>
                     <div style={s.cardRight}>
@@ -523,6 +536,7 @@ const s = {
   cardInfo:      { flex: 1, minWidth: 0 },
   cardName:      { fontSize: 15, fontWeight: 700, color: '#111827' },
   cardParent:    { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  cardAddress:   { fontSize: 12, color: '#6b7280', marginTop: 3, fontStyle: 'italic' },
   cardNotes:     { fontSize: 13, color: '#6b7280', marginTop: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
   cardRight:     { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 },
   photoRow:      { display: 'flex', gap: 4, alignItems: 'center' },
