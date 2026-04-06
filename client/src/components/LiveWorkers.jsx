@@ -6,13 +6,21 @@ import api from '../api';
 import { useT } from '../hooks/useT';
 import { formatInTz } from '../utils';
 
-// Fix default marker icons broken by Webpack/Vite bundling
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+// SVG divIcon — avoids all CDN/bundler PNG loading issues
+function makePinIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36">
+      <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="${color}" stroke="#fff" stroke-width="1.5"/>
+      <circle cx="12" cy="12" r="5" fill="#fff" opacity="0.9"/>
+    </svg>`,
+    iconSize: [24, 36],
+    iconAnchor: [12, 36],
+    popupAnchor: [0, -36],
+  });
+}
+
+const workerIcon = makePinIcon('#1a56db');
 
 function formatElapsed(clockInTime) {
   const seconds = Math.floor((Date.now() - new Date(clockInTime)) / 1000);
@@ -298,7 +306,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 />
                 {mapped.map(w => (
-                  <Marker key={w.user_id} position={[w._pos.lat, w._pos.lng]}>
+                  <Marker key={w.user_id} position={[w._pos.lat, w._pos.lng]} icon={workerIcon}>
                     <Popup>
                       <strong>{w.full_name}</strong><br />
                       {w.project_name && <>{w.project_name}<br /></>}
