@@ -108,6 +108,7 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
 function DocUploadForm({ clientId, onUploaded }) {
   const t = useT();
   const [docType, setDocType] = useState('coi');
+  const [direction, setDirection] = useState('from_client');
   const [expiresAt, setExpiresAt] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -130,6 +131,7 @@ function DocUploadForm({ clientId, onUploaded }) {
         name: file.name,
         doc_type: docType,
         expires_at: expiresAt || null,
+        direction,
       });
       onUploaded(doc);
       setExpiresAt('');
@@ -145,6 +147,18 @@ function DocUploadForm({ clientId, onUploaded }) {
         <select style={s.uploadSelect} value={docType} onChange={e => setDocType(e.target.value)}>
           {DOC_TYPES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
         </select>
+        <div style={s.directionToggle}>
+          <button
+            type="button"
+            style={{ ...s.dirBtn, ...(direction === 'from_client' ? s.dirBtnActive : {}) }}
+            onClick={() => setDirection('from_client')}
+          >← From Client</button>
+          <button
+            type="button"
+            style={{ ...s.dirBtn, ...(direction === 'from_company' ? s.dirBtnActive : {}) }}
+            onClick={() => setDirection('from_company')}
+          >From Us →</button>
+        </div>
         {needsExpiry && (
           <div style={s.expiryField}>
             <label style={s.uploadLabel}>{t.expiryDate}</label>
@@ -187,6 +201,9 @@ function DocList({ clientId, docs, onDeleted }) {
         return (
           <div key={doc.id} style={s.docRow}>
             <span style={{ ...s.docTypeBadge, color: meta.color, background: meta.bg }}>{meta.label}</span>
+            <span style={{ ...s.dirBadge, ...(doc.direction === 'from_company' ? s.dirBadgeOurs : s.dirBadgeTheirs) }}>
+              {doc.direction === 'from_company' ? 'From Us' : 'From Client'}
+            </span>
             <a href={doc.url} target="_blank" rel="noopener noreferrer" style={s.docName}>{doc.name}</a>
             {fmt(doc.size_bytes) && <span style={s.docSize}>{fmt(doc.size_bytes)}</span>}
             {exp && <span style={{ ...s.expiryBadge, color: exp.color, background: exp.bg }}>{exp.label}</span>}
@@ -452,6 +469,12 @@ const s = {
   uploadInput: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13 },
   uploadFileBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
   uploadError: { color: '#ef4444', fontSize: 12, marginTop: 4 },
+  directionToggle: { display: 'flex', border: '1px solid #e5e7eb', borderRadius: 7, overflow: 'hidden', flexShrink: 0 },
+  dirBtn: { background: '#fff', border: 'none', padding: '6px 10px', fontSize: 12, fontWeight: 600, color: '#6b7280', cursor: 'pointer', whiteSpace: 'nowrap' },
+  dirBtnActive: { background: '#1a56db', color: '#fff' },
+  dirBadge: { fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 6, flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04em' },
+  dirBadgeTheirs: { background: '#ede9fe', color: '#6d28d9' },
+  dirBadgeOurs: { background: '#dbeafe', color: '#1d4ed8' },
   // Doc list
   noDocsHint: { color: '#9ca3af', fontSize: 13 },
   docList: { display: 'flex', flexDirection: 'column', gap: 6 },
