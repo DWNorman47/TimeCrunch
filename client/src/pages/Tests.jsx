@@ -96,7 +96,7 @@ function validCoords(lat, lng) {
 
 // settingsDefaults.js
 const FEATURE_KEYS_TEST = ['feature_scheduling','feature_analytics','feature_chat','feature_prevailing_wage','module_field','module_timeclock','module_projects','module_inventory','module_analytics','feature_project_integration','feature_overtime','feature_geolocation','feature_inactive_alerts','feature_overtime_alerts','feature_broadcast','feature_media_gallery','show_worker_wages','notification_use_work_hours','media_delete_on_project_archive','notify_timeoff_requests','notify_budget_alerts','notify_entry_submitted'];
-const STRING_KEYS_TEST  = ['overtime_rule','currency','company_timezone','invoice_signature','default_temp_password'];
+const STRING_KEYS_TEST  = ['overtime_rule','currency','company_timezone','invoice_signature','default_temp_password','global_required_checklist_template_id'];
 function applySettingsRows(rows, defaults) {
   const s = { ...defaults };
   rows.forEach(r => {
@@ -598,6 +598,33 @@ const SUITES = [
     ],
   },
 
+  {
+    name: 'API — Auth guards: clients',
+    async: true,
+    tests: [
+      guard('GET /admin/clients',                        '/admin/clients'),
+      guard('POST /admin/clients',                       '/admin/clients', 'POST'),
+      guard('PATCH /admin/clients/0',                    '/admin/clients/0', 'PATCH'),
+      guard('DELETE /admin/clients/0',                   '/admin/clients/0', 'DELETE'),
+      guard('GET /admin/clients/0/documents',            '/admin/clients/0/documents'),
+      guard('POST /admin/clients/0/documents',           '/admin/clients/0/documents', 'POST'),
+      guard('GET /admin/clients/0/documents/upload-url', '/admin/clients/0/documents/upload-url'),
+    ],
+  },
+
+  {
+    name: 'API — Auth guards: time-off',
+    async: true,
+    tests: [
+      guard('POST /time-off',                      '/time-off', 'POST'),
+      guard('GET /time-off/mine',                  '/time-off/mine'),
+      guard('DELETE /time-off/0',                  '/time-off/0', 'DELETE'),
+      guard('GET /admin/time-off',                 '/admin/time-off'),
+      guard('PATCH /admin/time-off/0/approve',     '/admin/time-off/0/approve', 'PATCH'),
+      guard('PATCH /admin/time-off/0/deny',        '/admin/time-off/0/deny', 'PATCH'),
+    ],
+  },
+
   // ══════════════════════════════════════════════════════════════════════════════
   // API — INPUT VALIDATION (400 conditions)
   // ══════════════════════════════════════════════════════════════════════════════
@@ -652,6 +679,14 @@ const SUITES = [
       }},
       { name: 'POST /push/subscribe — missing endpoint → 400', run: async () => {
         const r = await post('/push/subscribe', {}, TOKEN());
+        assertOneOf(r.status, [400, 401]);
+      }},
+      { name: 'POST /admin/clients — missing name → 400', run: async () => {
+        const r = await post('/admin/clients', {}, TOKEN());
+        assertOneOf(r.status, [400, 401]);
+      }},
+      { name: 'POST /time-off — missing required fields → 400', run: async () => {
+        const r = await post('/time-off', {}, TOKEN());
         assertOneOf(r.status, [400, 401]);
       }},
     ],
@@ -759,6 +794,16 @@ const SUITES = [
         const d = await r.json();
         assert(Array.isArray(d.entries), 'entries array');
         assert(typeof d.total === 'number', 'total number');
+      }},
+      { name: '/admin/clients → array', run: async () => {
+        const r = await get('/admin/clients', TOKEN());
+        if (r.status !== 200) return;
+        assert(Array.isArray(await r.json()), 'Expected array');
+      }},
+      { name: '/admin/time-off → array', run: async () => {
+        const r = await get('/admin/time-off', TOKEN());
+        if (r.status !== 200) return;
+        assert(Array.isArray(await r.json()), 'Expected array');
       }},
     ],
   },
