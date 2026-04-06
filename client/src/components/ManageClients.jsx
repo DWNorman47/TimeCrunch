@@ -84,12 +84,12 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
       </div>
 
       <div style={s.field}>
-        <label style={s.label}>{t.address || 'Address'}</label>
+        <label style={s.label}>{t.address}</label>
         <input style={s.input} value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, State 00000" />
       </div>
 
       <div style={s.field}>
-        <label style={s.label}>{t.notes} <span style={s.opt}>({t.optional || 'optional'})</span></label>
+        <label style={s.label}>{t.notes} <span style={s.opt}>({t.optional})</span></label>
         <textarea style={s.textarea} rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional information..." />
       </div>
 
@@ -169,7 +169,7 @@ function DocList({ clientId, docs, onDeleted }) {
   const [deleting, setDeleting] = useState(null);
 
   const handleDelete = async doc => {
-    if (!confirm(`Delete "${doc.name}"?`)) return;
+    if (!confirm(t.deleteDocConfirm)) return;
     setDeleting(doc.id);
     try {
       await api.delete(`/admin/clients/${clientId}/documents/${doc.id}`);
@@ -225,7 +225,7 @@ function ClientCard({ client, onEdit, onDeleted }) {
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Remove client "${client.name}"? This cannot be undone.`)) return;
+    if (!confirm(t.removeClientConfirm)) return;
     setDeleting(true);
     try {
       await api.delete(`/admin/clients/${client.id}`);

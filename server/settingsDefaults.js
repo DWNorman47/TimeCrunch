@@ -5,7 +5,7 @@ const STRING_KEYS = ['overtime_rule', 'currency', 'company_timezone', 'invoice_s
 const SETTINGS_DEFAULTS = {
   prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5,
   overtime_rule: 'daily', overtime_threshold: 8,
-  feature_scheduling: true, feature_analytics: true, feature_chat: true, feature_prevailing_wage: true, module_field: false, module_timeclock: true, module_projects: true, module_inventory: false, module_analytics: false, feature_project_integration: true, feature_overtime: true, feature_geolocation: true, feature_inactive_alerts: true, feature_overtime_alerts: true, feature_broadcast: true, feature_media_gallery: false,
+  feature_scheduling: true, feature_analytics: true, feature_chat: true, feature_prevailing_wage: true, module_field: false, module_timeclock: true, module_projects: true, module_inventory: false, module_analytics: true, feature_project_integration: true, feature_overtime: true, feature_geolocation: true, feature_inactive_alerts: true, feature_overtime_alerts: true, feature_broadcast: true, feature_media_gallery: false,
   show_worker_wages: false, notification_use_work_hours: true, media_delete_on_project_archive: false,
   notify_timeoff_requests: true, notify_budget_alerts: true, notify_entry_submitted: false,
   media_retention_days: 0,

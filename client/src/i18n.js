@@ -976,6 +976,9 @@ const translations = {
     companyInfoHeading: 'Company Information',
 
     // ── Clients ───────────────────────────────────────────────────────────────
+    address: 'Address',
+    deleteDocConfirm: 'Delete this document?',
+    removeClientConfirm: 'Remove this client? This cannot be undone.',
     clientsTab: 'Clients',
     clientsHeading: 'Clients',
     addClient: '+ Add Client',
@@ -1979,6 +1982,9 @@ const translations = {
     companyInfoHeading: 'Información de la Empresa',
 
     // ── Clients ───────────────────────────────────────────────────────────────
+    address: 'Dirección',
+    deleteDocConfirm: '¿Eliminar este documento?',
+    removeClientConfirm: '¿Eliminar este cliente? Esta acción no se puede deshacer.',
     clientsTab: 'Clientes',
     clientsHeading: 'Clientes',
     addClient: '+ Agregar Cliente',
