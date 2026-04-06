@@ -588,21 +588,22 @@ router.get('/transactions', requireAuth, async (req, res) => {
 
 // GET /api/inventory/cycle-counts
 router.get('/cycle-counts', requireAdmin, async (req, res) => {
-  const { location_id, status } = req.query;
+  const { location_id, status, count_type } = req.query;
   const companyId = req.user.company_id;
   try {
     const conditions = ['cc.company_id = $1'];
     const values = [companyId]; let idx = 2;
     if (location_id) { conditions.push(`cc.location_id = $${idx++}`); values.push(location_id); }
     if (status) { conditions.push(`cc.status = $${idx++}`); values.push(status); }
+    if (count_type) { conditions.push(`cc.count_type = $${idx++}`); values.push(count_type); }
     const result = await pool.query(
-      `SELECT cc.*, l.name as location_name,
+      `SELECT cc.*, COALESCE(l.name, 'All Locations') as location_name,
               u.full_name as started_by_name,
               cu.full_name as completed_by_name,
               (SELECT COUNT(*) FROM inventory_cycle_count_lines WHERE cycle_count_id = cc.id) as line_count,
               (SELECT COUNT(*) FROM inventory_cycle_count_lines WHERE cycle_count_id = cc.id AND counted_qty IS NOT NULL) as counted_count
        FROM inventory_cycle_counts cc
-       JOIN inventory_locations l ON cc.location_id = l.id
+       LEFT JOIN inventory_locations l ON cc.location_id = l.id
        JOIN users u ON cc.started_by = u.id
        LEFT JOIN users cu ON cc.completed_by = cu.id
        WHERE ${conditions.join(' AND ')}
@@ -615,45 +616,69 @@ router.get('/cycle-counts', requireAdmin, async (req, res) => {
 
 // POST /api/inventory/cycle-counts
 router.post('/cycle-counts', requireAdmin, async (req, res) => {
-  const { location_id, notes } = req.body;
+  const { location_id, notes, count_type = 'cycle' } = req.body;
   const companyId = req.user.company_id;
-  if (!location_id) return res.status(400).json({ error: 'location_id required' });
-  try {
-    // Block if an active count already exists for this location
-    const existing = await pool.query(
-      `SELECT id FROM inventory_cycle_counts WHERE company_id=$1 AND location_id=$2 AND status IN ('draft','in_progress')`,
-      [companyId, location_id]
-    );
-    if (existing.rowCount > 0) return res.status(409).json({ error: 'An active cycle count already exists for this location.' });
+  const VALID_TYPES = ['cycle', 'full', 'audit', 'reconcile'];
+  if (!VALID_TYPES.includes(count_type)) return res.status(400).json({ error: 'Invalid count_type' });
 
-    // Verify location
-    const loc = await pool.query('SELECT id FROM inventory_locations WHERE id=$1 AND company_id=$2', [location_id, companyId]);
-    if (loc.rowCount === 0) return res.status(404).json({ error: 'Location not found' });
+  // Full counts don't need a location; all others do
+  if (count_type !== 'full' && !location_id) return res.status(400).json({ error: 'location_id required' });
+
+  try {
+    if (count_type === 'full') {
+      // Block if an active full count already exists
+      const existing = await pool.query(
+        `SELECT id FROM inventory_cycle_counts WHERE company_id=$1 AND count_type='full' AND status IN ('draft','in_progress')`,
+        [companyId]
+      );
+      if (existing.rowCount > 0) return res.status(409).json({ error: 'An active full count already exists.' });
+    } else {
+      // Block if an active count already exists for this location
+      const existing = await pool.query(
+        `SELECT id FROM inventory_cycle_counts WHERE company_id=$1 AND location_id=$2 AND status IN ('draft','in_progress')`,
+        [companyId, location_id]
+      );
+      if (existing.rowCount > 0) return res.status(409).json({ error: 'An active count already exists for this location.' });
+
+      const loc = await pool.query('SELECT id FROM inventory_locations WHERE id=$1 AND company_id=$2', [location_id, companyId]);
+      if (loc.rowCount === 0) return res.status(404).json({ error: 'Location not found' });
+    }
 
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       const cc = await client.query(
-        `INSERT INTO inventory_cycle_counts (company_id, location_id, started_by, notes)
-         VALUES ($1,$2,$3,$4) RETURNING *`,
-        [companyId, location_id, req.user.id, notes?.trim() || null]
+        `INSERT INTO inventory_cycle_counts (company_id, location_id, started_by, notes, count_type)
+         VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        [companyId, location_id || null, req.user.id, notes?.trim() || null, count_type]
       );
       const countId = cc.rows[0].id;
 
-      // Snapshot current stock at this location
-      const stock = await client.query(
-        `SELECT s.item_id, s.quantity FROM inventory_stock s
-         JOIN inventory_items i ON s.item_id = i.id
-         WHERE s.location_id = $1 AND s.company_id = $2 AND i.active = true`,
-        [location_id, companyId]
-      );
+      let stock;
+      if (count_type === 'full') {
+        // Snapshot all stock across all locations
+        stock = await client.query(
+          `SELECT s.item_id, s.location_id, s.quantity FROM inventory_stock s
+           JOIN inventory_items i ON s.item_id = i.id
+           WHERE s.company_id = $1 AND i.active = true
+           ORDER BY s.location_id, i.name`,
+          [companyId]
+        );
+      } else {
+        stock = await client.query(
+          `SELECT s.item_id, NULL::integer as location_id, s.quantity FROM inventory_stock s
+           JOIN inventory_items i ON s.item_id = i.id
+           WHERE s.location_id = $1 AND s.company_id = $2 AND i.active = true`,
+          [location_id, companyId]
+        );
+      }
 
       if (stock.rows.length > 0) {
-        const lineValues = stock.rows.map((r, i) => `($1, $${i * 2 + 2}, $${i * 2 + 3})`).join(', ');
+        const lineValues = stock.rows.map((r, i) => `($1, $${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`).join(', ');
         const lineParams = [countId];
-        stock.rows.forEach(r => { lineParams.push(r.item_id); lineParams.push(r.quantity); });
+        stock.rows.forEach(r => { lineParams.push(r.item_id); lineParams.push(r.location_id); lineParams.push(r.quantity); });
         await client.query(
-          `INSERT INTO inventory_cycle_count_lines (cycle_count_id, item_id, expected_qty) VALUES ${lineValues}`,
+          `INSERT INTO inventory_cycle_count_lines (cycle_count_id, item_id, location_id, expected_qty) VALUES ${lineValues}`,
           lineParams
         );
       }
@@ -662,10 +687,11 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
 
       // Return with lines
       const lines = await pool.query(
-        `SELECT l.*, i.name as item_name, i.unit, i.sku
+        `SELECT l.*, i.name as item_name, i.unit, i.sku, loc.name as location_name
          FROM inventory_cycle_count_lines l
          JOIN inventory_items i ON l.item_id = i.id
-         WHERE l.cycle_count_id = $1 ORDER BY i.name`,
+         LEFT JOIN inventory_locations loc ON l.location_id = loc.id
+         WHERE l.cycle_count_id = $1 ORDER BY loc.name NULLS FIRST, i.name`,
         [countId]
       );
       res.status(201).json({ ...cc.rows[0], lines: lines.rows });
@@ -683,11 +709,11 @@ router.get('/cycle-counts/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const cc = await pool.query(
-      `SELECT cc.*, l.name as location_name,
+      `SELECT cc.*, COALESCE(l.name, 'All Locations') as location_name,
               u.full_name as started_by_name,
               cu.full_name as completed_by_name
        FROM inventory_cycle_counts cc
-       JOIN inventory_locations l ON cc.location_id = l.id
+       LEFT JOIN inventory_locations l ON cc.location_id = l.id
        JOIN users u ON cc.started_by = u.id
        LEFT JOIN users cu ON cc.completed_by = cu.id
        WHERE cc.id = $1 AND cc.company_id = $2`,
@@ -695,11 +721,13 @@ router.get('/cycle-counts/:id', requireAdmin, async (req, res) => {
     );
     if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
     const lines = await pool.query(
-      `SELECT l.*, i.name as item_name, i.unit, i.sku, u.full_name as counted_by_name
+      `SELECT l.*, i.name as item_name, i.unit, i.sku, u.full_name as counted_by_name,
+              loc.name as location_name
        FROM inventory_cycle_count_lines l
        JOIN inventory_items i ON l.item_id = i.id
        LEFT JOIN users u ON l.counted_by = u.id
-       WHERE l.cycle_count_id = $1 ORDER BY i.name`,
+       LEFT JOIN inventory_locations loc ON l.location_id = loc.id
+       WHERE l.cycle_count_id = $1 ORDER BY loc.name NULLS FIRST, i.name`,
       [req.params.id]
     );
     res.json({ ...cc.rows[0], lines: lines.rows });
@@ -791,15 +819,21 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
 
       // Post adjust transactions for lines with non-zero variance
       const linesWithVariance = lines.rows.filter(l => parseFloat(l.variance) !== 0);
+      const isFullCount = cc.rows[0].count_type === 'full';
       for (const line of linesWithVariance) {
         const delta = parseFloat(line.variance); // positive = counted more, negative = counted less
+        const locationId = isFullCount ? line.location_id : cc.rows[0].location_id;
+        const typeLabel = cc.rows[0].count_type === 'reconcile' ? 'Reconcile count adjustment'
+          : cc.rows[0].count_type === 'audit' ? 'Audit count adjustment'
+          : cc.rows[0].count_type === 'full' ? 'Full count adjustment'
+          : 'Cycle count adjustment';
         await client.query(
           `INSERT INTO inventory_transactions
            (company_id, type, item_id, quantity, to_location_id, performed_by, notes)
-           VALUES ($1,'adjust',$2,$3,$4,$5,'Cycle count adjustment')`,
-          [companyId, line.item_id, Math.abs(delta), cc.rows[0].location_id, req.user.id]
+           VALUES ($1,'adjust',$2,$3,$4,$5,$6)`,
+          [companyId, line.item_id, Math.abs(delta), locationId, req.user.id, typeLabel]
         );
-        await applyStockDelta(client, companyId, line.item_id, cc.rows[0].location_id, delta);
+        await applyStockDelta(client, companyId, line.item_id, locationId, delta);
       }
 
       // Mark count complete

@@ -102,7 +102,7 @@ export default function InventoryPage() {
             { id: 'transactions', label: '↔️ Transactions' },
             ...(isAdmin ? [
               { id: 'items', label: '🗂 Items' },
-              { id: 'cycle', label: '🔄 Cycle Counts' },
+              { id: 'cycle', label: '📋 Count' },
               { id: 'setup', label: '⚙️ Setup' },
             ] : []),
           ]}
