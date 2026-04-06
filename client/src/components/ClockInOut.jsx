@@ -75,6 +75,20 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
     return () => clearInterval(timerRef.current);
   }, [status]);
 
+  // Push live location while clocked in (every 60s)
+  useEffect(() => {
+    if (!status || !status.clock_in_time || !geolocationEnabled || !navigator.geolocation) return;
+    const pushLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        pos => api.post('/clock/location', { lat: pos.coords.latitude, lng: pos.coords.longitude }).catch(() => {}),
+        () => {}
+      );
+    };
+    pushLocation(); // send immediately on clock-in
+    const id = setInterval(pushLocation, 60000);
+    return () => clearInterval(id);
+  }, [!!status?.clock_in_time, geolocationEnabled]);
+
   const toLocalTime = d => {
     const pad = n => String(n).padStart(2, '0');
     return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;

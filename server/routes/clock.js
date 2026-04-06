@@ -347,4 +347,24 @@ router.delete('/cancel', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/clock/location — update current GPS position while clocked in
+router.post('/location', requireAuth, async (req, res) => {
+  const { lat, lng } = req.body;
+  if (!validCoords(lat, lng)) return res.status(400).json({ error: 'Invalid coordinates' });
+  try {
+    const result = await pool.query(
+      `UPDATE active_clock
+       SET current_lat = $1, current_lng = $2, location_updated_at = NOW()
+       WHERE user_id = $3
+       RETURNING id`,
+      [lat, lng, req.user.id]
+    );
+    if (result.rowCount === 0) return res.status(400).json({ error: 'Not clocked in' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

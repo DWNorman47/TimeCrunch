@@ -465,6 +465,7 @@ router.get('/active-clocks', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT ac.user_id, ac.clock_in_time, ac.clock_in_lat, ac.clock_in_lng,
+              ac.current_lat, ac.current_lng, ac.location_updated_at,
               ac.notes, u.full_name, p.name as project_name, p.wage_type,
               ac.clock_source, ac.clocked_in_by, admin_u.full_name AS clocked_in_by_name
        FROM active_clock ac

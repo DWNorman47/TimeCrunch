@@ -159,10 +159,25 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
     ? workers.filter(w => w.project_name === selectedProject)
     : workers;
 
-  const mapped = filtered.filter(w => w.clock_in_lat && w.clock_in_lng);
+  // Prefer current live position; fall back to clock-in location
+  const livePos = w => w.current_lat && w.current_lng
+    ? { lat: parseFloat(w.current_lat), lng: parseFloat(w.current_lng), isLive: true, updatedAt: w.location_updated_at }
+    : w.clock_in_lat && w.clock_in_lng
+      ? { lat: parseFloat(w.clock_in_lat), lng: parseFloat(w.clock_in_lng), isLive: false, updatedAt: w.clock_in_time }
+      : null;
+
+  const mapped = filtered.map(w => ({ ...w, _pos: livePos(w) })).filter(w => w._pos);
   const center = mapped.length > 0
-    ? [mapped[0].clock_in_lat, mapped[0].clock_in_lng]
+    ? [mapped[0]._pos.lat, mapped[0]._pos.lng]
     : [39.5, -98.35];
+
+  const locationAge = updatedAt => {
+    if (!updatedAt) return null;
+    const mins = Math.floor((Date.now() - new Date(updatedAt)) / 60000);
+    if (mins < 2) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    return `${Math.floor(mins / 60)}h ago`;
+  };
 
   return (
     <div style={styles.wrap}>
@@ -235,9 +250,11 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                 {w.notes && <div style={styles.workerNotes}>{w.notes}</div>}
                 <div style={styles.workerMeta}>
                   <span>{t.clockedIn} {formatInTz(w.clock_in_time, timezone)}</span>
-                  {w.clock_in_lat
-                    ? <span style={styles.locationTag}>{t.locationCaptured}</span>
-                    : <span style={styles.noLocation}>{t.noLocation}</span>
+                  {w.current_lat
+                    ? <span style={styles.locationTag}>📍 Live · {locationAge(w.location_updated_at)}</span>
+                    : w.clock_in_lat
+                      ? <span style={styles.locationTagStale}>📍 Clock-in location</span>
+                      : <span style={styles.noLocation}>{t.noLocation}</span>
                   }
                   {w.clock_source === 'admin' && w.clocked_in_by_name && (
                     <span style={styles.adminBadge}>Clocked in by {w.clocked_in_by_name}</span>
@@ -274,17 +291,21 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
 
           {mapped.length > 0 && (
             <div style={styles.mapWrap}>
-              <h3 style={styles.mapTitle}>{t.clockInLocations}</h3>
+              <h3 style={styles.mapTitle}>Worker Locations</h3>
               <MapContainer center={center} zoom={mapped.length === 1 ? 13 : 5} style={styles.map}>
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 />
                 {mapped.map(w => (
-                  <Marker key={w.user_id} position={[w.clock_in_lat, w.clock_in_lng]}>
+                  <Marker key={w.user_id} position={[w._pos.lat, w._pos.lng]}>
                     <Popup>
                       <strong>{w.full_name}</strong><br />
-                      {w.project_name}<br />
+                      {w.project_name && <>{w.project_name}<br /></>}
+                      {w._pos.isLive
+                        ? <>📍 Live · {locationAge(w._pos.updatedAt)}<br /></>
+                        : <>📍 Clock-in location<br /></>
+                      }
                       In: {formatInTz(w.clock_in_time, timezone)}
                     </Popup>
                   </Marker>
@@ -379,6 +400,7 @@ const styles = {
   workerNotes: { fontSize: 13, color: '#555', fontStyle: 'italic', marginBottom: 6 },
   workerMeta: { display: 'flex', gap: 16, fontSize: 12, color: '#9ca3af', flexWrap: 'wrap' },
   locationTag: { color: '#16a34a' },
+  locationTagStale: { color: '#9ca3af' },
   noLocation: { color: '#d1d5db' },
   mapWrap: { background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
   mapTitle: { fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#374151' },
