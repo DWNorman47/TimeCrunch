@@ -474,6 +474,8 @@ const SUITES = [
       guard('GET /admin/workers/check-username',    '/admin/workers/check-username'),
       guard('POST /admin/workers',                  '/admin/workers', 'POST'),
       guard('POST /admin/workers/invite',           '/admin/workers/invite', 'POST'),
+      guard('PATCH /admin/workers/0',               '/admin/workers/0', 'PATCH'),
+      guard('DELETE /admin/workers/0',              '/admin/workers/0', 'DELETE'),
     ],
   },
 
@@ -481,10 +483,15 @@ const SUITES = [
     name: 'API — Auth guards: projects',
     async: true,
     tests: [
-      guard('GET /admin/projects',          '/admin/projects'),
-      guard('GET /admin/projects/archived', '/admin/projects/archived'),
-      guard('GET /admin/projects/metrics',  '/admin/projects/metrics'),
-      guard('POST /admin/projects',         '/admin/projects', 'POST'),
+      guard('GET /admin/projects',                    '/admin/projects'),
+      guard('GET /admin/projects/archived',           '/admin/projects/archived'),
+      guard('GET /admin/projects/metrics',            '/admin/projects/metrics'),
+      guard('POST /admin/projects',                   '/admin/projects', 'POST'),
+      guard('PATCH /admin/projects/0',                '/admin/projects/0', 'PATCH'),
+      guard('DELETE /admin/projects/0',               '/admin/projects/0', 'DELETE'),
+      guard('GET /admin/projects/0/documents',        '/admin/projects/0/documents'),
+      guard('POST /admin/projects/0/documents',       '/admin/projects/0/documents', 'POST'),
+      guard('DELETE /admin/projects/0/documents/0',   '/admin/projects/0/documents/0', 'DELETE'),
     ],
   },
 
@@ -568,10 +575,14 @@ const SUITES = [
       guard('POST /safety-talks',         '/safety-talks', 'POST'),
       guard('GET /rfis',                  '/rfis'),
       guard('POST /rfis',                 '/rfis', 'POST'),
-      guard('GET /equipment',             '/equipment'),
-      guard('GET /inspections',           '/inspections'),
-      guard('GET /inspections/templates', '/inspections/templates'),
-      guard('GET /sub-reports',           '/sub-reports'),
+      guard('GET /equipment',              '/equipment'),
+      guard('POST /equipment',             '/equipment', 'POST'),
+      guard('GET /safety-checklists',      '/safety-checklists'),
+      guard('POST /safety-checklists',     '/safety-checklists', 'POST'),
+      guard('GET /inspections',            '/inspections'),
+      guard('GET /inspections/templates',  '/inspections/templates'),
+      guard('GET /sub-reports',            '/sub-reports'),
+      guard('POST /sub-reports',           '/sub-reports', 'POST'),
     ],
   },
 
@@ -799,6 +810,11 @@ const SUITES = [
         const r = await get('/admin/clients', TOKEN());
         if (r.status !== 200) return;
         assert(Array.isArray(await r.json()), 'Expected array');
+      }},
+      { name: '/admin/clients/0/documents → array or 404', run: async () => {
+        const r = await get('/admin/clients/0/documents', TOKEN());
+        assertOneOf(r.status, [200, 404]);
+        if (r.status === 200) assert(Array.isArray(await r.json()), 'Expected array');
       }},
       { name: '/admin/time-off → array', run: async () => {
         const r = await get('/admin/time-off', TOKEN());
