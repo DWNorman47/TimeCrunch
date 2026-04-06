@@ -304,6 +304,16 @@ export default function ApprovalQueue({ onCountChange }) {
                                 {e.clock_in_lat && <Marker position={[parseFloat(e.clock_in_lat), parseFloat(e.clock_in_lng)]} icon={clockInIcon}><Popup>🟢 Clock In<br />{e.worker_name}</Popup></Marker>}
                                 {e.clock_out_lat && <Marker position={[parseFloat(e.clock_out_lat), parseFloat(e.clock_out_lng)]} icon={clockOutIcon}><Popup>🔴 Clock Out<br />{e.worker_name}</Popup></Marker>}
                               </MapContainer>
+                              <div style={styles.mapLegend}>
+                                {e.clock_in_lat
+                                  ? <span style={styles.mapLegendItem}><span style={{ color: '#16a34a' }}>●</span> Clock-in location</span>
+                                  : <span style={styles.mapLegendMissing}>No clock-in location captured</span>
+                                }
+                                {e.clock_out_lat
+                                  ? <span style={styles.mapLegendItem}><span style={{ color: '#dc2626' }}>●</span> Clock-out location</span>
+                                  : <span style={styles.mapLegendMissing}>No clock-out location captured</span>
+                                }
+                              </div>
                             </div>
                           );
                         })()}
@@ -459,5 +469,8 @@ const styles = {
   locationRow: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 },
   locationBtn: { background: 'none', border: '1px solid #bfdbfe', color: '#1a56db', padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer', alignSelf: 'flex-start' },
   mapWrap: { borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' },
+  mapLegend: { display: 'flex', gap: 12, padding: '6px 10px', background: '#f9fafb', flexWrap: 'wrap' },
+  mapLegendItem: { fontSize: 11, color: '#374151', display: 'flex', alignItems: 'center', gap: 4 },
+  mapLegendMissing: { fontSize: 11, color: '#9ca3af', fontStyle: 'italic' },
   map: { height: 280, width: '100%' },
 };
