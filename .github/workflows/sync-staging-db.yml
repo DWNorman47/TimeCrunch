@@ -29,14 +29,17 @@ jobs:
             --format=custom \
             --file=/tmp/prod.pgc
 
+      - name: Wipe staging schema
+        run: |
+          /usr/lib/postgresql/17/bin/psql "${{ secrets.STAGING_DATABASE_URL }}" \
+            -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+
       - name: Restore to staging database
         run: |
           /usr/lib/postgresql/17/bin/pg_restore \
             --dbname "${{ secrets.STAGING_DATABASE_URL }}" \
             --no-owner \
             --no-acl \
-            --clean \
-            --if-exists \
             /tmp/prod.pgc
 
       - name: Done
