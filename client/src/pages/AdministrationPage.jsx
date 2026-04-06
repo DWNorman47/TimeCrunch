@@ -36,6 +36,8 @@ function CompanyTab() {
   const [contactEmail, setContactEmail] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+  const [showContact, setShowContact] = useState(false);
+  const [showSubscription, setShowSubscription] = useState(false);
 
   useEffect(() => {
     api.get('/admin/company').then(r => {
@@ -98,37 +100,52 @@ function CompanyTab() {
         </div>
 
         {/* Contact info */}
-        <div style={{ padding: '16px 20px', borderTop: '1px solid #f3f4f6', marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Contact Info <span style={{ fontWeight: 400, color: '#d1d5db' }}>— used in worker invoices</span></div>
-          {editing ? (
-            <>
-              <input style={styles.input} placeholder="Physical address (e.g. 123 Main St, City, ST 00000)" value={address} onChange={e => setAddress(e.target.value)} />
-              <div style={{ display: 'flex', gap: 10 }}>
-                <input style={{ ...styles.input, flex: 1 }} placeholder="Phone (e.g. (555) 123-4567)" value={phone} onChange={e => setPhone(e.target.value)} />
-                <input style={{ ...styles.input, flex: 2 }} type="email" placeholder="Email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} />
-              </div>
-            </>
-          ) : (
-            <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.7 }}>
-              {company?.address ? <div>{company.address}</div> : <div style={{ color: '#d1d5db' }}>No address set</div>}
-              <div style={{ display: 'flex', gap: 20 }}>
-                {company?.phone ? <span>{company.phone}</span> : <span style={{ color: '#d1d5db' }}>No phone</span>}
-                {company?.contact_email ? <span>{company.contact_email}</span> : <span style={{ color: '#d1d5db' }}>No email</span>}
-              </div>
+        <div style={{ borderTop: '1px solid #f3f4f6', marginTop: 14 }}>
+          <button style={styles.accordionTrigger} onClick={() => setShowContact(o => !o)}>
+            <span style={styles.accordionLabel}>Contact Info <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: 12 }}>— used in worker invoices</span></span>
+            <span style={{ ...styles.accordionChevron, transform: showContact ? 'rotate(180deg)' : 'none' }}>▾</span>
+          </button>
+          {showContact && (
+            <div style={{ ...styles.accordionBody, gap: 10 }}>
+              {editing ? (
+                <>
+                  <input style={styles.input} placeholder="Physical address (e.g. 123 Main St, City, ST 00000)" value={address} onChange={e => setAddress(e.target.value)} />
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <input style={{ ...styles.input, flex: 1 }} placeholder="Phone (e.g. (555) 123-4567)" value={phone} onChange={e => setPhone(e.target.value)} />
+                    <input style={{ ...styles.input, flex: 2 }} type="email" placeholder="Email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} />
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.7 }}>
+                  {company?.address ? <div>{company.address}</div> : <div style={{ color: '#d1d5db' }}>No address set</div>}
+                  <div style={{ display: 'flex', gap: 20 }}>
+                    {company?.phone ? <span>{company.phone}</span> : <span style={{ color: '#d1d5db' }}>No phone</span>}
+                    {company?.contact_email ? <span>{company.contact_email}</span> : <span style={{ color: '#d1d5db' }}>No email</span>}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Subscription info */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderTop: '1px solid #f3f4f6' }}>
-          <span style={{ ...styles.planBadge, background: si.bg, color: si.color }}>{si.label}</span>
-          {company?.plan && (
-            <span style={styles.planName}>{company.plan.charAt(0).toUpperCase() + company.plan.slice(1)} plan</span>
-          )}
-          {company?.subscription_status === 'trial' && trialDaysLeft !== null && (
-            <span style={{ fontSize: 13, color: trialDaysLeft <= 3 ? '#dc2626' : '#6b7280', marginLeft: 'auto' }}>
-              {trialDaysLeft > 0 ? `${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''} left in trial` : t.trialExpired}
-            </span>
+        <div style={{ borderTop: '1px solid #f3f4f6' }}>
+          <button style={styles.accordionTrigger} onClick={() => setShowSubscription(o => !o)}>
+            <span style={styles.accordionLabel}>Subscription</span>
+            <span style={{ ...styles.accordionChevron, transform: showSubscription ? 'rotate(180deg)' : 'none' }}>▾</span>
+          </button>
+          {showSubscription && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 20px 16px' }}>
+              <span style={{ ...styles.planBadge, background: si.bg, color: si.color }}>{si.label}</span>
+              {company?.plan && (
+                <span style={styles.planName}>{company.plan.charAt(0).toUpperCase() + company.plan.slice(1)} plan</span>
+              )}
+              {company?.subscription_status === 'trial' && trialDaysLeft !== null && (
+                <span style={{ fontSize: 13, color: trialDaysLeft <= 3 ? '#dc2626' : '#6b7280', marginLeft: 'auto' }}>
+                  {trialDaysLeft > 0 ? `${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''} left in trial` : t.trialExpired}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>

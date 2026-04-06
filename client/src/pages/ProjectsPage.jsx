@@ -105,8 +105,22 @@ function ProjectCard({ project, metrics, settings, onClick }) {
 
 // ── Project Detail Panel ──────────────────────────────────────────────────────
 
-function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }) {
+function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, onProjectUpdated }) {
   const [tab, setTab] = useState('overview');
+  const [editForm, setEditForm] = useState({
+    name: project.name,
+    status: project.status || 'in_progress',
+    client_name: project.client_name || '',
+    job_number: project.job_number || '',
+    address: project.address || '',
+    start_date: project.start_date ? project.start_date.split('T')[0] : '',
+    end_date: project.end_date ? project.end_date.split('T')[0] : '',
+    description: project.description || '',
+    progress_pct: project.progress_pct != null ? String(project.progress_pct) : '',
+    wage_type: project.wage_type || 'regular',
+  });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editMsg, setEditMsg] = useState('');
   const [entries, setEntries] = useState([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [billData, setBillData] = useState(null);
@@ -270,6 +284,43 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
     if (tab === 'billing' && !billData) loadBilling();
   }, [tab]);
 
+  const handleEditSave = async () => {
+    if (!editForm.name.trim()) return;
+    setEditSaving(true); setEditMsg('');
+    try {
+      const r = await api.patch(`/admin/projects/${project.id}`, {
+        name: editForm.name.trim(),
+        status: editForm.status,
+        client_name: editForm.client_name || null,
+        job_number: editForm.job_number || null,
+        address: editForm.address || null,
+        start_date: editForm.start_date || null,
+        end_date: editForm.end_date || null,
+        description: editForm.description || null,
+        progress_pct: editForm.progress_pct !== '' ? parseInt(editForm.progress_pct, 10) : null,
+        wage_type: editForm.wage_type,
+      });
+      onProjectUpdated?.(r.data);
+      setEditMsg('Saved');
+      setTimeout(() => setEditMsg(''), 2000);
+    } catch {
+      setEditMsg('Failed to save');
+    } finally { setEditSaving(false); }
+  };
+
+  const handleMarkComplete = async () => {
+    setEditSaving(true); setEditMsg('');
+    try {
+      const r = await api.patch(`/admin/projects/${project.id}`, { status: 'completed' });
+      onProjectUpdated?.(r.data);
+      setEditForm(f => ({ ...f, status: 'completed' }));
+      setEditMsg('Project marked as complete');
+      setTimeout(() => setEditMsg(''), 2500);
+    } catch {
+      setEditMsg('Failed to update');
+    } finally { setEditSaving(false); }
+  };
+
   const exportCsv = () => {
     if (!billData?.entries?.length) return;
     const rows = [['Worker', 'Date', 'Start', 'End', 'Regular Hours', 'Overtime Hours', 'Cost']];
@@ -314,7 +365,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
         </div>
 
         <div style={styles.detailTabs}>
-          {['overview', 'billing', 'entries'].map(t => (
+          {['overview', 'billing', 'entries', 'edit'].map(t => (
             <button key={t} style={{ ...styles.detailTab, ...(tab === t ? styles.detailTabActive : {}) }} onClick={() => setTab(t)}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
@@ -893,7 +944,126 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
               {entries.length > 200 && <p style={styles.moreText}>Showing first 200 of {entries.length} entries</p>}
             </div>
           )}
+
+          {tab === 'edit' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {editForm.status !== 'completed' && (
+                <button
+                  style={styles.finishBtn}
+                  onClick={handleMarkComplete}
+                  disabled={editSaving}
+                >
+                  Mark as Complete
+                </button>
+              )}
+              {editForm.status === 'completed' && (
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#059669', background: '#d1fae5', borderRadius: 8, padding: '10px 14px' }}>
+                  This project is marked as complete.
+                </div>
+              )}
+
+              <div style={pf.field}>
+                <label style={pf.label}>Project Name</label>
+                <input style={pf.input} value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+
+              <div style={pf.row}>
+                <div style={pf.field}>
+                  <label style={pf.label}>Status</label>
+                  <select style={pf.input} value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}>
+                    <option value="planning">Planning</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+                <div style={pf.field}>
+                  <label style={pf.label}>Progress %</label>
+                  <input style={pf.input} type="number" min="0" max="100" placeholder="0–100" value={editForm.progress_pct} onChange={e => setEditForm(f => ({ ...f, progress_pct: e.target.value }))} />
+                </div>
+              </div>
+
+              <div style={pf.row}>
+                <div style={pf.field}>
+                  <label style={pf.label}>Client Name</label>
+                  <input style={pf.input} value={editForm.client_name} onChange={e => setEditForm(f => ({ ...f, client_name: e.target.value }))} placeholder="Acme Corp" />
+                </div>
+                <div style={pf.field}>
+                  <label style={pf.label}>Job Number</label>
+                  <input style={pf.input} value={editForm.job_number} onChange={e => setEditForm(f => ({ ...f, job_number: e.target.value }))} placeholder="JOB-2025-001" />
+                </div>
+              </div>
+
+              <div style={pf.field}>
+                <label style={pf.label}>Address</label>
+                <input style={pf.input} value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, City, State" />
+              </div>
+
+              <div style={pf.row}>
+                <div style={pf.field}>
+                  <label style={pf.label}>Start Date</label>
+                  <input style={pf.input} type="date" value={editForm.start_date} onChange={e => setEditForm(f => ({ ...f, start_date: e.target.value }))} />
+                </div>
+                <div style={pf.field}>
+                  <label style={pf.label}>End Date</label>
+                  <input style={pf.input} type="date" value={editForm.end_date} onChange={e => setEditForm(f => ({ ...f, end_date: e.target.value }))} />
+                </div>
+              </div>
+
+              <div style={pf.field}>
+                <label style={pf.label}>Description</label>
+                <textarea style={pf.textarea} rows={3} value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder="Scope of work, notes…" />
+              </div>
+
+              {editMsg && (
+                <p style={{ fontSize: 13, margin: 0, color: editMsg === 'Saved' || editMsg.includes('complete') ? '#059669' : '#dc2626', fontWeight: 600 }}>{editMsg}</p>
+              )}
+
+              <div style={pf.actions}>
+                <button style={pf.saveBtn} onClick={handleEditSave} disabled={editSaving || !editForm.name.trim()}>
+                  {editSaving ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Project Row (list view) ───────────────────────────────────────────────────
+
+function ProjectRow({ project, metrics, settings, onClick }) {
+  const m = metrics || {};
+  const totalHours = parseFloat(m.total_hours || 0);
+  const fmtHours = h => { const n = parseFloat(h); return isNaN(n) || n === 0 ? '0h' : n % 1 === 0 ? `${n}h` : `${n.toFixed(1)}h`; };
+  const statusColors = { planning: '#dbeafe|#1d4ed8', in_progress: '#d1fae5|#065f46', on_hold: '#fef3c7|#92400e', completed: '#e5e7eb|#374151' };
+  const [statusBg, statusFg] = (statusColors[project.status] || '#f3f4f6|#6b7280').split('|');
+  const statusLabel = { planning: 'Planning', in_progress: 'In Progress', on_hold: 'On Hold', completed: 'Completed' }[project.status];
+  const budgetHours = parseFloat(project.budget_hours || 0);
+  const hoursUsedPct = budgetHours > 0 ? Math.min(100, (totalHours / budgetHours) * 100) : 0;
+  const hourColor = hoursUsedPct >= 100 ? '#ef4444' : hoursUsedPct >= 85 ? '#f59e0b' : '#059669';
+
+  return (
+    <div style={styles.row} onClick={onClick}>
+      <div style={styles.rowLeft}>
+        <span style={styles.rowName}>{project.name}</span>
+        {project.client_name && <span style={styles.rowClient}>{project.client_name}{project.job_number ? ` · ${project.job_number}` : ''}</span>}
+      </div>
+      <div style={styles.rowRight}>
+        {statusLabel && <span style={{ fontSize: 10, fontWeight: 700, background: statusBg, color: statusFg, padding: '2px 7px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>{statusLabel}</span>}
+        {budgetHours > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <div style={{ width: 60, height: 5, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${hoursUsedPct}%`, background: hourColor, borderRadius: 3 }} />
+            </div>
+            <span style={{ fontSize: 12, color: hourColor, fontWeight: 600 }}>{fmtHours(totalHours)}/{fmtHours(budgetHours)}</span>
+          </div>
+        )}
+        {budgetHours === 0 && totalHours > 0 && <span style={{ fontSize: 12, color: '#6b7280', flexShrink: 0 }}>{fmtHours(totalHours)}</span>}
+        <span style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>{parseInt(m.worker_count || 0)} worker{parseInt(m.worker_count || 0) !== 1 ? 's' : ''}</span>
+        {project.active === false && <span style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Archived</span>}
       </div>
     </div>
   );
@@ -1015,6 +1185,7 @@ export default function ProjectsPage() {
   const [companyInfo, setCompanyInfo] = useState({});
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [clients, setClients] = useState([]);
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('opsfloa_projects_view') || 'grid');
 
   const loadProjects = (archived) => {
     setLoading(true);
@@ -1090,6 +1261,18 @@ export default function ProjectsPage() {
                     <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} style={{ cursor: 'pointer' }} />
                     Show archived
                   </label>
+                  <div style={styles.viewToggle}>
+                    <button
+                      style={{ ...styles.viewToggleBtn, ...(viewMode === 'grid' ? styles.viewToggleBtnActive : {}) }}
+                      title="Grid view"
+                      onClick={() => { setViewMode('grid'); localStorage.setItem('opsfloa_projects_view', 'grid'); }}
+                    >⊞</button>
+                    <button
+                      style={{ ...styles.viewToggleBtn, ...(viewMode === 'list' ? styles.viewToggleBtnActive : {}) }}
+                      title="List view"
+                      onClick={() => { setViewMode('list'); localStorage.setItem('opsfloa_projects_view', 'list'); }}
+                    >☰</button>
+                  </div>
                   {!showCreateForm && (
                     <button style={styles.newProjectBtn} onClick={() => setShowCreateForm(true)}>
                       + New Project
@@ -1118,10 +1301,22 @@ export default function ProjectsPage() {
                 <div style={styles.emptyIcon}>📁</div>
                 <p style={styles.emptyText}>No projects yet. Click "+ New Project" to get started.</p>
               </div>
-            ) : (
+            ) : viewMode === 'grid' ? (
               <div style={styles.grid}>
                 {projects.map(p => (
                   <ProjectCard
+                    key={p.id}
+                    project={p}
+                    metrics={metrics[p.id]}
+                    settings={settings}
+                    onClick={() => setSelected(p)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div style={styles.rowList}>
+                {projects.map(p => (
+                  <ProjectRow
                     key={p.id}
                     project={p}
                     metrics={metrics[p.id]}
@@ -1139,6 +1334,10 @@ export default function ProjectsPage() {
                 settings={settings}
                 companyInfo={companyInfo}
                 onClose={() => setSelected(null)}
+                onProjectUpdated={updated => {
+                  setProjects(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
+                  setSelected(updated);
+                }}
               />
             )}
           </>
@@ -1260,6 +1459,18 @@ const styles = {
   tabBtnActive: { color: '#8b5cf6', borderBottomColor: '#8b5cf6', background: '#faf5ff' },
   // New project button
   newProjectBtn: { background: '#8b5cf6', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
+  // View toggle
+  viewToggle: { display: 'flex', border: '1px solid #e5e7eb', borderRadius: 7, overflow: 'hidden' },
+  viewToggleBtn: { background: '#fff', border: 'none', padding: '6px 10px', fontSize: 16, cursor: 'pointer', color: '#9ca3af', lineHeight: 1 },
+  viewToggleBtnActive: { background: '#ede9fe', color: '#8b5cf6' },
+  // List view
+  rowList: { display: 'flex', flexDirection: 'column', gap: 2 },
+  row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#fff', borderRadius: 8, padding: '11px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', cursor: 'pointer', borderLeft: '3px solid #8b5cf6', transition: 'box-shadow 0.15s' },
+  rowLeft: { display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0, flex: 1 },
+  rowName: { fontSize: 14, fontWeight: 700, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  rowClient: { fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  rowRight: { display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 },
+  finishBtn: { background: '#059669', color: '#fff', border: 'none', padding: '11px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', width: '100%' },
 };
 
 // ── Project Create Form Styles ─────────────────────────────────────────────────
