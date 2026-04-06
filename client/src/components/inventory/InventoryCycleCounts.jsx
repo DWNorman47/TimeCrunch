@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../api';
+import { parseBinQR } from './BinLabelModal';
 
 const COUNT_TYPES = {
   cycle:     { label: 'Cycle Count',     color: '#2563eb', bg: '#dbeafe',   desc: 'Count stock at a specific location' },
@@ -31,6 +32,70 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // ── Scan Mode ────────────────────────────────────────────────────────────────
+  const [scanMode, setScanMode] = useState(false);
+  const [currentBin, setCurrentBin] = useState(null); // { type, id, name }
+  const [highlightedId, setHighlightedId] = useState(null);
+  const [scanFeedback, setScanFeedback] = useState(''); // success/error message
+  const scanInputRef = useRef(null);
+  const lineInputRefs = useRef({}); // { [lineId]: inputElement }
+
+  // Keep scan input focused whenever scan mode is on and nothing else is focused
+  useEffect(() => {
+    if (!scanMode) return;
+    const refocus = () => {
+      const active = document.activeElement;
+      const tag = active?.tagName?.toLowerCase();
+      if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
+        scanInputRef.current?.focus();
+      }
+    };
+    document.addEventListener('click', refocus);
+    scanInputRef.current?.focus();
+    return () => document.removeEventListener('click', refocus);
+  }, [scanMode]);
+
+  // Auto-focus line count input when a line is highlighted
+  useEffect(() => {
+    if (highlightedId != null) {
+      const el = lineInputRefs.current[highlightedId];
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => el.focus(), 150);
+      }
+    }
+  }, [highlightedId]);
+
+  const showFeedback = (msg, isError = false) => {
+    setScanFeedback({ msg, isError });
+    setTimeout(() => setScanFeedback(''), 2500);
+  };
+
+  const processScan = (raw) => {
+    const value = raw.trim();
+    if (!value) return;
+
+    // 1. Try to parse as bin QR code
+    const bin = parseBinQR(value);
+    if (bin) {
+      setCurrentBin(bin);
+      setHighlightedId(null);
+      showFeedback(`Bin set: ${bin.name}`);
+      return;
+    }
+
+    // 2. Try to match against item SKUs in the count lines
+    const match = lines.find(l =>
+      l.sku && l.sku.trim().toLowerCase() === value.toLowerCase()
+    );
+    if (match) {
+      setHighlightedId(match.id);
+      showFeedback(`Found: ${match.item_name}`);
+    } else {
+      showFeedback(`"${value}" not found in this count`, true);
+    }
+  };
 
   const isAudit = countData.count_type === 'audit';
   const isFull  = countData.count_type === 'full';
@@ -89,10 +154,14 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const renderLine = (line, i) => {
     const counted = line.counted_qty !== null && line.counted_qty !== undefined;
     const variance = counted ? parseFloat(line.counted_qty) - parseFloat(line.expected_qty) : null;
-    const showExpected = !isAudit || isCompleted; // audit hides expected until completed
+    const showExpected = !isAudit || isCompleted;
+    const isHighlighted = highlightedId === line.id;
+    const rowStyle = isHighlighted
+      ? { ...d.row, background: '#fef9c3', outline: '2px solid #f59e0b' }
+      : i % 2 === 0 ? d.rowEven : d.row;
 
     return (
-      <tr key={line.id} style={i % 2 === 0 ? d.rowEven : d.row}>
+      <tr key={line.id} id={`ccline-${line.id}`} style={rowStyle}>
         <td style={{ ...d.td, fontWeight: 600 }}>{line.item_name}</td>
         <td style={{ ...d.td, fontFamily: 'monospace', fontSize: 12, color: '#6b7280' }}>{line.sku || '—'}</td>
         <td style={{ ...d.td, color: '#6b7280' }}>{line.unit}</td>
@@ -102,7 +171,8 @@ function CycleCountDetail({ count, onBack, onComplete }) {
         <td style={{ ...d.td, textAlign: 'right' }}>
           {!isCompleted ? (
             <input
-              style={d.countInput}
+              ref={el => { lineInputRefs.current[line.id] = el; }}
+              style={{ ...d.countInput, ...(isHighlighted ? { borderColor: '#f59e0b', boxShadow: '0 0 0 2px #fde68a' } : {}) }}
               type="number"
               min="0"
               step="any"
@@ -112,6 +182,14 @@ function CycleCountDetail({ count, onBack, onComplete }) {
               onBlur={e => {
                 const val = e.target.value;
                 if (val !== '' && val !== String(line.counted_qty)) patchLine(line, parseFloat(val));
+                // Return focus to scan input after entering a count
+                if (scanMode) setTimeout(() => scanInputRef.current?.focus(), 50);
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.target.blur(); // triggers onBlur → save + refocus scan input
+                  setHighlightedId(null);
+                }
               }}
             />
           ) : (
@@ -168,17 +246,66 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             <button style={d.advanceBtn} onClick={advanceStatus}>Start Counting</button>
           )}
           {countData.status === 'in_progress' && (
-            <button
-              style={{ ...d.completeBtn, opacity: uncounted > 0 ? 0.5 : 1 }}
-              onClick={() => uncounted > 0 ? alert(`${uncounted} item(s) not yet counted.`) : setConfirmOpen(true)}
-            >
-              Complete Count
-            </button>
+            <>
+              <button
+                style={{ ...d.scanModeBtn, ...(scanMode ? d.scanModeBtnActive : {}) }}
+                onClick={() => { setScanMode(s => !s); setHighlightedId(null); setCurrentBin(null); }}
+              >
+                {scanMode ? '📷 Scan Mode ON' : '📷 Scan Mode'}
+              </button>
+              <button
+                style={{ ...d.completeBtn, opacity: uncounted > 0 ? 0.5 : 1 }}
+                onClick={() => uncounted > 0 ? alert(`${uncounted} item(s) not yet counted.`) : setConfirmOpen(true)}
+              >
+                Complete Count
+              </button>
+            </>
           )}
         </div>
       </div>
 
       {error && <div style={d.error}>{error}</div>}
+
+      {/* ── Scan Panel ── */}
+      {scanMode && (
+        <div style={d.scanPanel}>
+          <div style={d.scanBinRow}>
+            <span style={d.scanBinLabel}>
+              {currentBin
+                ? <>📍 <strong>{currentBin.name}</strong> <span style={{ color: '#9ca3af', fontSize: 12 }}>({currentBin.type})</span></>
+                : <span style={{ color: '#9ca3af' }}>📍 No bin scanned — scan a bin label to set location context</span>
+              }
+            </span>
+            {currentBin && (
+              <button style={d.scanClearBtn} onClick={() => setCurrentBin(null)}>Clear</button>
+            )}
+          </div>
+          <div style={d.scanInputRow}>
+            <input
+              ref={scanInputRef}
+              style={d.scanInput}
+              type="text"
+              placeholder="Scan barcode or QR code here…"
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  processScan(e.target.value);
+                  e.target.value = '';
+                }
+              }}
+              onChange={() => {}} // controlled by ref
+            />
+          </div>
+          {scanFeedback && (
+            <div style={{ ...d.scanFeedback, color: scanFeedback.isError ? '#dc2626' : '#059669',
+              background: scanFeedback.isError ? '#fee2e2' : '#d1fae5' }}>
+              {scanFeedback.msg}
+            </div>
+          )}
+          <p style={d.scanHint}>
+            Scan a <strong>bin label QR code</strong> to set the active bin, or scan a <strong>product barcode/SKU</strong> to jump to that item. Bin context persists between scans.
+          </p>
+        </div>
+      )}
 
       {lines.length === 0 ? (
         <div style={d.empty}>No items were in stock when the count was created.</div>
@@ -412,6 +539,16 @@ const d = {
   statusBadge:   { padding: '4px 14px', borderRadius: 12, fontSize: 13, fontWeight: 700 },
   advanceBtn:    { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   completeBtn:   { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  scanModeBtn:   { padding: '8px 16px', borderRadius: 8, border: '2px solid #d97706', background: '#fff', color: '#d97706', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  scanModeBtnActive: { background: '#d97706', color: '#fff' },
+  scanPanel:     { background: '#fffbeb', border: '2px solid #f59e0b', borderRadius: 10, padding: '14px 16px', marginBottom: 16 },
+  scanBinRow:    { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
+  scanBinLabel:  { fontSize: 14, color: '#374151', flex: 1 },
+  scanClearBtn:  { padding: '3px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', fontSize: 12, color: '#6b7280', cursor: 'pointer' },
+  scanInputRow:  { marginBottom: 8 },
+  scanInput:     { width: '100%', padding: '10px 12px', borderRadius: 8, border: '2px solid #f59e0b', fontSize: 14, background: '#fff', color: '#111827', boxSizing: 'border-box', outline: 'none' },
+  scanFeedback:  { padding: '7px 12px', borderRadius: 7, fontSize: 13, fontWeight: 600, marginBottom: 8 },
+  scanHint:      { fontSize: 12, color: '#78716c', lineHeight: 1.5, margin: 0 },
   error:         { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },
   empty:         { textAlign: 'center', padding: 40, color: '#6b7280' },
   tableWrap:     { overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb' },

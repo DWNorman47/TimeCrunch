@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api';
+import BinLabelModal from './BinLabelModal';
 
 // ── Level config ──────────────────────────────────────────────────────────────
 // Each level knows its API path, its parent's key name, and which parent level feeds it.
@@ -255,6 +256,7 @@ export default function InventorySetup({ projects }) {
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState('');
   const [editing,   setEditing]   = useState(null); // null=list, false=new, obj=edit
+  const [printItem, setPrintItem] = useState(null); // item to print label for
 
   // Parent cascade: store selected IDs for each level so child levels can filter
   const [parentSels, setParentSels] = useState({
@@ -496,6 +498,9 @@ export default function InventorySetup({ projects }) {
                         }
                         {item.active ? (
                           <>
+                            {level.key !== 'locations' && (
+                              <button style={s.iconBtn} onClick={() => setPrintItem(item)} title="Print QR Label">🏷</button>
+                            )}
                             <button style={s.iconBtn} onClick={() => setEditing(item)} title="Edit">✏️</button>
                             <button style={s.iconBtn} onClick={() => archive(item)} title="Archive">🗄️</button>
                           </>
@@ -510,6 +515,13 @@ export default function InventorySetup({ projects }) {
             </div>
           )}
         </>
+      )}
+      {printItem && (
+        <BinLabelModal
+          item={printItem}
+          binType={level.key.slice(0, -1)} // 'areas' → 'area'
+          onClose={() => setPrintItem(null)}
+        />
       )}
     </div>
   );
