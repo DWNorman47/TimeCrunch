@@ -52,6 +52,12 @@ function formatTime(t) {
   return `${hour % 12 || 12}:${m} ${hour < 12 ? 'AM' : 'PM'}`;
 }
 
+function midTime(start, end) {
+  const toMins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  const fromMins = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  return fromMins(Math.round((toMins(start) + toMins(end)) / 2));
+}
+
 function formatHours(start, end) {
   const s = new Date(`1970-01-01T${start}`);
   const e = new Date(`1970-01-01T${end}`);
@@ -62,6 +68,7 @@ export default function ApprovalQueue({ onCountChange }) {
   const { user } = useAuth();
   const t = useT();
   const [entries, setEntries] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectNote, setRejectNote] = useState('');
@@ -72,16 +79,26 @@ export default function ApprovalQueue({ onCountChange }) {
   const [fetchError, setFetchError] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [workerFilter, setWorkerFilter] = useState('');
-  const [editingTimesId, setEditingTimesId] = useState(null);
+  // Edit state
+  const [editingId, setEditingId] = useState(null);
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
+  const [editProject, setEditProject] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+  // Split state
+  const [splittingId, setSplittingId] = useState(null);
+  const [splitSegments, setSplitSegments] = useState([]);
+  const [splitSaving, setSplitSaving] = useState(false);
+  const [splitError, setSplitError] = useState('');
 
   const fetch = () => {
     setLoading(true);
     setFetchError(false);
-    api.get('/admin/entries/pending')
-      .then(r => { setEntries(r.data.entries); setHasMore(r.data.has_more); })
+    Promise.all([
+      api.get('/admin/entries/pending'),
+      api.get('/projects'),
+    ])
+      .then(([r, p]) => { setEntries(r.data.entries); setHasMore(r.data.has_more); setProjects(p.data); })
       .catch(() => setFetchError(true))
       .finally(() => setLoading(false));
   };
@@ -89,22 +106,67 @@ export default function ApprovalQueue({ onCountChange }) {
   useEffect(() => { fetch(); }, []);
   useEffect(() => { if (onCountChange) onCountChange(entries.length); }, [entries]);
 
-  const startEditTimes = (e) => {
-    setEditingTimesId(e.id);
+  const startEdit = (e) => {
+    setEditingId(e.id);
     setEditStart(e.start_time.substring(0, 5));
     setEditEnd(e.end_time.substring(0, 5));
+    setEditProject(e.project_id ? String(e.project_id) : '');
+    setSplittingId(null);
   };
 
-  const saveEditTimes = async (id) => {
+  const saveEdit = async (id) => {
     setEditSaving(true);
     try {
-      const updated = await api.patch(`/admin/entries/${id}/times`, { start_time: editStart, end_time: editEnd });
-      setEntries(prev => prev.map(e => e.id === id ? { ...e, start_time: updated.data.start_time, end_time: updated.data.end_time } : e));
-      setEditingTimesId(null);
-    } catch {
-      // silently fail
+      const updated = await api.patch(`/admin/entries/${id}/edit`, {
+        start_time: editStart,
+        end_time: editEnd,
+        project_id: editProject ? parseInt(editProject) : null,
+      });
+      setEntries(prev => prev.map(e => e.id === id ? { ...e, ...updated.data } : e));
+      setEditingId(null);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to save.');
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  const startSplit = (e) => {
+    setSplittingId(e.id);
+    setEditingId(null);
+    setSplitError('');
+    // Pre-fill two segments covering the full time range
+    const mid = midTime(e.start_time.substring(0, 5), e.end_time.substring(0, 5));
+    setSplitSegments([
+      { start_time: e.start_time.substring(0, 5), end_time: mid, project_id: e.project_id ? String(e.project_id) : '' },
+      { start_time: mid, end_time: e.end_time.substring(0, 5), project_id: '' },
+    ]);
+  };
+
+  const saveSplit = async (id) => {
+    setSplitSaving(true); setSplitError('');
+    try {
+      const r = await api.post(`/admin/entries/${id}/split`, {
+        segments: splitSegments.map(s => ({
+          start_time: s.start_time,
+          end_time: s.end_time,
+          project_id: s.project_id ? parseInt(s.project_id) : null,
+        })),
+      });
+      // Remove original, add new entries (with placeholder project names until reload)
+      setEntries(prev => {
+        const orig = prev.find(e => e.id === id);
+        const newEntries = r.data.created.map(ne => ({
+          ...orig, ...ne,
+          project_name: projects.find(p => p.id === ne.project_id)?.name || null,
+        }));
+        return [...prev.filter(e => e.id !== id), ...newEntries];
+      });
+      setSplittingId(null);
+    } catch (err) {
+      setSplitError(err.response?.data?.error || 'Failed to split entry.');
+    } finally {
+      setSplitSaving(false);
     }
   };
 
@@ -256,7 +318,7 @@ export default function ApprovalQueue({ onCountChange }) {
                     {openMessageId === e.id && <MessageThread entryId={e.id} currentUserId={user?.id} />}
                   </div>
 
-                  {editingTimesId === e.id ? (
+                  {editingId === e.id ? (
                     <div style={styles.editTimesForm}>
                       <div style={styles.editTimesRow}>
                         <div>
@@ -268,9 +330,61 @@ export default function ApprovalQueue({ onCountChange }) {
                           <input type="time" style={styles.editTimeInput} value={editEnd} onChange={ev => setEditEnd(ev.target.value)} />
                         </div>
                       </div>
+                      <div style={{ marginTop: 8 }}>
+                        <div style={styles.editTimesLabel}>Project</div>
+                        <select style={styles.editProjectSelect} value={editProject} onChange={ev => setEditProject(ev.target.value)}>
+                          <option value="">— No project —</option>
+                          {projects.filter(p => p.active !== false).map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      </div>
                       <div style={styles.editTimesActions}>
-                        <button style={styles.saveTimesBtn} onClick={() => saveEditTimes(e.id)} disabled={editSaving}>{editSaving ? '...' : 'Save'}</button>
-                        <button style={styles.cancelBtn} onClick={() => setEditingTimesId(null)}>Cancel</button>
+                        <button style={styles.saveTimesBtn} onClick={() => saveEdit(e.id)} disabled={editSaving}>{editSaving ? '...' : 'Save'}</button>
+                        <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : splittingId === e.id ? (
+                    <div style={styles.splitForm}>
+                      <div style={styles.splitTitle}>Split Entry</div>
+                      {splitError && <div style={styles.splitError}>{splitError}</div>}
+                      {splitSegments.map((seg, i) => (
+                        <div key={i} style={styles.splitSegment}>
+                          <div style={styles.splitSegLabel}>Segment {i + 1}</div>
+                          <div style={styles.splitSegRow}>
+                            <div>
+                              <div style={styles.editTimesLabel}>Start</div>
+                              <input type="time" style={styles.editTimeInput} value={seg.start_time}
+                                onChange={ev => setSplitSegments(prev => prev.map((s, j) => j === i ? { ...s, start_time: ev.target.value } : s))} />
+                            </div>
+                            <div>
+                              <div style={styles.editTimesLabel}>End</div>
+                              <input type="time" style={styles.editTimeInput} value={seg.end_time}
+                                onChange={ev => setSplitSegments(prev => prev.map((s, j) => j === i ? { ...s, end_time: ev.target.value } : s))} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 120 }}>
+                              <div style={styles.editTimesLabel}>Project</div>
+                              <select style={styles.editProjectSelect} value={seg.project_id}
+                                onChange={ev => setSplitSegments(prev => prev.map((s, j) => j === i ? { ...s, project_id: ev.target.value } : s))}>
+                                <option value="">— No project —</option>
+                                {projects.filter(p => p.active !== false).map(p => (
+                                  <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            {splitSegments.length > 2 && (
+                              <button style={styles.splitRemoveBtn} onClick={() => setSplitSegments(prev => prev.filter((_, j) => j !== i))}>✕</button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      <button style={styles.splitAddBtn} onClick={() => {
+                        const last = splitSegments[splitSegments.length - 1];
+                        setSplitSegments(prev => [...prev, { start_time: last.end_time, end_time: last.end_time, project_id: '' }]);
+                      }}>+ Add segment</button>
+                      <div style={styles.editTimesActions}>
+                        <button style={styles.saveTimesBtn} onClick={() => saveSplit(e.id)} disabled={splitSaving}>{splitSaving ? '...' : 'Split & Save'}</button>
+                        <button style={styles.cancelBtn} onClick={() => setSplittingId(null)}>Cancel</button>
                       </div>
                     </div>
                   ) : rejectingId === e.id ? (
@@ -281,7 +395,8 @@ export default function ApprovalQueue({ onCountChange }) {
                     </div>
                   ) : (
                     <div style={styles.actions}>
-                      <button style={styles.editTimesBtn} onClick={() => startEditTimes(e)}>✏️ Times</button>
+                      <button style={styles.editTimesBtn} onClick={() => startEdit(e)}>✏️ Edit</button>
+                      <button style={styles.splitBtn} onClick={() => startSplit(e)}>⇌ Split</button>
                       <button style={styles.approveBtn} onClick={() => approve(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.approve}</button>
                       <button style={styles.rejectBtn} onClick={() => { setRejectingId(e.id); setRejectNote(''); }}>{t.reject}</button>
                     </div>
@@ -319,6 +434,16 @@ const styles = {
   sourceBadge: { fontSize: 11, color: '#1e40af', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 8px', fontWeight: 600, display: 'inline-block', marginTop: 4 },
   actions: { display: 'flex', gap: 8, alignItems: 'center' },
   editTimesBtn: { padding: '6px 12px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  splitBtn:     { padding: '6px 12px', background: '#faf5ff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  editProjectSelect: { padding: '5px 8px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, width: '100%' },
+  splitForm:    { display: 'flex', flexDirection: 'column', gap: 10, minWidth: 220, maxWidth: 420 },
+  splitTitle:   { fontSize: 13, fontWeight: 700, color: '#374151' },
+  splitError:   { background: '#fee2e2', color: '#dc2626', borderRadius: 6, padding: '6px 10px', fontSize: 13 },
+  splitSegment: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 12px' },
+  splitSegLabel:{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' },
+  splitSegRow:  { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' },
+  splitRemoveBtn: { padding: '4px 8px', background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: 6, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-end' },
+  splitAddBtn:  { background: 'none', border: '1px dashed #d1d5db', color: '#6b7280', padding: '5px 12px', borderRadius: 7, fontSize: 13, cursor: 'pointer', textAlign: 'left' },
   editTimesForm: { display: 'flex', flexDirection: 'column', gap: 10, minWidth: 160 },
   editTimesRow: { display: 'flex', gap: 10 },
   editTimesLabel: { fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 3 },
