@@ -17,15 +17,17 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
     quantity: '',
     from_location_id: '',
     to_location_id: '',
-    area: '',
-    rack: '',
-    bay: '',
-    compartment: '',
+    area_id:        '',
+    rack_id:        '',
+    bay_id:         '',
+    compartment_id: '',
     project_id: '',
     notes: '',
     reference_no: '',
     unit_cost: '',
   });
+  // Cascading bin options for the destination location
+  const [binOpts, setBinOpts] = useState({ areas: [], racks: [], bays: [], compartments: [] });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
@@ -33,6 +35,44 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
   useEffect(() => {
     api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(() => {});
   }, []);
+
+  // Cascade bin options when destination location changes
+  useEffect(() => {
+    const locId = form.to_location_id;
+    set('area_id', ''); set('rack_id', ''); set('bay_id', ''); set('compartment_id', '');
+    setBinOpts({ areas: [], racks: [], bays: [], compartments: [] });
+    if (!locId) return;
+    api.get(`/inventory/setup/areas?location_id=${locId}&active=true`)
+      .then(r => setBinOpts(b => ({ ...b, areas: r.data })))
+      .catch(() => {});
+  }, [form.to_location_id]);
+
+  useEffect(() => {
+    set('rack_id', ''); set('bay_id', ''); set('compartment_id', '');
+    setBinOpts(b => ({ ...b, racks: [], bays: [], compartments: [] }));
+    if (!form.area_id) return;
+    api.get(`/inventory/setup/racks?area_id=${form.area_id}&active=true`)
+      .then(r => setBinOpts(b => ({ ...b, racks: r.data })))
+      .catch(() => {});
+  }, [form.area_id]);
+
+  useEffect(() => {
+    set('bay_id', ''); set('compartment_id', '');
+    setBinOpts(b => ({ ...b, bays: [], compartments: [] }));
+    if (!form.rack_id) return;
+    api.get(`/inventory/setup/bays?rack_id=${form.rack_id}&active=true`)
+      .then(r => setBinOpts(b => ({ ...b, bays: r.data })))
+      .catch(() => {});
+  }, [form.rack_id]);
+
+  useEffect(() => {
+    set('compartment_id', '');
+    setBinOpts(b => ({ ...b, compartments: [] }));
+    if (!form.bay_id) return;
+    api.get(`/inventory/setup/compartments?bay_id=${form.bay_id}&active=true`)
+      .then(r => setBinOpts(b => ({ ...b, compartments: r.data })))
+      .catch(() => {});
+  }, [form.bay_id]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -52,10 +92,10 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
         quantity: qty,
         from_location_id: form.from_location_id ? parseInt(form.from_location_id) : undefined,
         to_location_id: form.to_location_id ? parseInt(form.to_location_id) : undefined,
-        area:        form.area        || undefined,
-        rack:        form.rack        || undefined,
-        bay:         form.bay         || undefined,
-        compartment: form.compartment || undefined,
+        area_id:        form.area_id        ? parseInt(form.area_id)        : undefined,
+        rack_id:        form.rack_id        ? parseInt(form.rack_id)        : undefined,
+        bay_id:         form.bay_id         ? parseInt(form.bay_id)         : undefined,
+        compartment_id: form.compartment_id ? parseInt(form.compartment_id) : undefined,
         project_id: form.project_id ? parseInt(form.project_id) : undefined,
         notes: form.notes || undefined,
         reference_no: form.reference_no || undefined,
@@ -139,24 +179,44 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
               {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           </div>
-          <div style={f.binRow}>
-            <div style={f.binField}>
-              <label style={f.label}>Area</label>
-              <input style={f.input} value={form.area} onChange={e => set('area', e.target.value)} placeholder="e.g. A" />
+          {binOpts.areas.length > 0 && (
+            <div style={f.binRow}>
+              <div style={f.binField}>
+                <label style={f.label}>Area</label>
+                <select style={f.input} value={form.area_id} onChange={e => set('area_id', e.target.value)}>
+                  <option value="">None</option>
+                  {binOpts.areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              {form.area_id && binOpts.racks.length > 0 && (
+                <div style={f.binField}>
+                  <label style={f.label}>Rack</label>
+                  <select style={f.input} value={form.rack_id} onChange={e => set('rack_id', e.target.value)}>
+                    <option value="">None</option>
+                    {binOpts.racks.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                </div>
+              )}
+              {form.rack_id && binOpts.bays.length > 0 && (
+                <div style={f.binField}>
+                  <label style={f.label}>Bay</label>
+                  <select style={f.input} value={form.bay_id} onChange={e => set('bay_id', e.target.value)}>
+                    <option value="">None</option>
+                    {binOpts.bays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              )}
+              {form.bay_id && binOpts.compartments.length > 0 && (
+                <div style={f.binField}>
+                  <label style={f.label}>Compartment</label>
+                  <select style={f.input} value={form.compartment_id} onChange={e => set('compartment_id', e.target.value)}>
+                    <option value="">None</option>
+                    {binOpts.compartments.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
-            <div style={f.binField}>
-              <label style={f.label}>Rack</label>
-              <input style={f.input} value={form.rack} onChange={e => set('rack', e.target.value)} placeholder="e.g. R3" />
-            </div>
-            <div style={f.binField}>
-              <label style={f.label}>Bay</label>
-              <input style={f.input} value={form.bay} onChange={e => set('bay', e.target.value)} placeholder="e.g. B2" />
-            </div>
-            <div style={f.binField}>
-              <label style={f.label}>Compartment</label>
-              <input style={f.input} value={form.compartment} onChange={e => set('compartment', e.target.value)} placeholder="e.g. C1" />
-            </div>
-          </div>
+          )}
         </>
       )}
 

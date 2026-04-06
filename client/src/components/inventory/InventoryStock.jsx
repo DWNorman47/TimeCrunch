@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
 
-function formatBin(area, rack, bay, compartment) {
-  return [
-    area        && `Area ${area}`,
-    rack        && `Rack ${rack}`,
-    bay         && `Bay ${bay}`,
-    compartment && `Cpt ${compartment}`,
-  ].filter(Boolean).join(' · ') || null;
+function formatBin(area_name, rack_name, bay_name, compartment_name) {
+  return [area_name, rack_name, bay_name, compartment_name]
+    .filter(Boolean).join(' › ') || null;
 }
 
 export default function InventoryStock({ isAdmin, locations, onStockChange }) {
@@ -102,7 +98,7 @@ export default function InventoryStock({ isAdmin, locations, onStockChange }) {
                     <td style={s.td}>{row.category || '—'}</td>
                     <td style={s.td}>{row.location_name}</td>
                     <td style={{ ...s.td, color: '#6b7280', fontSize: 12 }}>
-                      {formatBin(row.area, row.rack, row.bay, row.compartment) || '—'}
+                      {formatBin(row.area_name, row.rack_name, row.bay_name, row.compartment_name) || '—'}
                     </td>
                     <td style={{ ...s.td, textAlign: 'right', fontWeight: 700, color: qty < 0 ? '#dc2626' : '#111827' }}>
                       {qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)}

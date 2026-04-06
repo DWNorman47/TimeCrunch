@@ -7,6 +7,7 @@ import InventoryStock from '../components/inventory/InventoryStock';
 import InventoryItems from '../components/inventory/InventoryItems';
 import InventoryTransactions from '../components/inventory/InventoryTransactions';
 import InventoryCycleCounts from '../components/inventory/InventoryCycleCounts';
+import InventorySetup from '../components/inventory/InventorySetup';
 
 export default function InventoryPage() {
   const { user, logout } = useAuth();
@@ -19,7 +20,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
 
   const INV_TABS = isAdmin
-    ? ['stock', 'items', 'transactions', 'cycle']
+    ? ['stock', 'items', 'transactions', 'cycle', 'setup']
     : ['stock', 'transactions'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(INV_TABS.includes(hashTab) ? hashTab : 'stock');
@@ -102,6 +103,7 @@ export default function InventoryPage() {
             ...(isAdmin ? [
               { id: 'items', label: '🗂 Items' },
               { id: 'cycle', label: '🔄 Cycle Counts' },
+              { id: 'setup', label: '⚙️ Setup' },
             ] : []),
           ]}
         />
@@ -129,6 +131,9 @@ export default function InventoryPage() {
             locations={locations}
             onComplete={refreshLowStock}
           />
+        )}
+        {tab === 'setup' && isAdmin && (
+          <InventorySetup projects={projects} />
         )}
       </main>
     </div>

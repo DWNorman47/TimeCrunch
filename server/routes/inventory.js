@@ -1,6 +1,8 @@
 const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { uploadBase64 } = require('../r2');
+const { checkStorageLimit, incrementStorage } = require('../storage');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -10,25 +12,52 @@ function isAdmin(req) {
 
 // Apply a signed quantity delta to inventory_stock atomically.
 // delta is positive to add, negative to subtract.
-// bin = { area, bay, rack } — optional; updates the stored bin address if provided.
+// bin = { area_id, rack_id, bay_id, compartment_id } — optional FK IDs; updates bin slot if provided.
 // Must be called inside a BEGIN/COMMIT block.
 async function applyStockDelta(client, companyId, itemId, locationId, delta, bin = {}) {
-  const area        = bin.area?.trim()        || null;
-  const bay         = bin.bay?.trim()         || null;
-  const compartment = bin.compartment?.trim() || null;
-  const rack        = bin.rack?.trim()        || null;
+  const area_id        = bin.area_id        ? parseInt(bin.area_id)        : null;
+  const rack_id        = bin.rack_id        ? parseInt(bin.rack_id)        : null;
+  const bay_id         = bin.bay_id         ? parseInt(bin.bay_id)         : null;
+  const compartment_id = bin.compartment_id ? parseInt(bin.compartment_id) : null;
   await client.query(
-    `INSERT INTO inventory_stock (company_id, item_id, location_id, quantity, area, bay, compartment, rack, updated_at)
+    `INSERT INTO inventory_stock (company_id, item_id, location_id, quantity, area_id, rack_id, bay_id, compartment_id, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
      ON CONFLICT (item_id, location_id)
      DO UPDATE SET
-       quantity    = inventory_stock.quantity + EXCLUDED.quantity,
-       area        = COALESCE(EXCLUDED.area,        inventory_stock.area),
-       bay         = COALESCE(EXCLUDED.bay,         inventory_stock.bay),
-       compartment = COALESCE(EXCLUDED.compartment, inventory_stock.compartment),
-       rack        = COALESCE(EXCLUDED.rack,        inventory_stock.rack),
-       updated_at  = NOW()`,
-    [companyId, itemId, locationId, delta, area, bay, compartment, rack]
+       quantity       = inventory_stock.quantity + EXCLUDED.quantity,
+       area_id        = COALESCE(EXCLUDED.area_id,        inventory_stock.area_id),
+       rack_id        = COALESCE(EXCLUDED.rack_id,        inventory_stock.rack_id),
+       bay_id         = COALESCE(EXCLUDED.bay_id,         inventory_stock.bay_id),
+       compartment_id = COALESCE(EXCLUDED.compartment_id, inventory_stock.compartment_id),
+       updated_at     = NOW()`,
+    [companyId, itemId, locationId, delta, area_id, rack_id, bay_id, compartment_id]
+  );
+}
+
+// Process an array of photo values (existing https:// URLs or new base64 data: URIs).
+// Uploads any base64 images to R2, tracks storage, returns array of https:// URLs.
+async function processPhotos(photos, companyId) {
+  if (!photos || photos.length === 0) return [];
+  const base64Photos = photos.filter(p => typeof p === 'string' && p.startsWith('data:'));
+  if (base64Photos.length > 0) {
+    const estimatedBytes = base64Photos.reduce((sum, p) => {
+      const b64 = p.split(',')[1] || '';
+      return sum + Math.floor(b64.length * 3 / 4);
+    }, 0);
+    if (estimatedBytes > 0) {
+      const { allowed } = await checkStorageLimit(companyId, estimatedBytes);
+      if (!allowed) throw Object.assign(new Error('Storage limit reached'), { storageLimit: true });
+    }
+  }
+  return Promise.all(
+    photos.map(async p => {
+      if (typeof p === 'string' && p.startsWith('data:')) {
+        const { url, sizeBytes } = await uploadBase64(p, 'inventory');
+        if (sizeBytes > 0) incrementStorage(companyId, sizeBytes).catch(() => {});
+        return url;
+      }
+      return p;
+    })
   );
 }
 
@@ -183,7 +212,7 @@ router.post('/locations', requireAdmin, async (req, res) => {
 // PATCH /api/inventory/locations/:id
 router.patch('/locations/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
-  const { name, type, project_id, notes, active } = req.body;
+  const { name, type, project_id, notes, active, photo_urls } = req.body;
   try {
     const existing = await pool.query('SELECT id FROM inventory_locations WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Location not found' });
@@ -193,13 +222,20 @@ router.patch('/locations/:id', requireAdmin, async (req, res) => {
     if (project_id !== undefined) { sets.push(`project_id=$${idx++}`); vals.push(project_id || null); }
     if (notes !== undefined) { sets.push(`notes=$${idx++}`); vals.push(notes?.trim() || null); }
     if (active !== undefined) { sets.push(`active=$${idx++}`); vals.push(!!active); }
+    if (photo_urls !== undefined) {
+      const processed = await processPhotos(photo_urls, companyId);
+      sets.push(`photo_urls=$${idx++}`); vals.push(JSON.stringify(processed));
+    }
     if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
     const result = await pool.query(
       `UPDATE inventory_locations SET ${sets.join(',')} WHERE id=$1 AND company_id=$2 RETURNING *`,
       vals
     );
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    if (err.storageLimit) return res.status(413).json({ error: err.message, storage_limit: true });
+    console.error(err); res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // DELETE /api/inventory/locations/:id  (soft delete)
@@ -238,12 +274,20 @@ router.get('/stock', requireAuth, async (req, res) => {
       `SELECT s.id, s.item_id, i.name as item_name, i.sku, i.category, i.unit,
               ${admin ? 'i.unit_cost,' : ''}
               i.reorder_point, s.location_id, l.name as location_name, l.type as location_type,
-              s.area, s.bay, s.compartment, s.rack, s.quantity, s.updated_at
+              s.area_id, ia.name as area_name,
+              s.rack_id, ir.name as rack_name,
+              s.bay_id,  ib.name as bay_name,
+              s.compartment_id, ic.name as compartment_name,
+              s.quantity, s.updated_at
        FROM inventory_stock s
        JOIN inventory_items i ON s.item_id = i.id
        JOIN inventory_locations l ON s.location_id = l.id
+       LEFT JOIN inventory_areas        ia ON s.area_id        = ia.id
+       LEFT JOIN inventory_racks        ir ON s.rack_id        = ir.id
+       LEFT JOIN inventory_bays         ib ON s.bay_id         = ib.id
+       LEFT JOIN inventory_compartments ic ON s.compartment_id = ic.id
        WHERE ${conditions.join(' AND ')} AND i.active = true AND l.active = true
-       ORDER BY l.name, i.name`,
+       ORDER BY l.name, ia.name, ir.name, ib.name, i.name`,
       values
     );
     res.json(result.rows);
@@ -278,7 +322,8 @@ router.get('/stock/low', requireAdmin, async (req, res) => {
 
 // POST /api/inventory/transactions
 router.post('/transactions', requireAuth, async (req, res) => {
-  const { type, item_id, quantity, from_location_id, to_location_id, project_id, notes, reference_no, unit_cost, area, bay, compartment, rack } = req.body;
+  const { type, item_id, quantity, from_location_id, to_location_id, project_id, notes, reference_no, unit_cost,
+          area_id, rack_id, bay_id, compartment_id } = req.body;
   const companyId = req.user.company_id;
   const admin = isAdmin(req);
 
@@ -326,8 +371,8 @@ router.post('/transactions', requireAuth, async (req, res) => {
        project_id || null, req.user.id, notes?.trim() || null, reference_no?.trim() || null, snapshotCost]
     );
 
-    // Update stock — bin fields (area/bay/compartment/rack) apply to the destination slot
-    const bin = { area, bay, compartment, rack };
+    // Update stock — bin FK IDs apply to the destination slot
+    const bin = { area_id, rack_id, bay_id, compartment_id };
     if (type === 'receive')  await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin);
     if (type === 'issue')    await applyStockDelta(client, companyId, item_id, from_location_id, -absQty);
     if (type === 'transfer') {
@@ -623,5 +668,112 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
     }
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
+
+// ── Setup: Storage Hierarchy (Areas → Racks → Bays → Compartments) ────────────
+//
+// Generic helpers reused for each level:
+//   buildSetupRoutes(prefix, table, parentKey, parentTable)
+// Each level supports:
+//   GET    /setup/:level          — list (filter by parent + active)
+//   POST   /setup/:level          — create
+//   PATCH  /setup/:level/:id      — update name/notes/active/photos
+//   DELETE /setup/:level/:id      — soft delete (requires no stock references)
+
+function buildSetupRoutes(prefix, table, parentKey, parentTable) {
+  // LIST
+  router.get(`/setup/${prefix}`, requireAdmin, async (req, res) => {
+    const companyId = req.user.company_id;
+    const { active = 'true' } = req.query;
+    const parentId = req.query[parentKey];
+    try {
+      const conds = [`e.company_id = $1`];
+      const vals = [companyId]; let idx = 2;
+      if (active !== 'all') { conds.push(`e.active = $${idx++}`); vals.push(active !== 'false'); }
+      if (parentId) { conds.push(`e.${parentKey} = $${idx++}`); vals.push(parentId); }
+      const result = await pool.query(
+        `SELECT e.*, p.name as parent_name
+         FROM ${table} e
+         LEFT JOIN ${parentTable} p ON e.${parentKey} = p.id
+         WHERE ${conds.join(' AND ')} ORDER BY e.name`,
+        vals
+      );
+      res.json(result.rows);
+    } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // CREATE
+  router.post(`/setup/${prefix}`, requireAdmin, async (req, res) => {
+    const companyId = req.user.company_id;
+    const { name, notes, photo_urls } = req.body;
+    const parentId = req.body[parentKey];
+    if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+    if (!parentId) return res.status(400).json({ error: `${parentKey} required` });
+    try {
+      const parentCheck = await pool.query(
+        `SELECT id FROM ${parentTable} WHERE id=$1 AND company_id=$2`,
+        [parentId, companyId]
+      );
+      if (parentCheck.rowCount === 0) return res.status(404).json({ error: 'Parent not found' });
+      const photos = await processPhotos(photo_urls || [], companyId);
+      const result = await pool.query(
+        `INSERT INTO ${table} (company_id, ${parentKey}, name, notes, photo_urls)
+         VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        [companyId, parentId, name.trim(), notes?.trim() || null, JSON.stringify(photos)]
+      );
+      res.status(201).json(result.rows[0]);
+    } catch (err) {
+      if (err.storageLimit) return res.status(413).json({ error: err.message, storage_limit: true });
+      console.error(err); res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  // UPDATE
+  router.patch(`/setup/${prefix}/:id`, requireAdmin, async (req, res) => {
+    const companyId = req.user.company_id;
+    const { name, notes, active, photo_urls } = req.body;
+    try {
+      const existing = await pool.query(
+        `SELECT id FROM ${table} WHERE id=$1 AND company_id=$2`,
+        [req.params.id, companyId]
+      );
+      if (existing.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+      const sets = [], vals = [req.params.id, companyId]; let idx = 3;
+      if (name !== undefined) { sets.push(`name=$${idx++}`); vals.push(name.trim()); }
+      if (notes !== undefined) { sets.push(`notes=$${idx++}`); vals.push(notes?.trim() || null); }
+      if (active !== undefined) { sets.push(`active=$${idx++}`); vals.push(!!active); }
+      if (photo_urls !== undefined) {
+        const processed = await processPhotos(photo_urls, companyId);
+        sets.push(`photo_urls=$${idx++}`); vals.push(JSON.stringify(processed));
+      }
+      if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+      const result = await pool.query(
+        `UPDATE ${table} SET ${sets.join(',')} WHERE id=$1 AND company_id=$2 RETURNING *`,
+        vals
+      );
+      res.json(result.rows[0]);
+    } catch (err) {
+      if (err.storageLimit) return res.status(413).json({ error: err.message, storage_limit: true });
+      console.error(err); res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  // SOFT DELETE
+  router.delete(`/setup/${prefix}/:id`, requireAdmin, async (req, res) => {
+    const companyId = req.user.company_id;
+    try {
+      const result = await pool.query(
+        `UPDATE ${table} SET active=false WHERE id=$1 AND company_id=$2 RETURNING id`,
+        [req.params.id, companyId]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+      res.json({ success: true });
+    } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  });
+}
+
+buildSetupRoutes('areas',        'inventory_areas',        'location_id', 'inventory_locations');
+buildSetupRoutes('racks',        'inventory_racks',        'area_id',     'inventory_areas');
+buildSetupRoutes('bays',         'inventory_bays',         'rack_id',     'inventory_racks');
+buildSetupRoutes('compartments', 'inventory_compartments', 'bay_id',      'inventory_bays');
 
 module.exports = router;
