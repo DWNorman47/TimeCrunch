@@ -248,6 +248,208 @@ const ef = {
   saveBtn:   { padding: '8px 18px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
 };
 
+// ── Supplier Panel ────────────────────────────────────────────────────────────
+
+function SupplierPanel() {
+  const [suppliers, setSuppliers] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState('');
+  const [showAll, setShowAll]     = useState(false);
+  const [editing, setEditing]     = useState(null); // null=list, false=new, obj=editing
+  const [form, setForm]           = useState({ name: '', contact_name: '', phone: '', email: '', website: '', notes: '' });
+  const [saving, setSaving]       = useState(false);
+  const [formErr, setFormErr]     = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await api.get(`/inventory/suppliers?active=${showAll ? 'all' : 'true'}`);
+      setSuppliers(r.data);
+    } catch { setError('Failed to load suppliers.'); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, [showAll]);
+
+  const openNew = () => {
+    setForm({ name: '', contact_name: '', phone: '', email: '', website: '', notes: '' });
+    setFormErr('');
+    setEditing(false);
+  };
+
+  const openEdit = (sup) => {
+    setForm({ name: sup.name, contact_name: sup.contact_name || '', phone: sup.phone || '',
+              email: sup.email || '', website: sup.website || '', notes: sup.notes || '' });
+    setFormErr('');
+    setEditing(sup);
+  };
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const save = async () => {
+    setFormErr('');
+    if (!form.name.trim()) return setFormErr('Name is required.');
+    setSaving(true);
+    try {
+      const payload = {
+        name: form.name.trim(),
+        contact_name: form.contact_name.trim() || null,
+        phone: form.phone.trim() || null,
+        email: form.email.trim() || null,
+        website: form.website.trim() || null,
+        notes: form.notes.trim() || null,
+      };
+      if (editing) await api.patch(`/inventory/suppliers/${editing.id}`, payload);
+      else await api.post('/inventory/suppliers', payload);
+      setEditing(null);
+      load();
+    } catch (err) {
+      setFormErr(err.response?.data?.error || 'Failed to save.');
+    } finally { setSaving(false); }
+  };
+
+  const archive = async (sup) => {
+    if (!confirm(`Archive "${sup.name}"?`)) return;
+    try {
+      await api.delete(`/inventory/suppliers/${sup.id}`);
+      load();
+    } catch (err) { alert(err.response?.data?.error || 'Failed to archive.'); }
+  };
+
+  const restore = async (sup) => {
+    try {
+      await api.patch(`/inventory/suppliers/${sup.id}`, { active: true });
+      load();
+    } catch { alert('Failed to restore.'); }
+  };
+
+  if (editing !== null) {
+    return (
+      <div style={sp.formWrap}>
+        <h3 style={sp.formTitle}>{editing ? 'Edit Supplier' : 'Add Supplier'}</h3>
+        {formErr && <div style={sp.error}>{formErr}</div>}
+        <div style={sp.row}>
+          <div style={sp.field}>
+            <label style={sp.label}>Name *</label>
+            <input style={sp.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Supply Co." />
+          </div>
+          <div style={sp.field}>
+            <label style={sp.label}>Contact Name</label>
+            <input style={sp.input} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" />
+          </div>
+        </div>
+        <div style={sp.row}>
+          <div style={sp.field}>
+            <label style={sp.label}>Phone</label>
+            <input style={sp.input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 555-5555" />
+          </div>
+          <div style={sp.field}>
+            <label style={sp.label}>Email</label>
+            <input style={sp.input} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="orders@supplier.com" />
+          </div>
+          <div style={sp.field}>
+            <label style={sp.label}>Website</label>
+            <input style={sp.input} value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://supplier.com" />
+          </div>
+        </div>
+        <div style={sp.field}>
+          <label style={sp.label}>Notes</label>
+          <textarea style={{ ...sp.input, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} />
+        </div>
+        <div style={sp.actions}>
+          <button style={sp.cancelBtn} onClick={() => setEditing(null)}>Cancel</button>
+          <button style={sp.saveBtn} onClick={save} disabled={saving}>{saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Supplier'}</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={sp.toolbar}>
+        <label style={sp.toggle}>
+          <input type="checkbox" checked={showAll} onChange={e => setShowAll(e.target.checked)} />
+          Show archived
+        </label>
+        <button style={sp.addBtn} onClick={openNew}>+ Add Supplier</button>
+      </div>
+      {error && <div style={sp.error}>{error}</div>}
+      {loading ? (
+        <div style={sp.empty}>Loading…</div>
+      ) : suppliers.length === 0 ? (
+        <div style={sp.empty}>
+          <div style={sp.emptyIcon}>🏭</div>
+          <p>No suppliers yet. Add your first supplier to get started.</p>
+        </div>
+      ) : (
+        <div style={sp.list}>
+          {suppliers.map(sup => (
+            <div key={sup.id} style={{ ...sp.card, opacity: sup.active ? 1 : 0.6 }}>
+              <div style={sp.cardMain}>
+                <div style={sp.cardInfo}>
+                  <div style={sp.cardName}>{sup.name}</div>
+                  {sup.contact_name && <div style={sp.cardMeta}>{sup.contact_name}</div>}
+                  <div style={sp.cardContacts}>
+                    {sup.phone && <span style={sp.contact}>{sup.phone}</span>}
+                    {sup.email && <a href={`mailto:${sup.email}`} style={sp.contactLink}>{sup.email}</a>}
+                    {sup.website && <a href={sup.website} target="_blank" rel="noopener noreferrer" style={sp.contactLink}>{sup.website.replace(/^https?:\/\//, '')}</a>}
+                  </div>
+                  {sup.notes && <div style={sp.cardNotes}>{sup.notes}</div>}
+                </div>
+                <div style={sp.cardActions}>
+                  {sup.active ? (
+                    <>
+                      <span style={{ ...sp.badge, color: '#059669', background: '#d1fae5' }}>Active</span>
+                      <button style={sp.iconBtn} onClick={() => openEdit(sup)} title="Edit">✏️</button>
+                      <button style={sp.iconBtn} onClick={() => archive(sup)} title="Archive">🗄️</button>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ ...sp.badge, color: '#9ca3af', background: '#f3f4f6' }}>Archived</span>
+                      <button style={sp.iconBtn} onClick={() => restore(sup)} title="Restore">↩️</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const sp = {
+  toolbar:     { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  toggle:      { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer' },
+  addBtn:      { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  error:       { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13 },
+  empty:       { textAlign: 'center', padding: '48px 24px', color: '#6b7280', fontSize: 14 },
+  emptyIcon:   { fontSize: 36, marginBottom: 10 },
+  list:        { display: 'flex', flexDirection: 'column', gap: 8 },
+  card:        { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '14px 16px' },
+  cardMain:    { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+  cardInfo:    { flex: 1, minWidth: 0 },
+  cardName:    { fontSize: 15, fontWeight: 700, color: '#111827' },
+  cardMeta:    { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  cardContacts:{ display: 'flex', flexWrap: 'wrap', gap: '2px 12px', marginTop: 4 },
+  contact:     { fontSize: 13, color: '#374151' },
+  contactLink: { fontSize: 13, color: '#2563eb', textDecoration: 'none' },
+  cardNotes:   { fontSize: 13, color: '#9ca3af', marginTop: 4, fontStyle: 'italic' },
+  cardActions: { display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 },
+  badge:       { display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, marginRight: 4 },
+  iconBtn:     { background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 3px' },
+  formWrap:    { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20 },
+  formTitle:   { fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 16 },
+  row:         { display: 'flex', gap: 12, flexWrap: 'wrap' },
+  field:       { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 160, marginBottom: 12 },
+  label:       { fontSize: 12, fontWeight: 600, color: '#374151' },
+  input:       { padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#111827', background: '#fff', width: '100%', boxSizing: 'border-box' },
+  actions:     { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 },
+  cancelBtn:   { padding: '8px 16px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#374151' },
+  saveBtn:     { padding: '8px 18px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+};
+
 // ── Main Setup Component ───────────────────────────────────────────────────────
 
 export default function InventorySetup({ projects }) {
@@ -408,7 +610,17 @@ export default function InventorySetup({ projects }) {
             {l.label}
           </button>
         ))}
+        <button
+          style={{ ...s.levelTab, ...(levelKey === 'suppliers' ? s.levelTabActive : {}) }}
+          onClick={() => setLevelKey('suppliers')}
+        >
+          Suppliers
+        </button>
       </div>
+
+      {levelKey === 'suppliers' && <SupplierPanel />}
+
+      {levelKey !== 'suppliers' && <>
 
       {/* Parent cascade filters */}
       {parentFilters().length > 0 && (
@@ -523,6 +735,8 @@ export default function InventorySetup({ projects }) {
           onClose={() => setPrintItem(null)}
         />
       )}
+
+      </>} {/* end levelKey !== 'suppliers' */}
     </div>
   );
 }

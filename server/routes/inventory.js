@@ -441,7 +441,8 @@ router.get('/stock/low', requireAdmin, async (req, res) => {
 router.post('/transactions', requireAuth, async (req, res) => {
   const { type, item_id, quantity, from_location_id, to_location_id, project_id, notes, reference_no, unit_cost,
           area_id, rack_id, bay_id, compartment_id,
-          uom_id, to_uom_id, to_quantity } = req.body;
+          uom_id, to_uom_id, to_quantity,
+          supplier_id, lot_number } = req.body;
   const companyId = req.user.company_id;
   const admin = isAdmin(req);
 
@@ -500,16 +501,23 @@ router.post('/transactions', requireAuth, async (req, res) => {
 
     const toQty = to_quantity ? parseFloat(to_quantity) : null;
 
+    // Validate supplier belongs to company if provided
+    const resolvedSupplierId = supplier_id ? parseInt(supplier_id) : null;
+    if (resolvedSupplierId) {
+      const sup = await client.query('SELECT id FROM inventory_suppliers WHERE id=$1 AND company_id=$2', [resolvedSupplierId, companyId]);
+      if (sup.rowCount === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'supplier_id not found' }); }
+    }
+
     // Insert transaction record
     const txn = await client.query(
       `INSERT INTO inventory_transactions
        (company_id, type, item_id, quantity, from_location_id, to_location_id, project_id, performed_by, notes, reference_no, unit_cost,
-        uom_id, to_uom_id, to_quantity)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-      [companyId, type, item_id, type === 'convert' ? absQty : absQty,
+        uom_id, to_uom_id, to_quantity, supplier_id, lot_number)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+      [companyId, type, item_id, absQty,
        from_location_id || null, type === 'convert' ? null : (to_location_id || null),
        project_id || null, req.user.id, notes?.trim() || null, reference_no?.trim() || null, snapshotCost,
-       resolvedUomId, resolvedToUomId, toQty]
+       resolvedUomId, resolvedToUomId, toQty, resolvedSupplierId, lot_number?.trim() || null]
     );
 
     // Update stock — bin FK IDs apply to the destination slot
@@ -546,7 +554,7 @@ router.post('/transactions', requireAuth, async (req, res) => {
 
 // GET /api/inventory/transactions
 router.get('/transactions', requireAuth, async (req, res) => {
-  const { item_id, location_id, type, project_id, from, to, limit = 50, offset = 0 } = req.query;
+  const { item_id, location_id, type, project_id, from, to, supplier_id, lot_number, limit = 50, offset = 0 } = req.query;
   const companyId = req.user.company_id;
   const admin = isAdmin(req);
   try {
@@ -559,6 +567,8 @@ router.get('/transactions', requireAuth, async (req, res) => {
     if (project_id) { conditions.push(`t.project_id = $${idx++}`); values.push(project_id); }
     if (from) { conditions.push(`t.created_at >= $${idx++}`); values.push(from); }
     if (to) { conditions.push(`t.created_at < ($${idx++}::date + interval '1 day')`); values.push(to); }
+    if (supplier_id) { conditions.push(`t.supplier_id = $${idx++}`); values.push(supplier_id); }
+    if (lot_number) { conditions.push(`t.lot_number ILIKE $${idx++}`); values.push(`%${lot_number}%`); }
     const result = await pool.query(
       `SELECT t.*,
               i.name as item_name,
@@ -566,7 +576,8 @@ router.get('/transactions', requireAuth, async (req, res) => {
               fu.unit || CASE WHEN fu.unit_spec IS NOT NULL THEN ' (' || fu.unit_spec || ')' ELSE '' END as uom_label,
               tu.unit || CASE WHEN tu.unit_spec IS NOT NULL THEN ' (' || tu.unit_spec || ')' ELSE '' END as to_uom_label,
               fl.name as from_location_name, tl.name as to_location_name,
-              p.name as project_name, u.full_name as performed_by_name
+              p.name as project_name, u.full_name as performed_by_name,
+              sup.name as supplier_name
        FROM inventory_transactions t
        JOIN inventory_items i ON t.item_id = i.id
        LEFT JOIN inventory_item_uoms fu ON t.uom_id    = fu.id
@@ -575,6 +586,7 @@ router.get('/transactions', requireAuth, async (req, res) => {
        LEFT JOIN inventory_locations tl ON t.to_location_id = tl.id
        LEFT JOIN projects p ON t.project_id = p.id
        JOIN users u ON t.performed_by = u.id
+       LEFT JOIN inventory_suppliers sup ON t.supplier_id = sup.id
        WHERE ${conditions.join(' AND ')}
        ORDER BY t.created_at DESC
        LIMIT $${idx} OFFSET $${idx + 1}`,
@@ -961,5 +973,110 @@ buildSetupRoutes('areas',        'inventory_areas',        'location_id', 'inven
 buildSetupRoutes('racks',        'inventory_racks',        'area_id',     'inventory_areas');
 buildSetupRoutes('bays',         'inventory_bays',         'rack_id',     'inventory_racks');
 buildSetupRoutes('compartments', 'inventory_compartments', 'bay_id',      'inventory_bays');
+
+// ── Suppliers ─────────────────────────────────────────────────────────────────
+
+// GET /api/inventory/suppliers
+router.get('/suppliers', requireAdmin, async (req, res) => {
+  const { active = 'true' } = req.query;
+  const companyId = req.user.company_id;
+  try {
+    const conditions = ['company_id = $1'];
+    const values = [companyId]; let idx = 2;
+    if (active !== 'all') { conditions.push(`active = $${idx++}`); values.push(active !== 'false'); }
+    const result = await pool.query(
+      `SELECT * FROM inventory_suppliers WHERE ${conditions.join(' AND ')} ORDER BY name`,
+      values
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/suppliers
+router.post('/suppliers', requireAdmin, async (req, res) => {
+  const { name, contact_name, phone, email, website, notes } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `INSERT INTO inventory_suppliers (company_id, name, contact_name, phone, email, website, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [companyId, name.trim(), contact_name?.trim() || null, phone?.trim() || null,
+       email?.trim() || null, website?.trim() || null, notes?.trim() || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// PATCH /api/inventory/suppliers/:id
+router.patch('/suppliers/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { name, contact_name, phone, email, website, notes, active } = req.body;
+  try {
+    const existing = await pool.query('SELECT id FROM inventory_suppliers WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'Supplier not found' });
+    const sets = [], vals = [req.params.id, companyId]; let idx = 3;
+    if (name !== undefined)         { sets.push(`name=$${idx++}`);         vals.push(name.trim()); }
+    if (contact_name !== undefined) { sets.push(`contact_name=$${idx++}`); vals.push(contact_name?.trim() || null); }
+    if (phone !== undefined)        { sets.push(`phone=$${idx++}`);        vals.push(phone?.trim() || null); }
+    if (email !== undefined)        { sets.push(`email=$${idx++}`);        vals.push(email?.trim() || null); }
+    if (website !== undefined)      { sets.push(`website=$${idx++}`);      vals.push(website?.trim() || null); }
+    if (notes !== undefined)        { sets.push(`notes=$${idx++}`);        vals.push(notes?.trim() || null); }
+    if (active !== undefined)       { sets.push(`active=$${idx++}`);       vals.push(!!active); }
+    if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    const result = await pool.query(
+      `UPDATE inventory_suppliers SET ${sets.join(',')} WHERE id=$1 AND company_id=$2 RETURNING *`,
+      vals
+    );
+    res.json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /api/inventory/suppliers/:id  (soft delete)
+router.delete('/suppliers/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      'UPDATE inventory_suppliers SET active=false WHERE id=$1 AND company_id=$2 RETURNING id',
+      [req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Supplier not found' });
+    res.json({ success: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Valuation ─────────────────────────────────────────────────────────────────
+
+// GET /api/inventory/valuation
+router.get('/valuation', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { location_id } = req.query;
+  try {
+    const conditions = ['i.company_id = $1', 'i.active = true'];
+    const values = [companyId]; let idx = 2;
+    if (location_id) { conditions.push(`s.location_id = $${idx++}`); values.push(location_id); }
+    const result = await pool.query(
+      `SELECT i.id, i.name, i.sku, i.category, i.unit, i.unit_cost,
+              COALESCE(SUM(s.quantity), 0) AS total_qty,
+              COALESCE(SUM(s.quantity), 0) * COALESCE(i.unit_cost, 0) AS total_value,
+              json_agg(
+                json_build_object(
+                  'location_id', l.id,
+                  'location_name', l.name,
+                  'quantity', s.quantity
+                ) ORDER BY l.name
+              ) FILTER (WHERE l.id IS NOT NULL) AS locations
+       FROM inventory_items i
+       LEFT JOIN inventory_stock s ON i.id = s.item_id AND s.company_id = i.company_id
+       LEFT JOIN inventory_locations l ON s.location_id = l.id AND l.active = true
+       WHERE ${conditions.join(' AND ')}
+       GROUP BY i.id
+       ORDER BY i.name`,
+      values
+    );
+    const grandTotal = result.rows.reduce((sum, r) => sum + parseFloat(r.total_value || 0), 0);
+    res.json({ items: result.rows, grand_total: grandTotal });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
 
 module.exports = router;

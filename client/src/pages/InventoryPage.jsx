@@ -8,6 +8,7 @@ import InventoryItems from '../components/inventory/InventoryItems';
 import InventoryTransactions from '../components/inventory/InventoryTransactions';
 import InventoryCycleCounts from '../components/inventory/InventoryCycleCounts';
 import InventorySetup from '../components/inventory/InventorySetup';
+import InventoryValuation from '../components/inventory/InventoryValuation';
 
 export default function InventoryPage() {
   const { user, logout } = useAuth();
@@ -20,7 +21,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
 
   const INV_TABS = isAdmin
-    ? ['stock', 'items', 'transactions', 'cycle', 'setup']
+    ? ['stock', 'items', 'transactions', 'cycle', 'valuation', 'setup']
     : ['stock', 'transactions'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(INV_TABS.includes(hashTab) ? hashTab : 'stock');
@@ -101,9 +102,10 @@ export default function InventoryPage() {
             { id: 'stock',        label: '📦 Stock', dot: lowStockCount > 0 ? '#f59e0b' : null },
             { id: 'transactions', label: '↔️ Transactions' },
             ...(isAdmin ? [
-              { id: 'items', label: '🗂 Items' },
-              { id: 'cycle', label: '📋 Count' },
-              { id: 'setup', label: '⚙️ Setup' },
+              { id: 'items',      label: '🗂 Items' },
+              { id: 'cycle',      label: '📋 Count' },
+              { id: 'valuation',  label: '💰 Valuation' },
+              { id: 'setup',      label: '⚙️ Setup' },
             ] : []),
           ]}
         />
@@ -131,6 +133,9 @@ export default function InventoryPage() {
             locations={locations}
             onComplete={refreshLowStock}
           />
+        )}
+        {tab === 'valuation' && isAdmin && (
+          <InventoryValuation locations={locations} />
         )}
         {tab === 'setup' && isAdmin && (
           <InventorySetup projects={projects} />

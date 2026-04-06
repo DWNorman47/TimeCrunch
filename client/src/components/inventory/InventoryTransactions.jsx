@@ -12,6 +12,7 @@ const TYPE_COLORS = {
 
 function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
   const [items, setItems] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [form, setForm] = useState({
     type: isAdmin ? 'receive' : 'issue',
     item_id: '',
@@ -29,6 +30,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
     notes: '',
     reference_no: '',
     unit_cost: '',
+    supplier_id: '',
+    lot_number: '',
   });
   const [itemUoms, setItemUoms] = useState([]);
   // Cascading bin options for the destination location
@@ -39,7 +42,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
 
   useEffect(() => {
     api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(() => {});
-  }, []);
+    if (isAdmin) api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(() => {});
+  }, [isAdmin]);
 
   // Load UOMs when item changes
   useEffect(() => {
@@ -118,6 +122,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
         notes: form.notes || undefined,
         reference_no: form.reference_no || undefined,
         unit_cost: form.unit_cost !== '' ? parseFloat(form.unit_cost) : undefined,
+        supplier_id: form.supplier_id ? parseInt(form.supplier_id) : undefined,
+        lot_number: form.lot_number || undefined,
       };
       const r = await api.post('/inventory/transactions', payload);
       if (r.data.warning === 'stock_negative') {
@@ -305,16 +311,35 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
       )}
 
       {isAdmin && (
-        <div style={f.row}>
-          <div style={f.field}>
-            <label style={f.label}>Unit Cost ($)</label>
-            <input style={f.input} type="number" min="0" step="0.01" value={form.unit_cost} onChange={e => set('unit_cost', e.target.value)} placeholder="From catalog" />
+        <>
+          <div style={f.row}>
+            <div style={f.field}>
+              <label style={f.label}>Unit Cost ($)</label>
+              <input style={f.input} type="number" min="0" step="0.01" value={form.unit_cost} onChange={e => set('unit_cost', e.target.value)} placeholder="From catalog" />
+            </div>
+            <div style={f.field}>
+              <label style={f.label}>Reference / PO #</label>
+              <input style={f.input} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder="Optional" />
+            </div>
           </div>
-          <div style={f.field}>
-            <label style={f.label}>Reference / PO #</label>
-            <input style={f.input} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder="Optional" />
+          <div style={f.row}>
+            {form.type === 'receive' && suppliers.length > 0 && (
+              <div style={f.field}>
+                <label style={f.label}>Supplier</label>
+                <select style={f.input} value={form.supplier_id} onChange={e => set('supplier_id', e.target.value)}>
+                  <option value="">None</option>
+                  {suppliers.map(sup => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
+                </select>
+              </div>
+            )}
+            {(form.type === 'receive' || form.type === 'adjust') && (
+              <div style={f.field}>
+                <label style={f.label}>Lot / Batch #</label>
+                <input style={f.input} value={form.lot_number} onChange={e => set('lot_number', e.target.value)} placeholder="Optional" />
+              </div>
+            )}
           </div>
-        </div>
+        </>
       )}
 
       <div style={f.field}>
@@ -336,7 +361,12 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [filters, setFilters] = useState({ type: '', location_id: '', from: '', to: '' });
+  const [filters, setFilters] = useState({ type: '', location_id: '', from: '', to: '', supplier_id: '', lot_number: '' });
+  const [suppliers, setSuppliers] = useState([]);
+
+  useEffect(() => {
+    if (isAdmin) api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(() => {});
+  }, [isAdmin]);
   const [offset, setOffset] = useState(0);
   const LIMIT = 50;
 
@@ -348,6 +378,8 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
       if (filters.location_id) params.set('location_id', filters.location_id);
       if (filters.from) params.set('from', filters.from);
       if (filters.to) params.set('to', filters.to);
+      if (filters.supplier_id) params.set('supplier_id', filters.supplier_id);
+      if (filters.lot_number) params.set('lot_number', filters.lot_number);
       const r = await api.get(`/inventory/transactions?${params}`);
       setTransactions(r.data.transactions);
       setTotal(r.data.total);
@@ -405,6 +437,21 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
             {(filters.from || filters.to) && (
               <button style={s.clearDates} onClick={() => setFilters(f => ({ ...f, from: '', to: '' }))} title="Clear date range">✕ Dates</button>
             )}
+            {isAdmin && suppliers.length > 0 && (
+              <select style={s.select} value={filters.supplier_id} onChange={e => setFilter('supplier_id', e.target.value)}>
+                <option value="">All Suppliers</option>
+                {suppliers.map(sup => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
+              </select>
+            )}
+            {isAdmin && (
+              <input
+                style={{ ...s.dateInput, minWidth: 120 }}
+                type="text"
+                placeholder="Lot # filter…"
+                value={filters.lot_number}
+                onChange={e => setFilter('lot_number', e.target.value)}
+              />
+            )}
             <button
               style={s.addBtn}
               onClick={() => setShowForm(true)}
@@ -435,6 +482,8 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
                       <th style={s.th}>From</th>
                       <th style={s.th}>To</th>
                       <th style={s.th}>Project</th>
+                      {isAdmin && <th style={s.th}>Supplier</th>}
+                      {isAdmin && <th style={s.th}>Lot #</th>}
                       {isAdmin && <th style={s.th}>By</th>}
                       <th style={s.th}>Notes</th>
                     </tr>
@@ -457,6 +506,8 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
                           <td style={{ ...s.td, color: '#6b7280', fontSize: 13 }}>{t.from_location_name || '—'}</td>
                           <td style={{ ...s.td, color: '#6b7280', fontSize: 13 }}>{t.to_location_name || '—'}</td>
                           <td style={{ ...s.td, fontSize: 13 }}>{t.project_name || '—'}</td>
+                          {isAdmin && <td style={{ ...s.td, fontSize: 13, color: '#6b7280' }}>{t.supplier_name || '—'}</td>}
+                          {isAdmin && <td style={{ ...s.td, fontSize: 12, fontFamily: 'monospace', color: t.lot_number ? '#374151' : '#9ca3af' }}>{t.lot_number || '—'}</td>}
                           {isAdmin && <td style={{ ...s.td, fontSize: 13 }}>{t.performed_by_name}</td>}
                           <td style={{ ...s.td, color: '#6b7280', fontSize: 13, maxWidth: 200 }}>{t.notes || (t.reference_no ? `Ref: ${t.reference_no}` : '—')}</td>
                         </tr>
