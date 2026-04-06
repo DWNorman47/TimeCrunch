@@ -14,7 +14,7 @@ CREATE INDEX IF NOT EXISTS idx_clients_company ON clients(company_id);
 
 CREATE TABLE IF NOT EXISTS client_documents (
   id           SERIAL PRIMARY KEY,
-  company_id   UUID         NOT NULL REFERENCES companies(id),
+  company_id   UUID         NOT NULL,
   client_id    INTEGER      NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   name         VARCHAR(500) NOT NULL,
   url          TEXT         NOT NULL,
