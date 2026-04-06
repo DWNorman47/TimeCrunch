@@ -2387,4 +2387,132 @@ router.post('/projects/:id/rfis', requireAdmin, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// ── Clients ───────────────────────────────────────────────────────────────────
+
+router.get('/clients', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT c.*,
+        COUNT(DISTINCT p.id) FILTER (WHERE p.active = true) AS project_count,
+        COUNT(DISTINCT d.id) AS document_count,
+        MIN(d.expires_at) FILTER (WHERE d.expires_at IS NOT NULL AND d.expires_at >= CURRENT_DATE) AS next_expiry
+       FROM clients c
+       LEFT JOIN projects p ON p.client_id = c.id AND p.company_id = $1
+       LEFT JOIN client_documents d ON d.client_id = c.id AND d.company_id = $1
+       WHERE c.company_id = $1 AND c.active = true
+       GROUP BY c.id
+       ORDER BY c.name`,
+      [companyId]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.post('/clients', requireAdmin, async (req, res) => {
+  const { name, contact_name, contact_email, contact_phone, address, notes } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Client name is required' });
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `INSERT INTO clients (company_id, name, contact_name, contact_email, contact_phone, address, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [companyId, name.trim(), contact_name || null, contact_email || null,
+       contact_phone || null, address || null, notes || null]
+    );
+    res.status(201).json({ ...result.rows[0], project_count: 0, document_count: 0 });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.patch('/clients/:id', requireAdmin, async (req, res) => {
+  const { name, contact_name, contact_email, contact_phone, address, notes } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Client name is required' });
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `UPDATE clients SET name=$1, contact_name=$2, contact_email=$3, contact_phone=$4,
+       address=$5, notes=$6 WHERE id=$7 AND company_id=$8 RETURNING *`,
+      [name.trim(), contact_name || null, contact_email || null, contact_phone || null,
+       address || null, notes || null, req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.delete('/clients/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    await pool.query('UPDATE clients SET active=false WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    await pool.query('UPDATE projects SET client_id=NULL WHERE client_id=$1 AND company_id=$2', [req.params.id, companyId]);
+    res.json({ deleted: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Client documents
+const CLIENT_DOC_TYPES = ['w9', 'w2', 'coi', 'contract', 'license', 'other'];
+
+router.get('/clients/:id/documents/upload-url', requireAdmin, async (req, res) => {
+  const { filename, contentType } = req.query;
+  if (!filename || !contentType) return res.status(400).json({ error: 'filename and contentType required' });
+  const ALLOWED = ['application/pdf', 'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/jpeg', 'image/png', 'image/webp', 'text/plain', 'text/csv'];
+  if (!ALLOWED.includes(contentType)) return res.status(400).json({ error: 'File type not allowed' });
+  try {
+    const ext = filename.split('.').pop().toLowerCase();
+    const { getPresignedUploadUrl } = require('../r2');
+    const { uploadUrl, publicUrl } = await getPresignedUploadUrl('client-docs', ext, contentType);
+    res.json({ uploadUrl, publicUrl });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to generate upload URL' }); }
+});
+
+router.post('/clients/:id/documents', requireAdmin, async (req, res) => {
+  const { name, url, size_bytes, doc_type, expires_at } = req.body;
+  if (!name || !url) return res.status(400).json({ error: 'name and url required' });
+  const companyId = req.user.company_id;
+  const safeType = CLIENT_DOC_TYPES.includes(doc_type) ? doc_type : 'other';
+  try {
+    const result = await pool.query(
+      `INSERT INTO client_documents (company_id, client_id, name, url, size_bytes, doc_type, expires_at, uploaded_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [companyId, req.params.id, name.trim(), url, size_bytes || null,
+       safeType, expires_at || null, req.user.id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.get('/clients/:id/documents', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT d.*, COALESCE(u.full_name, '') AS uploader_name
+       FROM client_documents d
+       LEFT JOIN users u ON d.uploaded_by = u.id
+       WHERE d.client_id = $1 AND d.company_id = $2
+       ORDER BY d.doc_type, d.created_at DESC`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.delete('/clients/:id/documents/:docId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const doc = await pool.query(
+      'SELECT url FROM client_documents WHERE id=$1 AND client_id=$2 AND company_id=$3',
+      [req.params.docId, req.params.id, companyId]
+    );
+    if (doc.rowCount === 0) return res.status(404).json({ error: 'Document not found' });
+    const { deleteByUrl } = require('../r2');
+    await deleteByUrl(doc.rows[0].url).catch(() => {});
+    await pool.query('DELETE FROM client_documents WHERE id=$1', [req.params.docId]);
+    res.json({ deleted: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 module.exports = router;

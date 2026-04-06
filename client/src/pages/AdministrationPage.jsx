@@ -8,6 +8,7 @@ import TabBar from '../components/TabBar';
 import BillingPanel from '../components/BillingPanel';
 import ManageWorkers from '../components/ManageWorkers';
 import ManageProjects from '../components/ManageProjects';
+import ManageClients from '../components/ManageClients';
 import ManageRates from '../components/ManageRates';
 import AuditLog from '../components/AuditLog';
 import QuickBooks from '../components/QuickBooks';
@@ -286,7 +287,7 @@ function AccountTab() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const ADMIN_TABS = ['company', 'team', 'projects', 'integrations', 'billing', 'log', 'account'];
+const ADMIN_TABS = ['company', 'team', 'projects', 'clients', 'integrations', 'billing', 'log', 'account'];
 
 export default function AdministrationPage() {
   const { user, logout } = useAuth();
@@ -306,6 +307,7 @@ export default function AdministrationPage() {
     { id: 'company',      label: t.adminTabCompany      },
     { id: 'team',         label: t.adminTabTeam         },
     ...(settings?.module_projects !== false ? [{ id: 'projects', label: t.adminTabProjects }] : []),
+    ...(settings?.module_projects !== false ? [{ id: 'clients', label: 'Clients' }] : []),
     ...(plan.hasQbo ? [{ id: 'integrations', label: t.adminTabIntegrations }] : []),
     { id: 'billing',      label: t.adminTabBilling      },
     { id: 'log',          label: t.adminTabLog          },
@@ -395,6 +397,11 @@ export default function AdministrationPage() {
               currency={settings?.currency ?? 'USD'}
               settings={settings}
             />
+          </div>
+        )}
+        {tab === 'clients' && (
+          <div style={styles.tabContent}>
+            <ManageClients />
           </div>
         )}
         {tab === 'integrations' && (
