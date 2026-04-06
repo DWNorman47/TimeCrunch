@@ -23,7 +23,7 @@ jobs:
 
       - name: Dump production database
         run: |
-          pg_dump "${{ secrets.PROD_DATABASE_URL }}" \
+          /usr/lib/postgresql/17/bin/pg_dump "${{ secrets.PROD_DATABASE_URL }}" \
             --no-owner \
             --no-acl \
             --format=custom \
@@ -31,7 +31,7 @@ jobs:
 
       - name: Restore to staging database
         run: |
-          pg_restore \
+          /usr/lib/postgresql/17/bin/pg_restore \
             --dbname "${{ secrets.STAGING_DATABASE_URL }}" \
             --no-owner \
             --no-acl \
