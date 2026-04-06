@@ -107,8 +107,12 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
   useEffect(() => {
     api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(() => {});
   }, []);
+  const DEFAULT_COLLAPSED = { wages: true, overtime: true, notifications: true, access: true, modules: true, features: true, storage: true };
   const [collapsed, setCollapsed] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('opsfloa_company_sections') || '{}'); } catch { return {}; }
+    try {
+      const stored = localStorage.getItem('opsfloa_company_sections');
+      return stored ? JSON.parse(stored) : DEFAULT_COLLAPSED;
+    } catch { return DEFAULT_COLLAPSED; }
   });
   const toggleCollapse = key => setCollapsed(c => {
     const next = { ...c, [key]: !c[key] };
