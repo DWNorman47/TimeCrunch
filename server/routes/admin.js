@@ -1138,17 +1138,22 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
 
 // Create a project
 router.post('/projects', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
-  const { wage_type, prevailing_wage_rate } = req.body;
+  const { wage_type, prevailing_wage_rate, client_id, client_name, job_number, address, start_date, end_date, status, description } = req.body;
   const name = req.body.name?.trim();
   if (!name) return res.status(400).json({ error: 'Project name required' });
   const companyId = req.user.company_id;
   const wt = wage_type === 'prevailing' ? 'prevailing' : 'regular';
   const pwr = prevailing_wage_rate != null ? parseFloat(prevailing_wage_rate) : null;
   if (pwr !== null && (isNaN(pwr) || pwr < 0)) return res.status(400).json({ error: 'prevailing_wage_rate must be non-negative' });
+  const validStatuses = ['planning', 'in_progress', 'on_hold', 'completed'];
+  const st = validStatuses.includes(status) ? status : 'in_progress';
   try {
     const result = await pool.query(
-      'INSERT INTO projects (company_id, name, wage_type, prevailing_wage_rate) VALUES ($1, $2, $3, $4) RETURNING *',
-      [companyId, name, wt, pwr]
+      `INSERT INTO projects (company_id, name, wage_type, prevailing_wage_rate, client_id, client_name, job_number, address, start_date, end_date, status, description)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [companyId, name, wt, pwr,
+       client_id || null, client_name?.trim() || null, job_number?.trim() || null,
+       address?.trim() || null, start_date || null, end_date || null, st, description?.trim() || null]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.created', 'project', result.rows[0].id, name, { wage_type: wt });
     res.status(201).json(result.rows[0]);

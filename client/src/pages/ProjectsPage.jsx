@@ -4,6 +4,7 @@ import api from '../api';
 import AppSwitcher from '../components/AppSwitcher';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ProjectBillPDF from '../components/ProjectBillPDF';
+import ManageClients from '../components/ManageClients';
 
 function punchColor(status) {
   return { open: '#f59e0b', in_progress: '#3b82f6', resolved: '#059669', closed: '#9ca3af' }[status] || '#9ca3af';
@@ -899,8 +900,109 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
+const BLANK_PROJECT = { name: '', client_id: '', job_number: '', address: '', start_date: '', end_date: '', status: 'in_progress', description: '', wage_type: 'regular' };
+
+function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
+  const [form, setForm] = useState(BLANK_PROJECT);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const showPrevailing = (settings?.prevailing_wage_rate ?? 0) > 0;
+
+  const handleSubmit = async e => {
+    e.preventDefault();
+    if (!form.name.trim()) { setError('Project name is required.'); return; }
+    setSaving(true); setError('');
+    try {
+      const r = await api.post('/admin/projects', {
+        ...form,
+        client_id: form.client_id || null,
+        prevailing_wage_rate: form.wage_type === 'prevailing' && settings?.prevailing_wage_rate ? settings.prevailing_wage_rate : null,
+      });
+      onSaved(r.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to create project.');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div style={pf.card}>
+      <h3 style={pf.title}>New Project</h3>
+      <form onSubmit={handleSubmit} style={pf.form}>
+        <div style={pf.row}>
+          <div style={pf.field}>
+            <label style={pf.label}>Project Name *</label>
+            <input style={pf.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Downtown Office Renovation" required autoFocus />
+          </div>
+          <div style={pf.field}>
+            <label style={pf.label}>Job Number</label>
+            <input style={pf.input} value={form.job_number} onChange={e => set('job_number', e.target.value)} placeholder="JOB-2025-001" />
+          </div>
+        </div>
+
+        <div style={pf.row}>
+          <div style={pf.field}>
+            <label style={pf.label}>Client</label>
+            <select style={pf.input} value={form.client_id} onChange={e => set('client_id', e.target.value)}>
+              <option value="">— No client —</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div style={pf.field}>
+            <label style={pf.label}>Status</label>
+            <select style={pf.input} value={form.status} onChange={e => set('status', e.target.value)}>
+              <option value="planning">Planning</option>
+              <option value="in_progress">In Progress</option>
+              <option value="on_hold">On Hold</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={pf.field}>
+          <label style={pf.label}>Address / Location</label>
+          <input style={pf.input} value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, State" />
+        </div>
+
+        <div style={pf.row}>
+          <div style={pf.field}>
+            <label style={pf.label}>Start Date</label>
+            <input style={pf.input} type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} />
+          </div>
+          <div style={pf.field}>
+            <label style={pf.label}>End Date</label>
+            <input style={pf.input} type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)} />
+          </div>
+          {showPrevailing && (
+            <div style={pf.field}>
+              <label style={pf.label}>Wage Type</label>
+              <select style={pf.input} value={form.wage_type} onChange={e => set('wage_type', e.target.value)}>
+                <option value="regular">Regular</option>
+                <option value="prevailing">Prevailing</option>
+              </select>
+            </div>
+          )}
+        </div>
+
+        <div style={pf.field}>
+          <label style={pf.label}>Description <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span></label>
+          <textarea style={pf.textarea} rows={2} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Scope of work, notes…" />
+        </div>
+
+        {error && <p style={pf.error}>{error}</p>}
+
+        <div style={pf.actions}>
+          <button style={pf.saveBtn} type="submit" disabled={saving}>{saving ? 'Creating…' : 'Create Project'}</button>
+          <button style={pf.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function ProjectsPage() {
   const { user, logout } = useAuth();
+  const [mainTab, setMainTab] = useState('projects');
   const [projects, setProjects] = useState([]);
   const [metrics, setMetrics] = useState({});
   const [settings, setSettings] = useState({});
@@ -909,6 +1011,8 @@ export default function ProjectsPage() {
   const [features, setFeatures] = useState({});
   const [showArchived, setShowArchived] = useState(false);
   const [companyInfo, setCompanyInfo] = useState({});
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [clients, setClients] = useState([]);
 
   const loadProjects = (archived) => {
     setLoading(true);
@@ -930,6 +1034,12 @@ export default function ProjectsPage() {
 
   useEffect(() => { loadProjects(showArchived); }, [showArchived]);
 
+  useEffect(() => {
+    if (mainTab === 'clients' || showCreateForm) {
+      api.get('/admin/clients').then(r => setClients(r.data)).catch(() => {});
+    }
+  }, [mainTab, showCreateForm]);
+
   const activeProjects = projects.filter(p => p.active).length;
   const totalHours = Object.values(metrics).reduce((s, m) => s + parseFloat(m.total_hours || 0), 0);
 
@@ -946,51 +1056,96 @@ export default function ProjectsPage() {
       </header>
 
       <main style={styles.main}>
-        <div style={styles.pageHeader}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <h1 style={styles.pageTitle}>Projects</h1>
-              <p style={styles.pageSub}>
-                {activeProjects} active project{activeProjects !== 1 ? 's' : ''}
-                {totalHours > 0 && ` · ${totalHours.toFixed(0)} total hours`}
-              </p>
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer', marginTop: 4 }}>
-              <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} style={{ cursor: 'pointer' }} />
-              Show archived
-            </label>
-          </div>
+        {/* Top-level tab bar */}
+        <div style={styles.tabBar}>
+          <button
+            style={{ ...styles.tabBtn, ...(mainTab === 'projects' ? styles.tabBtnActive : {}) }}
+            onClick={() => setMainTab('projects')}
+          >
+            📋 Projects
+          </button>
+          <button
+            style={{ ...styles.tabBtn, ...(mainTab === 'clients' ? styles.tabBtnActive : {}) }}
+            onClick={() => setMainTab('clients')}
+          >
+            🏢 Clients
+          </button>
         </div>
 
-        {loading ? (
-          <p style={styles.loadingText}>Loading…</p>
-        ) : projects.length === 0 ? (
-          <div style={styles.empty}>
-            <div style={styles.emptyIcon}>📁</div>
-            <p style={styles.emptyText}>No active projects. Create projects in Administration.</p>
-          </div>
-        ) : (
-          <div style={styles.grid}>
-            {projects.map(p => (
-              <ProjectCard
-                key={p.id}
-                project={p}
-                metrics={metrics[p.id]}
+        {mainTab === 'projects' && (
+          <>
+            <div style={styles.pageHeader}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                <div>
+                  <h1 style={styles.pageTitle}>Projects</h1>
+                  <p style={styles.pageSub}>
+                    {activeProjects} active project{activeProjects !== 1 ? 's' : ''}
+                    {totalHours > 0 && ` · ${totalHours.toFixed(0)} total hours`}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} style={{ cursor: 'pointer' }} />
+                    Show archived
+                  </label>
+                  {!showCreateForm && (
+                    <button style={styles.newProjectBtn} onClick={() => setShowCreateForm(true)}>
+                      + New Project
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {showCreateForm && (
+              <ProjectCreateForm
+                clients={clients}
                 settings={settings}
-                onClick={() => setSelected(p)}
+                onSaved={p => {
+                  setProjects(prev => [...prev, p]);
+                  setShowCreateForm(false);
+                }}
+                onCancel={() => setShowCreateForm(false)}
               />
-            ))}
-          </div>
+            )}
+
+            {loading ? (
+              <p style={styles.loadingText}>Loading…</p>
+            ) : projects.length === 0 ? (
+              <div style={styles.empty}>
+                <div style={styles.emptyIcon}>📁</div>
+                <p style={styles.emptyText}>No projects yet. Click "+ New Project" to get started.</p>
+              </div>
+            ) : (
+              <div style={styles.grid}>
+                {projects.map(p => (
+                  <ProjectCard
+                    key={p.id}
+                    project={p}
+                    metrics={metrics[p.id]}
+                    settings={settings}
+                    onClick={() => setSelected(p)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {selected && (
+              <ProjectDetail
+                project={selected}
+                metrics={metrics[selected.id]}
+                settings={settings}
+                companyInfo={companyInfo}
+                onClose={() => setSelected(null)}
+              />
+            )}
+          </>
         )}
 
-        {selected && (
-          <ProjectDetail
-            project={selected}
-            metrics={metrics[selected.id]}
-            settings={settings}
-            companyInfo={companyInfo}
-            onClose={() => setSelected(null)}
-          />
+        {mainTab === 'clients' && (
+          <div style={{ marginTop: 24 }}>
+            <ManageClients />
+          </div>
         )}
       </main>
     </div>
@@ -1097,4 +1252,27 @@ const styles = {
   lightboxOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   lightboxContent: { position: 'relative', maxWidth: '90vw', textAlign: 'center', padding: 16 },
   lightboxClose: { position: 'absolute', top: -8, right: -8, background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  // Tab bar
+  tabBar: { display: 'flex', gap: 4, marginBottom: 24, borderBottom: '2px solid #e5e7eb', paddingBottom: 0 },
+  tabBtn: { background: 'none', border: 'none', padding: '10px 20px', fontSize: 14, fontWeight: 600, color: '#6b7280', cursor: 'pointer', borderBottom: '2px solid transparent', marginBottom: -2, borderRadius: '6px 6px 0 0', transition: 'color 0.15s' },
+  tabBtnActive: { color: '#7c3aed', borderBottomColor: '#7c3aed', background: '#faf5ff' },
+  // New project button
+  newProjectBtn: { background: '#7c3aed', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
+};
+
+// ── Project Create Form Styles ─────────────────────────────────────────────────
+
+const pf = {
+  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '24px 28px', marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' },
+  title: { fontSize: 18, fontWeight: 800, color: '#111827', margin: '0 0 20px' },
+  form: { display: 'flex', flexDirection: 'column', gap: 16 },
+  row: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 },
+  field: { display: 'flex', flexDirection: 'column', gap: 4 },
+  label: { fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, background: '#fff', color: '#111827', width: '100%', boxSizing: 'border-box' },
+  textarea: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, background: '#fff', color: '#111827', resize: 'vertical', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' },
+  actions: { display: 'flex', gap: 10, marginTop: 4 },
+  saveBtn: { background: '#7c3aed', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' },
+  cancelBtn: { background: 'none', border: '1px solid #e5e7eb', padding: '10px 18px', borderRadius: 8, fontWeight: 600, fontSize: 14, color: '#6b7280', cursor: 'pointer' },
+  error: { color: '#ef4444', fontSize: 13, margin: 0 },
 };
