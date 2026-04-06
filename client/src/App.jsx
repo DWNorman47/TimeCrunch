@@ -15,6 +15,7 @@ import ProjectsPage from './pages/ProjectsPage';
 import AdministrationPage from './pages/AdministrationPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SuperAdmin from './pages/SuperAdmin';
+import InventoryPage from './pages/InventoryPage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import EULA from './pages/EULA';
 import InstallPrompt from './components/InstallPrompt';
@@ -91,6 +92,7 @@ function AppRoutes() {
       <Route path="/projects" element={<PrivateRoute adminOnly><ProjectsPage /></PrivateRoute>} />
       <Route path="/administration" element={<PrivateRoute adminOnly><AdministrationPage /></PrivateRoute>} />
       <Route path="/analytics" element={<PrivateRoute adminOnly><AnalyticsPage /></PrivateRoute>} />
+      <Route path="/inventory" element={<PrivateRoute><InventoryPage /></PrivateRoute>} />
       <Route path="/superadmin" element={<PrivateRoute superAdminOnly><SuperAdmin /></PrivateRoute>} />
       <Route path="/" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Landing />} />
       <Route path="*" element={<Navigate to={user ? (user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard') : '/'} replace />} />
