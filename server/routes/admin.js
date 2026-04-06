@@ -176,6 +176,12 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
             return res.status(400).json({ error: 'Invalid timezone' });
           if (key === 'invoice_signature' && !['none', 'optional', 'required'].includes(val))
             return res.status(400).json({ error: 'invoice_signature must be none, optional, or required' });
+          if (key === 'global_required_checklist_template_id' && val !== '') {
+            const id = parseInt(val);
+            if (isNaN(id)) return res.status(400).json({ error: 'Invalid checklist template ID' });
+            const tmpl = await pool.query('SELECT id FROM safety_checklist_templates WHERE id=$1 AND company_id=$2', [id, companyId]);
+            if (tmpl.rowCount === 0) return res.status(400).json({ error: 'Checklist template not found' });
+          }
           await pool.query(
             'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
             [companyId, key, val]
@@ -333,7 +339,7 @@ router.patch('/active-clock/:user_id', requireAdmin, requirePermission('manage_w
   }
 });
 
-// PATCH /admin/entries/:id — admin edits start/end times on a completed entry
+// PATCH /admin/entries/:id/times — admin edits start/end times (kept for backwards compat)
 router.patch('/entries/:id/times', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
   const { start_time, end_time } = req.body;
@@ -348,6 +354,105 @@ router.patch('/entries/:id/times', requireAdmin, requirePermission('manage_worke
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.times_edited', 'time_entry', parseInt(req.params.id), null);
     res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /admin/entries/:id/edit — admin edits times + project on a pending entry
+router.patch('/entries/:id/edit', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+  const companyId = req.user.company_id;
+  const { start_time, end_time, project_id } = req.body;
+  if (!start_time || !end_time) return res.status(400).json({ error: 'start_time and end_time required' });
+  try {
+    // Derive wage_type from new project if provided
+    let wage_type = 'regular';
+    if (project_id) {
+      const proj = await pool.query('SELECT wage_type FROM projects WHERE id=$1 AND company_id=$2', [project_id, companyId]);
+      if (proj.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
+      wage_type = proj.rows[0].wage_type;
+    }
+    const result = await pool.query(
+      `UPDATE time_entries SET start_time=$1, end_time=$2, project_id=$3, wage_type=$4
+       WHERE id=$5 AND company_id=$6 RETURNING *`,
+      [start_time, end_time, project_id || null, wage_type, req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    // Return with project name joined
+    const full = await pool.query(
+      `SELECT te.*, COALESCE(u.invoice_name, u.full_name) as worker_name, p.name as project_name
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       LEFT JOIN projects p ON te.project_id = p.id
+       WHERE te.id=$1`,
+      [req.params.id]
+    );
+    await logAudit(companyId, req.user.id, req.user.full_name, 'entry.edited', 'time_entry', parseInt(req.params.id), null);
+    res.json(full.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /admin/entries/:id/split — split a pending entry into multiple project segments
+router.post('/entries/:id/split', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+  const companyId = req.user.company_id;
+  const { segments } = req.body; // [{ project_id, start_time, end_time }, ...]
+  if (!Array.isArray(segments) || segments.length < 2) {
+    return res.status(400).json({ error: 'At least 2 segments required' });
+  }
+  for (const seg of segments) {
+    if (!seg.start_time || !seg.end_time) return res.status(400).json({ error: 'Each segment needs start_time and end_time' });
+  }
+  try {
+    const orig = await pool.query(
+      'SELECT * FROM time_entries WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (orig.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    const o = orig.rows[0];
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Delete original
+      await client.query('DELETE FROM time_entries WHERE id=$1', [req.params.id]);
+
+      // Insert new segments
+      const created = [];
+      for (const seg of segments) {
+        let wage_type = 'regular';
+        if (seg.project_id) {
+          const proj = await client.query('SELECT wage_type FROM projects WHERE id=$1 AND company_id=$2', [seg.project_id, companyId]);
+          if (proj.rowCount > 0) wage_type = proj.rows[0].wage_type;
+        }
+        const r = await client.query(
+          `INSERT INTO time_entries
+             (company_id, user_id, project_id, work_date, start_time, end_time, wage_type,
+              notes, break_minutes, mileage, clock_source, clocked_in_by, status)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending') RETURNING *`,
+          [
+            companyId, o.user_id, seg.project_id || null, o.work_date,
+            seg.start_time, seg.end_time, wage_type,
+            o.notes, o.break_minutes || 0, o.mileage,
+            'admin', req.user.id,
+          ]
+        );
+        created.push(r.rows[0]);
+      }
+
+      await client.query('COMMIT');
+      await logAudit(companyId, req.user.id, req.user.full_name, 'entry.split', 'time_entry', parseInt(req.params.id), null);
+      res.status(201).json({ created });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -577,9 +682,10 @@ router.get('/workers/check-username', requireAdmin, async (req, res) => {
   const { username, exclude_id } = req.query;
   if (!username) return res.json({ taken: false });
   try {
+    const companyId = req.user.company_id;
     const result = exclude_id
-      ? await pool.query('SELECT id FROM users WHERE username = $1 AND id != $2', [username.toLowerCase().trim(), exclude_id])
-      : await pool.query('SELECT id FROM users WHERE username = $1', [username.toLowerCase().trim()]);
+      ? await pool.query('SELECT id FROM users WHERE username = $1 AND company_id = $2 AND id != $3', [username.toLowerCase().trim(), companyId, exclude_id])
+      : await pool.query('SELECT id FROM users WHERE username = $1 AND company_id = $2', [username.toLowerCase().trim(), companyId]);
     res.json({ taken: result.rowCount > 0 });
   } catch (err) {
     res.json({ taken: false });
@@ -1138,7 +1244,7 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
 
 // Create a project
 router.post('/projects', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
-  const { wage_type, prevailing_wage_rate, client_id, client_name, job_number, address, start_date, end_date, status, description } = req.body;
+  const { wage_type, prevailing_wage_rate, client_id, job_number, address, start_date, end_date, status, description } = req.body;
   const name = req.body.name?.trim();
   if (!name) return res.status(400).json({ error: 'Project name required' });
   const companyId = req.user.company_id;
@@ -1148,11 +1254,16 @@ router.post('/projects', requireAdmin, requirePermission('manage_projects'), asy
   const validStatuses = ['planning', 'in_progress', 'on_hold', 'completed'];
   const st = validStatuses.includes(status) ? status : 'in_progress';
   try {
+    let resolvedClientName = null;
+    if (client_id) {
+      const cr = await pool.query('SELECT name FROM clients WHERE id = $1 AND company_id = $2', [client_id, companyId]);
+      if (cr.rows.length) resolvedClientName = cr.rows[0].name;
+    }
     const result = await pool.query(
       `INSERT INTO projects (company_id, name, wage_type, prevailing_wage_rate, client_id, client_name, job_number, address, start_date, end_date, status, description)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [companyId, name, wt, pwr,
-       client_id || null, client_name?.trim() || null, job_number?.trim() || null,
+       client_id || null, resolvedClientName, job_number?.trim() || null,
        address?.trim() || null, start_date || null, end_date || null, st, description?.trim() || null]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.created', 'project', result.rows[0].id, name, { wage_type: wt });
@@ -2119,7 +2230,10 @@ router.get('/audit-log', requireAdmin, async (req, res) => {
   const conditions = ['company_id = $1'];
   const values = [companyId];
   let idx = 2;
-  if (group) { conditions.push(`action LIKE $${idx++}`); values.push(`${group}.%`); }
+  if (group) {
+    if (!/^[a-zA-Z0-9_]+$/.test(group)) return res.status(400).json({ error: 'Invalid group' });
+    conditions.push(`action LIKE $${idx++}`); values.push(`${group}.%`);
+  }
   if (from) { conditions.push(`created_at >= $${idx++}`); values.push(from); }
   if (to) { conditions.push(`created_at < ($${idx++}::date + interval '1 day')`); values.push(to); }
   const where = conditions.join(' AND ');

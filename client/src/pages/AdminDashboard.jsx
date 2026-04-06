@@ -19,7 +19,6 @@ import BroadcastMessage from '../components/BroadcastMessage';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
 import AdminTimeOff from '../components/AdminTimeOff';
-import AuditLog from '../components/AuditLog';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import api from '../api';
 
@@ -78,7 +77,7 @@ export default function AdminDashboard() {
   // Permission helper — null admin_permissions means full access
   const canDo = key => !user?.admin_permissions || user.admin_permissions[key] === true;
 
-  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'timeoff', 'manage', 'auditlog'];
+  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'timeoff', 'manage'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
 
@@ -149,7 +148,6 @@ export default function AdminDashboard() {
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
             { id: 'timeoff', label: '🏖 Time Off' },
             ...(settings?.feature_scheduling !== false ? [{ id: 'manage', label: t.tabManage }] : []),
-            { id: 'auditlog', label: '📋 Audit Log' },
           ]}
         />
 
@@ -226,8 +224,6 @@ export default function AdminDashboard() {
           </>
         ) : tab === 'timeoff' ? (
           <AdminTimeOff />
-        ) : tab === 'auditlog' ? (
-          <AuditLog timezone={settings?.company_timezone || ''} />
         ) : tab === 'manage' ? (
           <>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}

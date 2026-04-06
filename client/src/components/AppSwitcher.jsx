@@ -39,12 +39,11 @@ const APPS = [
       </svg>
     ),
     path: '/inventory',
-    soon: true,
   },
   {
     id: 'projects',
     name: 'Projects',
-    bg: '#7c3aed',
+    bg: '#8b5cf6',
     adminOnly: true,
     icon: (
       <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
@@ -91,7 +90,8 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
     if (a.adminOnly && !isAdmin) return false;
     if (a.id === 'field' && features?.module_field === false) return false;
     if (a.id === 'projects' && features?.module_projects === false) return false;
-    if (a.id === 'analytics' && features?.module_projects === false) return false;
+    if (a.id === 'inventory' && features?.module_inventory === false) return false;
+    if (a.id === 'analytics' && features?.module_analytics === false) return false;
     // Only hide Time Clock from admins when toggle is off; workers still need it for Account tab
     if (a.id === 'timeclock' && features?.module_timeclock === false && isAdmin) return false;
     return true;
@@ -109,7 +109,7 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
     if (app.soon) return;
     // Time Clock routes differently for admin vs worker
     if (app.id === 'timeclock') {
-      window.location.href = userRole === 'admin' || userRole === 'super_admin' ? '/admin' : '/dashboard';
+      window.location.href = userRole === 'admin' || userRole === 'super_admin' ? '/timeclock' : '/dashboard';
     } else {
       window.location.href = app.path;
     }

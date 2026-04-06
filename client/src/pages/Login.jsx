@@ -43,7 +43,7 @@ export default function Login() {
       const key = `tc_visited_${user.id}`;
       const firstTime = !localStorage.getItem(key);
       localStorage.setItem(key, '1');
-      navigate(firstTime ? '/administration' : '/admin');
+      navigate(firstTime ? '/administration' : '/timeclock');
     } else {
       navigate('/dashboard');
     }

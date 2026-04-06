@@ -566,7 +566,7 @@ const styles = {
   header: { background: '#111827', color: '#fff', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
   logo: { fontWeight: 700, fontSize: 20 },
-  superBadge: { background: '#7c3aed', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, letterSpacing: '0.05em' },
+  superBadge: { background: '#8b5cf6', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, letterSpacing: '0.05em' },
   headerRight: { display: 'flex', alignItems: 'center', gap: 12 },
   userName: { fontSize: 14, opacity: 0.8 },
   headerBtn: { background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' },
