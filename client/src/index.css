@@ -24,6 +24,9 @@ button {
   font-family: inherit;
 }
 
+/* Company name row is mobile-only */
+.company-name-row { display: none; }
+
 /* Prevent iOS Safari from zooming in when tapping inputs */
 @media (max-width: 768px) {
   input, select, textarea {
@@ -127,6 +130,7 @@ input, select, textarea {
   }
   /* Company name — second row, darker band edge-to-edge */
   .company-name-row {
+    display: block !important;
     margin: 8px -24px 0 -24px !important;
     padding: 5px 24px !important;
     background: rgba(0, 0, 0, 0.18) !important;
