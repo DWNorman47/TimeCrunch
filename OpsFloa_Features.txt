@@ -498,7 +498,7 @@ FREE — $0/month
     - Timesheet PDF export (latest completed week only)
     - 90-day history
 
-STARTER — $19/month (or $190/year — save 17%)
+STARTER — $20/month (or $200/year — save 2 months)
   Up to 10 workers.
   Everything in Free, plus:
     - GPS geofencing (prevent off-site and buddy clock-ins)
@@ -507,12 +507,10 @@ STARTER — $19/month (or $190/year — save 17%)
     - Timesheet PDF export (any date range)
     - Full history — no limit
 
-BUSINESS — $25/month base + $1/worker/month
-  Unlimited workers. Scales with your crew size.
-  Example: 25 workers = $50/mo. 75 workers = $100/mo.
-  Annual billing: $250/yr base, $10/worker/yr for committed headcount.
-  Mid-year worker additions are billed monthly and roll into the annual
-  rate at the next renewal.
+BUSINESS — $35/month · 15 workers included · $2/worker after that
+  Scales with your crew size.
+  Example: 25 workers = $55/mo. 50 workers = $105/mo.
+  Annual billing available — save 2 months.
   Everything in Starter, plus:
     - Broadcast push notifications to all workers
     - Field reports, daily reports, and photo capture
@@ -527,13 +525,16 @@ BUSINESS — $25/month base + $1/worker/month
     - Advanced analytics — weekly trends, top projects, top workers
     - Inactive worker alerts (daily admin notification)
 
-PRO ADD-ON — +$45/month (or +$450/year)
+QBO ADD-ON — +$25/month
   Available on Starter or Business plans. Adds:
-    - Certified Payroll Report (WH-347 format) — required by law for
-      Davis-Bacon and prevailing wage government contracts. Generates
-      weekly reports as print-ready PDFs.
     - QuickBooks Online Integration — push time and payroll data directly
-      into QuickBooks. No manual double-entry.
+      into QuickBooks. No manual double-entry. Map workers and projects
+      once, then push with one click.
+
+CERTIFIED PAYROLL
+  Certified Payroll Reports (WH-347 format) are available on Business plans.
+  Required by law for contractors on Davis-Bacon and prevailing wage
+  government contracts. Generates weekly reports as print-ready PDFs.
 
 FREE TRIAL
   All new companies get a 14-day free trial with full access to every
