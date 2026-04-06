@@ -109,7 +109,7 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
     if (app.soon) return;
     // Time Clock routes differently for admin vs worker
     if (app.id === 'timeclock') {
-      window.location.href = userRole === 'admin' || userRole === 'super_admin' ? '/admin' : '/dashboard';
+      window.location.href = userRole === 'admin' || userRole === 'super_admin' ? '/timeclock' : '/dashboard';
     } else {
       window.location.href = app.path;
     }

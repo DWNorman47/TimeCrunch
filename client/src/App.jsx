@@ -69,7 +69,7 @@ function adminHome(userId) {
     localStorage.setItem(key, '1');
     return '/administration';
   }
-  return '/admin';
+  return '/timeclock';
 }
 
 function AppRoutes() {
@@ -87,7 +87,8 @@ function AppRoutes() {
       <Route path="/confirm-email" element={<ConfirmEmail />} />
       <Route path="/__tests__" element={<Tests />} />
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-      <Route path="/admin" element={<PrivateRoute adminOnly><AdminDashboard /></PrivateRoute>} />
+      <Route path="/timeclock" element={<PrivateRoute adminOnly><AdminDashboard /></PrivateRoute>} />
+      <Route path="/admin" element={<Navigate to="/timeclock" replace />} />
       <Route path="/field" element={<PrivateRoute><FieldPage /></PrivateRoute>} />
       <Route path="/projects" element={<PrivateRoute adminOnly><ProjectsPage /></PrivateRoute>} />
       <Route path="/administration" element={<PrivateRoute adminOnly><AdministrationPage /></PrivateRoute>} />
