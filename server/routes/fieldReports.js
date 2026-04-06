@@ -75,19 +75,26 @@ router.post('/', requireAuth, async (req, res) => {
 
     if (photos.length > 0) {
       // Upload base64 data URLs to R2; pass through any already-hosted URLs
-      const uploaded = await Promise.all(
-        photos.map(p => {
-          if (p.url?.startsWith('data:')) {
-            return uploadBase64(p.url).then(({ url, sizeBytes }) => ({
-              url,
-              sizeBytes,
-              caption: p.caption || null,
-              media_type: p.media_type || 'photo',
-            }));
-          }
-          return Promise.resolve({ url: p.url, sizeBytes: 0, caption: p.caption || null, media_type: p.media_type || 'photo' });
-        })
-      );
+      let uploaded;
+      try {
+        uploaded = await Promise.all(
+          photos.map(p => {
+            if (p.url?.startsWith('data:')) {
+              return uploadBase64(p.url).then(({ url, sizeBytes }) => ({
+                url,
+                sizeBytes,
+                caption: p.caption || null,
+                media_type: p.media_type || 'photo',
+              }));
+            }
+            return Promise.resolve({ url: p.url, sizeBytes: 0, caption: p.caption || null, media_type: p.media_type || 'photo' });
+          })
+        );
+      } catch (uploadErr) {
+        await pool.query('DELETE FROM field_reports WHERE id = $1', [report.id]).catch(() => {});
+        console.error('R2 upload failed:', uploadErr);
+        return res.status(500).json({ error: 'Photo upload failed. Please try again.' });
+      }
       const photoValues = uploaded.map((p, i) => `($1, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4}, $${i * 4 + 5})`).join(', ');
       const photoParams = [report.id];
       uploaded.forEach(p => { photoParams.push(p.url); photoParams.push(p.caption); photoParams.push(p.media_type); photoParams.push(p.sizeBytes || null); });

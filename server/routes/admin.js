@@ -577,9 +577,10 @@ router.get('/workers/check-username', requireAdmin, async (req, res) => {
   const { username, exclude_id } = req.query;
   if (!username) return res.json({ taken: false });
   try {
+    const companyId = req.user.company_id;
     const result = exclude_id
-      ? await pool.query('SELECT id FROM users WHERE username = $1 AND id != $2', [username.toLowerCase().trim(), exclude_id])
-      : await pool.query('SELECT id FROM users WHERE username = $1', [username.toLowerCase().trim()]);
+      ? await pool.query('SELECT id FROM users WHERE username = $1 AND company_id = $2 AND id != $3', [username.toLowerCase().trim(), companyId, exclude_id])
+      : await pool.query('SELECT id FROM users WHERE username = $1 AND company_id = $2', [username.toLowerCase().trim(), companyId]);
     res.json({ taken: result.rowCount > 0 });
   } catch (err) {
     res.json({ taken: false });
@@ -2124,7 +2125,10 @@ router.get('/audit-log', requireAdmin, async (req, res) => {
   const conditions = ['company_id = $1'];
   const values = [companyId];
   let idx = 2;
-  if (group) { conditions.push(`action LIKE $${idx++}`); values.push(`${group}.%`); }
+  if (group) {
+    if (!/^[a-zA-Z0-9_]+$/.test(group)) return res.status(400).json({ error: 'Invalid group' });
+    conditions.push(`action LIKE $${idx++}`); values.push(`${group}.%`);
+  }
   if (from) { conditions.push(`created_at >= $${idx++}`); values.push(from); }
   if (to) { conditions.push(`created_at < ($${idx++}::date + interval '1 day')`); values.push(to); }
   const where = conditions.join(' AND ');

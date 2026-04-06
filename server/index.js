@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL'];
+const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL', 'SENDGRID_API_KEY', 'SENDGRID_FROM_EMAIL'];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length) {
   console.error(`ERROR: Missing required environment variables: ${missing.join(', ')}`);
