@@ -1,4 +1,4 @@
-TIME CRUNCH — FULL FEATURE LIST
+OPSFLOA — FULL FEATURE LIST
 For marketing reference
 ================================================================================
 
@@ -29,6 +29,12 @@ GPS GEOFENCING
   only be able to clock in if they are physically within that radius. Prevents
   buddy punching and off-site clock-ins.
 
+REQUIRED SAFETY CHECKLIST ON CLOCK-IN
+  Admins can require workers to complete a specific safety checklist before
+  they are allowed to clock in — either globally (applies to all clock-ins)
+  or on a per-project basis. If the worker hasn't submitted the checklist
+  today, clock-in is blocked until they do.
+
 BREAK AND MILEAGE TRACKING
   While clocked in, workers can log a break (in minutes) and job-related mileage
   before clocking out. Both are captured on the time entry.
@@ -49,6 +55,11 @@ TIMESHEET VIEW
   A calendar-style view of a worker's own entries, grouped by week, so they can
   see their schedule at a glance.
 
+COPY LAST WEEK
+  Workers can copy all time entries from the previous week into the current week
+  with a single tap — useful for workers who work the same projects and hours
+  week over week.
+
 TIMESHEET SIGN-OFF
   Workers can digitally sign off on their timesheet for a date range, indicating
   the hours are accurate. This timestamp is visible to admins in the approval
@@ -67,6 +78,11 @@ UPCOMING SHIFTS
   pre-fills the time entry form with the shift's project, date, and hours,
   so logging time is even faster.
 
+TIME OFF REQUESTS
+  Workers can submit time off requests directly from their dashboard, selecting
+  a date range and adding a note. Admins are notified and can approve or deny
+  the request from the admin panel.
+
 
 ================================================================================
 ADMIN — APPROVAL AND OVERSIGHT
@@ -84,6 +100,10 @@ FILTER BY WORKER
 APPROVE ALL (BULK)
   A single button approves every pending entry, or every pending entry for a
   specific worker, instantly.
+
+TIME OFF MANAGEMENT
+  Admins see all pending time off requests in one place and can approve or
+  deny each request. Workers are notified of the decision automatically.
 
 LIVE DASHBOARD (REFRESHES EVERY MINUTE)
   Admins see real-time KPI cards: how many workers are clocked in right now,
@@ -113,10 +133,14 @@ INACTIVE WORKER ALERTS
   has not submitted a time entry in a configurable number of days (default: 3).
   Helps catch workers who may have stopped logging time without notice.
 
+OVERTIME ALERTS
+  Admins receive an alert when a worker is approaching or has exceeded their
+  overtime threshold, so they can act before labor costs spike.
+
 AUDIT LOG
   Every significant admin action (approval, rejection, rate change, pay period
   lock/unlock, etc.) is recorded in an audit log with the actor's name and
-  timestamp.
+  timestamp. Filterable by action group and date range.
 
 
 ================================================================================
@@ -125,7 +149,7 @@ SCHEDULING
 
 SHIFT SCHEDULING
   Admins can create shifts and assign them to workers and projects, with a
-  specific date and start/end time.
+  specific date and start/end time. Drag-and-drop calendar interface.
 
 WORKER SHIFT VIEW
   Workers see their upcoming shifts on their dashboard and can tap to auto-fill
@@ -212,6 +236,67 @@ LABOR COST ESTIMATES
 
 
 ================================================================================
+PROJECTS
+================================================================================
+
+PROJECT MANAGEMENT
+  Admins create and manage projects with a full set of fields: name, client,
+  job number, address, start and end dates, status, wage type, description,
+  progress percentage, and budget. Projects can be archived when complete.
+
+BUDGET TRACKING
+  Each project can have a budget set in dollars. The project detail panel
+  shows a live budget bar — hours logged against budget — and a progress
+  percentage. Admins can set a budget alert threshold to be notified when
+  a project is approaching its limit.
+
+PROJECT OVERVIEW
+  Each project has a detail panel with:
+    - Health status indicators (on track, at risk, over budget)
+    - Punchlist items (view and create inline)
+    - Document storage (upload, view, delete project documents)
+    - Photo gallery for the project
+    - RFIs associated with the project
+    - Assigned workers roster
+    - Budget and progress bars
+    - Activity feed
+
+BILLING TAB
+  Per-project billing view showing hours and labor costs for a selected date
+  range, broken down by worker and wage type. Export to CSV or generate a
+  formatted PDF invoice with company letterhead, bill-to information, and a
+  time entries table.
+
+PROJECT TIME ENTRIES
+  View all time entries logged against a project in one place, filterable by
+  date.
+
+DOCUMENT STORAGE
+  Upload and manage project documents (plans, permits, contracts, etc.) stored
+  securely in the cloud. Documents can be downloaded or deleted at any time.
+
+
+================================================================================
+CLIENTS
+================================================================================
+
+CLIENT MANAGEMENT
+  Admins maintain a client directory with contact information: company name,
+  contact person, email, and phone. Clients can be linked to projects so
+  billing and reporting are always connected to the right company.
+
+CLIENT DOCUMENT TRACKING
+  For each client, track key compliance and legal documents: Certificate of
+  Insurance (COI), W-9, W-2, contract, and business license. Each document
+  has an optional expiry date. The system flags documents that are expired
+  or expiring within 30 days, so nothing lapses without notice.
+
+DOCUMENT UPLOAD
+  Documents are uploaded directly to secure cloud storage and linked to the
+  client record. All documents are available for download at any time.
+
+
+================================================================================
 FIELD APP
 ================================================================================
 
@@ -221,28 +306,57 @@ apps from any screen.
 
 FIELD REPORTS
   Workers submit daily field reports — notes, observations, issues — tied to a
-  specific date and GPS location. Admins can mark reports as reviewed.
+  specific date and GPS location. Reports can include photos. Admins can mark
+  reports as reviewed.
 
 DAILY REPORTS
   Structured daily job site reports with a title, date, description, and photos.
   Admins can view, review, and download reports as PDFs.
 
-PHOTO CAPTURE
-  Workers can take or attach photos directly from their phone within the Field
-  app and attach them to daily reports.
+PHOTO AND VIDEO CAPTURE
+  Workers can take or attach photos and videos directly from their phone within
+  the Field app and attach them to reports.
 
 PUNCHLIST
   Create and track punch list items for any project — open issues, deficiencies,
-  or tasks that need to be resolved. Items can be marked complete.
+  or tasks that need to be resolved. Items can be broken down into sub-tasks
+  with a checklist, assigned to individuals, and marked complete.
 
 TOOLBOX TALKS (SAFETY TALKS)
   Record toolbox talk / safety meeting details: title, content, who gave the
   talk, date, and project. Creates a digital record of safety training for
   compliance purposes.
 
-PROJECT BILLING PDF
-  Generate a formatted billing summary PDF per project, showing hours and labor
-  costs for client invoicing.
+SAFETY CHECKLISTS
+  Create reusable safety checklist templates (daily pre-task, fall protection,
+  hazard assessment, etc.). Workers complete and submit checklists from their
+  device. Submissions are timestamped and stored for compliance records.
+  Checklists can be required before a worker is allowed to clock in.
+
+INSPECTION CHECKLISTS
+  Structured site inspection forms that capture checklist responses by category.
+  Useful for quality control walkthroughs, subcontractor inspections, and
+  owner punch walks.
+
+INCIDENT REPORTS
+  Workers and admins can document job site incidents — injuries, near-misses,
+  property damage — with a description, date, and supporting details. Records
+  are retained for safety compliance and insurance purposes.
+
+SUBCONTRACTOR REPORTS
+  Track and document subcontractor work on site — who was on site, what work
+  was performed, and any issues noted. Keeps a clear record for general
+  contractors managing multiple subs.
+
+EQUIPMENT LOG
+  Track company equipment: log hours, assign to projects, and maintain a
+  registry of all equipment. Useful for maintenance scheduling and project
+  cost allocation.
+
+RFI TRACKING
+  Submit, track, and manage Requests for Information (RFIs) from within the
+  Field app or from a project's detail panel. Each RFI has a title, description,
+  status, and response field.
 
 
 ================================================================================
@@ -260,8 +374,12 @@ PUSH NOTIFICATIONS
     - Approvals and rejections of their time entries
     - Comments on their entries from an admin
     - Broadcast announcements from admin
+    - Time off request decisions (worker)
+    - New time off requests (admin)
+    - Budget alerts on projects (admin)
     - Inactive worker alerts (admin only)
     - Worker timesheet sign-offs (admin only)
+    - Overtime alerts (admin only)
 
 ADMIN COMMENTS ON ENTRIES
   Admins can leave comments on individual time entries, visible to the worker.
@@ -280,7 +398,7 @@ WORKS ON ANY DEVICE
 INSTALLABLE (PWA)
   OpsFloa is a Progressive Web App. Workers can install it to their phone
   home screen and launch it like a native app. An in-app prompt guides them
-  through installation.
+  through installation on both iOS and Android.
 
 OFFLINE MODE
   Clock-ins and clock-outs are queued locally if the worker loses internet
@@ -308,15 +426,25 @@ PASSWORD RESET AND EMAIL CONFIRMATION
   Standard forgot-password email flow. New admin accounts require email
   confirmation before logging in.
 
+MULTI-FACTOR AUTHENTICATION (MFA)
+  Workers and admins can enable time-based one-time password (TOTP) MFA on
+  their account for an extra layer of login security, using any authenticator
+  app (Google Authenticator, Authy, etc.).
+
 ROLE-BASED ACCESS
   Three roles: Worker (can clock in/out, submit entries, view own data),
   Admin (full company management), Super Admin (platform-level access for the
-  operator).
+  operator). Admin permissions are further configurable per worker.
+
+MODULE TOGGLES
+  Admins can enable or disable entire feature modules per company — Time Clock,
+  Field, Projects, Analytics, and Inventory (coming soon) — so the app only
+  shows what each company actually uses.
 
 FEATURE FLAGS
-  Admins can enable or disable individual features per company — scheduling,
-  analytics, company chat, and prevailing wage tracking — to simplify the UI
-  for companies that don't use those features.
+  Within enabled modules, admins can individually toggle specific features:
+  scheduling, analytics, company chat, prevailing wage tracking, project
+  integration, overtime calculation, geolocation, media gallery, and more.
 
 SUBSCRIPTION BILLING (STRIPE)
   Four-tier pricing — Free, Starter, Business, and a Pro add-on — billed via
@@ -327,20 +455,33 @@ SUBSCRIPTION BILLING (STRIPE)
 
 COMPANY SETTINGS
   Admins configure:
-    - Default hourly rate
-    - Prevailing wage rate
-    - Overtime rule (daily or weekly) and threshold (e.g., 8 hrs/day or 40 hrs/week)
-    - Overtime multiplier (e.g., 1.5x)
+    - Default hourly rate and prevailing wage rate
+    - Overtime rule (daily or weekly), threshold, and multiplier
+    - Currency (USD, CAD, EUR, GBP, MXN, and more)
+    - Company timezone
     - Inactive worker alert threshold (days)
     - Unusual clock-in alert window (e.g., only alert outside 6 AM – 8 PM)
     - Chat message retention (days)
+    - Media retention period
+    - Invoice signature requirement (none, optional, required)
+    - Default temporary password for new workers
+    - Global required safety checklist for clock-in
+    - Notification preferences (per event type)
+    - Module and feature toggles
+
+MEDIA STORAGE
+  Photos and documents are stored securely in Cloudflare R2 cloud storage.
+  Admins can configure a media retention period, and optionally auto-delete
+  media when a project is archived.
 
 SECURITY
   - All data scoped to the company — no company can see another company's data
   - Rate limiting on login and sensitive auth endpoints
   - Helmet security headers on all API responses
   - JWT-based authentication with 8-hour token expiry
+  - MFA support via TOTP authenticator apps
   - Approved time entries are locked and cannot be modified
+  - Username availability is scoped per company
 
 
 ================================================================================
@@ -376,7 +517,13 @@ BUSINESS — $25/month base + $1/worker/month
     - Broadcast push notifications to all workers
     - Field reports, daily reports, and photo capture
     - Safety talks / toolbox talks with sign-off records
+    - Safety checklists and inspection checklists
+    - Incident reports and subcontractor reports
+    - Equipment log and RFI tracking
     - Punchlist management
+    - Projects module (budget tracking, billing, document storage)
+    - Client management and document tracking
+    - Time off requests and approvals
     - Advanced analytics — weekly trends, top projects, top workers
     - Inactive worker alerts (daily admin notification)
 
@@ -408,5 +555,5 @@ OpsFloa is designed for:
 
 It replaces paper timesheets, spreadsheets, and disconnected tools with a
 single platform that covers time collection, approval, reporting, field
-documentation, and payroll prep — built around how construction crews
-actually work.
+documentation, project management, and payroll prep — built around how
+construction crews actually work.
