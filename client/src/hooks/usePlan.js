@@ -10,13 +10,14 @@ export function usePlan() {
   const status = user?.subscription_status || 'trial';
   const qboAddon = user?.addon_qbo || false;
   const isTrial = status === 'trial';
+  const isExempt = status === 'exempt';
   const isTrialExpired = status === 'trial_expired';
-  const isActive = status === 'active' || isTrial;
+  const isActive = status === 'active' || isTrial || isExempt;
 
   // Does the current plan meet or exceed minPlan?
-  // Trial users always return true.
+  // Trial and exempt users always return true.
   function atLeast(minPlan) {
-    if (isTrial) return true;
+    if (isTrial || isExempt) return true;
     if (!isActive) return false;
     return (PLAN_LEVEL[plan] ?? 0) >= (PLAN_LEVEL[minPlan] ?? 0);
   }
@@ -26,12 +27,13 @@ export function usePlan() {
     status,
     qboAddon,
     isTrial,
+    isExempt,
     isTrialExpired,
     isActive,
-    isFree: plan === 'free' && !isTrial,
+    isFree: plan === 'free' && !isTrial && !isExempt,
     isStarter: atLeast('starter'),
     isBusiness: atLeast('business'),
-    hasQbo: qboAddon || isTrial,
+    hasQbo: qboAddon || isTrial || isExempt,
     atLeast,
     // History limit in days — null means no limit
     historyDays: atLeast('starter') ? null : 90,
