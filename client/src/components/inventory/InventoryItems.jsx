@@ -1,9 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api';
 
 const UNITS = ['each', 'box', 'bag', 'bundle', 'pallet', 'lb', 'kg', 'ft', 'm', 'sq ft', 'gal', 'L', 'roll', 'sheet', 'piece', 'other'];
 
 function ItemForm({ item, onSave, onCancel }) {
+  const skuRef = useRef(null);
+  const [skuScanning, setSkuScanning] = useState(false);
+
+  const activateSKUScan = () => {
+    setSkuScanning(true);
+    skuRef.current?.focus();
+    skuRef.current?.select();
+  };
+
   const [form, setForm] = useState({
     name: item?.name || '',
     sku: item?.sku || '',
@@ -67,7 +76,31 @@ function ItemForm({ item, onSave, onCancel }) {
         </div>
         <div style={f.field}>
           <label style={f.label}>SKU</label>
-          <input style={f.input} value={form.sku} onChange={e => set('sku', e.target.value)} placeholder="Optional" />
+          <div style={f.skuWrap}>
+            <input
+              ref={skuRef}
+              style={{ ...f.input, ...(skuScanning ? f.skuScanning : {}) }}
+              value={form.sku}
+              onChange={e => set('sku', e.target.value)}
+              placeholder={skuScanning ? 'Scan barcode now…' : 'Optional'}
+              onFocus={() => setSkuScanning(true)}
+              onBlur={() => setSkuScanning(false)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); skuRef.current?.blur(); } }}
+            />
+            <button
+              type="button"
+              style={{ ...f.scanBtn, ...(skuScanning ? f.scanBtnActive : {}) }}
+              onClick={activateSKUScan}
+              title="Click then scan barcode"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="16" height="16">
+                <path d="M3 5h2M3 9h2M3 15h2M3 19h2M19 5h2M19 9h2M19 15h2M19 19h2" />
+                <rect x="7" y="3" width="2" height="18" rx="0.5" fill="currentColor" stroke="none" />
+                <rect x="11" y="3" width="1" height="18" rx="0.5" fill="currentColor" stroke="none" />
+                <rect x="14" y="3" width="3" height="18" rx="0.5" fill="currentColor" stroke="none" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
       <div style={f.row}>
@@ -453,6 +486,10 @@ const f = {
   field:     { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 160, marginBottom: 14 },
   label:     { fontSize: 12, fontWeight: 600, color: '#374151' },
   input:     { padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#111827', background: '#fff', width: '100%', boxSizing: 'border-box' },
+  skuWrap:     { display: 'flex', gap: 6, alignItems: 'center' },
+  skuScanning: { borderColor: '#f59e0b', boxShadow: '0 0 0 2px #fde68a', outline: 'none' },
+  scanBtn:     { flexShrink: 0, padding: '7px 9px', borderRadius: 8, border: '1px solid #d1d5db', background: '#f9fafb', color: '#6b7280', cursor: 'pointer', display: 'flex', alignItems: 'center' },
+  scanBtnActive: { borderColor: '#f59e0b', background: '#fffbeb', color: '#d97706' },
   actions:   { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 },
   cancelBtn: { padding: '9px 18px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#374151' },
   saveBtn:   { padding: '9px 20px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
