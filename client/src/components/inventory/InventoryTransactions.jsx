@@ -17,6 +17,10 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
     quantity: '',
     from_location_id: '',
     to_location_id: '',
+    area: '',
+    rack: '',
+    bay: '',
+    compartment: '',
     project_id: '',
     notes: '',
     reference_no: '',
@@ -48,6 +52,10 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
         quantity: qty,
         from_location_id: form.from_location_id ? parseInt(form.from_location_id) : undefined,
         to_location_id: form.to_location_id ? parseInt(form.to_location_id) : undefined,
+        area:        form.area        || undefined,
+        rack:        form.rack        || undefined,
+        bay:         form.bay         || undefined,
+        compartment: form.compartment || undefined,
         project_id: form.project_id ? parseInt(form.project_id) : undefined,
         notes: form.notes || undefined,
         reference_no: form.reference_no || undefined,
@@ -123,13 +131,33 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
       )}
 
       {(showTo || showToAdj) && (
-        <div style={f.field}>
-          <label style={f.label}>{showToAdj ? 'Location *' : 'To Location *'}</label>
-          <select style={f.input} value={form.to_location_id} onChange={e => set('to_location_id', e.target.value)}>
-            <option value="">Select location…</option>
-            {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
-        </div>
+        <>
+          <div style={f.field}>
+            <label style={f.label}>{showToAdj ? 'Location *' : 'To Location *'}</label>
+            <select style={f.input} value={form.to_location_id} onChange={e => set('to_location_id', e.target.value)}>
+              <option value="">Select location…</option>
+              {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </div>
+          <div style={f.binRow}>
+            <div style={f.binField}>
+              <label style={f.label}>Area</label>
+              <input style={f.input} value={form.area} onChange={e => set('area', e.target.value)} placeholder="e.g. A" />
+            </div>
+            <div style={f.binField}>
+              <label style={f.label}>Rack</label>
+              <input style={f.input} value={form.rack} onChange={e => set('rack', e.target.value)} placeholder="e.g. R3" />
+            </div>
+            <div style={f.binField}>
+              <label style={f.label}>Bay</label>
+              <input style={f.input} value={form.bay} onChange={e => set('bay', e.target.value)} placeholder="e.g. B2" />
+            </div>
+            <div style={f.binField}>
+              <label style={f.label}>Compartment</label>
+              <input style={f.input} value={form.compartment} onChange={e => set('compartment', e.target.value)} placeholder="e.g. C1" />
+            </div>
+          </div>
+        </>
       )}
 
       {(form.type === 'issue' || form.type === 'receive') && (
@@ -318,6 +346,8 @@ const f = {
   label:     { fontSize: 12, fontWeight: 600, color: '#374151' },
   hint:      { fontSize: 11, color: '#9ca3af', fontWeight: 400 },
   input:     { padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#111827', background: '#fff', width: '100%', boxSizing: 'border-box' },
+  binRow:    { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 },
+  binField:  { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 100 },
   actions:   { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 },
   cancelBtn: { padding: '9px 18px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#374151' },
   saveBtn:   { padding: '9px 20px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },

@@ -10,14 +10,25 @@ function isAdmin(req) {
 
 // Apply a signed quantity delta to inventory_stock atomically.
 // delta is positive to add, negative to subtract.
+// bin = { area, bay, rack } — optional; updates the stored bin address if provided.
 // Must be called inside a BEGIN/COMMIT block.
-async function applyStockDelta(client, companyId, itemId, locationId, delta) {
+async function applyStockDelta(client, companyId, itemId, locationId, delta, bin = {}) {
+  const area        = bin.area?.trim()        || null;
+  const bay         = bin.bay?.trim()         || null;
+  const compartment = bin.compartment?.trim() || null;
+  const rack        = bin.rack?.trim()        || null;
   await client.query(
-    `INSERT INTO inventory_stock (company_id, item_id, location_id, quantity, updated_at)
-     VALUES ($1, $2, $3, $4, NOW())
+    `INSERT INTO inventory_stock (company_id, item_id, location_id, quantity, area, bay, compartment, rack, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
      ON CONFLICT (item_id, location_id)
-     DO UPDATE SET quantity = inventory_stock.quantity + $4, updated_at = NOW()`,
-    [companyId, itemId, locationId, delta]
+     DO UPDATE SET
+       quantity    = inventory_stock.quantity + EXCLUDED.quantity,
+       area        = COALESCE(EXCLUDED.area,        inventory_stock.area),
+       bay         = COALESCE(EXCLUDED.bay,         inventory_stock.bay),
+       compartment = COALESCE(EXCLUDED.compartment, inventory_stock.compartment),
+       rack        = COALESCE(EXCLUDED.rack,        inventory_stock.rack),
+       updated_at  = NOW()`,
+    [companyId, itemId, locationId, delta, area, bay, compartment, rack]
   );
 }
 
@@ -227,7 +238,7 @@ router.get('/stock', requireAuth, async (req, res) => {
       `SELECT s.id, s.item_id, i.name as item_name, i.sku, i.category, i.unit,
               ${admin ? 'i.unit_cost,' : ''}
               i.reorder_point, s.location_id, l.name as location_name, l.type as location_type,
-              s.quantity, s.updated_at
+              s.area, s.bay, s.compartment, s.rack, s.quantity, s.updated_at
        FROM inventory_stock s
        JOIN inventory_items i ON s.item_id = i.id
        JOIN inventory_locations l ON s.location_id = l.id
@@ -267,7 +278,7 @@ router.get('/stock/low', requireAdmin, async (req, res) => {
 
 // POST /api/inventory/transactions
 router.post('/transactions', requireAuth, async (req, res) => {
-  const { type, item_id, quantity, from_location_id, to_location_id, project_id, notes, reference_no, unit_cost } = req.body;
+  const { type, item_id, quantity, from_location_id, to_location_id, project_id, notes, reference_no, unit_cost, area, bay, compartment, rack } = req.body;
   const companyId = req.user.company_id;
   const admin = isAdmin(req);
 
@@ -315,14 +326,15 @@ router.post('/transactions', requireAuth, async (req, res) => {
        project_id || null, req.user.id, notes?.trim() || null, reference_no?.trim() || null, snapshotCost]
     );
 
-    // Update stock
-    if (type === 'receive')  await applyStockDelta(client, companyId, item_id, to_location_id, absQty);
+    // Update stock — bin fields (area/bay/compartment/rack) apply to the destination slot
+    const bin = { area, bay, compartment, rack };
+    if (type === 'receive')  await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin);
     if (type === 'issue')    await applyStockDelta(client, companyId, item_id, from_location_id, -absQty);
     if (type === 'transfer') {
       await applyStockDelta(client, companyId, item_id, from_location_id, -absQty);
-      await applyStockDelta(client, companyId, item_id, to_location_id, absQty);
+      await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin);
     }
-    if (type === 'adjust')   await applyStockDelta(client, companyId, item_id, to_location_id, qty); // signed
+    if (type === 'adjust')   await applyStockDelta(client, companyId, item_id, to_location_id, qty, bin); // signed
 
     await client.query('COMMIT');
 

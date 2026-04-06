@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
 
+function formatBin(area, rack, bay, compartment) {
+  return [
+    area        && `Area ${area}`,
+    rack        && `Rack ${rack}`,
+    bay         && `Bay ${bay}`,
+    compartment && `Cpt ${compartment}`,
+  ].filter(Boolean).join(' · ') || null;
+}
+
 export default function InventoryStock({ isAdmin, locations, onStockChange }) {
   const [stock, setStock] = useState([]);
   const [lowItems, setLowItems] = useState([]);
@@ -73,6 +82,7 @@ export default function InventoryStock({ isAdmin, locations, onStockChange }) {
                 <th style={s.th}>SKU</th>
                 <th style={s.th}>Category</th>
                 <th style={s.th}>Location</th>
+                <th style={s.th}>Bin</th>
                 <th style={{ ...s.th, textAlign: 'right' }}>Qty</th>
                 <th style={s.th}>Unit</th>
                 {isAdmin && <th style={{ ...s.th, textAlign: 'right' }}>Unit Cost</th>}
@@ -91,6 +101,9 @@ export default function InventoryStock({ isAdmin, locations, onStockChange }) {
                     <td style={{ ...s.td, color: '#6b7280', fontFamily: 'monospace', fontSize: 12 }}>{row.sku || '—'}</td>
                     <td style={s.td}>{row.category || '—'}</td>
                     <td style={s.td}>{row.location_name}</td>
+                    <td style={{ ...s.td, color: '#6b7280', fontSize: 12 }}>
+                      {formatBin(row.area, row.rack, row.bay, row.compartment) || '—'}
+                    </td>
                     <td style={{ ...s.td, textAlign: 'right', fontWeight: 700, color: qty < 0 ? '#dc2626' : '#111827' }}>
                       {qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)}
                     </td>
