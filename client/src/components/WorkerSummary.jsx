@@ -1,13 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { fmtHours, formatCurrency } from '../utils';
-
-const RANGES = [
-  { label: 'This week', key: 'this_week' },
-  { label: 'Last week', key: 'last_week' },
-  { label: 'This month', key: 'this_month' },
-  { label: 'Last 30 days', key: 'last_30' },
-  { label: 'All time', key: 'all' },
-];
+import { useT } from '../hooks/useT';
 
 function getDateRange(key) {
   const now = new Date();
@@ -66,6 +59,14 @@ function computeOT(entries, rule, threshold) {
 }
 
 export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly', overtimeMultiplier = 1.5, prevailingRate = 0, overtimeRule = 'daily', overtimeThreshold = 8, showWages = false, currency = 'USD', overtimeEnabled = true }) {
+  const t = useT();
+  const RANGES = [
+    { label: t.thisWeek, key: 'this_week' },
+    { label: t.lastWeek, key: 'last_week' },
+    { label: t.thisMonth, key: 'this_month' },
+    { label: t.last30Days, key: 'last_30' },
+    { label: t.allTime, key: 'all' },
+  ];
   const [range, setRange] = useState('this_week');
   const { from, to } = getDateRange(range);
 
@@ -94,14 +95,14 @@ export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly'
 
   const byProject = {};
   filtered.forEach(e => {
-    const name = e.project_name || 'Unknown';
+    const name = e.project_name || t.unknownProject;
     byProject[name] = (byProject[name] || 0) + entryHours(e);
   });
 
   return (
     <div style={styles.card} className="mobile-card">
       <div style={styles.header}>
-        <h2 style={styles.heading}>My Summary</h2>
+        <h2 style={styles.heading}>{t.mySummary}</h2>
         <div style={styles.rangeTabs} className="range-tabs">
           {RANGES.map(r => (
             <button
@@ -116,41 +117,41 @@ export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly'
       </div>
 
       {filtered.length === 0 ? (
-        <p style={styles.empty}>No entries for this period.</p>
+        <p style={styles.empty}>{t.noEntriesPeriod}</p>
       ) : (
         <>
           <div style={styles.statsGrid} className="stats-grid">
             <div style={styles.stat}>
               <div style={styles.statValue}>{fmtHours(totalHours)}</div>
-              <div style={styles.statLabel}>Total hours</div>
+              <div style={styles.statLabel}>{t.totalHoursLabel}</div>
             </div>
             <div style={styles.stat}>
               <div style={styles.statValue}>{fmtHours(regularHours)}</div>
-              <div style={styles.statLabel}>Regular</div>
+              <div style={styles.statLabel}>{t.regularLabel}</div>
             </div>
             {overtimeEnabled && overtimeHours > 0 && (
               <div style={{ ...styles.stat, borderColor: '#fbbf24' }}>
                 <div style={{ ...styles.statValue, color: '#d97706' }}>{fmtHours(overtimeHours)}</div>
-                <div style={styles.statLabel}>Overtime</div>
+                <div style={styles.statLabel}>{t.overtimeLabel}</div>
               </div>
             )}
             {prevailingHours > 0 && (
               <div style={{ ...styles.stat, borderColor: '#a78bfa' }}>
                 <div style={{ ...styles.statValue, color: '#7c3aed' }}>{fmtHours(prevailingHours)}</div>
-                <div style={styles.statLabel}>Prevailing</div>
+                <div style={styles.statLabel}>{t.prevailingLabel}</div>
               </div>
             )}
             {showWages && (
               <div style={{ ...styles.stat, borderColor: '#6ee7b7' }}>
                 <div style={{ ...styles.statValue, color: '#059669' }}>{formatCurrency(estimatedPay, currency)}</div>
-                <div style={styles.statLabel}>Est. earnings</div>
+                <div style={styles.statLabel}>{t.estEarnings}</div>
               </div>
             )}
           </div>
 
           {Object.keys(byProject).length > 1 && (
             <div style={styles.projectBreakdown}>
-              <div style={styles.breakdownTitle}>By project</div>
+              <div style={styles.breakdownTitle}>{t.byProject}</div>
               {Object.entries(byProject).sort((a, b) => b[1] - a[1]).map(([name, hours]) => (
                 <div key={name} style={styles.projectRow}>
                   <span style={styles.projectName}>{name}</span>

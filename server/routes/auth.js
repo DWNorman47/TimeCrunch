@@ -36,7 +36,7 @@ function validatePassword(password, username) {
 
 function signToken(user) {
   return jwt.sign(
-    { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name, admin_permissions: user.admin_permissions || null, worker_access_ids: user.worker_access_ids || null },
+    { id: user.id, username: user.username, role: user.role, full_name: user.full_name, invoice_name: user.invoice_name || null, language: user.language, company_id: user.company_id, company_name: user.company_name, admin_permissions: user.admin_permissions || null, worker_access_ids: user.worker_access_ids || null },
     process.env.JWT_SECRET,
     { expiresIn: '8h' }
   );

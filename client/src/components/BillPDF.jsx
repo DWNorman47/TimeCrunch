@@ -117,7 +117,7 @@ export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true
         <View style={s.parties}>
           <View style={s.partyBlock}>
             <Text style={s.partyLabel}>From</Text>
-            <Text style={s.partyName}>{worker.full_name || '—'}</Text>
+            <Text style={s.partyName}>{worker.invoice_name || worker.full_name || '—'}</Text>
             {worker.email ? <Text style={s.partyDetail}>{worker.email}</Text> : null}
           </View>
           <View style={s.partyBlock}>

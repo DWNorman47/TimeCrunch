@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { SafetyTalkPDFButton } from './SafetyTalkPDF';
+import { useT } from '../hooks/useT';
 
 const TALK_LIBRARY = [
   { title: 'Fall Protection', content: 'Key Points:\n• Workers at 6 ft or more must be protected from falls\n• Fall protection methods: guardrails, safety nets, personal fall arrest systems (PFAS)\n• Inspect all harnesses and lanyards before each use — retire any that has been in a fall\n• Keep work areas clear of tripping hazards\n\nHazards to watch for:\n• Unprotected floor openings and roof edges without guardrails\n• Scaffolding without toe boards\n\nAction: Report missing or damaged fall protection immediately. Do not work at heights without protection in place.' },
@@ -46,6 +47,7 @@ function fileIcon(contentType) {
 }
 
 function NewTalkForm({ projects, onAdded, onCancel }) {
+  const t = useT();
   const today = new Date().toLocaleDateString('en-CA');
   const [form, setForm] = useState({ title: '', content: '', given_by: '', talk_date: today, project_id: '' });
   const [questions, setQuestions] = useState([]);
@@ -74,7 +76,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
 
   const submit = async e => {
     e.preventDefault();
-    if (!form.title.trim()) { setError('Title is required'); return; }
+    if (!form.title.trim()) { setError(t.titleRequired); return; }
     for (let i = 0; i < questions.length; i++) {
       if (!questions[i].question.trim()) { setError(`Question ${i + 1} is missing text.`); return; }
       if (questions[i].options.filter(o => o.trim()).length < 2) { setError(`Question ${i + 1} needs at least 2 answer options.`); return; }
@@ -92,16 +94,16 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
         onAdded(r.data);
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save');
+      setError(err.response?.data?.error || t.failedToSave);
     } finally { setSaving(false); }
   };
 
   return (
     <form onSubmit={submit} style={styles.form}>
       <div style={styles.formTitleRow}>
-        <h3 style={styles.formTitle}>New Toolbox Talk</h3>
+        <h3 style={styles.formTitle}>{t.newTalkFormTitle}</h3>
         <button type="button" style={styles.libraryBtn} onClick={() => setShowLibrary(s => !s)}>
-          📚 {showLibrary ? 'Hide Library' : 'From Library'}
+          📚 {showLibrary ? t.hideLibrary : t.fromLibrary}
         </button>
       </div>
 
@@ -117,29 +119,29 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
 
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>Topic / Title *</label>
+          <label style={styles.label}>{t.topicTitle}</label>
           <input style={styles.input} type="text" placeholder="e.g. Ladder Safety, PPE Requirements, Fall Protection" value={form.title} onChange={e => set('title', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Date</label>
+          <label style={styles.label}>{t.date}</label>
           <input style={styles.input} type="date" value={form.talk_date} onChange={e => set('talk_date', e.target.value)} />
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>Project</label>
+            <label style={styles.label}>{t.project}</label>
             <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">No project</option>
+              <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
         )}
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Given by</label>
-          <input style={styles.input} type="text" placeholder="Foreman or safety officer name" value={form.given_by} onChange={e => set('given_by', e.target.value)} />
+          <label style={styles.label}>{t.givenBy}</label>
+          <input style={styles.input} type="text" placeholder={t.givenByPlaceholder} value={form.given_by} onChange={e => set('given_by', e.target.value)} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>Talk Content / Notes</label>
-          <textarea style={styles.textarea} rows={5} placeholder="Key points covered, hazards discussed, corrective actions..." value={form.content} onChange={e => set('content', e.target.value)} />
+          <label style={styles.label}>{t.talkContent}</label>
+          <textarea style={styles.textarea} rows={5} placeholder={t.talkContentPlaceholder} value={form.content} onChange={e => set('content', e.target.value)} />
         </div>
       </div>
 
@@ -147,10 +149,10 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
       <div style={styles.quizSection}>
         <div style={styles.quizSectionHead}>
           <div>
-            <div style={styles.quizSectionTitle}>Quiz Questions <span style={styles.optional}>(optional)</span></div>
-            <div style={styles.quizSectionSub}>Workers must answer correctly before signing off</div>
+            <div style={styles.quizSectionTitle}>{t.quizQuestionsTitle} <span style={styles.optional}>{t.quizOptional}</span></div>
+            <div style={styles.quizSectionSub}>{t.quizDesc}</div>
           </div>
-          <button type="button" style={styles.addQuestionBtn} onClick={addQuestion}>+ Add Question</button>
+          <button type="button" style={styles.addQuestionBtn} onClick={addQuestion}>+ {t.addQuestion}</button>
         </div>
 
         {questions.map((q, qi) => (
@@ -160,7 +162,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
               <input
                 style={{ ...styles.input, flex: 1 }}
                 type="text"
-                placeholder="Question text"
+                placeholder={t.questionTextPlaceholder}
                 value={q.question}
                 onChange={e => setQuestion(qi, e.target.value)}
               />
@@ -189,7 +191,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
                 </div>
               ))}
               {q.options.length < 4 && (
-                <button type="button" style={styles.addOptionBtn} onClick={() => addOption(qi)}>+ Add option</button>
+                <button type="button" style={styles.addOptionBtn} onClick={() => addOption(qi)}>+ {t.addOption}</button>
               )}
             </div>
           </div>
@@ -197,7 +199,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
 
         {questions.length > 0 && (
           <div style={styles.thresholdRow}>
-            <label style={styles.label}>Pass if at least</label>
+            <label style={styles.label}>{t.passIfAtLeast}</label>
             <input
               style={{ ...styles.input, width: 64, textAlign: 'center' }}
               type="number"
@@ -207,21 +209,22 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
               value={passThreshold}
               onChange={e => setPassThreshold(e.target.value)}
             />
-            <label style={styles.label}>of {questions.length} correct</label>
+            <label style={styles.label}>{t.ofCorrect} ({questions.length})</label>
           </div>
         )}
       </div>
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? 'Saving...' : 'Create Talk'}</button>
-        <button style={styles.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : t.createTalk}</button>
+        <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
   );
 }
 
 function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
+  const t = useT();
   const { user } = useAuth();
   const [talk, setTalk] = useState(initialTalk);
   const [expanded, setExpanded] = useState(false);
@@ -262,16 +265,16 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
         size_bytes: file.size,
       });
       setAttachments(prev => [...(prev || []), r.data]);
-    } catch { alert('Upload failed'); }
+    } catch { alert(t.uploadFailed); }
     finally { setUploading(false); }
   };
 
   const deleteAttachment = async attId => {
-    if (!confirm('Remove this attachment?')) return;
+    if (!confirm(t.removeAttachmentConfirm)) return;
     try {
       await api.delete(`/safety-talks/${talk.id}/attachments/${attId}`);
       setAttachments(prev => prev.filter(a => a.id !== attId));
-    } catch { alert('Failed to remove'); }
+    } catch { alert(t.failedRemoveAttachment); }
   };
 
   const handleExpand = () => {
@@ -300,10 +303,10 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
   };
 
   const handleDelete = async () => {
-    if (!confirm('Delete this toolbox talk?')) return;
+    if (!confirm(t.deleteTalkConfirm)) return;
     setDeleting(true);
     try { await api.delete(`/safety-talks/${talk.id}`); onDeleted(talk.id); }
-    catch { alert('Failed to delete'); }
+    catch { alert(t.failedToDelete); }
     finally { setDeleting(false); }
   };
 
@@ -315,11 +318,11 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
         <div style={styles.cardLeft}>
           <div style={styles.talkIcon}>🦺</div>
           <div>
-            <div style={styles.talkTitle}>{talk.title}{talk.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}</div>
+            <div style={styles.talkTitle}>{talk.title}{talk.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
             <div style={styles.talkMeta}>
               {fmtDate(talk.talk_date)}
               {talk.project_name && <span style={styles.projectTag}>{talk.project_name}</span>}
-              {talk.given_by && <span style={styles.givenBy}>by {talk.given_by}</span>}
+              {talk.given_by && <span style={styles.givenBy}>{t.talkGivenBy} {talk.given_by}</span>}
               {hasQuiz && <span style={styles.quizBadge}>📝 {talk.question_count} question{talk.question_count !== '1' ? 's' : ''}</span>}
             </div>
           </div>
@@ -373,25 +376,25 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
               ))}
               {quizResult && !quizResult.passed && (
                 <div style={styles.quizFail}>
-                  ✗ {quizResult.score}/{quizResult.total} correct — need {quizResult.needed} to pass. Try again.
+                  ✗ {quizResult.score}/{quizResult.total} {t.quizFailedMsg} {quizResult.needed} {t.quizFailedTryAgain}
                 </div>
               )}
             </div>
           )}
 
           {quizResult?.passed && (
-            <div style={styles.quizPass}>✓ {quizResult.score}/{quizResult.total} correct — you passed!</div>
+            <div style={styles.quizPass}>✓ {quizResult.score}/{quizResult.total} {t.quizPassedMsg}</div>
           )}
 
           {/* Attachments */}
           {((attachments && attachments.length > 0) || isAdmin) && (
             <div style={styles.attachmentsSection}>
               <div style={styles.attachmentsHeader}>
-                <span style={styles.attachmentsTitle}>Attachments</span>
+                <span style={styles.attachmentsTitle}>{t.attachmentsSection}</span>
                 {isAdmin && (
                   <>
                     <button style={styles.attachBtn} onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                      {uploading ? 'Uploading...' : '+ Attach File'}
+                      {uploading ? t.uploading : `+ ${t.attachFile}`}
                     </button>
                     <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleAttachmentUpload} />
                   </>
@@ -400,7 +403,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
               {attachments === null ? (
                 <p style={styles.hint}>Loading...</p>
               ) : attachments.length === 0 ? (
-                <p style={styles.hint}>No attachments yet.</p>
+                <p style={styles.hint}>{t.noAttachments}</p>
               ) : (
                 <div style={styles.attachmentList}>
                   {attachments.map(a => (
@@ -420,25 +423,25 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
 
           <div style={styles.signoffSection}>
             <div style={styles.signoffHeader}>
-              <span style={styles.signoffTitle}>Sign-offs ({signoffs?.length ?? talk.signoff_count})</span>
+              <span style={styles.signoffTitle}>{t.signoffsLabel} ({signoffs?.length ?? talk.signoff_count})</span>
               {!isAdmin && !alreadySigned && (
                 <button
                   style={styles.signBtn}
                   onClick={handleSignoff}
                   disabled={signing || (questions?.length > 0 && !allAnswered)}
-                  title={questions?.length > 0 && !allAnswered ? 'Answer all questions first' : ''}
+                  title={questions?.length > 0 && !allAnswered ? t.answerQuestionsFirst : ''}
                 >
-                  {signing ? '...' : '✍️ Sign Off'}
+                  {signing ? '...' : `✍️ ${t.signOff}`}
                 </button>
               )}
               {!isAdmin && alreadySigned && (
-                <span style={styles.signedNote}>✓ You've signed this talk</span>
+                <span style={styles.signedNote}>✓ {t.alreadySigned}</span>
               )}
             </div>
             {signoffs === null ? (
               <p style={styles.hint}>Loading...</p>
             ) : signoffs.length === 0 ? (
-              <p style={styles.hint}>No sign-offs yet.</p>
+              <p style={styles.hint}>{t.noSignoffs}</p>
             ) : (
               <div style={styles.signoffList}>
                 {signoffs.map((s, i) => (
@@ -457,7 +460,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
           {isAdmin && (
             <div style={styles.cardActions}>
               <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>
-                {deleting ? '...' : 'Delete'}
+                {deleting ? '...' : t.delete}
               </button>
             </div>
           )}
@@ -468,6 +471,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
 }
 
 export default function SafetyTalks({ projects }) {
+  const t = useT();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
@@ -495,14 +499,14 @@ export default function SafetyTalks({ projects }) {
     <div>
       <div style={styles.topRow}>
         <div>
-          <h2 style={styles.heading}>Safety / Toolbox Talks</h2>
+          <h2 style={styles.heading}>{t.safetyTalksTitle}</h2>
           {talks.length > 0 && (
-            <p style={styles.summary}>{talks.length} talk{talks.length !== 1 ? 's' : ''} · {totalSignoffs} total sign-offs</p>
+            <p style={styles.summary}>{talks.length} {talks.length !== 1 ? t.talksCountPlural : t.talksCount} · {totalSignoffs} {t.totalSignoffs}</p>
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {talks.length > 0 && <SafetyTalkPDFButton talks={talks} companyName={user?.company_name} style={styles.pdfBtn} />}
-          {isAdmin && <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ New Talk</button>}
+          {isAdmin && <button style={styles.newBtn} onClick={() => setShowForm(true)}>{t.newTalk}</button>}
         </div>
       </div>
 
@@ -519,21 +523,19 @@ export default function SafetyTalks({ projects }) {
       {projects.length > 0 && (
         <div style={styles.filters}>
           <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
-            <option value="">All projects</option>
+            <option value="">{t.allProjectsOpt}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
       )}
 
       {loading ? (
-        <p style={styles.hint}>Loading...</p>
+        <p style={styles.hint}>{t.loading}</p>
       ) : talks.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>🦺</div>
           <p style={styles.emptyText}>
-            {isAdmin
-              ? 'No toolbox talks yet. Create one and workers can sign off on their phones.'
-              : 'No toolbox talks scheduled. Check back before your next shift.'}
+            {isAdmin ? t.noTalksAdmin : t.noTalksWorker}
           </p>
         </div>
       ) : (

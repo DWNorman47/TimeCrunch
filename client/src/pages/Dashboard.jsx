@@ -20,6 +20,8 @@ import { getOrFetch, setCached } from '../offlineDb';
 import { useOffline } from '../contexts/OfflineContext';
 import OfflineBanner from '../components/OfflineBanner';
 import SignatureModal from '../components/SignatureModal';
+import TimeOffTab from '../components/TimeOffTab';
+import WorkerSchedule from '../components/WorkerSchedule';
 
 const isPwa = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
@@ -35,7 +37,7 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
-  const TABS = ['clock', 'messages', 'timesheet', 'account'];
+  const TABS = ['clock', 'messages', 'timesheet', 'timeoff', 'schedule', 'account'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'clock');
   const [entryView, setEntryView] = useState('list');
@@ -79,7 +81,7 @@ export default function Dashboard() {
 
   // When timeclock feature is off, redirect away from clock-only tabs
   useEffect(() => {
-    if (settings && settings.feature_timeclock === false && tab !== 'account') {
+    if (settings && settings.module_timeclock === false && tab !== 'account') {
       setTab('account');
       window.location.hash = 'account';
     }
@@ -141,7 +143,7 @@ export default function Dashboard() {
     ].filter(Boolean);
 
     // Feature flags
-    const showProject = settings?.feature_projects !== false;
+    const showProject = settings?.feature_project_integration !== false;
     const overtimeEnabled = settings?.feature_overtime !== false;
 
     // Rates
@@ -367,9 +369,11 @@ ${signatureDataUrl ? `
 
       <main style={styles.main} className="mobile-main">
         <div style={styles.tabs} className="tab-bar">
-          {settings?.feature_timeclock !== false && <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); window.location.hash = 'clock'; }}>🕐 Clock</button>}
-          {settings?.feature_timeclock !== false && <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => { setTab('messages'); window.location.hash = 'messages'; }}>💬 Messages</button>}
-          {settings?.feature_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); window.location.hash = 'timesheet'; }}>📋 Timesheet</button>}
+          {settings?.module_timeclock !== false && <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); window.location.hash = 'clock'; }}>🕐 Clock</button>}
+          {settings?.module_timeclock !== false && <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => { setTab('messages'); window.location.hash = 'messages'; }}>💬 Messages</button>}
+          {settings?.module_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); window.location.hash = 'timesheet'; }}>📋 Timesheet</button>}
+          <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); window.location.hash = 'timeoff'; }}>🏖 Time Off</button>
+          {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); window.location.hash = 'schedule'; }}>📅 Schedule</button>}
           <button style={tab === 'account' ? styles.tabActive : styles.tab} onClick={() => { setTab('account'); window.location.hash = 'account'; }}>👤 Account</button>
         </div>
 
@@ -377,8 +381,8 @@ ${signatureDataUrl ? `
 
         {tab === 'clock' && (
           <>
-            <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} geolocationEnabled={settings?.feature_geolocation ?? false} projectsEnabled={settings?.feature_projects !== false} />
-            <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} prefill={shiftPrefill} projectsEnabled={settings?.feature_projects !== false} />
+            <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} geolocationEnabled={settings?.feature_geolocation ?? false} projectsEnabled={settings?.feature_project_integration !== false} />
+            <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} prefill={shiftPrefill} projectsEnabled={settings?.feature_project_integration !== false} />
           </>
         )}
 
@@ -406,6 +410,10 @@ ${signatureDataUrl ? `
             )}
           </>
         )}
+
+        {tab === 'timeoff' && <TimeOffTab />}
+
+        {tab === 'schedule' && <WorkerSchedule />}
 
         {tab === 'account' && (
           <>

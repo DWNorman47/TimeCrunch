@@ -3,21 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { IncidentReportPDFButton } from './IncidentReportPDF';
-
-const TYPE_LABELS = {
-  'injury': '🤕 Injury',
-  'near-miss': '⚠️ Near-Miss',
-  'property-damage': '🔧 Property Damage',
-  'environmental': '🌿 Environmental',
-  'other': '📝 Other',
-};
-
-const TREATMENT_LABELS = {
-  'none': 'No treatment needed',
-  'first-aid': 'First aid on-site',
-  'medical-attention': 'Medical attention (off-site)',
-  'hospitalization': 'Hospitalization',
-};
+import { useT } from '../hooks/useT';
 
 function today() {
   return new Date().toLocaleDateString('en-CA');
@@ -26,6 +12,20 @@ function today() {
 // ── Incident Form ─────────────────────────────────────────────────────────────
 
 function IncidentForm({ projects, onSubmitted, onCancel }) {
+  const t = useT();
+  const TYPE_LABELS = {
+    'injury': `🤕 ${t.typeInjury}`,
+    'near-miss': `⚠️ ${t.typeNearMiss}`,
+    'property-damage': `🔧 ${t.typePropertyDamage}`,
+    'environmental': `🌿 ${t.typeEnvironmental}`,
+    'other': `📝 ${t.typeOther}`,
+  };
+  const TREATMENT_LABELS = {
+    'none': t.treatmentNone,
+    'first-aid': t.treatmentFirstAid,
+    'medical-attention': t.treatmentMedicalFull,
+    'hospitalization': t.treatmentHospitalization,
+  };
   const [form, setForm] = useState({
     incident_date: today(),
     incident_time: '',
@@ -47,7 +47,7 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!form.description.trim()) { setError('Description is required.'); return; }
+    if (!form.description.trim()) { setError(t.descriptionRequired); return; }
     setSaving(true); setError('');
     try {
       const payload = { ...form };
@@ -61,37 +61,37 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
         onSubmitted(r.data);
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to submit report');
+      setError(err.response?.data?.error || t.failedToSave);
     } finally { setSaving(false); }
   };
 
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
-      <h3 style={styles.formTitle}>New Incident Report</h3>
+      <h3 style={styles.formTitle}>{t.newIncidentReport}</h3>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Date *</label>
+          <label style={styles.label}>{t.date} *</label>
           <input style={styles.input} type="date" value={form.incident_date} onChange={e => set('incident_date', e.target.value)} required />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Time <span style={styles.optional}>(optional)</span></label>
+          <label style={styles.label}>{t.timeLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
           <input style={styles.input} type="time" value={form.incident_time} onChange={e => set('incident_time', e.target.value)} />
         </div>
       </div>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Incident Type *</label>
+          <label style={styles.label}>{t.incidentType}</label>
           <select style={styles.input} value={form.type} onChange={e => set('type', e.target.value)}>
             {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>Project <span style={styles.optional}>(optional)</span></label>
+            <label style={styles.label}>{t.project} <span style={styles.optional}>{t.quizOptional}</span></label>
             <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">No project</option>
+              <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -102,16 +102,16 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
         <>
           <div style={styles.row}>
             <div style={styles.fieldGroup}>
-              <label style={styles.label}>Injured Person's Name</label>
-              <input style={styles.input} type="text" placeholder="Full name" value={form.injured_name} onChange={e => set('injured_name', e.target.value)} />
+              <label style={styles.label}>{t.injuredName}</label>
+              <input style={styles.input} type="text" placeholder={t.fullNamePlaceholder} value={form.injured_name} onChange={e => set('injured_name', e.target.value)} />
             </div>
             <div style={styles.fieldGroup}>
-              <label style={styles.label}>Body Part Affected</label>
-              <input style={styles.input} type="text" placeholder="e.g. Left hand, lower back" value={form.body_part} onChange={e => set('body_part', e.target.value)} />
+              <label style={styles.label}>{t.bodyPartAffected}</label>
+              <input style={styles.input} type="text" placeholder={t.bodyPartPlaceholder} value={form.body_part} onChange={e => set('body_part', e.target.value)} />
             </div>
           </div>
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>Treatment</label>
+            <label style={styles.label}>{t.treatmentField}</label>
             <select style={styles.input} value={form.treatment} onChange={e => set('treatment', e.target.value)}>
               {Object.entries(TREATMENT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
@@ -120,32 +120,32 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
       )}
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>Description *</label>
-        <textarea style={styles.textarea} rows={4} placeholder="Describe what happened, where, and how…" value={form.description} onChange={e => set('description', e.target.value)} required />
+        <label style={styles.label}>{t.descriptionField} *</label>
+        <textarea style={styles.textarea} rows={4} placeholder={t.describeWhatHappened} value={form.description} onChange={e => set('description', e.target.value)} required />
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>Witnesses <span style={styles.optional}>(optional)</span></label>
-        <input style={styles.input} type="text" placeholder="Names of any witnesses" value={form.witnesses} onChange={e => set('witnesses', e.target.value)} />
+        <label style={styles.label}>{t.witnessesLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
+        <input style={styles.input} type="text" placeholder={t.witnessesPlaceholder} value={form.witnesses} onChange={e => set('witnesses', e.target.value)} />
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>Corrective Action Taken <span style={styles.optional}>(optional)</span></label>
-        <textarea style={styles.textarea} rows={3} placeholder="What was done to address the situation…" value={form.corrective_action} onChange={e => set('corrective_action', e.target.value)} />
+        <label style={styles.label}>{t.correctiveActionLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
+        <textarea style={styles.textarea} rows={3} placeholder={t.correctiveActionPlaceholder} value={form.corrective_action} onChange={e => set('corrective_action', e.target.value)} />
       </div>
 
       <label style={styles.checkRow}>
         <input type="checkbox" checked={form.work_stopped} onChange={e => set('work_stopped', e.target.checked)} />
-        <span style={styles.checkLabel}>Work was stopped as a result of this incident</span>
+        <span style={styles.checkLabel}>{t.workStoppedLabel}</span>
       </label>
 
       {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.formActions}>
         <button style={styles.submitBtn} type="submit" disabled={saving}>
-          {saving ? 'Submitting…' : 'Submit Report'}
+          {saving ? t.submitting : t.submitReport}
         </button>
-        <button style={styles.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+        <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
   );
@@ -154,6 +154,20 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
 // ── Incident Card ─────────────────────────────────────────────────────────────
 
 function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
+  const t = useT();
+  const TYPE_LABELS = {
+    'injury': `🤕 ${t.typeInjury}`,
+    'near-miss': `⚠️ ${t.typeNearMiss}`,
+    'property-damage': `🔧 ${t.typePropertyDamage}`,
+    'environmental': `🌿 ${t.typeEnvironmental}`,
+    'other': `📝 ${t.typeOther}`,
+  };
+  const TREATMENT_LABELS = {
+    'none': t.treatmentNone,
+    'first-aid': t.treatmentFirstAid,
+    'medical-attention': t.treatmentMedicalFull,
+    'hospitalization': t.treatmentHospitalization,
+  };
   const [expanded, setExpanded] = useState(false);
   const [closing, setClosing] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -167,7 +181,7 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
   };
 
   const handleDelete = async () => {
-    if (!confirm('Delete this incident report?')) return;
+    if (!confirm(t.deleteIncidentConfirm)) return;
     setDeleting(true);
     try {
       await api.delete(`/incidents/${incident.id}`);
@@ -183,16 +197,16 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
       <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
         <div style={styles.cardLeft}>
           {isAdmin && <div style={styles.workerName}>{incident.reporter_name}</div>}
-          <div style={styles.cardTitle}>{typeLabel}{incident.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}</div>
+          <div style={styles.cardTitle}>{typeLabel}{incident.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
           <div style={styles.cardMeta}>
             <span>{incident.incident_date?.toString().substring(0, 10)}{incident.incident_time ? ` · ${incident.incident_time.substring(0, 5)}` : ''}</span>
             {incident.project_name && <span style={styles.projectTag}>{incident.project_name}</span>}
-            {incident.work_stopped && <span style={styles.stoppedTag}>Work Stopped</span>}
+            {incident.work_stopped && <span style={styles.stoppedTag}>{t.workStoppedTag}</span>}
           </div>
         </div>
         <div style={styles.cardRight}>
           <span style={incident.status === 'closed' ? styles.badgeClosed : styles.badgeOpen}>
-            {incident.status === 'closed' ? 'Closed' : 'Open'}
+            {incident.status === 'closed' ? t.incidentClosed : t.incidentOpen}
           </span>
           <span style={styles.chevron}>{expanded ? '▲' : '▼'}</span>
         </div>
@@ -202,27 +216,27 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
         <div style={styles.cardBody}>
           {isInjury && (incident.injured_name || incident.body_part || incident.treatment) && (
             <div style={styles.injuryBox}>
-              {incident.injured_name && <div><strong>Injured:</strong> {incident.injured_name}</div>}
-              {incident.body_part && <div><strong>Body part:</strong> {incident.body_part}</div>}
-              {incident.treatment && <div><strong>Treatment:</strong> {TREATMENT_LABELS[incident.treatment] || incident.treatment}</div>}
+              {incident.injured_name && <div><strong>{t.injuredLabel}:</strong> {incident.injured_name}</div>}
+              {incident.body_part && <div><strong>{t.bodyPartLabel}:</strong> {incident.body_part}</div>}
+              {incident.treatment && <div><strong>{t.treatmentDetailLabel}:</strong> {TREATMENT_LABELS[incident.treatment] || incident.treatment}</div>}
             </div>
           )}
 
           <div style={styles.section}>
-            <div style={styles.sectionLabel}>Description</div>
+            <div style={styles.sectionLabel}>{t.descriptionSection}</div>
             <p style={styles.sectionText}>{incident.description}</p>
           </div>
 
           {incident.witnesses && (
             <div style={styles.section}>
-              <div style={styles.sectionLabel}>Witnesses</div>
+              <div style={styles.sectionLabel}>{t.witnessesSection}</div>
               <p style={styles.sectionText}>{incident.witnesses}</p>
             </div>
           )}
 
           {incident.corrective_action && (
             <div style={styles.section}>
-              <div style={styles.sectionLabel}>Corrective Action</div>
+              <div style={styles.sectionLabel}>{t.correctiveActionSection}</div>
               <p style={styles.sectionText}>{incident.corrective_action}</p>
             </div>
           )}
@@ -230,12 +244,12 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
           <div style={styles.cardActions}>
             {isAdmin && incident.status !== 'closed' && (
               <button style={styles.closeBtn} onClick={handleClose} disabled={closing}>
-                {closing ? '…' : '✓ Close Incident'}
+                {closing ? '…' : t.closeIncident}
               </button>
             )}
             {(!isAdmin || incident.status !== 'closed') && (
               <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>
-                {deleting ? '…' : 'Delete'}
+                {deleting ? '…' : t.delete}
               </button>
             )}
           </div>
@@ -249,8 +263,16 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
 
 export default function IncidentReports({ projects }) {
   const { user } = useAuth();
+  const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
+  const TYPE_LABELS = {
+    'injury': `🤕 ${t.typeInjury}`,
+    'near-miss': `⚠️ ${t.typeNearMiss}`,
+    'property-damage': `🔧 ${t.typePropertyDamage}`,
+    'environmental': `🌿 ${t.typeEnvironmental}`,
+    'other': `📝 ${t.typeOther}`,
+  };
 
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -277,14 +299,14 @@ export default function IncidentReports({ projects }) {
     <div>
       <div style={styles.topRow}>
         <div>
-          <h1 style={styles.heading}>Incident Reports</h1>
+          <h1 style={styles.heading}>{t.incidentReports}</h1>
           {openCount > 0 && (
-            <p style={styles.openNote}>{openCount} open incident{openCount !== 1 ? 's' : ''}</p>
+            <p style={styles.openNote}>{openCount} {openCount !== 1 ? t.openIncidentsPlural : t.openIncidents}</p>
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {incidents.length > 0 && <IncidentReportPDFButton incidents={incidents} companyName={user?.company_name} style={styles.pdfBtn} />}
-          {!showForm && <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ New Incident</button>}
+          {!showForm && <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ {t.newIncident}</button>}
         </div>
       </div>
 
@@ -301,13 +323,13 @@ export default function IncidentReports({ projects }) {
       {isAdmin && (
         <div style={styles.filterBar}>
           <select style={styles.filterSelect} value={filters.type || ''} onChange={e => setFilter('type', e.target.value)}>
-            <option value="">All types</option>
+            <option value="">{t.allTypes}</option>
             {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
           <select style={styles.filterSelect} value={filters.status || ''} onChange={e => setFilter('status', e.target.value)}>
-            <option value="">All statuses</option>
-            <option value="open">Open</option>
-            <option value="closed">Closed</option>
+            <option value="">{t.allStatuses}</option>
+            <option value="open">{t.incidentOpen}</option>
+            <option value="closed">{t.incidentClosed}</option>
           </select>
           <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title="From date" />
           <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title="To date" />
@@ -315,11 +337,11 @@ export default function IncidentReports({ projects }) {
       )}
 
       {loading ? (
-        <p style={styles.hint}>Loading…</p>
+        <p style={styles.hint}>{t.loading}</p>
       ) : incidents.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>🦺</div>
-          <p style={styles.emptyText}>{isAdmin ? 'No incident reports yet.' : 'No incidents reported. Tap + New Incident to file a report.'}</p>
+          <p style={styles.emptyText}>{isAdmin ? t.noIncidents : t.noIncidentsWorker}</p>
         </div>
       ) : (
         <div style={styles.list}>

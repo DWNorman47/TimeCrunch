@@ -179,7 +179,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
   const startEditInfo = w => {
     setEditingId(w.id); setEditSection('info');
-    setEditInfoForm({ full_name: w.full_name, email: w.email || '', role: w.role, language: w.language || 'English', worker_type: w.worker_type || 'employee' });
+    setEditInfoForm({ full_name: w.full_name, invoice_name: w.invoice_name || '', email: w.email || '', role: w.role, language: w.language || 'English', worker_type: w.worker_type || 'employee' });
   };
 
   const startEditUsername = w => {
@@ -500,6 +500,10 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 <input style={s.input} value={editInfoForm.full_name} onChange={e => setEditInfoForm(f => ({ ...f, full_name: e.target.value }))} />
                               </div>
                               <div style={s.fieldGroup}>
+                                <label style={s.label}>Invoice Name <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
+                                <input style={s.input} value={editInfoForm.invoice_name} onChange={e => setEditInfoForm(f => ({ ...f, invoice_name: e.target.value }))} placeholder="e.g. Acme Contracting LLC" />
+                              </div>
+                              <div style={s.fieldGroup}>
                                 <label style={s.label}>{t.email}</label>
                                 <input style={s.input} type="email" value={editInfoForm.email} onChange={e => setEditInfoForm(f => ({ ...f, email: e.target.value }))} />
                               </div>
@@ -536,6 +540,10 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                             <div style={s.infoGrid}>
                               <span style={s.infoLabel}>Name</span>
                               <span style={s.infoValue}>{w.full_name}</span>
+                              {w.invoice_name && <>
+                                <span style={s.infoLabel}>Invoice Name</span>
+                                <span style={s.infoValue}>{w.invoice_name}</span>
+                              </>}
                               <span style={s.infoLabel}>Email</span>
                               <span style={s.infoValue}>{w.email || <em style={{ color: '#9ca3af' }}>{t.notSet}</em>}</span>
                               <span style={s.infoLabel}>Language</span>

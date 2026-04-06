@@ -76,13 +76,14 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
     feature_overtime: settings?.feature_overtime ?? true,
-    feature_field: settings?.feature_field ?? false,
+    module_field: settings?.module_field ?? false,
     feature_scheduling: settings?.feature_scheduling ?? true,
     feature_analytics: settings?.feature_analytics ?? true,
     feature_chat: settings?.feature_chat ?? true,
     feature_geolocation: settings?.feature_geolocation ?? true,
-    feature_timeclock: settings?.feature_timeclock ?? true,
-    feature_projects: settings?.feature_projects ?? true,
+    module_timeclock: settings?.module_timeclock ?? true,
+    module_projects: settings?.module_projects ?? true,
+    feature_project_integration: settings?.feature_project_integration ?? true,
     feature_inactive_alerts: settings?.feature_inactive_alerts ?? true,
     feature_overtime_alerts: settings?.feature_overtime_alerts ?? true,
     feature_broadcast: settings?.feature_broadcast ?? true,
@@ -95,6 +96,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     default_temp_password: settings?.default_temp_password ?? '',
     media_retention_days: String(settings?.media_retention_days ?? 0),
     media_delete_on_project_archive: settings?.media_delete_on_project_archive ?? false,
+    notify_timeoff_requests: settings?.notify_timeoff_requests ?? true,
+    notify_budget_alerts: settings?.notify_budget_alerts ?? true,
+    notify_entry_submitted: settings?.notify_entry_submitted ?? false,
   });
   const [prevailingEnabled, setPrevailingEnabled] = useState(() => (settings?.prevailing_wage_rate ?? 0) > 0);
   const [checklistTemplates, setChecklistTemplates] = useState([]);
@@ -128,13 +132,14 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       notification_end_hour: String(settings.notification_end_hour ?? 20),
       chat_retention_days: String(settings.chat_retention_days ?? 3),
       feature_overtime: settings.feature_overtime ?? true,
-      feature_field: settings.feature_field ?? false,
+      module_field: settings.module_field ?? false,
       feature_scheduling: settings.feature_scheduling ?? true,
       feature_analytics: settings.feature_analytics ?? true,
       feature_chat: settings.feature_chat ?? true,
       feature_geolocation: settings.feature_geolocation ?? true,
-      feature_timeclock: settings.feature_timeclock ?? true,
-      feature_projects: settings.feature_projects ?? true,
+      module_timeclock: settings.module_timeclock ?? true,
+      module_projects: settings.module_projects ?? true,
+      feature_project_integration: settings.feature_project_integration ?? true,
       feature_inactive_alerts: settings.feature_inactive_alerts ?? true,
       feature_overtime_alerts: settings.feature_overtime_alerts ?? true,
       feature_broadcast: settings.feature_broadcast ?? true,
@@ -147,6 +152,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       default_temp_password: settings.default_temp_password ?? '',
       media_retention_days: String(settings.media_retention_days ?? 0),
       media_delete_on_project_archive: settings.media_delete_on_project_archive ?? false,
+      notify_timeoff_requests: settings.notify_timeoff_requests ?? true,
+      notify_budget_alerts: settings.notify_budget_alerts ?? true,
+      notify_entry_submitted: settings.notify_entry_submitted ?? false,
     });
   }, [settings]);
 
@@ -167,13 +175,14 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         notification_end_hour: parseFloat(form.notification_end_hour),
         chat_retention_days: parseFloat(form.chat_retention_days),
         feature_overtime: form.feature_overtime,
-        feature_field: form.feature_field,
+        module_field: form.module_field,
         feature_scheduling: form.feature_scheduling,
         feature_analytics: form.feature_analytics,
         feature_chat: form.feature_chat,
         feature_geolocation: form.feature_geolocation,
-        feature_timeclock: form.feature_timeclock,
-        feature_projects: form.feature_projects,
+        module_timeclock: form.module_timeclock,
+        module_projects: form.module_projects,
+        feature_project_integration: form.feature_project_integration,
         feature_inactive_alerts: form.feature_inactive_alerts,
         feature_overtime_alerts: form.feature_overtime_alerts,
         feature_broadcast: form.feature_broadcast,
@@ -186,6 +195,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         default_temp_password: form.default_temp_password,
         media_retention_days: parseFloat(form.media_retention_days) || 0,
         media_delete_on_project_archive: form.media_delete_on_project_archive,
+        notify_timeoff_requests: form.notify_timeoff_requests,
+        notify_budget_alerts: form.notify_budget_alerts,
+        notify_entry_submitted: form.notify_entry_submitted,
       });
       onSettingsUpdated(r.data);
       setSaved(section);
@@ -381,6 +393,36 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </label>
           </div>
           <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Time Off Request Notifications</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Email admins when a worker submits a time off request</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.notify_timeoff_requests ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.notify_timeoff_requests} onChange={e => set('notify_timeoff_requests', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.notify_timeoff_requests ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Budget Alert Notifications</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Email admins when a project reaches 90% or 100% of its hour budget</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.notify_budget_alerts ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.notify_budget_alerts} onChange={e => set('notify_budget_alerts', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.notify_budget_alerts ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Entry Submitted Notifications</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Email admins each time a worker submits a time entry</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.notify_entry_submitted ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.notify_entry_submitted} onChange={e => set('notify_entry_submitted', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.notify_entry_submitted ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
             <label style={styles.label}>{t.ratesClearChat}</label>
             <div style={styles.inputGroup}>
               <input style={styles.input} type="number" min="1" max="90" step="1" value={form.chat_retention_days} onChange={e => set('chat_retention_days', e.target.value)} required />
@@ -460,9 +502,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <div style={styles.label}>Time Clock</div>
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show the Time Clock app in the app switcher</div>
             </div>
-            <label style={{ ...styles.toggle, background: form.feature_timeclock ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_timeclock} onChange={e => set('feature_timeclock', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_timeclock ? 'translateX(46px)' : 'translateX(0)' }} />
+            <label style={{ ...styles.toggle, background: form.module_timeclock ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_timeclock} onChange={e => set('module_timeclock', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_timeclock ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
           <div style={styles.row}>
@@ -470,9 +512,22 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <div style={styles.label}>{t.featField}</div>
               <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featFieldDesc}</div>
             </div>
-            <label style={{ ...styles.toggle, background: form.feature_field ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_field} onChange={e => set('feature_field', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_field ? 'translateX(46px)' : 'translateX(0)' }} />
+            <label style={{ ...styles.toggle, background: form.module_field ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_field} onChange={e => set('module_field', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_field ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Projects</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show the Projects module in the app switcher</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.module_projects ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_projects} onChange={e => {
+                set('module_projects', e.target.checked);
+                if (!e.target.checked) set('feature_project_integration', false);
+              }} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_projects ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
         </div>}
@@ -490,14 +545,18 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <span style={styles.collapseChevron}>{collapsed.features ? '▶' : '▼'}</span>
         </div>
         {!collapsed.features && <div style={styles.sectionBody}>
-          <div style={styles.row}>
+          <div style={{ ...styles.row, opacity: form.module_projects ? 1 : 0.45, pointerEvents: form.module_projects ? 'auto' : 'none' }}>
             <div>
-              <div style={styles.label}>Projects</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Require project selection on time entries and clock-in</div>
+              <div style={styles.label}>Project Integration</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>
+                {form.module_projects
+                  ? 'Require project selection on time entries and clock-in'
+                  : 'Enable the Projects module to use this feature'}
+              </div>
             </div>
-            <label style={{ ...styles.toggle, background: form.feature_projects ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_projects} onChange={e => set('feature_projects', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_projects ? 'translateX(46px)' : 'translateX(0)' }} />
+            <label style={{ ...styles.toggle, background: form.feature_project_integration ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_project_integration} onChange={e => set('feature_project_integration', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_project_integration ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
           <div style={styles.row}>

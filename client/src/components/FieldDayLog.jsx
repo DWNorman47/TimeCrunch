@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import PhotoCapture from './PhotoCapture';
 import { useOffline } from '../contexts/OfflineContext';
+import { useT } from '../hooks/useT';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -15,10 +16,10 @@ function shiftDate(dateStr, n) {
   return d.toLocaleDateString('en-CA');
 }
 
-function dayLabel(dateStr) {
+function dayLabel(dateStr, t) {
   const today = todayISO();
-  if (dateStr === today) return 'Today';
-  if (dateStr === shiftDate(today, -1)) return 'Yesterday';
+  if (dateStr === today) return t ? t.today : 'Today';
+  if (dateStr === shiftDate(today, -1)) return t ? t.yesterday : 'Yesterday';
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric',
   });
@@ -86,6 +87,7 @@ function Lightbox({ photos, startIndex, onClose }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function FieldDayLog({ projects, isAdmin }) {
+  const t = useT();
   const { onSync } = useOffline() || {};
 
   const [project, setProject] = useState('');
@@ -150,7 +152,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
   const openVideo = () => { setVideoOpen(o => !o); setPhotoOpen(false); setNoteOpen(false); setError(''); };
 
   const submitPhotos = async () => {
-    if (capturePhotos.length === 0) { setError('Add at least one photo.'); return; }
+    if (capturePhotos.length === 0) { setError(t.atLeastOnePhoto); return; }
     setSaving(true); setError('');
     const { lat, lng } = await getLocation();
     try {
@@ -167,12 +169,12 @@ export default function FieldDayLog({ projects, isAdmin }) {
       setCapturePhotos([]);
       setPhotoOpen(false);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to submit');
+      setError(err.response?.data?.error || t.failedToSave);
     } finally { setSaving(false); }
   };
 
   const submitNote = async () => {
-    if (!captureNote.trim()) { setError('Enter a note.'); return; }
+    if (!captureNote.trim()) { setError(t.enterANote); return; }
     setSaving(true); setError('');
     const { lat, lng } = await getLocation();
     try {
@@ -189,12 +191,12 @@ export default function FieldDayLog({ projects, isAdmin }) {
       setCaptureNote('');
       setNoteOpen(false);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to submit');
+      setError(err.response?.data?.error || t.failedToSave);
     } finally { setSaving(false); }
   };
 
   const submitVideo = async () => {
-    if (!captureVideo) { setError('Select a video first.'); return; }
+    if (!captureVideo) { setError(t.selectVideoFirst); return; }
     setSaving(true); setError(''); setUploadProgress(0);
     try {
       const contentType = captureVideo.file.type || 'video/mp4';
@@ -223,7 +225,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
       setVideoCaption('');
       setVideoOpen(false);
     } catch (err) {
-      setError(err.response?.data?.error || 'Upload failed');
+      setError(err.response?.data?.error || t.uploadFailed);
     } finally { setSaving(false); setUploadProgress(0); }
   };
 
@@ -264,7 +266,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
       {/* Top bar — project + date nav */}
       <div style={s.topBar}>
         <select style={s.projectSelect} value={project} onChange={e => selectProject(e.target.value)}>
-          <option value="">All projects</option>
+          <option value="">{t.allProjectsOpt}</option>
           {sorted.map(p => (
             <option key={p.id} value={String(p.id)}>{p.name}</option>
           ))}
@@ -272,7 +274,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
 
         <div style={s.dateNav}>
           <button style={s.dateArrow} onClick={prevDay}>‹</button>
-          <span style={s.dateLabel}>{dayLabel(date)}</span>
+          <span style={s.dateLabel}>{dayLabel(date, t)}</span>
           <button style={{ ...s.dateArrow, opacity: isToday ? 0.3 : 1 }} onClick={nextDay} disabled={isToday}>›</button>
         </div>
       </div>
@@ -281,13 +283,13 @@ export default function FieldDayLog({ projects, isAdmin }) {
       {isToday && (
         <div style={s.actionRow}>
           <button style={photoOpen ? { ...s.actionBtn, ...s.actionBtnOn } : s.actionBtn} onClick={openPhoto}>
-            📷 Photos
+            📷 {t.photosSection}
           </button>
           <button style={videoOpen ? { ...s.actionBtn, ...s.actionBtnOn } : s.actionBtn} onClick={openVideo}>
-            🎥 Video
+            🎥 {t.videoSection}
           </button>
           <button style={noteOpen ? { ...s.actionBtn, ...s.actionBtnOn } : s.actionBtn} onClick={openNote}>
-            📝 Note
+            📝 {t.noteSection}
           </button>
         </div>
       )}
@@ -299,11 +301,11 @@ export default function FieldDayLog({ projects, isAdmin }) {
           {error && <p style={s.error}>{error}</p>}
           <div style={s.captureActions}>
             <button style={s.submitBtn} onClick={submitPhotos} disabled={saving || capturePhotos.length === 0}>
-              {saving ? 'Submitting…' : capturePhotos.length > 0
-                ? `Submit ${capturePhotos.length} photo${capturePhotos.length !== 1 ? 's' : ''}`
-                : 'Submit Photos'}
+              {saving ? t.submitting : capturePhotos.length > 0
+                ? `${t.submitPhotos} (${capturePhotos.length})`
+                : t.submitPhotos}
             </button>
-            <button style={s.cancelBtn} onClick={() => { setPhotoOpen(false); setCapturePhotos([]); setError(''); }}>Cancel</button>
+            <button style={s.cancelBtn} onClick={() => { setPhotoOpen(false); setCapturePhotos([]); setError(''); }}>{t.cancel}</button>
           </div>
         </div>
       )}
@@ -314,7 +316,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
           <textarea
             style={s.noteTextarea}
             rows={5}
-            placeholder="Describe what you observed, completed, or found on site…"
+            placeholder={t.noteFieldPlaceholder}
             value={captureNote}
             onChange={e => setCaptureNote(e.target.value)}
             autoFocus
@@ -322,9 +324,9 @@ export default function FieldDayLog({ projects, isAdmin }) {
           {error && <p style={s.error}>{error}</p>}
           <div style={s.captureActions}>
             <button style={s.submitBtn} onClick={submitNote} disabled={saving || !captureNote.trim()}>
-              {saving ? 'Submitting…' : 'Submit Note'}
+              {saving ? t.submitting : t.submitNote}
             </button>
-            <button style={s.cancelBtn} onClick={() => { setNoteOpen(false); setCaptureNote(''); setError(''); }}>Cancel</button>
+            <button style={s.cancelBtn} onClick={() => { setNoteOpen(false); setCaptureNote(''); setError(''); }}>{t.cancel}</button>
           </div>
         </div>
       )}
@@ -350,12 +352,12 @@ export default function FieldDayLog({ projects, isAdmin }) {
                 }}
               />
               <span style={s.videoPickerIcon}>🎥</span>
-              <span style={s.videoPickerText}>Tap to select or record a video</span>
+              <span style={s.videoPickerText}>{t.tapToRecord}</span>
             </label>
           )}
           <input
             style={{ ...s.noteTextarea, marginTop: 10, height: 'auto', resize: 'none', rows: 1 }}
-            placeholder="Caption (optional)"
+            placeholder={t.captionOptional}
             value={videoCaption}
             onChange={e => setVideoCaption(e.target.value)}
           />
@@ -368,9 +370,9 @@ export default function FieldDayLog({ projects, isAdmin }) {
           {error && <p style={s.error}>{error}</p>}
           <div style={s.captureActions}>
             <button style={s.submitBtn} onClick={submitVideo} disabled={saving || !captureVideo}>
-              {saving ? (uploadProgress > 0 ? `Uploading ${uploadProgress}%…` : 'Saving…') : 'Submit Video'}
+              {saving ? (uploadProgress > 0 ? `${t.uploading} ${uploadProgress}%` : t.submitting) : t.submitVideo}
             </button>
-            <button style={s.cancelBtn} onClick={() => { if (captureVideo) URL.revokeObjectURL(captureVideo.previewUrl); setCaptureVideo(null); setVideoCaption(''); setVideoOpen(false); setError(''); }}>Cancel</button>
+            <button style={s.cancelBtn} onClick={() => { if (captureVideo) URL.revokeObjectURL(captureVideo.previewUrl); setCaptureVideo(null); setVideoCaption(''); setVideoOpen(false); setError(''); }}>{t.cancel}</button>
           </div>
         </div>
       )}
@@ -382,9 +384,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
         <div style={s.empty}>
           <div style={s.emptyIcon}>📋</div>
           <p style={s.emptyText}>
-            {isToday
-              ? 'Nothing logged yet today. Use the buttons above to add photos or notes.'
-              : 'No field notes for this day.'}
+            {isToday ? t.nothingLoggedToday : t.noFieldNotesDay}
           </p>
         </div>
       ) : (
@@ -393,7 +393,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
           {allPhotos.length > 0 && (
             <div style={s.section}>
               <div style={s.sectionHead}>
-                <span style={s.sectionTitle}>Photos</span>
+                <span style={s.sectionTitle}>{t.photosSection}</span>
                 <span style={s.sectionCount}>{allPhotos.length}</span>
               </div>
               <div style={s.photoGrid}>
@@ -423,10 +423,10 @@ export default function FieldDayLog({ projects, isAdmin }) {
           {allNotes.length > 0 && (
             <div style={s.section}>
               <div style={s.sectionHead}>
-                <span style={s.sectionTitle}>Notes</span>
+                <span style={s.sectionTitle}>{t.notesSection}</span>
                 <span style={s.sectionCount}>{allNotes.length}</span>
                 {isAdmin && unreviewedNotes > 0 && (
-                  <span style={s.unreviewedBadge}>{unreviewedNotes} unreviewed</span>
+                  <span style={s.unreviewedBadge}>{unreviewedNotes} {t.unreviewedLabel}</span>
                 )}
               </div>
               <div style={s.notesList}>
@@ -439,15 +439,15 @@ export default function FieldDayLog({ projects, isAdmin }) {
                       <span style={s.noteTime}>
                         {new Date(r.reported_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                       </span>
-                      {r.pending && <span style={s.pendingBadge}>⏳ Pending sync</span>}
+                      {r.pending && <span style={s.pendingBadge}>⏳ {t.pendingSync}</span>}
                       {r.lat && (
                         <a href={`https://www.google.com/maps?q=${r.lat},${r.lng}`} target="_blank" rel="noreferrer" style={s.mapLink}>📍</a>
                       )}
                       {isAdmin && !r.pending && r.status !== 'reviewed' && (
-                        <button style={s.reviewBtn} onClick={() => handleReview(r.id)}>✓ Review</button>
+                        <button style={s.reviewBtn} onClick={() => handleReview(r.id)}>✓ {t.reviewBtn}</button>
                       )}
                       {r.status === 'reviewed' && (
-                        <span style={s.reviewedBadge}>✓ Reviewed</span>
+                        <span style={s.reviewedBadge}>✓ {t.reviewedLabel}</span>
                       )}
                     </div>
                     <p style={s.noteText}>{r.notes}</p>

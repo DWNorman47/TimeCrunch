@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { RFIDownloadLink } from './RFIPdf';
+import { useT } from '../hooks/useT';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
@@ -12,11 +13,11 @@ const STATUS_STYLES = {
   closed:   { color: '#374151', background: '#f3f4f6' },
 };
 
-const STATUS_LABELS = { open: 'Open', answered: 'Answered', closed: 'Closed' };
-
 // ── RFI Form ──────────────────────────────────────────────────────────────────
 
 function RFIForm({ initial, projects, onSaved, onCancel }) {
+  const t = useT();
+  const STATUS_LABELS = { open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed };
   const isEdit = !!initial?.id;
   const [form, setForm] = useState({
     project_id: initial?.project_id ?? '',
@@ -35,7 +36,7 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!form.subject.trim()) { setError('Subject is required.'); return; }
+    if (!form.subject.trim()) { setError(t.rfiSubjectRequired); return; }
     setSaving(true); setError('');
     try {
       const r = isEdit
@@ -47,62 +48,60 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       }
       onSaved(r.data, isEdit);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save');
+      setError(err.response?.data?.error || t.failedToSave);
     } finally { setSaving(false); }
   };
 
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
-      <h3 style={styles.formTitle}>{isEdit ? `Edit RFI #${initial.rfi_number}` : 'New RFI'}</h3>
+      <h3 style={styles.formTitle}>{isEdit ? `${t.editRFIPrefix} #${initial.rfi_number}` : t.newRFI}</h3>
 
       <div style={styles.row}>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>Project</label>
+            <label style={styles.label}>{t.project}</label>
             <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">No project</option>
+              <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
         )}
         <div style={{ ...styles.fieldGroup, flex: 3 }}>
-          <label style={styles.label}>Subject *</label>
+          <label style={styles.label}>{t.subjectField} *</label>
           <input style={styles.input} type="text" placeholder="Brief description of the question or request" value={form.subject} onChange={e => set('subject', e.target.value)} required />
         </div>
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>Description <span style={styles.optional}>(optional)</span></label>
+        <label style={styles.label}>{t.descriptionField} <span style={styles.optional}>({t.optional})</span></label>
         <textarea style={styles.textarea} rows={3} placeholder="Detailed description, background, or relevant context…" value={form.description} onChange={e => set('description', e.target.value)} />
       </div>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Directed To</label>
+          <label style={styles.label}>{t.directedTo}</label>
           <input style={styles.input} type="text" placeholder="e.g. Architect, Structural Engineer, Owner" value={form.directed_to} onChange={e => set('directed_to', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Submitted By</label>
+          <label style={styles.label}>{t.submittedBy}</label>
           <input style={styles.input} type="text" placeholder="Name or company" value={form.submitted_by} onChange={e => set('submitted_by', e.target.value)} />
         </div>
       </div>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Date Submitted</label>
+          <label style={styles.label}>{t.dateSubmitted}</label>
           <input style={styles.input} type="date" value={form.date_submitted} onChange={e => set('date_submitted', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Response Due <span style={styles.optional}>(optional)</span></label>
+          <label style={styles.label}>{t.responseDue} <span style={styles.optional}>({t.optional})</span></label>
           <input style={styles.input} type="date" value={form.date_due} onChange={e => set('date_due', e.target.value)} />
         </div>
         {isEdit && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>Status</label>
+            <label style={styles.label}>{t.statusLabel}</label>
             <select style={styles.input} value={form.status} onChange={e => set('status', e.target.value)}>
-              <option value="open">Open</option>
-              <option value="answered">Answered</option>
-              <option value="closed">Closed</option>
+              {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
         )}
@@ -110,7 +109,7 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
 
       {isEdit && (
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Response</label>
+          <label style={styles.label}>{t.rfiResponse}</label>
           <textarea style={styles.textarea} rows={3} placeholder="Enter the response or answer received…" value={form.response} onChange={e => set('response', e.target.value)} />
         </div>
       )}
@@ -118,8 +117,8 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create RFI'}</button>
-        <button style={styles.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.createRFI}</button>
+        <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
   );
@@ -128,14 +127,16 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
 // ── RFI Card ──────────────────────────────────────────────────────────────────
 
 function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
+  const t = useT();
+  const STATUS_LABELS = { open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed };
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
-    if (!confirm(`Delete RFI #${rfi.rfi_number}?`)) return;
+    if (!confirm(`${t.deleteRFIPrefix} #${rfi.rfi_number}?`)) return;
     setDeleting(true);
     try { await api.delete(`/rfis/${rfi.id}`); onDeleted(rfi.id); }
-    catch { alert('Failed to delete'); }
+    catch { alert(t.failedToDelete); }
     finally { setDeleting(false); }
   };
 
@@ -149,7 +150,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
         <div style={styles.cardMiddle}>
           <div style={styles.subject}>
             {rfi.subject}
-            {rfi.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}
+            {rfi.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}
           </div>
           <div style={styles.meta}>
             {rfi.project_name && <span style={styles.projectTag}>{rfi.project_name}</span>}
@@ -157,7 +158,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
             <span>{rfi.date_submitted?.toString().substring(0, 10)}</span>
             {rfi.date_due && (
               <span style={isOverdue ? styles.overdueDate : styles.dueDate}>
-                {isOverdue ? '⚠ ' : ''}Due {rfi.date_due?.toString().substring(0, 10)}
+                {isOverdue ? '⚠ ' : ''}{t.dueDateLabel} {rfi.date_due?.toString().substring(0, 10)}
               </span>
             )}
           </div>
@@ -172,24 +173,24 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
         <div style={styles.cardBody}>
           {rfi.description && (
             <div style={styles.section}>
-              <div style={styles.sectionLabel}>Description</div>
+              <div style={styles.sectionLabel}>{t.descriptionSection}</div>
               <p style={styles.sectionText}>{rfi.description}</p>
             </div>
           )}
 
           {rfi.submitted_by && (
             <div style={styles.inlineMeta}>
-              <span style={styles.metaKey}>Submitted by:</span> {rfi.submitted_by}
+              <span style={styles.metaKey}>{t.submittedByLabel}</span> {rfi.submitted_by}
             </div>
           )}
 
           {rfi.response ? (
             <div style={styles.responseBox}>
-              <div style={styles.responseLabel}>Response</div>
+              <div style={styles.responseLabel}>{t.rfiResponse}</div>
               <p style={styles.responseText}>{rfi.response}</p>
             </div>
           ) : rfi.status === 'open' ? (
-            <p style={styles.noResponse}>No response yet.</p>
+            <p style={styles.noResponse}>{t.noResponseYet}</p>
           ) : null}
 
           {!rfi.pending && (
@@ -198,9 +199,9 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
               {isAdmin && (
                 <>
                   <button style={styles.editBtn} onClick={() => onEdit(rfi)}>
-                    {rfi.status === 'open' && !rfi.response ? '+ Add Response' : 'Edit'}
+                    {rfi.status === 'open' && !rfi.response ? t.addResponse : t.edit}
                   </button>
-                  <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : 'Delete'}</button>
+                  <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.delete}</button>
                 </>
               )}
             </div>
@@ -215,6 +216,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
 
 export default function RFITracking({ projects }) {
   const { user } = useAuth();
+  const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
 
@@ -259,14 +261,14 @@ export default function RFITracking({ projects }) {
     <div>
       <div style={styles.topRow}>
         <div>
-          <h1 style={styles.heading}>RFI Tracking</h1>
+          <h1 style={styles.heading}>{t.rfiTracking}</h1>
           <p style={styles.summary}>
-            {rfis.length} RFI{rfis.length !== 1 ? 's' : ''} · {openCount} open
-            {overdueCount > 0 && <span style={styles.overdueNote}> · {overdueCount} overdue</span>}
+            {rfis.length} RFI{rfis.length !== 1 ? 's' : ''} · {openCount} {t.rfiOpenLabel}
+            {overdueCount > 0 && <span style={styles.overdueNote}> · {overdueCount} {t.rfiOverdueLabel}</span>}
           </p>
         </div>
         {isAdmin && !showForm && !editing && (
-          <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ New RFI</button>
+          <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ {t.newRFI}</button>
         )}
       </div>
 
@@ -283,14 +285,14 @@ export default function RFITracking({ projects }) {
 
       <div style={styles.filterBar}>
         <select style={styles.filterSelect} value={filters.status || ''} onChange={e => setFilter('status', e.target.value)}>
-          <option value="">All statuses</option>
-          <option value="open">Open</option>
-          <option value="answered">Answered</option>
-          <option value="closed">Closed</option>
+          <option value="">{t.allStatuses}</option>
+          <option value="open">{t.statusOpen}</option>
+          <option value="answered">{t.statusAnswered}</option>
+          <option value="closed">{t.statusClosed}</option>
         </select>
         {projects.length > 0 && (
           <select style={styles.filterSelect} value={filters.project_id || ''} onChange={e => setFilter('project_id', e.target.value)}>
-            <option value="">All projects</option>
+            <option value="">{t.allProjects}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
@@ -299,11 +301,11 @@ export default function RFITracking({ projects }) {
       </div>
 
       {loading ? (
-        <p style={styles.hint}>Loading…</p>
+        <p style={styles.hint}>{t.loading}</p>
       ) : rfis.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>📋</div>
-          <p style={styles.emptyText}>{isAdmin ? 'No RFIs yet. Create one to start tracking.' : 'No RFIs on file.'}</p>
+          <p style={styles.emptyText}>{isAdmin ? t.noRFIsAdmin : t.noRFIsWorker}</p>
         </div>
       ) : (
         <div style={styles.list}>

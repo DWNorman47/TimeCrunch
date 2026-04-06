@@ -13,6 +13,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import FieldPage from './pages/FieldPage';
 import ProjectsPage from './pages/ProjectsPage';
 import AdministrationPage from './pages/AdministrationPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 import SuperAdmin from './pages/SuperAdmin';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import EULA from './pages/EULA';
@@ -89,12 +90,25 @@ function AppRoutes() {
       <Route path="/field" element={<PrivateRoute><FieldPage /></PrivateRoute>} />
       <Route path="/projects" element={<PrivateRoute adminOnly><ProjectsPage /></PrivateRoute>} />
       <Route path="/administration" element={<PrivateRoute adminOnly><AdministrationPage /></PrivateRoute>} />
+      <Route path="/analytics" element={<PrivateRoute adminOnly><AnalyticsPage /></PrivateRoute>} />
       <Route path="/superadmin" element={<PrivateRoute superAdminOnly><SuperAdmin /></PrivateRoute>} />
       <Route path="/" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Landing />} />
       <Route path="*" element={<Navigate to={user ? (user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard') : '/'} replace />} />
     </Routes>
   );
 }
+
+// If this tab was opened via "Login as" from SuperAdmin, swap in the impersonate token
+// before React even mounts so AuthProvider picks it up on first render.
+(function applyImpersonateToken() {
+  if (!window.location.search.includes('impersonate=1')) return;
+  const token = sessionStorage.getItem('impersonate_token');
+  if (!token) return;
+  sessionStorage.removeItem('impersonate_token');
+  localStorage.setItem('tc_token', token);
+  // Strip the query param so normal auth flow runs from here
+  window.history.replaceState({}, '', window.location.pathname);
+})();
 
 export default function App() {
   return (

@@ -1,32 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { formatInTz } from '../utils';
-
-const ACTION_META = {
-  'worker.created':       { label: 'Worker added',        color: '#059669', bg: '#d1fae5' },
-  'worker.invited':       { label: 'Worker invited',       color: '#7c3aed', bg: '#ede9fe' },
-  'worker.updated':       { label: 'Worker updated',       color: '#1a56db', bg: '#dbeafe' },
-  'worker.deleted':       { label: 'Worker removed',       color: '#ef4444', bg: '#fee2e2' },
-  'worker.restored':      { label: 'Worker restored',      color: '#059669', bg: '#d1fae5' },
-  'project.created':      { label: 'Project created',      color: '#059669', bg: '#d1fae5' },
-  'project.updated':      { label: 'Project updated',      color: '#1a56db', bg: '#dbeafe' },
-  'project.deleted':      { label: 'Project removed',      color: '#ef4444', bg: '#fee2e2' },
-  'project.restored':     { label: 'Project restored',     color: '#059669', bg: '#d1fae5' },
-  'entry.approved':       { label: 'Entry approved',       color: '#059669', bg: '#d1fae5' },
-  'entry.rejected':       { label: 'Entry rejected',       color: '#dc2626', bg: '#fee2e2' },
-  'pay_period.locked':    { label: 'Pay period locked',    color: '#d97706', bg: '#fef3c7' },
-  'pay_period.unlocked':  { label: 'Pay period unlocked',  color: '#6b7280', bg: '#f3f4f6' },
-  'settings.updated':     { label: 'Settings updated',     color: '#d97706', bg: '#fef3c7' },
-};
-
-const ACTION_GROUPS = {
-  '': 'All actions',
-  worker: 'Workers',
-  project: 'Projects',
-  entry: 'Entries',
-  pay_period: 'Pay periods',
-  settings: 'Settings',
-};
+import { useT } from '../hooks/useT';
 
 function formatDt(str, tz) {
   return {
@@ -35,8 +10,8 @@ function formatDt(str, tz) {
   };
 }
 
-function ActionBadge({ action }) {
-  const meta = ACTION_META[action] || { label: action, color: '#6b7280', bg: '#f3f4f6' };
+function ActionBadge({ action, actionMeta }) {
+  const meta = actionMeta[action] || { label: action, color: '#6b7280', bg: '#f3f4f6' };
   return (
     <span style={{ display: 'inline-block', padding: '2px 9px', borderRadius: 6, fontSize: 12, fontWeight: 600, color: meta.color, background: meta.bg }}>
       {meta.label}
@@ -45,6 +20,7 @@ function ActionBadge({ action }) {
 }
 
 export default function AuditLog({ timezone = '' }) {
+  const t = useT();
   const [entries, setEntries] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -53,6 +29,32 @@ export default function AuditLog({ timezone = '' }) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const LIMIT = 25;
+
+  const ACTION_META = {
+    'worker.created':      { label: t.auditWorkerAdded,       color: '#059669', bg: '#d1fae5' },
+    'worker.invited':      { label: t.auditWorkerInvited,      color: '#7c3aed', bg: '#ede9fe' },
+    'worker.updated':      { label: t.auditWorkerUpdated,      color: '#1a56db', bg: '#dbeafe' },
+    'worker.deleted':      { label: t.auditWorkerRemoved,      color: '#ef4444', bg: '#fee2e2' },
+    'worker.restored':     { label: t.auditWorkerRestored,     color: '#059669', bg: '#d1fae5' },
+    'project.created':     { label: t.auditProjectCreated,     color: '#059669', bg: '#d1fae5' },
+    'project.updated':     { label: t.auditProjectUpdated,     color: '#1a56db', bg: '#dbeafe' },
+    'project.deleted':     { label: t.auditProjectRemoved,     color: '#ef4444', bg: '#fee2e2' },
+    'project.restored':    { label: t.auditProjectRestored,    color: '#059669', bg: '#d1fae5' },
+    'entry.approved':      { label: t.auditEntryApproved,      color: '#059669', bg: '#d1fae5' },
+    'entry.rejected':      { label: t.auditEntryRejected,      color: '#dc2626', bg: '#fee2e2' },
+    'pay_period.locked':   { label: t.auditPayPeriodLocked,    color: '#d97706', bg: '#fef3c7' },
+    'pay_period.unlocked': { label: t.auditPayPeriodUnlocked,  color: '#6b7280', bg: '#f3f4f6' },
+    'settings.updated':    { label: t.auditSettingsUpdated,    color: '#d97706', bg: '#fef3c7' },
+  };
+
+  const ACTION_GROUPS = {
+    '': t.filterAllActions,
+    worker: t.filterWorkers,
+    project: t.filterProjects,
+    entry: t.filterEntries,
+    pay_period: t.filterPayPeriods,
+    settings: t.filterSettings,
+  };
 
   const load = async (pg) => {
     setLoading(true);
@@ -78,8 +80,8 @@ export default function AuditLog({ timezone = '' }) {
   return (
     <div style={styles.card}>
       <div style={styles.header}>
-        <h3 style={styles.title}>Audit Log</h3>
-        <span style={styles.totalBadge}>{total} events</span>
+        <h3 style={styles.title}>{t.auditLogHeading}</h3>
+        <span style={styles.totalBadge}>{total} {t.auditEvents}</span>
       </div>
 
       <div style={styles.filters}>
@@ -91,14 +93,14 @@ export default function AuditLog({ timezone = '' }) {
         <input style={styles.filterDate} type="date" value={from} onChange={e => setFrom(e.target.value)} placeholder="From" title="From date" />
         <input style={styles.filterDate} type="date" value={to} onChange={e => setTo(e.target.value)} placeholder="To" title="To date" />
         {(group || from || to) && (
-          <button style={styles.clearBtn} onClick={() => { setGroup(''); setFrom(''); setTo(''); }}>Clear</button>
+          <button style={styles.clearBtn} onClick={() => { setGroup(''); setFrom(''); setTo(''); }}>{t.auditClear}</button>
         )}
       </div>
 
       {loading && entries.length === 0 ? (
-        <p style={styles.empty}>Loading...</p>
+        <p style={styles.empty}>{t.loading}</p>
       ) : entries.length === 0 ? (
-        <p style={styles.empty}>No matching activity.</p>
+        <p style={styles.empty}>{t.auditNoActivity}</p>
       ) : (
         <>
           <div style={styles.list}>
@@ -112,10 +114,10 @@ export default function AuditLog({ timezone = '' }) {
                   </div>
                   <div style={styles.rowBody}>
                     <div style={styles.rowTop}>
-                      <ActionBadge action={e.action} />
+                      <ActionBadge action={e.action} actionMeta={ACTION_META} />
                       {e.entity_name && <span style={styles.entityName}>{e.entity_name}</span>}
                     </div>
-                    <div style={styles.rowActor}>by {e.actor_name}</div>
+                    <div style={styles.rowActor}>{t.auditBy} {e.actor_name}</div>
                     {e.details && Object.keys(e.details).length > 0 && (
                       <div style={styles.details}>
                         {Object.entries(e.details).map(([k, v]) => (
@@ -132,9 +134,9 @@ export default function AuditLog({ timezone = '' }) {
           {totalPages > 1 && (
             <div style={styles.pagination}>
               <button style={styles.pageBtn} onClick={() => goTo(0)} disabled={page === 0 || loading}>«</button>
-              <button style={styles.pageBtn} onClick={() => goTo(page - 1)} disabled={page === 0 || loading}>‹ Prev</button>
-              <span style={styles.pageInfo}>Page {page + 1} of {totalPages}</span>
-              <button style={styles.pageBtn} onClick={() => goTo(page + 1)} disabled={page >= totalPages - 1 || loading}>Next ›</button>
+              <button style={styles.pageBtn} onClick={() => goTo(page - 1)} disabled={page === 0 || loading}>‹ {t.paginationPrev}</button>
+              <span style={styles.pageInfo}>{t.paginationPage} {page + 1} {t.ofLabel} {totalPages}</span>
+              <button style={styles.pageBtn} onClick={() => goTo(page + 1)} disabled={page >= totalPages - 1 || loading}>{t.paginationNext} ›</button>
               <button style={styles.pageBtn} onClick={() => goTo(totalPages - 1)} disabled={page >= totalPages - 1 || loading}>»</button>
             </div>
           )}

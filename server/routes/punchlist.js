@@ -7,7 +7,7 @@ const { sendPushToUser } = require('../push');
 router.get('/', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
-  const { project_id, status, priority } = req.query;
+  const { project_id, status, priority, phase } = req.query;
 
   try {
     const conditions = ['pi.company_id = $1'];
@@ -16,6 +16,7 @@ router.get('/', requireAuth, async (req, res) => {
     if (project_id) { params.push(project_id); conditions.push(`pi.project_id = $${params.length}`); }
     if (status) { params.push(status); conditions.push(`pi.status = $${params.length}`); }
     if (priority) { params.push(priority); conditions.push(`pi.priority = $${params.length}`); }
+    if (phase) { params.push(phase); conditions.push(`pi.phase = $${params.length}`); }
 
     const result = await pool.query(
       `SELECT pi.*, p.name as project_name,
@@ -39,18 +40,18 @@ router.get('/', requireAuth, async (req, res) => {
 
 // POST /punchlist
 router.post('/', requireAuth, async (req, res) => {
-  const { project_id, title, description, location, priority, assigned_to } = req.body;
+  const { project_id, title, description, location, priority, assigned_to, phase } = req.body;
   if (!title) return res.status(400).json({ error: 'title required' });
   const companyId = req.user.company_id;
 
   try {
     const result = await pool.query(
       `INSERT INTO punchlist_items
-         (company_id, project_id, title, description, location, priority, assigned_to, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         (company_id, project_id, title, description, location, priority, assigned_to, created_by, phase)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING id`,
       [companyId, project_id || null, title, description || null, location || null,
-       priority || 'normal', assigned_to || null, req.user.id]
+       priority || 'normal', assigned_to || null, req.user.id, phase || null]
     );
     const id = result.rows[0].id;
     const full = await pool.query(
@@ -78,7 +79,7 @@ router.post('/', requireAuth, async (req, res) => {
 // PATCH /punchlist/:id
 router.patch('/:id', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
-  const { title, description, location, priority, status, assigned_to } = req.body;
+  const { title, description, location, priority, status, assigned_to, phase } = req.body;
 
   try {
     const existing = await pool.query(
@@ -94,11 +95,13 @@ router.patch('/:id', requireAuth, async (req, res) => {
          title=COALESCE($1, title), description=COALESCE($2, description),
          location=COALESCE($3, location), priority=COALESCE($4, priority),
          status=COALESCE($5, status), assigned_to=$6,
-         resolved_at=$7, updated_at=NOW()
-       WHERE id=$8`,
+         resolved_at=$7, updated_at=NOW(), phase=$8
+       WHERE id=$9`,
       [title, description, location, priority, status,
        assigned_to !== undefined ? (assigned_to || null) : existing.rows[0].assigned_to,
-       resolvedAt, req.params.id]
+       resolvedAt,
+       phase !== undefined ? (phase || null) : existing.rows[0].phase,
+       req.params.id]
     );
 
     const full = await pool.query(
