@@ -7,8 +7,6 @@ import PasswordInput from '../components/PasswordInput';
 import TabBar from '../components/TabBar';
 import BillingPanel from '../components/BillingPanel';
 import ManageWorkers from '../components/ManageWorkers';
-import ManageProjects from '../components/ManageProjects';
-import ManageClients from '../components/ManageClients';
 import ManageRates from '../components/ManageRates';
 import AuditLog from '../components/AuditLog';
 import QuickBooks from '../components/QuickBooks';
@@ -287,7 +285,7 @@ function AccountTab() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const ADMIN_TABS = ['company', 'team', 'projects', 'clients', 'integrations', 'billing', 'log', 'account'];
+const ADMIN_TABS = ['company', 'team', 'integrations', 'billing', 'log', 'account'];
 
 export default function AdministrationPage() {
   const { user, logout } = useAuth();
@@ -298,7 +296,7 @@ export default function AdministrationPage() {
   const [tab, setTab] = useState(ADMIN_TABS.includes(hashTab) ? hashTab : 'company');
   const switchTab = t => { setTab(t); window.location.hash = t; };
 
-  // Shared state for ManageWorkers and ManageProjects
+  // Shared state for ManageWorkers and QuickBooks
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
@@ -306,8 +304,6 @@ export default function AdministrationPage() {
   const tabs = [
     { id: 'company',      label: t.adminTabCompany      },
     { id: 'team',         label: t.adminTabTeam         },
-    ...(settings?.module_projects !== false ? [{ id: 'projects', label: t.adminTabProjects }] : []),
-    ...(settings?.module_projects !== false ? [{ id: 'clients', label: 'Clients' }] : []),
     ...(plan.hasQbo ? [{ id: 'integrations', label: t.adminTabIntegrations }] : []),
     { id: 'billing',      label: t.adminTabBilling      },
     { id: 'log',          label: t.adminTabLog          },
@@ -330,10 +326,6 @@ export default function AdministrationPage() {
   const handleWorkerDeleted  = id => setWorkers(prev => prev.filter(w => w.id !== id));
   const handleWorkerUpdated  = w  => setWorkers(prev => prev.map(x => x.id === w.id ? { ...x, ...w } : x));
   const handleWorkerRestored = w  => setWorkers(prev => [...prev, w]);
-  const handleProjectAdded   = p  => setProjects(prev => [...prev, p]);
-  const handleProjectDeleted = id => setProjects(prev => prev.filter(p => p.id !== id));
-  const handleProjectUpdated = p  => setProjects(prev => prev.map(x => x.id === p.id ? p : x));
-  const handleProjectRestored= p  => setProjects(prev => [...prev, p]);
 
   return (
     <div style={styles.page}>
@@ -380,28 +372,6 @@ export default function AdministrationPage() {
           <div style={styles.tabContent}>
             <h2 style={styles.tabTitle}>{t.auditLog}</h2>
             <AuditLog timezone={settings?.company_timezone ?? ''} />
-          </div>
-        )}
-        {tab === 'projects' && (
-          <div style={styles.tabContent}>
-            <h2 style={styles.tabTitle}>{t.projects}</h2>
-            <ManageProjects
-              projects={projects}
-              onProjectAdded={handleProjectAdded}
-              onProjectDeleted={handleProjectDeleted}
-              onProjectUpdated={handleProjectUpdated}
-              onProjectRestored={handleProjectRestored}
-              nameEditable={true}
-              defaultPrevailingRate={settings?.prevailing_wage_rate}
-              showWageType={(settings?.prevailing_wage_rate ?? 0) > 0}
-              currency={settings?.currency ?? 'USD'}
-              settings={settings}
-            />
-          </div>
-        )}
-        {tab === 'clients' && (
-          <div style={styles.tabContent}>
-            <ManageClients />
           </div>
         )}
         {tab === 'integrations' && (
