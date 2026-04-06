@@ -21,14 +21,14 @@ function fmt(bytes) {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
-function expiryStatus(expiresAt) {
+function expiryStatus(expiresAt, t) {
   if (!expiresAt) return null;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const exp = new Date(expiresAt + 'T00:00:00');
   const days = Math.round((exp - today) / 86400000);
-  if (days < 0)  return { label: 'Expired',       color: '#dc2626', bg: '#fee2e2' };
-  if (days <= 30) return { label: `Expires in ${days}d`, color: '#d97706', bg: '#fef3c7' };
-  return { label: `Exp ${exp.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, color: '#059669', bg: '#d1fae5' };
+  if (days < 0)  return { label: t.expiryExpired, color: '#dc2626', bg: '#fee2e2' };
+  if (days <= 30) return { label: `${days}${t.expiryInDays}`, color: '#d97706', bg: '#fef3c7' };
+  return { label: exp.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }), color: '#059669', bg: '#d1fae5' };
 }
 
 // ── Client Form ───────────────────────────────────────────────────────────────
@@ -183,7 +183,7 @@ function DocList({ clientId, docs, onDeleted }) {
     <div style={s.docList}>
       {docs.map(doc => {
         const meta = DOC_META[doc.doc_type] || DOC_META.other;
-        const exp = doc.expires_at ? expiryStatus(doc.expires_at) : null;
+        const exp = doc.expires_at ? expiryStatus(doc.expires_at, t) : null;
         return (
           <div key={doc.id} style={s.docRow}>
             <span style={{ ...s.docTypeBadge, color: meta.color, background: meta.bg }}>{meta.label}</span>
@@ -247,7 +247,7 @@ function ClientCard({ client, onEdit, onDeleted }) {
             {client.name}
             {hasExpiryWarning && (
               <span style={{ ...s.badge, background: warningDays < 0 ? '#fee2e2' : '#fef3c7', color: warningDays < 0 ? '#dc2626' : '#d97706', marginLeft: 8 }}>
-                {warningDays < 0 ? `⚠ ${t.expiredCOI}` : `⚠ COI expires in ${warningDays}d`}
+                {warningDays < 0 ? `⚠ ${t.expiredCOI}` : `⚠ COI ${warningDays}${t.expiryInDays}`}
               </span>
             )}
           </div>
