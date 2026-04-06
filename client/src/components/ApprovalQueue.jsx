@@ -130,6 +130,9 @@ export default function ApprovalQueue({ onCountChange }) {
     ? entries.filter(e => e.worker_name === workerFilter)
     : entries;
 
+  const signedEntries   = visibleEntries.filter(e => e.worker_signed_at);
+  const unsignedEntries = visibleEntries.filter(e => !e.worker_signed_at);
+
   const workerNames = [...new Set(entries.map(e => e.worker_name))].sort();
 
   const approveAll = async () => {
@@ -189,7 +192,14 @@ export default function ApprovalQueue({ onCountChange }) {
           {visibleEntries.length === 0 && workerFilter && (
             <p style={styles.empty}>No pending entries for {workerFilter}.</p>
           )}
-          {visibleEntries.map(e => (
+          {signedEntries.length > 0 && (
+            <div style={styles.sectionHeader}>
+              <span style={styles.sectionDot} />
+              Worker Signed
+              <span style={styles.sectionCount}>{signedEntries.length}</span>
+            </div>
+          )}
+          {signedEntries.map((e, idx) => (
             <div key={e.id} style={styles.row}>
               <div style={styles.rowMain}>
                 <div style={styles.worker}>{e.worker_name}</div>
@@ -317,6 +327,99 @@ export default function ApprovalQueue({ onCountChange }) {
               )}
             </div>
           ))}
+          {unsignedEntries.length > 0 && (
+            <div style={{ ...styles.sectionHeader, marginTop: signedEntries.length > 0 ? 8 : 0 }}>
+              <span style={{ ...styles.sectionDot, background: '#d1d5db' }} />
+              Awaiting Worker Signature
+              <span style={{ ...styles.sectionCount, background: '#f3f4f6', color: '#6b7280' }}>{unsignedEntries.length}</span>
+            </div>
+          )}
+          {unsignedEntries.map(e => (
+            <div key={e.id} style={styles.row}>
+              <div style={styles.rowMain}>
+                <div style={styles.worker}>{e.worker_name}</div>
+                <div style={styles.detail}>
+                  <span style={styles.project}>{e.project_name}</span>
+                  <span style={styles.sep}>·</span>
+                  <span>{formatDate(e.work_date)}</span>
+                  <span style={styles.sep}>·</span>
+                  <span>{formatTime(e.start_time)} – {formatTime(e.end_time)} ({formatHours(e.start_time, e.end_time)})</span>
+                  <span style={{ ...styles.wageTag, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
+                    {e.wage_type === 'prevailing' ? 'Prevailing' : 'Regular'}
+                  </span>
+                </div>
+                {e.notes && <div style={styles.notes}>{e.notes}</div>}
+                {e.clock_source && e.clock_source !== 'worker' && (
+                  <div style={styles.sourceBadge}>
+                    {e.clock_source === 'admin'
+                      ? `Clocked in by admin${e.clocked_in_by_name ? ': ' + e.clocked_in_by_name : ''}`
+                      : 'Log entry'}
+                  </div>
+                )}
+                {(e.clock_in_lat || e.clock_out_lat) && (
+                  <div style={styles.locationRow}>
+                    <button
+                      style={styles.locationBtn}
+                      onClick={() => setOpenMapId(openMapId === e.id ? null : e.id)}
+                    >
+                      📍 {openMapId === e.id ? 'Hide Map' : 'View Location'}
+                    </button>
+                    {openMapId === e.id && (() => {
+                      const positions = [
+                        e.clock_in_lat  ? [parseFloat(e.clock_in_lat),  parseFloat(e.clock_in_lng)]  : null,
+                        e.clock_out_lat ? [parseFloat(e.clock_out_lat), parseFloat(e.clock_out_lng)] : null,
+                      ].filter(Boolean);
+                      return (
+                        <div style={styles.mapWrap}>
+                          <MapContainer center={positions[0]} zoom={14} style={styles.map} scrollWheelZoom={false}>
+                            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' />
+                            <FitBounds positions={positions} />
+                            {e.clock_in_lat && <Marker position={[parseFloat(e.clock_in_lat), parseFloat(e.clock_in_lng)]} icon={clockInIcon}><Popup>🟢 Clock In<br />{e.worker_name}</Popup></Marker>}
+                            {e.clock_out_lat && <Marker position={[parseFloat(e.clock_out_lat), parseFloat(e.clock_out_lng)]} icon={clockOutIcon}><Popup>🔴 Clock Out<br />{e.worker_name}</Popup></Marker>}
+                          </MapContainer>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+                <button style={styles.msgBtn} onClick={() => setOpenMessageId(openMessageId === e.id ? null : e.id)}>
+                  {openMessageId === e.id ? `💬 ${t.hideComments}` : t.commentsOpen}
+                </button>
+                {openMessageId === e.id && <MessageThread entryId={e.id} currentUserId={user?.id} />}
+              </div>
+
+              {editingTimesId === e.id ? (
+                <div style={styles.editTimesForm}>
+                  <div style={styles.editTimesRow}>
+                    <div>
+                      <div style={styles.editTimesLabel}>Start</div>
+                      <input type="time" style={styles.editTimeInput} value={editStart} onChange={ev => setEditStart(ev.target.value)} />
+                    </div>
+                    <div>
+                      <div style={styles.editTimesLabel}>End</div>
+                      <input type="time" style={styles.editTimeInput} value={editEnd} onChange={ev => setEditEnd(ev.target.value)} />
+                    </div>
+                  </div>
+                  <div style={styles.editTimesActions}>
+                    <button style={styles.saveTimesBtn} onClick={() => saveEditTimes(e.id)} disabled={editSaving}>{editSaving ? '...' : 'Save'}</button>
+                    <button style={styles.cancelBtn} onClick={() => setEditingTimesId(null)}>Cancel</button>
+                  </div>
+                </div>
+              ) : rejectingId === e.id ? (
+                <div style={styles.rejectForm}>
+                  <input style={styles.rejectInput} placeholder={t.reasonOptional} value={rejectNote} onChange={ev => setRejectNote(ev.target.value)} autoFocus />
+                  <button style={styles.confirmRejectBtn} onClick={() => submitReject(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.confirmReject}</button>
+                  <button style={styles.cancelBtn} onClick={() => { setRejectingId(null); setRejectNote(''); }}>{t.cancel}</button>
+                </div>
+              ) : (
+                <div style={styles.actions}>
+                  <button style={styles.editTimesBtn} onClick={() => startEditTimes(e)}>✏️ Times</button>
+                  <button style={styles.approveBtn} onClick={() => approve(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.approve}</button>
+                  <button style={styles.rejectBtn} onClick={() => { setRejectingId(e.id); setRejectNote(''); }}>{t.reject}</button>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -333,6 +436,9 @@ const styles = {
   fetchError: { color: '#991b1b', fontSize: 14 },
   retryBtn: { background: 'none', border: 'none', color: '#1a56db', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: 14 },
   list: { display: 'flex', flexDirection: 'column', gap: 12 },
+  sectionHeader: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '4px 0 2px' },
+  sectionDot:    { width: 8, height: 8, borderRadius: '50%', background: '#059669', flexShrink: 0 },
+  sectionCount:  { marginLeft: 2, background: '#d1fae5', color: '#059669', borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700, textTransform: 'none', letterSpacing: 0 },
   row: { border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
   rowMain: { flex: 1, minWidth: 200 },
   worker: { fontWeight: 700, fontSize: 15, marginBottom: 4 },
