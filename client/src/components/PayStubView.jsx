@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 function fmtDate(str) {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
@@ -33,7 +34,7 @@ function netHours(start, end, brk) {
   return Math.max(0, ms / 3600000 - (brk || 0) / 60);
 }
 
-function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen }) {
+function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
   const [open, setOpen] = useState(defaultOpen);
 
   const label = stub.label || `${fmtDateShort(stub.period_start)} – ${fmtDateShort(stub.period_end)}`;
@@ -66,9 +67,9 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen }) {
         <div style={s.cardHeaderLeft}>
           <span style={s.cardLabel}>{label}</span>
           <div style={s.chips}>
-            <span style={s.chip}>{fmtH(totalHours)} total</span>
-            {prevailing_hours > 0 && <span style={{ ...s.chip, background: '#fef3c7', color: '#b45309' }}>{fmtH(prevailing_hours)} prevailing</span>}
-            {total_mileage > 0 && <span style={s.chip}>{total_mileage} mi</span>}
+            <span style={s.chip}>{fmtH(totalHours)} {t.totalChip}</span>
+            {prevailing_hours > 0 && <span style={{ ...s.chip, background: '#fef3c7', color: '#b45309' }}>{fmtH(prevailing_hours)} {t.prevailingLabel}</span>}
+            {total_mileage > 0 && <span style={s.chip}>{total_mileage} {t.miChip}</span>}
             {showPay && totalPay > 0 && <span style={{ ...s.chip, background: '#d1fae5', color: '#065f46' }}>{fmtMoney(totalPay)}</span>}
           </div>
         </div>
@@ -81,12 +82,12 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen }) {
           <div style={s.invHeader}>
             <div>
               <div style={s.brand}>Ops Flow Assist</div>
-              <div style={s.brandSub}>Employee Time Invoice</div>
+              <div style={s.brandSub}>{t.employeeTimeInvoice}</div>
             </div>
             <div style={s.invRight}>
-              <div style={s.invTitle}>INVOICE</div>
+              <div style={s.invTitle}>{t.invoiceLabel}</div>
               <div style={s.invMeta}>
-                <span style={s.metaLabel}>Pay Period</span>
+                <span style={s.metaLabel}>{t.payPeriod}</span>
                 <span style={s.metaVal}>{label}</span>
               </div>
             </div>
@@ -95,12 +96,12 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen }) {
           {/* From / Bill To */}
           <div style={s.parties}>
             <div>
-              <div style={s.partyLabel}>From</div>
+              <div style={s.partyLabel}>{t.from}</div>
               <div style={s.partyName}>{user?.invoice_name || user?.full_name || '—'}</div>
               {user?.email && <div style={s.partyDetail}>{user.email}</div>}
             </div>
             <div>
-              <div style={s.partyLabel}>Bill To</div>
+              <div style={s.partyLabel}>{t.billTo}</div>
               {billToLines.map((line, i) => (
                 <div key={i} style={i === 0 ? s.partyName : s.partyDetail}>{line}</div>
               ))}
@@ -113,13 +114,13 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen }) {
             <table style={s.table}>
               <thead>
                 <tr>
-                  <th style={s.th}>Date</th>
-                  <th style={s.th}>Project</th>
-                  <th style={s.th}>Description</th>
-                  <th style={s.th}>Clock In</th>
-                  <th style={s.th}>Clock Out</th>
-                  <th style={s.th}>Rate Type</th>
-                  <th style={{ ...s.th, textAlign: 'right' }}>Hours</th>
+                  <th style={s.th}>{t.date}</th>
+                  <th style={s.th}>{t.project}</th>
+                  <th style={s.th}>{t.descriptionLabel}</th>
+                  <th style={s.th}>{t.clockIn}</th>
+                  <th style={s.th}>{t.clockOut}</th>
+                  <th style={s.th}>{t.rateTypeLabel}</th>
+                  <th style={{ ...s.th, textAlign: 'right' }}>{t.hours}</th>
                 </tr>
               </thead>
               <tbody>
@@ -135,7 +136,7 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen }) {
                       <td style={s.td}>{fmtTime(e.end_time)}</td>
                       <td style={s.td}>
                         <span style={{ ...s.badge, background: isPrev ? '#d97706' : '#2563eb' }}>
-                          {isPrev ? 'Prevailing' : 'Regular'}
+                          {isPrev ? t.prevailing : t.regular}
                         </span>
                       </td>
                       <td style={{ ...s.td, textAlign: 'right', fontWeight: 600 }}>{fmtH(h)}</td>
@@ -148,56 +149,52 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen }) {
 
           {/* Summary */}
           <div style={s.summaryWrap}>
-            <div style={s.thankYou}>
-              Thank you for reviewing this invoice.<br />
-              Please approve all time entries in OpsFloa<br />
-              and process payment at your earliest convenience.
-            </div>
+            <div style={s.thankYou}>{t.thankYouInvoice}</div>
             <div style={s.sumTable}>
               {regular_hours > 0 && (
                 <div style={s.sumRow}>
-                  <span>Regular Hours</span>
+                  <span>{t.regularHours}</span>
                   <span>{fmtH(regular_hours)}</span>
                 </div>
               )}
               {overtimeEnabled && overtime_hours > 0 && (
                 <div style={s.sumRow}>
-                  <span>Overtime Hours</span>
+                  <span>{t.overtimeHours}</span>
                   <span>{fmtH(overtime_hours)}</span>
                 </div>
               )}
               {prevailing_hours > 0 && (
                 <div style={s.sumRow}>
-                  <span>Prevailing Hours</span>
+                  <span>{t.prevailingHours}</span>
                   <span>{fmtH(prevailing_hours)}</span>
                 </div>
               )}
               <div style={{ ...s.sumRow, borderTop: '1px solid #e5e7eb', fontWeight: 700 }}>
-                <span>Total Hours</span>
+                <span>{t.totalHours}</span>
                 <span>{fmtH(totalHours)}</span>
               </div>
               {showPay && (
                 <>
                   {regular_hours > 0 && workerRate > 0 && (
                     <div style={{ ...s.sumRow, borderTop: '1px solid #e5e7eb' }}>
-                      <span>Regular Pay ({fmtMoney(workerRate)}/hr)</span>
+                      <span>{t.regularPay} ({fmtMoney(workerRate)}/hr)</span>
                       <span>{fmtMoney(regularPay)}</span>
                     </div>
                   )}
                   {overtimeEnabled && overtime_hours > 0 && workerRate > 0 && (
                     <div style={s.sumRow}>
-                      <span>Overtime Pay ({otMult}×)</span>
+                      <span>{t.overtimePay} ({otMult}×)</span>
                       <span>{fmtMoney(overtimePay)}</span>
                     </div>
                   )}
                   {prevailing_hours > 0 && prevRate > 0 && (
                     <div style={s.sumRow}>
-                      <span>Prevailing Pay ({fmtMoney(prevRate)}/hr)</span>
+                      <span>{t.prevailingPay} ({fmtMoney(prevRate)}/hr)</span>
                       <span>{fmtMoney(prevailingPay)}</span>
                     </div>
                   )}
                   <div style={s.sumTotal}>
-                    <span>Total Due</span>
+                    <span>{t.totalDue}</span>
                     <span>{fmtMoney(totalPay)}</span>
                   </div>
                 </>
@@ -211,6 +208,7 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen }) {
 }
 
 export default function PayStubView({ user, settings, companyInfo }) {
+  const t = useT();
   const [stubs, setStubs] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -224,14 +222,14 @@ export default function PayStubView({ user, settings, companyInfo }) {
   if (loading) return null;
   if (stubs.length === 0) return (
     <div style={s.empty}>
-      <div style={s.emptyTitle}>Pay Stubs</div>
-      <p style={s.emptyMsg}>No locked pay periods yet. Pay stubs appear here once your admin closes a pay period.</p>
+      <div style={s.emptyTitle}>{t.payStubs}</div>
+      <p style={s.emptyMsg}>{t.noPayPeriodsYet}</p>
     </div>
   );
 
   return (
     <div style={s.wrap}>
-      <div style={s.heading}>Pay Stubs</div>
+      <div style={s.heading}>{t.payStubs}</div>
       <div style={s.list}>
         {stubs.map((stub, i) => (
           <InvoiceCard
@@ -241,6 +239,7 @@ export default function PayStubView({ user, settings, companyInfo }) {
             settings={settings}
             companyInfo={companyInfo}
             defaultOpen={i === 0}
+            t={t}
           />
         ))}
       </div>

@@ -1,10 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
 
 export default function WelcomeModal() {
   const { user, firstLogin, clearFirstLogin } = useAuth();
   const navigate = useNavigate();
+  const t = useT();
   if (!firstLogin || !user) return null;
 
   const firstName = user.first_name || user.full_name?.split(' ')[0] || user.username;
@@ -18,30 +20,22 @@ export default function WelcomeModal() {
   return (
     <div style={styles.overlay}>
       <div style={styles.modal}>
-        <div style={styles.brand}>OpsFloA · Ops Flow Assist</div>
+        <div style={styles.brand}>{t.welcomeBrand}</div>
         <div style={styles.emoji}>{isAdmin ? '🏗️' : '👷'}</div>
         <h2 style={styles.title}>Welcome, {firstName}!</h2>
         {isAdmin ? (
           <>
-            <p style={styles.body}>
-              <strong>Ops Flow Assist</strong> is your all-in-one field operations platform — built for contractors and the crews who run the job.
-            </p>
-            <p style={styles.body}>
-              As an admin, you're in control. Add your team, set up projects, track time, approve timesheets, and push hours straight to QuickBooks.
-            </p>
+            <p style={styles.body}><strong>Ops Flow Assist</strong> {t.welcomeAdminBody1}</p>
+            <p style={styles.body}>{t.welcomeAdminBody2}</p>
           </>
         ) : (
           <>
-            <p style={styles.body}>
-              <strong>Ops Flow Assist</strong> (OpsFloA) is your field operations hub — time clock, schedule, reports, and more, right in your pocket.
-            </p>
-            <p style={styles.body}>
-              Use the <strong>Time Clock</strong> to log your hours, check your upcoming shifts, and submit field reports — all from this app.
-            </p>
+            <p style={styles.body}><strong>Ops Flow Assist</strong> {t.welcomeWorkerBody1}</p>
+            <p style={styles.body}>{t.welcomeWorkerBody2}</p>
           </>
         )}
         <button style={styles.btn} onClick={handleStart}>
-          {isAdmin ? 'Let\'s get started →' : 'Got it →'}
+          {isAdmin ? t.welcomeLetsGo : t.welcomeGotIt}
         </button>
       </div>
     </div>

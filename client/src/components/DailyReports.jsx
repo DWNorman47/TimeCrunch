@@ -3,18 +3,17 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { PDFButton } from './DailyReportPDF';
+import { useT } from '../hooks/useT';
 
-const WEATHER_OPTIONS = [
-  { value: 'sunny', label: '☀️ Sunny' },
-  { value: 'partly_cloudy', label: '🌤️ Partly Cloudy' },
-  { value: 'cloudy', label: '☁️ Cloudy' },
-  { value: 'rainy', label: '🌧️ Rainy' },
-  { value: 'stormy', label: '⛈️ Stormy' },
-  { value: 'snow', label: '🌨️ Snow' },
-  { value: 'windy', label: '🌬️ Windy' },
+const WEATHER_KEYS = [
+  { value: 'sunny', key: 'weatherSunny', emoji: '☀️' },
+  { value: 'partly_cloudy', key: 'weatherPartlyCloudy', emoji: '🌤️' },
+  { value: 'cloudy', key: 'weatherCloudy', emoji: '☁️' },
+  { value: 'rainy', key: 'weatherRainy', emoji: '🌧️' },
+  { value: 'stormy', key: 'weatherStormy', emoji: '⛈️' },
+  { value: 'snow', key: 'weatherSnow', emoji: '🌨️' },
+  { value: 'windy', key: 'weatherWindy', emoji: '🌬️' },
 ];
-
-const WEATHER_LABELS = Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label]));
 
 function fmtDate(str) {
   return new Date(str + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -42,8 +41,11 @@ function RowInput({ value, onChange, type = 'text', placeholder, style, min }) {
 // ── Report Editor ──────────────────────────────────────────────────────────────
 
 function ReportEditor({ report: initial, projects, onSaved, onCancel, companyName, fieldPhotos }) {
+  const t = useT();
   const isNew = !initial?.id;
   const today = new Date().toLocaleDateString('en-CA');
+  const WEATHER_OPTIONS = WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` }));
+  const WEATHER_LABELS = Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label]));
 
   const [form, setForm] = useState({
     project_id: initial?.project_id || '',
@@ -143,14 +145,14 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       }
       onSaved(r.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save');
+      setError(err.response?.data?.error || t.failedToSave);
     } finally { setSaving(false); setSubmitting(false); }
   };
 
   return (
     <div style={styles.editor}>
       <div style={styles.editorHeader}>
-        <h3 style={styles.editorTitle}>{isNew ? 'New Daily Report' : 'Edit Daily Report'}</h3>
+        <h3 style={styles.editorTitle}>{isNew ? t.newDailyReport : t.editDailyReport}</h3>
         {!isNew && initial.status === 'submitted' && (
           <PDFButton
             report={{ ...initial, ...form, manpower, equipment, materials }}
@@ -164,30 +166,30 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       {/* Header fields */}
       <div style={styles.fieldGrid}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Date</label>
+          <label style={styles.label}>{t.date}</label>
           <input style={styles.input} type="date" value={form.report_date} onChange={e => set('report_date', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Project</label>
+          <label style={styles.label}>{t.project}</label>
           <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-            <option value="">No project</option>
+            <option value="">{t.noProjectOpt}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Superintendent</label>
-          <input style={styles.input} type="text" placeholder="Name" value={form.superintendent} onChange={e => set('superintendent', e.target.value)} />
+          <label style={styles.label}>{t.superintendent}</label>
+          <input style={styles.input} type="text" placeholder={t.superintendent} value={form.superintendent} onChange={e => set('superintendent', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>
-            Weather
+            {t.weather}
             <button type="button" style={styles.weatherBtn} onClick={autoFillWeather} disabled={gettingWeather} title="Auto-fill from current location">
               {gettingWeather ? '...' : '🌤 Auto'}
             </button>
           </label>
           <div style={{ display: 'flex', gap: 6 }}>
             <select style={{ ...styles.input, flex: 1 }} value={form.weather_condition} onChange={e => set('weather_condition', e.target.value)}>
-              <option value="">Select</option>
+              <option value="">{t.select}</option>
               {WEATHER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             <input style={{ ...styles.input, width: 70 }} type="number" placeholder="°F" value={form.weather_temp} onChange={e => set('weather_temp', e.target.value)} />
@@ -198,18 +200,18 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       {/* Manpower */}
       <div style={styles.section}>
         <div style={styles.sectionHead}>
-          <span style={styles.sectionTitle}>Manpower</span>
+          <span style={styles.sectionTitle}>{t.manpowerSection}</span>
           <button style={styles.autofillBtn} onClick={autoFillManpower} disabled={suggesting}>
-            {suggesting ? '...' : '⚡ Auto-fill from time entries'}
+            {suggesting ? '...' : `⚡ ${t.autoFillEntries}`}
           </button>
         </div>
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={styles.th}>Trade / Name</th>
-              <th style={{ ...styles.th, width: 70 }}>Workers</th>
-              <th style={{ ...styles.th, width: 70 }}>Hours</th>
-              <th style={{ ...styles.th, flex: 2 }}>Notes</th>
+              <th style={styles.th}>{t.tradeOrName}</th>
+              <th style={{ ...styles.th, width: 70 }}>{t.workers}</th>
+              <th style={{ ...styles.th, width: 70 }}>{t.hours}</th>
+              <th style={{ ...styles.th, flex: 2 }}>{t.notes}</th>
               <th style={{ ...styles.th, width: 30 }}></th>
             </tr>
           </thead>
@@ -219,34 +221,34 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
                 <td style={styles.td}><RowInput value={m.trade} onChange={v => updateRow(manpower, setManpower, i, 'trade', v)} placeholder="e.g. Carpenters" /></td>
                 <td style={styles.td}><RowInput value={m.worker_count} onChange={v => updateRow(manpower, setManpower, i, 'worker_count', v)} type="number" min="1" style={{ width: 55 }} /></td>
                 <td style={styles.td}><RowInput value={m.hours} onChange={v => updateRow(manpower, setManpower, i, 'hours', v)} type="number" min="0" placeholder="0" style={{ width: 55 }} /></td>
-                <td style={styles.td}><RowInput value={m.notes} onChange={v => updateRow(manpower, setManpower, i, 'notes', v)} placeholder="Optional" /></td>
+                <td style={styles.td}><RowInput value={m.notes} onChange={v => updateRow(manpower, setManpower, i, 'notes', v)} placeholder={t.optional} /></td>
                 <td style={styles.td}><button style={styles.removeRowBtn} onClick={() => removeRow(manpower, setManpower, i)}>✕</button></td>
               </tr>
             ))}
           </tbody>
         </table>
-        <button style={styles.addRowBtn} onClick={() => addRow(manpower, setManpower, 'manpower')}>+ Add row</button>
+        <button style={styles.addRowBtn} onClick={() => addRow(manpower, setManpower, 'manpower')}>{t.addRow}</button>
       </div>
 
       {/* Work Performed */}
       <div style={styles.section}>
-        <div style={styles.sectionHead}><span style={styles.sectionTitle}>Work Performed</span></div>
-        <textarea style={styles.textarea} rows={4} placeholder="Describe work completed today..." value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
+        <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.workPerformed}</span></div>
+        <textarea style={styles.textarea} rows={4} placeholder={t.workPerformedPlaceholder} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
       </div>
 
       {/* Equipment */}
       <div style={styles.section}>
         <div style={styles.sectionHead}>
-          <span style={styles.sectionTitle}>Equipment on Site</span>
-          <button style={styles.addRowBtn} onClick={() => addRow(equipment, setEquipment, 'equipment')}>+ Add</button>
+          <span style={styles.sectionTitle}>{t.equipmentOnSite}</span>
+          <button style={styles.addRowBtn} onClick={() => addRow(equipment, setEquipment, 'equipment')}>+ {t.add}</button>
         </div>
         {equipment.length > 0 && (
           <table style={styles.table}>
             <thead>
               <tr>
-                <th style={styles.th}>Equipment</th>
-                <th style={{ ...styles.th, width: 70 }}>Qty</th>
-                <th style={{ ...styles.th, width: 70 }}>Hours</th>
+                <th style={styles.th}>{t.equipmentField}</th>
+                <th style={{ ...styles.th, width: 70 }}>{t.qty}</th>
+                <th style={{ ...styles.th, width: 70 }}>{t.hours}</th>
                 <th style={{ ...styles.th, width: 30 }}></th>
               </tr>
             </thead>
@@ -267,15 +269,15 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       {/* Materials */}
       <div style={styles.section}>
         <div style={styles.sectionHead}>
-          <span style={styles.sectionTitle}>Materials Delivered</span>
-          <button style={styles.addRowBtn} onClick={() => addRow(materials, setMaterials, 'materials')}>+ Add</button>
+          <span style={styles.sectionTitle}>{t.materialsDelivered}</span>
+          <button style={styles.addRowBtn} onClick={() => addRow(materials, setMaterials, 'materials')}>+ {t.add}</button>
         </div>
         {materials.length > 0 && (
           <table style={styles.table}>
             <thead>
               <tr>
-                <th style={styles.th}>Description</th>
-                <th style={{ ...styles.th, width: 110 }}>Quantity</th>
+                <th style={styles.th}>{t.descriptionField}</th>
+                <th style={{ ...styles.th, width: 110 }}>{t.quantity}</th>
                 <th style={{ ...styles.th, width: 30 }}></th>
               </tr>
             </thead>
@@ -294,25 +296,25 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
 
       {/* Delays */}
       <div style={styles.section}>
-        <div style={styles.sectionHead}><span style={styles.sectionTitle}>Delays / Issues</span></div>
-        <textarea style={styles.textarea} rows={3} placeholder="Any delays, issues, or safety observations..." value={form.delays_issues} onChange={e => set('delays_issues', e.target.value)} />
+        <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.delaysIssues}</span></div>
+        <textarea style={styles.textarea} rows={3} placeholder={t.delaysIssuesPlaceholder} value={form.delays_issues} onChange={e => set('delays_issues', e.target.value)} />
       </div>
 
       {/* Visitor log */}
       <div style={styles.section}>
-        <div style={styles.sectionHead}><span style={styles.sectionTitle}>Visitor Log</span></div>
-        <textarea style={styles.textarea} rows={2} placeholder="Inspectors, clients, or other visitors on site..." value={form.visitor_log} onChange={e => set('visitor_log', e.target.value)} />
+        <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.visitorLog}</span></div>
+        <textarea style={styles.textarea} rows={2} placeholder={t.visitorLogPlaceholder} value={form.visitor_log} onChange={e => set('visitor_log', e.target.value)} />
       </div>
 
       {fieldPhotos.length > 0 && (
         <div style={styles.section}>
-          <div style={styles.sectionHead}><span style={styles.sectionTitle}>Photos ({fieldPhotos.length} from Field Reports)</span></div>
+          <div style={styles.sectionHead}><span style={styles.sectionTitle}>📷 {fieldPhotos.length} {t.photosFromFieldReports}</span></div>
           <div style={styles.photoStrip}>
             {fieldPhotos.map((p, i) => (
               <img key={i} src={p.url} style={styles.photoThumb} alt={p.caption || `photo ${i + 1}`} title={p.caption} />
             ))}
           </div>
-          <p style={styles.photoNote}>Photos are pulled from Field Reports submitted for this project on this date.</p>
+          <p style={styles.photoNote}>{t.photosPulledNote}</p>
         </div>
       )}
 
@@ -320,12 +322,12 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
 
       <div style={styles.editorActions}>
         <button style={styles.saveDraftBtn} onClick={() => save('draft')} disabled={saving || submitting}>
-          {saving ? 'Saving...' : 'Save Draft'}
+          {saving ? t.saving : t.saveDraft}
         </button>
         <button style={styles.submitBtn} onClick={() => save('submitted')} disabled={saving || submitting}>
-          {submitting ? 'Submitting...' : 'Submit Report'}
+          {submitting ? t.submitting : t.submitReport}
         </button>
-        <button style={styles.cancelBtn} onClick={onCancel}>Cancel</button>
+        <button style={styles.cancelBtn} onClick={onCancel}>{t.cancel}</button>
       </div>
     </div>
   );
@@ -334,16 +336,19 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
 // ── Report list row ────────────────────────────────────────────────────────────
 
 function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyName, fieldPhotos }) {
+  const t = useT();
   const [report, setReport] = useState(initialReport);
   const [deleting, setDeleting] = useState(false);
   const [approving, setApproving] = useState(false);
+  const WEATHER_OPTIONS = WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` }));
+  const WEATHER_LABELS = Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label]));
   const weather = report.weather_condition ? WEATHER_LABELS[report.weather_condition] : null;
 
   const handleDelete = async () => {
-    if (!confirm('Delete this daily report?')) return;
+    if (!confirm(t.deleteDailyReportConfirm)) return;
     setDeleting(true);
     try { await api.delete(`/daily-reports/${report.id}`); onDelete(report.id); }
-    catch { alert('Failed to delete'); }
+    catch { alert(t.failedToDelete); }
     finally { setDeleting(false); }
   };
 
@@ -352,7 +357,7 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
     try {
       const r = await api.patch(`/daily-reports/${report.id}/review`);
       setReport(r.data);
-    } catch { alert('Failed to approve report'); }
+    } catch { alert(t.failedToApprove); }
     finally { setApproving(false); }
   };
 
@@ -362,20 +367,20 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
   return (
     <div style={styles.reportRow}>
       <div style={styles.rowLeft} onClick={() => !report.pending && onEdit(report)}>
-        <div style={styles.rowDate}>{fmtDate(report.report_date)}{report.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}</div>
-        <div style={styles.rowProject}>{report.project_name || 'No project'}</div>
+        <div style={styles.rowDate}>{fmtDate(report.report_date)}{report.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
+        <div style={styles.rowProject}>{report.project_name || t.noProjectOpt}</div>
         {weather && <div style={styles.rowMeta}>{weather}{report.weather_temp != null ? ` · ${report.weather_temp}°F` : ''}</div>}
-        {report.manpower_count > 0 && <div style={styles.rowMeta}>{report.manpower_count} crew entr{report.manpower_count !== 1 ? 'ies' : 'y'}</div>}
+        {report.manpower_count > 0 && <div style={styles.rowMeta}>{report.manpower_count} {report.manpower_count !== 1 ? t.crewEntries : t.crewEntry}</div>}
         {isReviewed && report.reviewed_by && (
           <div style={styles.reviewedMeta}>
-            ✓ Reviewed by {report.reviewed_by}
+            ✓ {t.reviewedBy} {report.reviewed_by}
             {report.reviewed_at && ` · ${new Date(report.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
           </div>
         )}
       </div>
       <div style={styles.rowRight}>
         <span style={isReviewed ? styles.badgeReviewed : isSubmitted ? styles.badgeSubmitted : styles.badgeDraft}>
-          {isReviewed ? 'Reviewed' : isSubmitted ? 'Submitted' : 'Draft'}
+          {isReviewed ? t.statusReviewed : isSubmitted ? t.statusSubmitted : t.statusDraft}
         </span>
         {(isSubmitted || isReviewed) && (
           <PDFButton
@@ -387,10 +392,10 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
         )}
         {isAdmin && isSubmitted && (
           <button style={styles.approveBtn} onClick={handleApprove} disabled={approving}>
-            {approving ? '...' : '✓ Approve'}
+            {approving ? '...' : t.approve}
           </button>
         )}
-        {!report.pending && <button style={styles.editRowBtn} onClick={() => onEdit(report)}>Edit</button>}
+        {!report.pending && <button style={styles.editRowBtn} onClick={() => onEdit(report)}>{t.edit}</button>}
         {!report.pending && <button style={styles.deleteRowBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : '✕'}</button>}
       </div>
     </div>
@@ -401,6 +406,7 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
 
 export default function DailyReports({ projects }) {
   const { user } = useAuth();
+  const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
   const [reports, setReports] = useState([]);
@@ -478,17 +484,17 @@ export default function DailyReports({ projects }) {
     <div>
       <div style={styles.listHeader}>
         <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
-          <option value="">All projects</option>
+          <option value="">{t.allProjects}</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        <button style={styles.newBtn} onClick={() => setEditing('new')}>+ New Report</button>
+        <button style={styles.newBtn} onClick={() => setEditing('new')}>{t.newReport}</button>
       </div>
 
-      {loading ? <p style={styles.hint}>Loading...</p> :
+      {loading ? <p style={styles.hint}>{t.loading}</p> :
         reports.length === 0 ? (
           <div style={styles.empty}>
             <div style={styles.emptyIcon}>📋</div>
-            <p style={styles.emptyText}>No daily reports yet. Create one to start tracking.</p>
+            <p style={styles.emptyText}>{t.noDailyReports}</p>
           </div>
         ) : (
           <div style={styles.reportList}>

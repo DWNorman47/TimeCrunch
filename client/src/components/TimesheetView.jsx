@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { fmtHours } from '../utils';
 import EntryPanel from './EntryPanel';
 import api from '../api';
+import { getT } from '../i18n';
 
 function startOfWeek(date) {
   const d = new Date(date);
@@ -45,6 +46,7 @@ function netHours(start, end, breakMinutes) {
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function TimesheetView({ entries, language, projects = [], onRefresh }) {
+  const t = getT(language);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [copying, setCopying] = useState(false);
@@ -63,7 +65,7 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
       setCopyMsg(`${created} entr${created === 1 ? 'y' : 'ies'} copied${skipped > 0 ? `, ${skipped} skipped` : ''}`);
       if (created > 0 && onRefresh) await onRefresh();
     } catch {
-      setCopyMsg('Failed to copy');
+      setCopyMsg(t.copyFailed);
     } finally {
       setCopying(false);
     }
@@ -103,9 +105,9 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
         <div style={styles.headerRight}>
           <span style={styles.weekTotal}>{fmtHours(weekTotalHours)}</span>
           {weekTotalMiles > 0 && <span style={styles.weekMiles}>🚗 {weekTotalMiles.toFixed(1)} mi</span>}
-          <button style={styles.todayBtn} onClick={goToday}>Today</button>
+          <button style={styles.todayBtn} onClick={goToday}>{t.todayBtn}</button>
           <button style={{ ...styles.todayBtn, borderColor: '#1a56db', color: '#1a56db' }} onClick={copyLastWeek} disabled={copying}>
-            {copying ? '…' : 'Copy Last Week'}
+            {copying ? '…' : t.copyLastWeekBtn}
           </button>
           {copyMsg && <span style={{ fontSize: 12, color: '#6b7280' }}>{copyMsg}</span>}
         </div>

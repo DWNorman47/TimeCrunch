@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
-const TYPE_LABELS = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' };
+const TYPE_LABELS_EN = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' };
 const TYPE_COLORS = { vacation: '#1d4ed8', sick: '#dc2626', personal: '#7c3aed', other: '#6b7280' };
 const STATUS_COLORS = { pending: '#d97706', approved: '#059669', denied: '#ef4444' };
 
@@ -17,6 +18,8 @@ function days(start, end) {
 }
 
 export default function TimeOffTab() {
+  const t = useT();
+  const TYPE_LABELS = { vacation: t.typeVacation, sick: t.typeSick, personal: t.typePersonal, other: t.typeOther };
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ type: 'vacation', start_date: '', end_date: '', note: '' });
@@ -38,8 +41,8 @@ export default function TimeOffTab() {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!form.start_date || !form.end_date) { setError('Please select a date range.'); return; }
-    if (form.end_date < form.start_date) { setError('End date must be on or after start date.'); return; }
+    if (!form.start_date || !form.end_date) { setError(t.dateRangeRequired); return; }
+    if (form.end_date < form.start_date) { setError(t.endDateAfterStart); return; }
     setSaving(true); setError('');
     try {
       const r = await api.post('/time-off', form);
@@ -47,26 +50,26 @@ export default function TimeOffTab() {
       setForm({ type: 'vacation', start_date: '', end_date: '', note: '' });
       setShowForm(false);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to submit request.');
+      setError(err.response?.data?.error || t.failedSubmitRequest);
     } finally { setSaving(false); }
   };
 
   const handleCancel = async (id) => {
-    if (!confirm('Cancel this time off request?')) return;
+    if (!confirm(t.cancelRequestConfirm)) return;
     try {
       await api.delete(`/time-off/${id}`);
       setRequests(prev => prev.filter(r => r.id !== id));
     } catch (err) {
-      alert(err.response?.data?.error || 'Could not cancel.');
+      alert(err.response?.data?.error || t.couldNotCancel);
     }
   };
 
   return (
     <div style={s.wrap}>
       <div style={s.headerRow}>
-        <h2 style={s.title}>Time Off Requests</h2>
+        <h2 style={s.title}>{t.timeOffRequests}</h2>
         <button style={s.addBtn} onClick={() => setShowForm(o => !o)}>
-          {showForm ? 'Cancel' : '+ New Request'}
+          {showForm ? t.cancel : t.newRequest}
         </button>
       </div>
 
@@ -74,38 +77,38 @@ export default function TimeOffTab() {
         <form onSubmit={handleSubmit} style={s.form}>
           <div style={s.row}>
             <div style={s.fieldGroup}>
-              <label style={s.label}>Type</label>
+              <label style={s.label}>{t.typeLabel}</label>
               <select style={s.input} value={form.type} onChange={e => set('type', e.target.value)}>
-                <option value="vacation">Vacation</option>
-                <option value="sick">Sick</option>
-                <option value="personal">Personal</option>
-                <option value="other">Other</option>
+                <option value="vacation">{t.typeVacation}</option>
+                <option value="sick">{t.typeSick}</option>
+                <option value="personal">{t.typePersonal}</option>
+                <option value="other">{t.typeOther}</option>
               </select>
             </div>
             <div style={s.fieldGroup}>
-              <label style={s.label}>Start Date</label>
+              <label style={s.label}>{t.startDate}</label>
               <input style={s.input} type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} required />
             </div>
             <div style={s.fieldGroup}>
-              <label style={s.label}>End Date</label>
+              <label style={s.label}>{t.endDate}</label>
               <input style={s.input} type="date" value={form.end_date} min={form.start_date} onChange={e => set('end_date', e.target.value)} required />
             </div>
           </div>
           <div style={s.fieldGroup}>
-            <label style={s.label}>Note (optional)</label>
-            <textarea style={{ ...s.input, resize: 'vertical', minHeight: 56 }} value={form.note} onChange={e => set('note', e.target.value)} placeholder="Any additional details…" />
+            <label style={s.label}>{t.noteOptionalLabel}</label>
+            <textarea style={{ ...s.input, resize: 'vertical', minHeight: 56 }} value={form.note} onChange={e => set('note', e.target.value)} placeholder={t.noteDetailsPlaceholder} />
           </div>
           {error && <p style={s.error}>{error}</p>}
           <button style={s.submitBtn} type="submit" disabled={saving}>
-            {saving ? 'Submitting…' : 'Submit Request'}
+            {saving ? t.submitting : t.submitRequest}
           </button>
         </form>
       )}
 
       {loading ? (
-        <p style={s.empty}>Loading…</p>
+        <p style={s.empty}>{t.loading}</p>
       ) : requests.length === 0 ? (
-        <p style={s.empty}>No time off requests yet.</p>
+        <p style={s.empty}>{t.noTimeOffYet}</p>
       ) : (
         <div style={s.list}>
           {requests.map(r => (
@@ -120,18 +123,18 @@ export default function TimeOffTab() {
               </div>
               <div style={s.dates}>
                 {fmt(r.start_date)} – {fmt(r.end_date)}
-                <span style={s.dayCount}>{days(r.start_date?.toString().substring(0,10), r.end_date?.toString().substring(0,10))} day{days(r.start_date?.toString().substring(0,10), r.end_date?.toString().substring(0,10)) !== 1 ? 's' : ''}</span>
+                {(() => { const d = days(r.start_date?.toString().substring(0,10), r.end_date?.toString().substring(0,10)); return <span style={s.dayCount}>{d} {d !== 1 ? t.days : t.day}</span>; })()}
               </div>
               {r.note && <p style={s.note}>{r.note}</p>}
               {r.review_note && (
                 <p style={{ ...s.note, color: STATUS_COLORS[r.status] || '#6b7280' }}>
-                  Admin: {r.review_note}
+                  {t.adminNotePrefix}{r.review_note}
                 </p>
               )}
               <div style={s.meta}>
-                Submitted {fmt(r.created_at)}
+                {t.submitted} {fmt(r.created_at)}
                 {r.status === 'pending' && (
-                  <button style={s.cancelBtn} onClick={() => handleCancel(r.id)}>Cancel</button>
+                  <button style={s.cancelBtn} onClick={() => handleCancel(r.id)}>{t.cancel}</button>
                 )}
               </div>
             </div>

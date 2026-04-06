@@ -1,17 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 const VENDOR_TYPES = ['contractor', 'subcontractor'];
 const EMPLOYEE_TYPES = ['employee', 'owner'];
 
-const TYPE_LABELS = {
-  employee: 'Employees (W-2)',
-  owner: 'Owners / Officers',
-  contractor: 'Independent Contractors (1099-NEC)',
-  subcontractor: 'Subcontractors (1099-NEC)',
-};
-
 export default function QuickBooks({ workers, projects, onWorkersImported, onProjectsImported }) {
+  const t = useT();
   const [status, setStatus] = useState(null);
   const [qboEmployees, setQboEmployees] = useState([]);
   const [qboVendors, setQboVendors] = useState([]);
@@ -82,7 +77,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   };
 
   const handleDisconnect = async () => {
-    if (!window.confirm('Disconnect QuickBooks? Existing mappings will be preserved.')) return;
+    if (!window.confirm(t.qboDisconnectConfirm)) return;
     await api.delete('/qbo/disconnect');
     setStatus({ connected: false });
   };
@@ -165,25 +160,32 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
     }
   };
 
-  if (!status) return <p style={{ color: '#666' }}>Loading...</p>;
+  if (!status) return <p style={{ color: '#666' }}>{t.loading}</p>;
+
+  const TYPE_LABELS = {
+    employee: t.qboTypeEmployee,
+    owner: t.qboTypeOwner,
+    contractor: t.qboTypeContractor,
+    subcontractor: t.qboTypeSubcontractor,
+  };
 
   // Group workers by type, only include types that have at least one worker
   const workersByType = {};
   workers.forEach(w => {
-    const t = w.worker_type || 'employee';
-    if (!workersByType[t]) workersByType[t] = [];
-    workersByType[t].push(w);
+    const wtype = w.worker_type || 'employee';
+    if (!workersByType[wtype]) workersByType[wtype] = [];
+    workersByType[wtype].push(w);
   });
   const typeOrder = ['employee', 'owner', 'contractor', 'subcontractor'];
-  const presentTypes = typeOrder.filter(t => workersByType[t]?.length > 0);
+  const presentTypes = typeOrder.filter(wtype => workersByType[wtype]?.length > 0);
 
   return (
     <div style={styles.wrap}>
       <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Connection</h3>
+        <h3 style={styles.sectionTitle}>{t.qboConnection}</h3>
         {status.disconnected && (
           <div style={styles.reconnectBanner}>
-            ⚠ Your QuickBooks authorization expired or was revoked. Reconnect to resume syncing.
+            ⚠ {t.qboReconnectBanner}
           </div>
         )}
         {status.connected ? (
@@ -191,19 +193,19 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             <span style={styles.connectedDot} />
             <div style={{ flex: 1 }}>
               <span style={{ fontWeight: 600, color: '#166534' }}>
-                {status.qbo_company_name ? status.qbo_company_name : 'Connected to QuickBooks'}
+                {status.qbo_company_name ? status.qbo_company_name : t.qboConnected}
               </span>
               {status.connected_at && (
-                <span style={styles.connectedSince}> · Connected {new Date(status.connected_at).toLocaleDateString()}</span>
+                <span style={styles.connectedSince}> · {t.qboConnectedSince} {new Date(status.connected_at).toLocaleDateString()}</span>
               )}
             </div>
-            <button style={styles.disconnectBtn} onClick={handleDisconnect}>Disconnect</button>
+            <button style={styles.disconnectBtn} onClick={handleDisconnect}>{t.qboDisconnect}</button>
           </div>
         ) : (
           <div>
-            <p style={styles.hint}>Connect your QuickBooks Online account to push time entries directly.</p>
+            <p style={styles.hint}>{t.qboConnectionHint}</p>
             <button style={styles.connectBtn} onClick={handleConnect}>
-              {status.disconnected ? 'Reconnect to QuickBooks' : 'Connect to QuickBooks'}
+              {status.disconnected ? t.qboReconnect : t.qboConnect}
             </button>
           </div>
         )}
@@ -216,23 +218,18 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           {presentTypes.map(type => {
             const isVendorType = VENDOR_TYPES.includes(type);
             const qboList = isVendorType ? qboVendors : qboEmployees;
-            const qboLabel = isVendorType ? 'QuickBooks Vendor' : 'QuickBooks Employee';
+            const qboLabel = isVendorType ? t.qboQBVendor : t.qboQBEmployee;
             const mappings = isVendorType ? vendorMappings : employeeMappings;
             const saveFn = isVendorType ? saveVendorMapping : saveEmployeeMapping;
             const typeWorkers = workersByType[type];
             return (
               <div key={type} style={styles.section}>
                 <h3 style={styles.sectionTitle}>{TYPE_LABELS[type]}</h3>
-                <p style={styles.hint}>
-                  {isVendorType
-                    ? `Link each ${type} to their corresponding vendor in QuickBooks for 1099 reporting.`
-                    : `Link each ${type === 'owner' ? 'owner/officer' : 'employee'} to their corresponding employee in QuickBooks.`}
-                </p>
-                {loadingMappings ? <p>Loading QuickBooks data...</p> : (
+                {loadingMappings ? <p>{t.qboLoadingData}</p> : (
                   <table style={styles.table}>
                     <thead>
                       <tr>
-                        <th style={styles.th}>OpsFloa Worker</th>
+                        <th style={styles.th}>{t.qboOpsFloaWorker}</th>
                         <th style={styles.th}>{qboLabel}</th>
                       </tr>
                     </thead>
@@ -246,7 +243,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                               value={mappings[w.id] || ''}
                               onChange={e => saveFn(w.id, e.target.value)}
                             >
-                              <option value="">— Not mapped —</option>
+                              <option value="">{t.qboNotMapped}</option>
                               {qboList.map(e => (
                                 <option key={e.Id} value={e.Id}>{e.DisplayName}</option>
                               ))}
@@ -262,14 +259,14 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           })}
 
           <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Project Mappings</h3>
-            <p style={styles.hint}>Link each project to the corresponding customer or job in QuickBooks.</p>
-            {loadingMappings ? <p>Loading QuickBooks customers...</p> : (
+            <h3 style={styles.sectionTitle}>{t.qboProjectMappings}</h3>
+            <p style={styles.hint}>{t.qboProjectMappingsHint}</p>
+            {loadingMappings ? <p>{t.qboLoadingCustomers}</p> : (
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>OpsFloa Project</th>
-                    <th style={styles.th}>QuickBooks Customer / Job</th>
+                    <th style={styles.th}>{t.qboOpsFloaProject}</th>
+                    <th style={styles.th}>{t.qboQBCustomer}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -282,7 +279,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                           value={projectMappings[p.id] || ''}
                           onChange={e => saveProjectMapping(p.id, e.target.value)}
                         >
-                          <option value="">— Not mapped —</option>
+                          <option value="">{t.qboNotMapped}</option>
                           {qboCustomers.map(c => (
                             <option key={c.Id} value={c.Id}>{c.DisplayName}</option>
                           ))}
@@ -307,15 +304,15 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             if (loadingMappings || (unmappedEmployees.length === 0 && unmappedVendors.length === 0 && unmappedCustomers.length === 0)) return null;
             return (
               <div style={styles.section}>
-                <h3 style={styles.sectionTitle}>Import from QuickBooks</h3>
-                <p style={styles.hint}>Select QuickBooks records to create as new OpsFloa workers or projects. Already-mapped records are hidden. Imported workers will be set to must-change-password on first login.</p>
+                <h3 style={styles.sectionTitle}>{t.qboImportFromQB}</h3>
+                <p style={styles.hint}>{t.qboImportHint}</p>
 
                 {unmappedEmployees.length > 0 && (
                   <div style={styles.importGroup}>
                     <div style={styles.importGroupLabel}>
-                      Employees
+                      {t.qboEmployeesGroup}
                       <button style={styles.selectAllBtn} onClick={() => setSelectedWorkers(s => s.size === unmappedEmployees.length ? new Set() : new Set(unmappedEmployees.map(e => e.Id)))}>
-                        {selectedWorkers.size === unmappedEmployees.length ? 'Deselect all' : 'Select all'}
+                        {selectedWorkers.size === unmappedEmployees.length ? t.qboDeselectAll : t.qboSelectAll}
                       </button>
                     </div>
                     {unmappedEmployees.map(e => (
@@ -331,9 +328,9 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 {unmappedVendors.length > 0 && (
                   <div style={styles.importGroup}>
                     <div style={styles.importGroupLabel}>
-                      Vendors (Contractors / Subcontractors)
+                      {t.qboVendorsGroup}
                       <button style={styles.selectAllBtn} onClick={() => setSelectedVendors(s => s.size === unmappedVendors.length ? new Set() : new Set(unmappedVendors.map(v => v.Id)))}>
-                        {selectedVendors.size === unmappedVendors.length ? 'Deselect all' : 'Select all'}
+                        {selectedVendors.size === unmappedVendors.length ? t.qboDeselectAll : t.qboSelectAll}
                       </button>
                     </div>
                     {unmappedVendors.map(v => (
@@ -344,7 +341,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                         <select
                           style={styles.importTypeSelect}
                           value={vendorTypes[v.Id] || 'contractor'}
-                          onChange={e => setVendorTypes(t => ({ ...t, [v.Id]: e.target.value }))}
+                          onChange={e => setVendorTypes(prev => ({ ...prev, [v.Id]: e.target.value }))}
                           onClick={e => e.preventDefault()}
                         >
                           <option value="contractor">Contractor</option>
@@ -359,9 +356,9 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 {unmappedCustomers.length > 0 && (
                   <div style={styles.importGroup}>
                     <div style={styles.importGroupLabel}>
-                      Customers → Projects
+                      {t.qboCustomersGroup}
                       <button style={styles.selectAllBtn} onClick={() => setSelectedProjects(s => s.size === unmappedCustomers.length ? new Set() : new Set(unmappedCustomers.map(c => c.Id)))}>
-                        {selectedProjects.size === unmappedCustomers.length ? 'Deselect all' : 'Select all'}
+                        {selectedProjects.size === unmappedCustomers.length ? t.qboDeselectAll : t.qboSelectAll}
                       </button>
                     </div>
                     {unmappedCustomers.map(c => (
@@ -374,7 +371,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 )}
 
                 <button style={{ ...styles.pushBtn, marginTop: 16, opacity: totalSelections === 0 ? 0.5 : 1 }} onClick={handleImport} disabled={importing || totalSelections === 0}>
-                  {importing ? 'Importing...' : `Import Selected (${totalSelections})`}
+                  {importing ? t.qboImporting : `${t.qboImportSelected} (${totalSelections})`}
                 </button>
 
                 {importResult && (
@@ -409,24 +406,24 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           })()}
 
           <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Push Time Entries</h3>
-            <p style={styles.hint}>Push entries to QuickBooks as Time Activities. Only mapped workers and projects will be included. Entries already synced are skipped unless you enable re-push.</p>
+            <h3 style={styles.sectionTitle}>{t.qboPushEntries}</h3>
+            <p style={styles.hint}>{t.qboPushHint}</p>
             <div style={styles.pushRow}>
               <div>
-                <label style={styles.label}>From</label>
+                <label style={styles.label}>{t.qboFrom}</label>
                 <input style={styles.dateInput} type="date" value={pushFrom} onChange={e => setPushFrom(e.target.value)} />
               </div>
               <div>
-                <label style={styles.label}>To</label>
+                <label style={styles.label}>{t.qboTo}</label>
                 <input style={styles.dateInput} type="date" value={pushTo} onChange={e => setPushTo(e.target.value)} />
               </div>
               <button style={styles.pushBtn} onClick={handlePush} disabled={pushing}>
-                {pushing ? 'Pushing...' : 'Push to QuickBooks'}
+                {pushing ? t.qboPushing : t.qboPush}
               </button>
             </div>
             <label style={styles.forceLabel}>
               <input type="checkbox" checked={forcePush} onChange={e => setForcePush(e.target.checked)} style={{ marginRight: 6 }} />
-              Re-push already synced entries
+              {t.qboRepush}
             </label>
             {pushResult && (
               <div style={styles.resultBox}>

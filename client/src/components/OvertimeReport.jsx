@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 import { fmtHours, formatCurrency } from '../utils';
+import { useT } from '../hooks/useT';
 
 function monthStart() {
   const d = new Date();
@@ -10,6 +11,7 @@ function today() { return new Date().toLocaleDateString('en-CA'); }
 function fmt(n) { return n == null ? '—' : fmtHours(n); }
 
 export default function OvertimeReport({ currency = 'USD' }) {
+  const t = useT();
   const money = n => n == null ? '—' : formatCurrency(n, currency);
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(today());
@@ -68,45 +70,45 @@ export default function OvertimeReport({ currency = 'USD' }) {
   return (
     <div style={styles.card}>
       <div style={styles.header}>
-        <h3 style={styles.title}>Overtime Report</h3>
+        <h3 style={styles.title}>{t.overtimeReport}</h3>
         <div style={styles.controls}>
           <div style={styles.filterGroup}>
-            <label style={styles.label}>From</label>
+            <label style={styles.label}>{t.qboFrom}</label>
             <input style={styles.input} type="date" value={from} onChange={e => setFrom(e.target.value)} />
           </div>
           <div style={styles.filterGroup}>
-            <label style={styles.label}>To</label>
+            <label style={styles.label}>{t.qboTo}</label>
             <input style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
           </div>
           <button style={styles.runBtn} onClick={load} disabled={loading || !from || !to}>
-            {loading ? 'Loading...' : 'Run Report'}
+            {loading ? t.loading : t.runReport}
           </button>
           {rows && rows.length > 0 && (
-            <button style={styles.exportBtn} onClick={downloadPayroll}>⬇ Payroll CSV</button>
+            <button style={styles.exportBtn} onClick={downloadPayroll}>⬇ {t.payrollCSV}</button>
           )}
         </div>
       </div>
 
       {rows === null ? (
-        <p style={styles.hint}>Select a date range and click Run Report.</p>
+        <p style={styles.hint}>{t.selectDateRange}</p>
       ) : rows.length === 0 ? (
-        <p style={styles.empty}>No approved entries found for this period.</p>
+        <p style={styles.empty}>{t.noApprovedEntries}</p>
       ) : (
         <div style={styles.tableWrap} className="table-scroll">
           <table style={styles.table}>
             <thead>
               <tr>
-                <Col k="worker_name" label="Worker" />
-                <Col k="rate" label="Rate" />
-                <Col k="regular_hours" label="Reg Hrs" />
-                <Col k="overtime_hours" label="OT Hrs" />
-                <Col k="prevailing_hours" label="Prev Hrs" />
-                <Col k="total_hours" label="Total Hrs" />
-                <Col k="mileage" label="Miles" />
-                <Col k="regular_cost" label="Reg Pay" />
-                <Col k="overtime_cost" label="OT Pay" />
-                <Col k="prevailing_cost" label="Prev Pay" />
-                <Col k="total_cost" label="Total Pay" />
+                <Col k="worker_name" label={t.workerCol} />
+                <Col k="rate" label={t.rateCol} />
+                <Col k="regular_hours" label={t.regHrs} />
+                <Col k="overtime_hours" label={t.otHrs} />
+                <Col k="prevailing_hours" label={t.prevHrs} />
+                <Col k="total_hours" label={t.totalHrs} />
+                <Col k="mileage" label={t.milesCol} />
+                <Col k="regular_cost" label={t.regPay} />
+                <Col k="overtime_cost" label={t.otPay} />
+                <Col k="prevailing_cost" label={t.prevPay} />
+                <Col k="total_cost" label={t.totalPayCol} />
               </tr>
             </thead>
             <tbody>
@@ -130,7 +132,7 @@ export default function OvertimeReport({ currency = 'USD' }) {
             </tbody>
             <tfoot>
               <tr style={styles.totalRow}>
-                <td style={styles.td} colSpan={2}><strong>Totals</strong></td>
+                <td style={styles.td} colSpan={2}><strong>{t.totalsRow}</strong></td>
                 <td style={styles.tdNum}><strong>{fmt(totals.regular_hours)}</strong></td>
                 <td style={styles.tdNum}><strong>{fmt(totals.overtime_hours)}</strong></td>
                 <td style={styles.tdNum}><strong>{fmt(totals.prevailing_hours)}</strong></td>

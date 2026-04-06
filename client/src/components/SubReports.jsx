@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
+import { useT } from '../hooks/useT';
 
 function today() {
   return new Date().toLocaleDateString('en-CA');
@@ -15,6 +16,7 @@ const BLANK = {
 // ── Form (create or edit) ─────────────────────────────────────────────────────
 
 function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
+  const t = useT();
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -23,7 +25,7 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!form.sub_company.trim()) { setError('Sub-contractor company name is required.'); return; }
+    if (!form.sub_company.trim()) { setError(t.subCompanyRequired); return; }
     setSaving(true); setError('');
     try {
       const r = isEdit
@@ -35,24 +37,24 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
       }
       onSaved(r.data, isEdit);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save report');
+      setError(err.response?.data?.error || t.failedToSave);
     } finally { setSaving(false); }
   };
 
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
-      <h3 style={styles.formTitle}>{isEdit ? 'Edit Sub Report' : 'New Sub Report'}</h3>
+      <h3 style={styles.formTitle}>{isEdit ? t.editSubReport : t.newSubReport}</h3>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Date *</label>
+          <label style={styles.label}>{t.date} *</label>
           <input style={styles.input} type="date" value={form.report_date} onChange={e => set('report_date', e.target.value)} required />
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>Project</label>
+            <label style={styles.label}>{t.project}</label>
             <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">No project</option>
+              <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -61,35 +63,35 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Sub-Contractor Company *</label>
-          <input style={styles.input} type="text" placeholder="Company name" value={form.sub_company} onChange={e => set('sub_company', e.target.value)} required />
+          <label style={styles.label}>{t.subCompany} *</label>
+          <input style={styles.input} type="text" placeholder={t.companyNamePlaceholder} value={form.sub_company} onChange={e => set('sub_company', e.target.value)} required />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Foreman / Supervisor</label>
-          <input style={styles.input} type="text" placeholder="Name on site" value={form.foreman_name} onChange={e => set('foreman_name', e.target.value)} />
+          <label style={styles.label}>{t.foremanField}</label>
+          <input style={styles.input} type="text" placeholder={t.nameOnSitePlaceholder} value={form.foreman_name} onChange={e => set('foreman_name', e.target.value)} />
         </div>
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>Headcount <span style={styles.optional}>(workers on site)</span></label>
+        <label style={styles.label}>{t.headcount} <span style={styles.optional}>({t.workersOnSite})</span></label>
         <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" placeholder="0" value={form.headcount} onChange={e => set('headcount', e.target.value)} />
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>Work Performed</label>
-        <textarea style={styles.textarea} rows={3} placeholder="What work did this sub perform today?" value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
+        <label style={styles.label}>{t.workPerformed}</label>
+        <textarea style={styles.textarea} rows={3} placeholder={t.subWorkPerformedPlaceholder} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>Notes <span style={styles.optional}>(optional)</span></label>
-        <textarea style={styles.textarea} rows={2} placeholder="Issues, delays, anything else to note…" value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <label style={styles.label}>{t.notes} <span style={styles.optional}>({t.optional})</span></label>
+        <textarea style={styles.textarea} rows={2} placeholder={t.issuesPlaceholder} value={form.notes} onChange={e => set('notes', e.target.value)} />
       </div>
 
       {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Report'}</button>
-        <button style={styles.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.addReport}</button>
+        <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
   );
@@ -98,11 +100,12 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
 // ── Card ──────────────────────────────────────────────────────────────────────
 
 function SubCard({ report, onEdit, onDeleted }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
-    if (!confirm('Delete this sub report?')) return;
+    if (!confirm(t.deleteSubReportConfirm)) return;
     setDeleting(true);
     try {
       await api.delete(`/sub-reports/${report.id}`);
@@ -116,7 +119,7 @@ function SubCard({ report, onEdit, onDeleted }) {
         <div style={styles.cardLeft}>
           <div style={styles.subName}>
             {report.sub_company}
-            {report.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}
+            {report.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}
           </div>
           <div style={styles.cardMeta}>
             <span>{report.report_date?.toString().substring(0, 10)}</span>
@@ -132,20 +135,20 @@ function SubCard({ report, onEdit, onDeleted }) {
         <div style={styles.cardBody}>
           {report.work_performed && (
             <div style={styles.section}>
-              <div style={styles.sectionLabel}>Work Performed</div>
+              <div style={styles.sectionLabel}>{t.workPerformed}</div>
               <p style={styles.sectionText}>{report.work_performed}</p>
             </div>
           )}
           {report.notes && (
             <div style={styles.section}>
-              <div style={styles.sectionLabel}>Notes</div>
+              <div style={styles.sectionLabel}>{t.notes}</div>
               <p style={styles.sectionText}>{report.notes}</p>
             </div>
           )}
           {!report.pending && (
             <div style={styles.cardActions}>
-              <button style={styles.editBtn} onClick={() => onEdit(report)}>Edit</button>
-              <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : 'Delete'}</button>
+              <button style={styles.editBtn} onClick={() => onEdit(report)}>{t.edit}</button>
+              <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.delete}</button>
             </div>
           )}
         </div>
@@ -157,6 +160,7 @@ function SubCard({ report, onEdit, onDeleted }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function SubReports({ projects }) {
+  const t = useT();
   const { onSync } = useOffline() || {};
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -194,9 +198,9 @@ export default function SubReports({ projects }) {
   return (
     <div>
       <div style={styles.topRow}>
-        <h1 style={styles.heading}>Sub Reports</h1>
+        <h1 style={styles.heading}>{t.subReports}</h1>
         {!showForm && !editing && (
-          <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ Add Report</button>
+          <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ {t.addReport}</button>
         )}
       </div>
 
@@ -214,13 +218,13 @@ export default function SubReports({ projects }) {
       <div style={styles.filterBar}>
         {projects.length > 0 && (
           <select style={styles.filterSelect} value={filters.project_id || ''} onChange={e => setFilter('project_id', e.target.value)}>
-            <option value="">All projects</option>
+            <option value="">{t.allProjects}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
         {subNames.length > 1 && (
           <select style={styles.filterSelect} value={filters.sub_company || ''} onChange={e => setFilter('sub_company', e.target.value)}>
-            <option value="">All subs</option>
+            <option value="">{t.allSubsOpt}</option>
             {subNames.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
         )}
@@ -229,11 +233,11 @@ export default function SubReports({ projects }) {
       </div>
 
       {loading ? (
-        <p style={styles.hint}>Loading…</p>
+        <p style={styles.hint}>{t.loading}</p>
       ) : reports.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>🏗️</div>
-          <p style={styles.emptyText}>No sub reports yet. Log what each sub-contractor did on site.</p>
+          <p style={styles.emptyText}>{t.noSubReports}</p>
         </div>
       ) : (
         <div style={styles.list}>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
-const TYPE_LABELS = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' };
 const TYPE_COLORS = { vacation: '#1d4ed8', sick: '#dc2626', personal: '#7c3aed', other: '#6b7280' };
 const STATUS_COLORS = { pending: '#d97706', approved: '#059669', denied: '#ef4444' };
 
@@ -17,6 +17,7 @@ function days(start, end) {
 }
 
 export default function AdminTimeOff() {
+  const t = useT();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('pending');
@@ -41,8 +42,26 @@ export default function AdminTimeOff() {
       setRequests(prev => prev.map(x => x.id === id ? r.data : x));
       setReviewNote(prev => { const n = { ...prev }; delete n[id]; return n; });
     } catch (err) {
-      alert(err.response?.data?.error || 'Action failed.');
+      alert(err.response?.data?.error || t.actionFailed);
     } finally { setActing(null); }
+  };
+
+  const TYPE_LABELS = {
+    vacation: t.timeOffVacation,
+    sick: t.timeOffSick,
+    personal: t.timeOffPersonal,
+    other: t.timeOffOtherType,
+  };
+  const STATUS_LABELS = {
+    pending: t.filterPending,
+    approved: t.filterApproved,
+    denied: t.filterDenied,
+  };
+  const FILTER_LABELS = {
+    pending: t.filterPending,
+    approved: t.filterApproved,
+    denied: t.filterDenied,
+    all: t.filterAll,
   };
 
   const pending = requests.filter(r => r.status === 'pending');
@@ -51,23 +70,25 @@ export default function AdminTimeOff() {
   return (
     <div>
       <div style={s.headerRow}>
-        <h2 style={s.title}>Time Off Requests</h2>
+        <h2 style={s.title}>{t.timeOffRequests}</h2>
         <div style={s.filterGroup}>
           {['pending', 'approved', 'denied', 'all'].map(f => (
             <button key={f} style={{ ...s.filterBtn, ...(filter === f ? s.filterBtnActive : {}) }} onClick={() => setFilter(f)}>
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              {FILTER_LABELS[f]}
             </button>
           ))}
         </div>
       </div>
 
       {loading ? (
-        <p style={s.empty}>Loading…</p>
+        <p style={s.empty}>{t.loading}</p>
       ) : requests.length === 0 ? (
-        <p style={s.empty}>No {filter === 'all' ? '' : filter + ' '}requests.</p>
+        <p style={s.empty}>{t.noTimeOffRequests}</p>
       ) : (
         <div style={s.list}>
-          {[...pending, ...rest].map(r => (
+          {[...pending, ...rest].map(r => {
+            const d = days(r.start_date.toString(), r.end_date.toString());
+            return (
             <div key={r.id} style={s.card}>
               <div style={s.cardTop}>
                 <div style={s.workerName}>{r.worker_name}</div>
@@ -76,7 +97,7 @@ export default function AdminTimeOff() {
                     {TYPE_LABELS[r.type] || r.type}
                   </span>
                   <span style={{ ...s.statusBadge, color: STATUS_COLORS[r.status] }}>
-                    {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+                    {STATUS_LABELS[r.status] || r.status}
                   </span>
                 </div>
               </div>
@@ -84,7 +105,7 @@ export default function AdminTimeOff() {
               <div style={s.dates}>
                 {fmt(r.start_date)} – {fmt(r.end_date)}
                 <span style={s.dayCount}>
-                  {days(r.start_date.toString(), r.end_date.toString())} day{days(r.start_date.toString(), r.end_date.toString()) !== 1 ? 's' : ''}
+                  {d} {d !== 1 ? t.daysLabel : t.dayLabel}
                 </span>
               </div>
 
@@ -94,7 +115,7 @@ export default function AdminTimeOff() {
                 <div style={s.actionRow}>
                   <input
                     style={s.noteInput}
-                    placeholder="Note (optional)"
+                    placeholder={t.reviewNotePlaceholder}
                     value={reviewNote[r.id] || ''}
                     onChange={e => setReviewNote(prev => ({ ...prev, [r.id]: e.target.value }))}
                   />
@@ -103,28 +124,29 @@ export default function AdminTimeOff() {
                     disabled={acting === r.id + 'approve'}
                     onClick={() => act(r.id, 'approve')}
                   >
-                    {acting === r.id + 'approve' ? '…' : '✓ Approve'}
+                    {acting === r.id + 'approve' ? '…' : `✓ ${t.filterApproved}`}
                   </button>
                   <button
                     style={s.denyBtn}
                     disabled={acting === r.id + 'deny'}
                     onClick={() => act(r.id, 'deny')}
                   >
-                    {acting === r.id + 'deny' ? '…' : '✕ Deny'}
+                    {acting === r.id + 'deny' ? '…' : t.denyAction}
                   </button>
                 </div>
               )}
 
               {r.review_note && (
-                <p style={{ ...s.note, color: STATUS_COLORS[r.status] }}>Note: {r.review_note}</p>
+                <p style={{ ...s.note, color: STATUS_COLORS[r.status] }}>{r.review_note}</p>
               )}
 
               <div style={s.meta}>
-                Submitted {fmt(r.created_at)}
-                {r.reviewer_name && ` · ${r.status} by ${r.reviewer_name}`}
+                {t.submittedOn} {fmt(r.created_at)}
+                {r.reviewer_name && ` · ${STATUS_LABELS[r.status] || r.status} by ${r.reviewer_name}`}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

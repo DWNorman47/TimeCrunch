@@ -3,24 +3,26 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { PunchlistPDFButton } from './PunchlistPDF';
+import { useT } from '../hooks/useT';
 
-const STATUSES = [
-  { value: 'open', label: 'Open', color: '#92400e', bg: '#fef3c7' },
-  { value: 'done', label: 'Done', color: '#1e40af', bg: '#dbeafe' },
-  { value: 'verified', label: 'Verified ✓', color: '#065f46', bg: '#d1fae5' },
-];
-const PRIORITIES = [
-  { value: 'high', label: '🔴 High' },
-  { value: 'normal', label: '🟡 Normal' },
-  { value: 'low', label: '⚪ Low' },
-];
+const STATUS_COLORS = {
+  open: { color: '#92400e', bg: '#fef3c7' },
+  done: { color: '#1e40af', bg: '#dbeafe' },
+  verified: { color: '#065f46', bg: '#d1fae5' },
+};
 
 function statusStyle(status) {
-  const s = STATUSES.find(x => x.value === status) || STATUSES[0];
-  return { color: s.color, background: s.bg };
+  const c = STATUS_COLORS[status] || STATUS_COLORS.open;
+  return { color: c.color, background: c.bg };
 }
 
 function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPhases }) {
+  const t = useT();
+  const PRIORITIES = [
+    { value: 'high', label: `🔴 ${t.priorityHigh}` },
+    { value: 'normal', label: `🟡 ${t.priorityNormal}` },
+    { value: 'low', label: `⚪ ${t.priorityLow}` },
+  ];
   const [form, setForm] = useState({ title: '', description: '', location: '', project_id: '', priority: 'normal', assigned_to: '', phase: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -28,7 +30,7 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
 
   const submit = async e => {
     e.preventDefault();
-    if (!form.title.trim()) { setError('Title is required'); return; }
+    if (!form.title.trim()) { setError(t.titleRequired); return; }
     setSaving(true); setError('');
     try {
       const r = await api.post('/punchlist', form);
@@ -38,68 +40,74 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
         onAdded(r.data);
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save');
+      setError(err.response?.data?.error || t.failedToSave);
     } finally { setSaving(false); }
   };
 
   return (
     <form onSubmit={submit} style={styles.form}>
-      <h3 style={styles.formTitle}>New Punchlist Item</h3>
+      <h3 style={styles.formTitle}>{t.newPunchlistItemForm}</h3>
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>Title *</label>
+          <label style={styles.label}>{t.titleField} *</label>
           <input style={styles.input} type="text" placeholder="e.g. Patch drywall in office 2B" value={form.title} onChange={e => set('title', e.target.value)} />
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
             <label style={styles.label}>Project</label>
             <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">No project</option>
+              <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
         )}
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Priority</label>
+          <label style={styles.label}>{t.priorityField}</label>
           <select style={styles.input} value={form.priority} onChange={e => set('priority', e.target.value)}>
             {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
         </div>
         {isAdmin && workers.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>Assign to</label>
+            <label style={styles.label}>{t.assignTo}</label>
             <select style={styles.input} value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)}>
-              <option value="">Unassigned</option>
+              <option value="">{t.unassigned}</option>
               {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
             </select>
           </div>
         )}
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Phase / Milestone</label>
+          <label style={styles.label}>{t.phaseField}</label>
           <input style={styles.input} type="text" list="phase-suggestions" placeholder="e.g. Foundation, Rough-in" value={form.phase} onChange={e => set('phase', e.target.value)} />
           <datalist id="phase-suggestions">
             {existingPhases.map(p => <option key={p} value={p} />)}
           </datalist>
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Location</label>
+          <label style={styles.label}>{t.locationField}</label>
           <input style={styles.input} type="text" placeholder="e.g. 2nd floor, north wing" value={form.location} onChange={e => set('location', e.target.value)} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>Description</label>
+          <label style={styles.label}>{t.descriptionField}</label>
           <textarea style={styles.textarea} rows={3} placeholder="Additional details..." value={form.description} onChange={e => set('description', e.target.value)} />
         </div>
       </div>
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? 'Saving...' : 'Add Item'}</button>
-        <button style={styles.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : t.addItem}</button>
+        <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
   );
 }
 
 function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, existingPhases }) {
+  const t = useT();
+  const STATUSES = [
+    { value: 'open', label: t.statusOpen },
+    { value: 'done', label: t.statusDone },
+    { value: 'verified', label: `${t.statusVerified} ✓` },
+  ];
   const [item, setItem] = useState(initialItem);
   const [expanded, setExpanded] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -111,7 +119,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
   useEffect(() => { setItem(initialItem); setEditPhase(initialItem.phase || ''); }, [initialItem]);
 
   const nextStatus = { open: 'done', done: 'verified', verified: 'open' };
-  const nextLabel = { open: 'Mark Done', done: 'Verify', verified: 'Reopen' };
+  const nextLabel = { open: t.markDone, done: t.verify, verified: t.reopen };
 
   const handleExpand = () => {
     if (item.pending) return;
@@ -147,7 +155,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
   };
 
   const handleDelete = async () => {
-    if (!confirm('Delete this item?')) return;
+    if (!confirm(t.deleteItemConfirm)) return;
     try { await api.delete(`/punchlist/${item.id}`); onDeleted(item.id); } catch {}
   };
 
@@ -193,7 +201,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
         <div style={styles.itemMain}>
           <span style={{ ...styles.itemTitle, textDecoration: item.status === 'verified' ? 'line-through' : 'none' }}>
             {item.title}
-            {item.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}
+            {item.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}
           </span>
           <div style={styles.itemMeta}>
             {item.project_name && <span style={styles.metaTag}>{item.project_name}</span>}
@@ -219,17 +227,17 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
         <div style={styles.itemBody}>
           {item.description && <p style={styles.desc}>{item.description}</p>}
           {item.resolved_at && item.status === 'verified' && (
-            <p style={styles.resolvedNote}>Verified {new Date(item.resolved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+            <p style={styles.resolvedNote}>{t.verifiedOn} {new Date(item.resolved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
           )}
 
           {/* Phase edit */}
           <div style={styles.phaseEditRow}>
-            <label style={styles.label}>Phase / Milestone</label>
+            <label style={styles.label}>{t.phaseField}</label>
             <input
               style={styles.phaseInput}
               type="text"
               list="phase-suggestions"
-              placeholder="e.g. Foundation, Rough-in…"
+              placeholder={t.phaseEditPlaceholder}
               value={editPhase}
               onChange={e => setEditPhase(e.target.value)}
               onBlur={savePhase}
@@ -240,7 +248,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
           {/* Checklist */}
           <div style={styles.checklistSection}>
             {checklist === null ? (
-              <p style={styles.checklistLoading}>Loading...</p>
+              <p style={styles.checklistLoading}>{t.loading}</p>
             ) : (
               <>
                 {checklist.length > 0 && (
@@ -265,12 +273,12 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
                   <input
                     style={styles.checkInput}
                     type="text"
-                    placeholder={checklist.length === 0 ? '+ Add checklist...' : '+ Add item...'}
+                    placeholder={checklist.length === 0 ? t.addChecklistPlaceholder : t.addChecklistItemPlaceholder}
                     value={newCheckText}
                     onChange={e => setNewCheckText(e.target.value)}
                   />
                   {newCheckText.trim() && (
-                    <button type="submit" style={styles.checkAddBtn} disabled={addingCheck}>Add</button>
+                    <button type="submit" style={styles.checkAddBtn} disabled={addingCheck}>{t.add}</button>
                   )}
                 </form>
               </>
@@ -279,18 +287,18 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
 
           {isAdmin && (
             <div style={styles.assignRow}>
-              <label style={styles.label}>Assign to: </label>
+              <label style={styles.label}>{t.assignTo}: </label>
               <select style={styles.smallSelect} value={item.assigned_to || ''} onChange={e => assignTo(e.target.value)}>
-                <option value="">Unassigned</option>
+                <option value="">{t.unassigned}</option>
                 {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
               </select>
             </div>
           )}
           <div style={styles.itemActions}>
             <button style={styles.advanceBtn} onClick={advance} disabled={updating}>
-              {updating ? '...' : nextLabel[item.status] || 'Update'}
+              {updating ? '...' : nextLabel[item.status] || t.markDone}
             </button>
-            <button style={styles.deleteBtn} onClick={handleDelete}>Delete</button>
+            <button style={styles.deleteBtn} onClick={handleDelete}>{t.delete}</button>
           </div>
         </div>
       )}
@@ -299,6 +307,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
 }
 
 export default function Punchlist({ projects }) {
+  const t = useT();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
@@ -355,16 +364,16 @@ export default function Punchlist({ projects }) {
     <div>
       <div style={styles.topRow}>
         <div>
-          <h2 style={styles.heading}>Punchlist</h2>
+          <h2 style={styles.heading}>{t.punchlistTitle}</h2>
           {items.length > 0 && (
             <p style={styles.summary}>
-              {openCount} open · {doneCount} done · {verifiedCount} verified
+              {openCount} {t.statusOpen} · {doneCount} {t.statusDone} · {verifiedCount} {t.statusVerified}
             </p>
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {items.length > 0 && <PunchlistPDFButton items={items} companyName={user?.company_name} style={styles.pdfBtn} />}
-          <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ Add Item</button>
+          <button style={styles.newBtn} onClick={() => setShowForm(true)}>{t.newPunchlistItem}</button>
         </div>
       </div>
 
@@ -383,27 +392,29 @@ export default function Punchlist({ projects }) {
 
       <div style={styles.filters}>
         <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
-          <option value="">All projects</option>
+          <option value="">{t.allProjectsOpt}</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <select style={styles.filterSelect} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-          <option value="">All statuses</option>
-          {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          <option value="">{t.allStatuses}</option>
+          <option value="open">{t.statusOpen}</option>
+          <option value="done">{t.statusDone}</option>
+          <option value="verified">{t.statusVerified} ✓</option>
         </select>
         {allPhases.length > 0 && (
           <select style={styles.filterSelect} value={filterPhase} onChange={e => setFilterPhase(e.target.value)}>
-            <option value="">All phases</option>
+            <option value="">{t.allPhases}</option>
             {allPhases.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         )}
       </div>
 
       {loading ? (
-        <p style={styles.hint}>Loading...</p>
+        <p style={styles.hint}>{t.loading}</p>
       ) : items.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>✅</div>
-          <p style={styles.emptyText}>No punchlist items. Add items that need to be corrected before project closeout.</p>
+          <p style={styles.emptyText}>{t.noPunchlistItems} {t.punchlistEmptyDesc}</p>
         </div>
       ) : (
         <div>
@@ -411,7 +422,7 @@ export default function Punchlist({ projects }) {
             <div key={phase || '__none__'} style={{ marginBottom: hasPhases ? 20 : 0 }}>
               {hasPhases && (
                 <div style={styles.phaseGroupHeader}>
-                  {phase || <span style={{ fontStyle: 'italic', color: '#9ca3af' }}>No phase</span>}
+                  {phase || <span style={{ fontStyle: 'italic', color: '#9ca3af' }}>{t.noPhase}</span>}
                   <span style={styles.phaseGroupCount}>{groupItems.length}</span>
                 </div>
               )}

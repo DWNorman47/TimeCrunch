@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useT } from '../hooks/useT';
 
 const DISMISS_KEY = 'opsfloa_onboarding_dismissed';
 
 export default function OnboardingChecklist({ workers, projects, settings }) {
+  const t = useT();
   const [dismissed, setDismissed] = useState(() => !!localStorage.getItem(DISMISS_KEY));
 
   if (dismissed) return null;
@@ -14,24 +16,24 @@ export default function OnboardingChecklist({ workers, projects, settings }) {
   const steps = [
     {
       done: hasWorkers,
-      label: 'Add your first worker',
-      sub: 'Invite crew members so they can clock in and submit time.',
+      label: t.onboardingAddWorker,
+      sub: t.onboardingAddWorkerSub,
       href: '/administration#workers',
-      cta: 'Add Worker',
+      cta: t.onboardingAddWorkerCta,
     },
     ...(projectsEnabled ? [{
       done: hasProjects,
-      label: 'Create your first project',
-      sub: 'Set up a job site so workers can log hours against it.',
+      label: t.onboardingAddProject,
+      sub: t.onboardingAddProjectSub,
       href: '/administration#projects',
-      cta: 'Add Project',
+      cta: t.onboardingAddProjectCta,
     }] : []),
     {
       done: false,
-      label: 'Configure company rates & settings',
-      sub: 'Set your hourly rates, overtime rules, and notification preferences.',
+      label: t.onboardingRates,
+      sub: t.onboardingRatesSub,
       href: '/administration#rates',
-      cta: 'Open Settings',
+      cta: t.onboardingRatesCta,
     },
   ];
 
@@ -47,9 +49,9 @@ export default function OnboardingChecklist({ workers, projects, settings }) {
     <div style={styles.wrap}>
       <div style={styles.header}>
         <div>
-          <div style={styles.title}>🚀 Get started with OpsFloa</div>
+          <div style={styles.title}>🚀 {t.onboardingTitle}</div>
           <div style={styles.progress}>
-            {doneCount} of {steps.length} steps complete
+            {doneCount} {t.onboardingOf} {steps.length} {t.onboardingStepsComplete}
             <span style={styles.progressBar}>
               <span style={{ ...styles.progressFill, width: `${(doneCount / steps.length) * 100}%` }} />
             </span>
@@ -79,7 +81,7 @@ export default function OnboardingChecklist({ workers, projects, settings }) {
 
       {allDone && (
         <div style={styles.allDone}>
-          All set! You're ready to roll. <button style={styles.dismissLink} onClick={dismiss}>Dismiss this checklist</button>
+          {t.onboardingAllDone} <button style={styles.dismissLink} onClick={dismiss}>{t.onboardingDismiss}</button>
         </div>
       )}
     </div>
