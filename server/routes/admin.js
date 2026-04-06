@@ -176,6 +176,12 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
             return res.status(400).json({ error: 'Invalid timezone' });
           if (key === 'invoice_signature' && !['none', 'optional', 'required'].includes(val))
             return res.status(400).json({ error: 'invoice_signature must be none, optional, or required' });
+          if (key === 'global_required_checklist_template_id' && val !== '') {
+            const id = parseInt(val);
+            if (isNaN(id)) return res.status(400).json({ error: 'Invalid checklist template ID' });
+            const tmpl = await pool.query('SELECT id FROM safety_checklist_templates WHERE id=$1 AND company_id=$2', [id, companyId]);
+            if (tmpl.rowCount === 0) return res.status(400).json({ error: 'Checklist template not found' });
+          }
           await pool.query(
             'INSERT INTO settings (company_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (company_id, key) DO UPDATE SET value = $3',
             [companyId, key, val]
