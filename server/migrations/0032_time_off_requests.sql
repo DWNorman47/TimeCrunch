@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS time_off_requests (
   id            SERIAL PRIMARY KEY,
-  company_id    UUID          NOT NULL REFERENCES companies(id),
+  company_id    UUID          NOT NULL,
   user_id       INTEGER       NOT NULL REFERENCES users(id),
   type          VARCHAR(20)   NOT NULL DEFAULT 'vacation', -- vacation | sick | personal | other
   start_date    DATE          NOT NULL,

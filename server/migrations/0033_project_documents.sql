@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS project_documents (
   id           SERIAL PRIMARY KEY,
-  company_id   UUID         NOT NULL REFERENCES companies(id),
+  company_id   UUID         NOT NULL,
   project_id   INTEGER      NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   name         VARCHAR(500) NOT NULL,
   url          TEXT         NOT NULL,
