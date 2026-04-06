@@ -2571,21 +2571,23 @@ router.delete('/clients/:id', requireAdmin, async (req, res) => {
 // Client documents
 const CLIENT_DOC_TYPES = ['w9', 'w2', 'coi', 'contract', 'license', 'other'];
 
-router.get('/clients/:id/documents/upload-url', requireAdmin, async (req, res) => {
-  const { filename, contentType } = req.query;
-  if (!filename || !contentType) return res.status(400).json({ error: 'filename and contentType required' });
-  const ALLOWED = ['application/pdf', 'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'image/jpeg', 'image/png', 'image/webp', 'text/plain', 'text/csv'];
-  if (!ALLOWED.includes(contentType)) return res.status(400).json({ error: 'File type not allowed' });
+router.post('/clients/:id/documents/upload', requireAdmin, async (req, res) => {
+  const { dataUrl, name, doc_type, expires_at } = req.body;
+  if (!dataUrl || !name) return res.status(400).json({ error: 'dataUrl and name required' });
+  const companyId = req.user.company_id;
+  const CLIENT_DOC_TYPES_LOCAL = ['coi', 'w9', 'w2', 'contract', 'license', 'other'];
+  const safeType = CLIENT_DOC_TYPES_LOCAL.includes(doc_type) ? doc_type : 'other';
   try {
-    const ext = filename.split('.').pop().toLowerCase();
-    const { getPresignedUploadUrl } = require('../r2');
-    const { uploadUrl, publicUrl } = await getPresignedUploadUrl('client-docs', ext, contentType);
-    res.json({ uploadUrl, publicUrl });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to generate upload URL' }); }
+    const { uploadBase64 } = require('../r2');
+    const { url, sizeBytes } = await uploadBase64(dataUrl, 'client-docs');
+    const result = await pool.query(
+      `INSERT INTO client_documents (company_id, client_id, name, url, size_bytes, doc_type, expires_at, uploaded_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [companyId, req.params.id, name.trim(), url, sizeBytes || null,
+       safeType, expires_at || null, req.user.id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Upload failed' }); }
 });
 
 router.post('/clients/:id/documents', requireAdmin, async (req, res) => {

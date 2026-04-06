@@ -119,15 +119,15 @@ function DocUploadForm({ clientId, onUploaded }) {
     if (!file) return;
     setUploading(true); setError('');
     try {
-      const { data: { uploadUrl, publicUrl } } = await api.get(
-        `/admin/clients/${clientId}/documents/upload-url`,
-        { params: { filename: file.name, contentType: file.type } }
-      );
-      await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
-      const { data: doc } = await api.post(`/admin/clients/${clientId}/documents`, {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = ev => resolve(ev.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const { data: doc } = await api.post(`/admin/clients/${clientId}/documents/upload`, {
+        dataUrl,
         name: file.name,
-        url: publicUrl,
-        size_bytes: file.size,
         doc_type: docType,
         expires_at: expiresAt || null,
       });
