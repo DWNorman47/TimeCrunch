@@ -83,6 +83,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     feature_geolocation: settings?.feature_geolocation ?? true,
     module_timeclock: settings?.module_timeclock ?? true,
     module_projects: settings?.module_projects ?? true,
+    module_inventory: settings?.module_inventory ?? false,
+    module_analytics: settings?.module_analytics ?? false,
     feature_project_integration: settings?.feature_project_integration ?? true,
     feature_inactive_alerts: settings?.feature_inactive_alerts ?? true,
     feature_overtime_alerts: settings?.feature_overtime_alerts ?? true,
@@ -139,6 +141,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       feature_geolocation: settings.feature_geolocation ?? true,
       module_timeclock: settings.module_timeclock ?? true,
       module_projects: settings.module_projects ?? true,
+      module_inventory: settings.module_inventory ?? false,
+      module_analytics: settings.module_analytics ?? false,
       feature_project_integration: settings.feature_project_integration ?? true,
       feature_inactive_alerts: settings.feature_inactive_alerts ?? true,
       feature_overtime_alerts: settings.feature_overtime_alerts ?? true,
@@ -182,6 +186,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_geolocation: form.feature_geolocation,
         module_timeclock: form.module_timeclock,
         module_projects: form.module_projects,
+        module_inventory: form.module_inventory,
+        module_analytics: form.module_analytics,
         feature_project_integration: form.feature_project_integration,
         feature_inactive_alerts: form.feature_inactive_alerts,
         feature_overtime_alerts: form.feature_overtime_alerts,
@@ -528,6 +534,26 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
                 if (!e.target.checked) set('feature_project_integration', false);
               }} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleKnob, transform: form.module_projects ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Inventory</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show the Inventory module in the app switcher</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.module_inventory ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_inventory} onChange={e => set('module_inventory', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_inventory ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Analytics</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show the Analytics module in the app switcher</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.module_analytics ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_analytics} onChange={e => set('module_analytics', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_analytics ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
         </div>}
