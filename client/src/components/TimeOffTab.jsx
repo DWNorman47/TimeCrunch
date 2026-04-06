@@ -3,7 +3,7 @@ import api from '../api';
 import { useT } from '../hooks/useT';
 
 const TYPE_LABELS_EN = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' };
-const TYPE_COLORS = { vacation: '#1d4ed8', sick: '#dc2626', personal: '#7c3aed', other: '#6b7280' };
+const TYPE_COLORS = { vacation: '#1d4ed8', sick: '#dc2626', personal: '#8b5cf6', other: '#6b7280' };
 const STATUS_COLORS = { pending: '#d97706', approved: '#059669', denied: '#ef4444' };
 
 function fmt(d) {

@@ -7,7 +7,7 @@ const TYPE_COLORS = {
   issue:    { color: '#d97706', bg: '#fef3c7' },
   transfer: { color: '#2563eb', bg: '#dbeafe' },
   adjust:   { color: '#6b7280', bg: '#f3f4f6' },
-  convert:  { color: '#7c3aed', bg: '#ede9fe' },
+  convert:  { color: '#8b5cf6', bg: '#ede9fe' },
 };
 
 function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {

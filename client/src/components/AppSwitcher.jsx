@@ -43,7 +43,7 @@ const APPS = [
   {
     id: 'projects',
     name: 'Projects',
-    bg: '#7c3aed',
+    bg: '#8b5cf6',
     adminOnly: true,
     icon: (
       <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">

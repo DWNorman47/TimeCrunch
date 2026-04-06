@@ -6,7 +6,7 @@ import { useT } from '../hooks/useT';
 const DOC_TYPES = [
   { value: 'coi',      label: 'COI',              color: '#d97706', bg: '#fef3c7', hasExpiry: true  },
   { value: 'w9',       label: 'W-9',              color: '#1d4ed8', bg: '#dbeafe', hasExpiry: false },
-  { value: 'w2',       label: 'W-2',              color: '#7c3aed', bg: '#ede9fe', hasExpiry: false },
+  { value: 'w2',       label: 'W-2',              color: '#8b5cf6', bg: '#ede9fe', hasExpiry: false },
   { value: 'contract', label: 'Contract',         color: '#059669', bg: '#d1fae5', hasExpiry: true  },
   { value: 'license',  label: 'License',          color: '#0891b2', bg: '#cffafe', hasExpiry: true  },
   { value: 'other',    label: 'Other',            color: '#6b7280', bg: '#f3f4f6', hasExpiry: false },

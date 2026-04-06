@@ -4,7 +4,7 @@ import { parseBinQR } from './BinLabelModal';
 
 const COUNT_TYPES = {
   cycle:     { label: 'Cycle Count',     color: '#2563eb', bg: '#dbeafe',   desc: 'Count stock at a specific location' },
-  full:      { label: 'Full Count',      color: '#7c3aed', bg: '#ede9fe',   desc: 'Count all items across every location' },
+  full:      { label: 'Full Count',      color: '#8b5cf6', bg: '#ede9fe',   desc: 'Count all items across every location' },
   audit:     { label: 'Audit Count',     color: '#d97706', bg: '#fef3c7',   desc: 'Blind count — expected quantities hidden during counting' },
   reconcile: { label: 'Reconcile Count', color: '#059669', bg: '#d1fae5',   desc: 'Recount items to resolve discrepancies' },
 };
