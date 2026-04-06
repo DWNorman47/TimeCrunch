@@ -152,7 +152,7 @@ const styles = {
   headerRight:   { display: 'flex', alignItems: 'center', gap: 10 },
   userName:      { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
   headerBtn:     { background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  main:          { maxWidth: 960, margin: '0 auto', padding: '0 0 80px' },
+  main:          { maxWidth: 960, margin: '24px auto 0', padding: '0 16px 80px' },
   disabled:      { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 12, padding: 24 },
   disabledIcon:  { fontSize: 48 },
   disabledTitle: { fontSize: 20, fontWeight: 700, color: '#374151', margin: 0 },
