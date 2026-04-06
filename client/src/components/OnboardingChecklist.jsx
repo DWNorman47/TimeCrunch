@@ -63,7 +63,7 @@ export default function OnboardingChecklist({ workers, projects, settings }) {
       <div style={styles.steps}>
         {steps.map((step, i) => (
           <div key={i} style={{ ...styles.step, opacity: step.done ? 0.6 : 1 }}>
-            <div style={{ ...styles.check, background: step.done ? '#d1fae5', color: '#065f46' }}>
+            <div style={{ ...styles.check, background: step.done ? '#d1fae5' : '#f3f4f6', color: '#065f46' }}>
               {step.done ? '✓' : <span style={{ color: '#9ca3af' }}>{i + 1}</span>}
             </div>
             <div style={styles.stepBody}>
