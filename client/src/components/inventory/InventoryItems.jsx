@@ -10,6 +10,7 @@ function ItemForm({ item, onSave, onCancel }) {
     description: item?.description || '',
     category: item?.category || '',
     unit: item?.unit || 'each',
+    unit_spec: item?.unit_spec || '',
     unit_cost: item?.unit_cost != null ? String(item.unit_cost) : '',
     reorder_point: item?.reorder_point != null ? String(item.reorder_point) : '0',
     reorder_qty: item?.reorder_qty != null ? String(item.reorder_qty) : '0',
@@ -40,6 +41,7 @@ function ItemForm({ item, onSave, onCancel }) {
         description: form.description.trim() || null,
         category: form.category.trim() || null,
         unit,
+        unit_spec: form.unit_spec.trim() || null,
         unit_cost: form.unit_cost !== '' ? parseFloat(form.unit_cost) : null,
         reorder_point: parseInt(form.reorder_point) || 0,
         reorder_qty: parseInt(form.reorder_qty) || 0,
@@ -82,6 +84,10 @@ function ItemForm({ item, onSave, onCancel }) {
             <input style={{ ...f.input, marginTop: 6 }} value={form.customUnit} onChange={e => set('customUnit', e.target.value)} placeholder="Enter unit…" />
           )}
         </div>
+        <div style={f.field}>
+          <label style={f.label}>Unit Spec <span style={{ fontWeight: 400, color: '#9ca3af' }}>(e.g. "50 ct", "10×50")</span></label>
+          <input style={f.input} value={form.unit_spec} onChange={e => set('unit_spec', e.target.value)} placeholder="Optional — describes what's in one unit" />
+        </div>
       </div>
       <div style={f.row}>
         <div style={f.field}>
@@ -108,6 +114,174 @@ function ItemForm({ item, onSave, onCancel }) {
     </form>
   );
 }
+
+// ── UOM Management Panel ──────────────────────────────────────────────────────
+function ItemUOMPanel({ item }) {
+  const [uoms, setUOMs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [addOpen, setAddOpen] = useState(false);
+  const [newForm, setNewForm] = useState({ unit: 'each', unit_spec: '', factor: '1', is_base: false });
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = () => {
+    api.get(`/inventory/items/${item.id}/uoms`)
+      .then(r => setUOMs(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+  React.useEffect(() => { load(); }, [item.id]);
+
+  const setN = (k, v) => setNewForm(f => ({ ...f, [k]: v }));
+  const setE = (k, v) => setEditForm(f => ({ ...f, [k]: v }));
+
+  const add = async () => {
+    setError(''); setSaving(true);
+    try {
+      const rows = await api.post(`/inventory/items/${item.id}/uoms`, {
+        unit: newForm.unit.trim(), unit_spec: newForm.unit_spec.trim() || null,
+        factor: parseFloat(newForm.factor), is_base: newForm.is_base,
+      });
+      setUOMs(rows.data);
+      setAddOpen(false);
+      setNewForm({ unit: 'each', unit_spec: '', factor: '1', is_base: false });
+    } catch (err) { setError(err.response?.data?.error || 'Failed to add UOM.'); }
+    finally { setSaving(false); }
+  };
+
+  const save = async (uomId) => {
+    setError(''); setSaving(true);
+    try {
+      const rows = await api.patch(`/inventory/items/${item.id}/uoms/${uomId}`, {
+        unit: editForm.unit, unit_spec: editForm.unit_spec || null,
+        factor: parseFloat(editForm.factor), is_base: editForm.is_base,
+      });
+      setUOMs(rows.data); setEditingId(null);
+    } catch (err) { setError(err.response?.data?.error || 'Failed to save.'); }
+    finally { setSaving(false); }
+  };
+
+  const remove = async (uomId) => {
+    if (!confirm('Remove this UOM?')) return;
+    try {
+      const rows = await api.delete(`/inventory/items/${item.id}/uoms/${uomId}`);
+      setUOMs(rows.data);
+    } catch (err) { alert(err.response?.data?.error || 'Failed to remove.'); }
+  };
+
+  return (
+    <div style={u.wrap}>
+      <div style={u.header}>
+        <div>
+          <div style={u.title}>Units of Measure</div>
+          <div style={u.hint}>Define pack sizes and conversion factors for this item.</div>
+        </div>
+        <button style={u.addBtn} onClick={() => setAddOpen(a => !a)}>
+          {addOpen ? 'Cancel' : '+ Add UOM'}
+        </button>
+      </div>
+
+      {error && <div style={u.error}>{error}</div>}
+
+      {addOpen && (
+        <div style={u.addForm}>
+          <div style={u.formRow}>
+            <div style={u.field}>
+              <label style={u.label}>Unit</label>
+              <input style={u.input} value={newForm.unit} onChange={e => setN('unit', e.target.value)} placeholder="box, bag, each…" />
+            </div>
+            <div style={u.field}>
+              <label style={u.label}>Spec</label>
+              <input style={u.input} value={newForm.unit_spec} onChange={e => setN('unit_spec', e.target.value)} placeholder="50 ct, 10×50…" />
+            </div>
+            <div style={u.field}>
+              <label style={u.label}>Factor</label>
+              <input style={u.input} type="number" min="0.0001" step="any" value={newForm.factor} onChange={e => setN('factor', e.target.value)} />
+            </div>
+            <div style={u.field}>
+              <label style={u.label}>Base?</label>
+              <input type="checkbox" checked={newForm.is_base} onChange={e => setN('is_base', e.target.checked)} style={{ marginTop: 10 }} />
+            </div>
+            <button style={u.saveBtn} onClick={add} disabled={saving}>Save</button>
+          </div>
+          <p style={u.factorNote}>Factor = how many base units fit in 1 of this UOM. e.g. "box/50 ct" with factor 50 means 1 box = 50 base units.</p>
+        </div>
+      )}
+
+      {loading ? (
+        <div style={u.empty}>Loading…</div>
+      ) : uoms.length === 0 ? (
+        <div style={u.empty}>No UOMs defined yet. Add one to enable pack-size conversions.</div>
+      ) : (
+        <table style={u.table}>
+          <thead>
+            <tr>
+              <th style={u.th}>Unit</th>
+              <th style={u.th}>Spec</th>
+              <th style={{ ...u.th, textAlign: 'right' }}>Factor</th>
+              <th style={u.th}>Base</th>
+              <th style={u.th}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {uoms.map(row => (
+              <tr key={row.id} style={{ opacity: row.active ? 1 : 0.5 }}>
+                {editingId === row.id ? (
+                  <>
+                    <td style={u.td}><input style={u.input} value={editForm.unit} onChange={e => setE('unit', e.target.value)} /></td>
+                    <td style={u.td}><input style={u.input} value={editForm.unit_spec || ''} onChange={e => setE('unit_spec', e.target.value)} placeholder="optional" /></td>
+                    <td style={u.td}><input style={{ ...u.input, width: 70, textAlign: 'right' }} type="number" min="0.0001" step="any" value={editForm.factor} onChange={e => setE('factor', e.target.value)} /></td>
+                    <td style={u.td}><input type="checkbox" checked={!!editForm.is_base} onChange={e => setE('is_base', e.target.checked)} /></td>
+                    <td style={{ ...u.td, whiteSpace: 'nowrap' }}>
+                      <button style={u.saveBtn} onClick={() => save(row.id)} disabled={saving}>Save</button>
+                      <button style={u.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td style={{ ...u.td, fontWeight: 600 }}>{row.unit}</td>
+                    <td style={{ ...u.td, color: '#6b7280' }}>{row.unit_spec || '—'}</td>
+                    <td style={{ ...u.td, textAlign: 'right' }}>{parseFloat(row.factor)}</td>
+                    <td style={u.td}>{row.is_base ? <span style={u.baseBadge}>Base</span> : ''}</td>
+                    <td style={{ ...u.td, whiteSpace: 'nowrap' }}>
+                      <button style={u.iconBtn} onClick={() => { setEditingId(row.id); setEditForm({ unit: row.unit, unit_spec: row.unit_spec || '', factor: String(row.factor), is_base: row.is_base }); }}>✏️</button>
+                      {!row.is_base && <button style={u.iconBtn} onClick={() => remove(row.id)}>🗑️</button>}
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+const u = {
+  wrap:       { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginTop: 16 },
+  header:     { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  title:      { fontSize: 14, fontWeight: 700, color: '#374151' },
+  hint:       { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  addBtn:     { padding: '6px 14px', borderRadius: 7, border: 'none', background: '#92400e', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
+  error:      { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13 },
+  addForm:    { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, marginBottom: 12 },
+  formRow:    { display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' },
+  field:      { display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 80 },
+  label:      { fontSize: 11, fontWeight: 600, color: '#6b7280' },
+  input:      { padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, width: '100%', boxSizing: 'border-box' },
+  factorNote: { fontSize: 11, color: '#9ca3af', marginTop: 8, marginBottom: 0 },
+  saveBtn:    { padding: '6px 12px', borderRadius: 6, border: 'none', background: '#059669', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', alignSelf: 'flex-end' },
+  cancelBtn:  { padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, cursor: 'pointer', marginLeft: 4 },
+  empty:      { fontSize: 13, color: '#9ca3af', padding: '8px 0' },
+  table:      { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
+  th:         { padding: '6px 8px', fontWeight: 700, color: '#6b7280', fontSize: 11, textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #e5e7eb' },
+  td:         { padding: '8px 8px', color: '#374151', borderBottom: '1px solid #f3f4f6' },
+  iconBtn:    { background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '2px 3px' },
+  baseBadge:  { display: 'inline-block', padding: '1px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#1d4ed8' },
+};
 
 export default function InventoryItems({ onItemChange }) {
   const [items, setItems] = useState([]);
@@ -173,11 +347,14 @@ export default function InventoryItems({ onItemChange }) {
   return (
     <div style={s.wrap}>
       {editingItem !== null && (
-        <ItemForm
-          item={editingItem || null}
-          onSave={handleSave}
-          onCancel={() => setEditingItem(null)}
-        />
+        <div style={s.wrap}>
+          <ItemForm
+            item={editingItem || null}
+            onSave={handleSave}
+            onCancel={() => setEditingItem(null)}
+          />
+          {editingItem && <ItemUOMPanel item={editingItem} />}
+        </div>
       )}
 
       {editingItem === null && (
@@ -235,7 +412,9 @@ export default function InventoryItems({ onItemChange }) {
                       <td style={{ ...s.td, fontWeight: 600 }}>{item.name}</td>
                       <td style={{ ...s.td, fontFamily: 'monospace', fontSize: 12, color: '#6b7280' }}>{item.sku || '—'}</td>
                       <td style={s.td}>{item.category || '—'}</td>
-                      <td style={{ ...s.td, color: '#6b7280' }}>{item.unit}</td>
+                      <td style={{ ...s.td, color: '#6b7280' }}>
+                        {item.unit}{item.unit_spec ? <span style={{ color: '#9ca3af', fontSize: 12 }}> ({item.unit_spec})</span> : ''}
+                      </td>
                       <td style={{ ...s.td, textAlign: 'right' }}>{item.unit_cost != null ? `$${parseFloat(item.unit_cost).toFixed(2)}` : '—'}</td>
                       <td style={{ ...s.td, textAlign: 'right' }}>{item.reorder_point > 0 ? item.reorder_point : '—'}</td>
                       <td style={{ ...s.td, textAlign: 'right' }}>{item.reorder_qty > 0 ? item.reorder_qty : '—'}</td>

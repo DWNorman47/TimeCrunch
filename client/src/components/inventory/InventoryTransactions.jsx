@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 
-const TYPE_LABELS = { receive: 'Receive', issue: 'Issue', transfer: 'Transfer', adjust: 'Adjust' };
+const TYPE_LABELS = { receive: 'Receive', issue: 'Issue', transfer: 'Transfer', adjust: 'Adjust', convert: 'Convert' };
 const TYPE_COLORS = {
   receive:  { color: '#059669', bg: '#d1fae5' },
   issue:    { color: '#d97706', bg: '#fef3c7' },
   transfer: { color: '#2563eb', bg: '#dbeafe' },
   adjust:   { color: '#6b7280', bg: '#f3f4f6' },
+  convert:  { color: '#7c3aed', bg: '#ede9fe' },
 };
 
 function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
@@ -15,6 +16,9 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
     type: isAdmin ? 'receive' : 'issue',
     item_id: '',
     quantity: '',
+    uom_id: '',
+    to_uom_id: '',
+    to_quantity: '',
     from_location_id: '',
     to_location_id: '',
     area_id:        '',
@@ -26,6 +30,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
     reference_no: '',
     unit_cost: '',
   });
+  const [itemUoms, setItemUoms] = useState([]);
   // Cascading bin options for the destination location
   const [binOpts, setBinOpts] = useState({ areas: [], racks: [], bays: [], compartments: [] });
   const [saving, setSaving] = useState(false);
@@ -35,6 +40,16 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
   useEffect(() => {
     api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(() => {});
   }, []);
+
+  // Load UOMs when item changes
+  useEffect(() => {
+    setItemUoms([]);
+    set('uom_id', ''); set('to_uom_id', ''); set('to_quantity', '');
+    if (!form.item_id) return;
+    api.get(`/inventory/items/${form.item_id}/uoms`)
+      .then(r => setItemUoms(r.data.filter(u => u.active)))
+      .catch(() => {});
+  }, [form.item_id]);
 
   // Cascade bin options when destination location changes
   useEffect(() => {
@@ -92,6 +107,9 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
         quantity: qty,
         from_location_id: form.from_location_id ? parseInt(form.from_location_id) : undefined,
         to_location_id: form.to_location_id ? parseInt(form.to_location_id) : undefined,
+        uom_id:         form.uom_id    ? parseInt(form.uom_id)    : undefined,
+        to_uom_id:      form.to_uom_id ? parseInt(form.to_uom_id) : undefined,
+        to_quantity:    form.to_quantity ? parseFloat(form.to_quantity) : undefined,
         area_id:        form.area_id        ? parseInt(form.area_id)        : undefined,
         rack_id:        form.rack_id        ? parseInt(form.rack_id)        : undefined,
         bay_id:         form.bay_id         ? parseInt(form.bay_id)         : undefined,
@@ -113,9 +131,22 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
     }
   };
 
-  const showFrom = ['issue', 'transfer'].includes(form.type);
-  const showTo   = ['receive', 'transfer'].includes(form.type);
+  const showFrom  = ['issue', 'transfer', 'convert'].includes(form.type);
+  const showTo    = ['receive', 'transfer'].includes(form.type);
   const showToAdj = form.type === 'adjust';
+  const isConvert = form.type === 'convert';
+
+  // Auto-suggest to_quantity when both UOMs have factors
+  const suggestedToQty = (() => {
+    if (!isConvert || !form.quantity || !form.to_uom_id) return null;
+    const src = form.uom_id ? itemUoms.find(u => String(u.id) === form.uom_id) : null;
+    const tgt = itemUoms.find(u => String(u.id) === form.to_uom_id);
+    if (!tgt) return null;
+    const srcFactor = src ? parseFloat(src.factor) : 1;
+    const tgtFactor = parseFloat(tgt.factor);
+    if (!tgtFactor) return null;
+    return ((parseFloat(form.quantity) * srcFactor) / tgtFactor).toFixed(4).replace(/\.?0+$/, '');
+  })();
 
   return (
     <form onSubmit={submit} style={f.form}>
@@ -131,6 +162,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
             <option value="issue">Issue — consume or send to job site</option>
             <option value="transfer">Transfer — move between locations</option>
             <option value="adjust">Adjust — manual correction</option>
+            <option value="convert">Convert — break into a different unit/pack size</option>
           </select>
         </div>
       )}
@@ -147,10 +179,24 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
             {items.map(i => <option key={i.id} value={i.id}>{i.name}{i.sku ? ` (${i.sku})` : ''}</option>)}
           </select>
         </div>
+        {itemUoms.length > 0 && (
+          <div style={f.field}>
+            <label style={f.label}>{isConvert ? 'Convert From' : 'UOM'}</label>
+            <select style={f.input} value={form.uom_id} onChange={e => set('uom_id', e.target.value)}>
+              <option value="">Default unit</option>
+              {itemUoms.map(u => (
+                <option key={u.id} value={u.id}>
+                  {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ' — base' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div style={f.field}>
           <label style={f.label}>
             Quantity *
             {form.type === 'adjust' && <span style={f.hint}> (+ to add, − to remove)</span>}
+            {isConvert && <span style={f.hint}> (qty to convert)</span>}
           </label>
           <input
             style={f.input} type="number" step="any"
@@ -159,6 +205,34 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
           />
         </div>
       </div>
+
+      {isConvert && (
+        <div style={f.row}>
+          <div style={f.field}>
+            <label style={f.label}>Convert To UOM *</label>
+            <select style={f.input} value={form.to_uom_id} onChange={e => set('to_uom_id', e.target.value)}>
+              <option value="">Select target UOM…</option>
+              {itemUoms.filter(u => String(u.id) !== form.uom_id).map(u => (
+                <option key={u.id} value={u.id}>
+                  {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={f.field}>
+            <label style={f.label}>
+              Resulting Qty *
+              {suggestedToQty && <span style={f.hint}> — suggested: {suggestedToQty}</span>}
+            </label>
+            <input
+              style={f.input} type="number" step="any" min="0"
+              value={form.to_quantity}
+              onChange={e => set('to_quantity', e.target.value)}
+              placeholder={suggestedToQty || 'qty in target UOM'}
+            />
+          </div>
+        </div>
+      )}
 
       {showFrom && (
         <div style={f.field}>

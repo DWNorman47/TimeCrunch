@@ -103,7 +103,10 @@ export default function InventoryStock({ isAdmin, locations, onStockChange }) {
                     <td style={{ ...s.td, textAlign: 'right', fontWeight: 700, color: qty < 0 ? '#dc2626' : '#111827' }}>
                       {qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)}
                     </td>
-                    <td style={{ ...s.td, color: '#6b7280' }}>{row.unit}</td>
+                    <td style={{ ...s.td, color: '#6b7280' }}>
+                      {row.unit}
+                      {row.unit_spec && <span style={{ fontSize: 11, color: '#9ca3af' }}> ({row.unit_spec})</span>}
+                    </td>
                     {isAdmin && (
                       <td style={{ ...s.td, textAlign: 'right', color: '#6b7280' }}>
                         {cost ? `$${cost.toFixed(2)}` : '—'}

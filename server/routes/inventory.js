@@ -12,17 +12,20 @@ function isAdmin(req) {
 
 // Apply a signed quantity delta to inventory_stock atomically.
 // delta is positive to add, negative to subtract.
-// bin = { area_id, rack_id, bay_id, compartment_id } — optional FK IDs; updates bin slot if provided.
+// bin    = { area_id, rack_id, bay_id, compartment_id } — optional FK IDs
+// uomId  = inventory_item_uoms.id — null means item's primary unit (no UOM row)
 // Must be called inside a BEGIN/COMMIT block.
-async function applyStockDelta(client, companyId, itemId, locationId, delta, bin = {}) {
+async function applyStockDelta(client, companyId, itemId, locationId, delta, bin = {}, uomId = null) {
   const area_id        = bin.area_id        ? parseInt(bin.area_id)        : null;
   const rack_id        = bin.rack_id        ? parseInt(bin.rack_id)        : null;
   const bay_id         = bin.bay_id         ? parseInt(bin.bay_id)         : null;
   const compartment_id = bin.compartment_id ? parseInt(bin.compartment_id) : null;
+  const uom            = uomId              ? parseInt(uomId)              : null;
   await client.query(
-    `INSERT INTO inventory_stock (company_id, item_id, location_id, quantity, area_id, rack_id, bay_id, compartment_id, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-     ON CONFLICT (item_id, location_id)
+    `INSERT INTO inventory_stock
+       (company_id, item_id, location_id, uom_id, quantity, area_id, rack_id, bay_id, compartment_id, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+     ON CONFLICT (item_id, location_id, (COALESCE(uom_id, 0)))
      DO UPDATE SET
        quantity       = inventory_stock.quantity + EXCLUDED.quantity,
        area_id        = COALESCE(EXCLUDED.area_id,        inventory_stock.area_id),
@@ -30,7 +33,7 @@ async function applyStockDelta(client, companyId, itemId, locationId, delta, bin
        bay_id         = COALESCE(EXCLUDED.bay_id,         inventory_stock.bay_id),
        compartment_id = COALESCE(EXCLUDED.compartment_id, inventory_stock.compartment_id),
        updated_at     = NOW()`,
-    [companyId, itemId, locationId, delta, area_id, rack_id, bay_id, compartment_id]
+    [companyId, itemId, locationId, uom, delta, area_id, rack_id, bay_id, compartment_id]
   );
 }
 
@@ -128,6 +131,7 @@ router.patch('/items/:id', requireAdmin, async (req, res) => {
     if (unit_cost !== undefined) { sets.push(`unit_cost=$${idx++}`); vals.push(unit_cost != null ? parseFloat(unit_cost) : null); }
     if (reorder_point !== undefined) { sets.push(`reorder_point=$${idx++}`); vals.push(parseInt(reorder_point) || 0); }
     if (reorder_qty !== undefined) { sets.push(`reorder_qty=$${idx++}`); vals.push(parseInt(reorder_qty) || 0); }
+    if ('unit_spec' in req.body) { sets.push(`unit_spec=$${idx++}`); vals.push(req.body.unit_spec?.trim() || null); }
     if (active !== undefined) { sets.push(`active=$${idx++}`); vals.push(!!active); }
     if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
     sets.push(`updated_at=NOW()`);
@@ -170,6 +174,114 @@ router.get('/items/categories', requireAuth, async (req, res) => {
       [req.user.company_id]
     );
     res.json(result.rows.map(r => r.category));
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Item UOMs ─────────────────────────────────────────────────────────────────
+
+// GET /api/inventory/items/:id/uoms
+router.get('/items/:id/uoms', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const item = await pool.query('SELECT id FROM inventory_items WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    if (item.rowCount === 0) return res.status(404).json({ error: 'Item not found' });
+    const result = await pool.query(
+      `SELECT * FROM inventory_item_uoms WHERE item_id=$1 ORDER BY is_base DESC, factor`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/items/:id/uoms
+router.post('/items/:id/uoms', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { unit, unit_spec, factor = 1, is_base = false } = req.body;
+  if (!unit?.trim()) return res.status(400).json({ error: 'unit required' });
+  const f = parseFloat(factor);
+  if (isNaN(f) || f <= 0) return res.status(400).json({ error: 'factor must be a positive number' });
+  try {
+    const item = await pool.query('SELECT id FROM inventory_items WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    if (item.rowCount === 0) return res.status(404).json({ error: 'Item not found' });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      if (is_base) {
+        await client.query('UPDATE inventory_item_uoms SET is_base=false WHERE item_id=$1', [req.params.id]);
+      }
+      const result = await client.query(
+        `INSERT INTO inventory_item_uoms (company_id, item_id, unit, unit_spec, factor, is_base)
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        [companyId, req.params.id, unit.trim(), unit_spec?.trim() || null, f, !!is_base]
+      );
+      await client.query('COMMIT');
+      // Return full list
+      const all = await pool.query('SELECT * FROM inventory_item_uoms WHERE item_id=$1 ORDER BY is_base DESC, factor', [req.params.id]);
+      res.status(201).json(all.rows);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      if (err.code === '23505') return res.status(409).json({ error: 'A UOM with that unit and spec already exists for this item.' });
+      throw err;
+    } finally { client.release(); }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// PATCH /api/inventory/items/:id/uoms/:uomId
+router.patch('/items/:id/uoms/:uomId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { unit, unit_spec, factor, is_base, active } = req.body;
+  try {
+    const existing = await pool.query(
+      'SELECT u.id FROM inventory_item_uoms u JOIN inventory_items i ON u.item_id=i.id WHERE u.id=$1 AND i.company_id=$2',
+      [req.params.uomId, companyId]
+    );
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'UOM not found' });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      if (is_base) {
+        await client.query('UPDATE inventory_item_uoms SET is_base=false WHERE item_id=$1', [req.params.id]);
+      }
+      const sets = [], vals = [req.params.uomId]; let idx = 2;
+      if (unit     !== undefined) { sets.push(`unit=$${idx++}`);      vals.push(unit.trim()); }
+      if ('unit_spec' in req.body) { sets.push(`unit_spec=$${idx++}`); vals.push(unit_spec?.trim() || null); }
+      if (factor   !== undefined) { sets.push(`factor=$${idx++}`);    vals.push(parseFloat(factor)); }
+      if (is_base  !== undefined) { sets.push(`is_base=$${idx++}`);   vals.push(!!is_base); }
+      if (active   !== undefined) { sets.push(`active=$${idx++}`);    vals.push(!!active); }
+      if (sets.length === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'No fields to update' }); }
+      await client.query(`UPDATE inventory_item_uoms SET ${sets.join(',')} WHERE id=$1`, vals);
+      await client.query('COMMIT');
+      const all = await pool.query('SELECT * FROM inventory_item_uoms WHERE item_id=$1 ORDER BY is_base DESC, factor', [req.params.id]);
+      res.json(all.rows);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      if (err.code === '23505') return res.status(409).json({ error: 'A UOM with that unit and spec already exists for this item.' });
+      throw err;
+    } finally { client.release(); }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /api/inventory/items/:id/uoms/:uomId  (soft delete if in use; hard delete otherwise)
+router.delete('/items/:id/uoms/:uomId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const existing = await pool.query(
+      'SELECT u.id FROM inventory_item_uoms u JOIN inventory_items i ON u.item_id=i.id WHERE u.id=$1 AND i.company_id=$2',
+      [req.params.uomId, companyId]
+    );
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'UOM not found' });
+    const inStock = await pool.query('SELECT 1 FROM inventory_stock WHERE uom_id=$1 LIMIT 1', [req.params.uomId]);
+    const inTxns  = await pool.query('SELECT 1 FROM inventory_transactions WHERE uom_id=$1 OR to_uom_id=$1 LIMIT 1', [req.params.uomId]);
+    if (inStock.rowCount > 0) {
+      return res.status(409).json({ error: 'UOM is in use by existing stock. Transfer or adjust stock to zero first.' });
+    }
+    if (inTxns.rowCount > 0) {
+      await pool.query('UPDATE inventory_item_uoms SET active=false WHERE id=$1', [req.params.uomId]);
+    } else {
+      await pool.query('DELETE FROM inventory_item_uoms WHERE id=$1', [req.params.uomId]);
+    }
+    const all = await pool.query('SELECT * FROM inventory_item_uoms WHERE item_id=$1 ORDER BY is_base DESC, factor', [req.params.id]);
+    res.json(all.rows);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -271,9 +383,12 @@ router.get('/stock', requireAuth, async (req, res) => {
     if (location_id) { conditions.push(`s.location_id = $${idx++}`); values.push(location_id); }
     if (item_id) { conditions.push(`s.item_id = $${idx++}`); values.push(item_id); }
     const result = await pool.query(
-      `SELECT s.id, s.item_id, i.name as item_name, i.sku, i.category, i.unit,
+      `SELECT s.id, s.item_id, i.name as item_name, i.sku, i.category,
+              COALESCE(u.unit, i.unit)           as unit,
+              COALESCE(u.unit_spec, i.unit_spec) as unit_spec,
               ${admin ? 'i.unit_cost,' : ''}
               i.reorder_point, s.location_id, l.name as location_name, l.type as location_type,
+              s.uom_id, u.unit as uom_unit, u.unit_spec as uom_spec, u.factor as uom_factor, u.is_base as uom_is_base,
               s.area_id, ia.name as area_name,
               s.rack_id, ir.name as rack_name,
               s.bay_id,  ib.name as bay_name,
@@ -282,6 +397,7 @@ router.get('/stock', requireAuth, async (req, res) => {
        FROM inventory_stock s
        JOIN inventory_items i ON s.item_id = i.id
        JOIN inventory_locations l ON s.location_id = l.id
+       LEFT JOIN inventory_item_uoms    u  ON s.uom_id        = u.id
        LEFT JOIN inventory_areas        ia ON s.area_id        = ia.id
        LEFT JOIN inventory_racks        ir ON s.rack_id        = ir.id
        LEFT JOIN inventory_bays         ib ON s.bay_id         = ib.id
@@ -323,12 +439,13 @@ router.get('/stock/low', requireAdmin, async (req, res) => {
 // POST /api/inventory/transactions
 router.post('/transactions', requireAuth, async (req, res) => {
   const { type, item_id, quantity, from_location_id, to_location_id, project_id, notes, reference_no, unit_cost,
-          area_id, rack_id, bay_id, compartment_id } = req.body;
+          area_id, rack_id, bay_id, compartment_id,
+          uom_id, to_uom_id, to_quantity } = req.body;
   const companyId = req.user.company_id;
   const admin = isAdmin(req);
 
   if (!type) return res.status(400).json({ error: 'type required' });
-  if (!['receive','issue','transfer','adjust'].includes(type)) return res.status(400).json({ error: 'Invalid type' });
+  if (!['receive','issue','transfer','adjust','convert'].includes(type)) return res.status(400).json({ error: 'Invalid type' });
   if (!admin && type !== 'issue') return res.status(403).json({ error: 'Workers may only post issue transactions' });
   if (!item_id) return res.status(400).json({ error: 'item_id required' });
   const qty = parseFloat(quantity);
@@ -340,6 +457,12 @@ router.post('/transactions', requireAuth, async (req, res) => {
   if (type === 'transfer' && (!from_location_id || !to_location_id)) return res.status(400).json({ error: 'from_location_id and to_location_id required for transfer' });
   if (type === 'transfer' && from_location_id === to_location_id) return res.status(400).json({ error: 'from and to locations must differ' });
   if (type === 'adjust' && !to_location_id) return res.status(400).json({ error: 'to_location_id required for adjust' });
+  if (type === 'convert') {
+    if (!from_location_id) return res.status(400).json({ error: 'from_location_id required for convert' });
+    if (!to_uom_id)        return res.status(400).json({ error: 'to_uom_id required for convert' });
+    const toQty = parseFloat(to_quantity);
+    if (isNaN(toQty) || toQty <= 0) return res.status(400).json({ error: 'to_quantity must be a positive number' });
+  }
 
   const client = await pool.connect();
   try {
@@ -362,24 +485,46 @@ router.post('/transactions', requireAuth, async (req, res) => {
     const absQty = Math.abs(qty);
     const snapshotCost = unit_cost != null ? parseFloat(unit_cost) : item.rows[0].unit_cost;
 
+    // Validate UOM IDs belong to this item if provided
+    const resolvedUomId   = uom_id   ? parseInt(uom_id)   : null;
+    const resolvedToUomId = to_uom_id ? parseInt(to_uom_id) : null;
+    if (resolvedUomId) {
+      const u = await client.query('SELECT id FROM inventory_item_uoms WHERE id=$1 AND item_id=$2', [resolvedUomId, item_id]);
+      if (u.rowCount === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'uom_id does not belong to this item' }); }
+    }
+    if (resolvedToUomId) {
+      const u = await client.query('SELECT id FROM inventory_item_uoms WHERE id=$1 AND item_id=$2', [resolvedToUomId, item_id]);
+      if (u.rowCount === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'to_uom_id does not belong to this item' }); }
+    }
+
+    const toQty = to_quantity ? parseFloat(to_quantity) : null;
+
     // Insert transaction record
     const txn = await client.query(
       `INSERT INTO inventory_transactions
-       (company_id, type, item_id, quantity, from_location_id, to_location_id, project_id, performed_by, notes, reference_no, unit_cost)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [companyId, type, item_id, absQty, from_location_id || null, to_location_id || null,
-       project_id || null, req.user.id, notes?.trim() || null, reference_no?.trim() || null, snapshotCost]
+       (company_id, type, item_id, quantity, from_location_id, to_location_id, project_id, performed_by, notes, reference_no, unit_cost,
+        uom_id, to_uom_id, to_quantity)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+      [companyId, type, item_id, type === 'convert' ? absQty : absQty,
+       from_location_id || null, type === 'convert' ? null : (to_location_id || null),
+       project_id || null, req.user.id, notes?.trim() || null, reference_no?.trim() || null, snapshotCost,
+       resolvedUomId, resolvedToUomId, toQty]
     );
 
     // Update stock — bin FK IDs apply to the destination slot
     const bin = { area_id, rack_id, bay_id, compartment_id };
-    if (type === 'receive')  await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin);
-    if (type === 'issue')    await applyStockDelta(client, companyId, item_id, from_location_id, -absQty);
+    if (type === 'receive')  await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin, resolvedUomId);
+    if (type === 'issue')    await applyStockDelta(client, companyId, item_id, from_location_id, -absQty, {}, resolvedUomId);
     if (type === 'transfer') {
-      await applyStockDelta(client, companyId, item_id, from_location_id, -absQty);
-      await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin);
+      await applyStockDelta(client, companyId, item_id, from_location_id, -absQty, {}, resolvedUomId);
+      await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin, resolvedUomId);
     }
-    if (type === 'adjust')   await applyStockDelta(client, companyId, item_id, to_location_id, qty, bin); // signed
+    if (type === 'adjust')   await applyStockDelta(client, companyId, item_id, to_location_id, qty, bin, resolvedUomId); // signed
+    if (type === 'convert') {
+      // Subtract from source UOM, add to target UOM — both at the same location
+      await applyStockDelta(client, companyId, item_id, from_location_id, -absQty, {}, resolvedUomId);
+      await applyStockDelta(client, companyId, item_id, from_location_id, toQty,   bin, resolvedToUomId);
+    }
 
     await client.query('COMMIT');
 
@@ -414,11 +559,17 @@ router.get('/transactions', requireAuth, async (req, res) => {
     if (from) { conditions.push(`t.created_at >= $${idx++}`); values.push(from); }
     if (to) { conditions.push(`t.created_at < ($${idx++}::date + interval '1 day')`); values.push(to); }
     const result = await pool.query(
-      `SELECT t.*, i.name as item_name, i.unit,
+      `SELECT t.*,
+              i.name as item_name,
+              COALESCE(fu.unit, i.unit) as unit,
+              fu.unit || CASE WHEN fu.unit_spec IS NOT NULL THEN ' (' || fu.unit_spec || ')' ELSE '' END as uom_label,
+              tu.unit || CASE WHEN tu.unit_spec IS NOT NULL THEN ' (' || tu.unit_spec || ')' ELSE '' END as to_uom_label,
               fl.name as from_location_name, tl.name as to_location_name,
               p.name as project_name, u.full_name as performed_by_name
        FROM inventory_transactions t
        JOIN inventory_items i ON t.item_id = i.id
+       LEFT JOIN inventory_item_uoms fu ON t.uom_id    = fu.id
+       LEFT JOIN inventory_item_uoms tu ON t.to_uom_id = tu.id
        LEFT JOIN inventory_locations fl ON t.from_location_id = fl.id
        LEFT JOIN inventory_locations tl ON t.to_location_id = tl.id
        LEFT JOIN projects p ON t.project_id = p.id
