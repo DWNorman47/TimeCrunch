@@ -75,10 +75,23 @@ app.get('/api/settings', requireAuth, async (req, res) => {
     const settings = applySettingsRows(settingsResult.rows, SETTINGS_DEFAULTS);
     const { plan, subscription_status, storage_bytes_used } = coResult.rows[0] || {};
     const resolvedPlan = plan || 'free';
+    const resolvedStatus = subscription_status || 'trial';
+
+    // Exempt companies get all features enabled regardless of stored settings
+    const featureOverrides = resolvedStatus === 'exempt'
+      ? Object.fromEntries(
+          Object.keys(settings)
+            .filter(k => k.startsWith('module_') || k.startsWith('feature_'))
+            .map(k => [k, true])
+        )
+      : {};
+
     res.json({
       ...settings,
+      ...featureOverrides,
+      ...(resolvedStatus === 'exempt' ? { addon_qbo: true } : {}),
       plan: resolvedPlan,
-      subscription_status: subscription_status || 'trial',
+      subscription_status: resolvedStatus,
       storage_bytes_used: parseInt(storage_bytes_used ?? 0),
       storage_limit_bytes: limitForPlan(resolvedPlan),
     });
