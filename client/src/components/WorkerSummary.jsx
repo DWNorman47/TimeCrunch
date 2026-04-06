@@ -137,7 +137,7 @@ export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly'
             )}
             {prevailingHours > 0 && (
               <div style={{ ...styles.stat, borderColor: '#a78bfa' }}>
-                <div style={{ ...styles.statValue, color: '#7c3aed' }}>{fmtHours(prevailingHours)}</div>
+                <div style={{ ...styles.statValue, color: '#8b5cf6' }}>{fmtHours(prevailingHours)}</div>
                 <div style={styles.statLabel}>{t.prevailingLabel}</div>
               </div>
             )}

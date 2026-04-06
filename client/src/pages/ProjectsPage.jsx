@@ -5,6 +5,7 @@ import AppSwitcher from '../components/AppSwitcher';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ProjectBillPDF from '../components/ProjectBillPDF';
 import ManageClients from '../components/ManageClients';
+import { useT } from '../hooks/useT';
 
 function punchColor(status) {
   return { open: '#f59e0b', in_progress: '#3b82f6', resolved: '#059669', closed: '#9ca3af' }[status] || '#9ca3af';
@@ -91,9 +92,9 @@ function ProjectCard({ project, metrics, settings, onClick }) {
       {project.progress_pct != null && (
         <div style={{ ...styles.progressWrap, marginTop: budgetHours > 0 ? 6 : 8 }}>
           <div style={styles.progressBar}>
-            <div style={{ ...styles.progressFill, width: `${project.progress_pct}%`, background: '#7c3aed' }} />
+            <div style={{ ...styles.progressFill, width: `${project.progress_pct}%`, background: '#8b5cf6' }} />
           </div>
-          <div style={{ ...styles.progressLabel, color: '#7c3aed' }}>
+          <div style={{ ...styles.progressLabel, color: '#8b5cf6' }}>
             {project.progress_pct}% complete
           </div>
         </div>
@@ -557,9 +558,9 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose }
                 <div style={{ ...styles.budgetSection, marginBottom: 16 }}>
                   <div style={styles.sectionTitle}>Progress</div>
                   <div style={styles.progressBar}>
-                    <div style={{ ...styles.progressFill, width: `${project.progress_pct}%`, background: '#7c3aed' }} />
+                    <div style={{ ...styles.progressFill, width: `${project.progress_pct}%`, background: '#8b5cf6' }} />
                   </div>
-                  <div style={{ ...styles.progressLabel, color: '#7c3aed', marginTop: 4 }}>{project.progress_pct}% complete</div>
+                  <div style={{ ...styles.progressLabel, color: '#8b5cf6', marginTop: 4 }}>{project.progress_pct}% complete</div>
                 </div>
               )}
 
@@ -1002,6 +1003,7 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
 
 export default function ProjectsPage() {
   const { user, logout } = useAuth();
+  const t = useT();
   const [mainTab, setMainTab] = useState('projects');
   const [projects, setProjects] = useState([]);
   const [metrics, setMetrics] = useState({});
@@ -1062,13 +1064,13 @@ export default function ProjectsPage() {
             style={{ ...styles.tabBtn, ...(mainTab === 'projects' ? styles.tabBtnActive : {}) }}
             onClick={() => setMainTab('projects')}
           >
-            📋 Projects
+            {t.projectsTabLabel}
           </button>
           <button
             style={{ ...styles.tabBtn, ...(mainTab === 'clients' ? styles.tabBtnActive : {}) }}
             onClick={() => setMainTab('clients')}
           >
-            🏢 Clients
+            {t.clientsTabLabel}
           </button>
         </div>
 
@@ -1156,7 +1158,7 @@ export default function ProjectsPage() {
 
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9', display: 'flex', flexDirection: 'column' },
-  header: { background: '#7c3aed', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 },
+  header: { background: '#8b5cf6', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
   companyName: { fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)' },
   headerRight: { display: 'flex', gap: 12, alignItems: 'center' },
@@ -1167,10 +1169,10 @@ const styles = {
   pageSub: { fontSize: 14, color: '#6b7280', margin: '4px 0 0' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 },
   // Card
-  card: { background: '#fff', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', cursor: 'pointer', transition: 'box-shadow 0.15s', borderLeft: '4px solid #7c3aed' },
+  card: { background: '#fff', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', cursor: 'pointer', transition: 'box-shadow 0.15s', borderLeft: '4px solid #8b5cf6' },
   cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   cardName: { fontSize: 16, fontWeight: 700, color: '#111827', lineHeight: 1.3 },
-  cardBadge: { fontSize: 11, fontWeight: 600, background: '#ede9fe', color: '#7c3aed', padding: '2px 8px', borderRadius: 10, flexShrink: 0, marginLeft: 8 },
+  cardBadge: { fontSize: 11, fontWeight: 600, background: '#ede9fe', color: '#8b5cf6', padding: '2px 8px', borderRadius: 10, flexShrink: 0, marginLeft: 8 },
   statsRow: { display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12 },
   statItem: {},
   statValue: { fontSize: 20, fontWeight: 800, color: '#111827' },
@@ -1193,7 +1195,7 @@ const styles = {
   closeBtn: { background: '#f3f4f6', border: 'none', borderRadius: 20, width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   detailTabs: { display: 'flex', borderBottom: '1px solid #f3f4f6', padding: '0 20px' },
   detailTab: { padding: '12px 16px', border: 'none', background: 'none', fontSize: 13, fontWeight: 600, color: '#6b7280', cursor: 'pointer', borderBottom: '2px solid transparent', marginBottom: -1 },
-  detailTabActive: { color: '#7c3aed', borderBottomColor: '#7c3aed' },
+  detailTabActive: { color: '#8b5cf6', borderBottomColor: '#8b5cf6' },
   detailBody: { flex: 1, overflowY: 'auto', padding: 20 },
   metricsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 },
   metricCard: { background: '#f9fafb', borderRadius: 10, padding: '12px 14px' },
@@ -1211,7 +1213,7 @@ const styles = {
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 4 },
   filterLabel: { fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' },
   filterInput: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff' },
-  generateBtn: { background: '#7c3aed', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-end' },
+  generateBtn: { background: '#8b5cf6', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-end' },
   pdfLink: { display: 'inline-block', marginTop: 16, background: '#eff6ff', color: '#1a56db', border: '1px solid #bfdbfe', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none' },
   // Entries table
   entriesTable: { display: 'flex', flexDirection: 'column', gap: 2 },
@@ -1255,9 +1257,9 @@ const styles = {
   // Tab bar
   tabBar: { display: 'flex', gap: 4, marginBottom: 24, borderBottom: '2px solid #e5e7eb', paddingBottom: 0 },
   tabBtn: { background: 'none', border: 'none', padding: '10px 20px', fontSize: 14, fontWeight: 600, color: '#6b7280', cursor: 'pointer', borderBottom: '2px solid transparent', marginBottom: -2, borderRadius: '6px 6px 0 0', transition: 'color 0.15s' },
-  tabBtnActive: { color: '#7c3aed', borderBottomColor: '#7c3aed', background: '#faf5ff' },
+  tabBtnActive: { color: '#8b5cf6', borderBottomColor: '#8b5cf6', background: '#faf5ff' },
   // New project button
-  newProjectBtn: { background: '#7c3aed', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
+  newProjectBtn: { background: '#8b5cf6', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
 };
 
 // ── Project Create Form Styles ─────────────────────────────────────────────────
@@ -1272,7 +1274,7 @@ const pf = {
   input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, background: '#fff', color: '#111827', width: '100%', boxSizing: 'border-box' },
   textarea: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, background: '#fff', color: '#111827', resize: 'vertical', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' },
   actions: { display: 'flex', gap: 10, marginTop: 4 },
-  saveBtn: { background: '#7c3aed', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' },
+  saveBtn: { background: '#8b5cf6', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' },
   cancelBtn: { background: 'none', border: '1px solid #e5e7eb', padding: '10px 18px', borderRadius: 8, fontWeight: 600, fontSize: 14, color: '#6b7280', cursor: 'pointer' },
   error: { color: '#ef4444', fontSize: 13, margin: 0 },
 };

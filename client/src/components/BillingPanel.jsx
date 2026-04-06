@@ -282,12 +282,12 @@ export default function BillingPanel() {
                   : <span>
                       Includes {INCLUDED_WORKERS} workers
                       {businessOverage > 0
-                        ? <> + {businessOverage} extra = <strong style={{ color: '#7c3aed' }}>${businessMonthly}/mo</strong></>
+                        ? <> + {businessOverage} extra = <strong style={{ color: '#8b5cf6' }}>${businessMonthly}/mo</strong></>
                         : <> · ${PER_WORKER_MONTHLY}/worker after {INCLUDED_WORKERS}</>
                       }
                     </span>
               }
-              color="#7c3aed"
+              color="#8b5cf6"
               current={currentPlan === 'business' && isActive}
               selected={selectedPlan === 'business'}
               features={[
@@ -323,7 +323,7 @@ export default function BillingPanel() {
               <label style={{ ...s.sliderLabel, marginBottom: 0 }}>
                 Team size (Business plan): <strong>{workerCount} workers</strong>
                 {workerCount > INCLUDED_WORKERS
-                  ? <span style={{ color: '#7c3aed', marginLeft: 8 }}>
+                  ? <span style={{ color: '#8b5cf6', marginLeft: 8 }}>
                       {annual ? `$${businessAnnualTotal}/yr` : `$${businessMonthly}/mo`}
                     </span>
                   : <span style={{ color: '#6b7280', marginLeft: 8 }}>included in base price</span>
@@ -349,7 +349,7 @@ export default function BillingPanel() {
               <>
                 <input type="range" min={INCLUDED_WORKERS} max={500} value={workerCount}
                   onChange={e => setWorkerCount(Number(e.target.value))}
-                  style={{ width: '100%', accentColor: '#7c3aed' }} />
+                  style={{ width: '100%', accentColor: '#8b5cf6' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af' }}>
                   <span>{INCLUDED_WORKERS} (included)</span><span>500+</span>
                 </div>
@@ -459,8 +459,8 @@ const s = {
   sliderWrap: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '14px 16px', marginBottom: 14 },
   sliderLabel: { fontSize: 13, color: '#374151', display: 'block', marginBottom: 8 },
   inputModeBtn: { background: '#f3f4f6', border: '1px solid #e5e7eb', color: '#6b7280', fontSize: 15, minWidth: 30, width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, flexGrow: 0, padding: 0, lineHeight: 1, boxSizing: 'content-box' },
-  workerNumInput: { width: 90, padding: '7px 10px', border: '1px solid #c7d2fe', borderRadius: 7, fontSize: 15, fontWeight: 700, color: '#7c3aed', textAlign: 'center' },
-  workerUpdateBtn: { padding: '7px 14px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 },
+  workerNumInput: { width: 90, padding: '7px 10px', border: '1px solid #c7d2fe', borderRadius: 7, fontSize: 15, fontWeight: 700, color: '#8b5cf6', textAlign: 'center' },
+  workerUpdateBtn: { padding: '7px 14px', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 },
   addonCard: { border: '2px solid #fde68a', borderRadius: 10, padding: '14px 16px', background: '#fffbeb', marginBottom: 16 },
   addonTitle: { fontSize: 15, fontWeight: 700, color: '#92400e' },
   trialCta: { background: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: 10, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 },

@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL'];
+const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL', 'SENDGRID_API_KEY', 'SENDGRID_FROM_EMAIL'];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length) {
   console.error(`ERROR: Missing required environment variables: ${missing.join(', ')}`);
@@ -53,6 +53,7 @@ app.use('/api/field-reports', requireAuth, requirePlan('business'), require('./r
 app.use('/api/incidents', requireAuth, requirePlan('business'), require('./routes/incidents'));
 app.use('/api/sub-reports', requireAuth, requirePlan('business'), require('./routes/subReports'));
 app.use('/api/equipment', requireAuth, requirePlan('business'), require('./routes/equipment'));
+app.use('/api/inventory', requireAuth, requirePlan('business'), require('./routes/inventory'));
 app.use('/api/rfis', requireAuth, requirePlan('business'), require('./routes/rfis'));
 app.use('/api/daily-reports', requireAuth, requirePlan('business'), require('./routes/dailyReports'));
 app.use('/api/punchlist', requireAuth, requirePlan('business'), require('./routes/punchlist'));
@@ -74,10 +75,23 @@ app.get('/api/settings', requireAuth, async (req, res) => {
     const settings = applySettingsRows(settingsResult.rows, SETTINGS_DEFAULTS);
     const { plan, subscription_status, storage_bytes_used } = coResult.rows[0] || {};
     const resolvedPlan = plan || 'free';
+    const resolvedStatus = subscription_status || 'trial';
+
+    // Exempt companies get all features enabled regardless of stored settings
+    const featureOverrides = resolvedStatus === 'exempt'
+      ? Object.fromEntries(
+          Object.keys(settings)
+            .filter(k => k.startsWith('module_') || k.startsWith('feature_'))
+            .map(k => [k, true])
+        )
+      : {};
+
     res.json({
       ...settings,
+      ...featureOverrides,
+      ...(resolvedStatus === 'exempt' ? { addon_qbo: true } : {}),
       plan: resolvedPlan,
-      subscription_status: subscription_status || 'trial',
+      subscription_status: resolvedStatus,
       storage_bytes_used: parseInt(storage_bytes_used ?? 0),
       storage_limit_bytes: limitForPlan(resolvedPlan),
     });

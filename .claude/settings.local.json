@@ -58,10 +58,29 @@
       "Bash(do)",
       "Bash(echo \"=== $f ===\")",
       "Bash(__NEW_LINE_f5f07bec34cee212__ grep:*)",
-      "Bash(__NEW_LINE_f5f07bec34cee212__ done:*)"
+      "Bash(__NEW_LINE_f5f07bec34cee212__ done:*)",
+      "Bash(ls -la c:/Users/v-normand/Workspaces/TimeCrunch_Claude/client/src/components/*.jsx)",
+      "Bash(node migrate.js)",
+      "Bash(head -10 grep -n \"PDF\\\\|pdf\" /c/Users/v-normand/Workspaces/TimeCrunch_Claude/client/src/components/SafetyTalks.jsx)",
+      "Bash(node backfill-storage.js)",
+      "Bash(grep -l \"project_id\" /c/Users/v-normand/Workspaces/TimeCrunch_Claude/server/routes/*.js)",
+      "Bash(done)",
+      "Bash(grep -h project_id /c/Users/v-normand/Workspaces/TimeCrunch_Claude/server/migrations/*.sql /c/Users/v-normand/Workspaces/TimeCrunch_Claude/server/schema.sql)",
+      "Bash(cat /c/Users/v-normand/Workspaces/TimeCrunch_Claude/server/schema.sql /c/Users/v-normand/Workspaces/TimeCrunch_Claude/server/migrations/*.sql)",
+      "Bash(ls -1 /c/Users/v-normand/Workspaces/TimeCrunch_Claude/server/migrations/*.sql)",
+      "Bash(grep -n \"time_off\\\\|timeoff\\\\|time_off_requests\" c:/Users/v-normand/Workspaces/TimeCrunch_Claude/server/schema.sql c:/Users/v-normand/Workspaces/TimeCrunch_Claude/server/migrations/*.sql)",
+      "Read(//c/Users/v-normand/Workspaces/TimeCrunch_Clara/client/**)",
+      "Bash(ls /c/Users/v-normand/Workspaces/TimeCrunch_Claude/client/src/components/WorkerSchedule*)",
+      "Bash(ls /c/Users/v-normand/Workspaces/TimeCrunch_Claude/client/src/components/FieldDayLog*)",
+      "Bash(node -e ':*)",
+      "Bash(grep -n \"CREATE TABLE\\\\|projects\" /c/Users/v-normand/Workspaces/TimeCrunch_Claude/server/migrations/*.sql)",
+      "Bash(ls -lh /c/Users/v-normand/Workspaces/TimeCrunch_Claude/server/migrations/*.sql)",
+      "Bash(grep -r \"api\\\\.\" /c/Users/v-normand/Workspaces/TimeCrunch_Claude/client/src/components/*.jsx)",
+      "Bash(node -e \"require\\('qrcode'\\); console.log\\('ok'\\)\")"
     ],
     "additionalDirectories": [
-      "C:\\Users\\v-normand\\Workspaces\\TimeCrunch_Claude\\Icons"
+      "C:\\Users\\v-normand\\Workspaces\\TimeCrunch_Claude\\Icons",
+      "c:\\Users\\v-normand\\.claude\\plans"
     ]
   },
   "hooks": {
