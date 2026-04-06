@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS clients (
   id            SERIAL PRIMARY KEY,
-  company_id    UUID         NOT NULL REFERENCES companies(id),
+  company_id    UUID         NOT NULL,
   name          VARCHAR(255) NOT NULL,
   contact_name  VARCHAR(255),
   contact_email VARCHAR(255),
