@@ -24,8 +24,9 @@ button {
   font-family: inherit;
 }
 
-/* Company name row is mobile-only */
+/* Company name: inline on desktop, band below header on mobile */
 .company-name-row { display: none; }
+.company-name-desktop { display: inline; }
 
 /* Prevent iOS Safari from zooming in when tapping inputs */
 @media (max-width: 768px) {
@@ -129,6 +130,7 @@ input, select, textarea {
     font-size: 12px !important;
   }
   /* Company name — second row, darker band edge-to-edge */
+  .company-name-desktop { display: none !important; }
   .company-name-row {
     display: block !important;
     margin: 8px -24px 0 -24px !important;
