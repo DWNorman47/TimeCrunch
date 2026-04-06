@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 // Document type metadata
 const DOC_TYPES = [
@@ -35,6 +36,7 @@ function expiryStatus(expiresAt) {
 const BLANK_CLIENT = { name: '', contact_name: '', contact_email: '', contact_phone: '', address: '', notes: '' };
 
 function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
+  const t = useT();
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -43,7 +45,7 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!form.name.trim()) { setError('Client name is required.'); return; }
+    if (!form.name.trim()) { setError(t.clientNameRequired); return; }
     setSaving(true); setError('');
     try {
       const r = isEdit
@@ -51,51 +53,51 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
         : await api.post('/admin/clients', form);
       onSaved(r.data, isEdit);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save.');
+      setError(err.response?.data?.error || t.failedSaveClient);
     } finally { setSaving(false); }
   };
 
   return (
     <form onSubmit={handleSubmit} style={s.form}>
-      <h3 style={s.formTitle}>{isEdit ? 'Edit Client' : 'New Client'}</h3>
+      <h3 style={s.formTitle}>{isEdit ? t.editClientTitle : t.newClientTitle}</h3>
 
       <div style={s.row}>
         <div style={s.field}>
-          <label style={s.label}>Company Name *</label>
+          <label style={s.label}>{t.clientCompanyName} *</label>
           <input style={s.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Construction Inc." required />
         </div>
         <div style={s.field}>
-          <label style={s.label}>Contact Name</label>
+          <label style={s.label}>{t.contactName}</label>
           <input style={s.input} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" />
         </div>
       </div>
 
       <div style={s.row}>
         <div style={s.field}>
-          <label style={s.label}>Contact Email</label>
+          <label style={s.label}>{t.contactEmail}</label>
           <input style={s.input} type="email" value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder="jane@example.com" />
         </div>
         <div style={s.field}>
-          <label style={s.label}>Contact Phone</label>
+          <label style={s.label}>{t.contactPhone}</label>
           <input style={s.input} type="tel" value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder="(555) 000-0000" />
         </div>
       </div>
 
       <div style={s.field}>
-        <label style={s.label}>Address</label>
+        <label style={s.label}>{t.address || 'Address'}</label>
         <input style={s.input} value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, State 00000" />
       </div>
 
       <div style={s.field}>
-        <label style={s.label}>Notes <span style={s.opt}>(optional)</span></label>
+        <label style={s.label}>{t.notes} <span style={s.opt}>({t.optional || 'optional'})</span></label>
         <textarea style={s.textarea} rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional information..." />
       </div>
 
       {error && <p style={s.error}>{error}</p>}
 
       <div style={s.formActions}>
-        <button style={s.saveBtn} type="submit" disabled={saving}>{saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Client'}</button>
-        <button style={s.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+        <button style={s.saveBtn} type="submit" disabled={saving}>{saving ? '…' : isEdit ? t.saveChanges : t.addClient}</button>
+        <button style={s.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
   );
@@ -104,6 +106,7 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
 // ── Document Upload ───────────────────────────────────────────────────────────
 
 function DocUploadForm({ clientId, onUploaded }) {
+  const t = useT();
   const [docType, setDocType] = useState('coi');
   const [expiresAt, setExpiresAt] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -132,7 +135,7 @@ function DocUploadForm({ clientId, onUploaded }) {
       setExpiresAt('');
       fileRef.current.value = '';
     } catch (err) {
-      setError(err.response?.data?.error || 'Upload failed.');
+      setError(err.response?.data?.error || t.uploadFailed);
     } finally { setUploading(false); }
   };
 
@@ -144,12 +147,12 @@ function DocUploadForm({ clientId, onUploaded }) {
         </select>
         {needsExpiry && (
           <div style={s.expiryField}>
-            <label style={s.uploadLabel}>Expiry date</label>
+            <label style={s.uploadLabel}>{t.expiryDate}</label>
             <input style={s.uploadInput} type="date" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
           </div>
         )}
         <label style={{ ...s.uploadFileBtn, opacity: uploading ? 0.6 : 1 }}>
-          {uploading ? 'Uploading…' : '+ Upload Document'}
+          {uploading ? '…' : t.uploadDocument}
           <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={handleFile} disabled={uploading}
             accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.txt,.csv" />
         </label>
@@ -162,6 +165,7 @@ function DocUploadForm({ clientId, onUploaded }) {
 // ── Document List ─────────────────────────────────────────────────────────────
 
 function DocList({ clientId, docs, onDeleted }) {
+  const t = useT();
   const [deleting, setDeleting] = useState(null);
 
   const handleDelete = async doc => {
@@ -173,7 +177,7 @@ function DocList({ clientId, docs, onDeleted }) {
     } finally { setDeleting(null); }
   };
 
-  if (docs.length === 0) return <p style={s.noDocsHint}>No documents yet. Upload using the form above.</p>;
+  if (docs.length === 0) return <p style={s.noDocsHint}>{t.noDocsYet}</p>;
 
   return (
     <div style={s.docList}>
@@ -199,6 +203,7 @@ function DocList({ clientId, docs, onDeleted }) {
 // ── Client Card ───────────────────────────────────────────────────────────────
 
 function ClientCard({ client, onEdit, onDeleted }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [docs, setDocs] = useState(null);
   const [loadingDocs, setLoadingDocs] = useState(false);
@@ -242,7 +247,7 @@ function ClientCard({ client, onEdit, onDeleted }) {
             {client.name}
             {hasExpiryWarning && (
               <span style={{ ...s.badge, background: warningDays < 0 ? '#fee2e2' : '#fef3c7', color: warningDays < 0 ? '#dc2626' : '#d97706', marginLeft: 8 }}>
-                {warningDays < 0 ? '⚠ COI Expired' : `⚠ COI expires in ${warningDays}d`}
+                {warningDays < 0 ? `⚠ ${t.expiredCOI}` : `⚠ COI expires in ${warningDays}d`}
               </span>
             )}
           </div>
@@ -266,7 +271,7 @@ function ClientCard({ client, onEdit, onDeleted }) {
           {client.address && <p style={s.addressText}>📍 {client.address}</p>}
           {client.notes && <p style={s.notesText}>{client.notes}</p>}
 
-          <div style={s.sectionLabel}>Documents</div>
+          <div style={s.sectionLabel}>{t.documentsSection}</div>
           <DocUploadForm
             clientId={client.id}
             onUploaded={doc => setDocs(prev => prev ? [doc, ...prev] : [doc])}
@@ -282,9 +287,9 @@ function ClientCard({ client, onEdit, onDeleted }) {
           )}
 
           <div style={s.cardActions}>
-            <button style={s.editBtn} onClick={() => onEdit(client)}>Edit</button>
+            <button style={s.editBtn} onClick={() => onEdit(client)}>{t.edit}</button>
             <button style={s.deleteBtn} onClick={handleDelete} disabled={deleting}>
-              {deleting ? '…' : 'Remove Client'}
+              {deleting ? '…' : t.removeClient}
             </button>
           </div>
         </div>
@@ -296,6 +301,7 @@ function ClientCard({ client, onEdit, onDeleted }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function ManageClients() {
+  const t = useT();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -335,16 +341,16 @@ export default function ManageClients() {
     <div>
       <div style={s.topRow}>
         <div>
-          <h2 style={s.heading}>Clients</h2>
+          <h2 style={s.heading}>{t.clientsHeading}</h2>
           {(expiredCount > 0 || expiringSoon > 0) && (
             <div style={s.summary}>
-              {expiredCount > 0 && <span style={s.summaryChip}>⚠ {expiredCount} expired COI{expiredCount !== 1 ? 's' : ''}</span>}
-              {expiringSoon > 0 && <span style={{ ...s.summaryChip, background: '#fef3c7', color: '#92400e' }}>⏰ {expiringSoon} expiring soon</span>}
+              {expiredCount > 0 && <span style={s.summaryChip}>⚠ {expiredCount} {t.expiredCOI}{expiredCount !== 1 ? 's' : ''}</span>}
+              {expiringSoon > 0 && <span style={{ ...s.summaryChip, background: '#fef3c7', color: '#92400e' }}>⏰ {expiringSoon} {t.expiringSoon}</span>}
             </div>
           )}
         </div>
         {!showForm && !editing && (
-          <button style={s.newBtn} onClick={() => setShowForm(true)}>+ Add Client</button>
+          <button style={s.newBtn} onClick={() => setShowForm(true)}>{t.addClient}</button>
         )}
       </div>
 
@@ -361,21 +367,21 @@ export default function ManageClients() {
       {clients.length > 4 && (
         <input
           style={s.search}
-          placeholder="Search clients…"
+          placeholder={t.searchClientsPlaceholder}
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
       )}
 
       {loading ? (
-        <p style={s.hint}>Loading…</p>
+        <p style={s.hint}>{t.loading}</p>
       ) : clients.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>🏢</div>
-          <p style={s.emptyText}>No clients yet. Add your first client above.</p>
+          <p style={s.emptyText}>{t.noClientsYet}</p>
         </div>
       ) : filtered.length === 0 ? (
-        <p style={s.hint}>No clients match your search.</p>
+        <p style={s.hint}>{t.noClientsMatch}</p>
       ) : (
         <div style={s.list}>
           {filtered.map(c => (

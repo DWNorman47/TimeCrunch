@@ -5,6 +5,7 @@ import AppSwitcher from '../components/AppSwitcher';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ProjectBillPDF from '../components/ProjectBillPDF';
 import ManageClients from '../components/ManageClients';
+import { useT } from '../hooks/useT';
 
 function punchColor(status) {
   return { open: '#f59e0b', in_progress: '#3b82f6', resolved: '#059669', closed: '#9ca3af' }[status] || '#9ca3af';
@@ -1002,6 +1003,7 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
 
 export default function ProjectsPage() {
   const { user, logout } = useAuth();
+  const t = useT();
   const [mainTab, setMainTab] = useState('projects');
   const [projects, setProjects] = useState([]);
   const [metrics, setMetrics] = useState({});
@@ -1062,13 +1064,13 @@ export default function ProjectsPage() {
             style={{ ...styles.tabBtn, ...(mainTab === 'projects' ? styles.tabBtnActive : {}) }}
             onClick={() => setMainTab('projects')}
           >
-            📋 Projects
+            {t.projectsTabLabel}
           </button>
           <button
             style={{ ...styles.tabBtn, ...(mainTab === 'clients' ? styles.tabBtnActive : {}) }}
             onClick={() => setMainTab('clients')}
           >
-            🏢 Clients
+            {t.clientsTabLabel}
           </button>
         </div>
 
