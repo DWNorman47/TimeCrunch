@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
 
 const today = () => new Date().toLocaleDateString('en-CA');
 
@@ -47,6 +48,7 @@ const PRESETS = [
 // ── Template Manager ──────────────────────────────────────────────────────────
 
 function TemplateForm({ initial, onSaved, onCancel }) {
+  const t = useT();
   const isEdit = !!initial?.id;
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -63,8 +65,8 @@ function TemplateForm({ initial, onSaved, onCancel }) {
 
   const submit = async e => {
     e.preventDefault();
-    if (!name.trim()) { setError('Name is required'); return; }
-    if (items.filter(i => i.label.trim()).length === 0) { setError('Add at least one item'); return; }
+    if (!name.trim()) { setError(t.nameRequired); return; }
+    if (items.filter(i => i.label.trim()).length === 0) { setError(t.atLeastOneItem); return; }
     setSaving(true); setError('');
     const payload = {
       name,
@@ -77,17 +79,17 @@ function TemplateForm({ initial, onSaved, onCancel }) {
         : await api.post('/safety-checklists/templates', payload);
       onSaved(r.data, isEdit);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save');
+      setError(err.response?.data?.error || t.failedToSave);
     } finally { setSaving(false); }
   };
 
   return (
     <form onSubmit={submit} style={styles.form}>
       <div style={styles.formTitleRow}>
-        <h3 style={styles.formTitle}>{isEdit ? 'Edit Template' : 'New Checklist Template'}</h3>
+        <h3 style={styles.formTitle}>{isEdit ? t.editTemplate : t.newChecklistTemplate}</h3>
         {!isEdit && (
           <button type="button" style={styles.presetBtn} onClick={() => setShowPresets(s => !s)}>
-            📋 {showPresets ? 'Hide Presets' : 'From Preset'}
+            📋 {showPresets ? t.hidePresets : t.fromPreset}
           </button>
         )}
       </div>
@@ -109,19 +111,19 @@ function TemplateForm({ initial, onSaved, onCancel }) {
 
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>Template Name *</label>
+          <label style={styles.label}>{t.templateNameLabel}</label>
           <input style={styles.input} type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daily Site Safety" />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>Description</label>
-          <input style={styles.input} type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="When to use this checklist" />
+          <label style={styles.label}>{t.descriptionField}</label>
+          <input style={styles.input} type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder={t.descriptionField} />
         </div>
       </div>
 
       <div style={styles.itemsSection}>
         <div style={styles.itemsHeader}>
-          <span style={styles.label}>Checklist Items</span>
-          <button type="button" style={styles.addItemBtn} onClick={addItem}>+ Add Item</button>
+          <span style={styles.label}>{t.checklistItemsLabel}</span>
+          <button type="button" style={styles.addItemBtn} onClick={addItem}>{t.addItem}</button>
         </div>
         {items.map((item, idx) => (
           <div key={item._id} style={styles.itemEditRow}>
@@ -129,7 +131,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
             <input
               style={{ ...styles.input, flex: 1 }}
               type="text"
-              placeholder="Item label"
+              placeholder={t.itemLabelPlaceholder}
               value={item.label}
               onChange={e => updateItem(item._id, 'label', e.target.value)}
             />
@@ -140,13 +142,13 @@ function TemplateForm({ initial, onSaved, onCancel }) {
             <button type="button" style={styles.removeItemBtn} onClick={() => removeItem(item._id)}>✕</button>
           </div>
         ))}
-        {items.length === 0 && <p style={styles.hint}>No items yet — add one above.</p>}
+        {items.length === 0 && <p style={styles.hint}>{t.noItemsYet}</p>}
       </div>
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Template'}</button>
-        <button style={styles.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.createTemplate}</button>
+        <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
   );
@@ -155,6 +157,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
 // ── Fill Out Form ─────────────────────────────────────────────────────────────
 
 function FillForm({ templates, projects, onSubmitted, onCancel }) {
+  const t = useT();
   const [templateId, setTemplateId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [checkDate, setCheckDate] = useState(today());
@@ -174,7 +177,7 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
 
   const submit = async e => {
     e.preventDefault();
-    if (!templateId) { setError('Select a checklist'); return; }
+    if (!templateId) { setError(t.selectChecklistError); return; }
     setSaving(true); setError('');
     try {
       const r = await api.post('/safety-checklists', {
@@ -186,19 +189,19 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
       });
       onSubmitted(r.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to submit');
+      setError(err.response?.data?.error || t.failedToSave);
     } finally { setSaving(false); }
   };
 
   return (
     <form onSubmit={submit} style={styles.form}>
-      <h3 style={styles.formTitle}>Fill Out Checklist</h3>
+      <h3 style={styles.formTitle}>{t.fillOutChecklist}</h3>
 
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>Checklist *</label>
+          <label style={styles.label}>{t.templateField} *</label>
           <select style={styles.input} value={templateId} onChange={e => { setTemplateId(e.target.value); setAnswers({}); }}>
-            <option value="">Select checklist...</option>
+            <option value="">{t.selectChecklistOpt}</option>
             {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
@@ -208,9 +211,9 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>Project</label>
+            <label style={styles.label}>{t.project}</label>
             <select style={styles.input} value={projectId} onChange={e => setProjectId(e.target.value)}>
-              <option value="">No project</option>
+              <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -242,7 +245,7 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
                   <input
                     style={{ ...styles.input, marginTop: 4 }}
                     type="text"
-                    placeholder="Enter response..."
+                    placeholder={t.enterResponse}
                     value={answers[i] || ''}
                     onChange={e => setAnswer(i, e.target.value)}
                   />
@@ -255,17 +258,17 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
 
       {items.length > 0 && (
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Additional Notes</label>
-          <textarea style={styles.textarea} rows={2} placeholder="Any observations or comments..." value={notes} onChange={e => setNotes(e.target.value)} />
+          <label style={styles.label}>{t.additionalNotes}</label>
+          <textarea style={styles.textarea} rows={2} placeholder={t.anyObservations} value={notes} onChange={e => setNotes(e.target.value)} />
         </div>
       )}
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
         <button style={styles.submitBtn} type="submit" disabled={saving || !templateId}>
-          {saving ? 'Submitting...' : 'Submit Checklist'}
+          {saving ? t.submitting : t.submitChecklist}
         </button>
-        <button style={styles.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+        <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
   );
@@ -274,6 +277,7 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
 // ── Submission Card ───────────────────────────────────────────────────────────
 
 function SubmissionCard({ sub, isAdmin, onDeleted }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const items = sub.template_items ?? [];
@@ -285,10 +289,10 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
   }).length;
 
   const handleDelete = async () => {
-    if (!confirm('Delete this submission?')) return;
+    if (!confirm(t.deleteSubmissionConfirm)) return;
     setDeleting(true);
     try { await api.delete(`/safety-checklists/${sub.id}`); onDeleted(sub.id); }
-    catch { alert('Failed to delete'); }
+    catch { alert(t.failedToDelete); }
     finally { setDeleting(false); }
   };
 
@@ -300,7 +304,7 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
           <div style={styles.cardMeta}>
             {new Date(sub.check_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
             {sub.project_name && <span style={styles.projectTag}>{sub.project_name}</span>}
-            {sub.submitted_by_name && <span style={styles.submittedBy}>by {sub.submitted_by_name}</span>}
+            {sub.submitted_by_name && <span style={styles.submittedBy}>{t.submittedBy} {sub.submitted_by_name}</span>}
           </div>
         </div>
         <div style={styles.cardRight}>
@@ -340,7 +344,7 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
           {isAdmin && (
             <div style={styles.cardActions}>
               <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>
-                {deleting ? '...' : 'Delete'}
+                {deleting ? '...' : t.delete}
               </button>
             </div>
           )}
@@ -353,6 +357,7 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function SafetyChecklists({ projects }) {
+  const t = useT();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [view, setView] = useState('list'); // 'list' | 'fill' | 'templates'
@@ -403,10 +408,10 @@ export default function SafetyChecklists({ projects }) {
     return (
       <div>
         <div style={styles.topRow}>
-          <h2 style={styles.heading}>Checklist Templates</h2>
+          <h2 style={styles.heading}>{t.checklistTemplates}</h2>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button style={styles.newBtn} onClick={() => { setEditingTemplate(null); setShowTemplateForm(true); }}>+ New Template</button>
-            <button style={styles.backBtn} onClick={() => { setShowTemplateForm(false); setView('list'); }}>← Back</button>
+            <button style={styles.newBtn} onClick={() => { setEditingTemplate(null); setShowTemplateForm(true); }}>{t.newTemplate}</button>
+            <button style={styles.backBtn} onClick={() => { setShowTemplateForm(false); setView('list'); }}>← {t.back}</button>
           </div>
         </div>
 
@@ -427,24 +432,24 @@ export default function SafetyChecklists({ projects }) {
         {templates.length === 0 && !showTemplateForm ? (
           <div style={styles.empty}>
             <div style={styles.emptyIcon}>📋</div>
-            <p style={styles.emptyText}>No templates yet. Create one to let workers fill out checklists.</p>
+            <p style={styles.emptyText}>{t.noTemplatesAdmin}</p>
           </div>
         ) : (
           <div style={styles.list}>
-            {templates.map(t => (
-              <div key={t.id} style={styles.templateCard}>
+            {templates.map(tmpl => (
+              <div key={tmpl.id} style={styles.templateCard}>
                 <div style={styles.templateCardLeft}>
-                  <div style={styles.templateCardName}>{t.name}</div>
-                  {t.description && <div style={styles.templateCardDesc}>{t.description}</div>}
-                  <div style={styles.templateCardCount}>{t.items?.length ?? 0} items</div>
+                  <div style={styles.templateCardName}>{tmpl.name}</div>
+                  {tmpl.description && <div style={styles.templateCardDesc}>{tmpl.description}</div>}
+                  <div style={styles.templateCardCount}>{tmpl.items?.length ?? 0} {t.itemsCount}</div>
                 </div>
                 <div style={styles.templateCardActions}>
-                  <button style={styles.editBtn} onClick={() => { setEditingTemplate({ ...t, items: t.items?.map(i => ({ ...i, _id: Math.random() })) }); setShowTemplateForm(true); }}>Edit</button>
+                  <button style={styles.editBtn} onClick={() => { setEditingTemplate({ ...tmpl, items: tmpl.items?.map(i => ({ ...i, _id: Math.random() })) }); setShowTemplateForm(true); }}>{t.edit}</button>
                   <button style={styles.deleteBtn} onClick={async () => {
-                    if (!confirm('Delete this template? Existing submissions are kept.')) return;
-                    await api.delete(`/safety-checklists/templates/${t.id}`);
-                    setTemplates(prev => prev.filter(x => x.id !== t.id));
-                  }}>Delete</button>
+                    if (!confirm(t.deleteTemplateConfirm)) return;
+                    await api.delete(`/safety-checklists/templates/${tmpl.id}`);
+                    setTemplates(prev => prev.filter(x => x.id !== tmpl.id));
+                  }}>{t.delete}</button>
                 </div>
               </div>
             ))}
@@ -458,15 +463,15 @@ export default function SafetyChecklists({ projects }) {
     <div>
       <div style={styles.topRow}>
         <div>
-          <h2 style={styles.heading}>Safety Checklists</h2>
+          <h2 style={styles.heading}>{t.safetyChecklists}</h2>
           {submissions.length > 0 && (
-            <p style={styles.summary}>{submissions.length} submission{submissions.length !== 1 ? 's' : ''}</p>
+            <p style={styles.summary}>{submissions.length} {submissions.length !== 1 ? t.submissionsPluralCount : t.submissionsCount}</p>
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {isAdmin && <button style={styles.templatesBtn} onClick={() => setView('templates')}>Manage Templates</button>}
+          {isAdmin && <button style={styles.templatesBtn} onClick={() => setView('templates')}>{t.manageTemplates}</button>}
           <button style={styles.newBtn} onClick={() => setView('fill')} disabled={templates.length === 0}>
-            {templates.length === 0 ? 'No Templates' : '+ Fill Out'}
+            {templates.length === 0 ? t.noTemplates : `+ ${t.fillOut}`}
           </button>
         </div>
       </div>
@@ -474,21 +479,21 @@ export default function SafetyChecklists({ projects }) {
       {projects.length > 0 && (
         <div style={styles.filters}>
           <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
-            <option value="">All projects</option>
+            <option value="">{t.allProjectsOpt}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
       )}
 
       {loading ? (
-        <p style={styles.hint}>Loading...</p>
+        <p style={styles.hint}>{t.loading}</p>
       ) : submissions.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>☑️</div>
           <p style={styles.emptyText}>
             {templates.length === 0
-              ? isAdmin ? 'Create a checklist template first, then workers can fill them out.' : 'No checklists available yet. Check back later.'
-              : 'No submissions yet. Tap "+ Fill Out" to complete a checklist.'}
+              ? isAdmin ? t.noTemplatesAdmin : t.noTemplatesWorker
+              : t.noSubmissionsYet}
           </p>
         </div>
       ) : (

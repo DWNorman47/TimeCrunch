@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
+import { useT } from '../hooks/useT';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
 // ── Equipment Item Form (admin) ────────────────────────────────────────────────
 
 function ItemForm({ initial, onSaved, onCancel }) {
+  const t = useT();
   const [form, setForm] = useState({
     name: initial?.name ?? '',
     type: initial?.type ?? '',
@@ -22,7 +24,7 @@ function ItemForm({ initial, onSaved, onCancel }) {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!form.name.trim()) { setError('Equipment name is required.'); return; }
+    if (!form.name.trim()) { setError(t.equipmentNameRequired); return; }
     setSaving(true); setError('');
     try {
       const r = isEdit
@@ -30,41 +32,41 @@ function ItemForm({ initial, onSaved, onCancel }) {
         : await api.post('/equipment', form);
       onSaved(r.data, isEdit);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save');
+      setError(err.response?.data?.error || t.failedToSave);
     } finally { setSaving(false); }
   };
 
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
-      <h3 style={styles.formTitle}>{isEdit ? 'Edit Equipment' : 'Add Equipment'}</h3>
+      <h3 style={styles.formTitle}>{isEdit ? t.editEquipment : t.addEquipmentTitle}</h3>
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Name *</label>
+          <label style={styles.label}>{t.name} *</label>
           <input style={styles.input} type="text" placeholder="e.g. Excavator CAT 320" value={form.name} onChange={e => set('name', e.target.value)} required />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Type</label>
+          <label style={styles.label}>{t.equipmentType}</label>
           <input style={styles.input} type="text" placeholder="e.g. Excavator, Skid Steer, Generator" value={form.type} onChange={e => set('type', e.target.value)} />
         </div>
       </div>
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Unit / Serial #</label>
+          <label style={styles.label}>{t.unitSerial}</label>
           <input style={styles.input} type="text" placeholder="e.g. Unit 4, SN-12345" value={form.unit_number} onChange={e => set('unit_number', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Maintenance Every (hours) <span style={styles.optional}>(optional)</span></label>
+          <label style={styles.label}>{t.maintenanceEvery} <span style={styles.optional}>({t.optional})</span></label>
           <input style={styles.input} type="number" min="0" placeholder="e.g. 250" value={form.maintenance_interval_hours} onChange={e => set('maintenance_interval_hours', e.target.value)} />
         </div>
       </div>
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>Notes</label>
-        <input style={styles.input} type="text" placeholder="Optional notes" value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <label style={styles.label}>{t.notes}</label>
+        <input style={styles.input} type="text" placeholder={t.optionalNotes} value={form.notes} onChange={e => set('notes', e.target.value)} />
       </div>
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Equipment'}</button>
-        <button style={styles.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.addEquipmentTitle}</button>
+        <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
   );
@@ -73,6 +75,7 @@ function ItemForm({ initial, onSaved, onCancel }) {
 // ── Log Hours Form ─────────────────────────────────────────────────────────────
 
 function LogHoursForm({ item, projects, onLogged, onCancel }) {
+  const t = useT();
   const { user } = useAuth();
   const [form, setForm] = useState({
     log_date: today(),
@@ -87,7 +90,7 @@ function LogHoursForm({ item, projects, onLogged, onCancel }) {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!form.hours || parseFloat(form.hours) <= 0) { setError('Hours must be greater than 0.'); return; }
+    if (!form.hours || parseFloat(form.hours) <= 0) { setError(t.hoursRequiredMsg); return; }
     setSaving(true); setError('');
     try {
       const r = await api.post(`/equipment/${item.id}/hours`, form);
@@ -97,46 +100,46 @@ function LogHoursForm({ item, projects, onLogged, onCancel }) {
       }
       onLogged(item.id, r.data, parseFloat(form.hours));
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to log hours');
+      setError(err.response?.data?.error || t.failedToLogHours);
     } finally { setSaving(false); }
   };
 
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
-      <h3 style={styles.formTitle}>Log Hours — {item.name}</h3>
+      <h3 style={styles.formTitle}>{t.logHoursTitle} — {item.name}</h3>
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Date *</label>
+          <label style={styles.label}>{t.date} *</label>
           <input style={styles.input} type="date" value={form.log_date} onChange={e => set('log_date', e.target.value)} required />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Hours *</label>
+          <label style={styles.label}>{t.hours} *</label>
           <input style={{ ...styles.input, maxWidth: 110 }} type="number" min="0.5" step="0.5" placeholder="0.0" value={form.hours} onChange={e => set('hours', e.target.value)} required />
         </div>
       </div>
       <div style={styles.row}>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>Project</label>
+            <label style={styles.label}>{t.project}</label>
             <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">No project</option>
+              <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
         )}
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Operator</label>
-          <input style={styles.input} type="text" placeholder="Operator name" value={form.operator_name} onChange={e => set('operator_name', e.target.value)} />
+          <label style={styles.label}>{t.operatorField}</label>
+          <input style={styles.input} type="text" placeholder={t.operatorField} value={form.operator_name} onChange={e => set('operator_name', e.target.value)} />
         </div>
       </div>
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>Notes <span style={styles.optional}>(optional)</span></label>
-        <input style={styles.input} type="text" placeholder="e.g. grading north section" value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <label style={styles.label}>{t.notes} <span style={styles.optional}>({t.optional})</span></label>
+        <input style={styles.input} type="text" placeholder={t.optionalNotes} value={form.notes} onChange={e => set('notes', e.target.value)} />
       </div>
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? 'Saving…' : 'Log Hours'}</button>
-        <button style={styles.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : t.logHoursBtn}</button>
+        <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
   );
@@ -145,6 +148,7 @@ function LogHoursForm({ item, projects, onLogged, onCancel }) {
 // ── Equipment Card ─────────────────────────────────────────────────────────────
 
 function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogged }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [loggingHours, setLoggingHours] = useState(false);
   const [hours, setHours] = useState([]);
@@ -172,20 +176,20 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Remove "${item.name}" from equipment list?`)) return;
+    if (!confirm(t.removeEquipmentConfirm)) return;
     setDeleting(true);
     try { await api.delete(`/equipment/${item.id}`); onDeleted(item.id); }
-    catch { alert('Failed to remove'); }
+    catch { alert(t.failedToRemove); }
     finally { setDeleting(false); }
   };
 
   const handleDeleteEntry = async (entryId, entryHours) => {
-    if (!confirm('Delete this hours entry?')) return;
+    if (!confirm(t.deleteHoursEntryConfirm)) return;
     try {
       await api.delete(`/equipment/hours/${entryId}`);
       setHours(prev => prev.filter(h => h.id !== entryId));
       onHoursLogged(item.id, -parseFloat(entryHours));
-    } catch { alert('Failed to delete entry'); }
+    } catch { alert(t.failedToDeleteEntry); }
   };
 
   return (
@@ -196,7 +200,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
           <div style={styles.itemMeta}>
             {item.type && <span>{item.type}</span>}
             {item.unit_number && <span style={styles.unitTag}>{item.unit_number}</span>}
-            {item.last_logged && <span>Last: {item.last_logged?.toString().substring(0, 10)}</span>}
+            {item.last_logged && <span>{t.lastLogged} {item.last_logged?.toString().substring(0, 10)}</span>}
           </div>
         </div>
         <div style={styles.cardRight}>
@@ -212,7 +216,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
                 background: overMaintenance ? '#ef4444' : nearMaintenance ? '#f59e0b' : '#10b981',
               }} />
               <span style={{ ...styles.maintenanceText, color: overMaintenance ? '#ef4444' : nearMaintenance ? '#d97706' : '#6b7280' }}>
-                {overMaintenance ? '⚠ Overdue' : nearMaintenance ? '⚠ Due soon' : `/ ${interval}h`}
+                {overMaintenance ? `⚠ ${t.overdueLabel}` : nearMaintenance ? `⚠ ${t.dueSoon}` : `/ ${interval}h`}
               </span>
             </div>
           )}
@@ -235,11 +239,11 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
             />
           ) : (
             <div style={styles.bodyActions}>
-              <button style={styles.logBtn} onClick={() => setLoggingHours(true)}>+ Log Hours</button>
+              <button style={styles.logBtn} onClick={() => setLoggingHours(true)}>+ {t.logHoursBtn}</button>
               {isAdmin && (
                 <>
-                  <button style={styles.editBtn} onClick={() => onEdit(item)}>Edit</button>
-                  <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : 'Remove'}</button>
+                  <button style={styles.editBtn} onClick={() => onEdit(item)}>{t.edit}</button>
+                  <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.removeBtn}</button>
                 </>
               )}
             </div>
@@ -247,20 +251,20 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
 
           {!loggingHours && (
             <div style={styles.hoursHistory}>
-              <div style={styles.historyTitle}>Hours History</div>
+              <div style={styles.historyTitle}>{t.hoursHistory}</div>
               {loadingHours ? (
-                <p style={styles.hint}>Loading…</p>
+                <p style={styles.hint}>{t.loading}</p>
               ) : hours.length === 0 ? (
-                <p style={styles.hint}>No hours logged yet.</p>
+                <p style={styles.hint}>{t.noHoursLogged}</p>
               ) : (
                 <table style={styles.histTable}>
                   <thead>
                     <tr>
-                      <th style={styles.hth}>Date</th>
-                      <th style={styles.hth}>Hours</th>
-                      <th style={styles.hth}>Operator</th>
-                      <th style={styles.hth}>Project</th>
-                      <th style={styles.hth}>Notes</th>
+                      <th style={styles.hth}>{t.date}</th>
+                      <th style={styles.hth}>{t.hours}</th>
+                      <th style={styles.hth}>{t.operatorField}</th>
+                      <th style={styles.hth}>{t.project}</th>
+                      <th style={styles.hth}>{t.notes}</th>
                       <th style={styles.hth}></th>
                     </tr>
                   </thead>
@@ -295,6 +299,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
 
 export default function EquipmentLog({ projects }) {
   const { user } = useAuth();
+  const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
 
@@ -333,14 +338,14 @@ export default function EquipmentLog({ projects }) {
     <div>
       <div style={styles.topRow}>
         <div>
-          <h1 style={styles.heading}>Equipment Hours</h1>
+          <h1 style={styles.heading}>{t.equipmentHours}</h1>
           <p style={styles.summary}>
-            {items.length} item{items.length !== 1 ? 's' : ''} · {totalHrs.toFixed(0)} total hours logged
-            {overdueCount > 0 && <span style={styles.overdueNote}> · {overdueCount} maintenance overdue</span>}
+            {items.length} · {totalHrs.toFixed(0)} {t.totalHoursLogged}
+            {overdueCount > 0 && <span style={styles.overdueNote}> · {overdueCount} {t.maintenanceOverdue}</span>}
           </p>
         </div>
         {isAdmin && !showForm && !editing && (
-          <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ Add Equipment</button>
+          <button style={styles.newBtn} onClick={() => setShowForm(true)}>{t.addEquipment}</button>
         )}
       </div>
 
@@ -355,11 +360,11 @@ export default function EquipmentLog({ projects }) {
       )}
 
       {loading ? (
-        <p style={styles.hint}>Loading…</p>
+        <p style={styles.hint}>{t.loading}</p>
       ) : items.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>🚜</div>
-          <p style={styles.emptyText}>{isAdmin ? 'No equipment yet. Add your first piece of equipment to start tracking hours.' : 'No equipment registered yet.'}</p>
+          <p style={styles.emptyText}>{isAdmin ? t.noEquipmentAdmin : t.noEquipmentWorker}</p>
         </div>
       ) : (
         <div style={styles.list}>

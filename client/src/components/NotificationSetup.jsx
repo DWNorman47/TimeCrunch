@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -9,6 +10,7 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 export default function NotificationSetup() {
+  const t = useT();
   const [state, setState] = useState('idle'); // idle | subscribed | denied | unsupported | loading | error
   const [subscription, setSubscription] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -78,17 +80,17 @@ export default function NotificationSetup() {
       <div style={styles.info}>
         <span style={styles.icon}>🔔</span>
         <div>
-          <div style={styles.label}>Push notifications</div>
-          <div style={styles.sub}>Get notified when entries are rejected, shifts are assigned, or you receive a message.</div>
+          <div style={styles.label}>{t.pushNotifications}</div>
+          <div style={styles.sub}>{t.pushNotificationsDesc}</div>
         </div>
       </div>
       {state === 'subscribed' ? (
-        <button style={styles.offBtn} onClick={unsubscribe}>Turn off</button>
+        <button style={styles.offBtn} onClick={unsubscribe}>{t.turnOff}</button>
       ) : state === 'denied' ? (
-        <span style={styles.denied}>Blocked in browser settings</span>
+        <span style={styles.denied}>{t.blockedInBrowser}</span>
       ) : (
         <button style={styles.onBtn} onClick={subscribe} disabled={state === 'loading'}>
-          {state === 'loading' ? 'Enabling...' : 'Enable'}
+          {state === 'loading' ? t.enabling : t.enable}
         </button>
       )}
       {state === 'error' && (

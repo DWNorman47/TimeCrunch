@@ -403,7 +403,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         FROM daily_regular
         GROUP BY user_id, date_trunc('week', work_date)
       )
-      SELECT u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password,
+      SELECT u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE(
@@ -425,7 +425,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1 ${accessFilter}
-      GROUP BY u.id, u.full_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password
+      GROUP BY u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
       queryParams
@@ -517,7 +517,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const userResult = await pool.query(
-      'SELECT id, full_name, username, email, hourly_rate, rate_type, overtime_rule FROM users WHERE id = $1 AND role = $2 AND company_id = $3',
+      'SELECT id, full_name, invoice_name, username, email, hourly_rate, rate_type, overtime_rule FROM users WHERE id = $1 AND role = $2 AND company_id = $3',
       [req.params.id, 'worker', companyId]
     );
     if (userResult.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
@@ -818,10 +818,11 @@ router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), 
     if (overtime_rule !== undefined) { fields.push(`overtime_rule = $${idx++}`); values.push(overtime_rule); }
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email || null); }
     if (worker_type !== undefined) { fields.push(`worker_type = $${idx++}`); values.push(worker_type); }
+    if (req.body.invoice_name !== undefined) { fields.push(`invoice_name = $${idx++}`); values.push(req.body.invoice_name?.trim() || null); }
     values.push(req.params.id);
     values.push(companyId);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type`,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, invoice_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
@@ -916,7 +917,7 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
     if (projectResult.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
 
     const entriesResult = await pool.query(
-      `SELECT te.*, u.full_name as worker_name, u.username, u.hourly_rate, u.rate_type, u.overtime_rule
+      `SELECT te.*, COALESCE(u.invoice_name, u.full_name) as worker_name, u.username, u.hourly_rate, u.rate_type, u.overtime_rule
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
        WHERE te.project_id = $1
@@ -1011,9 +1012,11 @@ router.get('/projects', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, company_id, name, wage_type, prevailing_wage_rate, geo_lat, geo_lng, geo_radius_ft,
-              budget_hours, budget_dollars, active, created_at
-       FROM projects WHERE active = true AND company_id = $1 ORDER BY name LIMIT 500`,
-      [companyId]
+              budget_hours, budget_dollars, active, created_at,
+              client_name, job_number, address, start_date, end_date, description, status,
+              required_checklist_template_id, progress_pct
+       FROM projects WHERE (active = true OR $2 = true) AND company_id = $1 ORDER BY active DESC, name LIMIT 500`,
+      [companyId, req.query.include_archived === 'true']
     );
     res.json(result.rows);
   } catch (err) {
@@ -1053,7 +1056,12 @@ router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
 
 // Update project (name and/or wage_type and/or geofence)
 router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
-  const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence, budget_hours, budget_dollars, prevailing_wage_rate, required_checklist_template_id } = req.body;
+  const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence, budget_hours, budget_dollars, prevailing_wage_rate, required_checklist_template_id,
+          client_name, job_number, address, start_date, end_date, description, status, progress_pct, active } = req.body;
+  const VALID_STATUSES = ['planning', 'in_progress', 'on_hold', 'completed'];
+  if (status !== undefined && !VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
+  }
   if (wage_type !== undefined && !['regular', 'prevailing'].includes(wage_type)) {
     return res.status(400).json({ error: 'wage_type must be regular or prevailing' });
   }
@@ -1082,6 +1090,8 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
       const bh = budget_hours === null ? null : parseFloat(budget_hours);
       if (bh !== null && (isNaN(bh) || bh < 0)) return res.status(400).json({ error: 'budget_hours must be non-negative' });
       fields.push(`budget_hours = $${idx++}`); values.push(bh);
+      // Reset alert tracker so new budget gets fresh alerts
+      fields.push(`budget_alert_pct = NULL`);
     }
     if (budget_dollars !== undefined) {
       const bd = budget_dollars === null ? null : parseFloat(budget_dollars);
@@ -1097,6 +1107,19 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
       fields.push(`required_checklist_template_id = $${idx++}`);
       values.push(required_checklist_template_id ? parseInt(required_checklist_template_id) : null);
     }
+    if (client_name !== undefined) { fields.push(`client_name = $${idx++}`); values.push(client_name || null); }
+    if (job_number !== undefined)   { fields.push(`job_number = $${idx++}`);   values.push(job_number || null); }
+    if (address !== undefined)      { fields.push(`address = $${idx++}`);      values.push(address || null); }
+    if (start_date !== undefined)   { fields.push(`start_date = $${idx++}`);   values.push(start_date || null); }
+    if (end_date !== undefined)     { fields.push(`end_date = $${idx++}`);     values.push(end_date || null); }
+    if (description !== undefined)  { fields.push(`description = $${idx++}`);  values.push(description || null); }
+    if (status !== undefined)       { fields.push(`status = $${idx++}`);       values.push(status); }
+    if (progress_pct !== undefined) {
+      const pp = progress_pct === null ? null : parseInt(progress_pct, 10);
+      if (pp !== null && (isNaN(pp) || pp < 0 || pp > 100)) return res.status(400).json({ error: 'progress_pct must be 0–100' });
+      fields.push(`progress_pct = $${idx++}`); values.push(pp);
+    }
+    if (active !== undefined) { fields.push(`active = $${idx++}`); values.push(!!active); }
     if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
     values.push(req.params.id);
     values.push(companyId);
@@ -1115,17 +1138,22 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
 
 // Create a project
 router.post('/projects', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
-  const { wage_type, prevailing_wage_rate } = req.body;
+  const { wage_type, prevailing_wage_rate, client_id, client_name, job_number, address, start_date, end_date, status, description } = req.body;
   const name = req.body.name?.trim();
   if (!name) return res.status(400).json({ error: 'Project name required' });
   const companyId = req.user.company_id;
   const wt = wage_type === 'prevailing' ? 'prevailing' : 'regular';
   const pwr = prevailing_wage_rate != null ? parseFloat(prevailing_wage_rate) : null;
   if (pwr !== null && (isNaN(pwr) || pwr < 0)) return res.status(400).json({ error: 'prevailing_wage_rate must be non-negative' });
+  const validStatuses = ['planning', 'in_progress', 'on_hold', 'completed'];
+  const st = validStatuses.includes(status) ? status : 'in_progress';
   try {
     const result = await pool.query(
-      'INSERT INTO projects (company_id, name, wage_type, prevailing_wage_rate) VALUES ($1, $2, $3, $4) RETURNING *',
-      [companyId, name, wt, pwr]
+      `INSERT INTO projects (company_id, name, wage_type, prevailing_wage_rate, client_id, client_name, job_number, address, start_date, end_date, status, description)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [companyId, name, wt, pwr,
+       client_id || null, client_name?.trim() || null, job_number?.trim() || null,
+       address?.trim() || null, start_date || null, end_date || null, st, description?.trim() || null]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.created', 'project', result.rows[0].id, name, { wage_type: wt });
     res.status(201).json(result.rows[0]);
@@ -1138,6 +1166,226 @@ router.post('/projects', requireAdmin, requirePermission('manage_projects'), asy
       }
       return res.status(409).json({ error: 'Project already exists' });
     }
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Unified activity feed for a project (field notes + punchlist items)
+// Recent photos for a project (across all field reports)
+router.get('/projects/:id/photos', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT ph.url, ph.caption, ph.media_type, ph.created_at,
+              COALESCE(r.report_date, r.reported_at::date) AS report_date,
+              COALESCE(u.invoice_name, u.full_name) AS worker_name
+       FROM field_report_photos ph
+       JOIN field_reports r ON ph.report_id = r.id
+       JOIN users u ON r.user_id = u.id
+       WHERE r.project_id = $1 AND r.company_id = $2 AND ph.url IS NOT NULL
+       ORDER BY COALESCE(r.report_date, r.reported_at::date) DESC, ph.created_at DESC
+       LIMIT 60`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Project documents
+router.get('/projects/:id/documents/upload-url', requireAdmin, async (req, res) => {
+  const { filename, contentType } = req.query;
+  if (!filename || !contentType) return res.status(400).json({ error: 'filename and contentType required' });
+  const ALLOWED = ['application/pdf', 'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/jpeg', 'image/png', 'image/webp', 'text/plain', 'text/csv'];
+  if (!ALLOWED.includes(contentType)) return res.status(400).json({ error: 'File type not allowed' });
+  try {
+    const ext = filename.split('.').pop().toLowerCase();
+    const { getPresignedUploadUrl } = require('../r2');
+    const { uploadUrl, publicUrl } = await getPresignedUploadUrl('documents', ext, contentType);
+    res.json({ uploadUrl, publicUrl });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to generate upload URL' }); }
+});
+
+router.post('/projects/:id/documents', requireAdmin, async (req, res) => {
+  const { name, url, size_bytes } = req.body;
+  if (!name || !url) return res.status(400).json({ error: 'name and url required' });
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `INSERT INTO project_documents (company_id, project_id, name, url, size_bytes, uploaded_by)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [companyId, req.params.id, name.trim(), url, size_bytes || null, req.user.id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.get('/projects/:id/documents', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT d.*, COALESCE(u.full_name, '') AS uploader_name
+       FROM project_documents d
+       LEFT JOIN users u ON d.uploaded_by = u.id
+       WHERE d.project_id = $1 AND d.company_id = $2
+       ORDER BY d.created_at DESC`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.delete('/projects/:id/documents/:docId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const doc = await pool.query(
+      'SELECT url FROM project_documents WHERE id=$1 AND project_id=$2 AND company_id=$3',
+      [req.params.docId, req.params.id, companyId]
+    );
+    if (doc.rowCount === 0) return res.status(404).json({ error: 'Document not found' });
+    const { deleteByUrl } = require('../r2');
+    await deleteByUrl(doc.rows[0].url).catch(() => {});
+    await pool.query('DELETE FROM project_documents WHERE id=$1', [req.params.docId]);
+    res.json({ deleted: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// RFIs for a project
+router.get('/projects/:id/rfis', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT id, rfi_number, subject, status, directed_to, date_submitted, date_due
+       FROM rfis
+       WHERE project_id = $1 AND company_id = $2
+       ORDER BY rfi_number DESC
+       LIMIT 100`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Project health snapshot — counts + approximate cost in one query
+router.get('/projects/:id/health', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT
+         (SELECT COUNT(*) FROM punchlist_items
+          WHERE project_id=$1 AND company_id=$2 AND status='open')::int             AS open_punchlist,
+         (SELECT COUNT(*) FROM punchlist_items
+          WHERE project_id=$1 AND company_id=$2 AND status!='verified')::int        AS active_punchlist,
+         (SELECT COUNT(*) FROM rfis
+          WHERE project_id=$1 AND company_id=$2 AND status='open')::int             AS open_rfis,
+         (SELECT COUNT(*) FROM field_reports
+          WHERE project_id=$1 AND company_id=$2
+            AND COALESCE(report_date, reported_at::date) >= CURRENT_DATE - 7)::int  AS reports_week,
+         (SELECT ROUND(COALESCE(SUM(
+            EXTRACT(EPOCH FROM (
+              CASE WHEN te.end_time < te.start_time
+                THEN te.end_time + INTERVAL '1 day' - te.start_time
+                ELSE te.end_time - te.start_time
+              END
+            )) / 3600 * COALESCE(u.hourly_rate, (
+              SELECT value::numeric FROM settings
+              WHERE company_id=$2 AND key='default_hourly_rate' LIMIT 1
+            ), 30)
+          ), 0)::numeric, 0)
+          FROM time_entries te
+          JOIN users u ON te.user_id = u.id
+          WHERE te.project_id=$1 AND te.company_id=$2)                              AS approx_cost`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/projects/:id/activity', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `WITH notes AS (
+         SELECT 'note'::text AS type,
+                r.id::text,
+                r.notes AS title,
+                r.reported_at AS event_at,
+                COALESCE(u.invoice_name, u.full_name) AS worker_name,
+                NULL::text AS status,
+                NULL::text AS priority
+         FROM field_reports r
+         JOIN users u ON r.user_id = u.id
+         WHERE r.project_id = $1 AND r.company_id = $2
+           AND r.notes IS NOT NULL AND r.notes <> ''
+         ORDER BY r.reported_at DESC
+         LIMIT 10
+       ),
+       punches AS (
+         SELECT 'punch'::text AS type,
+                pi.id::text,
+                pi.title,
+                pi.created_at AS event_at,
+                NULL::text AS worker_name,
+                pi.status,
+                pi.priority
+         FROM punchlist_items pi
+         WHERE pi.project_id = $1 AND pi.company_id = $2
+         ORDER BY pi.created_at DESC
+         LIMIT 15
+       )
+       SELECT * FROM notes
+       UNION ALL
+       SELECT * FROM punches
+       ORDER BY event_at DESC
+       LIMIT 25`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Workers who have time entries on this project
+router.get('/projects/:id/workers', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT u.id,
+              COALESCE(u.invoice_name, u.full_name) AS worker_name,
+              COUNT(te.id)::int AS entry_count,
+              ROUND(
+                COALESCE(SUM(EXTRACT(EPOCH FROM (
+                  CASE WHEN te.end_time < te.start_time
+                    THEN te.end_time + INTERVAL '1 day' - te.start_time
+                    ELSE te.end_time - te.start_time
+                  END
+                )) / 3600), 0)::numeric, 1
+              ) AS total_hours,
+              MAX(te.work_date) AS last_worked
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       WHERE te.project_id = $1 AND te.company_id = $2
+       GROUP BY u.id, COALESCE(u.invoice_name, u.full_name)
+       ORDER BY total_hours DESC`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
@@ -1225,6 +1473,59 @@ router.get('/projects/:id/media-zip', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     if (!res.headersSent) res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Merge one project into another — moves all data, deletes source
+router.post('/projects/:id/merge-into/:target_id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
+  const sourceId = parseInt(req.params.id);
+  const targetId = parseInt(req.params.target_id);
+  const companyId = req.user.company_id;
+
+  if (sourceId === targetId) return res.status(400).json({ error: 'Cannot merge a project into itself' });
+
+  try {
+    const check = await pool.query(
+      'SELECT id, name FROM projects WHERE id = ANY($1) AND company_id = $2',
+      [[sourceId, targetId], companyId]
+    );
+    if (check.rowCount < 2) return res.status(404).json({ error: 'One or both projects not found' });
+
+    const sourceName = check.rows.find(r => r.id === sourceId)?.name;
+    const targetName = check.rows.find(r => r.id === targetId)?.name;
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const intTables = [
+        'time_entries', 'active_clock', 'shifts', 'field_reports', 'daily_reports',
+        'punchlist_items', 'safety_talks', 'incident_reports', 'sub_reports',
+        'equipment_hours', 'rfis', 'safety_checklist_submissions',
+      ];
+      for (const table of intTables) {
+        await client.query(`UPDATE ${table} SET project_id = $1 WHERE project_id = $2`, [targetId, sourceId]);
+      }
+      // inspections stores project_id as UUID/text column
+      await client.query(
+        `UPDATE inspections SET project_id = $1::text WHERE project_id::text = $2::text AND company_id = $3`,
+        [targetId, sourceId, companyId]
+      );
+
+      await client.query('DELETE FROM projects WHERE id = $1 AND company_id = $2', [sourceId, companyId]);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    await logAudit(companyId, req.user.id, req.user.full_name, 'project.merged', 'project', sourceId, sourceName, `Merged into "${targetName}" (id ${targetId})`);
+    res.json({ success: true, message: `Merged "${sourceName}" into "${targetName}"` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -1338,7 +1639,7 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
     const workerFilter = accessIds && accessIds.length ? `AND te.user_id = ANY($3)` : '';
     const params = accessIds && accessIds.length ? [companyId, LIMIT + 1, accessIds] : [companyId, LIMIT + 1];
     const result = await pool.query(
-      `SELECT te.*, u.full_name as worker_name, u.email as worker_email, p.name as project_name,
+      `SELECT te.*, COALESCE(u.invoice_name, u.full_name) as worker_name, u.email as worker_email, p.name as project_name,
               te.clock_source, te.clocked_in_by, admin_u.full_name AS clocked_in_by_name
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
@@ -1406,6 +1707,62 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
     createInboxItem(entry.user_id, companyId, 'approval', 'Time entry approved ✓',
       `Your entry for ${entry.work_date?.toString().substring(0,10)} (${entry.start_time}–${entry.end_time}) was approved.`, '/dashboard');
     res.json(entry);
+
+    // Budget alert — fire-and-forget after response is sent
+    if (entry.project_id) {
+      setImmediate(async () => {
+        try {
+          const proj = await pool.query(
+            `SELECT id, name, budget_hours, budget_alert_pct FROM projects WHERE id = $1 AND company_id = $2`,
+            [entry.project_id, companyId]
+          );
+          if (!proj.rows[0] || !proj.rows[0].budget_hours) return;
+          const { id: pid, name: pname, budget_hours: budgetH, budget_alert_pct: alertedPct } = proj.rows[0];
+
+          const totals = await pool.query(
+            `SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (
+               CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time
+                    ELSE end_time - start_time END)) / 3600), 0) AS approved_hours
+             FROM time_entries
+             WHERE project_id = $1 AND company_id = $2 AND status = 'approved'`,
+            [pid, companyId]
+          );
+          const approvedH = parseFloat(totals.rows[0].approved_hours);
+          const pct = (approvedH / budgetH) * 100;
+
+          let threshold = null;
+          if (pct >= 100 && (alertedPct === null || alertedPct < 100)) threshold = 100;
+          else if (pct >= 90 && (alertedPct === null || alertedPct < 90)) threshold = 90;
+          if (!threshold) return;
+
+          const notifSetting = await pool.query(
+            `SELECT value FROM settings WHERE company_id = $1 AND key = 'notify_budget_alerts'`,
+            [companyId]
+          );
+          await pool.query(
+            `UPDATE projects SET budget_alert_pct = $1 WHERE id = $2`,
+            [threshold, pid]
+          );
+          if (notifSetting.rows[0]?.value === '0') return;
+
+          const admins = await pool.query(
+            `SELECT email, full_name FROM users WHERE company_id = $1 AND role = 'admin' AND email IS NOT NULL`,
+            [companyId]
+          );
+          const subject = threshold === 100
+            ? `Budget exceeded: ${pname}`
+            : `Budget alert (${threshold}%): ${pname}`;
+          const body = threshold === 100
+            ? `<p>The project <b>${pname}</b> has exceeded its hour budget.</p><p>Approved: <b>${approvedH.toFixed(1)} hrs</b> / Budget: <b>${budgetH} hrs</b></p><p>— OpsFloa</p>`
+            : `<p>The project <b>${pname}</b> has reached ${threshold}% of its hour budget.</p><p>Approved: <b>${approvedH.toFixed(1)} hrs</b> / Budget: <b>${budgetH} hrs</b></p><p>— OpsFloa</p>`;
+          for (const admin of admins.rows) {
+            sendEmail(admin.email, subject, body);
+          }
+        } catch (alertErr) {
+          console.error('Budget alert error:', alertErr);
+        }
+      });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -1529,13 +1886,13 @@ router.get('/export', requireAdmin, requirePermission('view_reports'), requirePl
   if (status) { conditions.push(`te.status = $${idx++}`); values.push(status); }
   try {
     const result = await pool.query(
-      `SELECT te.*, u.full_name as worker_name, p.name as project_name,
+      `SELECT te.*, COALESCE(u.invoice_name, u.full_name) as worker_name, p.name as project_name,
               to_char(te.work_date, 'YYYY-MM-DD') as work_date_str
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
        LEFT JOIN projects p ON te.project_id = p.id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY te.work_date, u.full_name, te.start_time`,
+       ORDER BY te.work_date, COALESCE(u.invoice_name, u.full_name), te.start_time`,
       values
     );
     const esc = v => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`;
@@ -1572,7 +1929,7 @@ router.get('/overtime-report', requireAdmin, requirePermission('view_reports'), 
     const prevRate = parseFloat(s.prevailing_wage_rate) || 45;
 
     const workers = await pool.query(
-      `SELECT u.id, u.full_name, u.hourly_rate, u.rate_type, u.overtime_rule FROM users u
+      `SELECT u.id, u.full_name, u.invoice_name, u.hourly_rate, u.rate_type, u.overtime_rule FROM users u
        WHERE u.company_id = $1 AND u.role = 'worker' AND u.active = true
        ORDER BY u.full_name`,
       [companyId]
@@ -1619,7 +1976,7 @@ router.get('/overtime-report', requireAdmin, requirePermission('view_reports'), 
       const totalCost = regularCost + overtimeCost + prevailingCost;
       const mileage = wEntries.reduce((s, e) => s + (parseFloat(e.mileage) || 0), 0);
       return {
-        worker_id: w.id, worker_name: w.full_name, rate, rate_type: w.rate_type || 'hourly', overtime_rule: workerOTRule,
+        worker_id: w.id, worker_name: w.invoice_name || w.full_name, rate, rate_type: w.rate_type || 'hourly', overtime_rule: workerOTRule,
         regular_hours: parseFloat(regularHours.toFixed(2)),
         overtime_hours: parseFloat(overtimeHours.toFixed(2)),
         prevailing_hours: parseFloat(prevHours.toFixed(2)),
@@ -1649,7 +2006,7 @@ router.get('/payroll-export', requireAdmin, requirePermission('view_reports'), r
     const prevRate = parseFloat(s.prevailing_wage_rate) || 45;
 
     const workers = await pool.query(
-      `SELECT u.id, u.full_name, u.hourly_rate, u.rate_type, u.overtime_rule FROM users u
+      `SELECT u.id, u.full_name, u.invoice_name, u.hourly_rate, u.rate_type, u.overtime_rule FROM users u
        WHERE u.company_id = $1 AND u.role = 'worker' AND u.active = true
        ORDER BY u.full_name`,
       [companyId]
@@ -1698,7 +2055,7 @@ router.get('/payroll-export', requireAdmin, requirePermission('view_reports'), r
         overtimeCost = overtimeHours * rate * otMult;
       }
       lines.push([
-        esc(w.full_name), w.rate_type || 'hourly', workerOTRule, rate.toFixed(2),
+        esc(w.invoice_name || w.full_name), w.rate_type || 'hourly', workerOTRule, rate.toFixed(2),
         regularHours.toFixed(2), overtimeHours.toFixed(2), prevHours.toFixed(2),
         (regularHours + overtimeHours + prevHours).toFixed(2),
         mileage.toFixed(1),
@@ -1837,13 +2194,13 @@ router.get('/certified-payroll', requireAdmin, requirePermission('view_reports')
     if (project_id) { conditions.push(`te.project_id = $${idx++}`); values.push(parseInt(project_id)); }
 
     const result = await pool.query(
-      `SELECT te.user_id, u.full_name as worker_name, u.hourly_rate,
+      `SELECT te.user_id, COALESCE(u.invoice_name, u.full_name) as worker_name, u.hourly_rate,
               to_char(te.work_date, 'YYYY-MM-DD') as work_date,
               te.start_time, te.end_time, te.break_minutes, te.wage_type
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY u.full_name, te.work_date, te.start_time`,
+       ORDER BY COALESCE(u.invoice_name, u.full_name), te.work_date, te.start_time`,
       values
     );
 
@@ -1858,7 +2215,7 @@ router.get('/certified-payroll', requireAdmin, requirePermission('view_reports')
       if (!workerMap[row.user_id]) {
         workerMap[row.user_id] = {
           worker_id: row.user_id,
-          worker_name: row.worker_name,
+          worker_name: row.worker_name,  // already COALESCE(invoice_name, full_name) from SQL
           rate: parseFloat(row.hourly_rate) || defaultRate,
           regular_days: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0 },
           prevailing_days: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0 },
@@ -1884,6 +2241,90 @@ router.get('/certified-payroll', requireAdmin, requirePermission('view_reports')
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// Analytics dashboard — summary, weekly trend, by-project, top workers
+router.get('/analytics', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const hoursExpr = `EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END))/3600`;
+  try {
+    const [summaryRes, weeklyRes, byProjectRes, topWorkersRes, statusRes] = await Promise.all([
+      pool.query(`
+        SELECT
+          ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN ${hoursExpr} END), 0)::numeric, 1) AS month_hours,
+          ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
+                                   AND work_date < date_trunc('month', CURRENT_DATE) THEN ${hoursExpr} END), 0)::numeric, 1) AS prev_month_hours,
+          COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN user_id END) AS month_workers,
+          COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
+                               AND work_date < date_trunc('month', CURRENT_DATE) THEN user_id END) AS prev_month_workers,
+          COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN project_id END) AS month_projects,
+          COUNT(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN 1 END) AS month_entries
+        FROM time_entries
+        WHERE company_id = $1 AND status = 'approved'
+          AND work_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
+      `, [companyId]),
+
+      pool.query(`
+        SELECT
+          date_trunc('week', work_date::timestamp)::date AS week_start,
+          ROUND(COALESCE(SUM(${hoursExpr}), 0)::numeric, 1) AS hours,
+          COUNT(DISTINCT user_id) AS workers,
+          COUNT(*) AS entries
+        FROM time_entries
+        WHERE company_id = $1 AND status = 'approved'
+          AND work_date >= CURRENT_DATE - INTERVAL '56 days'
+        GROUP BY week_start
+        ORDER BY week_start
+      `, [companyId]),
+
+      pool.query(`
+        SELECT
+          p.name AS project_name,
+          ROUND(COALESCE(SUM(${hoursExpr}), 0)::numeric, 1) AS hours,
+          COUNT(DISTINCT te.user_id) AS workers
+        FROM time_entries te
+        JOIN projects p ON te.project_id = p.id
+        WHERE te.company_id = $1 AND te.status = 'approved'
+          AND te.work_date >= date_trunc('month', CURRENT_DATE)
+          AND te.project_id IS NOT NULL
+        GROUP BY p.id, p.name
+        ORDER BY hours DESC
+        LIMIT 10
+      `, [companyId]),
+
+      pool.query(`
+        SELECT
+          COALESCE(u.invoice_name, u.full_name) AS worker_name,
+          ROUND(COALESCE(SUM(${hoursExpr}), 0)::numeric, 1) AS hours,
+          COUNT(*) AS entries
+        FROM time_entries te
+        JOIN users u ON te.user_id = u.id
+        WHERE te.company_id = $1 AND te.status = 'approved'
+          AND te.work_date >= date_trunc('month', CURRENT_DATE)
+        GROUP BY u.id, u.invoice_name, u.full_name
+        ORDER BY hours DESC
+        LIMIT 10
+      `, [companyId]),
+
+      pool.query(`
+        SELECT status, COUNT(*) AS count
+        FROM projects
+        WHERE company_id = $1 AND active = true
+        GROUP BY status
+      `, [companyId]),
+    ]);
+
+    res.json({
+      summary: summaryRes.rows[0],
+      weekly: weeklyRes.rows,
+      by_project: byProjectRes.rows,
+      top_workers: topWorkersRes.rows,
+      project_statuses: statusRes.rows,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.post('/support', requireAdmin, async (req, res) => {
   const { subject, message } = req.body;
   if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
@@ -1898,6 +2339,185 @@ router.post('/support', requireAdmin, async (req, res) => {
     '<p>' + message.trim().replace(/\n/g, '<br/>') + '</p>';
   await sendEmail('support@opsfloa.com', '[OpsFloa Support] ' + subjectLine + ' — ' + companyName, body);
   res.json({ ok: true });
+});
+
+// GET /admin/audit-log — recent audit events for this company
+router.get('/audit-log', requireAdmin, async (req, res) => {
+  const { limit = 25, offset = 0, group = '', from = '', to = '' } = req.query;
+  const companyId = req.user.company_id;
+  try {
+    const safeLimit = Math.min(parseInt(limit) || 25, 100);
+    const safeOffset = parseInt(offset) || 0;
+    const conditions = ['company_id = $1'];
+    const params = [companyId];
+    if (group) { params.push(`${group}.%`); conditions.push(`action LIKE $${params.length}`); }
+    if (from)  { params.push(from); conditions.push(`created_at >= $${params.length}::date`); }
+    if (to)    { params.push(to);   conditions.push(`created_at < ($${params.length}::date + INTERVAL '1 day')`); }
+    const where = conditions.join(' AND ');
+    const [dataRes, countRes] = await Promise.all([
+      pool.query(
+        `SELECT id, actor_name, action, entity_type, entity_name, details, created_at
+         FROM audit_log WHERE ${where}
+         ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, safeLimit, safeOffset]
+      ),
+      pool.query(`SELECT COUNT(*) FROM audit_log WHERE ${where}`, params),
+    ]);
+    res.json({ entries: dataRes.rows, total: parseInt(countRes.rows[0].count) });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /admin/projects/:id/rfis — create a new RFI
+router.post('/projects/:id/rfis', requireAdmin, async (req, res) => {
+  const { subject, directed_to, description, date_submitted, date_due } = req.body;
+  if (!subject?.trim()) return res.status(400).json({ error: 'subject is required' });
+  const companyId = req.user.company_id;
+  try {
+    const projCheck = await pool.query('SELECT id FROM projects WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
+    if (projCheck.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
+    const maxNum = await pool.query(
+      'SELECT COALESCE(MAX(rfi_number), 0) + 1 AS next FROM rfis WHERE project_id = $1 AND company_id = $2',
+      [req.params.id, companyId]
+    );
+    const rfi_number = maxNum.rows[0].next;
+    const today = new Date().toLocaleDateString('en-CA');
+    const result = await pool.query(
+      `INSERT INTO rfis (company_id, project_id, rfi_number, subject, description, directed_to, submitted_by, date_submitted, date_due, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'open')
+       RETURNING id, rfi_number, subject, status, directed_to, date_submitted, date_due`,
+      [companyId, req.params.id, rfi_number, subject.trim(), description || null,
+       directed_to || null, req.user.full_name, date_submitted || today, date_due || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Clients ───────────────────────────────────────────────────────────────────
+
+router.get('/clients', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT c.*,
+        COUNT(DISTINCT p.id) FILTER (WHERE p.active = true) AS project_count,
+        COUNT(DISTINCT d.id) AS document_count,
+        MIN(d.expires_at) FILTER (WHERE d.expires_at IS NOT NULL AND d.expires_at >= CURRENT_DATE) AS next_expiry
+       FROM clients c
+       LEFT JOIN projects p ON p.client_id = c.id AND p.company_id = $1
+       LEFT JOIN client_documents d ON d.client_id = c.id AND d.company_id = $1
+       WHERE c.company_id = $1 AND c.active = true
+       GROUP BY c.id
+       ORDER BY c.name`,
+      [companyId]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.post('/clients', requireAdmin, async (req, res) => {
+  const { name, contact_name, contact_email, contact_phone, address, notes } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Client name is required' });
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `INSERT INTO clients (company_id, name, contact_name, contact_email, contact_phone, address, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [companyId, name.trim(), contact_name || null, contact_email || null,
+       contact_phone || null, address || null, notes || null]
+    );
+    res.status(201).json({ ...result.rows[0], project_count: 0, document_count: 0 });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.patch('/clients/:id', requireAdmin, async (req, res) => {
+  const { name, contact_name, contact_email, contact_phone, address, notes } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Client name is required' });
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `UPDATE clients SET name=$1, contact_name=$2, contact_email=$3, contact_phone=$4,
+       address=$5, notes=$6 WHERE id=$7 AND company_id=$8 RETURNING *`,
+      [name.trim(), contact_name || null, contact_email || null, contact_phone || null,
+       address || null, notes || null, req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.delete('/clients/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    await pool.query('UPDATE clients SET active=false WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    await pool.query('UPDATE projects SET client_id=NULL WHERE client_id=$1 AND company_id=$2', [req.params.id, companyId]);
+    res.json({ deleted: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Client documents
+const CLIENT_DOC_TYPES = ['w9', 'w2', 'coi', 'contract', 'license', 'other'];
+
+router.get('/clients/:id/documents/upload-url', requireAdmin, async (req, res) => {
+  const { filename, contentType } = req.query;
+  if (!filename || !contentType) return res.status(400).json({ error: 'filename and contentType required' });
+  const ALLOWED = ['application/pdf', 'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/jpeg', 'image/png', 'image/webp', 'text/plain', 'text/csv'];
+  if (!ALLOWED.includes(contentType)) return res.status(400).json({ error: 'File type not allowed' });
+  try {
+    const ext = filename.split('.').pop().toLowerCase();
+    const { getPresignedUploadUrl } = require('../r2');
+    const { uploadUrl, publicUrl } = await getPresignedUploadUrl('client-docs', ext, contentType);
+    res.json({ uploadUrl, publicUrl });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to generate upload URL' }); }
+});
+
+router.post('/clients/:id/documents', requireAdmin, async (req, res) => {
+  const { name, url, size_bytes, doc_type, expires_at } = req.body;
+  if (!name || !url) return res.status(400).json({ error: 'name and url required' });
+  const companyId = req.user.company_id;
+  const safeType = CLIENT_DOC_TYPES.includes(doc_type) ? doc_type : 'other';
+  try {
+    const result = await pool.query(
+      `INSERT INTO client_documents (company_id, client_id, name, url, size_bytes, doc_type, expires_at, uploaded_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [companyId, req.params.id, name.trim(), url, size_bytes || null,
+       safeType, expires_at || null, req.user.id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.get('/clients/:id/documents', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT d.*, COALESCE(u.full_name, '') AS uploader_name
+       FROM client_documents d
+       LEFT JOIN users u ON d.uploaded_by = u.id
+       WHERE d.client_id = $1 AND d.company_id = $2
+       ORDER BY d.doc_type, d.created_at DESC`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.delete('/clients/:id/documents/:docId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const doc = await pool.query(
+      'SELECT url FROM client_documents WHERE id=$1 AND client_id=$2 AND company_id=$3',
+      [req.params.docId, req.params.id, companyId]
+    );
+    if (doc.rowCount === 0) return res.status(404).json({ error: 'Document not found' });
+    const { deleteByUrl } = require('../r2');
+    await deleteByUrl(doc.rows[0].url).catch(() => {});
+    await pool.query('DELETE FROM client_documents WHERE id=$1', [req.params.docId]);
+    res.json({ deleted: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

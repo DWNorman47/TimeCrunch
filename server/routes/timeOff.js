@@ -1,0 +1,149 @@
+const router = require('express').Router();
+const pool = require('../db');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { sendEmail } = require('../email');
+
+const VALID_TYPES = ['vacation', 'sick', 'personal', 'other'];
+
+// POST /time-off — worker submits a request
+router.post('/', requireAuth, async (req, res) => {
+  const { type, start_date, end_date, note } = req.body;
+  if (!start_date || !end_date) return res.status(400).json({ error: 'start_date and end_date are required' });
+  if (end_date < start_date) return res.status(400).json({ error: 'end_date must be on or after start_date' });
+  if (type && !VALID_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid type' });
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `INSERT INTO time_off_requests (company_id, user_id, type, start_date, end_date, note)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [companyId, req.user.id, type || 'vacation', start_date, end_date, note || null]
+    );
+    // Notify admins
+    setImmediate(async () => {
+      try {
+        const setting = await pool.query(
+          `SELECT value FROM settings WHERE company_id = $1 AND key = 'notify_timeoff_requests'`,
+          [companyId]
+        );
+        if (setting.rows[0]?.value === '0') return;
+        const admins = await pool.query(
+          `SELECT email FROM users WHERE company_id = $1 AND role = 'admin' AND email IS NOT NULL`,
+          [companyId]
+        );
+        const typeLabel = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' }[type || 'vacation'];
+        const subject = `Time off request: ${req.user.full_name}`;
+        const body = `<p><b>${req.user.full_name}</b> submitted a time off request.</p>
+          <p><b>Type:</b> ${typeLabel}<br/>
+          <b>Dates:</b> ${start_date} – ${end_date}${note ? `<br/><b>Note:</b> ${note}` : ''}</p>
+          <p>Log in to OpsFloa to approve or deny.</p>`;
+        for (const admin of admins.rows) sendEmail(admin.email, subject, body);
+      } catch {}
+    });
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /time-off/mine — worker's own requests
+router.get('/mine', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT r.*, COALESCE(u.full_name, '') AS reviewer_name
+       FROM time_off_requests r
+       LEFT JOIN users u ON r.reviewed_by = u.id
+       WHERE r.user_id = $1 AND r.company_id = $2
+       ORDER BY r.created_at DESC LIMIT 50`,
+      [req.user.id, req.user.company_id]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /time-off — admin: all requests, optionally filtered by status
+router.get('/', requireAdmin, async (req, res) => {
+  const { status } = req.query;
+  const params = [req.user.company_id];
+  const conditions = ['r.company_id = $1'];
+  if (status) { params.push(status); conditions.push(`r.status = $${params.length}`); }
+  try {
+    const result = await pool.query(
+      `SELECT r.*, COALESCE(u.invoice_name, u.full_name) AS worker_name, u.email AS worker_email,
+              COALESCE(rv.full_name, '') AS reviewer_name
+       FROM time_off_requests r
+       JOIN users u ON r.user_id = u.id
+       LEFT JOIN users rv ON r.reviewed_by = rv.id
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY r.status = 'pending' DESC, r.start_date ASC`,
+      params
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// PATCH /time-off/:id/approve
+router.patch('/:id/approve', requireAdmin, async (req, res) => {
+  const { review_note } = req.body;
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `UPDATE time_off_requests SET status = 'approved', reviewed_by = $1, review_note = $2, reviewed_at = NOW()
+       WHERE id = $3 AND company_id = $4 AND status = 'pending' RETURNING *`,
+      [req.user.id, review_note || null, req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Request not found or already reviewed' });
+    const row = result.rows[0];
+    setImmediate(async () => {
+      try {
+        const worker = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [row.user_id]);
+        if (worker.rows[0]?.email) {
+          sendEmail(worker.rows[0].email, 'Time off approved ✓',
+            `<p>Hi ${worker.rows[0].full_name},</p><p>Your time off request (<b>${row.start_date?.toString().substring(0,10)}</b> – <b>${row.end_date?.toString().substring(0,10)}</b>) has been <b style="color:#059669">approved</b>.</p>${review_note ? `<p>Note: ${review_note}</p>` : ''}<p>— OpsFloa</p>`);
+        }
+      } catch {}
+    });
+    res.json(row);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// PATCH /time-off/:id/deny
+router.patch('/:id/deny', requireAdmin, async (req, res) => {
+  const { review_note } = req.body;
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `UPDATE time_off_requests SET status = 'denied', reviewed_by = $1, review_note = $2, reviewed_at = NOW()
+       WHERE id = $3 AND company_id = $4 AND status = 'pending' RETURNING *`,
+      [req.user.id, review_note || null, req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Request not found or already reviewed' });
+    const row = result.rows[0];
+    setImmediate(async () => {
+      try {
+        const worker = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [row.user_id]);
+        if (worker.rows[0]?.email) {
+          sendEmail(worker.rows[0].email, 'Time off request denied',
+            `<p>Hi ${worker.rows[0].full_name},</p><p>Your time off request (<b>${row.start_date?.toString().substring(0,10)}</b> – <b>${row.end_date?.toString().substring(0,10)}</b>) was <b style="color:#ef4444">denied</b>.${review_note ? ` Reason: ${review_note}` : ''}</p><p>— OpsFloa</p>`);
+        }
+      } catch {}
+    });
+    res.json(row);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /time-off/:id — worker cancels a pending request
+router.delete('/:id', requireAuth, async (req, res) => {
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
+  const ownerCond = isAdmin ? '' : 'AND user_id = $3';
+  const params = isAdmin
+    ? [req.params.id, req.user.company_id]
+    : [req.params.id, req.user.company_id, req.user.id];
+  try {
+    const result = await pool.query(
+      `DELETE FROM time_off_requests WHERE id = $1 AND company_id = $2 AND status = 'pending' ${ownerCond} RETURNING id`,
+      params
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Request not found or already reviewed' });
+    res.json({ deleted: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+module.exports = router;

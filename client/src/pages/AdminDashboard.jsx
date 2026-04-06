@@ -18,6 +18,9 @@ import LiveKPIs from '../components/LiveKPIs';
 import BroadcastMessage from '../components/BroadcastMessage';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
+import AdminTimeOff from '../components/AdminTimeOff';
+import AuditLog from '../components/AuditLog';
+import OnboardingChecklist from '../components/OnboardingChecklist';
 import api from '../api';
 
 
@@ -75,7 +78,7 @@ export default function AdminDashboard() {
   // Permission helper — null admin_permissions means full access
   const canDo = key => !user?.admin_permissions || user.admin_permissions[key] === true;
 
-  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'manage'];
+  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'timeoff', 'manage', 'auditlog'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
 
@@ -144,7 +147,9 @@ export default function AdminDashboard() {
             ...(settings?.feature_analytics !== false && canDo('view_reports') ? [{ id: 'analytics', label: t.tabAnalytics }] : []),
             ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
+            { id: 'timeoff', label: '🏖 Time Off' },
             ...(settings?.feature_scheduling !== false ? [{ id: 'manage', label: t.tabManage }] : []),
+            { id: 'auditlog', label: '📋 Audit Log' },
           ]}
         />
 
@@ -155,6 +160,9 @@ export default function AdminDashboard() {
           </div>
         ) : tab === 'live' ? (
           <>
+            {workers.filter(w => w.role === 'worker').length === 0 && (
+              <OnboardingChecklist workers={workers} projects={projects} settings={settings} />
+            )}
             <LiveKPIs />
             {plan.isBusiness && settings?.feature_broadcast !== false ? <BroadcastMessage /> : null}
             {settings?.feature_chat !== false ? (
@@ -189,9 +197,9 @@ export default function AdminDashboard() {
             </button>
             {!collapsedSections.workers && (workers.length === 0
               ? <p style={{ color: '#666' }}>{t.noWorkersYet}</p>
-              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} overtimeEnabled={settings?.feature_overtime !== false} projectsEnabled={settings?.feature_projects !== false} projects={projects} />)
+              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} overtimeEnabled={settings?.feature_overtime !== false} projectsEnabled={settings?.feature_project_integration !== false} projects={projects} />)
             )}
-            {settings?.feature_projects !== false && <>
+            {settings?.feature_project_integration !== false && <>
               <button style={styles.sectionToggle} onClick={() => toggleSection('projects')}>
                 <span>{t.projectReports}</span>
                 <span style={styles.chevron}>{collapsedSections.projects ? '▶' : '▼'}</span>
@@ -216,6 +224,10 @@ export default function AdminDashboard() {
             </button>
             {!collapsedSections.export && (plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />)}
           </>
+        ) : tab === 'timeoff' ? (
+          <AdminTimeOff />
+        ) : tab === 'auditlog' ? (
+          <AuditLog timezone={settings?.company_timezone || ''} />
         ) : tab === 'manage' ? (
           <>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}

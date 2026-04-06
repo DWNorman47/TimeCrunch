@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 function daysLeft(dateStr) {
   if (!dateStr) return 0;
   return Math.max(0, Math.ceil((new Date(dateStr) - new Date()) / 86400000));
 }
 
-function StatusBadge({ status, trialEndsAt, plan }) {
+function StatusBadge({ status, trialEndsAt, plan, t }) {
   if (status === 'active') {
-    const label = plan === 'business' ? 'Business' : plan === 'starter' ? 'Starter' : 'Free';
+    const label = plan === 'business' ? t.planBusiness : plan === 'starter' ? t.planStarter : t.planFree;
     return <span style={{ ...badge, background: '#d1fae5', color: '#065f46' }}>● Active — {label}</span>;
   }
   if (status === 'trial') {
     const d = daysLeft(trialEndsAt);
     const color = d <= 3 ? '#fef2f2' : '#fef3c7';
     const text = d <= 3 ? '#991b1b' : '#92400e';
-    return <span style={{ ...badge, background: color, color: text }}>Trial — {d} day{d !== 1 ? 's' : ''} left</span>;
+    return <span style={{ ...badge, background: color, color: text }}>Trial — {d} {d !== 1 ? t.daysLabel : t.dayLabel} left</span>;
   }
   if (status === 'past_due') return <span style={{ ...badge, background: '#fef2f2', color: '#991b1b' }}>⚠ Payment past due</span>;
   if (status === 'canceled') return <span style={{ ...badge, background: '#f3f4f6', color: '#374151' }}>Canceled</span>;
@@ -57,6 +58,7 @@ function PlanCard({ name, priceEl, subline, features, color, highlight, tag, onS
 }
 
 export default function BillingPanel() {
+  const t = useT();
   const [status, setStatus] = useState(null);
   const [plans, setPlans] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -119,7 +121,7 @@ export default function BillingPanel() {
     }
   };
 
-  if (loading) return <div style={s.card}><p style={{ color: '#888' }}>Loading billing info...</p></div>;
+  if (loading) return <div style={s.card}><p style={{ color: '#888' }}>{t.loading}</p></div>;
 
   const sub = status?.subscription_status;
   const currentPlan = status?.plan || 'free';
@@ -147,10 +149,9 @@ export default function BillingPanel() {
     <div style={s.card}>
       <div style={s.topRow}>
         <div>
-          <h3 style={s.title}>Billing & Subscription</h3>
-          {isActive && <p style={s.sub}>Manage your plan and payment details below.</p>}
+          <h3 style={s.title}>{t.billingTitle}</h3>
         </div>
-        <StatusBadge status={sub} trialEndsAt={status?.trial_ends_at} plan={currentPlan} />
+        <StatusBadge status={sub} trialEndsAt={status?.trial_ends_at} plan={currentPlan} t={t} />
       </div>
 
       {sub === 'past_due' && (
@@ -183,11 +184,11 @@ export default function BillingPanel() {
       {isActive && (
         <div style={s.activeSection}>
           <p style={s.activeText}>
-            Your <strong>{currentPlan === 'business' ? 'Business' : 'Starter'}</strong> plan is active
-            {hasQbo ? ' with QuickBooks Online sync' : ''}.
+            Your <strong>{currentPlan === 'business' ? t.planBusiness : t.planStarter}</strong> plan is active
+            {hasQbo ? ` with ${t.addonQBO}` : ''}.
           </p>
           <button style={s.portalBtn} onClick={portal} disabled={redirecting === 'portal'}>
-            {redirecting === 'portal' ? 'Redirecting...' : 'Manage Subscription'}
+            {redirecting === 'portal' ? 'Redirecting...' : t.manageSub}
           </button>
         </div>
       )}
@@ -195,18 +196,18 @@ export default function BillingPanel() {
       {showPlans && (
         <>
           <div style={s.toggleRow}>
-            <span style={{ fontSize: 14, color: annual ? '#9ca3af' : '#111827', fontWeight: annual ? 400 : 600 }}>Monthly</span>
+            <span style={{ fontSize: 14, color: annual ? '#9ca3af' : '#111827', fontWeight: annual ? 400 : 600 }}>{t.planMonthly}</span>
             <button style={{ ...s.toggle, background: annual ? '#1a56db' : '#d1d5db' }} onClick={() => setAnnual(a => !a)}>
               <span style={{ ...s.toggleKnob, transform: annual ? 'translateX(46px)' : 'translateX(0)' }} />
             </button>
             <span style={{ fontSize: 14, color: annual ? '#111827' : '#9ca3af', fontWeight: annual ? 600 : 400 }}>
-              Annual <span style={{ background: '#d1fae5', color: '#065f46', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>Save 17%</span>
+              {t.planAnnual} <span style={{ background: '#d1fae5', color: '#065f46', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>{t.planSave}</span>
             </span>
           </div>
 
           <div style={s.plans}>
             <PlanCard
-              name="Free"
+              name={t.planFree}
               priceEl={<span><span style={{ fontSize: 28, fontWeight: 800 }}>$0</span></span>}
               subline="Up to 3 workers"
               color="#6b7280"
@@ -223,13 +224,13 @@ export default function BillingPanel() {
                 { text: 'CSV payroll export', lock: true },
                 { text: 'Full history', lock: true },
               ]}
-              btnLabel={currentPlan === 'free' && isActive ? 'Current Plan' : isTrial ? 'Choose Free' : 'Continue Free'}
+              btnLabel={currentPlan === 'free' && isActive ? t.currentPlan : isTrial ? `Choose ${t.planFree}` : `Continue ${t.planFree}`}
               disabled={currentPlan === 'free' && isActive}
               onSelect={() => isTrial ? setSelectedPlan('free') : null}
             />
 
             <PlanCard
-              name="Starter"
+              name={t.planStarter}
               priceEl={
                 annual
                   ? <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans ? Math.round(plans.starter.annual / 12) : 17}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
@@ -252,8 +253,8 @@ export default function BillingPanel() {
                 { text: 'Field reports, safety, punchlist', lock: true },
               ]}
               btnLabel={
-                currentPlan === 'starter' && isActive ? 'Current Plan'
-                  : isTrial ? (selectedPlan === 'starter' ? '✓ Starter Selected' : 'Choose Starter')
+                currentPlan === 'starter' && isActive ? t.currentPlan
+                  : isTrial ? (selectedPlan === 'starter' ? `✓ ${t.planStarter} Selected` : `Choose ${t.planStarter}`)
                   : `Subscribe — ${annual ? `$${plans?.starter.annual ?? 200}/yr` : `$${plans?.starter.monthly ?? 20}/mo`}`
               }
               disabled={!!redirecting || (currentPlan === 'starter' && isActive)}
@@ -264,9 +265,9 @@ export default function BillingPanel() {
             />
 
             <PlanCard
-              name="Business"
+              name={t.planBusiness}
               highlight
-              tag="Most Popular"
+              tag={t.planMostPopular}
               priceEl={
                 annual
                   ? <><span style={{ fontSize: 28, fontWeight: 800 }}>${businessAnnualPerMonth}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
@@ -300,8 +301,8 @@ export default function BillingPanel() {
                 { text: 'Inactive worker alerts' },
               ]}
               btnLabel={
-                currentPlan === 'business' && isActive ? 'Current Plan'
-                  : isTrial ? (selectedPlan === 'business' ? '✓ Business Selected' : 'Choose Business')
+                currentPlan === 'business' && isActive ? t.currentPlan
+                  : isTrial ? (selectedPlan === 'business' ? `✓ ${t.planBusiness} Selected` : `Choose ${t.planBusiness}`)
                   : annual ? `Subscribe — $${businessAnnualTotal}/yr` : `Subscribe — $${businessMonthly}/mo`
               }
               disabled={!!redirecting || (currentPlan === 'business' && isActive)}

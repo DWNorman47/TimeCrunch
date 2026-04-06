@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-// Administration is admin-only; filtered at render time based on userRole
+// Workers see: Time Clock, Field, Inventory (locked)
+// Admins see: above + Projects, Administration, Analytics
 const APPS = [
   {
     id: 'timeclock',
@@ -27,20 +28,6 @@ const APPS = [
     path: '/field',
   },
   {
-    id: 'projects',
-    name: 'Projects',
-    bg: '#7c3aed',
-    icon: (
-      <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-        <rect x="2.5" y="2.5" width="6" height="6" rx="1" />
-        <rect x="11.5" y="2.5" width="6" height="6" rx="1" />
-        <rect x="2.5" y="11.5" width="6" height="6" rx="1" />
-        <rect x="11.5" y="11.5" width="6" height="6" rx="1" />
-      </svg>
-    ),
-    path: '/projects',
-  },
-  {
     id: 'inventory',
     name: 'Inventory',
     bg: '#d97706',
@@ -55,6 +42,21 @@ const APPS = [
     soon: true,
   },
   {
+    id: 'projects',
+    name: 'Projects',
+    bg: '#7c3aed',
+    adminOnly: true,
+    icon: (
+      <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+        <rect x="2.5" y="2.5" width="6" height="6" rx="1" />
+        <rect x="11.5" y="2.5" width="6" height="6" rx="1" />
+        <rect x="2.5" y="11.5" width="6" height="6" rx="1" />
+        <rect x="11.5" y="11.5" width="6" height="6" rx="1" />
+      </svg>
+    ),
+    path: '/projects',
+  },
+  {
     id: 'administration',
     name: 'Administration',
     bg: '#64748b',
@@ -66,6 +68,19 @@ const APPS = [
     ),
     path: '/administration',
   },
+  {
+    id: 'analytics',
+    name: 'Analytics',
+    bg: '#0891b2',
+    adminOnly: true,
+    icon: (
+      <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+        <polyline points="2,15 7,9 11,12 18,5" />
+        <polyline points="14,5 18,5 18,9" />
+      </svg>
+    ),
+    path: '/analytics',
+  },
 ];
 
 export default function AppSwitcher({ currentApp = 'timeclock', userRole, features = {} }) {
@@ -74,11 +89,11 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const visibleApps = APPS.filter(a => {
     if (a.adminOnly && !isAdmin) return false;
-    if (a.soon) return !isAdmin ? false : true;
-    if (a.id === 'field' && features?.feature_field === false) return false;
-    if (a.id === 'projects') return false;
+    if (a.id === 'field' && features?.module_field === false) return false;
+    if (a.id === 'projects' && features?.module_projects === false) return false;
+    if (a.id === 'analytics' && features?.module_projects === false) return false;
     // Only hide Time Clock from admins when toggle is off; workers still need it for Account tab
-    if (a.id === 'timeclock' && features?.feature_timeclock === false && isAdmin) return false;
+    if (a.id === 'timeclock' && features?.module_timeclock === false && isAdmin) return false;
     return true;
   });
   const current = APPS.find(a => a.id === currentApp) || APPS[0];

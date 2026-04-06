@@ -88,13 +88,15 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
     setError('');
     setLocationDenied(false);
     setLoading(true);
+    // Capture clock-in time immediately before GPS wait — GPS can take several seconds
+    const clock_in_time = new Date().toISOString();
     // Always fetch GPS when the selected project has a geofence, even if geolocation feature is off globally
     const loc = (geolocationEnabled || projectHasGeofence) ? await getLocation() : { lat: null, lng: null };
     if (loc.permissionDenied) setLocationDenied(true);
     const { lat, lng } = loc;
     const local_work_date = new Date().toLocaleDateString('en-CA');
     try {
-      const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, location_denied: loc.permissionDenied || false });
+      const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, location_denied: loc.permissionDenied || false, clock_in_time });
       if (r.data?.offline) {
         // Queued offline — show a pending state
         setStatus({ offline_queued: true, project_name: projects.find(p => p.id == selectedProject)?.name });
@@ -112,8 +114,8 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
         api.get(`/safety-checklists/templates`).then(r => {
           const tmpl = r.data.find(t => t.id === data.template_id);
           if (tmpl) setPendingChecklist(tmpl);
-          else setError('A safety checklist is required — please complete it in the Field app first.');
-        }).catch(() => setError('A safety checklist is required before clocking in.'));
+          else setError(t.checklistRequiredFieldApp);
+        }).catch(() => setError(t.checklistRequiredField));
       } else {
         setError(data?.geofence ? data.error : (data?.error || t.clockInFailed));
       }
@@ -137,14 +139,14 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
       // Retry clock-in now that checklist is complete
       handleClockIn();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to submit checklist');
+      setError(err.response?.data?.error || t.failedSubmitChecklist);
     } finally {
       setChecklistSubmitting(false);
     }
   };
 
   const handleCancelClockIn = async () => {
-    if (!confirm('Cancel this clock-in? No time entry will be created.')) return;
+    if (!confirm(t.cancelClockInConfirm)) return;
     setLoading(true);
     try {
       await api.delete('/clock/cancel');
@@ -156,7 +158,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
       setBreakMinutes('');
       setMileage('');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to cancel');
+      setError(err.response?.data?.error || t.failedCancel);
     } finally {
       setLoading(false);
     }
@@ -196,7 +198,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
   };
 
   const handleSwitchProject = async () => {
-    if (!switchProject) { setError('Select a project to switch to'); return; }
+    if (!switchProject) { setError(t.selectNewProject); return; }
     setError('');
     setLoading(true);
     const { lat, lng } = geolocationEnabled ? await getLocation() : { lat: null, lng: null };
@@ -211,7 +213,8 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
         local_clock_out,
       });
       const local_work_date = new Date().toLocaleDateString('en-CA');
-      const r = await api.post('/clock/in', { project_id: switchProject, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+      const switch_clock_in_time = new Date().toISOString();
+      const r = await api.post('/clock/in', { project_id: switchProject, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, clock_in_time: switch_clock_in_time });
       setStatus(r.data);
       setSwitchingProject(false);
       setSwitchProject('');
@@ -220,7 +223,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
       setBreakMinutes('');
       setMileage('');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to switch project');
+      setError(err.response?.data?.error || t.failedSwitchProject);
     } finally {
       setLoading(false);
     }
@@ -228,7 +231,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
 
   const offlineBanner = (isOffline || queueCount > 0) && (
     <div style={styles.offlineBanner}>
-      {isOffline ? 'You are offline — punches will sync when reconnected.' : null}
+      {isOffline ? t.offlineWarning : null}
       {queueCount > 0 && !isOffline ? `${queueCount} punch${queueCount !== 1 ? 'es' : ''} pending sync...` : null}
       {queueCount > 0 && isOffline ? ` ${queueCount} punch${queueCount !== 1 ? 'es' : ''} queued.` : null}
     </div>
@@ -237,7 +240,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
   if (status === null) return (
     <div style={styles.card}>
       {offlineBanner}
-      <p style={{ color: '#9ca3af', fontSize: 14, margin: 0 }}>Loading clock status...</p>
+      <p style={{ color: '#9ca3af', fontSize: 14, margin: 0 }}>{t.clockingStatus}</p>
     </div>
   );
 
@@ -245,13 +248,13 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
     const clockOutQueued = status.clock_out_queued;
     return (
       <div style={styles.clockedInCard}>
-        {isOffline && <div style={styles.offlineBannerDark}>Offline — clock-out will sync when reconnected.</div>}
+        {isOffline && <div style={styles.offlineBannerDark}>{t.offlineClockOutWarn}</div>}
         <div style={styles.clockedInTop}>
           <div>
             <div style={styles.clockedInLabel}>{t.currentlyClockedIn}</div>
             <div style={styles.projectName}>{status.project_name}</div>
-            {status.offline_queued && <div style={{ fontSize: 11, opacity: 0.75, marginTop: 2 }}>Clock-in queued offline</div>}
-            {clockOutQueued && <div style={{ fontSize: 11, opacity: 0.75, marginTop: 2 }}>Clock-out queued — will sync</div>}
+            {status.offline_queued && <div style={{ fontSize: 11, opacity: 0.75, marginTop: 2 }}>{t.clockInQueuedOffline}</div>}
+            {clockOutQueued && <div style={{ fontSize: 11, opacity: 0.75, marginTop: 2 }}>{t.clockOutQueuedSync}</div>}
           </div>
           {!status.offline_queued && !clockOutQueued && <div style={styles.timer}>{formatElapsed(elapsed)}</div>}
         </div>
@@ -262,7 +265,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
             {breakAdded && (
               <div style={styles.addedRow}>
                 <span style={styles.addedIcon}>☕</span>
-                <span style={styles.addedLabel}>Break</span>
+                <span style={styles.addedLabel}>{t.breakLabel}</span>
                 <input
                   style={styles.addedInput}
                   type="number" min="0" max="480" step="1"
@@ -278,7 +281,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
             {mileageAdded && (
               <div style={styles.addedRow}>
                 <span style={styles.addedIcon}>🚗</span>
-                <span style={styles.addedLabel}>Mileage</span>
+                <span style={styles.addedLabel}>{t.mileageLabel}</span>
                 <input
                   style={styles.addedInput}
                   type="number" min="0" step="0.1"
@@ -294,8 +297,8 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
             {/* Add buttons */}
             {(!breakAdded || !mileageAdded) && (
               <div style={styles.addBtns}>
-                {!breakAdded && <button style={styles.addBtn} onClick={() => setBreakAdded(true)}>+ Break</button>}
-                {!mileageAdded && <button style={styles.addBtn} onClick={() => setMileageAdded(true)}>+ Mileage</button>}
+                {!breakAdded && <button style={styles.addBtn} onClick={() => setBreakAdded(true)}>{t.addBreak}</button>}
+                {!mileageAdded && <button style={styles.addBtn} onClick={() => setMileageAdded(true)}>{t.addMileage}</button>}
               </div>
             )}
 
@@ -309,24 +312,24 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
                   onChange={e => setSwitchProject(e.target.value)}
                   autoFocus
                 >
-                  <option value="">Select new project...</option>
+                  <option value="">{t.selectNewProject}</option>
                   {projects?.filter(p => String(p.id) !== String(status.project_id)).map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
                 <div style={styles.switchActions}>
                   <button style={styles.switchConfirmBtn} onClick={handleSwitchProject} disabled={loading || !switchProject}>
-                    {loading ? '...' : 'Confirm Switch'}
+                    {loading ? '...' : t.confirmSwitch}
                   </button>
                   <button style={styles.switchCancelBtn} onClick={() => { setSwitchingProject(false); setSwitchProject(''); setError(''); }}>
-                    Cancel
+                    {t.cancel}
                   </button>
                 </div>
               </div>
             ) : (
               projectsEnabled && projects?.length > 1 && (
                 <button style={styles.switchProjectBtn} onClick={() => setSwitchingProject(true)} disabled={loading}>
-                  Switch Project
+                  {t.switchProject}
                 </button>
               )
             )}
@@ -335,7 +338,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
               {loading ? t.clockingOut : t.clockOut}
             </button>
             <button style={styles.cancelClockInBtn} onClick={handleCancelClockIn} disabled={loading}>
-              Cancel clock-in
+              {t.cancelClockIn}
             </button>
           </>
         )}
@@ -350,8 +353,8 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
         <h2 style={styles.heading}>{t.clockIn}</h2>
         <div style={styles.noProjects}>
           <div style={styles.noProjectsIcon}>📋</div>
-          <div style={styles.noProjectsTitle}>No projects available</div>
-          <div style={styles.noProjectsText}>Your admin needs to add a project before you can clock in. Contact your manager to get set up.</div>
+          <div style={styles.noProjectsTitle}>{t.noProjectsTitle}</div>
+          <div style={styles.noProjectsText}>{t.noProjectsText}</div>
         </div>
       </div>
     );
@@ -388,30 +391,26 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
           />
         </div>
         {projectHasGeofence && (
-          <div style={styles.geofenceHint}>
-            📍 This job site requires location verification to clock in.
-          </div>
+          <div style={styles.geofenceHint}>{t.geofenceLocationHint}</div>
         )}
         {locationDenied && (
           <div style={styles.locationDenied}>
-            <div style={styles.locationDeniedTitle}>📍 Location access blocked</div>
-            <p style={styles.locationDeniedText}>
-              You previously denied location access. To fix this, re-enable it in your browser:
-            </p>
+            <div style={styles.locationDeniedTitle}>{t.locationAccessBlocked}</div>
+            <p style={styles.locationDeniedText}>{t.locationAccessHelp}</p>
             <ul style={styles.locationDeniedList}>
               <li><strong>iPhone/iPad:</strong> Settings → Privacy → Location Services → Safari (or your browser) → While Using</li>
               <li><strong>Android:</strong> Tap the lock icon in your browser's address bar → Permissions → Location → Allow</li>
               <li><strong>Desktop Chrome:</strong> Click the lock icon in the address bar → Site settings → Location → Allow</li>
               <li><strong>Desktop Firefox:</strong> Click the lock icon → Connection secure → More information → Permissions → Access your location</li>
             </ul>
-            <p style={styles.locationDeniedText}>After updating the setting, reload this page and try again.</p>
+            <p style={styles.locationDeniedText}>{t.locationAfterUpdate}</p>
           </div>
         )}
         {error && <p style={styles.error}>{error}</p>}
         {pendingChecklist && (
           <div style={styles.checklistGate}>
             <div style={styles.checklistGateTitle}>☑ Required: {pendingChecklist.name}</div>
-            <div style={styles.checklistGateSub}>Complete this checklist to clock in.</div>
+            <div style={styles.checklistGateSub}>{t.checklistCompleteToClock}</div>
             {(pendingChecklist.items || []).map((item, i) => (
               <div key={i} style={styles.checklistGateItem}>
                 {item.type === 'text' ? (
@@ -420,7 +419,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
                     <input
                       style={styles.checklistGateTextInput}
                       type="text"
-                      placeholder="Your answer..."
+                      placeholder={t.notesPlaceholder}
                       value={checklistAnswers[i] || ''}
                       onChange={e => setChecklistAnswers(a => ({ ...a, [i]: e.target.value }))}
                     />
@@ -443,10 +442,10 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
               onClick={handleChecklistSubmit}
               disabled={checklistSubmitting}
             >
-              {checklistSubmitting ? 'Submitting...' : 'Submit & Clock In'}
+              {checklistSubmitting ? t.checklistSubmitting : t.submitChecklistClockIn}
             </button>
             <button style={styles.checklistGateCancelBtn} onClick={() => { setPendingChecklist(null); setChecklistAnswers({}); }}>
-              Cancel
+              {t.cancel}
             </button>
           </div>
         )}
