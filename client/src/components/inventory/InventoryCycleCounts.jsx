@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../api';
 import { parseBinQR } from './BinLabelModal';
+import { parseItemQR } from './ItemLabelModal';
 
 const COUNT_TYPES = {
   cycle:     { label: 'Cycle Count',     color: '#2563eb', bg: '#dbeafe',   desc: 'Count stock at a specific location' },
@@ -32,6 +33,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [reportLines, setReportLines] = useState(null); // non-null after completion
 
   // ── Scan Mode ────────────────────────────────────────────────────────────────
   const [scanMode, setScanMode] = useState(false);
@@ -85,7 +87,20 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       return;
     }
 
-    // 2. Try to match against item SKUs in the count lines
+    // 2. Try to parse as item QR code
+    const itemQR = parseItemQR(value);
+    if (itemQR) {
+      const match = lines.find(l => l.item_id === itemQR.id);
+      if (match) {
+        setHighlightedId(match.id);
+        showFeedback(`Found: ${match.item_name}`);
+      } else {
+        showFeedback(`Item "${itemQR.name}" not in this count`, true);
+      }
+      return;
+    }
+
+    // 3. Try to match against item SKUs in the count lines
     const match = lines.find(l =>
       l.sku && l.sku.trim().toLowerCase() === value.toLowerCase()
     );
@@ -125,12 +140,39 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     setCompleting(true); setError('');
     try {
       await api.post(`/inventory/cycle-counts/${count.id}/complete`);
-      onComplete();
+      setConfirmOpen(false);
+      setReportLines(lines); // show variance report
     } catch (e) {
       setError(e.response?.data?.error || 'Failed to complete count.');
-    } finally {
       setCompleting(false); setConfirmOpen(false);
+    } finally {
+      setCompleting(false);
     }
+  };
+
+  const downloadVarianceCSV = (reportData) => {
+    const header = ['Item', 'SKU', 'Unit', 'Expected Qty', 'Counted Qty', 'Variance'];
+    const rows = reportData.map(l => {
+      const expected = parseFloat(l.expected_qty);
+      const counted  = l.counted_qty != null ? parseFloat(l.counted_qty) : '';
+      const variance = counted !== '' ? counted - expected : '';
+      return [
+        `"${l.item_name.replace(/"/g, '""')}"`,
+        l.sku || '',
+        l.unit,
+        expected,
+        counted,
+        variance,
+      ].join(',');
+    });
+    const csv = [header.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `variance-report-${count.id}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const uncounted = lines.filter(l => l.counted_qty === null || l.counted_qty === undefined).length;
@@ -333,6 +375,73 @@ function CycleCountDetail({ count, onBack, onComplete }) {
 
       {uncounted > 0 && countData.status === 'in_progress' && (
         <p style={d.uncountedNote}>{uncounted} item{uncounted !== 1 ? 's' : ''} not yet counted.</p>
+      )}
+
+      {reportLines && (
+        <div style={d.modalOverlay}>
+          <div style={{ ...d.modal, maxWidth: 560 }}>
+            <h3 style={d.modalTitle}>Count Complete — Variance Report</h3>
+            {(() => {
+              const withVariance = reportLines.filter(l => {
+                if (l.counted_qty == null) return false;
+                return parseFloat(l.counted_qty) - parseFloat(l.expected_qty) !== 0;
+              });
+              const noVariance = reportLines.filter(l => {
+                if (l.counted_qty == null) return true;
+                return parseFloat(l.counted_qty) - parseFloat(l.expected_qty) === 0;
+              });
+              return (
+                <>
+                  <p style={d.modalBody}>
+                    {withVariance.length === 0
+                      ? 'No variances — all counts matched expected quantities.'
+                      : `${withVariance.length} item${withVariance.length !== 1 ? 's' : ''} with variance, ${noVariance.length} matched.`}
+                  </p>
+                  <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: '#f9fafb' }}>
+                          <th style={d.rth}>Item</th>
+                          <th style={{ ...d.rth, textAlign: 'right' }}>Expected</th>
+                          <th style={{ ...d.rth, textAlign: 'right' }}>Counted</th>
+                          <th style={{ ...d.rth, textAlign: 'right' }}>Variance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...withVariance, ...noVariance].map((l, i) => {
+                          const expected = parseFloat(l.expected_qty);
+                          const counted  = l.counted_qty != null ? parseFloat(l.counted_qty) : null;
+                          const variance = counted != null ? counted - expected : null;
+                          const isVar    = variance !== null && variance !== 0;
+                          return (
+                            <tr key={l.id} style={{ background: isVar ? '#fff7ed' : (i % 2 === 0 ? '#fafafa' : '#fff') }}>
+                              <td style={{ ...d.rtd, fontWeight: isVar ? 700 : 400 }}>
+                                {isFull && l.location_name ? <span style={{ color: '#9ca3af', marginRight: 4 }}>{l.location_name} —</span> : ''}
+                                {l.item_name}
+                              </td>
+                              <td style={{ ...d.rtd, textAlign: 'right', color: '#6b7280' }}>{expected} {l.unit}</td>
+                              <td style={{ ...d.rtd, textAlign: 'right' }}>{counted != null ? `${counted} ${l.unit}` : <em style={{ color: '#9ca3af' }}>not counted</em>}</td>
+                              <td style={{ ...d.rtd, textAlign: 'right', fontWeight: 700,
+                                color: variance === null ? '#9ca3af' : variance > 0 ? '#059669' : variance < 0 ? '#dc2626' : '#374151' }}>
+                                {variance === null ? '—' : variance > 0 ? `+${variance}` : variance}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
+            <div style={d.modalActions}>
+              <button style={d.cancelBtn} onClick={() => { setReportLines(null); onComplete(); }}>Close</button>
+              <button style={{ ...d.confirmBtn, background: '#2563eb' }} onClick={() => downloadVarianceCSV(reportLines)}>
+                Download CSV
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {confirmOpen && (
@@ -570,6 +679,8 @@ const d = {
   modalActions:  { display: 'flex', gap: 10, justifyContent: 'flex-end' },
   cancelBtn:     { padding: '9px 18px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#374151' },
   confirmBtn:    { padding: '9px 20px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  rth:           { padding: '8px 10px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', textAlign: 'left', borderBottom: '2px solid #e5e7eb' },
+  rtd:           { padding: '8px 10px', fontSize: 13, color: '#374151', borderBottom: '1px solid #f3f4f6' },
 };
 
 const s = {

@@ -394,8 +394,17 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
               <option value="">All Locations</option>
               {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
-            <input style={s.dateInput} type="date" value={filters.from} onChange={e => setFilter('from', e.target.value)} title="From date" />
-            <input style={s.dateInput} type="date" value={filters.to} onChange={e => setFilter('to', e.target.value)} title="To date" />
+            <div style={s.dateWrap}>
+              <span style={s.dateLabel}>From</span>
+              <input style={s.dateInput} type="date" value={filters.from} onChange={e => setFilter('from', e.target.value)} />
+            </div>
+            <div style={s.dateWrap}>
+              <span style={s.dateLabel}>To</span>
+              <input style={s.dateInput} type="date" value={filters.to} onChange={e => setFilter('to', e.target.value)} />
+            </div>
+            {(filters.from || filters.to) && (
+              <button style={s.clearDates} onClick={() => setFilters(f => ({ ...f, from: '', to: '' }))} title="Clear date range">✕ Dates</button>
+            )}
             <button
               style={s.addBtn}
               onClick={() => setShowForm(true)}
@@ -491,7 +500,10 @@ const s = {
   wrap:        { padding: 16 },
   toolbar:     { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 },
   select:      { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151' },
+  dateWrap:    { display: 'flex', alignItems: 'center', gap: 5 },
+  dateLabel:   { fontSize: 12, fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap' },
   dateInput:   { padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#374151', background: '#fff' },
+  clearDates:  { padding: '7px 11px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fee2e2', color: '#dc2626', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
   addBtn:      { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginLeft: 'auto', whiteSpace: 'nowrap' },
   error:       { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },
   empty:       { textAlign: 'center', padding: '60px 24px', color: '#6b7280', fontSize: 15 },
