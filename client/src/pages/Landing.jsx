@@ -149,9 +149,9 @@ export default function Landing() {
       {/* Hero */}
       <section style={styles.hero}>
         <div style={styles.heroBadge}>Built for Contractors &amp; Field Crews</div>
-        <h1 style={styles.heroTitle}>Stop Running Your Job Site on Paper and Group Texts</h1>
+        <h1 style={styles.heroTitle}>One app for time, field, safety, and payroll. Built for contractors, not HR departments.</h1>
         <p style={styles.heroSub}>
-          OpsFloa puts time tracking, field documentation, project management, safety, and payroll prep in one platform — on every worker's phone, online or offline.
+          Time tracking, field reports, projects, clients, safety checklists, punchlist, and payroll prep — all in one platform, on any phone, online or offline. No app download required.
         </p>
         <div style={styles.heroCtas}>
           <Link to="/register" style={styles.heroBtn}>Start Free — No Card Required</Link>
