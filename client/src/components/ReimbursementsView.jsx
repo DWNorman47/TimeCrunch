@@ -28,8 +28,9 @@ function StatusBadge({ status }) {
 export default function ReimbursementsView() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [projects, setProjects] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA') });
+  const [form, setForm] = useState({ amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), project_id: '' });
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptPreview, setReceiptPreview] = useState(null);
   const [noReceipt, setNoReceipt] = useState(false);
@@ -43,6 +44,7 @@ export default function ReimbursementsView() {
   };
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { api.get('/projects').then(r => setProjects(r.data)).catch(() => {}); }, []);
 
   const handleFileChange = e => {
     const file = e.target.files[0];
@@ -62,14 +64,15 @@ export default function ReimbursementsView() {
     try {
       await api.post('/reimbursements', {
         amount: form.amount,
-        description: form.description,
+        description: form.description || null,
         category: form.category || null,
         expense_date: form.expense_date,
+        project_id: form.project_id || null,
         receipt: receiptFile || null,
       });
       setSuccess('Reimbursement submitted successfully.');
       setShowForm(false);
-      setForm({ amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA') });
+      setForm({ amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), project_id: '' });
       setReceiptFile(null); setReceiptPreview(null); setNoReceipt(false);
       load();
     } catch (err) {
@@ -120,6 +123,15 @@ export default function ReimbursementsView() {
                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
+            {projects.length > 0 && (
+              <div style={s.field}>
+                <label style={s.label}>Project</label>
+                <select style={s.input} value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}>
+                  <option value="">No project</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
           <div style={s.field}>
             <label style={s.label}>Description</label>
@@ -161,6 +173,7 @@ export default function ReimbursementsView() {
                 <div style={s.cardLeft}>
                   <span style={s.amount}>{fmtMoney(item.amount)}</span>
                   {item.category && <span style={s.category}>{item.category}</span>}
+                  {item.project_name && <span style={s.projectTag}>{item.project_name}</span>}
                 </div>
                 <div style={s.cardRight}>
                   <StatusBadge status={item.status} />
@@ -212,6 +225,7 @@ const s = {
   cardRight: { display: 'flex', alignItems: 'center', gap: 8 },
   amount: { fontSize: 18, fontWeight: 700, color: '#111827' },
   category: { fontSize: 11, fontWeight: 600, background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: 8 },
+  projectTag: { fontSize: 11, fontWeight: 600, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: 8 },
   badge: { fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8 },
   deleteBtn: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '2px 4px' },
   desc: { fontSize: 14, color: '#374151' },

@@ -52,6 +52,7 @@ function ReimbursementRow({ item, onUpdate }) {
         <div style={s.rowMid}>
           <span style={s.amount}>{fmtMoney(item.amount)}</span>
           {item.category && <span style={s.cat}>{item.category}</span>}
+          {item.project_name && <span style={s.projectTag}>{item.project_name}</span>}
           <span style={s.date}>{fmtDate(item.expense_date)}</span>
         </div>
         <div style={s.rowRight}>
@@ -110,8 +111,9 @@ export default function ReimbursementsAdmin() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('pending');
   const [workers, setWorkers] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ user_id: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved' });
+  const [form, setForm] = useState({ user_id: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved', project_id: '' });
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptPreview, setReceiptPreview] = useState(null);
   const [noReceipt, setNoReceipt] = useState(false);
@@ -132,6 +134,7 @@ export default function ReimbursementsAdmin() {
 
   useEffect(() => {
     api.get('/admin/workers').then(r => setWorkers(r.data)).catch(() => {});
+    api.get('/projects').then(r => setProjects(r.data)).catch(() => {});
   }, []);
 
   const handleFileChange = e => {
@@ -150,15 +153,16 @@ export default function ReimbursementsAdmin() {
       await api.post('/reimbursements/admin', {
         user_id: form.user_id,
         amount: form.amount,
-        description: form.description,
+        description: form.description || null,
         category: form.category || null,
         expense_date: form.expense_date,
+        project_id: form.project_id || null,
         status: form.status,
         receipt: receiptFile || null,
       });
       setFormSuccess('Expense added successfully.');
       setShowForm(false);
-      setForm({ user_id: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved' });
+      setForm({ user_id: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved', project_id: '' });
       setReceiptFile(null); setReceiptPreview(null); setNoReceipt(false);
       load();
     } catch (err) {
@@ -231,6 +235,15 @@ export default function ReimbursementsAdmin() {
                 <option value="pending">Pending review</option>
               </select>
             </div>
+            {projects.length > 0 && (
+              <div style={s.field}>
+                <label style={s.fieldLabel}>Project</label>
+                <select style={s.input} value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}>
+                  <option value="">No project</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
           <div style={s.field}>
             <label style={s.fieldLabel}>Description</label>
@@ -308,6 +321,7 @@ const s = {
   rowRight: { display: 'flex', gap: 10, alignItems: 'center', marginLeft: 'auto' },
   amount: { fontSize: 16, fontWeight: 700, color: '#111827' },
   cat: { fontSize: 11, fontWeight: 600, background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: 8 },
+  projectTag: { fontSize: 11, fontWeight: 600, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: 8 },
   date: { fontSize: 12, color: '#6b7280' },
   badge: { fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8 },
   chevron: { fontSize: 13, color: '#6b7280' },

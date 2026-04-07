@@ -9,11 +9,12 @@ const { incrementStorage, decrementStorage, checkStorageLimit } = require('../st
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, amount, description, category, expense_date, receipt_url,
-              status, admin_notes, created_at
-       FROM reimbursements
-       WHERE company_id = $1 AND user_id = $2
-       ORDER BY expense_date DESC, created_at DESC`,
+      `SELECT r.id, r.amount, r.description, r.category, r.expense_date, r.receipt_url,
+              r.status, r.admin_notes, r.created_at, r.project_id, p.name AS project_name
+       FROM reimbursements r
+       LEFT JOIN projects p ON p.id = r.project_id
+       WHERE r.company_id = $1 AND r.user_id = $2
+       ORDER BY r.expense_date DESC, r.created_at DESC`,
       [req.user.company_id, req.user.id]
     );
     res.json(rows);
@@ -25,9 +26,9 @@ router.get('/', requireAuth, async (req, res) => {
 
 // POST /api/reimbursements — worker: submit a reimbursement
 router.post('/', requireAuth, async (req, res) => {
-  const { amount, description, category, expense_date, receipt } = req.body;
-  if (!amount || !description || !expense_date) {
-    return res.status(400).json({ error: 'amount, description, and expense_date are required' });
+  const { amount, description, category, expense_date, receipt, project_id } = req.body;
+  if (!amount || !expense_date) {
+    return res.status(400).json({ error: 'amount and expense_date are required' });
   }
   const amt = parseFloat(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
@@ -37,7 +38,6 @@ router.post('/', requireAuth, async (req, res) => {
     let receiptSizeBytes = null;
 
     if (receipt) {
-      // receipt is a base64 data URL
       const { allowed } = await checkStorageLimit(req.user.company_id, 5 * 1024 * 1024);
       if (!allowed) return res.status(400).json({ error: 'Storage limit reached. Upgrade your plan to upload more files.' });
 
@@ -48,10 +48,10 @@ router.post('/', requireAuth, async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO reimbursements (company_id, user_id, amount, description, category, expense_date, receipt_url, receipt_size_bytes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, amount, description, category, expense_date, receipt_url, status, admin_notes, created_at`,
-      [req.user.company_id, req.user.id, amt, description, category || null, expense_date, receiptUrl, receiptSizeBytes]
+      `INSERT INTO reimbursements (company_id, user_id, amount, description, category, expense_date, receipt_url, receipt_size_bytes, project_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id, amount, description, category, expense_date, receipt_url, status, admin_notes, created_at, project_id`,
+      [req.user.company_id, req.user.id, amt, description || null, category || null, expense_date, receiptUrl, receiptSizeBytes, project_id || null]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -83,15 +83,14 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
 // POST /api/reimbursements/admin — admin: submit a reimbursement for any worker (or self)
 router.post('/admin', requireAuth, requireAdmin, async (req, res) => {
-  const { user_id, amount, description, category, expense_date, receipt, status = 'approved' } = req.body;
-  if (!user_id || !amount || !description || !expense_date) {
-    return res.status(400).json({ error: 'user_id, amount, description, and expense_date are required' });
+  const { user_id, amount, description, category, expense_date, receipt, project_id, status = 'approved' } = req.body;
+  if (!user_id || !amount || !expense_date) {
+    return res.status(400).json({ error: 'user_id, amount, and expense_date are required' });
   }
   const amt = parseFloat(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
   if (!['pending', 'approved'].includes(status)) return res.status(400).json({ error: 'status must be pending or approved' });
 
-  // Verify worker belongs to this company
   try {
     const worker = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [user_id, req.user.company_id]);
     if (!worker.rows.length) return res.status(404).json({ error: 'Worker not found' });
@@ -108,10 +107,10 @@ router.post('/admin', requireAuth, requireAdmin, async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO reimbursements (company_id, user_id, amount, description, category, expense_date, receipt_url, receipt_size_bytes, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, amount, description, category, expense_date, receipt_url, status, admin_notes, created_at`,
-      [req.user.company_id, user_id, amt, description, category || null, expense_date, receiptUrl, receiptSizeBytes, status]
+      `INSERT INTO reimbursements (company_id, user_id, amount, description, category, expense_date, receipt_url, receipt_size_bytes, status, project_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, amount, description, category, expense_date, receipt_url, status, admin_notes, created_at, project_id`,
+      [req.user.company_id, user_id, amt, description || null, category || null, expense_date, receiptUrl, receiptSizeBytes, status, project_id || null]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -131,10 +130,11 @@ router.get('/admin', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT r.id, r.amount, r.description, r.category, r.expense_date, r.receipt_url,
-              r.status, r.admin_notes, r.created_at,
+              r.status, r.admin_notes, r.created_at, r.project_id, p.name AS project_name,
               u.full_name, u.username
        FROM reimbursements r
        JOIN users u ON u.id = r.user_id
+       LEFT JOIN projects p ON p.id = r.project_id
        WHERE ${conditions.join(' AND ')}
        ORDER BY r.expense_date DESC, r.created_at DESC`,
       params
@@ -158,7 +158,7 @@ router.patch('/admin/:id', requireAuth, requireAdmin, async (req, res) => {
        SET status = $1, admin_notes = $2, updated_at = NOW()
        WHERE id = $3 AND company_id = $4
        RETURNING id, amount, description, category, expense_date, receipt_url,
-                 status, admin_notes, created_at`,
+                 status, admin_notes, created_at, project_id`,
       [status, admin_notes || null, req.params.id, req.user.company_id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Not found' });

@@ -1,0 +1,2 @@
+ALTER TABLE reimbursements
+  ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL;
