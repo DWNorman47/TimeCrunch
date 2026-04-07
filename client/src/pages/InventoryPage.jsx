@@ -122,6 +122,7 @@ export default function InventoryPage() {
           <InventoryStock
             isAdmin={isAdmin}
             locations={locations}
+            projects={projects}
             onStockChange={refreshLowStock}
             onReorderClick={isAdmin ? handleReorderClick : null}
           />

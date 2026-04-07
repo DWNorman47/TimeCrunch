@@ -205,9 +205,95 @@ const a = {
   save:        { padding: '9px 18px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
 };
 
+// ── Quick Issue Modal (workers) ───────────────────────────────────────────────
+
+function IssueModal({ item, projects, onClose, onDone }) {
+  const [qty, setQty]         = useState('');
+  const [projectId, setProjectId] = useState('');
+  const [notes, setNotes]     = useState('');
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState('');
+
+  const available = parseFloat(item.quantity);
+
+  const submit = async () => {
+    const n = parseFloat(qty);
+    if (isNaN(n) || n <= 0) { setError('Enter a positive quantity to issue'); return; }
+    if (n > available) { setError(`Cannot issue more than available (${available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} ${item.unit})`); return; }
+    setSaving(true); setError('');
+    try {
+      await api.post('/inventory/transactions', {
+        type: 'issue',
+        item_id: item.item_id,
+        quantity: n,
+        from_location_id: item.location_id,
+        project_id: projectId ? parseInt(projectId) : undefined,
+        notes: notes.trim() || undefined,
+      });
+      onDone();
+    } catch (e) {
+      setError(e.response?.data?.error || 'Failed to issue material');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={a.overlay} onClick={onClose}>
+      <div style={a.modal} onClick={e => e.stopPropagation()}>
+        <div style={a.header}>
+          <div style={a.title}>Issue — {item.item_name}</div>
+          <button style={a.close} onClick={onClose}>✕</button>
+        </div>
+        <div style={a.body}>
+          <div style={a.currentRow}>
+            <span style={a.currentLabel}>Available at {item.location_name}</span>
+            <span style={a.currentQty}>{available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} {item.unit}</span>
+          </div>
+          {error && <div style={a.error}>{error}</div>}
+          <label style={a.label}>Quantity to issue *</label>
+          <input
+            type="number"
+            step="any"
+            min="0.001"
+            placeholder="e.g. 5"
+            value={qty}
+            onChange={e => setQty(e.target.value)}
+            style={a.input}
+            autoFocus
+          />
+          {projects && projects.length > 0 && (
+            <>
+              <label style={a.label}>Project (optional)</label>
+              <select value={projectId} onChange={e => setProjectId(e.target.value)} style={a.input}>
+                <option value="">No project</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </>
+          )}
+          <label style={a.label}>Notes (optional)</label>
+          <input
+            type="text"
+            placeholder="e.g. Job site use"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            style={a.input}
+          />
+          <div style={a.actions}>
+            <button style={a.cancel} onClick={onClose} disabled={saving}>Cancel</button>
+            <button style={{ ...a.save, background: '#d97706' }} onClick={submit} disabled={saving}>
+              {saving ? 'Issuing…' : 'Issue Materials'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Stock Component ──────────────────────────────────────────────────────
 
-export default function InventoryStock({ isAdmin, locations, onStockChange, onReorderClick }) {
+export default function InventoryStock({ isAdmin, locations, projects, onStockChange, onReorderClick }) {
   const [stock, setStock]           = useState([]);
   const [lowItems, setLowItems]     = useState([]);
   const [locationFilter, setLocationFilter] = useState('');
@@ -215,6 +301,7 @@ export default function InventoryStock({ isAdmin, locations, onStockChange, onRe
   const [error, setError]           = useState('');
   const [historyItem, setHistoryItem] = useState(null);
   const [adjustItem, setAdjustItem]   = useState(null);
+  const [issueItem, setIssueItem]     = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -244,6 +331,12 @@ export default function InventoryStock({ isAdmin, locations, onStockChange, onRe
 
   const handleAdjustDone = () => {
     setAdjustItem(null);
+    load();
+    if (onStockChange) onStockChange();
+  };
+
+  const handleIssueDone = () => {
+    setIssueItem(null);
     load();
     if (onStockChange) onStockChange();
   };
@@ -352,6 +445,13 @@ export default function InventoryStock({ isAdmin, locations, onStockChange, onRe
                           onClick={() => setAdjustItem(row)}
                         >±</button>
                       )}
+                      {!isAdmin && qty > 0 && (
+                        <button
+                          style={s.issueBtn}
+                          title="Issue material"
+                          onClick={() => setIssueItem(row)}
+                        >Issue</button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -370,6 +470,14 @@ export default function InventoryStock({ isAdmin, locations, onStockChange, onRe
           locations={locations}
           onClose={() => setAdjustItem(null)}
           onDone={handleAdjustDone}
+        />
+      )}
+      {issueItem && (
+        <IssueModal
+          item={issueItem}
+          projects={projects || []}
+          onClose={() => setIssueItem(null)}
+          onDone={handleIssueDone}
         />
       )}
     </div>
@@ -397,4 +505,5 @@ const s = {
   badge:       { display: 'inline-block', padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700 },
   histBtn:     { padding: '4px 8px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#f9fafb', fontSize: 13, cursor: 'pointer', marginRight: 4 },
   adjBtn:      { padding: '4px 10px', borderRadius: 6, border: '1px solid #bfdbfe', background: '#eff6ff', color: '#2563eb', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  issueBtn:    { padding: '4px 10px', borderRadius: 6, border: '1px solid #fcd34d', background: '#fef3c7', color: '#92400e', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
 };

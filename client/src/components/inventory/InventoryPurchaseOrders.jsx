@@ -151,6 +151,8 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
   });
   const [editSaving, setEditSaving] = useState(false);
   const [actionErr, setActionErr]   = useState('');
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent]       = useState(false);
 
   useEffect(() => {
     if (addingLine) {
@@ -232,6 +234,19 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
     } catch (err) { alert(err.response?.data?.error || 'Failed to remove line.'); }
   };
 
+  const emailPO = async () => {
+    setActionErr(''); setEmailSending(true); setEmailSent(false);
+    try {
+      await api.post(`/inventory/purchase-orders/${po.id}/email`);
+      setEmailSent(true);
+      setTimeout(() => setEmailSent(false), 4000);
+    } catch (err) {
+      setActionErr(err.response?.data?.error || 'Failed to send email.');
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
   const handleReceiveDone = (updated) => {
     setPo(updated);
     setLines(updated.lines || []);
@@ -266,6 +281,16 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
                 <button style={d.cancelEditBtn} onClick={() => setEditing(false)}>Cancel</button>
                 <button style={d.submitBtn} onClick={saveEdit} disabled={editSaving}>{editSaving ? 'Saving…' : 'Save'}</button>
               </>
+            )}
+            {po.supplier_name && !isDraft && (
+              <button
+                style={{ ...d.editBtn, color: emailSent ? '#059669' : '#2563eb', borderColor: emailSent ? '#059669' : '#bfdbfe', background: emailSent ? '#d1fae5' : '#eff6ff' }}
+                onClick={emailPO}
+                disabled={emailSending}
+                title={`Email PO to ${po.supplier_name}`}
+              >
+                {emailSending ? 'Sending…' : emailSent ? '✓ Sent' : '📧 Email PO'}
+              </button>
             )}
             {canReceive && (
               <button style={d.receiveBtn} onClick={() => setReceiveOpen(true)}>Receive Items</button>

@@ -1436,6 +1436,124 @@ router.post('/purchase-orders/:id/receive', requireAdmin, async (req, res) => {
   } finally { client.release(); }
 });
 
+// ── Purchase Order Email ───────────────────────────────────────────────────────
+
+// POST /api/inventory/purchase-orders/:id/email
+router.post('/purchase-orders/:id/email', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    // Load PO + lines + supplier + company
+    const poResult = await pool.query(
+      `SELECT po.*,
+              sup.name AS supplier_name, sup.email AS supplier_email,
+              sup.contact_name AS supplier_contact,
+              loc.name AS to_location_name,
+              u.full_name AS created_by_name,
+              co.name AS company_name, co.address AS company_address,
+              co.phone AS company_phone, co.contact_email AS company_email
+       FROM purchase_orders po
+       LEFT JOIN inventory_suppliers sup ON po.supplier_id = sup.id
+       LEFT JOIN inventory_locations loc ON po.to_location_id = loc.id
+       JOIN users u ON po.created_by = u.id
+       JOIN companies co ON po.company_id = co.id
+       WHERE po.id = $1 AND po.company_id = $2`,
+      [req.params.id, companyId]
+    );
+    if (poResult.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    const po = poResult.rows[0];
+
+    if (!po.supplier_email) {
+      return res.status(400).json({ error: 'Supplier has no email address on file. Add one in Setup → Suppliers.' });
+    }
+
+    const linesResult = await pool.query(
+      `SELECT pol.*, i.name AS item_name, i.sku, i.unit
+       FROM purchase_order_lines pol
+       JOIN inventory_items i ON pol.item_id = i.id
+       WHERE pol.po_id = $1 ORDER BY pol.id`,
+      [req.params.id]
+    );
+    const lines = linesResult.rows;
+    if (lines.length === 0) return res.status(400).json({ error: 'Cannot email a PO with no line items.' });
+
+    const fmt = n => n != null ? parseFloat(n).toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '—';
+    const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+    const lineTotal = lines.reduce((s, l) => s + (l.unit_cost != null ? parseFloat(l.unit_cost) * parseFloat(l.qty_ordered) : 0), 0);
+    const hasAnyPricing = lines.some(l => l.unit_cost != null);
+
+    const tableRows = lines.map(l => {
+      const qty = parseFloat(l.qty_ordered);
+      return `<tr>
+        <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;font-weight:600">${l.item_name}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;font-family:monospace;font-size:12px;color:#6b7280">${l.sku || '—'}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;text-align:right">${qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)} ${l.unit}</td>
+        ${hasAnyPricing ? `<td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;text-align:right">${l.unit_cost != null ? fmt(l.unit_cost) : '—'}</td>` : ''}
+        ${hasAnyPricing ? `<td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700">${l.unit_cost != null ? fmt(parseFloat(l.unit_cost) * qty) : '—'}</td>` : ''}
+        ${l.notes ? `<td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;font-size:12px;color:#6b7280">${l.notes}</td>` : '<td style="padding:8px 10px;border-bottom:1px solid #f3f4f6"></td>'}
+      </tr>`;
+    }).join('');
+
+    const { sendEmail } = require('../email');
+    await sendEmail(
+      po.supplier_email,
+      `Purchase Order ${po.po_number} from ${po.company_name}`,
+      `<div style="font-family:system-ui,sans-serif;max-width:640px;margin:0 auto;padding:24px">
+        <div style="border-bottom:3px solid #92400e;padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px">
+          <div>
+            <h2 style="color:#92400e;margin:0;font-size:22px">Purchase Order</h2>
+            <p style="color:#6b7280;margin:4px 0 0;font-size:13px">${po.po_number}</p>
+          </div>
+          <div style="text-align:right;font-size:13px;color:#374151">
+            <strong>${po.company_name}</strong><br>
+            ${po.company_address ? po.company_address + '<br>' : ''}
+            ${po.company_phone ? po.company_phone + '<br>' : ''}
+            ${po.company_email ? `<a href="mailto:${po.company_email}" style="color:#92400e">${po.company_email}</a>` : ''}
+          </div>
+        </div>
+
+        <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:20px;font-size:13px">
+          <div><span style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;display:block">To</span><strong>${po.supplier_name}</strong>${po.supplier_contact ? '<br>' + po.supplier_contact : ''}</div>
+          <div><span style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;display:block">Order Date</span>${fmtDate(po.order_date)}</div>
+          ${po.expected_date ? `<div><span style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;display:block">Expected By</span>${fmtDate(po.expected_date)}</div>` : ''}
+          ${po.to_location_name ? `<div><span style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;display:block">Ship To</span>${po.to_location_name}</div>` : ''}
+          ${po.reference_no ? `<div><span style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;display:block">Your Ref #</span>${po.reference_no}</div>` : ''}
+        </div>
+
+        <table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:14px">
+          <thead>
+            <tr style="background:#f9fafb">
+              <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb">Item</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb">SKU</th>
+              <th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb">Qty</th>
+              ${hasAnyPricing ? '<th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb">Unit Price</th>' : ''}
+              ${hasAnyPricing ? '<th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb">Total</th>' : ''}
+              <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb">Notes</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+          ${hasAnyPricing ? `<tfoot><tr style="background:#f0fdf4;border-top:2px solid #d1fae5">
+            <td colspan="${3 + (lines[0]?.notes ? 1 : 0)}" style="padding:10px;font-weight:700">Order Total</td>
+            <td colspan="2" style="padding:10px;text-align:right;font-weight:800;font-size:16px">${fmt(lineTotal)}</td>
+          </tr></tfoot>` : ''}
+        </table>
+
+        ${po.notes ? `<div style="margin-top:16px;background:#f9fafb;border-radius:8px;padding:12px 16px;font-size:13px"><strong style="font-size:11px;text-transform:uppercase;color:#6b7280">Notes</strong><p style="margin:6px 0 0">${po.notes}</p></div>` : ''}
+
+        <p style="margin-top:24px;font-size:12px;color:#9ca3af;border-top:1px solid #f3f4f6;padding-top:16px">
+          Please confirm receipt of this purchase order by replying to this email.
+          This order was generated by ${po.company_name} via OpsFloa.
+        </p>
+      </div>`
+    );
+
+    res.json({ ok: true, sent_to: po.supplier_email });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ── Valuation ─────────────────────────────────────────────────────────────────
 
 // GET /api/inventory/valuation
