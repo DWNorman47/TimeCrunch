@@ -81,6 +81,45 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
 // --- Admin routes ---
 
+// POST /api/reimbursements/admin — admin: submit a reimbursement for any worker (or self)
+router.post('/admin', requireAuth, requireAdmin, async (req, res) => {
+  const { user_id, amount, description, category, expense_date, receipt, status = 'approved' } = req.body;
+  if (!user_id || !amount || !description || !expense_date) {
+    return res.status(400).json({ error: 'user_id, amount, description, and expense_date are required' });
+  }
+  const amt = parseFloat(amount);
+  if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
+  if (!['pending', 'approved'].includes(status)) return res.status(400).json({ error: 'status must be pending or approved' });
+
+  // Verify worker belongs to this company
+  try {
+    const worker = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [user_id, req.user.company_id]);
+    if (!worker.rows.length) return res.status(404).json({ error: 'Worker not found' });
+
+    let receiptUrl = null;
+    let receiptSizeBytes = null;
+    if (receipt) {
+      const { allowed } = await checkStorageLimit(req.user.company_id, 5 * 1024 * 1024);
+      if (!allowed) return res.status(400).json({ error: 'Storage limit reached.' });
+      const uploaded = await uploadBase64(receipt, 'receipts');
+      receiptUrl = uploaded.url;
+      receiptSizeBytes = uploaded.sizeBytes;
+      await incrementStorage(req.user.company_id, receiptSizeBytes);
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO reimbursements (company_id, user_id, amount, description, category, expense_date, receipt_url, receipt_size_bytes, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id, amount, description, category, expense_date, receipt_url, status, admin_notes, created_at`,
+      [req.user.company_id, user_id, amt, description, category || null, expense_date, receiptUrl, receiptSizeBytes, status]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to submit reimbursement' });
+  }
+});
+
 // GET /api/reimbursements/admin — admin: list all reimbursements for company
 router.get('/admin', requireAuth, requireAdmin, async (req, res) => {
   const { status, user_id } = req.query;
