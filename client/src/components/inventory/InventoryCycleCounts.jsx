@@ -34,6 +34,18 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const [error, setError] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [reportLines, setReportLines] = useState(null); // non-null after completion
+  // UOM support: per-line selected UOM and lazy-loaded item UOM lists
+  const [lineUomSelections, setLineUomSelections] = useState({}); // { [lineId]: uomId | null }
+  const [lineInputValues, setLineInputValues]     = useState({}); // { [lineId]: string }
+  const [itemUomCache, setItemUomCache]           = useState({}); // { [itemId]: [uoms] }
+
+  const fetchItemUoms = async (itemId) => {
+    if (itemUomCache[itemId]) return;
+    try {
+      const r = await api.get(`/inventory/items/${itemId}/uoms`);
+      setItemUomCache(prev => ({ ...prev, [itemId]: r.data.filter(u => u.active) }));
+    } catch {}
+  };
 
   // ── Scan Mode ────────────────────────────────────────────────────────────────
   const [scanMode, setScanMode] = useState(false);
@@ -115,13 +127,14 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const isAudit = countData.count_type === 'audit';
   const isFull  = countData.count_type === 'full';
 
-  const patchLine = async (line, countedQty) => {
+  const patchLine = async (line, countedQty, countedUomId) => {
     setSaving(line.id);
     try {
-      const r = await api.patch(`/inventory/cycle-counts/${count.id}/lines/${line.id}`, { counted_qty: countedQty });
-      setLines(prev => prev.map(l => l.id === line.id
-        ? { ...l, ...r.data, variance: parseFloat(countedQty) - parseFloat(l.expected_qty) }
-        : l));
+      const payload = { counted_qty: countedQty };
+      // Always send counted_uom_id so the server can compute correct variance
+      payload.counted_uom_id = (countedUomId !== undefined ? countedUomId : lineUomSelections[line.id]) ?? null;
+      const r = await api.patch(`/inventory/cycle-counts/${count.id}/lines/${line.id}`, payload);
+      setLines(prev => prev.map(l => l.id === line.id ? { ...l, ...r.data } : l));
     } catch (e) {
       alert(e.response?.data?.error || 'Failed to save count.');
     } finally {
@@ -195,53 +208,109 @@ function CycleCountDetail({ count, onBack, onComplete }) {
 
   const renderLine = (line, i) => {
     const counted = line.counted_qty !== null && line.counted_qty !== undefined;
-    const variance = counted ? parseFloat(line.counted_qty) - parseFloat(line.expected_qty) : null;
+    // variance is now stored in stock UOM units by the server
+    const variance = line.variance != null ? parseFloat(line.variance) : null;
     const showExpected = !isAudit || isCompleted;
     const isHighlighted = highlightedId === line.id;
     const rowStyle = isHighlighted
       ? { ...d.row, background: '#fef9c3', outline: '2px solid #f59e0b' }
       : i % 2 === 0 ? d.rowEven : d.row;
 
+    // UOM resolution
+    const stockUnit      = line.stock_uom_unit  || line.unit;  // unit of the expected qty
+    const stockUomId     = line.stock_uom_id    || null;
+    const stockFactor    = parseFloat(line.stock_uom_factor  || 1);
+    const availableUoms  = itemUomCache[line.item_id] || [];
+    const selectedUomId  = lineUomSelections[line.id] !== undefined
+      ? lineUomSelections[line.id] : stockUomId;
+    const selectedUom    = availableUoms.find(u => u.id === selectedUomId);
+    const selectedUnit   = selectedUom ? `${selectedUom.unit}${selectedUom.unit_spec ? ` (${selectedUom.unit_spec})` : ''}` : stockUnit;
+    const isDifferentUom = selectedUomId !== stockUomId;
+
+    // Conversion hint: show what the current input value converts to in stock units
+    const inputVal = lineInputValues[line.id];
+    let conversionHint = null;
+    if (isDifferentUom && inputVal !== undefined && inputVal !== '') {
+      const n = parseFloat(inputVal);
+      if (!isNaN(n) && selectedUom) {
+        const countedFactor = parseFloat(selectedUom.factor || 1);
+        const inStockUnits = n * (countedFactor / stockFactor);
+        conversionHint = `= ${inStockUnits % 1 === 0 ? inStockUnits.toFixed(0) : inStockUnits.toFixed(3).replace(/\.?0+$/, '')} ${stockUnit}`;
+      }
+    }
+
     return (
       <tr key={line.id} id={`ccline-${line.id}`} style={rowStyle}>
         <td style={{ ...d.td, fontWeight: 600 }}>{line.item_name}</td>
         <td style={{ ...d.td, fontFamily: 'monospace', fontSize: 12, color: '#6b7280' }}>{line.sku || '—'}</td>
-        <td style={{ ...d.td, color: '#6b7280' }}>{line.unit}</td>
+        <td style={{ ...d.td, color: '#6b7280' }}>{stockUnit}</td>
         {showExpected && (
           <td style={{ ...d.td, textAlign: 'right' }}>{parseFloat(line.expected_qty)}</td>
         )}
-        <td style={{ ...d.td, textAlign: 'right' }}>
+        <td style={{ ...d.td }}>
           {!isCompleted ? (
-            <input
-              ref={el => { lineInputRefs.current[line.id] = el; }}
-              style={{ ...d.countInput, ...(isHighlighted ? { borderColor: '#f59e0b', boxShadow: '0 0 0 2px #fde68a' } : {}) }}
-              type="number"
-              min="0"
-              step="any"
-              defaultValue={counted ? line.counted_qty : ''}
-              placeholder="—"
-              disabled={saving === line.id}
-              onBlur={e => {
-                const val = e.target.value;
-                if (val !== '' && val !== String(line.counted_qty)) patchLine(line, parseFloat(val));
-                // Return focus to scan input after entering a count
-                if (scanMode) setTimeout(() => scanInputRef.current?.focus(), 50);
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.target.blur(); // triggers onBlur → save + refocus scan input
-                  setHighlightedId(null);
-                }
-              }}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <input
+                  ref={el => { lineInputRefs.current[line.id] = el; }}
+                  style={{ ...d.countInput, ...(isHighlighted ? { borderColor: '#f59e0b', boxShadow: '0 0 0 2px #fde68a' } : {}) }}
+                  type="number"
+                  min="0"
+                  step="any"
+                  defaultValue={counted ? line.counted_qty : ''}
+                  placeholder="—"
+                  disabled={saving === line.id}
+                  onChange={e => setLineInputValues(prev => ({ ...prev, [line.id]: e.target.value }))}
+                  onFocus={() => { if (!itemUomCache[line.item_id]) fetchItemUoms(line.item_id); }}
+                  onBlur={e => {
+                    const val = e.target.value;
+                    if (val !== '' && val !== String(line.counted_qty)) patchLine(line, parseFloat(val));
+                    if (scanMode) setTimeout(() => scanInputRef.current?.focus(), 50);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.target.blur(); setHighlightedId(null); }
+                  }}
+                />
+                {/* UOM selector — only shown if item has alternate UOMs */}
+                {availableUoms.length > 1 && (
+                  <select
+                    style={d.uomSelect}
+                    value={selectedUomId ?? ''}
+                    onChange={e => {
+                      const newUomId = e.target.value ? parseInt(e.target.value) : null;
+                      setLineUomSelections(prev => ({ ...prev, [line.id]: newUomId }));
+                      // If a qty is already entered, re-patch with new UOM
+                      const inputEl = lineInputRefs.current[line.id];
+                      if (inputEl && inputEl.value !== '') {
+                        patchLine(line, parseFloat(inputEl.value), newUomId);
+                      }
+                    }}
+                  >
+                    {availableUoms.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ' — base' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              {conversionHint && (
+                <span style={{ fontSize: 11, color: '#6b7280' }}>{conversionHint}</span>
+              )}
+            </div>
           ) : (
-            <span>{counted ? parseFloat(line.counted_qty) : '—'}</span>
+            <div style={{ textAlign: 'right' }}>
+              <span>{counted ? parseFloat(line.counted_qty) : '—'}</span>
+              {line.counted_uom_unit && line.counted_uom_unit !== stockUnit && (
+                <span style={{ fontSize: 11, color: '#6b7280', marginLeft: 4 }}>{line.counted_uom_unit}</span>
+              )}
+            </div>
           )}
         </td>
-        {(showExpected) && (
+        {showExpected && (
           <td style={{ ...d.td, textAlign: 'right', fontWeight: variance !== null && variance !== 0 ? 700 : 400,
             color: variance === null ? '#9ca3af' : variance > 0 ? '#059669' : variance < 0 ? '#dc2626' : '#374151' }}>
-            {variance === null ? '—' : variance > 0 ? `+${variance}` : variance}
+            {variance === null ? '—' : `${variance > 0 ? '+' : ''}${variance % 1 === 0 ? variance.toFixed(0) : variance.toFixed(3).replace(/\.?0+$/, '')} ${stockUnit}`}
           </td>
         )}
         <td style={{ ...d.td, fontSize: 13, color: '#6b7280' }}>{line.counted_by_name || '—'}</td>
@@ -668,6 +737,7 @@ const d = {
   rowEven:       { background: '#fafafa', borderBottom: '1px solid #f3f4f6' },
   td:            { padding: '10px 12px', fontSize: 14, color: '#374151' },
   countInput:    { width: 80, padding: '5px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 14, textAlign: 'right' },
+  uomSelect:     { padding: '5px 6px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 12, color: '#374151', background: '#f9fafb', cursor: 'pointer' },
   uncountedNote: { textAlign: 'center', fontSize: 13, color: '#d97706', fontWeight: 600, marginTop: 12 },
   locationHeader:{ fontSize: 13, fontWeight: 700, color: '#374151', padding: '8px 0 6px', borderBottom: '2px solid #e5e7eb', marginBottom: 4 },
   modalOverlay:  { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 },

@@ -713,7 +713,7 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
       if (count_type === 'full') {
         // Snapshot all stock across all locations
         stock = await client.query(
-          `SELECT s.item_id, s.location_id, s.quantity FROM inventory_stock s
+          `SELECT s.item_id, s.location_id, s.quantity, s.uom_id FROM inventory_stock s
            JOIN inventory_items i ON s.item_id = i.id
            WHERE s.company_id = $1 AND i.active = true
            ORDER BY s.location_id, i.name`,
@@ -721,7 +721,7 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
         );
       } else {
         stock = await client.query(
-          `SELECT s.item_id, NULL::integer as location_id, s.quantity FROM inventory_stock s
+          `SELECT s.item_id, NULL::integer as location_id, s.quantity, s.uom_id FROM inventory_stock s
            JOIN inventory_items i ON s.item_id = i.id
            WHERE s.location_id = $1 AND s.company_id = $2 AND i.active = true`,
           [location_id, companyId]
@@ -729,11 +729,11 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
       }
 
       if (stock.rows.length > 0) {
-        const lineValues = stock.rows.map((r, i) => `($1, $${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`).join(', ');
+        const lineValues = stock.rows.map((r, i) => `($1, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4}, $${i * 4 + 5})`).join(', ');
         const lineParams = [countId];
-        stock.rows.forEach(r => { lineParams.push(r.item_id); lineParams.push(r.location_id); lineParams.push(r.quantity); });
+        stock.rows.forEach(r => { lineParams.push(r.item_id); lineParams.push(r.location_id); lineParams.push(r.quantity); lineParams.push(r.uom_id || null); });
         await client.query(
-          `INSERT INTO inventory_cycle_count_lines (cycle_count_id, item_id, location_id, expected_qty) VALUES ${lineValues}`,
+          `INSERT INTO inventory_cycle_count_lines (cycle_count_id, item_id, location_id, expected_qty, stock_uom_id) VALUES ${lineValues}`,
           lineParams
         );
       }
@@ -742,10 +742,14 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
 
       // Return with lines
       const lines = await pool.query(
-        `SELECT l.*, i.name as item_name, i.unit, i.sku, loc.name as location_name
+        `SELECT l.*, i.name as item_name, i.unit, i.sku, loc.name as location_name,
+              su.unit as stock_uom_unit, su.unit_spec as stock_uom_spec, su.factor as stock_uom_factor,
+              cu.unit as counted_uom_unit, cu.unit_spec as counted_uom_spec, cu.factor as counted_uom_factor
          FROM inventory_cycle_count_lines l
          JOIN inventory_items i ON l.item_id = i.id
          LEFT JOIN inventory_locations loc ON l.location_id = loc.id
+         LEFT JOIN inventory_item_uoms su ON l.stock_uom_id = su.id
+         LEFT JOIN inventory_item_uoms cu ON l.counted_uom_id = cu.id
          WHERE l.cycle_count_id = $1 ORDER BY loc.name NULLS FIRST, i.name`,
         [countId]
       );
@@ -813,7 +817,7 @@ router.patch('/cycle-counts/:id', requireAdmin, async (req, res) => {
 // PATCH /api/inventory/cycle-counts/:id/lines/:lineId
 router.patch('/cycle-counts/:id/lines/:lineId', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
-  const { counted_qty, notes } = req.body;
+  const { counted_qty, counted_uom_id, notes } = req.body;
   try {
     // Verify count belongs to company and isn't completed
     const cc = await pool.query(
@@ -830,6 +834,31 @@ router.patch('/cycle-counts/:id/lines/:lineId', requireAuth, async (req, res) =>
       sets.push(`counted_qty=$${idx++}`); vals.push(qty);
       sets.push(`counted_by=$${idx++}`); vals.push(req.user.id);
       sets.push(`counted_at=NOW()`);
+
+      // Resolve UOM and calculate variance in stock UOM units
+      const resolvedCountedUomId = counted_uom_id != null ? parseInt(counted_uom_id) : null;
+      sets.push(`counted_uom_id=$${idx++}`); vals.push(resolvedCountedUomId);
+
+      // Fetch line's expected_qty and UOM factors to compute variance
+      const lineRow = await pool.query(
+        `SELECT l.expected_qty, l.stock_uom_id,
+                su.factor as stock_factor,
+                cu.factor as counted_factor
+         FROM inventory_cycle_count_lines l
+         LEFT JOIN inventory_item_uoms su ON l.stock_uom_id = su.id
+         LEFT JOIN inventory_item_uoms cu ON cu.id = $1
+         WHERE l.id = $2`,
+        [resolvedCountedUomId, req.params.lineId]
+      );
+      if (lineRow.rowCount > 0) {
+        const { expected_qty, stock_factor, counted_factor } = lineRow.rows[0];
+        const stockF   = parseFloat(stock_factor   || 1);
+        const countedF = parseFloat(counted_factor || 1);
+        // Convert counted qty to stock UOM: qty_in_stock_uom = qty * (counted_factor / stock_factor)
+        const qtyInStockUom = qty * (countedF / stockF);
+        const variance = qtyInStockUom - parseFloat(expected_qty);
+        sets.push(`variance=$${idx++}`); vals.push(variance);
+      }
     }
     if (notes !== undefined) { sets.push(`notes=$${idx++}`); vals.push(notes); }
     if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
@@ -876,19 +905,20 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
       const linesWithVariance = lines.rows.filter(l => parseFloat(l.variance) !== 0);
       const isFullCount = cc.rows[0].count_type === 'full';
       for (const line of linesWithVariance) {
-        const delta = parseFloat(line.variance); // positive = counted more, negative = counted less
+        const delta = parseFloat(line.variance); // in stock UOM units
         const locationId = isFullCount ? line.location_id : cc.rows[0].location_id;
+        const stockUomId = line.stock_uom_id || null;
         const typeLabel = cc.rows[0].count_type === 'reconcile' ? 'Reconcile count adjustment'
           : cc.rows[0].count_type === 'audit' ? 'Audit count adjustment'
           : cc.rows[0].count_type === 'full' ? 'Full count adjustment'
           : 'Cycle count adjustment';
         await client.query(
           `INSERT INTO inventory_transactions
-           (company_id, type, item_id, quantity, to_location_id, performed_by, notes)
-           VALUES ($1,'adjust',$2,$3,$4,$5,$6)`,
-          [companyId, line.item_id, Math.abs(delta), locationId, req.user.id, typeLabel]
+           (company_id, type, item_id, quantity, to_location_id, performed_by, notes, uom_id)
+           VALUES ($1,'adjust',$2,$3,$4,$5,$6,$7)`,
+          [companyId, line.item_id, Math.abs(delta), locationId, req.user.id, typeLabel, stockUomId]
         );
-        await applyStockDelta(client, companyId, line.item_id, locationId, delta);
+        await applyStockDelta(client, companyId, line.item_id, locationId, delta, {}, stockUomId);
       }
 
       // Mark count complete
