@@ -98,10 +98,12 @@ export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true
       <Page size="A4" style={s.page}>
         {/* Invoice header */}
         <View style={s.invHeader}>
-          <View>
-            <Text style={s.brand}>Ops Flow Assist</Text>
-            <Text style={s.brandSub}>Employee Time Invoice</Text>
-          </View>
+          {ci.name ? (
+            <View>
+              <Text style={s.brand}>{ci.name}</Text>
+              <Text style={s.brandSub}>Employee Time Invoice</Text>
+            </View>
+          ) : null}
           <View style={s.invRight}>
             <Text style={s.invTitle}>INVOICE</Text>
             <Text style={s.metaLabel}>Invoice #</Text>
@@ -164,7 +166,7 @@ export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true
         {/* Summary */}
         <View style={s.summaryWrap}>
           <Text style={s.thankYou}>
-            {'Thank you for reviewing this invoice.\nPlease approve all time entries in OpsFloa\nand process payment at your earliest convenience.'}
+            {'Thank you for reviewing this invoice.\nPlease process payment at your earliest convenience.'}
           </Text>
           <View style={s.sumTable}>
             {summary.regular_hours > 0 && (
@@ -185,9 +187,17 @@ export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true
                 <Text style={s.sumVal}>{fmtH(summary.prevailing_hours)}</Text>
               </View>
             )}
+            {summary.guarantee_shortfall_hours > 0 && (
+              <View style={s.sumRow}>
+                <Text style={[s.sumLabel, { color: '#2563eb' }]}>
+                  Minimum Guarantee ({fmtH(summary.guarantee_min_hours)}/period shortfall)
+                </Text>
+                <Text style={[s.sumVal, { color: '#2563eb' }]}>+{fmtH(summary.guarantee_shortfall_hours)}</Text>
+              </View>
+            )}
             <View style={[s.sumRow, s.sumDivider]}>
               <Text style={[s.sumLabel, s.sumBold]}>Total Hours</Text>
-              <Text style={[s.sumVal, s.sumBold]}>{fmtH(summary.total_hours)}</Text>
+              <Text style={[s.sumVal, s.sumBold]}>{fmtH((summary.total_hours || 0) + (summary.guarantee_shortfall_hours || 0))}</Text>
             </View>
             {summary.rate > 0 && summary.regular_hours > 0 && (
               <View style={[s.sumRow, s.sumDivider]}>
@@ -205,6 +215,14 @@ export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true
               <View style={s.sumRow}>
                 <Text style={s.sumLabel}>Prevailing Pay ({fmtMoney(summary.prevailing_wage_rate)}/hr)</Text>
                 <Text style={s.sumVal}>{fmtMoney(summary.prevailing_cost)}</Text>
+              </View>
+            )}
+            {summary.guarantee_shortfall_hours > 0 && summary.rate > 0 && (
+              <View style={s.sumRow}>
+                <Text style={[s.sumLabel, { color: '#2563eb' }]}>
+                  Minimum Guarantee ({fmtH(summary.guarantee_shortfall_hours)} @ {fmtMoney(summary.rate)}/hr)
+                </Text>
+                <Text style={[s.sumVal, { color: '#2563eb' }]}>{fmtMoney(summary.guarantee_cost || 0)}</Text>
               </View>
             )}
             <View style={s.sumTotal}>

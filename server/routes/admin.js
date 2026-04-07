@@ -465,6 +465,7 @@ router.get('/active-clocks', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT ac.user_id, ac.clock_in_time, ac.clock_in_lat, ac.clock_in_lng,
+              ac.current_lat, ac.current_lng, ac.location_updated_at,
               ac.notes, u.full_name, p.name as project_name, p.wage_type,
               ac.clock_source, ac.clocked_in_by, admin_u.full_name AS clocked_in_by_name
        FROM active_clock ac
@@ -622,7 +623,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const userResult = await pool.query(
-      'SELECT id, full_name, invoice_name, username, email, hourly_rate, rate_type, overtime_rule FROM users WHERE id = $1 AND role = $2 AND company_id = $3',
+      'SELECT id, full_name, invoice_name, username, email, hourly_rate, rate_type, overtime_rule, guaranteed_weekly_hours FROM users WHERE id = $1 AND role = $2 AND company_id = $3',
       [req.params.id, 'worker', companyId]
     );
     if (userResult.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
@@ -659,14 +660,20 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
       overtimeCost = overtimeHours * rate * settings.overtime_multiplier;
     }
     const prevailingCost = prevailingHours * settings.prevailing_wage_rate;
-    const totalCost = regularCost + overtimeCost + prevailingCost;
+    const { shortfall: guaranteeShortfall, minHours: guaranteeMinHours, weeks: guaranteeWeeks } =
+      computeGuaranteeShortfall(totalHours, worker.guaranteed_weekly_hours, from, to);
+    const guaranteeCost = guaranteeShortfall * rate;
+    const totalCost = regularCost + overtimeCost + prevailingCost + guaranteeCost;
 
     res.json({
       worker,
       entries,
       summary: {
         total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours,
-        rate, regular_cost: regularCost, overtime_cost: overtimeCost, prevailing_cost: prevailingCost, total_cost: totalCost,
+        rate, regular_cost: regularCost, overtime_cost: overtimeCost, prevailing_cost: prevailingCost,
+        guarantee_shortfall_hours: guaranteeShortfall, guarantee_min_hours: guaranteeMinHours,
+        guarantee_weeks: guaranteeWeeks, guarantee_cost: guaranteeCost,
+        total_cost: totalCost,
         overtime_multiplier: settings.overtime_multiplier, prevailing_wage_rate: settings.prevailing_wage_rate,
       },
       period: { from: from || null, to: to || null },
@@ -879,10 +886,26 @@ router.post('/workers', requireAdmin, requirePermission('manage_workers'), async
   }
 });
 
+// Helper: compute how many hours short of the weekly guarantee a period is
+function computeGuaranteeShortfall(totalHours, guaranteedWeeklyHours, fromDate, toDate) {
+  if (!guaranteedWeeklyHours || parseFloat(guaranteedWeeklyHours) <= 0) return { shortfall: 0, minHours: 0, weeks: 0 };
+  let weeks = 1;
+  if (fromDate && toDate) {
+    const f = new Date(String(fromDate).substring(0, 10) + 'T00:00:00');
+    const t = new Date(String(toDate).substring(0, 10) + 'T00:00:00');
+    const days = Math.round((t - f) / (1000 * 60 * 60 * 24)) + 1;
+    weeks = Math.max(1, Math.round(days / 7));
+  }
+  const minHours = parseFloat(guaranteedWeeklyHours) * weeks;
+  const shortfall = Math.max(0, minHours - totalHours);
+  return { shortfall: +shortfall.toFixed(2), minHours: +minHours.toFixed(2), weeks };
+}
+
 // Update a worker (full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, email, worker_type)
 router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
   const { full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type } = req.body;
-  if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && rate_type === undefined && overtime_rule === undefined && email === undefined && worker_type === undefined) {
+  const hasGuarantee = 'guaranteed_weekly_hours' in req.body;
+  if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && rate_type === undefined && overtime_rule === undefined && email === undefined && worker_type === undefined && !hasGuarantee) {
     return res.status(400).json({ error: 'At least one field required' });
   }
   const companyId = req.user.company_id;
@@ -925,10 +948,20 @@ router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), 
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email || null); }
     if (worker_type !== undefined) { fields.push(`worker_type = $${idx++}`); values.push(worker_type); }
     if (req.body.invoice_name !== undefined) { fields.push(`invoice_name = $${idx++}`); values.push(req.body.invoice_name?.trim() || null); }
+    if (hasGuarantee) {
+      const gv = req.body.guaranteed_weekly_hours;
+      if (gv === null || gv === '' || gv === undefined) {
+        fields.push(`guaranteed_weekly_hours = $${idx++}`); values.push(null);
+      } else {
+        const gn = parseFloat(gv);
+        if (isNaN(gn) || gn < 0) return res.status(400).json({ error: 'guaranteed_weekly_hours must be a non-negative number' });
+        fields.push(`guaranteed_weekly_hours = $${idx++}`); values.push(gn);
+      }
+    }
     values.push(req.params.id);
     values.push(companyId);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, invoice_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type`,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, invoice_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type, guaranteed_weekly_hours`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
@@ -1722,7 +1755,9 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
            COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN user_id END) as active_workers_this_month,
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE)
              THEN EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600 END), 0)::numeric, 1) as hours_this_month,
-           COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_approvals
+           COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_approvals,
+           ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('week', CURRENT_DATE) THEN mileage END), 0)::numeric, 1) as mileage_this_week,
+           ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN mileage END), 0)::numeric, 1) as mileage_this_month
          FROM time_entries WHERE company_id = $1`,
         [companyId]
       ),
@@ -1763,6 +1798,33 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
     );
     const has_more = result.rows.length > LIMIT;
     res.json({ entries: result.rows.slice(0, LIMIT), has_more });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /admin/entries/recently-approved — entries approved in the last 24 hours
+router.get('/entries/recently-approved', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+  const companyId = req.user.company_id;
+  const accessIds = req.user.worker_access_ids;
+  try {
+    const workerFilter = accessIds && accessIds.length ? `AND te.user_id = ANY($2)` : '';
+    const params = accessIds && accessIds.length ? [companyId, accessIds] : [companyId];
+    const { rows } = await pool.query(
+      `SELECT te.id, te.work_date, te.start_time, te.end_time, te.project_id, te.user_id, te.approved_at,
+              COALESCE(u.invoice_name, u.full_name) AS worker_name, p.name AS project_name
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       LEFT JOIN projects p ON te.project_id = p.id
+       WHERE te.company_id = $1 AND te.status = 'approved'
+         AND te.approved_at >= NOW() - INTERVAL '24 hours'
+         ${workerFilter}
+       ORDER BY te.approved_at DESC
+       LIMIT 100`,
+      params
+    );
+    res.json(rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -1913,6 +1975,29 @@ router.patch('/entries/:id/reject', requireAdmin, requirePermission('approve_ent
     createInboxItem(rejEntry.user_id, companyId, 'rejection', 'Time entry rejected',
       `Your entry for ${rejEntry.work_date?.toString().substring(0,10)} was rejected.${note ? ` Reason: ${note}` : ''}`, '/dashboard');
     res.json(rejEntry);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /admin/entries/:id/unapprove — revert an approved entry back to pending
+router.patch('/entries/:id/unapprove', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+  const companyId = req.user.company_id;
+  const accessIds = req.user.worker_access_ids;
+  try {
+    const workerFilter = accessIds && accessIds.length ? `AND user_id = ANY($3)` : '';
+    const params = accessIds && accessIds.length ? [req.params.id, companyId, accessIds] : [req.params.id, companyId];
+    const result = await pool.query(
+      `UPDATE time_entries
+       SET status = 'pending', locked = false, approved_by = NULL, approved_at = NULL, approval_note = NULL
+       WHERE id = $1 AND company_id = $2 AND status = 'approved' ${workerFilter}
+       RETURNING *`,
+      params
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found or not in approved state' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'entry.unapproved', 'time_entry', parseInt(req.params.id), null);
+    res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

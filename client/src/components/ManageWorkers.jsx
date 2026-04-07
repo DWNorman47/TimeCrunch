@@ -79,7 +79,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const [editUsernameChecking, setEditUsernameChecking] = useState(false);
   const [editUsernameSaving, setEditUsernameSaving] = useState(false);
 
-  const [editRateForm, setEditRateForm] = useState({ rate: '', rate_type: 'hourly', overtime_rule: 'daily' });
+  const [editRateForm, setEditRateForm] = useState({ rate: '', rate_type: 'hourly', overtime_rule: 'daily', guaranteed_weekly_hours: '', guarantee_enabled: false });
   const [editRateSaving, setEditRateSaving] = useState(false);
 
   const [editPermForm, setEditPermForm] = useState({ full_access: true, keys: {} });
@@ -189,7 +189,14 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
   const startEditRate = w => {
     setEditingId(w.id); setEditSection('rate');
-    setEditRateForm({ rate: String(w.hourly_rate ?? 0), rate_type: w.rate_type || 'hourly', overtime_rule: w.overtime_rule || 'daily' });
+    const gwh = w.guaranteed_weekly_hours != null ? parseFloat(w.guaranteed_weekly_hours) : null;
+    setEditRateForm({
+      rate: String(w.hourly_rate ?? 0),
+      rate_type: w.rate_type || 'hourly',
+      overtime_rule: w.overtime_rule || 'daily',
+      guarantee_enabled: gwh != null && gwh > 0,
+      guaranteed_weekly_hours: gwh != null ? String(gwh) : '40',
+    });
   };
 
   const checkEditUsername = async (username, workerId) => {
@@ -225,7 +232,14 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const saveRate = async id => {
     setEditRateSaving(true);
     try {
-      const r = await api.patch(`/admin/workers/${id}`, { hourly_rate: editRateForm.rate, rate_type: editRateForm.rate_type, overtime_rule: editRateForm.overtime_rule });
+      const r = await api.patch(`/admin/workers/${id}`, {
+        hourly_rate: editRateForm.rate,
+        rate_type: editRateForm.rate_type,
+        overtime_rule: editRateForm.overtime_rule,
+        guaranteed_weekly_hours: editRateForm.guarantee_enabled
+          ? (parseFloat(editRateForm.guaranteed_weekly_hours) || 40)
+          : null,
+      });
       onWorkerUpdated(r.data);
       cancelEdit();
     } catch (err) { toast(err.response?.data?.error || 'Failed to update', 'error'); }
@@ -630,6 +644,29 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 </select>
                               </div>
                             </div>
+                            <div style={{ marginBottom: 10 }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#374151', userSelect: 'none' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={editRateForm.guarantee_enabled}
+                                  onChange={e => setEditRateForm(f => ({ ...f, guarantee_enabled: e.target.checked }))}
+                                />
+                                <span style={{ fontWeight: 600 }}>Weekly minimum hour guarantee</span>
+                              </label>
+                              {editRateForm.guarantee_enabled && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, marginLeft: 24 }}>
+                                  <input
+                                    style={{ ...s.input, maxWidth: 80 }}
+                                    type="number"
+                                    min="1"
+                                    step="0.5"
+                                    value={editRateForm.guaranteed_weekly_hours}
+                                    onChange={e => setEditRateForm(f => ({ ...f, guaranteed_weekly_hours: e.target.value }))}
+                                  />
+                                  <span style={{ fontSize: 13, color: '#6b7280' }}>hrs/week — invoice will include shortfall to reach this minimum</span>
+                                </div>
+                              )}
+                            </div>
                             <div style={s.editActions}>
                               <button style={s.saveBtn} onClick={() => saveRate(w.id)} disabled={editRateSaving}>{editRateSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
@@ -641,6 +678,11 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                             <span style={{ ...s.infoValue, marginLeft: 10, fontSize: 12, color: '#9ca3af' }}>
                               {overtimeRules.find(r => r.value === (w.overtime_rule || 'daily'))?.label}
                             </span>
+                            {w.guaranteed_weekly_hours != null && parseFloat(w.guaranteed_weekly_hours) > 0 && (
+                              <span style={{ ...s.infoValue, marginLeft: 10, fontSize: 12, color: '#2563eb', background: '#dbeafe', padding: '1px 7px', borderRadius: 8 }}>
+                                {parseFloat(w.guaranteed_weekly_hours)}h/wk min
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>

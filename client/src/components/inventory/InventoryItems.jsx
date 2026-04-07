@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api';
+import ItemLabelModal from './ItemLabelModal';
 
 const UNITS = ['each', 'box', 'bag', 'bundle', 'pallet', 'lb', 'kg', 'ft', 'm', 'sq ft', 'gal', 'L', 'roll', 'sheet', 'piece', 'other'];
 
@@ -326,6 +327,7 @@ export default function InventoryItems({ onItemChange }) {
   const [categories, setCategories] = useState([]);
   const [editingItem, setEditingItem] = useState(null); // null=none, false=new, obj=editing
   const [archiving, setArchiving] = useState(null);
+  const [labelItem, setLabelItem] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -459,6 +461,7 @@ export default function InventoryItems({ onItemChange }) {
                       <td style={{ ...s.td, whiteSpace: 'nowrap' }}>
                         {item.active ? (
                           <>
+                            <button style={s.iconBtn} onClick={() => setLabelItem(item)} title="Print label">🏷️</button>
                             <button style={s.iconBtn} onClick={() => setEditingItem(item)} title="Edit">✏️</button>
                             <button style={{ ...s.iconBtn, opacity: archiving === item.id ? 0.5 : 1 }} onClick={() => archive(item)} title="Archive">🗄️</button>
                           </>
@@ -473,6 +476,9 @@ export default function InventoryItems({ onItemChange }) {
             </div>
           )}
         </>
+      )}
+      {labelItem && (
+        <ItemLabelModal item={labelItem} onClose={() => setLabelItem(null)} />
       )}
     </div>
   );

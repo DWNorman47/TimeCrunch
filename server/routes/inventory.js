@@ -3,6 +3,8 @@ const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadBase64 } = require('../r2');
 const { checkStorageLimit, incrementStorage } = require('../storage');
+const { sendPushToCompanyAdmins } = require('../push');
+const { createInboxItemBatch } = require('./inbox');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -35,6 +37,80 @@ async function applyStockDelta(client, companyId, itemId, locationId, delta, bin
        updated_at     = NOW()`,
     [companyId, itemId, locationId, uom, delta, area_id, rack_id, bay_id, compartment_id]
   );
+}
+
+// When issuing/transferring out using a UOM that has no stock row at this location,
+// find the UOM that does have stock and convert the quantity automatically.
+// e.g. stock is in 'box' (factor=30), user issues 9 'each' (factor=1) →
+//      converts to 9 × (1/30) = 0.3 box and subtracts from the box row.
+// Must be called inside a BEGIN/COMMIT block.
+async function autoConvertIssueUom(client, companyId, itemId, locationId, requestedUomId, qty) {
+  if (!requestedUomId) return { uomId: null, qty }; // base unit — no conversion needed
+
+  // Check if stock already exists for the requested UOM at this location
+  const ownRow = await client.query(
+    `SELECT quantity FROM inventory_stock
+     WHERE item_id=$1 AND location_id=$2 AND company_id=$3 AND uom_id=$4`,
+    [itemId, locationId, companyId, requestedUomId]
+  );
+  if (ownRow.rowCount > 0) return { uomId: requestedUomId, qty }; // has its own row, use it directly
+
+  // No row for requested UOM — find the UOM that actually has stock here
+  const other = await client.query(
+    `SELECT s.uom_id,
+            COALESCE(su.factor, 1) AS stock_factor,
+            ru.factor              AS req_factor
+     FROM inventory_stock s
+     LEFT JOIN inventory_item_uoms su ON s.uom_id = su.id
+     JOIN  inventory_item_uoms ru ON ru.id = $4
+     WHERE s.item_id=$1 AND s.location_id=$2 AND s.company_id=$3
+       AND s.uom_id IS NOT NULL
+     ORDER BY s.quantity DESC LIMIT 1`,
+    [itemId, locationId, companyId, requestedUomId]
+  );
+  if (other.rowCount === 0) return { uomId: requestedUomId, qty }; // can't resolve, leave as-is
+
+  const { uom_id, stock_factor, req_factor } = other.rows[0];
+  // qty_in_stock_uom = qty_in_requested_uom × (req_factor / stock_factor)
+  const convertedQty = qty * (parseFloat(req_factor) / parseFloat(stock_factor));
+  return { uomId: uom_id, qty: convertedQty };
+}
+
+// Fire low-stock push + inbox notification to admins when stock falls at/below reorder_point.
+// Called after COMMIT so it never blocks the transaction.
+async function maybeSendLowStockAlert(companyId, itemId) {
+  try {
+    const r = await pool.query(
+      `SELECT i.name, i.reorder_point, COALESCE(SUM(s.quantity), 0) AS total_qty
+       FROM inventory_items i
+       LEFT JOIN inventory_stock s ON i.id = s.item_id AND s.company_id = i.company_id
+       WHERE i.id = $1 AND i.company_id = $2 AND i.active = true
+       GROUP BY i.id`,
+      [itemId, companyId]
+    );
+    if (r.rowCount === 0) return;
+    const { name, reorder_point, total_qty } = r.rows[0];
+    const rp = parseFloat(reorder_point);
+    const qty = parseFloat(total_qty);
+    if (rp <= 0 || qty > rp) return; // not low
+    const isOut = qty <= 0;
+    const title = isOut ? `Out of stock: ${name}` : `Low stock: ${name}`;
+    const body  = isOut
+      ? `${name} is out of stock. Reorder point: ${rp}.`
+      : `${name} has ${qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)} units remaining (reorder at ${rp}).`;
+    // Push notification
+    await sendPushToCompanyAdmins(companyId, { title, body, url: '/inventory#stock' });
+    // In-app inbox — get all admin user IDs
+    const admins = await pool.query(
+      `SELECT id FROM users WHERE company_id=$1 AND role IN ('admin','super_admin') AND active=true`,
+      [companyId]
+    );
+    if (admins.rowCount > 0) {
+      await createInboxItemBatch(admins.rows.map(u => u.id), companyId, 'low_stock', title, body, '/inventory#stock');
+    }
+  } catch (err) {
+    console.error('maybeSendLowStockAlert error:', err);
+  }
 }
 
 // Process an array of photo values (existing https:// URLs or new base64 data: URIs).
@@ -178,6 +254,26 @@ router.get('/items/categories', requireAuth, async (req, res) => {
 });
 
 // ── Item UOMs ─────────────────────────────────────────────────────────────────
+
+// GET /api/inventory/uom-conversions — all non-base UOMs for this company (admin)
+router.get('/uom-conversions', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(`
+      SELECT
+        i.id   AS item_id,  i.name AS item_name, i.unit AS base_unit,
+        u.id   AS uom_id,   u.unit, u.unit_spec,
+        u.factor, u.is_base, u.active
+      FROM inventory_item_uoms u
+      JOIN inventory_items i ON u.item_id = i.id
+      WHERE i.company_id = $1
+        AND u.is_base = false
+        AND i.active  = true
+      ORDER BY i.name, u.factor, u.unit
+    `, [companyId]);
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
 
 // GET /api/inventory/items/:id/uoms
 router.get('/items/:id/uoms', requireAuth, async (req, res) => {
@@ -441,7 +537,8 @@ router.get('/stock/low', requireAdmin, async (req, res) => {
 router.post('/transactions', requireAuth, async (req, res) => {
   const { type, item_id, quantity, from_location_id, to_location_id, project_id, notes, reference_no, unit_cost,
           area_id, rack_id, bay_id, compartment_id,
-          uom_id, to_uom_id, to_quantity } = req.body;
+          uom_id, to_uom_id, to_quantity,
+          supplier_id, lot_number } = req.body;
   const companyId = req.user.company_id;
   const admin = isAdmin(req);
 
@@ -500,27 +597,48 @@ router.post('/transactions', requireAuth, async (req, res) => {
 
     const toQty = to_quantity ? parseFloat(to_quantity) : null;
 
+    // Validate supplier belongs to company if provided
+    const resolvedSupplierId = supplier_id ? parseInt(supplier_id) : null;
+    if (resolvedSupplierId) {
+      const sup = await client.query('SELECT id FROM inventory_suppliers WHERE id=$1 AND company_id=$2', [resolvedSupplierId, companyId]);
+      if (sup.rowCount === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'supplier_id not found' }); }
+    }
+
     // Insert transaction record
     const txn = await client.query(
       `INSERT INTO inventory_transactions
        (company_id, type, item_id, quantity, from_location_id, to_location_id, project_id, performed_by, notes, reference_no, unit_cost,
-        uom_id, to_uom_id, to_quantity)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-      [companyId, type, item_id, type === 'convert' ? absQty : absQty,
+        uom_id, to_uom_id, to_quantity, supplier_id, lot_number)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+      [companyId, type, item_id, absQty,
        from_location_id || null, type === 'convert' ? null : (to_location_id || null),
        project_id || null, req.user.id, notes?.trim() || null, reference_no?.trim() || null, snapshotCost,
-       resolvedUomId, resolvedToUomId, toQty]
+       resolvedUomId, resolvedToUomId, toQty, resolvedSupplierId, lot_number?.trim() || null]
     );
 
     // Update stock — bin FK IDs apply to the destination slot
     const bin = { area_id, rack_id, bay_id, compartment_id };
-    if (type === 'receive')  await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin, resolvedUomId);
-    if (type === 'issue')    await applyStockDelta(client, companyId, item_id, from_location_id, -absQty, {}, resolvedUomId);
-    if (type === 'transfer') {
-      await applyStockDelta(client, companyId, item_id, from_location_id, -absQty, {}, resolvedUomId);
+    if (type === 'receive') {
       await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin, resolvedUomId);
     }
-    if (type === 'adjust')   await applyStockDelta(client, companyId, item_id, to_location_id, qty, bin, resolvedUomId); // signed
+    if (type === 'issue') {
+      // Auto-convert: if stock is in a different UOM, convert qty before applying
+      const { uomId: issueUomId, qty: issueQty } = await autoConvertIssueUom(
+        client, companyId, item_id, from_location_id, resolvedUomId, absQty
+      );
+      await applyStockDelta(client, companyId, item_id, from_location_id, -issueQty, {}, issueUomId);
+    }
+    if (type === 'transfer') {
+      // Auto-convert the outgoing side
+      const { uomId: fromUomId, qty: fromQty } = await autoConvertIssueUom(
+        client, companyId, item_id, from_location_id, resolvedUomId, absQty
+      );
+      await applyStockDelta(client, companyId, item_id, from_location_id, -fromQty, {}, fromUomId);
+      await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin, resolvedUomId);
+    }
+    if (type === 'adjust') {
+      await applyStockDelta(client, companyId, item_id, to_location_id, qty, bin, resolvedUomId); // signed
+    }
     if (type === 'convert') {
       // Subtract from source UOM, add to target UOM — both at the same location
       await applyStockDelta(client, companyId, item_id, from_location_id, -absQty, {}, resolvedUomId);
@@ -536,6 +654,9 @@ router.post('/transactions', requireAuth, async (req, res) => {
     if (anyNegative) warning = 'stock_negative';
 
     res.status(201).json({ ...txn.rows[0], warning });
+
+    // Fire low-stock alert (async, after response sent)
+    maybeSendLowStockAlert(companyId, item_id).catch(() => {});
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err); res.status(500).json({ error: 'Server error' });
@@ -546,7 +667,7 @@ router.post('/transactions', requireAuth, async (req, res) => {
 
 // GET /api/inventory/transactions
 router.get('/transactions', requireAuth, async (req, res) => {
-  const { item_id, location_id, type, project_id, from, to, limit = 50, offset = 0 } = req.query;
+  const { item_id, location_id, type, project_id, from, to, supplier_id, lot_number, limit = 50, offset = 0 } = req.query;
   const companyId = req.user.company_id;
   const admin = isAdmin(req);
   try {
@@ -559,6 +680,8 @@ router.get('/transactions', requireAuth, async (req, res) => {
     if (project_id) { conditions.push(`t.project_id = $${idx++}`); values.push(project_id); }
     if (from) { conditions.push(`t.created_at >= $${idx++}`); values.push(from); }
     if (to) { conditions.push(`t.created_at < ($${idx++}::date + interval '1 day')`); values.push(to); }
+    if (supplier_id) { conditions.push(`t.supplier_id = $${idx++}`); values.push(supplier_id); }
+    if (lot_number) { conditions.push(`t.lot_number ILIKE $${idx++}`); values.push(`%${lot_number}%`); }
     const result = await pool.query(
       `SELECT t.*,
               i.name as item_name,
@@ -566,7 +689,8 @@ router.get('/transactions', requireAuth, async (req, res) => {
               fu.unit || CASE WHEN fu.unit_spec IS NOT NULL THEN ' (' || fu.unit_spec || ')' ELSE '' END as uom_label,
               tu.unit || CASE WHEN tu.unit_spec IS NOT NULL THEN ' (' || tu.unit_spec || ')' ELSE '' END as to_uom_label,
               fl.name as from_location_name, tl.name as to_location_name,
-              p.name as project_name, u.full_name as performed_by_name
+              p.name as project_name, u.full_name as performed_by_name,
+              sup.name as supplier_name
        FROM inventory_transactions t
        JOIN inventory_items i ON t.item_id = i.id
        LEFT JOIN inventory_item_uoms fu ON t.uom_id    = fu.id
@@ -575,6 +699,7 @@ router.get('/transactions', requireAuth, async (req, res) => {
        LEFT JOIN inventory_locations tl ON t.to_location_id = tl.id
        LEFT JOIN projects p ON t.project_id = p.id
        JOIN users u ON t.performed_by = u.id
+       LEFT JOIN inventory_suppliers sup ON t.supplier_id = sup.id
        WHERE ${conditions.join(' AND ')}
        ORDER BY t.created_at DESC
        LIMIT $${idx} OFFSET $${idx + 1}`,
@@ -659,7 +784,7 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
       if (count_type === 'full') {
         // Snapshot all stock across all locations
         stock = await client.query(
-          `SELECT s.item_id, s.location_id, s.quantity FROM inventory_stock s
+          `SELECT s.item_id, s.location_id, s.quantity, s.uom_id FROM inventory_stock s
            JOIN inventory_items i ON s.item_id = i.id
            WHERE s.company_id = $1 AND i.active = true
            ORDER BY s.location_id, i.name`,
@@ -667,7 +792,7 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
         );
       } else {
         stock = await client.query(
-          `SELECT s.item_id, NULL::integer as location_id, s.quantity FROM inventory_stock s
+          `SELECT s.item_id, NULL::integer as location_id, s.quantity, s.uom_id FROM inventory_stock s
            JOIN inventory_items i ON s.item_id = i.id
            WHERE s.location_id = $1 AND s.company_id = $2 AND i.active = true`,
           [location_id, companyId]
@@ -675,11 +800,11 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
       }
 
       if (stock.rows.length > 0) {
-        const lineValues = stock.rows.map((r, i) => `($1, $${i * 3 + 2}, $${i * 3 + 3}, $${i * 3 + 4})`).join(', ');
+        const lineValues = stock.rows.map((r, i) => `($1, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4}, $${i * 4 + 5})`).join(', ');
         const lineParams = [countId];
-        stock.rows.forEach(r => { lineParams.push(r.item_id); lineParams.push(r.location_id); lineParams.push(r.quantity); });
+        stock.rows.forEach(r => { lineParams.push(r.item_id); lineParams.push(r.location_id); lineParams.push(r.quantity); lineParams.push(r.uom_id || null); });
         await client.query(
-          `INSERT INTO inventory_cycle_count_lines (cycle_count_id, item_id, location_id, expected_qty) VALUES ${lineValues}`,
+          `INSERT INTO inventory_cycle_count_lines (cycle_count_id, item_id, location_id, expected_qty, stock_uom_id) VALUES ${lineValues}`,
           lineParams
         );
       }
@@ -688,10 +813,14 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
 
       // Return with lines
       const lines = await pool.query(
-        `SELECT l.*, i.name as item_name, i.unit, i.sku, loc.name as location_name
+        `SELECT l.*, i.name as item_name, i.unit, i.sku, loc.name as location_name,
+              su.unit as stock_uom_unit, su.unit_spec as stock_uom_spec, su.factor as stock_uom_factor,
+              cu.unit as counted_uom_unit, cu.unit_spec as counted_uom_spec, cu.factor as counted_uom_factor
          FROM inventory_cycle_count_lines l
          JOIN inventory_items i ON l.item_id = i.id
          LEFT JOIN inventory_locations loc ON l.location_id = loc.id
+         LEFT JOIN inventory_item_uoms su ON l.stock_uom_id = su.id
+         LEFT JOIN inventory_item_uoms cu ON l.counted_uom_id = cu.id
          WHERE l.cycle_count_id = $1 ORDER BY loc.name NULLS FIRST, i.name`,
         [countId]
       );
@@ -759,7 +888,7 @@ router.patch('/cycle-counts/:id', requireAdmin, async (req, res) => {
 // PATCH /api/inventory/cycle-counts/:id/lines/:lineId
 router.patch('/cycle-counts/:id/lines/:lineId', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
-  const { counted_qty, notes } = req.body;
+  const { counted_qty, counted_uom_id, notes } = req.body;
   try {
     // Verify count belongs to company and isn't completed
     const cc = await pool.query(
@@ -776,6 +905,31 @@ router.patch('/cycle-counts/:id/lines/:lineId', requireAuth, async (req, res) =>
       sets.push(`counted_qty=$${idx++}`); vals.push(qty);
       sets.push(`counted_by=$${idx++}`); vals.push(req.user.id);
       sets.push(`counted_at=NOW()`);
+
+      // Resolve UOM and calculate variance in stock UOM units
+      const resolvedCountedUomId = counted_uom_id != null ? parseInt(counted_uom_id) : null;
+      sets.push(`counted_uom_id=$${idx++}`); vals.push(resolvedCountedUomId);
+
+      // Fetch line's expected_qty and UOM factors to compute variance
+      const lineRow = await pool.query(
+        `SELECT l.expected_qty, l.stock_uom_id,
+                su.factor as stock_factor,
+                cu.factor as counted_factor
+         FROM inventory_cycle_count_lines l
+         LEFT JOIN inventory_item_uoms su ON l.stock_uom_id = su.id
+         LEFT JOIN inventory_item_uoms cu ON cu.id = $1
+         WHERE l.id = $2`,
+        [resolvedCountedUomId, req.params.lineId]
+      );
+      if (lineRow.rowCount > 0) {
+        const { expected_qty, stock_factor, counted_factor } = lineRow.rows[0];
+        const stockF   = parseFloat(stock_factor   || 1);
+        const countedF = parseFloat(counted_factor || 1);
+        // Convert counted qty to stock UOM: qty_in_stock_uom = qty * (counted_factor / stock_factor)
+        const qtyInStockUom = qty * (countedF / stockF);
+        const variance = qtyInStockUom - parseFloat(expected_qty);
+        sets.push(`variance=$${idx++}`); vals.push(variance);
+      }
     }
     if (notes !== undefined) { sets.push(`notes=$${idx++}`); vals.push(notes); }
     if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
@@ -822,19 +976,20 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
       const linesWithVariance = lines.rows.filter(l => parseFloat(l.variance) !== 0);
       const isFullCount = cc.rows[0].count_type === 'full';
       for (const line of linesWithVariance) {
-        const delta = parseFloat(line.variance); // positive = counted more, negative = counted less
+        const delta = parseFloat(line.variance); // in stock UOM units
         const locationId = isFullCount ? line.location_id : cc.rows[0].location_id;
+        const stockUomId = line.stock_uom_id || null;
         const typeLabel = cc.rows[0].count_type === 'reconcile' ? 'Reconcile count adjustment'
           : cc.rows[0].count_type === 'audit' ? 'Audit count adjustment'
           : cc.rows[0].count_type === 'full' ? 'Full count adjustment'
           : 'Cycle count adjustment';
         await client.query(
           `INSERT INTO inventory_transactions
-           (company_id, type, item_id, quantity, to_location_id, performed_by, notes)
-           VALUES ($1,'adjust',$2,$3,$4,$5,$6)`,
-          [companyId, line.item_id, Math.abs(delta), locationId, req.user.id, typeLabel]
+           (company_id, type, item_id, quantity, to_location_id, performed_by, notes, uom_id)
+           VALUES ($1,'adjust',$2,$3,$4,$5,$6,$7)`,
+          [companyId, line.item_id, Math.abs(delta), locationId, req.user.id, typeLabel, stockUomId]
         );
-        await applyStockDelta(client, companyId, line.item_id, locationId, delta);
+        await applyStockDelta(client, companyId, line.item_id, locationId, delta, {}, stockUomId);
       }
 
       // Mark count complete
@@ -961,5 +1116,577 @@ buildSetupRoutes('areas',        'inventory_areas',        'location_id', 'inven
 buildSetupRoutes('racks',        'inventory_racks',        'area_id',     'inventory_areas');
 buildSetupRoutes('bays',         'inventory_bays',         'rack_id',     'inventory_racks');
 buildSetupRoutes('compartments', 'inventory_compartments', 'bay_id',      'inventory_bays');
+
+// ── Suppliers ─────────────────────────────────────────────────────────────────
+
+// GET /api/inventory/suppliers
+router.get('/suppliers', requireAdmin, async (req, res) => {
+  const { active = 'true' } = req.query;
+  const companyId = req.user.company_id;
+  try {
+    const conditions = ['company_id = $1'];
+    const values = [companyId]; let idx = 2;
+    if (active !== 'all') { conditions.push(`active = $${idx++}`); values.push(active !== 'false'); }
+    const result = await pool.query(
+      `SELECT * FROM inventory_suppliers WHERE ${conditions.join(' AND ')} ORDER BY name`,
+      values
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/suppliers
+router.post('/suppliers', requireAdmin, async (req, res) => {
+  const { name, contact_name, phone, email, website, notes } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `INSERT INTO inventory_suppliers (company_id, name, contact_name, phone, email, website, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [companyId, name.trim(), contact_name?.trim() || null, phone?.trim() || null,
+       email?.trim() || null, website?.trim() || null, notes?.trim() || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// PATCH /api/inventory/suppliers/:id
+router.patch('/suppliers/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { name, contact_name, phone, email, website, notes, active } = req.body;
+  try {
+    const existing = await pool.query('SELECT id FROM inventory_suppliers WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'Supplier not found' });
+    const sets = [], vals = [req.params.id, companyId]; let idx = 3;
+    if (name !== undefined)         { sets.push(`name=$${idx++}`);         vals.push(name.trim()); }
+    if (contact_name !== undefined) { sets.push(`contact_name=$${idx++}`); vals.push(contact_name?.trim() || null); }
+    if (phone !== undefined)        { sets.push(`phone=$${idx++}`);        vals.push(phone?.trim() || null); }
+    if (email !== undefined)        { sets.push(`email=$${idx++}`);        vals.push(email?.trim() || null); }
+    if (website !== undefined)      { sets.push(`website=$${idx++}`);      vals.push(website?.trim() || null); }
+    if (notes !== undefined)        { sets.push(`notes=$${idx++}`);        vals.push(notes?.trim() || null); }
+    if (active !== undefined)       { sets.push(`active=$${idx++}`);       vals.push(!!active); }
+    if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    const result = await pool.query(
+      `UPDATE inventory_suppliers SET ${sets.join(',')} WHERE id=$1 AND company_id=$2 RETURNING *`,
+      vals
+    );
+    res.json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /api/inventory/suppliers/:id  (soft delete)
+router.delete('/suppliers/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      'UPDATE inventory_suppliers SET active=false WHERE id=$1 AND company_id=$2 RETURNING id',
+      [req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Supplier not found' });
+    res.json({ success: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Purchase Orders ───────────────────────────────────────────────────────────
+
+// Generate next PO number for a company: PO-YYYY-NNNN
+async function nextPONumber(client, companyId) {
+  const year = new Date().getFullYear();
+  const res = await client.query(
+    `SELECT COUNT(*) FROM purchase_orders WHERE company_id=$1 AND po_number LIKE $2`,
+    [companyId, `PO-${year}-%`]
+  );
+  const seq = parseInt(res.rows[0].count) + 1;
+  return `PO-${year}-${String(seq).padStart(4, '0')}`;
+}
+
+// GET /api/inventory/purchase-orders
+router.get('/purchase-orders', requireAdmin, async (req, res) => {
+  const { status, supplier_id } = req.query;
+  const companyId = req.user.company_id;
+  try {
+    const conditions = ['po.company_id = $1'];
+    const values = [companyId]; let idx = 2;
+    if (status) { conditions.push(`po.status = $${idx++}`); values.push(status); }
+    if (supplier_id) { conditions.push(`po.supplier_id = $${idx++}`); values.push(supplier_id); }
+    const result = await pool.query(
+      `SELECT po.*,
+              sup.name AS supplier_name,
+              loc.name AS to_location_name,
+              u.full_name AS created_by_name,
+              (SELECT COUNT(*)        FROM purchase_order_lines WHERE po_id = po.id) AS line_count,
+              (SELECT COALESCE(SUM(qty_ordered),  0) FROM purchase_order_lines WHERE po_id = po.id) AS total_ordered,
+              (SELECT COALESCE(SUM(qty_received), 0) FROM purchase_order_lines WHERE po_id = po.id) AS total_received
+       FROM purchase_orders po
+       LEFT JOIN inventory_suppliers  sup ON po.supplier_id    = sup.id
+       LEFT JOIN inventory_locations  loc ON po.to_location_id = loc.id
+       JOIN  users u ON po.created_by = u.id
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY po.created_at DESC`,
+      values
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/purchase-orders
+router.post('/purchase-orders', requireAdmin, async (req, res) => {
+  const { supplier_id, order_date, expected_date, to_location_id, notes, reference_no, lines = [] } = req.body;
+  const companyId = req.user.company_id;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const poNumber = await nextPONumber(client, companyId);
+    const poResult = await client.query(
+      `INSERT INTO purchase_orders
+         (company_id, po_number, supplier_id, order_date, expected_date, to_location_id, notes, reference_no, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [companyId, poNumber, supplier_id || null,
+       order_date || new Date().toISOString().slice(0,10),
+       expected_date || null, to_location_id || null,
+       notes?.trim() || null, reference_no?.trim() || null, req.user.id]
+    );
+    const po = poResult.rows[0];
+    for (const line of lines) {
+      if (!line.item_id || !line.qty_ordered || parseFloat(line.qty_ordered) <= 0) continue;
+      await client.query(
+        `INSERT INTO purchase_order_lines (po_id, item_id, qty_ordered, unit_cost, uom_id, notes)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [po.id, parseInt(line.item_id), parseFloat(line.qty_ordered),
+         line.unit_cost != null ? parseFloat(line.unit_cost) : null,
+         line.uom_id ? parseInt(line.uom_id) : null, line.notes?.trim() || null]
+      );
+    }
+    await client.query('COMMIT');
+    res.status(201).json(po);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err); res.status(500).json({ error: 'Server error' });
+  } finally { client.release(); }
+});
+
+// GET /api/inventory/purchase-orders/:id  (with lines)
+router.get('/purchase-orders/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const poResult = await pool.query(
+      `SELECT po.*,
+              sup.name AS supplier_name,
+              loc.name AS to_location_name,
+              u.full_name AS created_by_name
+       FROM purchase_orders po
+       LEFT JOIN inventory_suppliers sup ON po.supplier_id    = sup.id
+       LEFT JOIN inventory_locations loc ON po.to_location_id = loc.id
+       JOIN users u ON po.created_by = u.id
+       WHERE po.id=$1 AND po.company_id=$2`,
+      [req.params.id, companyId]
+    );
+    if (poResult.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    const linesResult = await pool.query(
+      `SELECT pol.*, i.name AS item_name, i.sku, i.unit,
+              u.unit AS uom_unit, u.unit_spec AS uom_spec
+       FROM purchase_order_lines pol
+       JOIN inventory_items i ON pol.item_id = i.id
+       LEFT JOIN inventory_item_uoms u ON pol.uom_id = u.id
+       WHERE pol.po_id = $1 ORDER BY pol.id`,
+      [req.params.id]
+    );
+    res.json({ ...poResult.rows[0], lines: linesResult.rows });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// PATCH /api/inventory/purchase-orders/:id
+router.patch('/purchase-orders/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { supplier_id, order_date, expected_date, to_location_id, notes, reference_no, status } = req.body;
+  try {
+    const existing = await pool.query(
+      'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    const cur = existing.rows[0];
+    if (['received', 'cancelled'].includes(cur.status) && status === undefined) {
+      return res.status(400).json({ error: `Cannot edit a ${cur.status} PO` });
+    }
+    const sets = [], vals = [req.params.id, companyId]; let idx = 3;
+    if (supplier_id  !== undefined) { sets.push(`supplier_id=$${idx++}`);    vals.push(supplier_id  || null); }
+    if (order_date   !== undefined) { sets.push(`order_date=$${idx++}`);     vals.push(order_date); }
+    if (expected_date!== undefined) { sets.push(`expected_date=$${idx++}`);  vals.push(expected_date || null); }
+    if (to_location_id!==undefined) { sets.push(`to_location_id=$${idx++}`); vals.push(to_location_id || null); }
+    if (notes        !== undefined) { sets.push(`notes=$${idx++}`);          vals.push(notes?.trim() || null); }
+    if (reference_no !== undefined) { sets.push(`reference_no=$${idx++}`);   vals.push(reference_no?.trim() || null); }
+    if (status       !== undefined) {
+      const VALID = ['draft','submitted','partial','received','cancelled'];
+      if (!VALID.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+      sets.push(`status=$${idx++}`); vals.push(status);
+      if (status === 'submitted')  { sets.push(`submitted_at=NOW()`); }
+      if (status === 'received')   { sets.push(`received_at=NOW()`); }
+    }
+    if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    const result = await pool.query(
+      `UPDATE purchase_orders SET ${sets.join(',')} WHERE id=$1 AND company_id=$2 RETURNING *`,
+      vals
+    );
+    res.json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /api/inventory/purchase-orders/:id  (hard-delete drafts; cancel others)
+router.delete('/purchase-orders/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const existing = await pool.query(
+      'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    const { status } = existing.rows[0];
+    if (status === 'received') return res.status(409).json({ error: 'Cannot delete a received PO' });
+    if (status === 'draft') {
+      await pool.query('DELETE FROM purchase_orders WHERE id=$1', [req.params.id]);
+    } else {
+      await pool.query(
+        'UPDATE purchase_orders SET status=$1, received_at=NULL WHERE id=$2',
+        ['cancelled', req.params.id]
+      );
+    }
+    res.json({ success: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/purchase-orders/:id/lines
+router.post('/purchase-orders/:id/lines', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { item_id, qty_ordered, unit_cost, uom_id, notes } = req.body;
+  if (!item_id || !qty_ordered || parseFloat(qty_ordered) <= 0) {
+    return res.status(400).json({ error: 'item_id and positive qty_ordered required' });
+  }
+  try {
+    const po = await pool.query(
+      'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (po.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    if (po.rows[0].status !== 'draft') return res.status(409).json({ error: 'Can only add lines to a draft PO' });
+    const item = await pool.query('SELECT id FROM inventory_items WHERE id=$1 AND company_id=$2', [item_id, companyId]);
+    if (item.rowCount === 0) return res.status(404).json({ error: 'Item not found' });
+    await pool.query(
+      `INSERT INTO purchase_order_lines (po_id, item_id, qty_ordered, unit_cost, uom_id, notes)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [req.params.id, parseInt(item_id), parseFloat(qty_ordered),
+       unit_cost != null ? parseFloat(unit_cost) : null,
+       uom_id ? parseInt(uom_id) : null, notes?.trim() || null]
+    );
+    const lines = await pool.query(
+      `SELECT pol.*, i.name AS item_name, i.sku, i.unit
+       FROM purchase_order_lines pol JOIN inventory_items i ON pol.item_id = i.id
+       WHERE pol.po_id=$1 ORDER BY pol.id`,
+      [req.params.id]
+    );
+    res.status(201).json(lines.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// PATCH /api/inventory/purchase-orders/:id/lines/:lineId
+router.patch('/purchase-orders/:id/lines/:lineId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { qty_ordered, unit_cost, uom_id, notes } = req.body;
+  try {
+    const po = await pool.query(
+      'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (po.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    if (po.rows[0].status !== 'draft') return res.status(409).json({ error: 'Can only edit lines on a draft PO' });
+    const sets = [], vals = [req.params.lineId]; let idx = 2;
+    if (qty_ordered !== undefined) { sets.push(`qty_ordered=$${idx++}`); vals.push(parseFloat(qty_ordered)); }
+    if (unit_cost   !== undefined) { sets.push(`unit_cost=$${idx++}`);   vals.push(unit_cost != null ? parseFloat(unit_cost) : null); }
+    if (uom_id      !== undefined) { sets.push(`uom_id=$${idx++}`);      vals.push(uom_id ? parseInt(uom_id) : null); }
+    if (notes       !== undefined) { sets.push(`notes=$${idx++}`);       vals.push(notes?.trim() || null); }
+    if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    await pool.query(`UPDATE purchase_order_lines SET ${sets.join(',')} WHERE id=$1`, vals);
+    const lines = await pool.query(
+      `SELECT pol.*, i.name AS item_name, i.sku, i.unit
+       FROM purchase_order_lines pol JOIN inventory_items i ON pol.item_id = i.id
+       WHERE pol.po_id=$1 ORDER BY pol.id`,
+      [req.params.id]
+    );
+    res.json(lines.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /api/inventory/purchase-orders/:id/lines/:lineId
+router.delete('/purchase-orders/:id/lines/:lineId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const po = await pool.query(
+      'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (po.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    if (po.rows[0].status !== 'draft') return res.status(409).json({ error: 'Can only remove lines from a draft PO' });
+    await pool.query('DELETE FROM purchase_order_lines WHERE id=$1 AND po_id=$2', [req.params.lineId, req.params.id]);
+    const lines = await pool.query(
+      `SELECT pol.*, i.name AS item_name, i.sku, i.unit
+       FROM purchase_order_lines pol JOIN inventory_items i ON pol.item_id = i.id
+       WHERE pol.po_id=$1 ORDER BY pol.id`,
+      [req.params.id]
+    );
+    res.json(lines.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/purchase-orders/:id/receive
+router.post('/purchase-orders/:id/receive', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { location_id, lines } = req.body; // lines: [{ line_id, qty_to_receive }]
+  if (!location_id) return res.status(400).json({ error: 'location_id required' });
+  if (!Array.isArray(lines) || lines.length === 0) return res.status(400).json({ error: 'lines required' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const po = await client.query(
+      'SELECT id, status, company_id FROM purchase_orders WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (po.rowCount === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'PO not found' }); }
+    if (!['submitted','partial'].includes(po.rows[0].status)) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Can only receive against a submitted or partial PO' });
+    }
+    const loc = await client.query('SELECT id FROM inventory_locations WHERE id=$1 AND company_id=$2', [location_id, companyId]);
+    if (loc.rowCount === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Location not found' }); }
+
+    const receivedItemIds = new Set();
+    for (const entry of lines) {
+      const qty = parseFloat(entry.qty_to_receive);
+      if (!entry.line_id || isNaN(qty) || qty <= 0) continue;
+      const lineResult = await client.query(
+        `SELECT pol.*, ii.unit_cost AS catalog_cost
+         FROM purchase_order_lines pol
+         JOIN inventory_items ii ON pol.item_id = ii.id
+         WHERE pol.id=$1 AND pol.po_id=$2`,
+        [entry.line_id, req.params.id]
+      );
+      if (lineResult.rowCount === 0) continue;
+      const line = lineResult.rows[0];
+      const remaining = parseFloat(line.qty_ordered) - parseFloat(line.qty_received);
+      const actualQty = Math.min(qty, remaining);
+      if (actualQty <= 0) continue;
+      const unitCost = line.unit_cost != null ? parseFloat(line.unit_cost) : (line.catalog_cost != null ? parseFloat(line.catalog_cost) : null);
+      // Create receive transaction
+      await client.query(
+        `INSERT INTO inventory_transactions
+           (company_id, type, item_id, quantity, to_location_id, performed_by, unit_cost, uom_id, supplier_id)
+         VALUES ($1,'receive',$2,$3,$4,$5,$6,$7,
+           (SELECT supplier_id FROM purchase_orders WHERE id=$8))`,
+        [companyId, line.item_id, actualQty, location_id, req.user.id,
+         unitCost, line.uom_id || null, req.params.id]
+      );
+      // Update stock
+      await applyStockDelta(client, companyId, line.item_id, location_id, actualQty, {}, line.uom_id || null);
+      // Update line qty_received
+      await client.query(
+        'UPDATE purchase_order_lines SET qty_received = qty_received + $1 WHERE id=$2',
+        [actualQty, entry.line_id]
+      );
+      receivedItemIds.add(line.item_id);
+    }
+
+    // Update PO status based on received amounts
+    const totals = await client.query(
+      `SELECT COALESCE(SUM(qty_ordered),0) AS ordered, COALESCE(SUM(qty_received),0) AS received
+       FROM purchase_order_lines WHERE po_id=$1`,
+      [req.params.id]
+    );
+    const { ordered, received } = totals.rows[0];
+    let newStatus = 'partial';
+    if (parseFloat(received) >= parseFloat(ordered)) newStatus = 'received';
+    await client.query(
+      `UPDATE purchase_orders SET status=$1${newStatus === 'received' ? ', received_at=NOW()' : ''} WHERE id=$2`,
+      [newStatus, req.params.id]
+    );
+
+    await client.query('COMMIT');
+    // Return updated PO with lines
+    const updated = await pool.query(
+      `SELECT po.*, sup.name AS supplier_name, loc.name AS to_location_name
+       FROM purchase_orders po
+       LEFT JOIN inventory_suppliers sup ON po.supplier_id = sup.id
+       LEFT JOIN inventory_locations loc ON po.to_location_id = loc.id
+       WHERE po.id=$1`,
+      [req.params.id]
+    );
+    const updatedLines = await pool.query(
+      `SELECT pol.*, i.name AS item_name, i.sku, i.unit
+       FROM purchase_order_lines pol JOIN inventory_items i ON pol.item_id = i.id
+       WHERE pol.po_id=$1 ORDER BY pol.id`,
+      [req.params.id]
+    );
+    res.json({ ...updated.rows[0], lines: updatedLines.rows });
+
+    // Fire low-stock alerts for all received items (stock may have dipped below reorder point before this receipt)
+    for (const itemId of receivedItemIds) {
+      maybeSendLowStockAlert(companyId, itemId).catch(() => {});
+    }
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err); res.status(500).json({ error: 'Server error' });
+  } finally { client.release(); }
+});
+
+// ── Purchase Order Email ───────────────────────────────────────────────────────
+
+// POST /api/inventory/purchase-orders/:id/email
+router.post('/purchase-orders/:id/email', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    // Load PO + lines + supplier + company
+    const poResult = await pool.query(
+      `SELECT po.*,
+              sup.name AS supplier_name, sup.email AS supplier_email,
+              sup.contact_name AS supplier_contact,
+              loc.name AS to_location_name,
+              u.full_name AS created_by_name,
+              co.name AS company_name, co.address AS company_address,
+              co.phone AS company_phone, co.contact_email AS company_email
+       FROM purchase_orders po
+       LEFT JOIN inventory_suppliers sup ON po.supplier_id = sup.id
+       LEFT JOIN inventory_locations loc ON po.to_location_id = loc.id
+       JOIN users u ON po.created_by = u.id
+       JOIN companies co ON po.company_id = co.id
+       WHERE po.id = $1 AND po.company_id = $2`,
+      [req.params.id, companyId]
+    );
+    if (poResult.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    const po = poResult.rows[0];
+
+    if (!po.supplier_email) {
+      return res.status(400).json({ error: 'Supplier has no email address on file. Add one in Setup → Suppliers.' });
+    }
+
+    const linesResult = await pool.query(
+      `SELECT pol.*, i.name AS item_name, i.sku, i.unit
+       FROM purchase_order_lines pol
+       JOIN inventory_items i ON pol.item_id = i.id
+       WHERE pol.po_id = $1 ORDER BY pol.id`,
+      [req.params.id]
+    );
+    const lines = linesResult.rows;
+    if (lines.length === 0) return res.status(400).json({ error: 'Cannot email a PO with no line items.' });
+
+    const fmt = n => n != null ? parseFloat(n).toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '—';
+    const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+    const lineTotal = lines.reduce((s, l) => s + (l.unit_cost != null ? parseFloat(l.unit_cost) * parseFloat(l.qty_ordered) : 0), 0);
+    const hasAnyPricing = lines.some(l => l.unit_cost != null);
+
+    const tableRows = lines.map(l => {
+      const qty = parseFloat(l.qty_ordered);
+      return `<tr>
+        <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;font-weight:600">${l.item_name}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;font-family:monospace;font-size:12px;color:#6b7280">${l.sku || '—'}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;text-align:right">${qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)} ${l.unit}</td>
+        ${hasAnyPricing ? `<td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;text-align:right">${l.unit_cost != null ? fmt(l.unit_cost) : '—'}</td>` : ''}
+        ${hasAnyPricing ? `<td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700">${l.unit_cost != null ? fmt(parseFloat(l.unit_cost) * qty) : '—'}</td>` : ''}
+        ${l.notes ? `<td style="padding:8px 10px;border-bottom:1px solid #f3f4f6;font-size:12px;color:#6b7280">${l.notes}</td>` : '<td style="padding:8px 10px;border-bottom:1px solid #f3f4f6"></td>'}
+      </tr>`;
+    }).join('');
+
+    const { sendEmail } = require('../email');
+    await sendEmail(
+      po.supplier_email,
+      `Purchase Order ${po.po_number} from ${po.company_name}`,
+      `<div style="font-family:system-ui,sans-serif;max-width:640px;margin:0 auto;padding:24px">
+        <div style="border-bottom:3px solid #92400e;padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px">
+          <div>
+            <h2 style="color:#92400e;margin:0;font-size:22px">Purchase Order</h2>
+            <p style="color:#6b7280;margin:4px 0 0;font-size:13px">${po.po_number}</p>
+          </div>
+          <div style="text-align:right;font-size:13px;color:#374151">
+            <strong>${po.company_name}</strong><br>
+            ${po.company_address ? po.company_address + '<br>' : ''}
+            ${po.company_phone ? po.company_phone + '<br>' : ''}
+            ${po.company_email ? `<a href="mailto:${po.company_email}" style="color:#92400e">${po.company_email}</a>` : ''}
+          </div>
+        </div>
+
+        <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:20px;font-size:13px">
+          <div><span style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;display:block">To</span><strong>${po.supplier_name}</strong>${po.supplier_contact ? '<br>' + po.supplier_contact : ''}</div>
+          <div><span style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;display:block">Order Date</span>${fmtDate(po.order_date)}</div>
+          ${po.expected_date ? `<div><span style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;display:block">Expected By</span>${fmtDate(po.expected_date)}</div>` : ''}
+          ${po.to_location_name ? `<div><span style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;display:block">Ship To</span>${po.to_location_name}</div>` : ''}
+          ${po.reference_no ? `<div><span style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;display:block">Your Ref #</span>${po.reference_no}</div>` : ''}
+        </div>
+
+        <table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:14px">
+          <thead>
+            <tr style="background:#f9fafb">
+              <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb">Item</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb">SKU</th>
+              <th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb">Qty</th>
+              ${hasAnyPricing ? '<th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb">Unit Price</th>' : ''}
+              ${hasAnyPricing ? '<th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb">Total</th>' : ''}
+              <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb">Notes</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+          ${hasAnyPricing ? `<tfoot><tr style="background:#f0fdf4;border-top:2px solid #d1fae5">
+            <td colspan="${3 + (lines[0]?.notes ? 1 : 0)}" style="padding:10px;font-weight:700">Order Total</td>
+            <td colspan="2" style="padding:10px;text-align:right;font-weight:800;font-size:16px">${fmt(lineTotal)}</td>
+          </tr></tfoot>` : ''}
+        </table>
+
+        ${po.notes ? `<div style="margin-top:16px;background:#f9fafb;border-radius:8px;padding:12px 16px;font-size:13px"><strong style="font-size:11px;text-transform:uppercase;color:#6b7280">Notes</strong><p style="margin:6px 0 0">${po.notes}</p></div>` : ''}
+
+        <p style="margin-top:24px;font-size:12px;color:#9ca3af;border-top:1px solid #f3f4f6;padding-top:16px">
+          Please confirm receipt of this purchase order by replying to this email.
+          This order was generated by ${po.company_name} via OpsFloa.
+        </p>
+      </div>`
+    );
+
+    res.json({ ok: true, sent_to: po.supplier_email });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── Valuation ─────────────────────────────────────────────────────────────────
+
+// GET /api/inventory/valuation
+router.get('/valuation', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { location_id } = req.query;
+  try {
+    const conditions = ['i.company_id = $1', 'i.active = true'];
+    const values = [companyId]; let idx = 2;
+    if (location_id) { conditions.push(`s.location_id = $${idx++}`); values.push(location_id); }
+    const result = await pool.query(
+      `SELECT i.id, i.name, i.sku, i.category, i.unit, i.unit_cost,
+              COALESCE(SUM(s.quantity), 0) AS total_qty,
+              COALESCE(SUM(s.quantity), 0) * COALESCE(i.unit_cost, 0) AS total_value,
+              json_agg(
+                json_build_object(
+                  'location_id', l.id,
+                  'location_name', l.name,
+                  'quantity', s.quantity
+                ) ORDER BY l.name
+              ) FILTER (WHERE l.id IS NOT NULL) AS locations
+       FROM inventory_items i
+       LEFT JOIN inventory_stock s ON i.id = s.item_id AND s.company_id = i.company_id
+       LEFT JOIN inventory_locations l ON s.location_id = l.id AND l.active = true
+       WHERE ${conditions.join(' AND ')}
+       GROUP BY i.id
+       ORDER BY i.name`,
+      values
+    );
+    const grandTotal = result.rows.reduce((sum, r) => sum + parseFloat(r.total_value || 0), 0);
+    res.json({ items: result.rows, grand_total: grandTotal });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
 
 module.exports = router;

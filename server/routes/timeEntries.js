@@ -235,14 +235,16 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
     const [periods, settingsRows, workerRow] = await Promise.all([
       pool.query('SELECT * FROM pay_periods WHERE company_id = $1 ORDER BY period_start DESC', [companyId]),
       pool.query('SELECT key, value FROM settings WHERE company_id = $1', [companyId]),
-      pool.query('SELECT overtime_rule FROM users WHERE id = $1', [userId]),
+      pool.query('SELECT overtime_rule, hourly_rate, rate_type, guaranteed_weekly_hours FROM users WHERE id = $1', [userId]),
     ]);
-    const s = { overtime_threshold: 8 };
+    const s = { overtime_threshold: 8, default_hourly_rate: 0 };
     settingsRows.rows.forEach(r => {
       if (r.key === 'overtime_threshold') s.overtime_threshold = parseFloat(r.value);
+      if (r.key === 'default_hourly_rate') s.default_hourly_rate = parseFloat(r.value);
     });
-    // Use the worker's own overtime_rule, falling back to company setting if not set
-    const workerOTRule = workerRow.rows[0]?.overtime_rule || 'daily';
+    const workerData = workerRow.rows[0] || {};
+    const workerOTRule = workerData.overtime_rule || 'daily';
+    const guaranteedWeeklyHours = workerData.guaranteed_weekly_hours ? parseFloat(workerData.guaranteed_weekly_hours) : null;
 
     const result = [];
     if (periods.rows.length > 0) {
@@ -272,6 +274,17 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
           if (e.mileage) totalMileage += parseFloat(e.mileage);
         }
 
+        const totalHours = regularHours + overtimeHours + prevailingHours;
+        // Guarantee shortfall: scale by how many weeks are in this pay period
+        let guaranteeShortfall = 0, guaranteeMinHours = 0;
+        if (guaranteedWeeklyHours) {
+          const ps = new Date(String(period.period_start).substring(0, 10) + 'T00:00:00');
+          const pe = new Date(String(period.period_end).substring(0, 10) + 'T00:00:00');
+          const days = Math.round((pe - ps) / (1000 * 60 * 60 * 24)) + 1;
+          const weeks = Math.max(1, Math.round(days / 7));
+          guaranteeMinHours = +(guaranteedWeeklyHours * weeks).toFixed(2);
+          guaranteeShortfall = +Math.max(0, guaranteeMinHours - totalHours).toFixed(2);
+        }
         result.push({
           id: period.id,
           period_start: period.period_start,
@@ -283,6 +296,9 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
             overtime_hours: +overtimeHours.toFixed(2),
             prevailing_hours: +prevailingHours.toFixed(2),
             total_mileage: +totalMileage.toFixed(1),
+            guarantee_shortfall_hours: guaranteeShortfall,
+            guarantee_min_hours: guaranteeMinHours,
+            guaranteed_weekly_hours: guaranteedWeeklyHours,
           },
         });
       }

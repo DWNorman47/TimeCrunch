@@ -197,7 +197,7 @@ router.post('/out', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const clockResult = await pool.query(
-      'SELECT user_id, company_id, project_id, clock_in_time, work_date, notes, timezone, clock_source, clocked_in_by FROM active_clock WHERE user_id = $1',
+      'SELECT user_id, company_id, project_id, clock_in_time, clock_in_lat, clock_in_lng, work_date, notes, timezone, clock_source, clocked_in_by FROM active_clock WHERE user_id = $1',
       [req.user.id]
     );
     if (clockResult.rowCount === 0) return res.status(400).json({ error: 'Not clocked in' });
@@ -341,6 +341,26 @@ router.delete('/cancel', requireAuth, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(400).json({ error: 'Not clocked in' });
     res.json({ cancelled: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/clock/location — update current GPS position while clocked in
+router.post('/location', requireAuth, async (req, res) => {
+  const { lat, lng } = req.body;
+  if (!validCoords(lat, lng)) return res.status(400).json({ error: 'Invalid coordinates' });
+  try {
+    const result = await pool.query(
+      `UPDATE active_clock
+       SET current_lat = $1, current_lng = $2, location_updated_at = NOW()
+       WHERE user_id = $3
+       RETURNING id`,
+      [lat, lng, req.user.id]
+    );
+    if (result.rowCount === 0) return res.status(400).json({ error: 'Not clocked in' });
+    res.json({ ok: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

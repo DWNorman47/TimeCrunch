@@ -152,10 +152,13 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
             <div style={{ marginTop: 16 }}>
               <div style={styles.billSummary}>
                 <span>{t.entriesLabel} <b>{billData.entries.length}</b></span>
-                <span>{t.totalLabel} <b>{fmtHours(billData.summary.total_hours)}</b></span>
+                <span>{t.totalLabel} <b>{fmtHours((billData.summary.total_hours || 0) + (billData.summary.guarantee_shortfall_hours || 0))}</b></span>
                 {billData.summary.regular_hours > 0 && <span style={{ color: '#2563eb' }}>{t.regularLabel} <b>{fmtHours(billData.summary.regular_hours)} · {formatCurrency(billData.summary.regular_cost, currency)}</b></span>}
                 {overtimeEnabled && billData.summary.overtime_hours > 0 && <span style={{ color: '#dc2626' }}>{t.overtimeLabel} <b>{fmtHours(billData.summary.overtime_hours)} · {formatCurrency(billData.summary.overtime_cost, currency)}</b></span>}
                 {billData.summary.prevailing_hours > 0 && <span style={{ color: '#d97706' }}>{t.prevailingLabel} <b>{fmtHours(billData.summary.prevailing_hours)} · {formatCurrency(billData.summary.prevailing_cost, currency)}</b></span>}
+                {billData.summary.guarantee_shortfall_hours > 0 && (
+                  <span style={{ color: '#2563eb' }}>Min. Guarantee <b>+{fmtHours(billData.summary.guarantee_shortfall_hours)} · {formatCurrency(billData.summary.guarantee_cost, currency)}</b></span>
+                )}
                 <span style={{ fontWeight: 700 }}>{t.totalCostLabel} <b>{formatCurrency(billData.summary.total_cost, currency)}</b></span>
               </div>
               <div style={styles.btnRow}>

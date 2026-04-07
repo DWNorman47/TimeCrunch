@@ -75,6 +75,35 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
     return () => clearInterval(timerRef.current);
   }, [status]);
 
+  // Push live location while clocked in
+  useEffect(() => {
+    if (!status || !status.clock_in_time || !geolocationEnabled || !navigator.geolocation) return;
+
+    const pushLocation = (pos) => {
+      api.post('/clock/location', { lat: pos.coords.latitude, lng: pos.coords.longitude }).catch(() => {});
+    };
+
+    // watchPosition runs continuously while screen is on; fires on movement too
+    const watchId = navigator.geolocation.watchPosition(pushLocation, () => {}, {
+      enableHighAccuracy: false,
+      maximumAge: 30000,
+      timeout: 10000,
+    });
+
+    // Also push immediately when the worker opens their phone / switches back to the app
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        navigator.geolocation.getCurrentPosition(pushLocation, () => {});
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [!!status?.clock_in_time, geolocationEnabled]);
+
   const toLocalTime = d => {
     const pad = n => String(n).padStart(2, '0');
     return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;

@@ -8,6 +8,9 @@ import InventoryItems from '../components/inventory/InventoryItems';
 import InventoryTransactions from '../components/inventory/InventoryTransactions';
 import InventoryCycleCounts from '../components/inventory/InventoryCycleCounts';
 import InventorySetup from '../components/inventory/InventorySetup';
+import InventoryValuation from '../components/inventory/InventoryValuation';
+import InventoryPurchaseOrders from '../components/inventory/InventoryPurchaseOrders';
+import InventoryConversions from '../components/inventory/InventoryConversions';
 
 export default function InventoryPage() {
   const { user, logout } = useAuth();
@@ -17,11 +20,18 @@ export default function InventoryPage() {
   const [projects, setProjects] = useState([]);
   const [locations, setLocations] = useState([]);
   const [lowStockCount, setLowStockCount] = useState(0);
+  const [pendingConversions, setPendingConversions] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const INV_TABS = isAdmin
-    ? ['stock', 'items', 'transactions', 'cycle', 'setup']
+    ? ['stock', 'items', 'transactions', 'orders', 'cycle', 'valuation', 'conversions', 'setup']
     : ['stock', 'transactions'];
+  const [poLowStockTrigger, setPoLowStockTrigger] = useState(false);
+
+  const handleReorderClick = () => {
+    setPoLowStockTrigger(true);
+    switchTab('orders');
+  };
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(INV_TABS.includes(hashTab) ? hashTab : 'stock');
   const switchTab = t => { setTab(t); window.location.hash = t; };
@@ -39,6 +49,7 @@ export default function InventoryPage() {
         setLocations(l.data);
         if (isAdmin) {
           api.get('/inventory/stock/low').then(r => setLowStockCount(r.data.length)).catch(() => {});
+          api.get('/inventory/uom-conversions').then(r => setPendingConversions(r.data.filter(u => parseFloat(u.factor) === 1).length)).catch(() => {});
         }
       } catch (e) {
         console.error(e);
@@ -49,8 +60,9 @@ export default function InventoryPage() {
     init();
   }, [isAdmin]);
 
-  const refreshLocations = () => api.get('/inventory/locations').then(r => setLocations(r.data)).catch(() => {});
-  const refreshLowStock  = () => isAdmin && api.get('/inventory/stock/low').then(r => setLowStockCount(r.data.length)).catch(() => {});
+  const refreshLocations   = () => api.get('/inventory/locations').then(r => setLocations(r.data)).catch(() => {});
+  const refreshLowStock    = () => isAdmin && api.get('/inventory/stock/low').then(r => setLowStockCount(r.data.length)).catch(() => {});
+  const refreshConversions = () => isAdmin && api.get('/inventory/uom-conversions').then(r => setPendingConversions(r.data.filter(u => parseFloat(u.factor) === 1).length)).catch(() => {});
 
   if (loading) return <div style={styles.loading}>Loading…</div>;
 
@@ -101,9 +113,12 @@ export default function InventoryPage() {
             { id: 'stock',        label: '📦 Stock', dot: lowStockCount > 0 ? '#f59e0b' : null },
             { id: 'transactions', label: '↔️ Transactions' },
             ...(isAdmin ? [
-              { id: 'items', label: '🗂 Items' },
-              { id: 'cycle', label: '📋 Count' },
-              { id: 'setup', label: '⚙️ Setup' },
+              { id: 'items',      label: '🗂 Items' },
+              { id: 'orders',     label: '🛒 Orders' },
+              { id: 'cycle',        label: '📋 Count' },
+              { id: 'valuation',    label: '💰 Valuation' },
+              { id: 'conversions',  label: '🔄 Conversions', dot: pendingConversions > 0 ? '#d97706' : null },
+              { id: 'setup',        label: '⚙️ Setup' },
             ] : []),
           ]}
         />
@@ -112,7 +127,9 @@ export default function InventoryPage() {
           <InventoryStock
             isAdmin={isAdmin}
             locations={locations}
+            projects={projects}
             onStockChange={refreshLowStock}
+            onReorderClick={isAdmin ? handleReorderClick : null}
           />
         )}
         {tab === 'items' && isAdmin && (
@@ -124,6 +141,7 @@ export default function InventoryPage() {
             locations={locations}
             projects={projects}
             onTransaction={refreshLowStock}
+            onConversionSaved={refreshConversions}
           />
         )}
         {tab === 'cycle' && isAdmin && (
@@ -131,6 +149,19 @@ export default function InventoryPage() {
             locations={locations}
             onComplete={refreshLowStock}
           />
+        )}
+        {tab === 'orders' && isAdmin && (
+          <InventoryPurchaseOrders
+            locations={locations}
+            prefillLowStock={poLowStockTrigger}
+            onPrefillHandled={() => setPoLowStockTrigger(false)}
+          />
+        )}
+        {tab === 'valuation' && isAdmin && (
+          <InventoryValuation locations={locations} />
+        )}
+        {tab === 'conversions' && isAdmin && (
+          <InventoryConversions onConversionChange={refreshConversions} />
         )}
         {tab === 'setup' && isAdmin && (
           <InventorySetup projects={projects} />
