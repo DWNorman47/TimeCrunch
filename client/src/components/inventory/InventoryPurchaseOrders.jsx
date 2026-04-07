@@ -1,0 +1,960 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import api from '../../api';
+
+const STATUS = {
+  draft:      { label: 'Draft',      color: '#6b7280', bg: '#f3f4f6' },
+  submitted:  { label: 'Submitted',  color: '#2563eb', bg: '#dbeafe' },
+  partial:    { label: 'Partial',    color: '#d97706', bg: '#fef3c7' },
+  received:   { label: 'Received',   color: '#059669', bg: '#d1fae5' },
+  cancelled:  { label: 'Cancelled',  color: '#9ca3af', bg: '#f3f4f6' },
+};
+
+function StatusBadge({ status }) {
+  const st = STATUS[status] || STATUS.draft;
+  return (
+    <span style={{ padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700,
+      color: st.color, background: st.bg, whiteSpace: 'nowrap' }}>
+      {st.label}
+    </span>
+  );
+}
+
+// ── Receive Modal ──────────────────────────────────────────────────────────────
+
+function ReceiveModal({ po, locations, onDone, onClose }) {
+  const defaultLoc = po.to_location_id ? String(po.to_location_id) : '';
+  const [locationId, setLocationId] = useState(defaultLoc);
+  const [qtys, setQtys] = useState(() => {
+    const init = {};
+    (po.lines || []).forEach(l => {
+      const remaining = parseFloat(l.qty_ordered) - parseFloat(l.qty_received);
+      init[l.id] = remaining > 0 ? String(remaining) : '';
+    });
+    return init;
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const openLines = (po.lines || []).filter(l =>
+    parseFloat(l.qty_ordered) - parseFloat(l.qty_received) > 0
+  );
+
+  const submit = async () => {
+    setError('');
+    if (!locationId) return setError('Select a receiving location.');
+    const lines = openLines
+      .map(l => ({ line_id: l.id, qty_to_receive: parseFloat(qtys[l.id] || 0) }))
+      .filter(l => l.qty_to_receive > 0);
+    if (lines.length === 0) return setError('Enter a quantity for at least one line.');
+    setSaving(true);
+    try {
+      const r = await api.post(`/inventory/purchase-orders/${po.id}/receive`, {
+        location_id: parseInt(locationId),
+        lines,
+      });
+      onDone(r.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to receive items.');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div style={m.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={m.modal}>
+        <div style={m.header}>
+          <h3 style={m.title}>Receive Items — {po.po_number}</h3>
+          <button style={m.closeBtn} onClick={onClose}>✕</button>
+        </div>
+
+        {error && <div style={m.error}>{error}</div>}
+
+        <div style={m.field}>
+          <label style={m.label}>Receiving Location *</label>
+          <select style={m.input} value={locationId} onChange={e => setLocationId(e.target.value)}>
+            <option value="">Select location…</option>
+            {locations.filter(l => l.active).map(l => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f9fafb' }}>
+                <th style={m.th}>Item</th>
+                <th style={{ ...m.th, textAlign: 'right' }}>Ordered</th>
+                <th style={{ ...m.th, textAlign: 'right' }}>Received</th>
+                <th style={{ ...m.th, textAlign: 'right' }}>Remaining</th>
+                <th style={{ ...m.th, textAlign: 'right' }}>Receive Now</th>
+              </tr>
+            </thead>
+            <tbody>
+              {openLines.map((line, i) => {
+                const remaining = parseFloat(line.qty_ordered) - parseFloat(line.qty_received);
+                return (
+                  <tr key={line.id} style={{ background: i % 2 === 0 ? '#fafafa' : '#fff', borderBottom: '1px solid #f3f4f6' }}>
+                    <td style={m.td}>
+                      <div style={{ fontWeight: 600 }}>{line.item_name}</div>
+                      {line.sku && <div style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'monospace' }}>{line.sku}</div>}
+                    </td>
+                    <td style={{ ...m.td, textAlign: 'right', color: '#6b7280' }}>{parseFloat(line.qty_ordered)} {line.unit}</td>
+                    <td style={{ ...m.td, textAlign: 'right', color: '#6b7280' }}>{parseFloat(line.qty_received)}</td>
+                    <td style={{ ...m.td, textAlign: 'right', fontWeight: 700 }}>{remaining}</td>
+                    <td style={{ ...m.td, textAlign: 'right' }}>
+                      <input
+                        style={m.qtyInput}
+                        type="number"
+                        min="0"
+                        max={remaining}
+                        step="any"
+                        value={qtys[line.id] || ''}
+                        onChange={e => setQtys(q => ({ ...q, [line.id]: e.target.value }))}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={m.actions}>
+          <button style={m.cancelBtn} onClick={onClose}>Cancel</button>
+          <button style={m.confirmBtn} onClick={submit} disabled={saving}>
+            {saving ? 'Receiving…' : 'Confirm Receipt'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PO Detail ──────────────────────────────────────────────────────────────────
+
+function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
+  const [po, setPo]           = useState(initialPo);
+  const [lines, setLines]     = useState(initialPo.lines || []);
+  const [receiveOpen, setReceiveOpen] = useState(false);
+  const [addingLine, setAddingLine]   = useState(false);
+  const [items, setItems]     = useState([]);
+  const [newLine, setNewLine] = useState({ item_id: '', qty_ordered: '', unit_cost: '', notes: '' });
+  const [lineErr, setLineErr] = useState('');
+  const [saving, setSaving]   = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    supplier_id: po.supplier_id ? String(po.supplier_id) : '',
+    to_location_id: po.to_location_id ? String(po.to_location_id) : '',
+    expected_date: po.expected_date ? po.expected_date.slice(0,10) : '',
+    reference_no: po.reference_no || '',
+    notes: po.notes || '',
+  });
+  const [editSaving, setEditSaving] = useState(false);
+  const [actionErr, setActionErr]   = useState('');
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent]       = useState(false);
+
+  useEffect(() => {
+    if (addingLine) {
+      api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(() => {});
+    }
+  }, [addingLine]);
+
+  const isDraft     = po.status === 'draft';
+  const canReceive  = ['submitted', 'partial'].includes(po.status);
+  const isFinished  = ['received', 'cancelled'].includes(po.status);
+
+  const totalOrdered  = lines.reduce((s, l) => s + parseFloat(l.qty_ordered), 0);
+  const totalReceived = lines.reduce((s, l) => s + parseFloat(l.qty_received), 0);
+
+  const submitPO = async () => {
+    if (lines.length === 0) return setActionErr('Add at least one line item before submitting.');
+    setActionErr(''); setSaving(true);
+    try {
+      const r = await api.patch(`/inventory/purchase-orders/${po.id}`, { status: 'submitted' });
+      setPo(r.data);
+      onUpdate();
+    } catch (err) { setActionErr(err.response?.data?.error || 'Failed to submit.'); }
+    finally { setSaving(false); }
+  };
+
+  const cancelPO = async () => {
+    if (!confirm('Cancel this purchase order?')) return;
+    setActionErr(''); setSaving(true);
+    try {
+      await api.delete(`/inventory/purchase-orders/${po.id}`);
+      onBack(true); // true = reload list
+    } catch (err) { setActionErr(err.response?.data?.error || 'Failed to cancel.'); }
+    finally { setSaving(false); }
+  };
+
+  const saveEdit = async () => {
+    setActionErr(''); setEditSaving(true);
+    try {
+      const r = await api.patch(`/inventory/purchase-orders/${po.id}`, {
+        supplier_id: editForm.supplier_id ? parseInt(editForm.supplier_id) : null,
+        to_location_id: editForm.to_location_id ? parseInt(editForm.to_location_id) : null,
+        expected_date: editForm.expected_date || null,
+        reference_no: editForm.reference_no,
+        notes: editForm.notes,
+      });
+      setPo(r.data);
+      setEditing(false);
+      onUpdate();
+    } catch (err) { setActionErr(err.response?.data?.error || 'Failed to save.'); }
+    finally { setEditSaving(false); }
+  };
+
+  const addLine = async () => {
+    setLineErr('');
+    if (!newLine.item_id) return setLineErr('Select an item.');
+    if (!newLine.qty_ordered || parseFloat(newLine.qty_ordered) <= 0) return setLineErr('Enter a positive quantity.');
+    setSaving(true);
+    try {
+      const r = await api.post(`/inventory/purchase-orders/${po.id}/lines`, {
+        item_id: parseInt(newLine.item_id),
+        qty_ordered: parseFloat(newLine.qty_ordered),
+        unit_cost: newLine.unit_cost !== '' ? parseFloat(newLine.unit_cost) : null,
+        notes: newLine.notes,
+      });
+      setLines(r.data);
+      setNewLine({ item_id: '', qty_ordered: '', unit_cost: '', notes: '' });
+      setAddingLine(false);
+      onUpdate();
+    } catch (err) { setLineErr(err.response?.data?.error || 'Failed to add line.'); }
+    finally { setSaving(false); }
+  };
+
+  const removeLine = async (lineId) => {
+    if (!confirm('Remove this line?')) return;
+    try {
+      const r = await api.delete(`/inventory/purchase-orders/${po.id}/lines/${lineId}`);
+      setLines(r.data);
+      onUpdate();
+    } catch (err) { alert(err.response?.data?.error || 'Failed to remove line.'); }
+  };
+
+  const emailPO = async () => {
+    setActionErr(''); setEmailSending(true); setEmailSent(false);
+    try {
+      await api.post(`/inventory/purchase-orders/${po.id}/email`);
+      setEmailSent(true);
+      setTimeout(() => setEmailSent(false), 4000);
+    } catch (err) {
+      setActionErr(err.response?.data?.error || 'Failed to send email.');
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
+  const handleReceiveDone = (updated) => {
+    setPo(updated);
+    setLines(updated.lines || []);
+    setReceiveOpen(false);
+    onUpdate();
+  };
+
+  return (
+    <div style={d.wrap}>
+      <button style={d.backBtn} onClick={() => onBack(false)}>← Back to Orders</button>
+
+      {/* Header card */}
+      <div style={d.headerCard}>
+        <div style={d.headerTop}>
+          <div>
+            <div style={d.poNumber}>{po.po_number}</div>
+            <div style={d.poMeta}>
+              Created by {po.created_by_name} · {new Date(po.created_at).toLocaleDateString()}
+              {po.order_date && ` · Ordered ${new Date(po.order_date + 'T00:00:00').toLocaleDateString()}`}
+            </div>
+          </div>
+          <div style={d.headerActions}>
+            <StatusBadge status={po.status} />
+            {isDraft && !editing && (
+              <>
+                <button style={d.editBtn} onClick={() => setEditing(true)}>Edit</button>
+                <button style={d.submitBtn} onClick={submitPO} disabled={saving}>Submit</button>
+              </>
+            )}
+            {editing && (
+              <>
+                <button style={d.cancelEditBtn} onClick={() => setEditing(false)}>Cancel</button>
+                <button style={d.submitBtn} onClick={saveEdit} disabled={editSaving}>{editSaving ? 'Saving…' : 'Save'}</button>
+              </>
+            )}
+            {po.supplier_name && !isDraft && (
+              <button
+                style={{ ...d.editBtn, color: emailSent ? '#059669' : '#2563eb', borderColor: emailSent ? '#059669' : '#bfdbfe', background: emailSent ? '#d1fae5' : '#eff6ff' }}
+                onClick={emailPO}
+                disabled={emailSending}
+                title={`Email PO to ${po.supplier_name}`}
+              >
+                {emailSending ? 'Sending…' : emailSent ? '✓ Sent' : '📧 Email PO'}
+              </button>
+            )}
+            {canReceive && (
+              <button style={d.receiveBtn} onClick={() => setReceiveOpen(true)}>Receive Items</button>
+            )}
+            {!isFinished && (
+              <button style={d.cancelBtn} onClick={cancelPO} disabled={saving}>
+                {isDraft ? 'Delete' : 'Cancel PO'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {actionErr && <div style={d.error}>{actionErr}</div>}
+
+        {editing ? (
+          <div style={d.editGrid}>
+            <div style={d.editField}>
+              <label style={d.editLabel}>Supplier</label>
+              <select style={d.editInput} value={editForm.supplier_id} onChange={e => setEditForm(f => ({ ...f, supplier_id: e.target.value }))}>
+                <option value="">None</option>
+                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div style={d.editField}>
+              <label style={d.editLabel}>Default Receive Location</label>
+              <select style={d.editInput} value={editForm.to_location_id} onChange={e => setEditForm(f => ({ ...f, to_location_id: e.target.value }))}>
+                <option value="">None</option>
+                {locations.filter(l => l.active).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </div>
+            <div style={d.editField}>
+              <label style={d.editLabel}>Expected Date</label>
+              <input style={d.editInput} type="date" value={editForm.expected_date} onChange={e => setEditForm(f => ({ ...f, expected_date: e.target.value }))} />
+            </div>
+            <div style={d.editField}>
+              <label style={d.editLabel}>Reference / PO #</label>
+              <input style={d.editInput} value={editForm.reference_no} onChange={e => setEditForm(f => ({ ...f, reference_no: e.target.value }))} placeholder="Supplier's order #" />
+            </div>
+            <div style={{ ...d.editField, flexBasis: '100%' }}>
+              <label style={d.editLabel}>Notes</label>
+              <textarea style={{ ...d.editInput, minHeight: 52, resize: 'vertical' }} value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+          </div>
+        ) : (
+          <div style={d.infoGrid}>
+            <div style={d.infoItem}>
+              <span style={d.infoLabel}>Supplier</span>
+              <span style={d.infoValue}>{po.supplier_name || <em style={{ color: '#9ca3af' }}>None</em>}</span>
+            </div>
+            <div style={d.infoItem}>
+              <span style={d.infoLabel}>Receive To</span>
+              <span style={d.infoValue}>{po.to_location_name || <em style={{ color: '#9ca3af' }}>Not set</em>}</span>
+            </div>
+            <div style={d.infoItem}>
+              <span style={d.infoLabel}>Expected</span>
+              <span style={d.infoValue}>{po.expected_date ? new Date(po.expected_date + 'T00:00:00').toLocaleDateString() : <em style={{ color: '#9ca3af' }}>Not set</em>}</span>
+            </div>
+            {po.reference_no && (
+              <div style={d.infoItem}>
+                <span style={d.infoLabel}>Supplier Ref</span>
+                <span style={d.infoValue}>{po.reference_no}</span>
+              </div>
+            )}
+            {po.notes && (
+              <div style={{ ...d.infoItem, flexBasis: '100%' }}>
+                <span style={d.infoLabel}>Notes</span>
+                <span style={d.infoValue}>{po.notes}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Progress bar (non-draft) */}
+        {!isDraft && totalOrdered > 0 && (
+          <div style={d.progress}>
+            <div style={d.progressBar}>
+              <div style={{ ...d.progressFill, width: `${Math.min(100, (totalReceived / totalOrdered) * 100)}%` }} />
+            </div>
+            <span style={d.progressText}>{totalReceived}/{totalOrdered} items received</span>
+          </div>
+        )}
+      </div>
+
+      {/* Lines table */}
+      <div style={d.linesHeader}>
+        <div style={d.linesTitle}>Line Items</div>
+        {isDraft && !addingLine && (
+          <button style={d.addLineBtn} onClick={() => setAddingLine(true)}>+ Add Item</button>
+        )}
+      </div>
+
+      {lines.length === 0 ? (
+        <div style={d.emptyLines}>No items on this order yet.{isDraft ? ' Add items using the button above.' : ''}</div>
+      ) : (
+        <div style={d.tableWrap}>
+          <table style={d.table}>
+            <thead>
+              <tr style={d.thead}>
+                <th style={d.th}>Item</th>
+                <th style={d.th}>SKU</th>
+                <th style={d.th}>Unit</th>
+                <th style={{ ...d.th, textAlign: 'right' }}>Qty Ordered</th>
+                <th style={{ ...d.th, textAlign: 'right' }}>Qty Received</th>
+                <th style={{ ...d.th, textAlign: 'right' }}>Remaining</th>
+                <th style={{ ...d.th, textAlign: 'right' }}>Unit Cost</th>
+                {isDraft && <th style={d.th}></th>}
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line, i) => {
+                const remaining = parseFloat(line.qty_ordered) - parseFloat(line.qty_received);
+                return (
+                  <tr key={line.id} style={i % 2 === 0 ? d.rowEven : d.row}>
+                    <td style={{ ...d.td, fontWeight: 600 }}>{line.item_name}</td>
+                    <td style={{ ...d.td, fontFamily: 'monospace', fontSize: 12, color: '#6b7280' }}>{line.sku || '—'}</td>
+                    <td style={{ ...d.td, color: '#6b7280' }}>{line.unit}</td>
+                    <td style={{ ...d.td, textAlign: 'right' }}>{parseFloat(line.qty_ordered)}</td>
+                    <td style={{ ...d.td, textAlign: 'right', color: parseFloat(line.qty_received) > 0 ? '#059669' : '#9ca3af' }}>
+                      {parseFloat(line.qty_received)}
+                    </td>
+                    <td style={{ ...d.td, textAlign: 'right', fontWeight: remaining > 0 ? 700 : 400,
+                      color: remaining > 0 ? '#d97706' : '#059669' }}>
+                      {remaining > 0 ? remaining : '✓'}
+                    </td>
+                    <td style={{ ...d.td, textAlign: 'right', color: '#6b7280' }}>
+                      {line.unit_cost != null ? `$${parseFloat(line.unit_cost).toFixed(2)}` : '—'}
+                    </td>
+                    {isDraft && (
+                      <td style={d.td}>
+                        <button style={d.removeBtn} onClick={() => removeLine(line.id)} title="Remove line">🗑️</button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+            {lines.length > 0 && (
+              <tfoot>
+                <tr style={d.totalRow}>
+                  <td colSpan={3} style={{ ...d.td, fontWeight: 700 }}>Total</td>
+                  <td style={{ ...d.td, textAlign: 'right', fontWeight: 700 }}>{totalOrdered}</td>
+                  <td style={{ ...d.td, textAlign: 'right', fontWeight: 700, color: '#059669' }}>{totalReceived}</td>
+                  <td style={{ ...d.td, textAlign: 'right', fontWeight: 700, color: totalOrdered - totalReceived > 0 ? '#d97706' : '#059669' }}>
+                    {totalOrdered - totalReceived > 0 ? totalOrdered - totalReceived : '✓'}
+                  </td>
+                  <td style={{ ...d.td, textAlign: 'right', fontWeight: 700 }}>
+                    {lines.some(l => l.unit_cost != null)
+                      ? `$${lines.reduce((s, l) => s + (l.unit_cost ? parseFloat(l.unit_cost) * parseFloat(l.qty_ordered) : 0), 0).toFixed(2)}`
+                      : '—'}
+                  </td>
+                  {isDraft && <td style={d.td} />}
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      )}
+
+      {/* Add line form */}
+      {addingLine && (
+        <div style={d.addLineForm}>
+          {lineErr && <div style={d.lineErr}>{lineErr}</div>}
+          <div style={d.addLineRow}>
+            <div style={d.addLineField}>
+              <label style={d.editLabel}>Item *</label>
+              <select style={d.editInput} value={newLine.item_id}
+                onChange={e => {
+                  const item = items.find(i => String(i.id) === e.target.value);
+                  setNewLine(f => ({ ...f, item_id: e.target.value,
+                    unit_cost: item?.unit_cost != null ? String(item.unit_cost) : f.unit_cost }));
+                }}>
+                <option value="">Select item…</option>
+                {items.map(i => <option key={i.id} value={i.id}>{i.name}{i.sku ? ` (${i.sku})` : ''}</option>)}
+              </select>
+            </div>
+            <div style={{ ...d.addLineField, maxWidth: 100 }}>
+              <label style={d.editLabel}>Qty *</label>
+              <input style={d.editInput} type="number" min="0.001" step="any"
+                value={newLine.qty_ordered} onChange={e => setNewLine(f => ({ ...f, qty_ordered: e.target.value }))} />
+            </div>
+            <div style={{ ...d.addLineField, maxWidth: 110 }}>
+              <label style={d.editLabel}>Unit Cost</label>
+              <input style={d.editInput} type="number" min="0" step="0.01"
+                value={newLine.unit_cost} onChange={e => setNewLine(f => ({ ...f, unit_cost: e.target.value }))}
+                placeholder="Optional" />
+            </div>
+            <div style={d.addLineField}>
+              <label style={d.editLabel}>Notes</label>
+              <input style={d.editInput} value={newLine.notes}
+                onChange={e => setNewLine(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
+            </div>
+            <div style={d.addLineBtns}>
+              <button style={d.cancelEditBtn} onClick={() => { setAddingLine(false); setLineErr(''); }}>Cancel</button>
+              <button style={d.submitBtn} onClick={addLine} disabled={saving}>
+                {saving ? '…' : 'Add'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {receiveOpen && (
+        <ReceiveModal
+          po={{ ...po, lines }}
+          locations={locations}
+          onDone={handleReceiveDone}
+          onClose={() => setReceiveOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Create PO Form ─────────────────────────────────────────────────────────────
+
+function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel }) {
+  const [form, setForm] = useState({
+    supplier_id: '',
+    to_location_id: '',
+    order_date: new Date().toISOString().slice(0,10),
+    expected_date: '',
+    reference_no: '',
+    notes: '',
+  });
+  const [lines, setLines]   = useState(() =>
+    (prefillItems || []).map(item => ({
+      key: item.id,
+      item_id: String(item.id),
+      item_name: item.item_name,
+      sku: item.sku,
+      unit: item.unit,
+      qty_ordered: String(item.reorder_qty > 0 ? item.reorder_qty : 1),
+      unit_cost: item.unit_cost != null ? String(item.unit_cost) : '',
+      notes: '',
+    }))
+  );
+  const [items, setItems]   = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState('');
+
+  useEffect(() => {
+    api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(() => {});
+  }, []);
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const addLine = () => setLines(ls => [...ls, {
+    key: Date.now(), item_id: '', item_name: '', sku: '', unit: '',
+    qty_ordered: '1', unit_cost: '', notes: '',
+  }]);
+
+  const updateLine = (key, field, value) => setLines(ls =>
+    ls.map(l => {
+      if (l.key !== key) return l;
+      const updated = { ...l, [field]: value };
+      if (field === 'item_id') {
+        const item = items.find(i => String(i.id) === value);
+        updated.item_name = item?.name || '';
+        updated.sku = item?.sku || '';
+        updated.unit = item?.unit || '';
+        if (item?.unit_cost != null && !updated.unit_cost) updated.unit_cost = String(item.unit_cost);
+      }
+      return updated;
+    })
+  );
+
+  const removeLine = (key) => setLines(ls => ls.filter(l => l.key !== key));
+
+  const submit = async () => {
+    setError('');
+    const validLines = lines.filter(l => l.item_id && parseFloat(l.qty_ordered) > 0);
+    if (validLines.length === 0) return setError('Add at least one line item.');
+    setSaving(true);
+    try {
+      const payload = {
+        supplier_id: form.supplier_id ? parseInt(form.supplier_id) : null,
+        to_location_id: form.to_location_id ? parseInt(form.to_location_id) : null,
+        order_date: form.order_date,
+        expected_date: form.expected_date || null,
+        reference_no: form.reference_no,
+        notes: form.notes,
+        lines: validLines.map(l => ({
+          item_id: parseInt(l.item_id),
+          qty_ordered: parseFloat(l.qty_ordered),
+          unit_cost: l.unit_cost !== '' ? parseFloat(l.unit_cost) : null,
+          notes: l.notes,
+        })),
+      };
+      const r = await api.post('/inventory/purchase-orders', payload);
+      onSaved(r.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to create PO.');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div style={c.wrap}>
+      <h3 style={c.title}>New Purchase Order</h3>
+      {error && <div style={c.error}>{error}</div>}
+
+      <div style={c.row}>
+        <div style={c.field}>
+          <label style={c.label}>Supplier</label>
+          <select style={c.input} value={form.supplier_id} onChange={e => set('supplier_id', e.target.value)}>
+            <option value="">None</option>
+            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        <div style={c.field}>
+          <label style={c.label}>Default Receive Location</label>
+          <select style={c.input} value={form.to_location_id} onChange={e => set('to_location_id', e.target.value)}>
+            <option value="">None</option>
+            {locations.filter(l => l.active).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+          </select>
+        </div>
+        <div style={c.field}>
+          <label style={c.label}>Order Date</label>
+          <input style={c.input} type="date" value={form.order_date} onChange={e => set('order_date', e.target.value)} />
+        </div>
+        <div style={c.field}>
+          <label style={c.label}>Expected Date</label>
+          <input style={c.input} type="date" value={form.expected_date} onChange={e => set('expected_date', e.target.value)} />
+        </div>
+        <div style={c.field}>
+          <label style={c.label}>Supplier Ref #</label>
+          <input style={c.input} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder="Optional" />
+        </div>
+      </div>
+
+      <div style={c.field}>
+        <label style={c.label}>Notes</label>
+        <textarea style={{ ...c.input, minHeight: 52, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} />
+      </div>
+
+      <div style={c.linesHeader}>
+        <div style={c.linesTitle}>Line Items</div>
+        <button style={c.addLineBtn} onClick={addLine}>+ Add Item</button>
+      </div>
+
+      {lines.length === 0 ? (
+        <div style={c.emptyLines}>No items yet. Click "+ Add Item" to begin.</div>
+      ) : (
+        <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb', marginBottom: 16 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+            <thead>
+              <tr style={{ background: '#f9fafb' }}>
+                <th style={c.th}>Item</th>
+                <th style={{ ...c.th, width: 90 }}>Qty</th>
+                <th style={{ ...c.th, width: 110 }}>Unit Cost</th>
+                <th style={c.th}>Notes</th>
+                <th style={{ ...c.th, width: 36 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line, i) => (
+                <tr key={line.key} style={{ background: i % 2 === 0 ? '#fafafa' : '#fff', borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={c.td}>
+                    <select style={c.cellInput} value={line.item_id}
+                      onChange={e => updateLine(line.key, 'item_id', e.target.value)}>
+                      <option value="">Select item…</option>
+                      {items.map(i => <option key={i.id} value={i.id}>{i.name}{i.sku ? ` (${i.sku})` : ''}</option>)}
+                    </select>
+                  </td>
+                  <td style={c.td}>
+                    <input style={{ ...c.cellInput, textAlign: 'right' }} type="number" min="0.001" step="any"
+                      value={line.qty_ordered} onChange={e => updateLine(line.key, 'qty_ordered', e.target.value)} />
+                  </td>
+                  <td style={c.td}>
+                    <input style={{ ...c.cellInput, textAlign: 'right' }} type="number" min="0" step="0.01"
+                      value={line.unit_cost} onChange={e => updateLine(line.key, 'unit_cost', e.target.value)}
+                      placeholder="—" />
+                  </td>
+                  <td style={c.td}>
+                    <input style={c.cellInput} value={line.notes}
+                      onChange={e => updateLine(line.key, 'notes', e.target.value)} placeholder="Optional" />
+                  </td>
+                  <td style={c.td}>
+                    <button style={c.removeBtn} onClick={() => removeLine(line.key)}>✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div style={c.actions}>
+        <button style={c.cancelBtn} onClick={onCancel}>Cancel</button>
+        <button style={c.saveBtn} onClick={submit} disabled={saving}>
+          {saving ? 'Creating…' : 'Create Draft PO'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
+
+export default function InventoryPurchaseOrders({ locations, suppliers: suppliersProp, prefillLowStock, onPrefillHandled }) {
+  const [view, setView]         = useState('list'); // 'list' | 'create' | 'detail'
+  const [pos, setPos]           = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterSupplier, setFilterSupplier] = useState('');
+  const [suppliers, setSuppliers] = useState(suppliersProp || []);
+  const [prefillItems, setPrefillItems] = useState(null); // null = no prefill
+
+  // Load suppliers if not provided
+  useEffect(() => {
+    if (!suppliersProp || suppliersProp.length === 0) {
+      api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(() => {});
+    }
+  }, []);
+
+  // Handle low-stock reorder prefill
+  useEffect(() => {
+    if (!prefillLowStock) return;
+    api.get('/inventory/stock/low').then(r => {
+      setPrefillItems(r.data);
+      setView('create');
+      onPrefillHandled?.();
+    }).catch(() => {
+      setView('create');
+      setPrefillItems([]);
+      onPrefillHandled?.();
+    });
+  }, [prefillLowStock]);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const params = new URLSearchParams();
+      if (filterStatus) params.set('status', filterStatus);
+      if (filterSupplier) params.set('supplier_id', filterSupplier);
+      const r = await api.get(`/inventory/purchase-orders?${params}`);
+      setPos(r.data);
+    } catch { setError('Failed to load purchase orders.'); }
+    finally { setLoading(false); }
+  }, [filterStatus, filterSupplier]);
+
+  useEffect(() => { if (view === 'list') load(); }, [load, view]);
+
+  const openDetail = async (po) => {
+    try {
+      const r = await api.get(`/inventory/purchase-orders/${po.id}`);
+      setSelected(r.data);
+      setView('detail');
+    } catch { alert('Failed to load PO details.'); }
+  };
+
+  const handleSaved = (newPo) => {
+    setPrefillItems(null);
+    openDetail(newPo);
+    load();
+  };
+
+  const handleBack = (reload) => {
+    setSelected(null);
+    setView('list');
+    if (reload) load();
+  };
+
+  if (view === 'create') {
+    return (
+      <POCreateForm
+        locations={locations}
+        suppliers={suppliers}
+        prefillItems={prefillItems}
+        onSaved={handleSaved}
+        onCancel={() => { setPrefillItems(null); setView('list'); }}
+      />
+    );
+  }
+
+  if (view === 'detail' && selected) {
+    return (
+      <PODetail
+        po={selected}
+        locations={locations}
+        suppliers={suppliers}
+        onBack={handleBack}
+        onUpdate={load}
+      />
+    );
+  }
+
+  // List view
+  return (
+    <div style={l.wrap}>
+      <div style={l.toolbar}>
+        <select style={l.select} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option value="">All Statuses</option>
+          {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        {suppliers.length > 0 && (
+          <select style={l.select} value={filterSupplier} onChange={e => setFilterSupplier(e.target.value)}>
+            <option value="">All Suppliers</option>
+            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        )}
+        <button style={l.createBtn} onClick={() => { setPrefillItems([]); setView('create'); }}>+ New PO</button>
+      </div>
+
+      {error && <div style={l.error}>{error}</div>}
+
+      {loading ? (
+        <div style={l.empty}>Loading…</div>
+      ) : pos.length === 0 ? (
+        <div style={l.empty}>
+          <div style={l.emptyIcon}>📋</div>
+          <p>No purchase orders yet. Create one above.</p>
+        </div>
+      ) : (
+        <div style={l.list}>
+          {pos.map(po => {
+            const ordered  = parseFloat(po.total_ordered  || 0);
+            const received = parseFloat(po.total_received || 0);
+            const pct = ordered > 0 ? Math.round((received / ordered) * 100) : 0;
+            return (
+              <div key={po.id} style={l.card} onClick={() => openDetail(po)}>
+                <div style={l.cardTop}>
+                  <div style={l.cardLeft}>
+                    <div style={l.cardPo}>{po.po_number}</div>
+                    <div style={l.cardMeta}>
+                      {po.supplier_name || <em style={{ color: '#9ca3af' }}>No supplier</em>}
+                      {' · '}
+                      {new Date(po.created_at).toLocaleDateString()}
+                      {po.expected_date && ` · Expected ${new Date(po.expected_date + 'T00:00:00').toLocaleDateString()}`}
+                    </div>
+                  </div>
+                  <div style={l.cardRight}>
+                    <StatusBadge status={po.status} />
+                    <span style={l.lineCount}>{po.line_count} item{po.line_count !== '1' ? 's' : ''}</span>
+                  </div>
+                </div>
+                {po.status !== 'draft' && po.status !== 'cancelled' && ordered > 0 && (
+                  <div style={l.cardProgress}>
+                    <div style={l.progressBar}>
+                      <div style={{ ...l.progressFill, width: `${pct}%`,
+                        background: pct >= 100 ? '#059669' : '#2563eb' }} />
+                    </div>
+                    <span style={l.progressText}>{received}/{ordered} received</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+// Receive modal
+const m = {
+  overlay:   { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 16 },
+  modal:     { background: '#fff', borderRadius: 14, padding: 24, maxWidth: 580, width: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' },
+  header:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  title:     { fontSize: 16, fontWeight: 700, color: '#111827' },
+  closeBtn:  { background: 'none', border: 'none', fontSize: 18, color: '#6b7280', cursor: 'pointer', padding: 0 },
+  error:     { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13 },
+  field:     { marginBottom: 14 },
+  label:     { display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 },
+  input:     { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, boxSizing: 'border-box' },
+  th:        { padding: '8px 10px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', textAlign: 'left', borderBottom: '2px solid #e5e7eb' },
+  td:        { padding: '8px 10px', fontSize: 13, color: '#374151', borderBottom: '1px solid #f3f4f6' },
+  qtyInput:  { width: 80, padding: '4px 6px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, textAlign: 'right' },
+  actions:   { display: 'flex', gap: 10, justifyContent: 'flex-end' },
+  cancelBtn: { padding: '9px 18px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#374151' },
+  confirmBtn:{ padding: '9px 20px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+};
+
+// Detail
+const d = {
+  wrap:         { padding: 16 },
+  backBtn:      { background: 'none', border: 'none', color: '#2563eb', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 16, padding: 0 },
+  headerCard:   { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 20, marginBottom: 16 },
+  headerTop:    { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 12 },
+  poNumber:     { fontSize: 20, fontWeight: 800, color: '#111827' },
+  poMeta:       { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  headerActions:{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  editBtn:      { padding: '7px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' },
+  cancelEditBtn:{ padding: '7px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' },
+  submitBtn:    { padding: '7px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  receiveBtn:   { padding: '7px 16px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  cancelBtn:    { padding: '7px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fee2e2', color: '#dc2626', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  error:        { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '8px 12px', marginTop: 8, fontSize: 13 },
+  infoGrid:     { display: 'flex', flexWrap: 'wrap', gap: '8px 24px', marginTop: 4 },
+  infoItem:     { display: 'flex', flexDirection: 'column', gap: 2 },
+  infoLabel:    { fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' },
+  infoValue:    { fontSize: 14, color: '#374151' },
+  editGrid:     { display: 'flex', flexWrap: 'wrap', gap: '8px 12px', marginTop: 8 },
+  editField:    { display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 140 },
+  editLabel:    { fontSize: 11, fontWeight: 700, color: '#6b7280' },
+  editInput:    { padding: '7px 9px', borderRadius: 7, border: '1px solid #d1d5db', fontSize: 13, width: '100%', boxSizing: 'border-box', background: '#fff' },
+  progress:     { display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 },
+  progressBar:  { flex: 1, height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', background: '#2563eb', borderRadius: 3, transition: 'width 0.3s' },
+  progressText: { fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' },
+  linesHeader:  { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  linesTitle:   { fontSize: 15, fontWeight: 700, color: '#374151' },
+  addLineBtn:   { padding: '6px 14px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  emptyLines:   { fontSize: 13, color: '#9ca3af', padding: '16px 0' },
+  tableWrap:    { overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb', marginBottom: 16 },
+  table:        { width: '100%', borderCollapse: 'collapse', minWidth: 520 },
+  thead:        { background: '#f9fafb' },
+  th:           { padding: '10px 12px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left', borderBottom: '2px solid #e5e7eb' },
+  row:          { borderBottom: '1px solid #f3f4f6' },
+  rowEven:      { background: '#fafafa', borderBottom: '1px solid #f3f4f6' },
+  td:           { padding: '10px 12px', fontSize: 14, color: '#374151' },
+  totalRow:     { background: '#f0fdf4', borderTop: '2px solid #d1fae5' },
+  removeBtn:    { background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '2px 4px' },
+  addLineForm:  { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: 14, marginBottom: 16 },
+  lineErr:      { background: '#fee2e2', color: '#dc2626', borderRadius: 7, padding: '6px 10px', marginBottom: 10, fontSize: 13 },
+  addLineRow:   { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' },
+  addLineField: { display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 140 },
+  addLineBtns:  { display: 'flex', gap: 6, alignSelf: 'flex-end' },
+};
+
+// Create form
+const c = {
+  wrap:       { padding: 16 },
+  title:      { fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 16 },
+  error:      { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 14 },
+  row:        { display: 'flex', gap: 12, flexWrap: 'wrap' },
+  field:      { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 160, marginBottom: 12 },
+  label:      { fontSize: 12, fontWeight: 600, color: '#374151' },
+  input:      { padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', width: '100%', boxSizing: 'border-box' },
+  linesHeader:{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, marginTop: 4 },
+  linesTitle: { fontSize: 14, fontWeight: 700, color: '#374151' },
+  addLineBtn: { padding: '6px 14px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  emptyLines: { fontSize: 13, color: '#9ca3af', padding: '12px 0', marginBottom: 16 },
+  th:         { padding: '8px 10px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', textAlign: 'left', borderBottom: '2px solid #e5e7eb', background: '#f9fafb' },
+  td:         { padding: '6px 8px', borderBottom: '1px solid #f3f4f6' },
+  cellInput:  { width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' },
+  removeBtn:  { background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 14, padding: '3px 5px' },
+  actions:    { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 },
+  cancelBtn:  { padding: '9px 18px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#374151' },
+  saveBtn:    { padding: '9px 20px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+};
+
+// List
+const l = {
+  wrap:         { padding: 16 },
+  toolbar:      { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 },
+  select:       { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151' },
+  createBtn:    { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginLeft: 'auto', whiteSpace: 'nowrap' },
+  error:        { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },
+  empty:        { textAlign: 'center', padding: '60px 24px', color: '#6b7280', fontSize: 15 },
+  emptyIcon:    { fontSize: 40, marginBottom: 12 },
+  list:         { display: 'flex', flexDirection: 'column', gap: 10 },
+  card:         { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, cursor: 'pointer', transition: 'border-color 0.15s' },
+  cardTop:      { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
+  cardLeft:     { flex: 1, minWidth: 0 },
+  cardPo:       { fontSize: 16, fontWeight: 800, color: '#111827', fontFamily: 'monospace' },
+  cardMeta:     { fontSize: 12, color: '#6b7280', marginTop: 2 },
+  cardRight:    { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
+  lineCount:    { fontSize: 12, color: '#9ca3af' },
+  cardProgress: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 },
+  progressBar:  { flex: 1, height: 5, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3, transition: 'width 0.3s' },
+  progressText: { fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' },
+};

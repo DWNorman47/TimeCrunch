@@ -101,13 +101,16 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     notify_timeoff_requests: settings?.notify_timeoff_requests ?? true,
     notify_budget_alerts: settings?.notify_budget_alerts ?? true,
     notify_entry_submitted: settings?.notify_entry_submitted ?? false,
+    report_weekly_payroll: settings?.report_weekly_payroll ?? false,
+    report_weekly_low_stock: settings?.report_weekly_low_stock ?? false,
+    report_monthly_valuation: settings?.report_monthly_valuation ?? false,
   });
   const [prevailingEnabled, setPrevailingEnabled] = useState(() => (settings?.prevailing_wage_rate ?? 0) > 0);
   const [checklistTemplates, setChecklistTemplates] = useState([]);
   useEffect(() => {
     api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(() => {});
   }, []);
-  const DEFAULT_COLLAPSED = { wages: true, overtime: true, notifications: true, access: true, modules: true, features: true, storage: true };
+  const DEFAULT_COLLAPSED = { wages: true, overtime: true, notifications: true, reports: true, access: true, modules: true, features: true, storage: true };
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem('opsfloa_company_sections');
@@ -163,6 +166,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       notify_timeoff_requests: settings.notify_timeoff_requests ?? true,
       notify_budget_alerts: settings.notify_budget_alerts ?? true,
       notify_entry_submitted: settings.notify_entry_submitted ?? false,
+      report_weekly_payroll: settings.report_weekly_payroll ?? false,
+      report_weekly_low_stock: settings.report_weekly_low_stock ?? false,
+      report_monthly_valuation: settings.report_monthly_valuation ?? false,
     });
   }, [settings]);
 
@@ -208,6 +214,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         notify_timeoff_requests: form.notify_timeoff_requests,
         notify_budget_alerts: form.notify_budget_alerts,
         notify_entry_submitted: form.notify_entry_submitted,
+        report_weekly_payroll: form.report_weekly_payroll,
+        report_weekly_low_stock: form.report_weekly_low_stock,
+        report_monthly_valuation: form.report_monthly_valuation,
       });
       onSettingsUpdated(r.data);
       setSaved(section);
@@ -441,6 +450,51 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
         </div>}
         {!collapsed.notifications && <SectionFooter section="notifications" />}
+      </div>
+
+      {/* ── Scheduled Reports ── */}
+      <div style={styles.section}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('reports')}>
+          <span style={styles.sectionIcon}>📧</span>
+          <div style={{ flex: 1 }}>
+            <div style={styles.sectionTitle}>Scheduled Email Reports</div>
+            <div style={styles.sectionSub}>Automated email summaries sent to the primary admin. All off by default.</div>
+          </div>
+          <span style={styles.collapseChevron}>{collapsed.reports ? '▶' : '▼'}</span>
+        </div>
+        {!collapsed.reports && <div style={styles.sectionBody}>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Weekly Payroll Summary</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Every Monday — total hours and overtime per worker for the prior week</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.report_weekly_payroll ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.report_weekly_payroll} onChange={e => set('report_weekly_payroll', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.report_weekly_payroll ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Weekly Low-Stock Report</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Every Monday — items at or below their reorder point (skipped if none)</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.report_weekly_low_stock ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.report_weekly_low_stock} onChange={e => set('report_weekly_low_stock', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.report_weekly_low_stock ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Monthly Inventory Valuation</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>1st of each month — full inventory value breakdown by item</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.report_monthly_valuation ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.report_monthly_valuation} onChange={e => set('report_monthly_valuation', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.report_monthly_valuation ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+        </div>}
+        {!collapsed.reports && <SectionFooter section="reports" />}
       </div>
 
       {/* ── Worker Access ── */}

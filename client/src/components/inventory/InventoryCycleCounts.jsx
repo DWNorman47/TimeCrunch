@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../api';
 import { parseBinQR } from './BinLabelModal';
+import { parseItemQR } from './ItemLabelModal';
+import UomConversionModal from './UomConversionModal';
 
 const COUNT_TYPES = {
   cycle:     { label: 'Cycle Count',     color: '#2563eb', bg: '#dbeafe',   desc: 'Count stock at a specific location' },
@@ -32,6 +34,20 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [reportLines, setReportLines] = useState(null); // non-null after completion
+  // UOM support: per-line selected UOM and lazy-loaded item UOM lists
+  const [lineUomSelections, setLineUomSelections] = useState({}); // { [lineId]: uomId | null }
+  const [lineInputValues, setLineInputValues]     = useState({}); // { [lineId]: string }
+  const [itemUomCache, setItemUomCache]           = useState({}); // { [itemId]: [uoms] }
+  const [conversionPrompt, setConversionPrompt]   = useState(null); // { lineId, itemId, uom, baseUnit }
+
+  const fetchItemUoms = async (itemId) => {
+    if (itemUomCache[itemId]) return;
+    try {
+      const r = await api.get(`/inventory/items/${itemId}/uoms`);
+      setItemUomCache(prev => ({ ...prev, [itemId]: r.data.filter(u => u.active) }));
+    } catch {}
+  };
 
   // ── Scan Mode ────────────────────────────────────────────────────────────────
   const [scanMode, setScanMode] = useState(false);
@@ -85,7 +101,20 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       return;
     }
 
-    // 2. Try to match against item SKUs in the count lines
+    // 2. Try to parse as item QR code
+    const itemQR = parseItemQR(value);
+    if (itemQR) {
+      const match = lines.find(l => l.item_id === itemQR.id);
+      if (match) {
+        setHighlightedId(match.id);
+        showFeedback(`Found: ${match.item_name}`);
+      } else {
+        showFeedback(`Item "${itemQR.name}" not in this count`, true);
+      }
+      return;
+    }
+
+    // 3. Try to match against item SKUs in the count lines
     const match = lines.find(l =>
       l.sku && l.sku.trim().toLowerCase() === value.toLowerCase()
     );
@@ -100,13 +129,14 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const isAudit = countData.count_type === 'audit';
   const isFull  = countData.count_type === 'full';
 
-  const patchLine = async (line, countedQty) => {
+  const patchLine = async (line, countedQty, countedUomId) => {
     setSaving(line.id);
     try {
-      const r = await api.patch(`/inventory/cycle-counts/${count.id}/lines/${line.id}`, { counted_qty: countedQty });
-      setLines(prev => prev.map(l => l.id === line.id
-        ? { ...l, ...r.data, variance: parseFloat(countedQty) - parseFloat(l.expected_qty) }
-        : l));
+      const payload = { counted_qty: countedQty };
+      // Always send counted_uom_id so the server can compute correct variance
+      payload.counted_uom_id = (countedUomId !== undefined ? countedUomId : lineUomSelections[line.id]) ?? null;
+      const r = await api.patch(`/inventory/cycle-counts/${count.id}/lines/${line.id}`, payload);
+      setLines(prev => prev.map(l => l.id === line.id ? { ...l, ...r.data } : l));
     } catch (e) {
       alert(e.response?.data?.error || 'Failed to save count.');
     } finally {
@@ -125,12 +155,39 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     setCompleting(true); setError('');
     try {
       await api.post(`/inventory/cycle-counts/${count.id}/complete`);
-      onComplete();
+      setConfirmOpen(false);
+      setReportLines(lines); // show variance report
     } catch (e) {
       setError(e.response?.data?.error || 'Failed to complete count.');
-    } finally {
       setCompleting(false); setConfirmOpen(false);
+    } finally {
+      setCompleting(false);
     }
+  };
+
+  const downloadVarianceCSV = (reportData) => {
+    const header = ['Item', 'SKU', 'Unit', 'Expected Qty', 'Counted Qty', 'Variance'];
+    const rows = reportData.map(l => {
+      const expected = parseFloat(l.expected_qty);
+      const counted  = l.counted_qty != null ? parseFloat(l.counted_qty) : '';
+      const variance = counted !== '' ? counted - expected : '';
+      return [
+        `"${l.item_name.replace(/"/g, '""')}"`,
+        l.sku || '',
+        l.unit,
+        expected,
+        counted,
+        variance,
+      ].join(',');
+    });
+    const csv = [header.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `variance-report-${count.id}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const uncounted = lines.filter(l => l.counted_qty === null || l.counted_qty === undefined).length;
@@ -153,53 +210,114 @@ function CycleCountDetail({ count, onBack, onComplete }) {
 
   const renderLine = (line, i) => {
     const counted = line.counted_qty !== null && line.counted_qty !== undefined;
-    const variance = counted ? parseFloat(line.counted_qty) - parseFloat(line.expected_qty) : null;
+    // variance is now stored in stock UOM units by the server
+    const variance = line.variance != null ? parseFloat(line.variance) : null;
     const showExpected = !isAudit || isCompleted;
     const isHighlighted = highlightedId === line.id;
     const rowStyle = isHighlighted
       ? { ...d.row, background: '#fef9c3', outline: '2px solid #f59e0b' }
       : i % 2 === 0 ? d.rowEven : d.row;
 
+    // UOM resolution
+    const stockUnit      = line.stock_uom_unit  || line.unit;  // unit of the expected qty
+    const stockUomId     = line.stock_uom_id    || null;
+    const stockFactor    = parseFloat(line.stock_uom_factor  || 1);
+    const availableUoms  = itemUomCache[line.item_id] || [];
+    const selectedUomId  = lineUomSelections[line.id] !== undefined
+      ? lineUomSelections[line.id] : stockUomId;
+    const selectedUom    = availableUoms.find(u => u.id === selectedUomId);
+    const selectedUnit   = selectedUom ? `${selectedUom.unit}${selectedUom.unit_spec ? ` (${selectedUom.unit_spec})` : ''}` : stockUnit;
+    const isDifferentUom = selectedUomId !== stockUomId;
+
+    // Conversion hint: show what the current input value converts to in stock units
+    const inputVal = lineInputValues[line.id];
+    let conversionHint = null;
+    if (isDifferentUom && inputVal !== undefined && inputVal !== '') {
+      const n = parseFloat(inputVal);
+      if (!isNaN(n) && selectedUom) {
+        const countedFactor = parseFloat(selectedUom.factor || 1);
+        const inStockUnits = n * (countedFactor / stockFactor);
+        conversionHint = `= ${inStockUnits % 1 === 0 ? inStockUnits.toFixed(0) : inStockUnits.toFixed(3).replace(/\.?0+$/, '')} ${stockUnit}`;
+      }
+    }
+
     return (
       <tr key={line.id} id={`ccline-${line.id}`} style={rowStyle}>
         <td style={{ ...d.td, fontWeight: 600 }}>{line.item_name}</td>
         <td style={{ ...d.td, fontFamily: 'monospace', fontSize: 12, color: '#6b7280' }}>{line.sku || '—'}</td>
-        <td style={{ ...d.td, color: '#6b7280' }}>{line.unit}</td>
+        <td style={{ ...d.td, color: '#6b7280' }}>{stockUnit}</td>
         {showExpected && (
           <td style={{ ...d.td, textAlign: 'right' }}>{parseFloat(line.expected_qty)}</td>
         )}
-        <td style={{ ...d.td, textAlign: 'right' }}>
+        <td style={{ ...d.td }}>
           {!isCompleted ? (
-            <input
-              ref={el => { lineInputRefs.current[line.id] = el; }}
-              style={{ ...d.countInput, ...(isHighlighted ? { borderColor: '#f59e0b', boxShadow: '0 0 0 2px #fde68a' } : {}) }}
-              type="number"
-              min="0"
-              step="any"
-              defaultValue={counted ? line.counted_qty : ''}
-              placeholder="—"
-              disabled={saving === line.id}
-              onBlur={e => {
-                const val = e.target.value;
-                if (val !== '' && val !== String(line.counted_qty)) patchLine(line, parseFloat(val));
-                // Return focus to scan input after entering a count
-                if (scanMode) setTimeout(() => scanInputRef.current?.focus(), 50);
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.target.blur(); // triggers onBlur → save + refocus scan input
-                  setHighlightedId(null);
-                }
-              }}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <input
+                  ref={el => { lineInputRefs.current[line.id] = el; }}
+                  style={{ ...d.countInput, ...(isHighlighted ? { borderColor: '#f59e0b', boxShadow: '0 0 0 2px #fde68a' } : {}) }}
+                  type="number"
+                  min="0"
+                  step="any"
+                  defaultValue={counted ? line.counted_qty : ''}
+                  placeholder="—"
+                  disabled={saving === line.id}
+                  onChange={e => setLineInputValues(prev => ({ ...prev, [line.id]: e.target.value }))}
+                  onFocus={() => { if (!itemUomCache[line.item_id]) fetchItemUoms(line.item_id); }}
+                  onBlur={e => {
+                    const val = e.target.value;
+                    if (val !== '' && val !== String(line.counted_qty)) patchLine(line, parseFloat(val));
+                    if (scanMode) setTimeout(() => scanInputRef.current?.focus(), 50);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.target.blur(); setHighlightedId(null); }
+                  }}
+                />
+                {/* UOM selector — only shown if item has alternate UOMs */}
+                {availableUoms.length > 1 && (
+                  <select
+                    style={d.uomSelect}
+                    value={selectedUomId ?? ''}
+                    onChange={e => {
+                      const newUomId = e.target.value ? parseInt(e.target.value) : null;
+                      setLineUomSelections(prev => ({ ...prev, [line.id]: newUomId }));
+                      // Check if conversion factor needs to be set
+                      const newUom = availableUoms.find(u => u.id === newUomId);
+                      if (newUom && !newUom.is_base && parseFloat(newUom.factor) === 1) {
+                        setConversionPrompt({ lineId: line.id, itemId: line.item_id, uom: newUom, baseUnit: stockUnit });
+                      }
+                      // If a qty is already entered, re-patch with new UOM
+                      const inputEl = lineInputRefs.current[line.id];
+                      if (inputEl && inputEl.value !== '') {
+                        patchLine(line, parseFloat(inputEl.value), newUomId);
+                      }
+                    }}
+                  >
+                    {availableUoms.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ' — base' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              {conversionHint && (
+                <span style={{ fontSize: 11, color: '#6b7280' }}>{conversionHint}</span>
+              )}
+            </div>
           ) : (
-            <span>{counted ? parseFloat(line.counted_qty) : '—'}</span>
+            <div style={{ textAlign: 'right' }}>
+              <span>{counted ? parseFloat(line.counted_qty) : '—'}</span>
+              {line.counted_uom_unit && line.counted_uom_unit !== stockUnit && (
+                <span style={{ fontSize: 11, color: '#6b7280', marginLeft: 4 }}>{line.counted_uom_unit}</span>
+              )}
+            </div>
           )}
         </td>
-        {(showExpected) && (
+        {showExpected && (
           <td style={{ ...d.td, textAlign: 'right', fontWeight: variance !== null && variance !== 0 ? 700 : 400,
             color: variance === null ? '#9ca3af' : variance > 0 ? '#059669' : variance < 0 ? '#dc2626' : '#374151' }}>
-            {variance === null ? '—' : variance > 0 ? `+${variance}` : variance}
+            {variance === null ? '—' : `${variance > 0 ? '+' : ''}${variance % 1 === 0 ? variance.toFixed(0) : variance.toFixed(3).replace(/\.?0+$/, '')} ${stockUnit}`}
           </td>
         )}
         <td style={{ ...d.td, fontSize: 13, color: '#6b7280' }}>{line.counted_by_name || '—'}</td>
@@ -335,6 +453,73 @@ function CycleCountDetail({ count, onBack, onComplete }) {
         <p style={d.uncountedNote}>{uncounted} item{uncounted !== 1 ? 's' : ''} not yet counted.</p>
       )}
 
+      {reportLines && (
+        <div style={d.modalOverlay}>
+          <div style={{ ...d.modal, maxWidth: 560 }}>
+            <h3 style={d.modalTitle}>Count Complete — Variance Report</h3>
+            {(() => {
+              const withVariance = reportLines.filter(l => {
+                if (l.counted_qty == null) return false;
+                return parseFloat(l.counted_qty) - parseFloat(l.expected_qty) !== 0;
+              });
+              const noVariance = reportLines.filter(l => {
+                if (l.counted_qty == null) return true;
+                return parseFloat(l.counted_qty) - parseFloat(l.expected_qty) === 0;
+              });
+              return (
+                <>
+                  <p style={d.modalBody}>
+                    {withVariance.length === 0
+                      ? 'No variances — all counts matched expected quantities.'
+                      : `${withVariance.length} item${withVariance.length !== 1 ? 's' : ''} with variance, ${noVariance.length} matched.`}
+                  </p>
+                  <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: '#f9fafb' }}>
+                          <th style={d.rth}>Item</th>
+                          <th style={{ ...d.rth, textAlign: 'right' }}>Expected</th>
+                          <th style={{ ...d.rth, textAlign: 'right' }}>Counted</th>
+                          <th style={{ ...d.rth, textAlign: 'right' }}>Variance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...withVariance, ...noVariance].map((l, i) => {
+                          const expected = parseFloat(l.expected_qty);
+                          const counted  = l.counted_qty != null ? parseFloat(l.counted_qty) : null;
+                          const variance = counted != null ? counted - expected : null;
+                          const isVar    = variance !== null && variance !== 0;
+                          return (
+                            <tr key={l.id} style={{ background: isVar ? '#fff7ed' : (i % 2 === 0 ? '#fafafa' : '#fff') }}>
+                              <td style={{ ...d.rtd, fontWeight: isVar ? 700 : 400 }}>
+                                {isFull && l.location_name ? <span style={{ color: '#9ca3af', marginRight: 4 }}>{l.location_name} —</span> : ''}
+                                {l.item_name}
+                              </td>
+                              <td style={{ ...d.rtd, textAlign: 'right', color: '#6b7280' }}>{expected} {l.unit}</td>
+                              <td style={{ ...d.rtd, textAlign: 'right' }}>{counted != null ? `${counted} ${l.unit}` : <em style={{ color: '#9ca3af' }}>not counted</em>}</td>
+                              <td style={{ ...d.rtd, textAlign: 'right', fontWeight: 700,
+                                color: variance === null ? '#9ca3af' : variance > 0 ? '#059669' : variance < 0 ? '#dc2626' : '#374151' }}>
+                                {variance === null ? '—' : variance > 0 ? `+${variance}` : variance}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
+            <div style={d.modalActions}>
+              <button style={d.cancelBtn} onClick={() => { setReportLines(null); onComplete(); }}>Close</button>
+              <button style={{ ...d.confirmBtn, background: '#2563eb' }} onClick={() => downloadVarianceCSV(reportLines)}>
+                Download CSV
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmOpen && (
         <div style={d.modalOverlay}>
           <div style={d.modal}>
@@ -364,6 +549,22 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             </div>
           </div>
         </div>
+      )}
+
+      {conversionPrompt && (
+        <UomConversionModal
+          itemId={conversionPrompt.itemId}
+          uom={conversionPrompt.uom}
+          baseUnit={conversionPrompt.baseUnit}
+          onSaved={updatedList => {
+            setItemUomCache(prev => ({
+              ...prev,
+              [conversionPrompt.itemId]: updatedList.filter(u => u.active),
+            }));
+            setConversionPrompt(null);
+          }}
+          onDismiss={() => setConversionPrompt(null)}
+        />
       )}
     </div>
   );
@@ -559,6 +760,7 @@ const d = {
   rowEven:       { background: '#fafafa', borderBottom: '1px solid #f3f4f6' },
   td:            { padding: '10px 12px', fontSize: 14, color: '#374151' },
   countInput:    { width: 80, padding: '5px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 14, textAlign: 'right' },
+  uomSelect:     { padding: '5px 6px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 12, color: '#374151', background: '#f9fafb', cursor: 'pointer' },
   uncountedNote: { textAlign: 'center', fontSize: 13, color: '#d97706', fontWeight: 600, marginTop: 12 },
   locationHeader:{ fontSize: 13, fontWeight: 700, color: '#374151', padding: '8px 0 6px', borderBottom: '2px solid #e5e7eb', marginBottom: 4 },
   modalOverlay:  { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 },
@@ -570,6 +772,8 @@ const d = {
   modalActions:  { display: 'flex', gap: 10, justifyContent: 'flex-end' },
   cancelBtn:     { padding: '9px 18px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#374151' },
   confirmBtn:    { padding: '9px 20px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  rth:           { padding: '8px 10px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', textAlign: 'left', borderBottom: '2px solid #e5e7eb' },
+  rtd:           { padding: '8px 10px', fontSize: 13, color: '#374151', borderBottom: '1px solid #f3f4f6' },
 };
 
 const s = {

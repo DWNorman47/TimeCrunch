@@ -20,6 +20,7 @@ import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
 import AdminTimeOff from '../components/AdminTimeOff';
 import OnboardingChecklist from '../components/OnboardingChecklist';
+import ReimbursementsAdmin from '../components/ReimbursementsAdmin';
 import api from '../api';
 
 
@@ -53,6 +54,7 @@ export default function AdminDashboard() {
   const [loadError, setLoadError] = useState(false);
   const [billing, setBilling] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingReimbursements, setPendingReimbursements] = useState(0);
   const [collapsedSections, setCollapsedSections] = useState(() => {
     try { return JSON.parse(localStorage.getItem('opsfloa_report_sections') || '{}'); } catch { return {}; }
   });
@@ -69,6 +71,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchPending = () => {
       api.get('/admin/kpis').then(r => setPendingCount(r.data.pending_approvals ?? 0)).catch(() => {});
+      api.get('/reimbursements/admin?status=pending').then(r => setPendingReimbursements(r.data.length)).catch(() => {});
     };
     fetchPending();
     const interval = setInterval(fetchPending, 60000);
@@ -77,7 +80,7 @@ export default function AdminDashboard() {
   // Permission helper — null admin_permissions means full access
   const canDo = key => !user?.admin_permissions || user.admin_permissions[key] === true;
 
-  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'timeoff', 'manage'];
+  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'timeoff', 'expenses', 'manage'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
 
@@ -147,6 +150,7 @@ export default function AdminDashboard() {
             ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
             { id: 'timeoff', label: '🏖 Time Off' },
+            { id: 'expenses', label: '💳 Expenses', dot: pendingReimbursements > 0 ? '#f59e0b' : null },
             ...(settings?.feature_scheduling !== false ? [{ id: 'manage', label: t.tabManage }] : []),
           ]}
         />
@@ -224,6 +228,8 @@ export default function AdminDashboard() {
           </>
         ) : tab === 'timeoff' ? (
           <AdminTimeOff />
+        ) : tab === 'expenses' ? (
+          <ReimbursementsAdmin />
         ) : tab === 'manage' ? (
           <>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}

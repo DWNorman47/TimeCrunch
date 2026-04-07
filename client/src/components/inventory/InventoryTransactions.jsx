@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
+import UomConversionModal from './UomConversionModal';
 
 const TYPE_LABELS = { receive: 'Receive', issue: 'Issue', transfer: 'Transfer', adjust: 'Adjust', convert: 'Convert' };
 const TYPE_COLORS = {
@@ -10,8 +11,11 @@ const TYPE_COLORS = {
   convert:  { color: '#8b5cf6', bg: '#ede9fe' },
 };
 
-function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
+function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onConversionSaved }) {
   const [items, setItems] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [locationStock, setLocationStock] = useState(null); // { quantity, unit, uom_id } at from_location
+  const [conversionPrompt, setConversionPrompt] = useState(null); // { uom, baseUnit, field }
   const [form, setForm] = useState({
     type: isAdmin ? 'receive' : 'issue',
     item_id: '',
@@ -29,6 +33,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
     notes: '',
     reference_no: '',
     unit_cost: '',
+    supplier_id: '',
+    lot_number: '',
   });
   const [itemUoms, setItemUoms] = useState([]);
   // Cascading bin options for the destination location
@@ -39,17 +45,48 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
 
   useEffect(() => {
     api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(() => {});
-  }, []);
+    if (isAdmin) api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(() => {});
+  }, [isAdmin]);
 
   // Load UOMs when item changes
   useEffect(() => {
     setItemUoms([]);
     set('uom_id', ''); set('to_uom_id', ''); set('to_quantity', '');
+    setLocationStock(null);
     if (!form.item_id) return;
     api.get(`/inventory/items/${form.item_id}/uoms`)
       .then(r => setItemUoms(r.data.filter(u => u.active)))
       .catch(() => {});
   }, [form.item_id]);
+
+  // Prompt for conversion factor when admin selects a non-base UOM with factor=1
+  const checkConversionNeeded = (uomId, field) => {
+    if (!isAdmin || !uomId || !form.item_id) return;
+    const uom = itemUoms.find(u => String(u.id) === String(uomId));
+    if (uom && !uom.is_base && parseFloat(uom.factor) === 1) {
+      const baseUom  = itemUoms.find(u => u.is_base);
+      const baseUnit = baseUom
+        ? `${baseUom.unit}${baseUom.unit_spec ? ` (${baseUom.unit_spec})` : ''}`
+        : items.find(i => String(i.id) === form.item_id)?.unit || 'base unit';
+      setConversionPrompt({ uom, baseUnit, field });
+    }
+  };
+
+  useEffect(() => { checkConversionNeeded(form.uom_id, 'uom_id'); }, [form.uom_id]);
+  useEffect(() => { checkConversionNeeded(form.to_uom_id, 'to_uom_id'); }, [form.to_uom_id]);
+
+  // Load current stock at from_location when item + location both set (for issue/transfer)
+  useEffect(() => {
+    setLocationStock(null);
+    const locId = form.from_location_id;
+    if (!form.item_id || !locId || !['issue', 'transfer', 'convert'].includes(form.type)) return;
+    api.get(`/inventory/stock?location_id=${locId}`)
+      .then(r => {
+        const row = r.data.find(s => String(s.item_id) === String(form.item_id));
+        setLocationStock(row || null);
+      })
+      .catch(() => {});
+  }, [form.item_id, form.from_location_id, form.type]);
 
   // Cascade bin options when destination location changes
   useEffect(() => {
@@ -118,6 +155,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
         notes: form.notes || undefined,
         reference_no: form.reference_no || undefined,
         unit_cost: form.unit_cost !== '' ? parseFloat(form.unit_cost) : undefined,
+        supplier_id: form.supplier_id ? parseInt(form.supplier_id) : undefined,
+        lot_number: form.lot_number || undefined,
       };
       const r = await api.post('/inventory/transactions', payload);
       if (r.data.warning === 'stock_negative') {
@@ -162,7 +201,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
             <option value="issue">Issue — consume or send to job site</option>
             <option value="transfer">Transfer — move between locations</option>
             <option value="adjust">Adjust — manual correction</option>
-            <option value="convert">Convert — break into a different unit/pack size</option>
+            <option value="convert">Convert/Split — open a box, break a pallet, change units</option>
           </select>
         </div>
       )}
@@ -241,6 +280,20 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
             <option value="">Select location…</option>
             {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
+          {locationStock && (() => {
+            const qty = parseFloat(locationStock.quantity);
+            const stockUnit = locationStock.uom_unit
+              ? `${locationStock.uom_unit}${locationStock.uom_spec ? ` (${locationStock.uom_spec})` : ''}`
+              : locationStock.unit;
+            return (
+              <div style={f.stockHint}>
+                On hand: <strong>{qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)} {stockUnit}</strong>
+                {locationStock.uom_unit && locationStock.unit !== locationStock.uom_unit && (
+                  <span style={{ color: '#6b7280' }}> — enter qty in any unit above; system converts automatically</span>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -305,16 +358,35 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
       )}
 
       {isAdmin && (
-        <div style={f.row}>
-          <div style={f.field}>
-            <label style={f.label}>Unit Cost ($)</label>
-            <input style={f.input} type="number" min="0" step="0.01" value={form.unit_cost} onChange={e => set('unit_cost', e.target.value)} placeholder="From catalog" />
+        <>
+          <div style={f.row}>
+            <div style={f.field}>
+              <label style={f.label}>Unit Cost ($)</label>
+              <input style={f.input} type="number" min="0" step="0.01" value={form.unit_cost} onChange={e => set('unit_cost', e.target.value)} placeholder="From catalog" />
+            </div>
+            <div style={f.field}>
+              <label style={f.label}>Reference / PO #</label>
+              <input style={f.input} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder="Optional" />
+            </div>
           </div>
-          <div style={f.field}>
-            <label style={f.label}>Reference / PO #</label>
-            <input style={f.input} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder="Optional" />
+          <div style={f.row}>
+            {form.type === 'receive' && suppliers.length > 0 && (
+              <div style={f.field}>
+                <label style={f.label}>Supplier</label>
+                <select style={f.input} value={form.supplier_id} onChange={e => set('supplier_id', e.target.value)}>
+                  <option value="">None</option>
+                  {suppliers.map(sup => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
+                </select>
+              </div>
+            )}
+            {(form.type === 'receive' || form.type === 'adjust') && (
+              <div style={f.field}>
+                <label style={f.label}>Lot / Batch #</label>
+                <input style={f.input} value={form.lot_number} onChange={e => set('lot_number', e.target.value)} placeholder="Optional" />
+              </div>
+            )}
           </div>
-        </div>
+        </>
       )}
 
       <div style={f.field}>
@@ -326,17 +398,36 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
         <button type="button" style={f.cancelBtn} onClick={onCancel}>Cancel</button>
         <button type="submit" style={f.saveBtn} disabled={saving}>{saving ? 'Saving…' : 'Log Transaction'}</button>
       </div>
+
+      {conversionPrompt && (
+        <UomConversionModal
+          itemId={form.item_id}
+          uom={conversionPrompt.uom}
+          baseUnit={conversionPrompt.baseUnit}
+          onSaved={updatedList => {
+            setItemUoms(updatedList.filter(u => u.active));
+            setConversionPrompt(null);
+            onConversionSaved?.();
+          }}
+          onDismiss={() => setConversionPrompt(null)}
+        />
+      )}
     </form>
   );
 }
 
-export default function InventoryTransactions({ isAdmin, locations, projects, onTransaction }) {
+export default function InventoryTransactions({ isAdmin, locations, projects, onTransaction, onConversionSaved }) {
   const [transactions, setTransactions] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [filters, setFilters] = useState({ type: '', location_id: '', from: '', to: '' });
+  const [filters, setFilters] = useState({ type: '', location_id: '', from: '', to: '', supplier_id: '', lot_number: '' });
+  const [suppliers, setSuppliers] = useState([]);
+
+  useEffect(() => {
+    if (isAdmin) api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(() => {});
+  }, [isAdmin]);
   const [offset, setOffset] = useState(0);
   const LIMIT = 50;
 
@@ -348,6 +439,8 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
       if (filters.location_id) params.set('location_id', filters.location_id);
       if (filters.from) params.set('from', filters.from);
       if (filters.to) params.set('to', filters.to);
+      if (filters.supplier_id) params.set('supplier_id', filters.supplier_id);
+      if (filters.lot_number) params.set('lot_number', filters.lot_number);
       const r = await api.get(`/inventory/transactions?${params}`);
       setTransactions(r.data.transactions);
       setTotal(r.data.total);
@@ -380,6 +473,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
           projects={projects}
           onSave={handleSave}
           onCancel={() => setShowForm(false)}
+          onConversionSaved={onConversionSaved}
         />
       ) : (
         <>
@@ -394,8 +488,32 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
               <option value="">All Locations</option>
               {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
-            <input style={s.dateInput} type="date" value={filters.from} onChange={e => setFilter('from', e.target.value)} title="From date" />
-            <input style={s.dateInput} type="date" value={filters.to} onChange={e => setFilter('to', e.target.value)} title="To date" />
+            <div style={s.dateWrap}>
+              <span style={s.dateLabel}>From</span>
+              <input style={s.dateInput} type="date" value={filters.from} onChange={e => setFilter('from', e.target.value)} />
+            </div>
+            <div style={s.dateWrap}>
+              <span style={s.dateLabel}>To</span>
+              <input style={s.dateInput} type="date" value={filters.to} onChange={e => setFilter('to', e.target.value)} />
+            </div>
+            {(filters.from || filters.to) && (
+              <button style={s.clearDates} onClick={() => setFilters(f => ({ ...f, from: '', to: '' }))} title="Clear date range">✕ Dates</button>
+            )}
+            {isAdmin && suppliers.length > 0 && (
+              <select style={s.select} value={filters.supplier_id} onChange={e => setFilter('supplier_id', e.target.value)}>
+                <option value="">All Suppliers</option>
+                {suppliers.map(sup => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
+              </select>
+            )}
+            {isAdmin && (
+              <input
+                style={{ ...s.dateInput, minWidth: 120 }}
+                type="text"
+                placeholder="Lot # filter…"
+                value={filters.lot_number}
+                onChange={e => setFilter('lot_number', e.target.value)}
+              />
+            )}
             <button
               style={s.addBtn}
               onClick={() => setShowForm(true)}
@@ -426,6 +544,8 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
                       <th style={s.th}>From</th>
                       <th style={s.th}>To</th>
                       <th style={s.th}>Project</th>
+                      {isAdmin && <th style={s.th}>Supplier</th>}
+                      {isAdmin && <th style={s.th}>Lot #</th>}
                       {isAdmin && <th style={s.th}>By</th>}
                       <th style={s.th}>Notes</th>
                     </tr>
@@ -448,6 +568,8 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
                           <td style={{ ...s.td, color: '#6b7280', fontSize: 13 }}>{t.from_location_name || '—'}</td>
                           <td style={{ ...s.td, color: '#6b7280', fontSize: 13 }}>{t.to_location_name || '—'}</td>
                           <td style={{ ...s.td, fontSize: 13 }}>{t.project_name || '—'}</td>
+                          {isAdmin && <td style={{ ...s.td, fontSize: 13, color: '#6b7280' }}>{t.supplier_name || '—'}</td>}
+                          {isAdmin && <td style={{ ...s.td, fontSize: 12, fontFamily: 'monospace', color: t.lot_number ? '#374151' : '#9ca3af' }}>{t.lot_number || '—'}</td>}
                           {isAdmin && <td style={{ ...s.td, fontSize: 13 }}>{t.performed_by_name}</td>}
                           <td style={{ ...s.td, color: '#6b7280', fontSize: 13, maxWidth: 200 }}>{t.notes || (t.reference_no ? `Ref: ${t.reference_no}` : '—')}</td>
                         </tr>
@@ -485,13 +607,17 @@ const f = {
   actions:   { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 },
   cancelBtn: { padding: '9px 18px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#374151' },
   saveBtn:   { padding: '9px 20px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  stockHint: { marginTop: 5, fontSize: 12, color: '#374151', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '5px 10px' },
 };
 
 const s = {
   wrap:        { padding: 16 },
   toolbar:     { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 },
   select:      { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151' },
+  dateWrap:    { display: 'flex', alignItems: 'center', gap: 5 },
+  dateLabel:   { fontSize: 12, fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap' },
   dateInput:   { padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#374151', background: '#fff' },
+  clearDates:  { padding: '7px 11px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fee2e2', color: '#dc2626', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
   addBtn:      { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginLeft: 'auto', whiteSpace: 'nowrap' },
   error:       { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },
   empty:       { textAlign: 'center', padding: '60px 24px', color: '#6b7280', fontSize: 15 },

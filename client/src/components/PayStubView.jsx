@@ -38,7 +38,8 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
   const [open, setOpen] = useState(defaultOpen);
 
   const label = stub.label || `${fmtDateShort(stub.period_start)} – ${fmtDateShort(stub.period_end)}`;
-  const { regular_hours, overtime_hours, prevailing_hours, total_mileage } = stub.summary;
+  const { regular_hours, overtime_hours, prevailing_hours, total_mileage,
+          guarantee_shortfall_hours = 0, guarantee_min_hours = 0 } = stub.summary;
   const totalHours = regular_hours + overtime_hours + prevailing_hours;
 
   const workerRate = parseFloat(user?.hourly_rate) || parseFloat(settings?.default_hourly_rate) || 0;
@@ -49,8 +50,10 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
   const regularPay = regular_hours * workerRate;
   const overtimePay = overtimeEnabled ? overtime_hours * workerRate * otMult : 0;
   const prevailingPay = prevailing_hours * prevRate;
-  const totalPay = regularPay + overtimePay + prevailingPay;
+  const guaranteePay = guarantee_shortfall_hours > 0 ? guarantee_shortfall_hours * workerRate : 0;
+  const totalPay = regularPay + overtimePay + prevailingPay + guaranteePay;
   const showPay = workerRate > 0 || prevRate > 0;
+  const billedHours = totalHours + guarantee_shortfall_hours;
 
   const ci = companyInfo || {};
   const billToLines = [
@@ -67,7 +70,7 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
         <div style={s.cardHeaderLeft}>
           <span style={s.cardLabel}>{label}</span>
           <div style={s.chips}>
-            <span style={s.chip}>{fmtH(totalHours)} {t.totalChip}</span>
+            <span style={s.chip}>{fmtH(billedHours)} {t.totalChip}</span>
             {prevailing_hours > 0 && <span style={{ ...s.chip, background: '#fef3c7', color: '#b45309' }}>{fmtH(prevailing_hours)} {t.prevailingLabel}</span>}
             {total_mileage > 0 && <span style={s.chip}>{total_mileage} {t.miChip}</span>}
             {showPay && totalPay > 0 && <span style={{ ...s.chip, background: '#d1fae5', color: '#065f46' }}>{fmtMoney(totalPay)}</span>}
@@ -81,7 +84,7 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
           {/* Invoice header */}
           <div style={s.invHeader}>
             <div>
-              <div style={s.brand}>Ops Flow Assist</div>
+              {ci?.name && <div style={s.brand}>{ci.name}</div>}
               <div style={s.brandSub}>{t.employeeTimeInvoice}</div>
             </div>
             <div style={s.invRight}>
@@ -169,9 +172,15 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
                   <span>{fmtH(prevailing_hours)}</span>
                 </div>
               )}
+              {guarantee_shortfall_hours > 0 && (
+                <div style={{ ...s.sumRow, color: '#2563eb' }}>
+                  <span>Minimum Guarantee ({fmtH(guarantee_min_hours)}/period shortfall)</span>
+                  <span>+{fmtH(guarantee_shortfall_hours)}</span>
+                </div>
+              )}
               <div style={{ ...s.sumRow, borderTop: '1px solid #e5e7eb', fontWeight: 700 }}>
                 <span>{t.totalHours}</span>
-                <span>{fmtH(totalHours)}</span>
+                <span>{fmtH(billedHours)}</span>
               </div>
               {showPay && (
                 <>
@@ -191,6 +200,12 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
                     <div style={s.sumRow}>
                       <span>{t.prevailingPay} ({fmtMoney(prevRate)}/hr)</span>
                       <span>{fmtMoney(prevailingPay)}</span>
+                    </div>
+                  )}
+                  {guarantee_shortfall_hours > 0 && workerRate > 0 && (
+                    <div style={{ ...s.sumRow, color: '#2563eb' }}>
+                      <span>Minimum Guarantee ({fmtH(guarantee_shortfall_hours)} @ {fmtMoney(workerRate)}/hr)</span>
+                      <span>{fmtMoney(guaranteePay)}</span>
                     </div>
                   )}
                   <div style={s.sumTotal}>
