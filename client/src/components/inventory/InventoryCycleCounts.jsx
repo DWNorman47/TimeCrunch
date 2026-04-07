@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../api';
 import { parseBinQR } from './BinLabelModal';
 import { parseItemQR } from './ItemLabelModal';
+import UomConversionModal from './UomConversionModal';
 
 const COUNT_TYPES = {
   cycle:     { label: 'Cycle Count',     color: '#2563eb', bg: '#dbeafe',   desc: 'Count stock at a specific location' },
@@ -38,6 +39,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const [lineUomSelections, setLineUomSelections] = useState({}); // { [lineId]: uomId | null }
   const [lineInputValues, setLineInputValues]     = useState({}); // { [lineId]: string }
   const [itemUomCache, setItemUomCache]           = useState({}); // { [itemId]: [uoms] }
+  const [conversionPrompt, setConversionPrompt]   = useState(null); // { lineId, itemId, uom, baseUnit }
 
   const fetchItemUoms = async (itemId) => {
     if (itemUomCache[itemId]) return;
@@ -279,6 +281,11 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                     onChange={e => {
                       const newUomId = e.target.value ? parseInt(e.target.value) : null;
                       setLineUomSelections(prev => ({ ...prev, [line.id]: newUomId }));
+                      // Check if conversion factor needs to be set
+                      const newUom = availableUoms.find(u => u.id === newUomId);
+                      if (newUom && !newUom.is_base && parseFloat(newUom.factor) === 1) {
+                        setConversionPrompt({ lineId: line.id, itemId: line.item_id, uom: newUom, baseUnit: stockUnit });
+                      }
                       // If a qty is already entered, re-patch with new UOM
                       const inputEl = lineInputRefs.current[line.id];
                       if (inputEl && inputEl.value !== '') {
@@ -542,6 +549,22 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             </div>
           </div>
         </div>
+      )}
+
+      {conversionPrompt && (
+        <UomConversionModal
+          itemId={conversionPrompt.itemId}
+          uom={conversionPrompt.uom}
+          baseUnit={conversionPrompt.baseUnit}
+          onSaved={updatedList => {
+            setItemUomCache(prev => ({
+              ...prev,
+              [conversionPrompt.itemId]: updatedList.filter(u => u.active),
+            }));
+            setConversionPrompt(null);
+          }}
+          onDismiss={() => setConversionPrompt(null)}
+        />
       )}
     </div>
   );

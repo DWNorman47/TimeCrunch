@@ -255,6 +255,26 @@ router.get('/items/categories', requireAuth, async (req, res) => {
 
 // ── Item UOMs ─────────────────────────────────────────────────────────────────
 
+// GET /api/inventory/uom-conversions — all non-base UOMs for this company (admin)
+router.get('/uom-conversions', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(`
+      SELECT
+        i.id   AS item_id,  i.name AS item_name, i.unit AS base_unit,
+        u.id   AS uom_id,   u.unit, u.unit_spec,
+        u.factor, u.is_base, u.active
+      FROM inventory_item_uoms u
+      JOIN inventory_items i ON u.item_id = i.id
+      WHERE i.company_id = $1
+        AND u.is_base = false
+        AND i.active  = true
+      ORDER BY i.name, u.factor, u.unit
+    `, [companyId]);
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // GET /api/inventory/items/:id/uoms
 router.get('/items/:id/uoms', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;

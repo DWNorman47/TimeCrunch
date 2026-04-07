@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
+import UomConversionModal from './UomConversionModal';
 
 const TYPE_LABELS = { receive: 'Receive', issue: 'Issue', transfer: 'Transfer', adjust: 'Adjust', convert: 'Convert' };
 const TYPE_COLORS = {
@@ -10,10 +11,11 @@ const TYPE_COLORS = {
   convert:  { color: '#8b5cf6', bg: '#ede9fe' },
 };
 
-function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
+function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onConversionSaved }) {
   const [items, setItems] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [locationStock, setLocationStock] = useState(null); // { quantity, unit, uom_id } at from_location
+  const [conversionPrompt, setConversionPrompt] = useState(null); // { uom, baseUnit, field }
   const [form, setForm] = useState({
     type: isAdmin ? 'receive' : 'issue',
     item_id: '',
@@ -56,6 +58,22 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
       .then(r => setItemUoms(r.data.filter(u => u.active)))
       .catch(() => {});
   }, [form.item_id]);
+
+  // Prompt for conversion factor when admin selects a non-base UOM with factor=1
+  const checkConversionNeeded = (uomId, field) => {
+    if (!isAdmin || !uomId || !form.item_id) return;
+    const uom = itemUoms.find(u => String(u.id) === String(uomId));
+    if (uom && !uom.is_base && parseFloat(uom.factor) === 1) {
+      const baseUom  = itemUoms.find(u => u.is_base);
+      const baseUnit = baseUom
+        ? `${baseUom.unit}${baseUom.unit_spec ? ` (${baseUom.unit_spec})` : ''}`
+        : items.find(i => String(i.id) === form.item_id)?.unit || 'base unit';
+      setConversionPrompt({ uom, baseUnit, field });
+    }
+  };
+
+  useEffect(() => { checkConversionNeeded(form.uom_id, 'uom_id'); }, [form.uom_id]);
+  useEffect(() => { checkConversionNeeded(form.to_uom_id, 'to_uom_id'); }, [form.to_uom_id]);
 
   // Load current stock at from_location when item + location both set (for issue/transfer)
   useEffect(() => {
@@ -380,11 +398,25 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
         <button type="button" style={f.cancelBtn} onClick={onCancel}>Cancel</button>
         <button type="submit" style={f.saveBtn} disabled={saving}>{saving ? 'Saving…' : 'Log Transaction'}</button>
       </div>
+
+      {conversionPrompt && (
+        <UomConversionModal
+          itemId={form.item_id}
+          uom={conversionPrompt.uom}
+          baseUnit={conversionPrompt.baseUnit}
+          onSaved={updatedList => {
+            setItemUoms(updatedList.filter(u => u.active));
+            setConversionPrompt(null);
+            onConversionSaved?.();
+          }}
+          onDismiss={() => setConversionPrompt(null)}
+        />
+      )}
     </form>
   );
 }
 
-export default function InventoryTransactions({ isAdmin, locations, projects, onTransaction }) {
+export default function InventoryTransactions({ isAdmin, locations, projects, onTransaction, onConversionSaved }) {
   const [transactions, setTransactions] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -441,6 +473,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
           projects={projects}
           onSave={handleSave}
           onCancel={() => setShowForm(false)}
+          onConversionSaved={onConversionSaved}
         />
       ) : (
         <>
