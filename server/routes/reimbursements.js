@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { requireAuth, requireAdmin } = require('./auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadBase64 } = require('../r2');
 const { incrementStorage, decrementStorage, checkStorageLimit } = require('../storage');
 
