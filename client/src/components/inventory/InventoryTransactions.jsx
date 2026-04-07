@@ -13,6 +13,7 @@ const TYPE_COLORS = {
 function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
   const [items, setItems] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [locationStock, setLocationStock] = useState(null); // { quantity, unit, uom_id } at from_location
   const [form, setForm] = useState({
     type: isAdmin ? 'receive' : 'issue',
     item_id: '',
@@ -49,11 +50,25 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
   useEffect(() => {
     setItemUoms([]);
     set('uom_id', ''); set('to_uom_id', ''); set('to_quantity', '');
+    setLocationStock(null);
     if (!form.item_id) return;
     api.get(`/inventory/items/${form.item_id}/uoms`)
       .then(r => setItemUoms(r.data.filter(u => u.active)))
       .catch(() => {});
   }, [form.item_id]);
+
+  // Load current stock at from_location when item + location both set (for issue/transfer)
+  useEffect(() => {
+    setLocationStock(null);
+    const locId = form.from_location_id;
+    if (!form.item_id || !locId || !['issue', 'transfer', 'convert'].includes(form.type)) return;
+    api.get(`/inventory/stock?location_id=${locId}`)
+      .then(r => {
+        const row = r.data.find(s => String(s.item_id) === String(form.item_id));
+        setLocationStock(row || null);
+      })
+      .catch(() => {});
+  }, [form.item_id, form.from_location_id, form.type]);
 
   // Cascade bin options when destination location changes
   useEffect(() => {
@@ -168,7 +183,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
             <option value="issue">Issue — consume or send to job site</option>
             <option value="transfer">Transfer — move between locations</option>
             <option value="adjust">Adjust — manual correction</option>
-            <option value="convert">Convert — break into a different unit/pack size</option>
+            <option value="convert">Convert/Split — open a box, break a pallet, change units</option>
           </select>
         </div>
       )}
@@ -247,6 +262,20 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel }) {
             <option value="">Select location…</option>
             {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
+          {locationStock && (() => {
+            const qty = parseFloat(locationStock.quantity);
+            const stockUnit = locationStock.uom_unit
+              ? `${locationStock.uom_unit}${locationStock.uom_spec ? ` (${locationStock.uom_spec})` : ''}`
+              : locationStock.unit;
+            return (
+              <div style={f.stockHint}>
+                On hand: <strong>{qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)} {stockUnit}</strong>
+                {locationStock.uom_unit && locationStock.unit !== locationStock.uom_unit && (
+                  <span style={{ color: '#6b7280' }}> — enter qty in any unit above; system converts automatically</span>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -545,6 +574,7 @@ const f = {
   actions:   { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 },
   cancelBtn: { padding: '9px 18px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#374151' },
   saveBtn:   { padding: '9px 20px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  stockHint: { marginTop: 5, fontSize: 12, color: '#374151', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '5px 10px' },
 };
 
 const s = {

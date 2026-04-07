@@ -39,6 +39,43 @@ async function applyStockDelta(client, companyId, itemId, locationId, delta, bin
   );
 }
 
+// When issuing/transferring out using a UOM that has no stock row at this location,
+// find the UOM that does have stock and convert the quantity automatically.
+// e.g. stock is in 'box' (factor=30), user issues 9 'each' (factor=1) →
+//      converts to 9 × (1/30) = 0.3 box and subtracts from the box row.
+// Must be called inside a BEGIN/COMMIT block.
+async function autoConvertIssueUom(client, companyId, itemId, locationId, requestedUomId, qty) {
+  if (!requestedUomId) return { uomId: null, qty }; // base unit — no conversion needed
+
+  // Check if stock already exists for the requested UOM at this location
+  const ownRow = await client.query(
+    `SELECT quantity FROM inventory_stock
+     WHERE item_id=$1 AND location_id=$2 AND company_id=$3 AND uom_id=$4`,
+    [itemId, locationId, companyId, requestedUomId]
+  );
+  if (ownRow.rowCount > 0) return { uomId: requestedUomId, qty }; // has its own row, use it directly
+
+  // No row for requested UOM — find the UOM that actually has stock here
+  const other = await client.query(
+    `SELECT s.uom_id,
+            COALESCE(su.factor, 1) AS stock_factor,
+            ru.factor              AS req_factor
+     FROM inventory_stock s
+     LEFT JOIN inventory_item_uoms su ON s.uom_id = su.id
+     JOIN  inventory_item_uoms ru ON ru.id = $4
+     WHERE s.item_id=$1 AND s.location_id=$2 AND s.company_id=$3
+       AND s.uom_id IS NOT NULL
+     ORDER BY s.quantity DESC LIMIT 1`,
+    [itemId, locationId, companyId, requestedUomId]
+  );
+  if (other.rowCount === 0) return { uomId: requestedUomId, qty }; // can't resolve, leave as-is
+
+  const { uom_id, stock_factor, req_factor } = other.rows[0];
+  // qty_in_stock_uom = qty_in_requested_uom × (req_factor / stock_factor)
+  const convertedQty = qty * (parseFloat(req_factor) / parseFloat(stock_factor));
+  return { uomId: uom_id, qty: convertedQty };
+}
+
 // Fire low-stock push + inbox notification to admins when stock falls at/below reorder_point.
 // Called after COMMIT so it never blocks the transaction.
 async function maybeSendLowStockAlert(companyId, itemId) {
@@ -561,13 +598,27 @@ router.post('/transactions', requireAuth, async (req, res) => {
 
     // Update stock — bin FK IDs apply to the destination slot
     const bin = { area_id, rack_id, bay_id, compartment_id };
-    if (type === 'receive')  await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin, resolvedUomId);
-    if (type === 'issue')    await applyStockDelta(client, companyId, item_id, from_location_id, -absQty, {}, resolvedUomId);
-    if (type === 'transfer') {
-      await applyStockDelta(client, companyId, item_id, from_location_id, -absQty, {}, resolvedUomId);
+    if (type === 'receive') {
       await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin, resolvedUomId);
     }
-    if (type === 'adjust')   await applyStockDelta(client, companyId, item_id, to_location_id, qty, bin, resolvedUomId); // signed
+    if (type === 'issue') {
+      // Auto-convert: if stock is in a different UOM, convert qty before applying
+      const { uomId: issueUomId, qty: issueQty } = await autoConvertIssueUom(
+        client, companyId, item_id, from_location_id, resolvedUomId, absQty
+      );
+      await applyStockDelta(client, companyId, item_id, from_location_id, -issueQty, {}, issueUomId);
+    }
+    if (type === 'transfer') {
+      // Auto-convert the outgoing side
+      const { uomId: fromUomId, qty: fromQty } = await autoConvertIssueUom(
+        client, companyId, item_id, from_location_id, resolvedUomId, absQty
+      );
+      await applyStockDelta(client, companyId, item_id, from_location_id, -fromQty, {}, fromUomId);
+      await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin, resolvedUomId);
+    }
+    if (type === 'adjust') {
+      await applyStockDelta(client, companyId, item_id, to_location_id, qty, bin, resolvedUomId); // signed
+    }
     if (type === 'convert') {
       // Subtract from source UOM, add to target UOM — both at the same location
       await applyStockDelta(client, companyId, item_id, from_location_id, -absQty, {}, resolvedUomId);

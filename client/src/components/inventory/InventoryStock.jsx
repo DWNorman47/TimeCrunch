@@ -203,29 +203,57 @@ const a = {
   actions:     { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 },
   cancel:      { padding: '9px 18px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, color: '#374151', cursor: 'pointer' },
   save:        { padding: '9px 18px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  hint:        { fontSize: 12, color: '#059669', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '4px 10px' },
 };
 
 // ── Quick Issue Modal (workers) ───────────────────────────────────────────────
 
 function IssueModal({ item, projects, onClose, onDone }) {
-  const [qty, setQty]         = useState('');
+  const [qty, setQty]             = useState('');
+  const [uomId, setUomId]         = useState(item.uom_id ? String(item.uom_id) : '');
+  const [itemUoms, setItemUoms]   = useState([]);
   const [projectId, setProjectId] = useState('');
-  const [notes, setNotes]     = useState('');
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState('');
+  const [notes, setNotes]         = useState('');
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState('');
 
   const available = parseFloat(item.quantity);
+  const stockUnit = item.unit_spec ? `${item.unit} (${item.unit_spec})` : item.unit;
+
+  useEffect(() => {
+    api.get(`/inventory/items/${item.item_id}/uoms`)
+      .then(r => setItemUoms(r.data.filter(u => u.active)))
+      .catch(() => {});
+  }, [item.item_id]);
+
+  const selectedUom = itemUoms.find(u => String(u.id) === uomId);
+  const stockUom    = item.uom_id ? itemUoms.find(u => u.id === item.uom_id) : null;
+
+  // Conversion hint: how many of the selected UOM equal the available stock
+  const availableInSelected = (() => {
+    if (!selectedUom || !stockUom) return null;
+    const sf = parseFloat(stockUom.factor || 1);
+    const tf = parseFloat(selectedUom.factor || 1);
+    if (!tf || sf === tf) return null;
+    const converted = (available * sf) / tf;
+    return `${converted % 1 === 0 ? converted.toFixed(0) : converted.toFixed(2)} ${selectedUom.unit}`;
+  })();
 
   const submit = async () => {
     const n = parseFloat(qty);
     if (isNaN(n) || n <= 0) { setError('Enter a positive quantity to issue'); return; }
-    if (n > available) { setError(`Cannot issue more than available (${available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} ${item.unit})`); return; }
+    // Only enforce client-side limit when issuing in the same UOM as stock
+    if ((!uomId || uomId === String(item.uom_id)) && n > available) {
+      setError(`Cannot issue more than available (${available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} ${stockUnit})`);
+      return;
+    }
     setSaving(true); setError('');
     try {
       await api.post('/inventory/transactions', {
         type: 'issue',
         item_id: item.item_id,
         quantity: n,
+        uom_id: uomId ? parseInt(uomId) : undefined,
         from_location_id: item.location_id,
         project_id: projectId ? parseInt(projectId) : undefined,
         notes: notes.trim() || undefined,
@@ -248,7 +276,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
         <div style={a.body}>
           <div style={a.currentRow}>
             <span style={a.currentLabel}>Available at {item.location_name}</span>
-            <span style={a.currentQty}>{available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} {item.unit}</span>
+            <span style={a.currentQty}>{available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} {stockUnit}</span>
           </div>
           {error && <div style={a.error}>{error}</div>}
           <label style={a.label}>Quantity to issue *</label>
@@ -262,6 +290,22 @@ function IssueModal({ item, projects, onClose, onDone }) {
             style={a.input}
             autoFocus
           />
+          {itemUoms.length > 1 && (
+            <>
+              <label style={a.label}>Unit</label>
+              <select value={uomId} onChange={e => setUomId(e.target.value)} style={a.input}>
+                <option value="">Default ({item.unit})</option>
+                {itemUoms.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ' — base' : ''}
+                  </option>
+                ))}
+              </select>
+              {availableInSelected && (
+                <div style={a.hint}>≈ {availableInSelected} available in this unit</div>
+              )}
+            </>
+          )}
           {projects && projects.length > 0 && (
             <>
               <label style={a.label}>Project (optional)</label>
