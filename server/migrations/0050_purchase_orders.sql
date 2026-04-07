@@ -1,7 +1,7 @@
 -- Purchase orders header
 CREATE TABLE IF NOT EXISTS purchase_orders (
   id              SERIAL PRIMARY KEY,
-  company_id      INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id      UUID NOT NULL,
   po_number       VARCHAR(50) NOT NULL,
   supplier_id     INTEGER REFERENCES inventory_suppliers(id),
   status          VARCHAR(20) NOT NULL DEFAULT 'draft'
