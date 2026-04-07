@@ -84,6 +84,10 @@ export default function ApprovalQueue({ onCountChange }) {
   const [editSaving, setEditSaving] = useState(false);
   // Split state
   const [splittingId, setSplittingId] = useState(null);
+  // Recent approvals
+  const [recentApproved, setRecentApproved] = useState([]);
+  const [showRecent, setShowRecent] = useState(false);
+  const [unapproving, setUnapproving] = useState(null);
   const [splitSegments, setSplitSegments] = useState([]);
   const [splitSaving, setSplitSaving] = useState(false);
   const [splitError, setSplitError] = useState('');
@@ -100,7 +104,13 @@ export default function ApprovalQueue({ onCountChange }) {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetch(); }, []);
+  const fetchRecentApproved = () => {
+    api.get('/admin/entries/recently-approved')
+      .then(r => setRecentApproved(r.data))
+      .catch(() => {});
+  };
+
+  useEffect(() => { fetch(); fetchRecentApproved(); }, []);
   useEffect(() => { if (onCountChange) onCountChange(entries.length); }, [entries]);
 
   const startEdit = (e) => {
@@ -172,7 +182,19 @@ export default function ApprovalQueue({ onCountChange }) {
     try {
       await api.patch(`/admin/entries/${id}/approve`);
       setEntries(prev => prev.filter(e => e.id !== id));
+      fetchRecentApproved();
     } finally { setWorking(null); }
+  };
+
+  const unapprove = async id => {
+    setUnapproving(id);
+    try {
+      await api.patch(`/admin/entries/${id}/unapprove`);
+      setRecentApproved(prev => prev.filter(e => e.id !== id));
+      fetch(); // refresh pending queue
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to unapprove entry');
+    } finally { setUnapproving(null); }
   };
 
   const submitReject = async id => {
@@ -414,6 +436,36 @@ export default function ApprovalQueue({ onCountChange }) {
           ))}
         </div>
       )}
+
+      {recentApproved.length > 0 && (
+        <div style={styles.recentSection}>
+          <button style={styles.recentToggle} onClick={() => setShowRecent(v => !v)}>
+            <span>Recently Approved ({recentApproved.length})</span>
+            <span>{showRecent ? '▾' : '▸'}</span>
+          </button>
+          {showRecent && (
+            <div style={styles.recentList}>
+              {recentApproved.map(e => (
+                <div key={e.id} style={styles.recentRow}>
+                  <div style={styles.recentInfo}>
+                    <span style={styles.recentWorker}>{e.worker_name}</span>
+                    <span style={styles.recentDate}>{formatDate(e.work_date)}</span>
+                    <span style={styles.recentTime}>{formatTime(e.start_time)} – {formatTime(e.end_time)}</span>
+                    {e.project_name && <span style={styles.recentProject}>{e.project_name}</span>}
+                  </div>
+                  <button
+                    style={styles.unapproveBtn}
+                    onClick={() => unapprove(e.id)}
+                    disabled={unapproving === e.id}
+                  >
+                    {unapproving === e.id ? '…' : '↩ Unapprove'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -464,6 +516,16 @@ const styles = {
   confirmRejectBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   cancelBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   approveAllBtn: { background: '#059669', color: '#fff', border: 'none', padding: '5px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', marginLeft: 'auto' },
+  recentSection: { marginTop: 20, borderTop: '1px solid #f0f0f0', paddingTop: 12 },
+  recentToggle: { background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: 13, fontWeight: 600, color: '#6b7280', cursor: 'pointer', padding: '4px 0' },
+  recentList: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 },
+  recentRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 10px', background: '#f9fafb', borderRadius: 7, flexWrap: 'wrap' },
+  recentInfo: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', fontSize: 13 },
+  recentWorker: { fontWeight: 700, color: '#374151' },
+  recentDate: { color: '#6b7280' },
+  recentTime: { color: '#6b7280' },
+  recentProject: { background: '#e0e7ff', color: '#3730a3', borderRadius: 6, padding: '1px 7px', fontSize: 11, fontWeight: 600 },
+  unapproveBtn: { padding: '5px 12px', background: '#fff', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 6 },
   signedTag: { display: 'inline-block', marginTop: 4, background: '#ede9fe', color: '#5b21b6', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
   locationRow: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 },

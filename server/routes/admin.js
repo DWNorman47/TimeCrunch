@@ -1804,6 +1804,33 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
   }
 });
 
+// GET /admin/entries/recently-approved — entries approved in the last 24 hours
+router.get('/entries/recently-approved', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+  const companyId = req.user.company_id;
+  const accessIds = req.user.worker_access_ids;
+  try {
+    const workerFilter = accessIds && accessIds.length ? `AND te.user_id = ANY($2)` : '';
+    const params = accessIds && accessIds.length ? [companyId, accessIds] : [companyId];
+    const { rows } = await pool.query(
+      `SELECT te.id, te.work_date, te.start_time, te.end_time, te.project_id, te.user_id, te.approved_at,
+              COALESCE(u.invoice_name, u.full_name) AS worker_name, p.name AS project_name
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       LEFT JOIN projects p ON te.project_id = p.id
+       WHERE te.company_id = $1 AND te.status = 'approved'
+         AND te.approved_at >= NOW() - INTERVAL '24 hours'
+         ${workerFilter}
+       ORDER BY te.approved_at DESC
+       LIMIT 100`,
+      params
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /admin/entries/approve-all — approve every pending entry for this company
 router.post('/entries/approve-all', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
@@ -1948,6 +1975,29 @@ router.patch('/entries/:id/reject', requireAdmin, requirePermission('approve_ent
     createInboxItem(rejEntry.user_id, companyId, 'rejection', 'Time entry rejected',
       `Your entry for ${rejEntry.work_date?.toString().substring(0,10)} was rejected.${note ? ` Reason: ${note}` : ''}`, '/dashboard');
     res.json(rejEntry);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /admin/entries/:id/unapprove — revert an approved entry back to pending
+router.patch('/entries/:id/unapprove', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+  const companyId = req.user.company_id;
+  const accessIds = req.user.worker_access_ids;
+  try {
+    const workerFilter = accessIds && accessIds.length ? `AND user_id = ANY($3)` : '';
+    const params = accessIds && accessIds.length ? [req.params.id, companyId, accessIds] : [req.params.id, companyId];
+    const result = await pool.query(
+      `UPDATE time_entries
+       SET status = 'pending', locked = false, approved_by = NULL, approved_at = NULL, approval_note = NULL
+       WHERE id = $1 AND company_id = $2 AND status = 'approved' ${workerFilter}
+       RETURNING *`,
+      params
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found or not in approved state' });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'entry.unapproved', 'time_entry', parseInt(req.params.id), null);
+    res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
