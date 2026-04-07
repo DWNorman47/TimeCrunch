@@ -3,6 +3,8 @@ const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadBase64 } = require('../r2');
 const { checkStorageLimit, incrementStorage } = require('../storage');
+const { sendPushToCompanyAdmins } = require('../push');
+const { createInboxItemBatch } = require('./inbox');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -35,6 +37,43 @@ async function applyStockDelta(client, companyId, itemId, locationId, delta, bin
        updated_at     = NOW()`,
     [companyId, itemId, locationId, uom, delta, area_id, rack_id, bay_id, compartment_id]
   );
+}
+
+// Fire low-stock push + inbox notification to admins when stock falls at/below reorder_point.
+// Called after COMMIT so it never blocks the transaction.
+async function maybeSendLowStockAlert(companyId, itemId) {
+  try {
+    const r = await pool.query(
+      `SELECT i.name, i.reorder_point, COALESCE(SUM(s.quantity), 0) AS total_qty
+       FROM inventory_items i
+       LEFT JOIN inventory_stock s ON i.id = s.item_id AND s.company_id = i.company_id
+       WHERE i.id = $1 AND i.company_id = $2 AND i.active = true
+       GROUP BY i.id`,
+      [itemId, companyId]
+    );
+    if (r.rowCount === 0) return;
+    const { name, reorder_point, total_qty } = r.rows[0];
+    const rp = parseFloat(reorder_point);
+    const qty = parseFloat(total_qty);
+    if (rp <= 0 || qty > rp) return; // not low
+    const isOut = qty <= 0;
+    const title = isOut ? `Out of stock: ${name}` : `Low stock: ${name}`;
+    const body  = isOut
+      ? `${name} is out of stock. Reorder point: ${rp}.`
+      : `${name} has ${qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)} units remaining (reorder at ${rp}).`;
+    // Push notification
+    await sendPushToCompanyAdmins(companyId, { title, body, url: '/inventory#stock' });
+    // In-app inbox — get all admin user IDs
+    const admins = await pool.query(
+      `SELECT id FROM users WHERE company_id=$1 AND role IN ('admin','super_admin') AND active=true`,
+      [companyId]
+    );
+    if (admins.rowCount > 0) {
+      await createInboxItemBatch(admins.rows.map(u => u.id), companyId, 'low_stock', title, body, '/inventory#stock');
+    }
+  } catch (err) {
+    console.error('maybeSendLowStockAlert error:', err);
+  }
 }
 
 // Process an array of photo values (existing https:// URLs or new base64 data: URIs).
@@ -544,6 +583,9 @@ router.post('/transactions', requireAuth, async (req, res) => {
     if (anyNegative) warning = 'stock_negative';
 
     res.status(201).json({ ...txn.rows[0], warning });
+
+    // Fire low-stock alert (async, after response sent)
+    maybeSendLowStockAlert(companyId, item_id).catch(() => {});
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err); res.status(500).json({ error: 'Server error' });
@@ -1316,6 +1358,7 @@ router.post('/purchase-orders/:id/receive', requireAdmin, async (req, res) => {
     const loc = await client.query('SELECT id FROM inventory_locations WHERE id=$1 AND company_id=$2', [location_id, companyId]);
     if (loc.rowCount === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Location not found' }); }
 
+    const receivedItemIds = new Set();
     for (const entry of lines) {
       const qty = parseFloat(entry.qty_to_receive);
       if (!entry.line_id || isNaN(qty) || qty <= 0) continue;
@@ -1348,6 +1391,7 @@ router.post('/purchase-orders/:id/receive', requireAdmin, async (req, res) => {
         'UPDATE purchase_order_lines SET qty_received = qty_received + $1 WHERE id=$2',
         [actualQty, entry.line_id]
       );
+      receivedItemIds.add(line.item_id);
     }
 
     // Update PO status based on received amounts
@@ -1381,6 +1425,11 @@ router.post('/purchase-orders/:id/receive', requireAdmin, async (req, res) => {
       [req.params.id]
     );
     res.json({ ...updated.rows[0], lines: updatedLines.rows });
+
+    // Fire low-stock alerts for all received items (stock may have dipped below reorder point before this receipt)
+    for (const itemId of receivedItemIds) {
+      maybeSendLowStockAlert(companyId, itemId).catch(() => {});
+    }
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err); res.status(500).json({ error: 'Server error' });
