@@ -32,6 +32,7 @@ export default function ReimbursementsView() {
   const [form, setForm] = useState({ amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA') });
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptPreview, setReceiptPreview] = useState(null);
+  const [noReceipt, setNoReceipt] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -56,6 +57,7 @@ export default function ReimbursementsView() {
 
   const handleSubmit = async e => {
     e.preventDefault();
+    if (!noReceipt && !receiptFile) { setError('Please attach a receipt or check "No Receipt Available".'); return; }
     setSaving(true); setError(''); setSuccess('');
     try {
       await api.post('/reimbursements', {
@@ -68,7 +70,7 @@ export default function ReimbursementsView() {
       setSuccess('Reimbursement submitted successfully.');
       setShowForm(false);
       setForm({ amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA') });
-      setReceiptFile(null); setReceiptPreview(null);
+      setReceiptFile(null); setReceiptPreview(null); setNoReceipt(false);
       load();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to submit reimbursement');
@@ -120,21 +122,27 @@ export default function ReimbursementsView() {
             </div>
           </div>
           <div style={s.field}>
-            <label style={s.label}>Description *</label>
-            <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder="What was this expense for?" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} required />
+            <label style={s.label}>Description</label>
+            <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder="What was this expense for? (optional)" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
           <div style={s.field}>
             <label style={s.label}>Receipt (photo or PDF)</label>
-            <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={handleFileChange} />
-            <button type="button" style={s.uploadBtn} onClick={() => fileRef.current.click()}>
-              {receiptFile ? '✓ Receipt attached — change' : '📎 Attach Receipt'}
-            </button>
-            {receiptPreview && receiptPreview.startsWith('data:image') && (
+            <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => { handleFileChange(e); setNoReceipt(false); }} />
+            {!noReceipt && (
+              <button type="button" style={s.uploadBtn} onClick={() => fileRef.current.click()}>
+                {receiptFile ? '✓ Receipt attached — change' : '📎 Attach Receipt'}
+              </button>
+            )}
+            {receiptPreview && !noReceipt && receiptPreview.startsWith('data:image') && (
               <img src={receiptPreview} alt="Receipt preview" style={s.preview} />
             )}
-            {receiptPreview && receiptPreview.startsWith('data:application/pdf') && (
+            {receiptPreview && !noReceipt && receiptPreview.startsWith('data:application/pdf') && (
               <div style={s.pdfHint}>PDF attached</div>
             )}
+            <label style={s.checkLabel}>
+              <input type="checkbox" checked={noReceipt} onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setReceiptFile(null); setReceiptPreview(null); } }} />
+              {' '}No receipt available
+            </label>
           </div>
           {error && <div style={s.errorMsg}>{error}</div>}
           <button style={s.submitBtn} type="submit" disabled={saving}>
@@ -192,6 +200,7 @@ const s = {
   label: { fontSize: 12, fontWeight: 600, color: '#666' },
   input: { padding: '8px 10px', border: '1px solid #ddd', borderRadius: 7, fontSize: 14 },
   uploadBtn: { padding: '8px 14px', background: '#f9fafb', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#374151', cursor: 'pointer', alignSelf: 'flex-start' },
+  checkLabel: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer', marginTop: 6 },
   preview: { marginTop: 8, maxWidth: 220, maxHeight: 180, borderRadius: 6, border: '1px solid #e5e7eb', objectFit: 'cover' },
   pdfHint: { marginTop: 8, fontSize: 12, color: '#6b7280' },
   submitBtn: { padding: '10px 24px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', alignSelf: 'flex-start' },
