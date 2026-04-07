@@ -101,12 +101,10 @@ export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true
       <Page size="A4" style={s.page}>
         {/* Invoice header */}
         <View style={s.invHeader}>
-          {ci.name ? (
-            <View>
-              <Text style={s.brand}>{ci.name}</Text>
-              <Text style={s.brandSub}>Employee Time Invoice</Text>
-            </View>
-          ) : null}
+          <View>
+            <Text style={s.brand}>{worker.invoice_name || worker.full_name || '—'}</Text>
+            <Text style={s.brandSub}>Employee Time Invoice</Text>
+          </View>
           <View style={s.invRight}>
             <Text style={s.invTitle}>INVOICE</Text>
             <Text style={s.metaLabel}>Invoice #</Text>
