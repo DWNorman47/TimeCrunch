@@ -159,6 +159,9 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
                 {billData.summary.guarantee_shortfall_hours > 0 && (
                   <span style={{ color: '#2563eb' }}>Min. Guarantee <b>+{fmtHours(billData.summary.guarantee_shortfall_hours)} · {formatCurrency(billData.summary.guarantee_cost, currency)}</b></span>
                 )}
+                {billData.summary.reimbursement_total > 0 && (
+                  <span style={{ color: '#7c3aed' }}>Expenses <b>{formatCurrency(billData.summary.reimbursement_total, currency)}</b></span>
+                )}
                 <span style={{ fontWeight: 700 }}>{t.totalCostLabel} <b>{formatCurrency(billData.summary.total_cost, currency)}</b></span>
               </div>
               <div style={styles.btnRow}>
@@ -166,12 +169,15 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
                   {showPreview ? t.hideBill : t.previewBill}
                 </button>
                 <button style={styles.csvBtn} onClick={() => {
-                  const headers = ['Date', 'Project', 'Wage Type', 'Start', 'End', 'Hours'];
-                  const rows = billData.entries.map(e => {
+                  const headers = ['Date', 'Type', 'Project', 'Category / Wage Type', 'Start', 'End', 'Hours', 'Amount'];
+                  const timeRows = billData.entries.map(e => {
                     const h = ((new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000).toFixed(2);
-                    return [e.work_date?.toString().substring(0,10), e.project_name, e.wage_type, e.start_time, e.end_time, h];
+                    return [e.work_date?.toString().substring(0,10), 'Time', e.project_name || '', e.wage_type, e.start_time, e.end_time, h, ''];
                   });
-                  downloadCSV([headers, ...rows], `${worker.username}-${from||'all'}-to-${to||'all'}.csv`);
+                  const reimbRows = (billData.reimbursements || []).map(r => [
+                    r.expense_date?.toString().substring(0,10), 'Expense', r.project_name || '', r.category || r.description || '', '', '', '', r.amount,
+                  ]);
+                  downloadCSV([headers, ...timeRows, ...reimbRows], `${worker.username}-${from||'all'}-to-${to||'all'}.csv`);
                 }}>{t.exportCSV}</button>
                 <PDFDownloadLink
                   document={<BillPDF data={billData} currency={currency} companyInfo={companyInfo} overtimeEnabled={overtimeEnabled} showProject={projectsEnabled} showRateType={(companyInfo?.prevailing_wage_rate ?? 0) > 0} />}
