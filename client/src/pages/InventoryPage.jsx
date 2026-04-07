@@ -20,11 +20,11 @@ export default function InventoryPage() {
   const [projects, setProjects] = useState([]);
   const [locations, setLocations] = useState([]);
   const [lowStockCount, setLowStockCount] = useState(0);
-  const [conversionCount, setConversionCount] = useState(0);
+  const [pendingConversions, setPendingConversions] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const INV_TABS = isAdmin
-    ? ['stock', 'items', 'transactions', 'orders', 'cycle', 'valuation', 'setup']
+    ? ['stock', 'items', 'transactions', 'orders', 'cycle', 'valuation', 'conversions', 'setup']
     : ['stock', 'transactions'];
   const [poLowStockTrigger, setPoLowStockTrigger] = useState(false);
 
@@ -49,7 +49,7 @@ export default function InventoryPage() {
         setLocations(l.data);
         if (isAdmin) {
           api.get('/inventory/stock/low').then(r => setLowStockCount(r.data.length)).catch(() => {});
-          api.get('/inventory/uom-conversions').then(r => setConversionCount(r.data.length)).catch(() => {});
+          api.get('/inventory/uom-conversions').then(r => setPendingConversions(r.data.filter(u => parseFloat(u.factor) === 1).length)).catch(() => {});
         }
       } catch (e) {
         console.error(e);
@@ -60,9 +60,9 @@ export default function InventoryPage() {
     init();
   }, [isAdmin]);
 
-  const refreshLocations    = () => api.get('/inventory/locations').then(r => setLocations(r.data)).catch(() => {});
-  const refreshLowStock     = () => isAdmin && api.get('/inventory/stock/low').then(r => setLowStockCount(r.data.length)).catch(() => {});
-  const refreshConversions  = () => isAdmin && api.get('/inventory/uom-conversions').then(r => setConversionCount(r.data.length)).catch(() => {});
+  const refreshLocations   = () => api.get('/inventory/locations').then(r => setLocations(r.data)).catch(() => {});
+  const refreshLowStock    = () => isAdmin && api.get('/inventory/stock/low').then(r => setLowStockCount(r.data.length)).catch(() => {});
+  const refreshConversions = () => isAdmin && api.get('/inventory/uom-conversions').then(r => setPendingConversions(r.data.filter(u => parseFloat(u.factor) === 1).length)).catch(() => {});
 
   if (loading) return <div style={styles.loading}>Loading…</div>;
 
@@ -115,10 +115,10 @@ export default function InventoryPage() {
             ...(isAdmin ? [
               { id: 'items',      label: '🗂 Items' },
               { id: 'orders',     label: '🛒 Orders' },
-              { id: 'cycle',      label: '📋 Count' },
-              { id: 'valuation',  label: '💰 Valuation' },
-              ...(conversionCount > 0 ? [{ id: 'conversions', label: '🔄 Conversions' }] : []),
-              { id: 'setup',      label: '⚙️ Setup' },
+              { id: 'cycle',        label: '📋 Count' },
+              { id: 'valuation',    label: '💰 Valuation' },
+              { id: 'conversions',  label: '🔄 Conversions', dot: pendingConversions > 0 ? '#d97706' : null },
+              { id: 'setup',        label: '⚙️ Setup' },
             ] : []),
           ]}
         />
