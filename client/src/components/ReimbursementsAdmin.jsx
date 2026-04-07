@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api';
+import { useAuth } from '../contexts/AuthContext';
 
 const CATEGORIES = ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'];
 
@@ -104,9 +105,19 @@ function ReimbursementRow({ item, onUpdate }) {
 }
 
 export default function ReimbursementsAdmin() {
+  const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('pending');
+  const [workers, setWorkers] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ user_id: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved' });
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptPreview, setReceiptPreview] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [formSuccess, setFormSuccess] = useState('');
+  const fileRef = useRef();
 
   const load = useCallback(() => {
     const params = filter !== 'all' ? `?status=${filter}` : '';
@@ -118,6 +129,43 @@ export default function ReimbursementsAdmin() {
 
   useEffect(() => { setLoading(true); load(); }, [load]);
 
+  useEffect(() => {
+    api.get('/admin/workers').then(r => setWorkers(r.data)).catch(() => {});
+  }, []);
+
+  const handleFileChange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => { setReceiptFile(ev.target.result); setReceiptPreview(ev.target.result); };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async e => {
+    e.preventDefault();
+    setSaving(true); setFormError(''); setFormSuccess('');
+    try {
+      await api.post('/reimbursements/admin', {
+        user_id: form.user_id,
+        amount: form.amount,
+        description: form.description,
+        category: form.category || null,
+        expense_date: form.expense_date,
+        status: form.status,
+        receipt: receiptFile || null,
+      });
+      setFormSuccess('Expense added successfully.');
+      setShowForm(false);
+      setForm({ user_id: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved' });
+      setReceiptFile(null); setReceiptPreview(null);
+      load();
+    } catch (err) {
+      setFormError(err.response?.data?.error || 'Failed to add expense');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleUpdate = updated => {
     setItems(prev => prev.map(i => i.id === updated.id ? { ...i, ...updated } : i));
   };
@@ -127,18 +175,79 @@ export default function ReimbursementsAdmin() {
     return acc;
   }, {});
 
+  const allWorkers = [{ id: user?.id, full_name: `${user?.full_name || 'Me'} (you)` }, ...workers.filter(w => w.id !== user?.id)];
+
   return (
     <div style={s.wrap}>
       <div style={s.header}>
         <div style={s.title}>Expense Reimbursements</div>
-        <div style={s.filters}>
-          {['pending', 'approved', 'rejected', 'all'].map(f => (
-            <button key={f} style={filter === f ? s.filterActive : s.filter} onClick={() => setFilter(f)}>
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
+        <div style={s.headerRight}>
+          <button style={s.addBtn} onClick={() => { setShowForm(v => !v); setFormError(''); setFormSuccess(''); }}>
+            {showForm ? '✕ Cancel' : '+ Add Expense'}
+          </button>
+          <div style={s.filters}>
+            {['pending', 'approved', 'rejected', 'all'].map(f => (
+              <button key={f} style={filter === f ? s.filterActive : s.filter} onClick={() => setFilter(f)}>
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+
+      {formSuccess && <div style={s.successMsg}>{formSuccess}</div>}
+
+      {showForm && (
+        <form onSubmit={handleSubmit} style={s.form}>
+          <div style={s.formRow}>
+            <div style={s.field}>
+              <label style={s.fieldLabel}>Worker *</label>
+              <select style={s.input} value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} required>
+                <option value="">Select worker…</option>
+                {allWorkers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
+              </select>
+            </div>
+            <div style={s.field}>
+              <label style={s.fieldLabel}>Date *</label>
+              <input style={s.input} type="date" value={form.expense_date} onChange={e => setForm(f => ({ ...f, expense_date: e.target.value }))} required />
+            </div>
+            <div style={s.field}>
+              <label style={s.fieldLabel}>Amount *</label>
+              <input style={{ ...s.input, width: 100 }} type="number" min="0.01" step="0.01" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required />
+            </div>
+            <div style={s.field}>
+              <label style={s.fieldLabel}>Category</label>
+              <select style={s.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                <option value="">Select…</option>
+                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={s.field}>
+              <label style={s.fieldLabel}>Status</label>
+              <select style={s.input} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                <option value="approved">Approved</option>
+                <option value="pending">Pending review</option>
+              </select>
+            </div>
+          </div>
+          <div style={s.field}>
+            <label style={s.fieldLabel}>Description *</label>
+            <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder="What was this expense for?" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} required />
+          </div>
+          <div style={s.field}>
+            <label style={s.fieldLabel}>Receipt (optional)</label>
+            <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={handleFileChange} />
+            <button type="button" style={s.uploadBtn} onClick={() => fileRef.current.click()}>
+              {receiptFile ? '✓ Receipt attached — change' : '📎 Attach Receipt'}
+            </button>
+            {receiptPreview && receiptPreview.startsWith('data:image') && (
+              <img src={receiptPreview} alt="Receipt" style={s.preview} />
+            )}
+          </div>
+          {formError && <div style={s.errorMsg}>{formError}</div>}
+          <button style={s.submitBtn} type="submit" disabled={saving}>{saving ? 'Saving…' : 'Add Expense'}</button>
+        </form>
+      )}
 
       {!loading && items.length > 0 && filter !== 'all' && (
         <div style={s.summary}>
@@ -163,7 +272,19 @@ export default function ReimbursementsAdmin() {
 const s = {
   wrap: { display: 'flex', flexDirection: 'column', gap: 16 },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 },
+  headerRight: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
   title: { fontSize: 17, fontWeight: 700, color: '#111827' },
+  addBtn: { padding: '7px 16px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  successMsg: { color: '#059669', fontWeight: 600, fontSize: 13, padding: '8px 12px', background: '#d1fae5', borderRadius: 7 },
+  errorMsg: { color: '#dc2626', fontSize: 13 },
+  form: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 },
+  formRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
+  field: { display: 'flex', flexDirection: 'column', gap: 4 },
+  fieldLabel: { fontSize: 12, fontWeight: 600, color: '#666' },
+  input: { padding: '7px 10px', border: '1px solid #ddd', borderRadius: 7, fontSize: 13 },
+  uploadBtn: { padding: '7px 12px', background: '#f9fafb', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#374151', cursor: 'pointer', alignSelf: 'flex-start' },
+  preview: { marginTop: 6, maxWidth: 180, maxHeight: 140, borderRadius: 6, border: '1px solid #e5e7eb', objectFit: 'cover' },
+  submitBtn: { padding: '9px 22px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-start' },
   filters: { display: 'flex', gap: 6 },
   filter: { padding: '6px 14px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#6b7280', cursor: 'pointer' },
   filterActive: { padding: '6px 14px', background: '#1a56db', border: '1px solid #1a56db', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer' },
