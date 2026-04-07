@@ -4,14 +4,14 @@ import api from '../api';
 const DEFAULT_CATEGORIES = ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'];
 
 function CategorySection({ cfg, onSave, saving }) {
-  const [suppressed, setSuppressed] = useState(cfg.suppressed || []);
-  const [custom, setCustom]         = useState(cfg.custom || []);
+  const [suppressed, setSuppressed] = useState(cfg?.suppressed || []);
+  const [custom, setCustom]         = useState(cfg?.custom || []);
   const [newCat, setNewCat]         = useState('');
   const [dirty, setDirty]           = useState(false);
 
   useEffect(() => {
-    setSuppressed(cfg.suppressed || []);
-    setCustom(cfg.custom || []);
+    setSuppressed(cfg?.suppressed || []);
+    setCustom(cfg?.custom || []);
     setDirty(false);
   }, [cfg]);
 
@@ -154,20 +154,24 @@ export default function AdvancedSettings() {
             <div style={s.loading}>Loading…</div>
           ) : (
             <>
-              <CollapsibleCategory title="Reimbursement Categories">
-                <CategorySection
-                  cfg={config.reimbursement_categories}
-                  onSave={makeSaver('reimbursement_categories')}
-                  saving={saving}
-                />
-              </CollapsibleCategory>
-              <CollapsibleCategory title="Item Units">
-                <CategorySection
-                  cfg={config.item_units}
-                  onSave={makeSaver('item_units')}
-                  saving={saving}
-                />
-              </CollapsibleCategory>
+              {config.reimbursement_categories && (
+                <CollapsibleCategory title="Reimbursement Categories">
+                  <CategorySection
+                    cfg={config.reimbursement_categories}
+                    onSave={makeSaver('reimbursement_categories')}
+                    saving={saving}
+                  />
+                </CollapsibleCategory>
+              )}
+              {config.item_units && (
+                <CollapsibleCategory title="Item Units">
+                  <CategorySection
+                    cfg={config.item_units}
+                    onSave={makeSaver('item_units')}
+                    saving={saving}
+                  />
+                </CollapsibleCategory>
+              )}
             </>
           )}
         </div>
