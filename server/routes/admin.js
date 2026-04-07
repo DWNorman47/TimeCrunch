@@ -658,16 +658,11 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
     const settings = await getSettings(companyId);
     const worker = userResult.rows[0];
     const workerOTRule = worker.overtime_rule || 'daily';
-    const { regularHours: rawRegular, overtimeHours: rawOvertime } = computeOT(entries, workerOTRule, settings.overtime_threshold);
-    const rawPrevailing = entries.filter(e => e.wage_type === 'prevailing').reduce((sum, e) => {
+    const { regularHours, overtimeHours } = computeOT(entries, workerOTRule, settings.overtime_threshold);
+    const prevailingHours = entries.filter(e => e.wage_type === 'prevailing').reduce((sum, e) => {
       const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
       return sum + h;
     }, 0);
-    // Round hours to the nearest minute so displayed h/m values × rate = displayed pay amounts
-    const roundMin = h => Math.round(h * 60) / 60;
-    const regularHours = roundMin(rawRegular);
-    const overtimeHours = roundMin(rawOvertime);
-    const prevailingHours = roundMin(rawPrevailing);
     const totalHours = regularHours + overtimeHours + prevailingHours;
     const rate = parseFloat(worker.hourly_rate) || settings.default_hourly_rate;
     let regularCost, overtimeCost;
@@ -682,8 +677,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
     const prevailingCost = prevailingHours * settings.prevailing_wage_rate;
     const { shortfall: guaranteeShortfall, minHours: guaranteeMinHours, weeks: guaranteeWeeks } =
       computeGuaranteeShortfall(totalHours, worker.guaranteed_weekly_hours, from, to);
-    const guaranteeHours = roundMin(guaranteeShortfall);
-    const guaranteeCost = guaranteeHours * rate;
+    const guaranteeCost = guaranteeShortfall * rate;
     // Round each cost component to cents so displayed line items always sum to the total
     const roundedRegularCost = Math.round(regularCost * 100) / 100;
     const roundedOvertimeCost = Math.round(overtimeCost * 100) / 100;
@@ -699,7 +693,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
       summary: {
         total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours,
         rate, regular_cost: roundedRegularCost, overtime_cost: roundedOvertimeCost, prevailing_cost: roundedPrevailingCost,
-        guarantee_shortfall_hours: guaranteeHours, guarantee_min_hours: guaranteeMinHours,
+        guarantee_shortfall_hours: guaranteeShortfall, guarantee_min_hours: guaranteeMinHours,
         guarantee_weeks: guaranteeWeeks, guarantee_cost: roundedGuaranteeCost,
         reimbursement_total: roundedReimbTotal,
         total_cost: totalCost + roundedReimbTotal,
