@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS reimbursements (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id    UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id    UUID NOT NULL,
   user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   amount        DECIMAL(10,2) NOT NULL,
   description   TEXT NOT NULL,
