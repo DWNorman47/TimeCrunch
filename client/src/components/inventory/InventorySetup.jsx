@@ -525,6 +525,7 @@ export default function InventorySetup({ projects }) {
 
   // Load items for current level
   const load = async () => {
+    if (levelKey === 'suppliers') return; // SupplierPanel manages its own data
     setLoading(true);
     setError('');
     try {
@@ -572,12 +573,12 @@ export default function InventorySetup({ projects }) {
 
   // Which parent option list feeds the "Add new" form's parent selector
   const parentOptionsForForm = () => {
-    if (!level.parentLevel) return [];
+    if (!level?.parentLevel) return [];
     return parentOpts[level.parentLevel] || [];
   };
 
   // Pre-selected parent ID for "Add new" form
-  const preselectedParentId = level.parentKey ? parentSels[level.parentKey] : null;
+  const preselectedParentId = level?.parentKey ? parentSels[level.parentKey] : null;
 
   // Parent filter selects to show above the list
   const parentFilters = () => {
