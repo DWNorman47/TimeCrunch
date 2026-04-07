@@ -98,10 +98,12 @@ export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true
       <Page size="A4" style={s.page}>
         {/* Invoice header */}
         <View style={s.invHeader}>
-          <View>
-            <Text style={s.brand}>Ops Flow Assist</Text>
-            <Text style={s.brandSub}>Employee Time Invoice</Text>
-          </View>
+          {ci.name ? (
+            <View>
+              <Text style={s.brand}>{ci.name}</Text>
+              <Text style={s.brandSub}>Employee Time Invoice</Text>
+            </View>
+          ) : null}
           <View style={s.invRight}>
             <Text style={s.invTitle}>INVOICE</Text>
             <Text style={s.metaLabel}>Invoice #</Text>
@@ -164,7 +166,7 @@ export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true
         {/* Summary */}
         <View style={s.summaryWrap}>
           <Text style={s.thankYou}>
-            {'Thank you for reviewing this invoice.\nPlease approve all time entries in OpsFloa\nand process payment at your earliest convenience.'}
+            {'Thank you for reviewing this invoice.\nPlease process payment at your earliest convenience.'}
           </Text>
           <View style={s.sumTable}>
             {summary.regular_hours > 0 && (

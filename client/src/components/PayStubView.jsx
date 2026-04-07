@@ -84,7 +84,7 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
           {/* Invoice header */}
           <div style={s.invHeader}>
             <div>
-              <div style={s.brand}>Ops Flow Assist</div>
+              {ci?.name && <div style={s.brand}>{ci.name}</div>}
               <div style={s.brandSub}>{t.employeeTimeInvoice}</div>
             </div>
             <div style={s.invRight}>
