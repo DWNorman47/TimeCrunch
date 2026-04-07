@@ -641,6 +641,20 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
     );
 
     const entries = entriesResult.rows;
+
+    const reimbResult = await pool.query(
+      `SELECT r.id, r.amount, r.description, r.category, r.expense_date, r.project_id, p.name AS project_name
+       FROM reimbursements r
+       LEFT JOIN projects p ON p.id = r.project_id
+       WHERE r.user_id = $1 AND r.company_id = $2 AND r.status = 'approved'
+         AND ($3::date IS NULL OR r.expense_date >= $3::date)
+         AND ($4::date IS NULL OR r.expense_date <= $4::date)
+       ORDER BY r.expense_date ASC`,
+      [req.params.id, companyId, from || null, to || null]
+    );
+    const reimbursements = reimbResult.rows;
+    const reimbursementTotal = reimbursements.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+
     const settings = await getSettings(companyId);
     const worker = userResult.rows[0];
     const workerOTRule = worker.overtime_rule || 'daily';
@@ -669,12 +683,14 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
     res.json({
       worker,
       entries,
+      reimbursements,
       summary: {
         total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours,
         rate, regular_cost: regularCost, overtime_cost: overtimeCost, prevailing_cost: prevailingCost,
         guarantee_shortfall_hours: guaranteeShortfall, guarantee_min_hours: guaranteeMinHours,
         guarantee_weeks: guaranteeWeeks, guarantee_cost: guaranteeCost,
-        total_cost: totalCost,
+        reimbursement_total: reimbursementTotal,
+        total_cost: totalCost + reimbursementTotal,
         overtime_multiplier: settings.overtime_multiplier, prevailing_wage_rate: settings.prevailing_wage_rate,
       },
       period: { from: from || null, to: to || null },

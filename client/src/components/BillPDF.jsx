@@ -65,10 +65,13 @@ const s = StyleSheet.create({
   sumBold: { fontWeight: 'bold' },
   sumTotal: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 10, backgroundColor: '#1a56db' },
   sumTotalText: { fontSize: 11, fontWeight: 'bold', color: '#fff' },
+  reimbSection: { marginTop: 16 },
+  reimbHeader: { flexDirection: 'row', backgroundColor: '#f5f3ff', paddingVertical: 6, paddingHorizontal: 4, borderBottomWidth: 1.5, borderBottomColor: '#e5e7eb', borderBottomStyle: 'solid' },
+  reimbRow: { flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 4, borderBottomWidth: 0.5, borderBottomColor: '#f3f4f6', borderBottomStyle: 'solid' },
 });
 
 export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true, showProject = true, showRateType = true }) {
-  const { worker, entries, summary, period } = data;
+  const { worker, entries, reimbursements = [], summary, period } = data;
 
   const periodStr = period.from || period.to
     ? `${period.from ? fmtDateShort(period.from) : 'Beginning'} – ${period.to ? fmtDateShort(period.to) : 'Present'}`
@@ -98,12 +101,10 @@ export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true
       <Page size="A4" style={s.page}>
         {/* Invoice header */}
         <View style={s.invHeader}>
-          {ci.name ? (
-            <View>
-              <Text style={s.brand}>{ci.name}</Text>
-              <Text style={s.brandSub}>Employee Time Invoice</Text>
-            </View>
-          ) : null}
+          <View>
+            <Text style={s.brand}>{worker.invoice_name || worker.full_name || '—'}</Text>
+            <Text style={s.brandSub}>Employee Time Invoice</Text>
+          </View>
           <View style={s.invRight}>
             <Text style={s.invTitle}>INVOICE</Text>
             <Text style={s.metaLabel}>Invoice #</Text>
@@ -162,6 +163,28 @@ export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true
             </View>
           );
         })}
+
+        {/* Reimbursements table */}
+        {reimbursements.length > 0 && (
+          <View style={s.reimbSection}>
+            <View style={s.reimbHeader}>
+              <Text style={[s.th, { width: '18%' }]}>Date</Text>
+              <Text style={[s.th, { width: '22%' }]}>Category</Text>
+              <Text style={[s.th, { flex: 1 }]}>Description</Text>
+              {showProject && <Text style={[s.th, { width: '20%' }]}>Project</Text>}
+              <Text style={[s.th, { width: '16%', textAlign: 'right' }]}>Amount</Text>
+            </View>
+            {reimbursements.map(r => (
+              <View key={r.id} style={s.reimbRow}>
+                <Text style={[s.td, { width: '18%' }]}>{fmtDateShort(r.expense_date)}</Text>
+                <Text style={[s.td, { width: '22%' }]}>{r.category || '—'}</Text>
+                <Text style={[s.td, { flex: 1, color: '#6b7280' }]}>{r.description || ''}</Text>
+                {showProject && <Text style={[s.td, { width: '20%' }]}>{r.project_name || '—'}</Text>}
+                <Text style={[s.td, { width: '16%', textAlign: 'right', fontWeight: 'bold', color: '#7c3aed' }]}>{fmtMoney(r.amount)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Summary */}
         <View style={s.summaryWrap}>
@@ -223,6 +246,12 @@ export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true
                   Minimum Guarantee ({fmtH(summary.guarantee_shortfall_hours)} @ {fmtMoney(summary.rate)}/hr)
                 </Text>
                 <Text style={[s.sumVal, { color: '#2563eb' }]}>{fmtMoney(summary.guarantee_cost || 0)}</Text>
+              </View>
+            )}
+            {(summary.reimbursement_total || 0) > 0 && (
+              <View style={s.sumRow}>
+                <Text style={[s.sumLabel, { color: '#7c3aed' }]}>Expense Reimbursements</Text>
+                <Text style={[s.sumVal, { color: '#7c3aed' }]}>{fmtMoney(summary.reimbursement_total)}</Text>
               </View>
             )}
             <View style={s.sumTotal}>
