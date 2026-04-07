@@ -62,6 +62,7 @@ app.use('/api/safety-talks', requireAuth, requirePlan('business'), require('./ro
 app.use('/api/safety-checklists', requireAuth, requirePlan('business'), require('./routes/safetyChecklists'));
 app.use('/api/inbox', require('./routes/inbox'));
 app.use('/api/time-off', requireAuth, require('./routes/timeOff'));
+app.use('/api/reimbursements', requireAuth, require('./routes/reimbursements'));
 
 // Read-only company settings — available to all authenticated users
 const { SETTINGS_DEFAULTS, applySettingsRows } = require('./settingsDefaults');
