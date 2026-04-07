@@ -1723,7 +1723,9 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
            COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN user_id END) as active_workers_this_month,
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE)
              THEN EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600 END), 0)::numeric, 1) as hours_this_month,
-           COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_approvals
+           COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_approvals,
+           ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('week', CURRENT_DATE) THEN mileage END), 0)::numeric, 1) as mileage_this_week,
+           ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN mileage END), 0)::numeric, 1) as mileage_this_month
          FROM time_entries WHERE company_id = $1`,
         [companyId]
       ),

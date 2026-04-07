@@ -110,6 +110,14 @@ export default function AnalyticsDashboard() {
           sub={summary.pending_approvals > 0 ? t.needsReview : t.allCaughtUpAnalytics}
           color={summary.pending_approvals > 0 ? ORANGE : GREEN}
         />
+        {(parseFloat(summary.mileage_this_month) > 0 || parseFloat(summary.mileage_this_week) > 0) && (
+          <StatCard
+            label="Mileage This Month"
+            value={`${summary.mileage_this_month} mi`}
+            sub={`${summary.mileage_this_week} mi this week`}
+            color="#8b5cf6"
+          />
+        )}
       </div>
 
       {/* Daily hours bar chart */}
