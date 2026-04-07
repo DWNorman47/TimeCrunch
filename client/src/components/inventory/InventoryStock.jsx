@@ -6,7 +6,7 @@ function formatBin(area_name, rack_name, bay_name, compartment_name) {
     .filter(Boolean).join(' › ') || null;
 }
 
-export default function InventoryStock({ isAdmin, locations, onStockChange }) {
+export default function InventoryStock({ isAdmin, locations, onStockChange, onReorderClick }) {
   const [stock, setStock] = useState([]);
   const [lowItems, setLowItems] = useState([]);
   const [locationFilter, setLocationFilter] = useState('');
@@ -44,7 +44,12 @@ export default function InventoryStock({ isAdmin, locations, onStockChange }) {
       {/* Low stock alert banner */}
       {isAdmin && lowItems.length > 0 && (
         <div style={s.alertBanner}>
-          ⚠️ {lowItems.length} item{lowItems.length !== 1 ? 's' : ''} at or below reorder point
+          <span>⚠️ {lowItems.length} item{lowItems.length !== 1 ? 's' : ''} at or below reorder point</span>
+          {onReorderClick && (
+            <button style={s.reorderBtn} onClick={onReorderClick}>
+              Create Reorder PO
+            </button>
+          )}
         </div>
       )}
 
@@ -133,7 +138,8 @@ export default function InventoryStock({ isAdmin, locations, onStockChange }) {
 
 const s = {
   wrap:        { padding: 16 },
-  alertBanner: { background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14, fontWeight: 600 },
+  alertBanner: { background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  reorderBtn:  { padding: '6px 14px', borderRadius: 7, border: 'none', background: '#92400e', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
   filterBar:   { display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' },
   select:      { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151' },
   refreshBtn:  { padding: '8px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 600, color: '#374151', cursor: 'pointer' },

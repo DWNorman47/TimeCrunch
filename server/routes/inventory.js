@@ -1045,6 +1045,348 @@ router.delete('/suppliers/:id', requireAdmin, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// ── Purchase Orders ───────────────────────────────────────────────────────────
+
+// Generate next PO number for a company: PO-YYYY-NNNN
+async function nextPONumber(client, companyId) {
+  const year = new Date().getFullYear();
+  const res = await client.query(
+    `SELECT COUNT(*) FROM purchase_orders WHERE company_id=$1 AND po_number LIKE $2`,
+    [companyId, `PO-${year}-%`]
+  );
+  const seq = parseInt(res.rows[0].count) + 1;
+  return `PO-${year}-${String(seq).padStart(4, '0')}`;
+}
+
+// GET /api/inventory/purchase-orders
+router.get('/purchase-orders', requireAdmin, async (req, res) => {
+  const { status, supplier_id } = req.query;
+  const companyId = req.user.company_id;
+  try {
+    const conditions = ['po.company_id = $1'];
+    const values = [companyId]; let idx = 2;
+    if (status) { conditions.push(`po.status = $${idx++}`); values.push(status); }
+    if (supplier_id) { conditions.push(`po.supplier_id = $${idx++}`); values.push(supplier_id); }
+    const result = await pool.query(
+      `SELECT po.*,
+              sup.name AS supplier_name,
+              loc.name AS to_location_name,
+              u.full_name AS created_by_name,
+              (SELECT COUNT(*)        FROM purchase_order_lines WHERE po_id = po.id) AS line_count,
+              (SELECT COALESCE(SUM(qty_ordered),  0) FROM purchase_order_lines WHERE po_id = po.id) AS total_ordered,
+              (SELECT COALESCE(SUM(qty_received), 0) FROM purchase_order_lines WHERE po_id = po.id) AS total_received
+       FROM purchase_orders po
+       LEFT JOIN inventory_suppliers  sup ON po.supplier_id    = sup.id
+       LEFT JOIN inventory_locations  loc ON po.to_location_id = loc.id
+       JOIN  users u ON po.created_by = u.id
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY po.created_at DESC`,
+      values
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/purchase-orders
+router.post('/purchase-orders', requireAdmin, async (req, res) => {
+  const { supplier_id, order_date, expected_date, to_location_id, notes, reference_no, lines = [] } = req.body;
+  const companyId = req.user.company_id;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const poNumber = await nextPONumber(client, companyId);
+    const poResult = await client.query(
+      `INSERT INTO purchase_orders
+         (company_id, po_number, supplier_id, order_date, expected_date, to_location_id, notes, reference_no, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [companyId, poNumber, supplier_id || null,
+       order_date || new Date().toISOString().slice(0,10),
+       expected_date || null, to_location_id || null,
+       notes?.trim() || null, reference_no?.trim() || null, req.user.id]
+    );
+    const po = poResult.rows[0];
+    for (const line of lines) {
+      if (!line.item_id || !line.qty_ordered || parseFloat(line.qty_ordered) <= 0) continue;
+      await client.query(
+        `INSERT INTO purchase_order_lines (po_id, item_id, qty_ordered, unit_cost, uom_id, notes)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [po.id, parseInt(line.item_id), parseFloat(line.qty_ordered),
+         line.unit_cost != null ? parseFloat(line.unit_cost) : null,
+         line.uom_id ? parseInt(line.uom_id) : null, line.notes?.trim() || null]
+      );
+    }
+    await client.query('COMMIT');
+    res.status(201).json(po);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err); res.status(500).json({ error: 'Server error' });
+  } finally { client.release(); }
+});
+
+// GET /api/inventory/purchase-orders/:id  (with lines)
+router.get('/purchase-orders/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const poResult = await pool.query(
+      `SELECT po.*,
+              sup.name AS supplier_name,
+              loc.name AS to_location_name,
+              u.full_name AS created_by_name
+       FROM purchase_orders po
+       LEFT JOIN inventory_suppliers sup ON po.supplier_id    = sup.id
+       LEFT JOIN inventory_locations loc ON po.to_location_id = loc.id
+       JOIN users u ON po.created_by = u.id
+       WHERE po.id=$1 AND po.company_id=$2`,
+      [req.params.id, companyId]
+    );
+    if (poResult.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    const linesResult = await pool.query(
+      `SELECT pol.*, i.name AS item_name, i.sku, i.unit,
+              u.unit AS uom_unit, u.unit_spec AS uom_spec
+       FROM purchase_order_lines pol
+       JOIN inventory_items i ON pol.item_id = i.id
+       LEFT JOIN inventory_item_uoms u ON pol.uom_id = u.id
+       WHERE pol.po_id = $1 ORDER BY pol.id`,
+      [req.params.id]
+    );
+    res.json({ ...poResult.rows[0], lines: linesResult.rows });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// PATCH /api/inventory/purchase-orders/:id
+router.patch('/purchase-orders/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { supplier_id, order_date, expected_date, to_location_id, notes, reference_no, status } = req.body;
+  try {
+    const existing = await pool.query(
+      'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    const cur = existing.rows[0];
+    if (['received', 'cancelled'].includes(cur.status) && status === undefined) {
+      return res.status(400).json({ error: `Cannot edit a ${cur.status} PO` });
+    }
+    const sets = [], vals = [req.params.id, companyId]; let idx = 3;
+    if (supplier_id  !== undefined) { sets.push(`supplier_id=$${idx++}`);    vals.push(supplier_id  || null); }
+    if (order_date   !== undefined) { sets.push(`order_date=$${idx++}`);     vals.push(order_date); }
+    if (expected_date!== undefined) { sets.push(`expected_date=$${idx++}`);  vals.push(expected_date || null); }
+    if (to_location_id!==undefined) { sets.push(`to_location_id=$${idx++}`); vals.push(to_location_id || null); }
+    if (notes        !== undefined) { sets.push(`notes=$${idx++}`);          vals.push(notes?.trim() || null); }
+    if (reference_no !== undefined) { sets.push(`reference_no=$${idx++}`);   vals.push(reference_no?.trim() || null); }
+    if (status       !== undefined) {
+      const VALID = ['draft','submitted','partial','received','cancelled'];
+      if (!VALID.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+      sets.push(`status=$${idx++}`); vals.push(status);
+      if (status === 'submitted')  { sets.push(`submitted_at=NOW()`); }
+      if (status === 'received')   { sets.push(`received_at=NOW()`); }
+    }
+    if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    const result = await pool.query(
+      `UPDATE purchase_orders SET ${sets.join(',')} WHERE id=$1 AND company_id=$2 RETURNING *`,
+      vals
+    );
+    res.json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /api/inventory/purchase-orders/:id  (hard-delete drafts; cancel others)
+router.delete('/purchase-orders/:id', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const existing = await pool.query(
+      'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    const { status } = existing.rows[0];
+    if (status === 'received') return res.status(409).json({ error: 'Cannot delete a received PO' });
+    if (status === 'draft') {
+      await pool.query('DELETE FROM purchase_orders WHERE id=$1', [req.params.id]);
+    } else {
+      await pool.query(
+        'UPDATE purchase_orders SET status=$1, received_at=NULL WHERE id=$2',
+        ['cancelled', req.params.id]
+      );
+    }
+    res.json({ success: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/purchase-orders/:id/lines
+router.post('/purchase-orders/:id/lines', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { item_id, qty_ordered, unit_cost, uom_id, notes } = req.body;
+  if (!item_id || !qty_ordered || parseFloat(qty_ordered) <= 0) {
+    return res.status(400).json({ error: 'item_id and positive qty_ordered required' });
+  }
+  try {
+    const po = await pool.query(
+      'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (po.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    if (po.rows[0].status !== 'draft') return res.status(409).json({ error: 'Can only add lines to a draft PO' });
+    const item = await pool.query('SELECT id FROM inventory_items WHERE id=$1 AND company_id=$2', [item_id, companyId]);
+    if (item.rowCount === 0) return res.status(404).json({ error: 'Item not found' });
+    await pool.query(
+      `INSERT INTO purchase_order_lines (po_id, item_id, qty_ordered, unit_cost, uom_id, notes)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [req.params.id, parseInt(item_id), parseFloat(qty_ordered),
+       unit_cost != null ? parseFloat(unit_cost) : null,
+       uom_id ? parseInt(uom_id) : null, notes?.trim() || null]
+    );
+    const lines = await pool.query(
+      `SELECT pol.*, i.name AS item_name, i.sku, i.unit
+       FROM purchase_order_lines pol JOIN inventory_items i ON pol.item_id = i.id
+       WHERE pol.po_id=$1 ORDER BY pol.id`,
+      [req.params.id]
+    );
+    res.status(201).json(lines.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// PATCH /api/inventory/purchase-orders/:id/lines/:lineId
+router.patch('/purchase-orders/:id/lines/:lineId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { qty_ordered, unit_cost, uom_id, notes } = req.body;
+  try {
+    const po = await pool.query(
+      'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (po.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    if (po.rows[0].status !== 'draft') return res.status(409).json({ error: 'Can only edit lines on a draft PO' });
+    const sets = [], vals = [req.params.lineId]; let idx = 2;
+    if (qty_ordered !== undefined) { sets.push(`qty_ordered=$${idx++}`); vals.push(parseFloat(qty_ordered)); }
+    if (unit_cost   !== undefined) { sets.push(`unit_cost=$${idx++}`);   vals.push(unit_cost != null ? parseFloat(unit_cost) : null); }
+    if (uom_id      !== undefined) { sets.push(`uom_id=$${idx++}`);      vals.push(uom_id ? parseInt(uom_id) : null); }
+    if (notes       !== undefined) { sets.push(`notes=$${idx++}`);       vals.push(notes?.trim() || null); }
+    if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    await pool.query(`UPDATE purchase_order_lines SET ${sets.join(',')} WHERE id=$1`, vals);
+    const lines = await pool.query(
+      `SELECT pol.*, i.name AS item_name, i.sku, i.unit
+       FROM purchase_order_lines pol JOIN inventory_items i ON pol.item_id = i.id
+       WHERE pol.po_id=$1 ORDER BY pol.id`,
+      [req.params.id]
+    );
+    res.json(lines.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /api/inventory/purchase-orders/:id/lines/:lineId
+router.delete('/purchase-orders/:id/lines/:lineId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const po = await pool.query(
+      'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (po.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
+    if (po.rows[0].status !== 'draft') return res.status(409).json({ error: 'Can only remove lines from a draft PO' });
+    await pool.query('DELETE FROM purchase_order_lines WHERE id=$1 AND po_id=$2', [req.params.lineId, req.params.id]);
+    const lines = await pool.query(
+      `SELECT pol.*, i.name AS item_name, i.sku, i.unit
+       FROM purchase_order_lines pol JOIN inventory_items i ON pol.item_id = i.id
+       WHERE pol.po_id=$1 ORDER BY pol.id`,
+      [req.params.id]
+    );
+    res.json(lines.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/purchase-orders/:id/receive
+router.post('/purchase-orders/:id/receive', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { location_id, lines } = req.body; // lines: [{ line_id, qty_to_receive }]
+  if (!location_id) return res.status(400).json({ error: 'location_id required' });
+  if (!Array.isArray(lines) || lines.length === 0) return res.status(400).json({ error: 'lines required' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const po = await client.query(
+      'SELECT id, status, company_id FROM purchase_orders WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (po.rowCount === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'PO not found' }); }
+    if (!['submitted','partial'].includes(po.rows[0].status)) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Can only receive against a submitted or partial PO' });
+    }
+    const loc = await client.query('SELECT id FROM inventory_locations WHERE id=$1 AND company_id=$2', [location_id, companyId]);
+    if (loc.rowCount === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Location not found' }); }
+
+    for (const entry of lines) {
+      const qty = parseFloat(entry.qty_to_receive);
+      if (!entry.line_id || isNaN(qty) || qty <= 0) continue;
+      const lineResult = await client.query(
+        `SELECT pol.*, ii.unit_cost AS catalog_cost
+         FROM purchase_order_lines pol
+         JOIN inventory_items ii ON pol.item_id = ii.id
+         WHERE pol.id=$1 AND pol.po_id=$2`,
+        [entry.line_id, req.params.id]
+      );
+      if (lineResult.rowCount === 0) continue;
+      const line = lineResult.rows[0];
+      const remaining = parseFloat(line.qty_ordered) - parseFloat(line.qty_received);
+      const actualQty = Math.min(qty, remaining);
+      if (actualQty <= 0) continue;
+      const unitCost = line.unit_cost != null ? parseFloat(line.unit_cost) : (line.catalog_cost != null ? parseFloat(line.catalog_cost) : null);
+      // Create receive transaction
+      await client.query(
+        `INSERT INTO inventory_transactions
+           (company_id, type, item_id, quantity, to_location_id, performed_by, unit_cost, uom_id, supplier_id)
+         VALUES ($1,'receive',$2,$3,$4,$5,$6,$7,
+           (SELECT supplier_id FROM purchase_orders WHERE id=$8))`,
+        [companyId, line.item_id, actualQty, location_id, req.user.id,
+         unitCost, line.uom_id || null, req.params.id]
+      );
+      // Update stock
+      await applyStockDelta(client, companyId, line.item_id, location_id, actualQty, {}, line.uom_id || null);
+      // Update line qty_received
+      await client.query(
+        'UPDATE purchase_order_lines SET qty_received = qty_received + $1 WHERE id=$2',
+        [actualQty, entry.line_id]
+      );
+    }
+
+    // Update PO status based on received amounts
+    const totals = await client.query(
+      `SELECT COALESCE(SUM(qty_ordered),0) AS ordered, COALESCE(SUM(qty_received),0) AS received
+       FROM purchase_order_lines WHERE po_id=$1`,
+      [req.params.id]
+    );
+    const { ordered, received } = totals.rows[0];
+    let newStatus = 'partial';
+    if (parseFloat(received) >= parseFloat(ordered)) newStatus = 'received';
+    await client.query(
+      `UPDATE purchase_orders SET status=$1${newStatus === 'received' ? ', received_at=NOW()' : ''} WHERE id=$2`,
+      [newStatus, req.params.id]
+    );
+
+    await client.query('COMMIT');
+    // Return updated PO with lines
+    const updated = await pool.query(
+      `SELECT po.*, sup.name AS supplier_name, loc.name AS to_location_name
+       FROM purchase_orders po
+       LEFT JOIN inventory_suppliers sup ON po.supplier_id = sup.id
+       LEFT JOIN inventory_locations loc ON po.to_location_id = loc.id
+       WHERE po.id=$1`,
+      [req.params.id]
+    );
+    const updatedLines = await pool.query(
+      `SELECT pol.*, i.name AS item_name, i.sku, i.unit
+       FROM purchase_order_lines pol JOIN inventory_items i ON pol.item_id = i.id
+       WHERE pol.po_id=$1 ORDER BY pol.id`,
+      [req.params.id]
+    );
+    res.json({ ...updated.rows[0], lines: updatedLines.rows });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err); res.status(500).json({ error: 'Server error' });
+  } finally { client.release(); }
+});
+
 // ── Valuation ─────────────────────────────────────────────────────────────────
 
 // GET /api/inventory/valuation

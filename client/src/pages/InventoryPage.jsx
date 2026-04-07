@@ -9,6 +9,7 @@ import InventoryTransactions from '../components/inventory/InventoryTransactions
 import InventoryCycleCounts from '../components/inventory/InventoryCycleCounts';
 import InventorySetup from '../components/inventory/InventorySetup';
 import InventoryValuation from '../components/inventory/InventoryValuation';
+import InventoryPurchaseOrders from '../components/inventory/InventoryPurchaseOrders';
 
 export default function InventoryPage() {
   const { user, logout } = useAuth();
@@ -21,8 +22,14 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
 
   const INV_TABS = isAdmin
-    ? ['stock', 'items', 'transactions', 'cycle', 'valuation', 'setup']
+    ? ['stock', 'items', 'transactions', 'orders', 'cycle', 'valuation', 'setup']
     : ['stock', 'transactions'];
+  const [poLowStockTrigger, setPoLowStockTrigger] = useState(false);
+
+  const handleReorderClick = () => {
+    setPoLowStockTrigger(true);
+    switchTab('orders');
+  };
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(INV_TABS.includes(hashTab) ? hashTab : 'stock');
   const switchTab = t => { setTab(t); window.location.hash = t; };
@@ -103,6 +110,7 @@ export default function InventoryPage() {
             { id: 'transactions', label: '↔️ Transactions' },
             ...(isAdmin ? [
               { id: 'items',      label: '🗂 Items' },
+              { id: 'orders',     label: '🛒 Orders' },
               { id: 'cycle',      label: '📋 Count' },
               { id: 'valuation',  label: '💰 Valuation' },
               { id: 'setup',      label: '⚙️ Setup' },
@@ -115,6 +123,7 @@ export default function InventoryPage() {
             isAdmin={isAdmin}
             locations={locations}
             onStockChange={refreshLowStock}
+            onReorderClick={isAdmin ? handleReorderClick : null}
           />
         )}
         {tab === 'items' && isAdmin && (
@@ -132,6 +141,13 @@ export default function InventoryPage() {
           <InventoryCycleCounts
             locations={locations}
             onComplete={refreshLowStock}
+          />
+        )}
+        {tab === 'orders' && isAdmin && (
+          <InventoryPurchaseOrders
+            locations={locations}
+            prefillLowStock={poLowStockTrigger}
+            onPrefillHandled={() => setPoLowStockTrigger(false)}
           />
         )}
         {tab === 'valuation' && isAdmin && (
