@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api';
 import ItemLabelModal from './ItemLabelModal';
 
-const UNITS = ['each', 'box', 'bag', 'bundle', 'pallet', 'lb', 'kg', 'ft', 'm', 'sq ft', 'gal', 'L', 'roll', 'sheet', 'piece', 'other'];
+const DEFAULT_UNITS = ['each', 'box', 'bag', 'bundle', 'pallet', 'lb', 'kg', 'ft', 'm', 'sq ft', 'gal', 'L', 'roll', 'sheet', 'piece', 'other'];
 
-function ItemForm({ item, onSave, onCancel }) {
+function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUnits = DEFAULT_UNITS }) {
   const skuRef = useRef(null);
   const [skuScanning, setSkuScanning] = useState(false);
 
@@ -25,7 +25,7 @@ function ItemForm({ item, onSave, onCancel }) {
     reorder_point: item?.reorder_point != null ? String(item.reorder_point) : '0',
     reorder_qty: item?.reorder_qty != null ? String(item.reorder_qty) : '0',
     customUnit: '',
-    useCustomUnit: item ? !UNITS.includes(item.unit) : false,
+    useCustomUnit: item ? !knownUnits.includes(item.unit) : false,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -112,7 +112,7 @@ function ItemForm({ item, onSave, onCancel }) {
         <div style={f.field}>
           <label style={f.label}>Unit *</label>
           <select style={f.input} value={form.useCustomUnit ? 'other' : form.unit} onChange={handleUnitChange}>
-            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+            {activeUnits.map(u => <option key={u} value={u}>{u}</option>)}
           </select>
           {form.useCustomUnit && (
             <input style={{ ...f.input, marginTop: 6 }} value={form.customUnit} onChange={e => set('customUnit', e.target.value)} placeholder="Enter unit…" />
@@ -325,6 +325,7 @@ export default function InventoryItems({ onItemChange }) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [categories, setCategories] = useState([]);
+  const [units, setUnits] = useState({ active: DEFAULT_UNITS, known: DEFAULT_UNITS });
   const [editingItem, setEditingItem] = useState(null); // null=none, false=new, obj=editing
   const [archiving, setArchiving] = useState(null);
   const [labelItem, setLabelItem] = useState(null);
@@ -335,12 +336,14 @@ export default function InventoryItems({ onItemChange }) {
       const params = new URLSearchParams({ active: showInactive ? 'all' : 'true' });
       if (search) params.set('search', search);
       if (categoryFilter) params.set('category', categoryFilter);
-      const [items, cats] = await Promise.all([
+      const [items, cats, unitsRes] = await Promise.all([
         api.get(`/inventory/items?${params}`),
         api.get('/inventory/items/categories'),
+        api.get('/inventory/units'),
       ]);
       setItems(items.data);
       setCategories(cats.data);
+      setUnits(unitsRes.data);
     } catch (e) {
       setError('Failed to load items');
     } finally {
@@ -387,6 +390,8 @@ export default function InventoryItems({ onItemChange }) {
             item={editingItem || null}
             onSave={handleSave}
             onCancel={() => setEditingItem(null)}
+            activeUnits={units.active}
+            knownUnits={units.known}
           />
           {editingItem && <ItemUOMPanel item={editingItem} />}
         </div>

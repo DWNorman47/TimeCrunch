@@ -125,10 +125,10 @@ export default function AdvancedSettings() {
     }
   }, [open, config]);
 
-  const saveCategories = async ({ suppressed, custom }) => {
+  const makeSaver = key => async ({ suppressed, custom }) => {
     setSaving(true); setError(''); setSuccess('');
     try {
-      const r = await api.patch('/admin/advanced-settings/reimbursement_categories', { suppressed, custom });
+      const r = await api.patch(`/admin/advanced-settings/${key}`, { suppressed, custom });
       setConfig(r.data);
       setSuccess('Saved.');
       setTimeout(() => setSuccess(''), 2000);
@@ -153,13 +153,22 @@ export default function AdvancedSettings() {
           {!config ? (
             <div style={s.loading}>Loading…</div>
           ) : (
-            <CollapsibleCategory title="Reimbursement Categories">
-              <CategorySection
-                cfg={config.reimbursement_categories}
-                onSave={saveCategories}
-                saving={saving}
-              />
-            </CollapsibleCategory>
+            <>
+              <CollapsibleCategory title="Reimbursement Categories">
+                <CategorySection
+                  cfg={config.reimbursement_categories}
+                  onSave={makeSaver('reimbursement_categories')}
+                  saving={saving}
+                />
+              </CollapsibleCategory>
+              <CollapsibleCategory title="Item Units">
+                <CategorySection
+                  cfg={config.item_units}
+                  onSave={makeSaver('item_units')}
+                  saving={saving}
+                />
+              </CollapsibleCategory>
+            </>
           )}
         </div>
       )}

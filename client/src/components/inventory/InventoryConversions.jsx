@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 
-const UNITS = ['each', 'box', 'bag', 'bundle', 'pallet', 'lb', 'kg', 'ft', 'm', 'sq ft', 'gal', 'L', 'roll', 'sheet', 'piece', 'other'];
+const DEFAULT_UNITS = ['each', 'box', 'bag', 'bundle', 'pallet', 'lb', 'kg', 'ft', 'm', 'sq ft', 'gal', 'L', 'roll', 'sheet', 'piece', 'other'];
 
 function SectionHeader({ children, count, warn }) {
   return (
@@ -17,6 +17,7 @@ function SectionHeader({ children, count, warn }) {
 export default function InventoryConversions({ onConversionChange }) {
   const [rows, setRows]       = useState([]);
   const [items, setItems]     = useState([]);
+  const [units, setUnits]     = useState({ active: DEFAULT_UNITS, known: DEFAULT_UNITS });
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
 
@@ -39,12 +40,14 @@ export default function InventoryConversions({ onConversionChange }) {
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [conv, itemList] = await Promise.all([
+      const [conv, itemList, unitsRes] = await Promise.all([
         api.get('/inventory/uom-conversions'),
         api.get('/inventory/items?active=true'),
+        api.get('/inventory/units'),
       ]);
       setRows(conv.data);
       setItems(itemList.data);
+      setUnits(unitsRes.data);
     } catch { setError('Failed to load.'); }
     finally { setLoading(false); }
   }, []);
@@ -198,7 +201,7 @@ export default function InventoryConversions({ onConversionChange }) {
               <div style={s.addField}>
                 <label style={s.addLabel}>Alternate Unit *</label>
                 <select style={s.addInput} value={addUnit} onChange={e => setAddUnit(e.target.value)}>
-                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                  {units.active.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
                 {addUnit === 'other' && (
                   <input style={{ ...s.addInput, marginTop: 4 }} value={addCustomUnit}

@@ -213,12 +213,17 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
 
 // ── Advanced Settings ──────────────────────────────────────────────────────────
 
-const ADVANCED_SETTING_KEYS = ['reimbursement_categories'];
+const ADVANCED_SETTING_KEYS = ['reimbursement_categories', 'item_units'];
 
 // Hardcoded defaults — never stored in DB unless overridden
 const ADVANCED_DEFAULTS = {
   reimbursement_categories: {
     defaults: ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'],
+    suppressed: [],
+    custom: [],
+  },
+  item_units: {
+    defaults: ['each', 'box', 'bag', 'bundle', 'pallet', 'lb', 'kg', 'ft', 'm', 'sq ft', 'gal', 'L', 'roll', 'sheet', 'piece', 'other'],
     suppressed: [],
     custom: [],
   },
@@ -256,7 +261,7 @@ router.patch('/advanced-settings/:key', requireAdmin, requirePermission('manage_
     const def = ADVANCED_DEFAULTS[key];
     let value = {};
 
-    if (key === 'reimbursement_categories') {
+    if (key === 'reimbursement_categories' || key === 'item_units') {
       const suppressed = Array.isArray(req.body.suppressed)
         ? req.body.suppressed.filter(s => def.defaults.includes(s))
         : [];

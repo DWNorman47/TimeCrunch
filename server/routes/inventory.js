@@ -5,6 +5,24 @@ const { uploadBase64 } = require('../r2');
 const { checkStorageLimit, incrementStorage } = require('../storage');
 const { sendPushToCompanyAdmins } = require('../push');
 const { createInboxItemBatch } = require('./inbox');
+const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
+
+// GET /api/inventory/units — active units for this company
+router.get('/units', requireAuth, async (req, res) => {
+  try {
+    const all = await getAdvancedSettings(req.user.company_id);
+    const cfg = all.item_units;
+    const active = [
+      ...cfg.defaults.filter(u => !cfg.suppressed.includes(u)),
+      ...cfg.custom,
+    ];
+    const known = [...cfg.defaults, ...cfg.custom];
+    res.json({ active, known });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
