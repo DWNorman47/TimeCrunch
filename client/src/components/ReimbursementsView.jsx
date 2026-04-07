@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 
-const CATEGORIES = ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'];
-
 function fmtDate(str) {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -29,6 +27,7 @@ export default function ReimbursementsView() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
+  const [categories, setCategories] = useState({ active: [], known: [] });
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), project_id: '' });
   const [receiptFile, setReceiptFile] = useState(null);
@@ -39,12 +38,15 @@ export default function ReimbursementsView() {
   const [success, setSuccess] = useState('');
   const fileRef = useRef();
 
+  const resolveCategory = cat => cat && categories.known.includes(cat) ? cat : cat ? 'Other' : null;
+
   const load = () => {
     api.get('/reimbursements').then(r => setItems(r.data)).catch(() => {}).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
   useEffect(() => { api.get('/projects').then(r => setProjects(r.data)).catch(() => {}); }, []);
+  useEffect(() => { api.get('/reimbursements/categories').then(r => setCategories(r.data)).catch(() => {}); }, []);
 
   const handleFileChange = e => {
     const file = e.target.files[0];
@@ -120,7 +122,7 @@ export default function ReimbursementsView() {
               <label style={s.label}>Category</label>
               <select style={s.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
                 <option value="">Select…</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {categories.active.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             {projects.length > 0 && (
@@ -172,7 +174,7 @@ export default function ReimbursementsView() {
               <div style={s.cardTop}>
                 <div style={s.cardLeft}>
                   <span style={s.amount}>{fmtMoney(item.amount)}</span>
-                  {item.category && <span style={s.category}>{item.category}</span>}
+                  {item.category && <span style={s.category}>{resolveCategory(item.category)}</span>}
                   {item.project_name && <span style={s.projectTag}>{item.project_name}</span>}
                 </div>
                 <div style={s.cardRight}>

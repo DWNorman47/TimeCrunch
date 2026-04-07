@@ -4,6 +4,28 @@ const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadBase64 } = require('../r2');
 const { incrementStorage, decrementStorage, checkStorageLimit } = require('../storage');
+const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
+
+// GET /api/reimbursements/categories
+// Returns:
+//   active — shown in form dropdowns (defaults minus suppressed, plus custom)
+//   known  — all valid category values for display (all defaults + current custom)
+//            if a stored category isn't in "known", the client shows "Other"
+router.get('/categories', requireAuth, async (req, res) => {
+  try {
+    const all = await getAdvancedSettings(req.user.company_id);
+    const cfg = all.reimbursement_categories;
+    const active = [
+      ...cfg.defaults.filter(c => !cfg.suppressed.includes(c)),
+      ...cfg.custom,
+    ];
+    const known = [...cfg.defaults, ...cfg.custom];
+    res.json({ active, known });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // GET /api/reimbursements — worker: list own reimbursements
 router.get('/', requireAuth, async (req, res) => {

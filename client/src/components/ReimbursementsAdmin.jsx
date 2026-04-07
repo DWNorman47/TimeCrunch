@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 
-const CATEGORIES = ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'];
 
 function fmtDate(str) {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
@@ -26,7 +25,10 @@ function StatusBadge({ status }) {
   );
 }
 
-function ReimbursementRow({ item, onUpdate }) {
+const DEFAULT_CATEGORIES = ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'];
+
+function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES }) {
+  const resolveCategory = cat => cat && knownCategories.includes(cat) ? cat : cat ? 'Other' : null;
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState(item.admin_notes || '');
   const [saving, setSaving] = useState(false);
@@ -51,7 +53,7 @@ function ReimbursementRow({ item, onUpdate }) {
         <div style={s.workerName}>{item.full_name} <span style={s.username}>@{item.username}</span></div>
         <div style={s.rowMid}>
           <span style={s.amount}>{fmtMoney(item.amount)}</span>
-          {item.category && <span style={s.cat}>{item.category}</span>}
+          {item.category && <span style={s.cat}>{resolveCategory(item.category)}</span>}
           {item.project_name && <span style={s.projectTag}>{item.project_name}</span>}
           <span style={s.date}>{fmtDate(item.expense_date)}</span>
         </div>
@@ -112,6 +114,7 @@ export default function ReimbursementsAdmin() {
   const [filter, setFilter] = useState('pending');
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [categories, setCategories] = useState({ active: [], known: [] });
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ user_id: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved', project_id: '' });
   const [receiptFile, setReceiptFile] = useState(null);
@@ -135,6 +138,7 @@ export default function ReimbursementsAdmin() {
   useEffect(() => {
     api.get('/admin/workers').then(r => setWorkers(r.data)).catch(() => {});
     api.get('/projects').then(r => setProjects(r.data)).catch(() => {});
+    api.get('/reimbursements/categories').then(r => setCategories(r.data)).catch(() => {});
   }, []);
 
   const handleFileChange = e => {
@@ -225,7 +229,7 @@ export default function ReimbursementsAdmin() {
               <label style={s.fieldLabel}>Category</label>
               <select style={s.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
                 <option value="">Select…</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {categories.active.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div style={s.field}>
@@ -282,7 +286,7 @@ export default function ReimbursementsAdmin() {
       ) : (
         <div style={s.list}>
           {items.map(item => (
-            <ReimbursementRow key={item.id} item={item} onUpdate={handleUpdate} />
+            <ReimbursementRow key={item.id} item={item} onUpdate={handleUpdate} knownCategories={categories.known} />
           ))}
         </div>
       )}

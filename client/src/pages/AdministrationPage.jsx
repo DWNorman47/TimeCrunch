@@ -8,6 +8,7 @@ import TabBar from '../components/TabBar';
 import BillingPanel from '../components/BillingPanel';
 import ManageWorkers from '../components/ManageWorkers';
 import ManageRates from '../components/ManageRates';
+import AdvancedSettings from '../components/AdvancedSettings';
 import AuditLog from '../components/AuditLog';
 import QuickBooks from '../components/QuickBooks';
 import MFASetup from '../components/MFASetup';
@@ -365,6 +366,7 @@ export default function AdministrationPage() {
             <CompanyTab />
             <h3 style={{ ...styles.sectionTitle, marginTop: 8 }}>{t.settings}</h3>
             <ManageRates settings={settings} onSettingsUpdated={setSettings} />
+            <AdvancedSettings />
           </div>
         )}
         {tab === 'team'     && (

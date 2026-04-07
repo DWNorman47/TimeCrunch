@@ -211,6 +211,74 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
   }
 });
 
+// ── Advanced Settings ──────────────────────────────────────────────────────────
+
+const ADVANCED_SETTING_KEYS = ['reimbursement_categories'];
+
+// Hardcoded defaults — never stored in DB unless overridden
+const ADVANCED_DEFAULTS = {
+  reimbursement_categories: {
+    defaults: ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'],
+    suppressed: [],
+    custom: [],
+  },
+};
+
+async function getAdvancedSettings(companyId) {
+  const result = await pool.query(
+    'SELECT key, value FROM advanced_settings WHERE company_id = $1',
+    [companyId]
+  );
+  const out = {};
+  for (const key of ADVANCED_SETTING_KEYS) {
+    const row = result.rows.find(r => r.key === key);
+    const def = ADVANCED_DEFAULTS[key];
+    out[key] = row ? { ...def, ...row.value } : { ...def };
+  }
+  return out;
+}
+
+router.get('/advanced-settings', requireAdmin, async (req, res) => {
+  try {
+    res.json(await getAdvancedSettings(req.user.company_id));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.patch('/advanced-settings/:key', requireAdmin, requirePermission('manage_settings'), async (req, res) => {
+  const { key } = req.params;
+  if (!ADVANCED_SETTING_KEYS.includes(key))
+    return res.status(400).json({ error: 'Unknown advanced setting key' });
+  const companyId = req.user.company_id;
+  try {
+    const def = ADVANCED_DEFAULTS[key];
+    let value = {};
+
+    if (key === 'reimbursement_categories') {
+      const suppressed = Array.isArray(req.body.suppressed)
+        ? req.body.suppressed.filter(s => def.defaults.includes(s))
+        : [];
+      const custom = Array.isArray(req.body.custom)
+        ? req.body.custom.map(s => String(s).trim()).filter(Boolean)
+        : [];
+      value = { suppressed, custom };
+    }
+
+    await pool.query(
+      `INSERT INTO advanced_settings (company_id, key, value, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (company_id, key) DO UPDATE SET value = $3, updated_at = NOW()`,
+      [companyId, key, JSON.stringify(value)]
+    );
+    res.json(await getAdvancedSettings(companyId));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Notifications — inactive workers
 router.get('/notifications', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
@@ -2746,3 +2814,5 @@ router.delete('/clients/:id/documents/:docId', requireAdmin, async (req, res) =>
 });
 
 module.exports = router;
+module.exports.getAdvancedSettings = getAdvancedSettings;
+module.exports.ADVANCED_DEFAULTS = ADVANCED_DEFAULTS;
