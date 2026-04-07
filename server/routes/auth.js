@@ -140,7 +140,7 @@ router.get('/me', requireAuth, async (req, res) => {
   try {
     const [companyRes, userRes] = await Promise.all([
       pool.query('SELECT plan, subscription_status, addon_qbo, trial_ends_at FROM companies WHERE id = $1', [req.user.company_id]),
-      pool.query('SELECT mfa_enabled, language, admin_permissions, hourly_rate, rate_type FROM users WHERE id = $1', [req.user.id]),
+      pool.query('SELECT mfa_enabled, language, admin_permissions, hourly_rate, rate_type, guaranteed_weekly_hours FROM users WHERE id = $1', [req.user.id]),
     ]);
     const company = companyRes.rows[0] || {};
     const userRow = userRes.rows[0] || {};
@@ -157,6 +157,7 @@ router.get('/me', requireAuth, async (req, res) => {
         worker_access_ids: userRow.worker_access_ids || null,
         hourly_rate: userRow.hourly_rate != null ? parseFloat(userRow.hourly_rate) : null,
         rate_type: userRow.rate_type || 'hourly',
+        guaranteed_weekly_hours: userRow.guaranteed_weekly_hours != null ? parseFloat(userRow.guaranteed_weekly_hours) : null,
       },
     });
   } catch (err) {

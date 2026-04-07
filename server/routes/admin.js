@@ -623,7 +623,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const userResult = await pool.query(
-      'SELECT id, full_name, invoice_name, username, email, hourly_rate, rate_type, overtime_rule FROM users WHERE id = $1 AND role = $2 AND company_id = $3',
+      'SELECT id, full_name, invoice_name, username, email, hourly_rate, rate_type, overtime_rule, guaranteed_weekly_hours FROM users WHERE id = $1 AND role = $2 AND company_id = $3',
       [req.params.id, 'worker', companyId]
     );
     if (userResult.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
@@ -660,14 +660,20 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
       overtimeCost = overtimeHours * rate * settings.overtime_multiplier;
     }
     const prevailingCost = prevailingHours * settings.prevailing_wage_rate;
-    const totalCost = regularCost + overtimeCost + prevailingCost;
+    const { shortfall: guaranteeShortfall, minHours: guaranteeMinHours, weeks: guaranteeWeeks } =
+      computeGuaranteeShortfall(totalHours, worker.guaranteed_weekly_hours, from, to);
+    const guaranteeCost = guaranteeShortfall * rate;
+    const totalCost = regularCost + overtimeCost + prevailingCost + guaranteeCost;
 
     res.json({
       worker,
       entries,
       summary: {
         total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours,
-        rate, regular_cost: regularCost, overtime_cost: overtimeCost, prevailing_cost: prevailingCost, total_cost: totalCost,
+        rate, regular_cost: regularCost, overtime_cost: overtimeCost, prevailing_cost: prevailingCost,
+        guarantee_shortfall_hours: guaranteeShortfall, guarantee_min_hours: guaranteeMinHours,
+        guarantee_weeks: guaranteeWeeks, guarantee_cost: guaranteeCost,
+        total_cost: totalCost,
         overtime_multiplier: settings.overtime_multiplier, prevailing_wage_rate: settings.prevailing_wage_rate,
       },
       period: { from: from || null, to: to || null },
@@ -880,10 +886,26 @@ router.post('/workers', requireAdmin, requirePermission('manage_workers'), async
   }
 });
 
+// Helper: compute how many hours short of the weekly guarantee a period is
+function computeGuaranteeShortfall(totalHours, guaranteedWeeklyHours, fromDate, toDate) {
+  if (!guaranteedWeeklyHours || parseFloat(guaranteedWeeklyHours) <= 0) return { shortfall: 0, minHours: 0, weeks: 0 };
+  let weeks = 1;
+  if (fromDate && toDate) {
+    const f = new Date(String(fromDate).substring(0, 10) + 'T00:00:00');
+    const t = new Date(String(toDate).substring(0, 10) + 'T00:00:00');
+    const days = Math.round((t - f) / (1000 * 60 * 60 * 24)) + 1;
+    weeks = Math.max(1, Math.round(days / 7));
+  }
+  const minHours = parseFloat(guaranteedWeeklyHours) * weeks;
+  const shortfall = Math.max(0, minHours - totalHours);
+  return { shortfall: +shortfall.toFixed(2), minHours: +minHours.toFixed(2), weeks };
+}
+
 // Update a worker (full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, email, worker_type)
 router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
   const { full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type } = req.body;
-  if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && rate_type === undefined && overtime_rule === undefined && email === undefined && worker_type === undefined) {
+  const hasGuarantee = 'guaranteed_weekly_hours' in req.body;
+  if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && rate_type === undefined && overtime_rule === undefined && email === undefined && worker_type === undefined && !hasGuarantee) {
     return res.status(400).json({ error: 'At least one field required' });
   }
   const companyId = req.user.company_id;
@@ -926,10 +948,20 @@ router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), 
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email || null); }
     if (worker_type !== undefined) { fields.push(`worker_type = $${idx++}`); values.push(worker_type); }
     if (req.body.invoice_name !== undefined) { fields.push(`invoice_name = $${idx++}`); values.push(req.body.invoice_name?.trim() || null); }
+    if (hasGuarantee) {
+      const gv = req.body.guaranteed_weekly_hours;
+      if (gv === null || gv === '' || gv === undefined) {
+        fields.push(`guaranteed_weekly_hours = $${idx++}`); values.push(null);
+      } else {
+        const gn = parseFloat(gv);
+        if (isNaN(gn) || gn < 0) return res.status(400).json({ error: 'guaranteed_weekly_hours must be a non-negative number' });
+        fields.push(`guaranteed_weekly_hours = $${idx++}`); values.push(gn);
+      }
+    }
     values.push(req.params.id);
     values.push(companyId);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, invoice_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type`,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, invoice_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type, guaranteed_weekly_hours`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
