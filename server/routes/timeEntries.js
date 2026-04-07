@@ -254,7 +254,7 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
         `SELECT te.*, p.name as project_name,
                 to_char(te.work_date, 'YYYY-MM-DD') as work_date_str
          FROM time_entries te LEFT JOIN projects p ON te.project_id = p.id
-         WHERE te.user_id = $1 AND te.work_date >= $2 AND te.work_date <= $3
+         WHERE te.user_id = $1 AND te.status != 'rejected' AND te.work_date >= $2 AND te.work_date <= $3
          ORDER BY te.work_date, te.start_time`,
         [userId, minDate, maxDate]
       );

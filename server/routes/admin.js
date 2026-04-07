@@ -633,6 +633,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
        FROM time_entries te
        LEFT JOIN projects p ON te.project_id = p.id
        WHERE te.user_id = $1
+         AND te.status != 'rejected'
          AND ($2::date IS NULL OR te.work_date >= $2::date)
          AND ($3::date IS NULL OR te.work_date <= $3::date)
        ORDER BY te.work_date ASC, te.start_time ASC`,
