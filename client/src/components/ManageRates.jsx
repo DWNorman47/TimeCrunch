@@ -769,19 +769,29 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
                 <div style={styles.row}>
                   <div>
                     <div style={styles.label}>Auto-delete media after</div>
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Automatically delete photos and attachments older than this many days (0 = disabled)</div>
+                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Automatically delete photos and attachments older than this many days</div>
                   </div>
-                  <div style={styles.inputGroup}>
-                    <input
-                      style={styles.input}
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={form.media_retention_days}
-                      onChange={e => set('media_retention_days', e.target.value)}
-                    />
-                    <span style={styles.suffix}>days</span>
-                  </div>
+                  {parseFloat(form.media_retention_days) === 0 ? (
+                    <button
+                      type="button"
+                      style={{ padding: '7px 16px', background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+                      onClick={() => set('media_retention_days', '30')}
+                    >
+                      Turn on
+                    </button>
+                  ) : (
+                    <div style={styles.inputGroup}>
+                      <input
+                        style={styles.input}
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={form.media_retention_days}
+                        onChange={e => set('media_retention_days', e.target.value)}
+                      />
+                      <span style={styles.suffix}>days</span>
+                    </div>
+                  )}
                 </div>
                 <div style={styles.row}>
                   <div>
