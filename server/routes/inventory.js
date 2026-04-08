@@ -201,6 +201,9 @@ router.get('/items', requireAuth, async (req, res) => {
 router.post('/items', requireAdmin, async (req, res) => {
   const { name, sku, description, category, unit = 'each', unit_cost, reorder_point = 0, reorder_qty = 0 } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  if (unit_cost !== undefined && unit_cost !== null && isNaN(parseFloat(unit_cost))) {
+    return res.status(400).json({ error: 'unit_cost must be a number' });
+  }
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -221,6 +224,9 @@ router.post('/items', requireAdmin, async (req, res) => {
 router.patch('/items/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const { name, sku, description, category, unit, unit_cost, reorder_point, reorder_qty, active } = req.body;
+  if (unit_cost !== undefined && unit_cost !== null && isNaN(parseFloat(unit_cost))) {
+    return res.status(400).json({ error: 'unit_cost must be a number' });
+  }
   try {
     const existing = await pool.query('SELECT id FROM inventory_items WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Item not found' });
@@ -1316,12 +1322,21 @@ router.post('/purchase-orders', requireAdmin, async (req, res) => {
     );
     const po = poResult.rows[0];
     for (const line of lines) {
-      if (!line.item_id || !line.qty_ordered || parseFloat(line.qty_ordered) <= 0) continue;
+      const qtyOrdered = parseFloat(line.qty_ordered);
+      if (!line.item_id || isNaN(qtyOrdered) || qtyOrdered <= 0) continue;
+      const parsedUnitCost = line.unit_cost != null ? parseFloat(line.unit_cost) : null;
+      if (parsedUnitCost !== null && isNaN(parsedUnitCost)) continue; // skip lines with invalid cost
+      // Verify item belongs to this company
+      const itemCheck = await client.query(
+        'SELECT id FROM inventory_items WHERE id=$1 AND company_id=$2',
+        [parseInt(line.item_id), companyId]
+      );
+      if (itemCheck.rowCount === 0) continue;
       await client.query(
         `INSERT INTO purchase_order_lines (po_id, item_id, qty_ordered, unit_cost, uom_id, notes)
          VALUES ($1,$2,$3,$4,$5,$6)`,
-        [po.id, parseInt(line.item_id), parseFloat(line.qty_ordered),
-         line.unit_cost != null ? parseFloat(line.unit_cost) : null,
+        [po.id, parseInt(line.item_id), qtyOrdered,
+         parsedUnitCost,
          line.uom_id ? parseInt(line.uom_id) : null, line.notes?.trim() || null]
       );
     }
@@ -1467,6 +1482,13 @@ router.patch('/purchase-orders/:id/lines/:lineId', requireAdmin, async (req, res
     );
     if (po.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
     if (po.rows[0].status !== 'draft') return res.status(409).json({ error: 'Can only edit lines on a draft PO' });
+    if (qty_ordered !== undefined) {
+      const q = parseFloat(qty_ordered);
+      if (isNaN(q) || q <= 0) return res.status(400).json({ error: 'qty_ordered must be a positive number' });
+    }
+    if (unit_cost !== undefined && unit_cost !== null) {
+      if (isNaN(parseFloat(unit_cost))) return res.status(400).json({ error: 'unit_cost must be a number' });
+    }
     const sets = [], vals = [req.params.lineId]; let idx = 2;
     if (qty_ordered !== undefined) { sets.push(`qty_ordered=$${idx++}`); vals.push(parseFloat(qty_ordered)); }
     if (unit_cost   !== undefined) { sets.push(`unit_cost=$${idx++}`);   vals.push(unit_cost != null ? parseFloat(unit_cost) : null); }

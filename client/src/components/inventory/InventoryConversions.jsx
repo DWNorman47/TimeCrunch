@@ -235,7 +235,7 @@ export default function InventoryConversions({ onConversionChange }) {
       </div>
 
       {error && <div style={s.errorMsg}>{error}</div>}
-      {loading && <div style={s.empty}>Loading…</div>}
+      {loading && <div style={s.empty}>{t.loading}</div>}
 
       {!loading && !error && (
         <>

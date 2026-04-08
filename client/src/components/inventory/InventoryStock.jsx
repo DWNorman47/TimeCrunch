@@ -46,7 +46,7 @@ function HistoryPanel({ item, onClose }) {
         </div>
         {error && <div style={h.error}>{error}</div>}
         {loading ? (
-          <div style={h.empty}>Loading…</div>
+          <div style={h.empty}>{t.loading}</div>
         ) : rows.length === 0 ? (
           <div style={h.empty}>{t.invStockNoHistory}</div>
         ) : (
@@ -168,9 +168,9 @@ function AdjustModal({ item, locations, onClose, onDone }) {
             style={a.input}
             autoFocus
           />
-          <label style={a.label}>Location</label>
+          <label style={a.label}>{t.invStockAdjLocLabel}</label>
           <select value={locId} onChange={e => setLocId(e.target.value)} style={a.input}>
-            <option value="">Select location…</option>
+            <option value="">{t.invStockSelectLocOption}</option>
             {locations.filter(l => l.active).map(l => (
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
@@ -282,7 +282,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
         </div>
         <div style={a.body}>
           <div style={a.currentRow}>
-            <span style={a.currentLabel}>Available at {item.location_name}</span>
+            <span style={a.currentLabel}>{t.invStockAvailableAt} {item.location_name}</span>
             <span style={a.currentQty}>{available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} {stockUnit}</span>
           </div>
           {error && <div style={a.error}>{error}</div>}
@@ -299,9 +299,9 @@ function IssueModal({ item, projects, onClose, onDone }) {
           />
           {itemUoms.length > 1 && (
             <>
-              <label style={a.label}>Unit</label>
+              <label style={a.label}>{t.invStockUnitLabel}</label>
               <select value={uomId} onChange={e => setUomId(e.target.value)} style={a.input}>
-                <option value="">Default ({item.unit})</option>
+                <option value="">{t.invStockDefaultUnit} ({item.unit})</option>
                 {itemUoms.map(u => (
                   <option key={u.id} value={u.id}>
                     {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ' — base' : ''}
@@ -315,9 +315,9 @@ function IssueModal({ item, projects, onClose, onDone }) {
           )}
           {projects && projects.length > 0 && (
             <>
-              <label style={a.label}>Project (optional)</label>
+              <label style={a.label}>{t.invStockProjectLabel}</label>
               <select value={projectId} onChange={e => setProjectId(e.target.value)} style={a.input}>
-                <option value="">No project</option>
+                <option value="">{t.invStockNoProject}</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </>
@@ -325,7 +325,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
           <label style={a.label}>{t.invStockAdjNotesLabel}</label>
           <input
             type="text"
-            placeholder="e.g. Job site use"
+            placeholder={t.invStockIssuePlaceholder}
             value={notes}
             onChange={e => setNotes(e.target.value)}
             style={a.input}
@@ -401,6 +401,38 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
     return { label: t.invStockStatusInStock, color: '#059669', bg: '#d1fae5' };
   };
 
+  const downloadCSV = () => {
+    if (!stock.length) return;
+    const header = [t.invTxColItem, 'SKU', t.colCategory, t.invValColLocation, t.invStockColBin,
+      t.invTxColQty, t.colUnit, t.colUnitCost, t.invValColTotalValue, t.invStockColStatus].join(',');
+    const rows = stock.map(row => {
+      const qty = parseFloat(row.quantity);
+      const cost = parseFloat(row.unit_cost);
+      const status = stockStatus(qty, row.reorder_point);
+      const bin = [row.area_name, row.rack_name, row.bay_name, row.compartment_name].filter(Boolean).join(' > ') || '';
+      return [
+        `"${(row.item_name || '').replace(/"/g, '""')}"`,
+        row.sku || '',
+        `"${(row.category || '').replace(/"/g, '""')}"`,
+        `"${(row.location_name || '').replace(/"/g, '""')}"`,
+        `"${bin}"`,
+        qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2),
+        row.unit,
+        cost ? cost.toFixed(2) : '',
+        cost && qty > 0 ? (cost * qty).toFixed(2) : '',
+        status.label,
+      ].join(',');
+    });
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inventory-stock-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleAdjustDone = () => {
     setAdjustItem(null);
     load();
@@ -436,6 +468,9 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
           ))}
         </select>
         <button style={s.refreshBtn} onClick={load}>{t.invStockRefresh}</button>
+        {stock.length > 0 && (
+          <button style={s.refreshBtn} onClick={downloadCSV}>{t.invValDownloadCSV}</button>
+        )}
       </div>
 
       {error && <div style={s.error}>{error}</div>}

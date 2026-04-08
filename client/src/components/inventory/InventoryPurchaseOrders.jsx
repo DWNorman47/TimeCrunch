@@ -874,7 +874,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
         </div>
         {pos.length < posTotal && (
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
-            <button style={l.select} onClick={loadMorePos} disabled={loadingMore}>
+            <button style={l.loadMoreBtn} onClick={loadMorePos} disabled={loadingMore}>
               {loadingMore ? t.loading : t.loadMore}
             </button>
             <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>{pos.length} / {posTotal}</span>
@@ -981,6 +981,7 @@ const l = {
   wrap:         { padding: 16 },
   toolbar:      { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 },
   select:       { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151' },
+  loadMoreBtn:  { padding: '8px 20px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, color: '#374151', cursor: 'pointer' },
   createBtn:    { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginLeft: 'auto', whiteSpace: 'nowrap' },
   error:        { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },
   empty:        { textAlign: 'center', padding: '60px 24px', color: '#6b7280', fontSize: 15 },

@@ -387,7 +387,7 @@ function SupplierPanel() {
       </div>
       {error && <div style={sp.error}>{error}</div>}
       {loading ? (
-        <div style={sp.empty}>Loading…</div>
+        <div style={sp.empty}>{t.loading}</div>
       ) : suppliers.length === 0 ? (
         <div style={sp.empty}>
           <div style={sp.emptyIcon}>🏭</div>
@@ -698,7 +698,7 @@ export default function InventorySetup({ projects }) {
           {error && <div style={s.error}>{error}</div>}
 
           {loading ? (
-            <div style={s.empty}>Loading…</div>
+            <div style={s.empty}>{t.loading}</div>
           ) : items.length === 0 ? (
             <div style={s.empty}>
               <div style={s.emptyIcon}>📍</div>

@@ -540,7 +540,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
           {error && <div style={s.error}>{error}</div>}
 
           {loading ? (
-            <div style={s.empty}>Loading…</div>
+            <div style={s.empty}>{t.loading}</div>
           ) : transactions.length === 0 ? (
             <div style={s.empty}>
               <div style={s.emptyIcon}>↔️</div>

@@ -630,7 +630,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
   useEffect(() => { load(); }, [load]);
 
   const startCount = async () => {
-    if (newCountType !== 'full' && !newLocationId) return alert('Select a location.');
+    if (newCountType !== 'full' && !newLocationId) return alert(t.invCycSelectLocationAlert);
     setCreating(true);
     try {
       const payload = { count_type: newCountType, notes: null };
@@ -639,7 +639,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
       setSelected(r.data);
       load();
     } catch (e) {
-      alert(e.response?.data?.error || 'Failed to create count.');
+      alert(e.response?.data?.error || t.invCycFailedCreate);
     } finally {
       setCreating(false); setNewLocationId('');
     }
@@ -649,7 +649,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
     try {
       const r = await api.get(`/inventory/cycle-counts/${count.id}`);
       setSelected(r.data);
-    } catch { alert('Failed to load count details.'); }
+    } catch { alert(t.invCycFailedLoadDetails); }
   };
 
   const handleComplete = () => {
@@ -760,7 +760,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
         </div>
         {counts.length < countsTotal && (
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
-            <button style={s.select} onClick={loadMoreCounts} disabled={loadingMore}>
+            <button style={s.loadMoreBtn} onClick={loadMoreCounts} disabled={loadingMore}>
               {loadingMore ? t.loading : t.loadMore}
             </button>
             <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>{counts.length} / {countsTotal}</span>
@@ -820,6 +820,7 @@ const d = {
 
 const s = {
   wrap:          { padding: 16 },
+  loadMoreBtn:   { padding: '8px 20px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, color: '#374151', cursor: 'pointer' },
   startCard:     { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginBottom: 12 },
   startRow:      { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
   typeSelect:    { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151', minWidth: 160 },
