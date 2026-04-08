@@ -145,8 +145,8 @@ export default function ApprovalQueue({ onCountChange }) {
     // Pre-fill two segments covering the full time range
     const mid = midTime(e.start_time.substring(0, 5), e.end_time.substring(0, 5));
     setSplitSegments([
-      { start_time: e.start_time.substring(0, 5), end_time: mid, project_id: e.project_id ? String(e.project_id) : '' },
-      { start_time: mid, end_time: e.end_time.substring(0, 5), project_id: '' },
+      { _key: 0, start_time: e.start_time.substring(0, 5), end_time: mid, project_id: e.project_id ? String(e.project_id) : '' },
+      { _key: 1, start_time: mid, end_time: e.end_time.substring(0, 5), project_id: '' },
     ]);
   };
 
@@ -378,7 +378,7 @@ export default function ApprovalQueue({ onCountChange }) {
                       <div style={styles.splitTitle}>Split Entry</div>
                       {splitError && <div style={styles.splitError}>{splitError}</div>}
                       {splitSegments.map((seg, i) => (
-                        <div key={i} style={styles.splitSegment}>
+                        <div key={seg._key} style={styles.splitSegment}>
                           <div style={styles.splitSegLabel}>Segment {i + 1}</div>
                           <div style={styles.splitSegRow}>
                             <div>
@@ -409,7 +409,7 @@ export default function ApprovalQueue({ onCountChange }) {
                       ))}
                       <button style={styles.splitAddBtn} onClick={() => {
                         const last = splitSegments[splitSegments.length - 1];
-                        setSplitSegments(prev => [...prev, { start_time: last.end_time, end_time: last.end_time, project_id: '' }]);
+                        setSplitSegments(prev => [...prev, { _key: Date.now(), start_time: last.end_time, end_time: last.end_time, project_id: '' }]);
                       }}>+ Add segment</button>
                       <div style={styles.editTimesActions}>
                         <button style={styles.saveTimesBtn} onClick={() => saveSplit(e.id)} disabled={splitSaving}>{splitSaving ? '...' : 'Split & Save'}</button>

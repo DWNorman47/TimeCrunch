@@ -87,6 +87,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
       .catch(() => {});
   }, []);
 
+  const [actionError, setActionError] = useState('');
   const [clockingOutId, setClockingOutId] = useState(null);
   const [editingClockInId, setEditingClockInId] = useState(null); // user_id being edited
   const [editClockInValue, setEditClockInValue] = useState('');   // datetime-local string
@@ -109,9 +110,10 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
     try {
       await api.patch(`/admin/active-clock/${userId}`, { clock_in_time: new Date(editClockInValue).toISOString() });
       setEditingClockInId(null);
+      setActionError('');
       fetchActive();
     } catch {
-      // silently fail
+      setActionError(t.actionFailed);
     } finally {
       setEditClockInSaving(false);
     }
@@ -121,9 +123,10 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
     setClockingOutId(userId);
     try {
       await api.post(`/admin/clock-out/${userId}`, {});
+      setActionError('');
       fetchActive();
     } catch {
-      // silently fail
+      setActionError(t.actionFailed);
     } finally {
       setClockingOutId(null);
     }
@@ -136,9 +139,10 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
       await api.post('/admin/clock-in', { user_id: clockInUserId, project_id: clockInProjectId || null, notes: clockInNotes || null });
       setShowClockInModal(false);
       setClockInUserId(''); setClockInProjectId(''); setClockInNotes('');
+      setActionError('');
       fetchActive();
     } catch {
-      // silently fail for now
+      setActionError(t.actionFailed);
     } finally {
       setClockInSaving(false);
     }
@@ -205,6 +209,11 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
             </div>
           </div>
           <button style={styles.dismissBtn} onClick={() => setDismissedInactive(true)}>✕</button>
+        </div>
+      )}
+      {actionError && (
+        <div style={{ padding: '8px 14px', background: '#fef2f2', color: '#b91c1c', borderRadius: 8, marginBottom: 10, fontSize: 14 }}>
+          {actionError}
         </div>
       )}
       <div style={styles.header}>

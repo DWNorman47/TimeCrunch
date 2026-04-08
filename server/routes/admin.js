@@ -624,7 +624,7 @@ router.get('/workers/archived', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, full_name, username, role, language, hourly_rate
-       FROM users WHERE active = false AND company_id = $1 ORDER BY full_name`,
+       FROM users WHERE active = false AND company_id = $1 ORDER BY full_name LIMIT 500`,
       [companyId]
     );
     res.json(result.rows);
@@ -1266,7 +1266,7 @@ router.get('/projects', requireAdmin, async (req, res) => {
 router.get('/projects/archived', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
-    const result = await pool.query('SELECT * FROM projects WHERE active = false AND company_id = $1 ORDER BY name', [companyId]);
+    const result = await pool.query('SELECT * FROM projects WHERE active = false AND company_id = $1 ORDER BY name LIMIT 500', [companyId]);
     res.json(result.rows);
   } catch (err) {
     console.error(err);

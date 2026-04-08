@@ -16,7 +16,26 @@ const pool = require('./db');
 const app = express();
 app.set('trust proxy', 1); // trust first proxy (Render) so req.ip is the real client IP
 app.use(helmet());
-app.use(cors());
+
+const ALLOWED_ORIGINS = [
+  'https://opsfloa.com',
+  'https://www.opsfloa.com',
+  'https://dev.opsfloa.com',
+  'https://stage.opsfloa.com',
+  // Local development
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://localhost:3000',
+];
+app.use(cors({
+  origin: (origin, cb) => {
+    // Allow requests with no origin (curl, Postman, mobile apps, same-origin)
+    if (!origin) return cb(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+}));
 
 // Block TRACE method
 app.use((req, res, next) => {

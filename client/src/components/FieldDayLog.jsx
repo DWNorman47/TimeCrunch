@@ -129,7 +129,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
       if (proj) params.project_id = proj;
       const r = await api.get('/field-reports', { params });
       setDayReports(r.data);
-    } catch {} finally { setLoading(false); }
+    } catch { setError(t.failedLoadFieldReports); } finally { setLoading(false); }
   };
 
   useEffect(() => { if (project !== '' || projects.length === 0) load(); }, [project, date]);
@@ -233,7 +233,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
     try {
       await api.patch(`/field-reports/${id}/review`);
       setDayReports(prev => prev.map(r => r.id === id ? { ...r, status: 'reviewed' } : r));
-    } catch {}
+    } catch { setError(t.failedMarkReviewed); }
   };
 
   // Flatten all photos across the day's reports
