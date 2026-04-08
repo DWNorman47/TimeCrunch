@@ -137,7 +137,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
         )}
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.givenBy}</label>
-          <input style={styles.input} type="text" placeholder={t.givenByPlaceholder} value={form.given_by} onChange={e => set('given_by', e.target.value)} />
+          <input style={styles.input} type="text" maxLength={255} placeholder={t.givenByPlaceholder} value={form.given_by} onChange={e => set('given_by', e.target.value)} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.talkContent}</label>

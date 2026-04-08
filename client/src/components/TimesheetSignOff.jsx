@@ -18,6 +18,7 @@ export default function TimesheetSignOff({ t }) {
   const [loading, setLoading] = useState(false);
   const [signing, setSigning] = useState(false);
   const [signed, setSigned] = useState(false);
+  const [confirmSign, setConfirmSign] = useState(false);
   const [count, setCount] = useState(0);
 
   const load = async () => {
@@ -35,8 +36,8 @@ export default function TimesheetSignOff({ t }) {
   useEffect(() => { load(); }, []);
 
   const signOff = async () => {
-    if (!confirm(`Sign off on ${entries.filter(e => !e.worker_signed_at).length} entries for ${from} to ${to}? This tells your manager they're ready to review.`)) return;
     setSigning(true);
+    setConfirmSign(false);
     try {
       const r = await api.post('/time-entries/sign-off', { from, to });
       setCount(r.data.signed);
@@ -96,10 +97,22 @@ export default function TimesheetSignOff({ t }) {
 
           {unsigned.length > 0 ? (
             <div style={styles.signArea}>
-              <button style={styles.signBtn} onClick={signOff} disabled={signing}>
-                {signing ? 'Signing...' : `✍ Sign & Submit ${unsigned.length} entr${unsigned.length === 1 ? 'y' : 'ies'}`}
-              </button>
-              <span style={styles.signHint}>Your manager will be notified to review.</span>
+              {confirmSign ? (
+                <>
+                  <span style={styles.signHint}>Sign off on {unsigned.length} entr{unsigned.length === 1 ? 'y' : 'ies'}? Your manager will be notified to review.</span>
+                  <button style={styles.signBtn} onClick={signOff} disabled={signing}>
+                    {signing ? 'Signing...' : 'Confirm'}
+                  </button>
+                  <button style={styles.cancelSignBtn} onClick={() => setConfirmSign(false)}>Cancel</button>
+                </>
+              ) : (
+                <>
+                  <button style={styles.signBtn} onClick={() => setConfirmSign(true)} disabled={signing}>
+                    {`✍ Sign & Submit ${unsigned.length} entr${unsigned.length === 1 ? 'y' : 'ies'}`}
+                  </button>
+                  <span style={styles.signHint}>Your manager will be notified to review.</span>
+                </>
+              )}
             </div>
           ) : (
             <div style={styles.allSignedMsg}>
@@ -134,6 +147,7 @@ const styles = {
   pendingBadge: { background: '#fef3c7', color: '#92400e', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
   signArea: { display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' },
   signBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  cancelSignBtn: { background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', padding: '10px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' },
   signHint: { fontSize: 12, color: '#9ca3af' },
   allSignedMsg: { background: '#f0fdf4', color: '#065f46', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', fontSize: 14, fontWeight: 600 },
 };

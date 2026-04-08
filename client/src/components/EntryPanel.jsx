@@ -115,7 +115,7 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
                 <div style={s.field}><label style={s.label}>{t.entryPanelEnd}</label><input style={s.input} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} /></div>
                 <div style={s.field}><label style={s.label}>{t.entryPanelBreakMin}</label><input style={s.input} type="number" min="0" max="480" value={editForm.break_minutes} onChange={ev => setEditForm(f => ({ ...f, break_minutes: ev.target.value }))} /></div>
                 <div style={s.field}><label style={s.label}>{t.entryPanelMileage}</label><input style={s.input} type="number" min="0" step="0.1" value={editForm.mileage} onChange={ev => setEditForm(f => ({ ...f, mileage: ev.target.value }))} placeholder="optional" /></div>
-                <div style={{ ...s.field, flex: 2 }}><label style={s.label}>{t.notes}</label><input style={s.input} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder="optional" /></div>
+                <div style={{ ...s.field, flex: 2 }}><label style={s.label}>{t.notes}</label><input style={s.input} type="text" maxLength={500} value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder="optional" /></div>
               </div>
               {editError && <p style={s.error}>{editError}</p>}
               <div style={s.actions}>

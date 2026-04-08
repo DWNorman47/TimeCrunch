@@ -107,7 +107,7 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
             </div>
             <div style={styles.fieldGroup}>
               <label style={styles.label}>{t.bodyPartAffected}</label>
-              <input style={styles.input} type="text" placeholder={t.bodyPartPlaceholder} value={form.body_part} onChange={e => set('body_part', e.target.value)} />
+              <input style={styles.input} type="text" maxLength={255} placeholder={t.bodyPartPlaceholder} value={form.body_part} onChange={e => set('body_part', e.target.value)} />
             </div>
           </div>
           <div style={styles.fieldGroup}>

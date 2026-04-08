@@ -112,11 +112,11 @@ function TemplateForm({ initial, onSaved, onCancel }) {
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.templateNameLabel}</label>
-          <input style={styles.input} type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t.checklistNamePlaceholder} />
+          <input style={styles.input} type="text" maxLength={255} value={name} onChange={e => setName(e.target.value)} placeholder={t.checklistNamePlaceholder} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.descriptionField}</label>
-          <input style={styles.input} type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder={t.descriptionField} />
+          <input style={styles.input} type="text" maxLength={500} value={description} onChange={e => setDescription(e.target.value)} placeholder={t.descriptionField} />
         </div>
       </div>
 

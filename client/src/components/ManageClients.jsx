@@ -64,22 +64,22 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
       <div style={s.row}>
         <div style={s.field}>
           <label style={s.label}>{t.clientCompanyName} *</label>
-          <input style={s.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Construction Inc." required />
+          <input style={s.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Construction Inc." required />
         </div>
         <div style={s.field}>
           <label style={s.label}>{t.contactName}</label>
-          <input style={s.input} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" />
+          <input style={s.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" />
         </div>
       </div>
 
       <div style={s.row}>
         <div style={s.field}>
           <label style={s.label}>{t.contactEmail}</label>
-          <input style={s.input} type="email" value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder="jane@example.com" />
+          <input style={s.input} type="email" maxLength={255} value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder="jane@example.com" />
         </div>
         <div style={s.field}>
           <label style={s.label}>{t.contactPhone}</label>
-          <input style={s.input} type="tel" value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder="(555) 000-0000" />
+          <input style={s.input} type="tel" maxLength={50} value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder="(555) 000-0000" />
         </div>
       </div>
 
