@@ -120,6 +120,9 @@ router.post('/admin', requireAdmin, async (req, res) => {
   if (!user_id || !amount || !expense_date) {
     return res.status(400).json({ error: 'user_id, amount, and expense_date are required' });
   }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expense_date) || isNaN(Date.parse(expense_date))) {
+    return res.status(400).json({ error: 'expense_date must be a valid date (YYYY-MM-DD)' });
+  }
   const amt = parseFloat(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
   if (!['pending', 'approved'].includes(status)) return res.status(400).json({ error: 'status must be pending or approved' });
@@ -192,7 +195,7 @@ router.patch('/admin/:id', requireAdmin, async (req, res) => {
        WHERE id = $3 AND company_id = $4
        RETURNING id, amount, description, category, expense_date, receipt_url,
                  status, admin_notes, created_at, project_id`,
-      [status, admin_notes || null, req.params.id, req.user.company_id]
+      [status, admin_notes?.trim() || null, req.params.id, req.user.company_id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);

@@ -104,7 +104,7 @@ router.post('/', requireAuth, async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
       [req.user.company_id, template_id, tmpl.rows[0].name,
        project_id || null, req.user.id, req.user.full_name,
-       check_date, JSON.stringify(answers || {}), notes || null]
+       check_date, JSON.stringify(answers || {}), notes?.trim() || null]
     );
     const full = await pool.query(
       `SELECT s.*, p.name AS project_name FROM safety_checklist_submissions s

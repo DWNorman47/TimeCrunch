@@ -38,12 +38,16 @@ export default function ReimbursementsView() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
   const fileRef = useRef();
 
   const resolveCategory = cat => cat && categories.known.includes(cat) ? cat : cat ? 'Other' : null;
 
   const load = () => {
-    api.get('/reimbursements').then(r => setItems(r.data)).catch(() => {}).finally(() => setLoading(false));
+    setLoadError('');
+    api.get('/reimbursements').then(r => setItems(r.data)).catch(() => setLoadError(t.failedLoad)).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
@@ -87,16 +91,18 @@ export default function ReimbursementsView() {
   };
 
   const handleDelete = async id => {
-    if (!confirm(t.deleteReimbConfirm)) return;
+    setPendingDeleteId(null);
+    setDeleteError('');
     try {
       await api.delete(`/reimbursements/${id}`);
       setItems(prev => prev.filter(i => i.id !== id));
     } catch (err) {
-      alert(err.response?.data?.error || t.failedSave);
+      setDeleteError(err.response?.data?.error || t.failedSave);
     }
   };
 
   if (loading) return null;
+  if (loadError) return <p style={{ color: '#dc2626', fontSize: 13, padding: 16 }}>{loadError}</p>;
 
   return (
     <div style={s.wrap}>
@@ -108,6 +114,7 @@ export default function ReimbursementsView() {
       </div>
 
       {success && <div style={s.successMsg}>{success}</div>}
+      {deleteError && <div style={s.errorMsg}>{deleteError}</div>}
 
       {showForm && (
         <form onSubmit={handleSubmit} style={s.form}>
@@ -182,7 +189,14 @@ export default function ReimbursementsView() {
                 <div style={s.cardRight}>
                   <StatusBadge status={item.status} />
                   {item.status === 'pending' && (
-                    <button style={s.deleteBtn} onClick={() => handleDelete(item.id)}>✕</button>
+                    pendingDeleteId === item.id ? (
+                      <>
+                        <button style={s.deleteConfirmBtn} onClick={() => handleDelete(item.id)}>{t.confirm}</button>
+                        <button style={s.deleteCancelBtn} onClick={() => setPendingDeleteId(null)}>{t.cancel}</button>
+                      </>
+                    ) : (
+                      <button style={s.deleteBtn} aria-label="Delete reimbursement" onClick={() => setPendingDeleteId(item.id)}>✕</button>
+                    )
                   )}
                 </div>
               </div>
@@ -232,6 +246,8 @@ const s = {
   projectTag: { fontSize: 11, fontWeight: 600, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: 8 },
   badge: { fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8 },
   deleteBtn: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '2px 4px' },
+  deleteConfirmBtn: { background: '#dc2626', color: '#fff', border: 'none', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
+  deleteCancelBtn: { background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
   desc: { fontSize: 14, color: '#374151' },
   meta: { display: 'flex', gap: 14, fontSize: 12, color: '#6b7280', alignItems: 'center' },
   receiptLink: { color: '#1a56db', textDecoration: 'none', fontWeight: 600 },

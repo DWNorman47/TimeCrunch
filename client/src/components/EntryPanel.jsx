@@ -34,6 +34,8 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
   const [splitSaving, setSplitSaving] = useState(false);
   const [splitError, setSplitError] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const switchTab = tabName => { setTab(tabName); setSplitError(''); setEditError(''); };
 
@@ -81,13 +83,16 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
   };
 
   const handleDelete = async () => {
-    if (!confirm(t.entryPanelDeleteConfirm)) return;
     setDeleting(true);
+    setDeleteError('');
     try {
       await api.delete(`/time-entries/${entry.id}`);
       onDeleted?.(entry.id);
       onClose?.();
-    } catch (err) { alert(err.response?.data?.error || t.entryPanelFailedDelete); }
+    } catch (err) {
+      setDeleteError(err.response?.data?.error || t.entryPanelFailedDelete);
+      setConfirmingDelete(false);
+    }
     finally { setDeleting(false); }
   };
 
@@ -162,7 +167,16 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
 
       {!entry.pending && !entry.locked && (
         <div style={s.deleteRow}>
-          <button style={s.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? t.entryPanelDeleting : t.entryPanelDeleteEntry}</button>
+          {confirmingDelete ? (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13, color: '#374151' }}>{t.entryPanelDeleteConfirm}</span>
+              <button style={s.deleteConfirmBtn} onClick={handleDelete} disabled={deleting}>{deleting ? t.entryPanelDeleting : t.confirm}</button>
+              <button style={s.cancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+            </div>
+          ) : (
+            <button style={s.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.entryPanelDeleteEntry}</button>
+          )}
+          {deleteError && <p style={s.error}>{deleteError}</p>}
         </div>
       )}
     </div>
@@ -186,4 +200,5 @@ const s = {
   cancelBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '7px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   deleteRow: { marginTop: 12, paddingTop: 10, borderTop: '1px solid #fee2e2' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '9px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  deleteConfirmBtn: { background: '#dc2626', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' },
 };

@@ -29,10 +29,15 @@ router.get('/', requireAuth, async (req, res) => {
 
 // POST /rfis — create with auto-number
 router.post('/', requireAdmin, async (req, res) => {
-  const { project_id, subject, description, directed_to, submitted_by, date_submitted, date_due } = req.body;
-  if (!subject?.trim() || !date_submitted) {
+  const { project_id, date_submitted, date_due } = req.body;
+  const subject = req.body.subject?.trim();
+  const description = req.body.description?.trim() || null;
+  const directed_to = req.body.directed_to?.trim() || null;
+  const submitted_by = req.body.submitted_by?.trim() || null;
+  if (!subject || !date_submitted) {
     return res.status(400).json({ error: 'subject and date_submitted are required' });
   }
+  if (description && description.length > 2000) return res.status(400).json({ error: 'description too long (max 2000 characters)' });
   const companyId = req.user.company_id;
   try {
     // Auto-number: next sequential RFI number for this company
@@ -46,8 +51,8 @@ router.post('/', requireAdmin, async (req, res) => {
       `INSERT INTO rfis (company_id, project_id, rfi_number, subject, description, directed_to,
          submitted_by, date_submitted, date_due, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [companyId, project_id || null, rfiNumber, subject.trim(), description || null,
-       directed_to || null, submitted_by || null, date_submitted,
+      [companyId, project_id || null, rfiNumber, subject, description,
+       directed_to, submitted_by, date_submitted,
        date_due || null, req.user.id]
     );
     const full = await pool.query(`${FULL_SELECT} WHERE r.id = $1`, [result.rows[0].id]);
@@ -58,8 +63,14 @@ router.post('/', requireAdmin, async (req, res) => {
 // PATCH /rfis/:id — update (edit fields or add response)
 router.patch('/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
-  const { project_id, subject, description, directed_to, submitted_by,
-          date_submitted, date_due, response, status } = req.body;
+  const { project_id, date_submitted, date_due, status } = req.body;
+  const subject = req.body.subject !== undefined ? (req.body.subject?.trim() || null) : undefined;
+  const description = req.body.description !== undefined ? (req.body.description?.trim() || null) : undefined;
+  const directed_to = req.body.directed_to !== undefined ? (req.body.directed_to?.trim() || null) : undefined;
+  const submitted_by = req.body.submitted_by !== undefined ? (req.body.submitted_by?.trim() || null) : undefined;
+  const response = req.body.response !== undefined ? (req.body.response?.trim() || null) : undefined;
+  if (description !== undefined && description && description.length > 2000) return res.status(400).json({ error: 'description too long (max 2000 characters)' });
+  if (response !== undefined && response && response.length > 2000) return res.status(400).json({ error: 'response too long (max 2000 characters)' });
   try {
     const existing = await pool.query('SELECT * FROM rfis WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
     if (existing.rowCount === 0) return res.status(404).json({ error: 'RFI not found' });
@@ -67,13 +78,13 @@ router.patch('/:id', requireAdmin, async (req, res) => {
 
     // Auto-set status to 'answered' when response is added
     let newStatus = status ?? r.status;
-    if (response?.trim() && r.status === 'open') newStatus = 'answered';
+    if (response && r.status === 'open') newStatus = 'answered';
 
     const result = await pool.query(
       `UPDATE rfis SET project_id=$1, subject=$2, description=$3, directed_to=$4, submitted_by=$5,
          date_submitted=$6, date_due=$7, response=$8, status=$9, updated_at=NOW()
        WHERE id=$10 AND company_id=$11 RETURNING *`,
-      [project_id ?? r.project_id, subject?.trim() ?? r.subject, description ?? r.description,
+      [project_id ?? r.project_id, subject ?? r.subject, description ?? r.description,
        directed_to ?? r.directed_to, submitted_by ?? r.submitted_by,
        date_submitted ?? r.date_submitted, date_due ?? r.date_due,
        response ?? r.response, newStatus, req.params.id, companyId]

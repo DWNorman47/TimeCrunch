@@ -1040,6 +1040,7 @@ const translations = {
 
     // ── Reimbursements (worker) ───────────────────────────────────────────────
     reimbursementsTitle: 'Reimbursements',
+    failedLoad: 'Failed to load. Please try again.',
     newRequest: '+ New Request',
     amountLabel: 'Amount *',
     categoryLabel: 'Category',
@@ -2576,6 +2577,7 @@ const translations = {
 
     // ── Reimbursements (worker) ───────────────────────────────────────────────
     reimbursementsTitle: 'Reembolsos',
+    failedLoad: 'Error al cargar. Por favor intente de nuevo.',
     newRequest: '+ Nueva Solicitud',
     amountLabel: 'Monto *',
     categoryLabel: 'Categoría',

@@ -88,17 +88,22 @@ router.get('/', requireAuth, async (req, res) => {
 
 // POST /inspections
 router.post('/', requireAdmin, async (req, res) => {
-  const { template_id, project_id, name, inspector, location, notes, results, status, inspected_at } = req.body;
-  if (!name?.trim() || !inspected_at) {
+  const { template_id, project_id, results, status, inspected_at } = req.body;
+  const name = req.body.name?.trim();
+  const inspector = req.body.inspector?.trim() || null;
+  const location = req.body.location?.trim() || null;
+  const notes = req.body.notes?.trim() || null;
+  if (!name || !inspected_at) {
     return res.status(400).json({ error: 'name and inspected_at are required' });
   }
+  if (notes && notes.length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
   try {
     const result = await pool.query(
       `INSERT INTO inspections (company_id, template_id, project_id, name, inspector, location,
          notes, results, status, inspected_at, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [req.user.company_id, template_id || null, project_id || null, name.trim(),
-       inspector || null, location || null, notes || null,
+      [req.user.company_id, template_id || null, project_id || null, name,
+       inspector, location, notes,
        JSON.stringify(results || {}), status || 'pass', inspected_at, req.user.id]
     );
     res.status(201).json(result.rows[0]);
@@ -107,7 +112,12 @@ router.post('/', requireAdmin, async (req, res) => {
 
 // PATCH /inspections/:id
 router.patch('/:id', requireAdmin, async (req, res) => {
-  const { project_id, name, inspector, location, notes, results, status, inspected_at } = req.body;
+  const { project_id, results, status, inspected_at } = req.body;
+  const name = req.body.name !== undefined ? (req.body.name?.trim() || null) : undefined;
+  const inspector = req.body.inspector !== undefined ? (req.body.inspector?.trim() || null) : undefined;
+  const location = req.body.location !== undefined ? (req.body.location?.trim() || null) : undefined;
+  const notes = req.body.notes !== undefined ? (req.body.notes?.trim() || null) : undefined;
+  if (notes !== undefined && notes && notes.length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
   try {
     const existing = await pool.query(
       'SELECT * FROM inspections WHERE id=$1 AND company_id=$2',
@@ -119,7 +129,7 @@ router.patch('/:id', requireAdmin, async (req, res) => {
       `UPDATE inspections SET project_id=$1, name=$2, inspector=$3, location=$4,
          notes=$5, results=$6, status=$7, inspected_at=$8, updated_at=NOW()
        WHERE id=$9 AND company_id=$10 RETURNING *`,
-      [project_id ?? ins.project_id, name?.trim() ?? ins.name, inspector ?? ins.inspector,
+      [project_id ?? ins.project_id, name ?? ins.name, inspector ?? ins.inspector,
        location ?? ins.location, notes ?? ins.notes,
        JSON.stringify(results ?? ins.results), status ?? ins.status,
        inspected_at ?? ins.inspected_at, req.params.id, req.user.company_id]
