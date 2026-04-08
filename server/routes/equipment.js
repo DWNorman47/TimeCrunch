@@ -104,19 +104,17 @@ router.post('/:id/hours', requireAuth, async (req, res) => {
     );
     if (item.rowCount === 0) return res.status(404).json({ error: 'Equipment not found' });
 
-    const result = await pool.query(
-      `INSERT INTO equipment_hours (equipment_id, company_id, project_id, log_date, hours, operator_name, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+    const full = await pool.query(
+      `WITH inserted AS (
+         INSERT INTO equipment_hours (equipment_id, company_id, project_id, log_date, hours, operator_name, notes, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
+       )
+       SELECT h.*, p.name AS project_name, u.full_name AS logged_by_name
+       FROM inserted h
+       LEFT JOIN projects p ON h.project_id = p.id
+       LEFT JOIN users u ON h.created_by = u.id`,
       [req.params.id, companyId, project_id || null, log_date, parseFloat(hours),
        operator_name || null, notes || null, req.user.id]
-    );
-    const full = await pool.query(
-      `SELECT h.*, p.name AS project_name, u.full_name AS logged_by_name
-       FROM equipment_hours h
-       LEFT JOIN projects p ON h.project_id = p.id
-       LEFT JOIN users u ON h.created_by = u.id
-       WHERE h.id = $1`,
-      [result.rows[0].id]
     );
     res.status(201).json(full.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
