@@ -202,7 +202,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
               <option value="">{t.select}</option>
               {WEATHER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <input style={{ ...styles.input, width: 70 }} type="number" placeholder="°F" value={form.weather_temp} onChange={e => set('weather_temp', e.target.value)} />
+            <input style={{ ...styles.input, width: 70 }} type="number" placeholder="°F" min="-50" max="130" value={form.weather_temp} onChange={e => set('weather_temp', e.target.value)} />
           </div>
         </div>
       </div>

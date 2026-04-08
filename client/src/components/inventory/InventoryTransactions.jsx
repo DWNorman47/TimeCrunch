@@ -246,6 +246,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
           </label>
           <input
             style={f.input} type="number" step="any"
+            min={form.type === 'adjust' ? undefined : 0}
             value={form.quantity} onChange={e => set('quantity', e.target.value)}
             placeholder={form.type === 'adjust' ? '±qty' : 'qty'}
           />

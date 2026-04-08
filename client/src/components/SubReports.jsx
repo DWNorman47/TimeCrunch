@@ -64,11 +64,11 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.subCompany} *</label>
-          <input style={styles.input} type="text" placeholder={t.companyNamePlaceholder} value={form.sub_company} onChange={e => set('sub_company', e.target.value)} required />
+          <input style={styles.input} type="text" placeholder={t.companyNamePlaceholder} maxLength={255} value={form.sub_company} onChange={e => set('sub_company', e.target.value)} required />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.foremanField}</label>
-          <input style={styles.input} type="text" placeholder={t.nameOnSitePlaceholder} value={form.foreman_name} onChange={e => set('foreman_name', e.target.value)} />
+          <input style={styles.input} type="text" placeholder={t.nameOnSitePlaceholder} maxLength={255} value={form.foreman_name} onChange={e => set('foreman_name', e.target.value)} />
         </div>
       </div>
 
@@ -79,12 +79,12 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.workPerformed}</label>
-        <textarea style={styles.textarea} rows={3} placeholder={t.subWorkPerformedPlaceholder} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
+        <textarea style={styles.textarea} rows={3} placeholder={t.subWorkPerformedPlaceholder} maxLength={2000} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
       </div>
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.notes} <span style={styles.optional}>({t.optional})</span></label>
-        <textarea style={styles.textarea} rows={2} placeholder={t.issuesPlaceholder} value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <textarea style={styles.textarea} rows={2} placeholder={t.issuesPlaceholder} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
       </div>
 
       {error && <p style={styles.error}>{error}</p>}

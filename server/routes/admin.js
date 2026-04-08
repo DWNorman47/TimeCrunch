@@ -1779,7 +1779,7 @@ router.post('/projects/:id/merge-into/:target_id', requireAdmin, requirePermissi
         'equipment_hours', 'rfis', 'safety_checklist_submissions',
       ];
       for (const table of intTables) {
-        await client.query(`UPDATE ${table} SET project_id = $1 WHERE project_id = $2`, [targetId, sourceId]);
+        await client.query(`UPDATE ${table} SET project_id = $1 WHERE project_id = $2 AND company_id = $3`, [targetId, sourceId, companyId]);
       }
       // inspections stores project_id as UUID/text column
       await client.query(
@@ -2046,8 +2046,8 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
             [companyId]
           );
           await pool.query(
-            `UPDATE projects SET budget_alert_pct = $1 WHERE id = $2`,
-            [threshold, pid]
+            `UPDATE projects SET budget_alert_pct = $1 WHERE id = $2 AND company_id = $3`,
+            [threshold, pid, companyId]
           );
           if (notifSetting.rows[0]?.value === '0') return;
 

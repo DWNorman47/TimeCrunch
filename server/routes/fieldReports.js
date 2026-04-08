@@ -44,7 +44,11 @@ router.get('/', requireAuth, async (req, res) => {
 
 // POST /field-reports — create a report with photos
 router.post('/', requireAuth, async (req, res) => {
-  const { title, notes, project_id, lat, lng, photos = [], report_date } = req.body;
+  const { project_id, lat, lng, photos = [], report_date } = req.body;
+  const title = req.body.title?.trim() || null;
+  const notes = req.body.notes?.trim() || null;
+  if (title && title.length > 500) return res.status(400).json({ error: 'title too long (max 500 characters)' });
+  if (notes && notes.length > 2000) return res.status(400).json({ error: 'notes too long (max 2000 characters)' });
   const companyId = req.user.company_id;
   try {
     // Estimate total upload size from base64 payloads for limit check
@@ -133,7 +137,11 @@ router.post('/', requireAuth, async (req, res) => {
 
 // PATCH /field-reports/:id — worker updates their own report (if not yet reviewed)
 router.patch('/:id', requireAuth, async (req, res) => {
-  const { title, notes, project_id } = req.body;
+  const { project_id } = req.body;
+  const title = req.body.title !== undefined ? (req.body.title?.trim() || null) : undefined;
+  const notes = req.body.notes !== undefined ? (req.body.notes?.trim() || null) : undefined;
+  if (title !== undefined && title && title.length > 500) return res.status(400).json({ error: 'title too long (max 500 characters)' });
+  if (notes !== undefined && notes && notes.length > 2000) return res.status(400).json({ error: 'notes too long (max 2000 characters)' });
   const companyId = req.user.company_id;
   try {
     const existing = await pool.query(
