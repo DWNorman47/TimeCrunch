@@ -364,12 +364,14 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const handleDelete = async () => {
-    if (!confirm(t.inspDeleteInspection)) return;
     setDeleting(true);
+    setDeleteError('');
     try { await api.delete(`/inspections/${ins.id}`); onDeleted(ins.id); }
-    catch { alert(t.inspFailedDelete); }
+    catch { setDeleteError(t.inspFailedDelete); setConfirmingDelete(false); }
     finally { setDeleting(false); }
   };
 
@@ -447,7 +449,15 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
           {isAdmin && !ins.pending && (
             <div style={styles.cardActions}>
               <button style={styles.editBtn} onClick={() => onEdit(ins)}>{t.edit}</button>
-              <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.delete}</button>
+              {confirmingDelete ? (
+                <>
+                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                  <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+                </>
+              ) : (
+                <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.delete}</button>
+              )}
+              {deleteError && <span style={styles.inlineError}>{deleteError}</span>}
             </div>
           )}
         </div>
@@ -471,6 +481,7 @@ export default function InspectionChecklists({ projects }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [filters, setFilters] = useState({});
+  const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
 
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
@@ -597,11 +608,18 @@ export default function InspectionChecklists({ projects }) {
                 {isAdmin && (
                   <div style={styles.cardActions}>
                     <button style={styles.editBtn} onClick={() => { setEditing(tpl); setShowForm(false); }}>{t.edit}</button>
-                    <button style={styles.deleteBtn} onClick={async () => {
-                      if (!confirm(t.inspDeleteTemplate)) return;
-                      await api.delete(`/inspections/templates/${tpl.id}`);
-                      setTemplates(prev => prev.filter(x => x.id !== tpl.id));
-                    }}>{t.delete}</button>
+                    {pendingDeleteTemplateId === tpl.id ? (
+                      <>
+                        <button style={styles.confirmDeleteBtn} onClick={async () => {
+                          await api.delete(`/inspections/templates/${tpl.id}`);
+                          setTemplates(prev => prev.filter(x => x.id !== tpl.id));
+                          setPendingDeleteTemplateId(null);
+                        }}>{t.confirm}</button>
+                        <button style={styles.cancelDeleteBtn} onClick={() => setPendingDeleteTemplateId(null)}>{t.cancel}</button>
+                      </>
+                    ) : (
+                      <button style={styles.deleteBtn} onClick={() => setPendingDeleteTemplateId(tpl.id)}>{t.delete}</button>
+                    )}
                   </div>
                 )}
               </div>
@@ -677,6 +695,9 @@ const styles = {
   cardActions: { display: 'flex', gap: 8, marginTop: 14 },
   editBtn: { background: '#f3f4f6', border: 'none', color: '#374151', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  cancelDeleteBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  inlineError: { fontSize: 12, color: '#ef4444' },
   // Template card
   templateCard: { background: '#fff', borderRadius: 10, padding: '14px 16px', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
   templateInfo: { flex: 1 },

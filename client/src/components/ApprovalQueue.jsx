@@ -91,6 +91,9 @@ export default function ApprovalQueue({ onCountChange }) {
   const [splitSegments, setSplitSegments] = useState([]);
   const [splitSaving, setSplitSaving] = useState(false);
   const [splitError, setSplitError] = useState('');
+  const [confirmingApproveAll, setConfirmingApproveAll] = useState(false);
+  const [editSaveError, setEditSaveError] = useState('');
+  const [unapproveError, setUnapproveError] = useState('');
 
   const fetch = () => {
     setLoading(true);
@@ -132,7 +135,7 @@ export default function ApprovalQueue({ onCountChange }) {
       setEntries(prev => prev.map(e => e.id === id ? { ...e, ...updated.data } : e));
       setEditingId(null);
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to save.');
+      setEditSaveError(err.response?.data?.error || 'Failed to save.');
     } finally {
       setEditSaving(false);
     }
@@ -193,7 +196,7 @@ export default function ApprovalQueue({ onCountChange }) {
       setRecentApproved(prev => prev.filter(e => e.id !== id));
       fetch(); // refresh pending queue
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to unapprove entry');
+      setUnapproveError(err.response?.data?.error || 'Failed to unapprove entry');
     } finally { setUnapproving(null); }
   };
 
@@ -224,7 +227,7 @@ export default function ApprovalQueue({ onCountChange }) {
 
   const approveAll = async () => {
     const targets = visibleEntries;
-    if (!confirm(`Approve ${targets.length} entr${targets.length === 1 ? 'y' : 'ies'}${workerFilter ? ` for ${workerFilter}` : ''}? This cannot be undone.`)) return;
+    setConfirmingApproveAll(false);
     setApprovingAll(true);
     try {
       if (workerFilter) {
@@ -258,9 +261,18 @@ export default function ApprovalQueue({ onCountChange }) {
                 ))}
               </select>
             )}
-            <button style={styles.approveAllBtn} onClick={approveAll} disabled={approvingAll || visibleEntries.length === 0}>
-              {approvingAll ? 'Approving...' : `✓ Approve${workerFilter ? ` ${workerFilter.split(' ')[0]}'s` : ' All'}`}
-            </button>
+            {confirmingApproveAll ? (
+              <>
+                <button style={styles.approveAllBtn} onClick={approveAll} disabled={approvingAll}>
+                  {approvingAll ? 'Approving...' : 'Confirm'}
+                </button>
+                <button style={styles.cancelApproveAllBtn} onClick={() => setConfirmingApproveAll(false)}>Cancel</button>
+              </>
+            ) : (
+              <button style={styles.approveAllBtn} onClick={() => setConfirmingApproveAll(true)} disabled={approvingAll || visibleEntries.length === 0}>
+                {`✓ Approve${workerFilter ? ` ${workerFilter.split(' ')[0]}'s` : ' All'}`}
+              </button>
+            )}
           </>
         )}
       </div>
@@ -369,8 +381,9 @@ export default function ApprovalQueue({ onCountChange }) {
                         </select>
                       </div>
                       <div style={styles.editTimesActions}>
-                        <button style={styles.saveTimesBtn} onClick={() => saveEdit(e.id)} disabled={editSaving}>{editSaving ? '...' : 'Save'}</button>
+                        <button style={styles.saveTimesBtn} onClick={() => { setEditSaveError(''); saveEdit(e.id); }} disabled={editSaving}>{editSaving ? '...' : 'Save'}</button>
                         <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+                        {editSaveError && <span style={styles.inlineError}>{editSaveError}</span>}
                       </div>
                     </div>
                   ) : splittingId === e.id ? (
@@ -453,13 +466,16 @@ export default function ApprovalQueue({ onCountChange }) {
                     <span style={styles.recentTime}>{formatTime(e.start_time)} – {formatTime(e.end_time)}</span>
                     {e.project_name && <span style={styles.recentProject}>{e.project_name}</span>}
                   </div>
-                  <button
-                    style={styles.unapproveBtn}
-                    onClick={() => unapprove(e.id)}
-                    disabled={unapproving === e.id}
-                  >
-                    {unapproving === e.id ? '…' : '↩ Unapprove'}
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                    <button
+                      style={styles.unapproveBtn}
+                      onClick={() => { setUnapproveError(''); unapprove(e.id); }}
+                      disabled={unapproving === e.id}
+                    >
+                      {unapproving === e.id ? '…' : '↩ Unapprove'}
+                    </button>
+                    {unapproveError && unapproving === null && <span style={styles.inlineError}>{unapproveError}</span>}
+                  </div>
                 </div>
               ))}
             </div>
@@ -526,6 +542,8 @@ const styles = {
   recentTime: { color: '#6b7280' },
   recentProject: { background: '#e0e7ff', color: '#3730a3', borderRadius: 6, padding: '1px 7px', fontSize: 11, fontWeight: 600 },
   unapproveBtn: { padding: '5px 12px', background: '#fff', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  cancelApproveAllBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '5px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
+  inlineError: { fontSize: 12, color: '#ef4444' },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 6 },
   signedTag: { display: 'inline-block', marginTop: 4, background: '#ede9fe', color: '#5b21b6', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
   locationRow: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 },

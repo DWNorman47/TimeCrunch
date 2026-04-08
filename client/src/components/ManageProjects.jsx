@@ -31,6 +31,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   const [editStatus, setEditStatus] = useState('in_progress');
   const [editProgressPct, setEditProgressPct] = useState('');
   const [checklistTemplates, setChecklistTemplates] = useState([]);
+  const [confirmingClearGeoId, setConfirmingClearGeoId] = useState(null);
+  const [confirmingClearBudgetId, setConfirmingClearBudgetId] = useState(null);
   const [geoLocating, setGeoLocating] = useState(false);
   const [geoError, setGeoError] = useState('');
   const [archived, setArchived] = useState([]);
@@ -142,7 +144,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   };
 
   const handleClearGeofence = async (id) => {
-    if (!confirm('Remove geofence from this project?')) return;
+    setConfirmingClearGeoId(null);
     try {
       const r = await api.patch(`/admin/projects/${id}`, { clear_geofence: true });
       onProjectUpdated(r.data);
@@ -155,7 +157,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
   };
 
   const handleClearBudget = async (id) => {
-    if (!confirm('Remove budget from this project?')) return;
+    setConfirmingClearBudgetId(null);
     try {
       const r = await api.patch(`/admin/projects/${id}`, { budget_hours: null, budget_dollars: null });
       onProjectUpdated(r.data);
@@ -442,9 +444,14 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                           <button style={s.geoLocBtn} type="button" onClick={useMyLocation} disabled={geoLocating}>
                             {geoLocating ? '...' : t.myLocation}
                           </button>
-                          {p.geo_radius_ft && (
-                            <button style={s.clearBtn} type="button" onClick={() => handleClearGeofence(p.id)}>✕ Clear</button>
-                          )}
+                          {p.geo_radius_ft && (confirmingClearGeoId === p.id ? (
+                            <>
+                              <button style={s.confirmClearBtn} type="button" onClick={() => handleClearGeofence(p.id)}>{t.confirm}</button>
+                              <button style={s.cancelClearBtn} type="button" onClick={() => setConfirmingClearGeoId(null)}>{t.cancel}</button>
+                            </>
+                          ) : (
+                            <button style={s.clearBtn} type="button" onClick={() => setConfirmingClearGeoId(p.id)}>✕ Clear</button>
+                          ))}
                         </div>
                         {geoError && <p style={s.geoErrorText}>{geoError}</p>}
                         <p style={s.hint}>{t.geofenceNote}</p>
@@ -464,9 +471,14 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                             <label style={s.budgetLabel}>Dollars ($)</label>
                             <input style={s.geoInput} type="number" min="0" step="100" placeholder="e.g. 15000" value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
                           </div>
-                          {hasBudget(p) && (
-                            <button style={{ ...s.clearBtn, alignSelf: 'flex-end' }} type="button" onClick={() => handleClearBudget(p.id)}>✕ Clear</button>
-                          )}
+                          {hasBudget(p) && (confirmingClearBudgetId === p.id ? (
+                            <>
+                              <button style={{ ...s.confirmClearBtn, alignSelf: 'flex-end' }} type="button" onClick={() => handleClearBudget(p.id)}>{t.confirm}</button>
+                              <button style={{ ...s.cancelClearBtn, alignSelf: 'flex-end' }} type="button" onClick={() => setConfirmingClearBudgetId(null)}>{t.cancel}</button>
+                            </>
+                          ) : (
+                            <button style={{ ...s.clearBtn, alignSelf: 'flex-end' }} type="button" onClick={() => setConfirmingClearBudgetId(p.id)}>✕ Clear</button>
+                          ))}
                         </div>
                         <p style={s.hint}>{t.budgetNote}</p>
                       </div>
@@ -626,6 +638,8 @@ const s = {
   geoInput: { padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, width: 120 },
   geoLocBtn: { padding: '5px 10px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
   clearBtn: { padding: '5px 10px', background: 'none', border: '1px solid #e5e7eb', color: '#9ca3af', borderRadius: 6, fontSize: 11, cursor: 'pointer', flexShrink: 0 },
+  confirmClearBtn: { padding: '5px 10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
+  cancelClearBtn: { padding: '5px 10px', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 6, fontSize: 11, cursor: 'pointer', flexShrink: 0 },
   geoErrorText: { fontSize: 11, color: '#dc2626', margin: '4px 0 0', fontWeight: 600 },
   hint: { fontSize: 11, color: '#6b7280', margin: '4px 0 0', opacity: 0.8 },
   budgetField: { display: 'flex', flexDirection: 'column', gap: 3 },

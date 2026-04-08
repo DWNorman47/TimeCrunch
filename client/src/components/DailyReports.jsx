@@ -349,25 +349,29 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
   const t = useT();
   const [report, setReport] = useState(initialReport);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [approving, setApproving] = useState(false);
+  const [approveError, setApproveError] = useState('');
   const WEATHER_OPTIONS = WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` }));
   const WEATHER_LABELS = Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label]));
   const weather = report.weather_condition ? WEATHER_LABELS[report.weather_condition] : null;
 
   const handleDelete = async () => {
-    if (!confirm(t.deleteDailyReportConfirm)) return;
     setDeleting(true);
+    setDeleteError('');
     try { await api.delete(`/daily-reports/${report.id}`); onDelete(report.id); }
-    catch { alert(t.failedToDelete); }
+    catch { setDeleteError(t.failedToDelete); setConfirmingDelete(false); }
     finally { setDeleting(false); }
   };
 
   const handleApprove = async () => {
     setApproving(true);
+    setApproveError('');
     try {
       const r = await api.patch(`/daily-reports/${report.id}/review`);
       setReport(r.data);
-    } catch { alert(t.failedToApprove); }
+    } catch { setApproveError(t.failedToApprove); }
     finally { setApproving(false); }
   };
 
@@ -401,12 +405,23 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
           />
         )}
         {isAdmin && isSubmitted && (
-          <button style={styles.approveBtn} onClick={handleApprove} disabled={approving}>
-            {approving ? '...' : t.approve}
-          </button>
+          <>
+            <button style={styles.approveBtn} onClick={handleApprove} disabled={approving}>
+              {approving ? '...' : t.approve}
+            </button>
+            {approveError && <span style={styles.inlineError}>{approveError}</span>}
+          </>
         )}
         {!report.pending && <button style={styles.editRowBtn} onClick={() => onEdit(report)}>{t.edit}</button>}
-        {!report.pending && <button style={styles.deleteRowBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : '✕'}</button>}
+        {!report.pending && (confirmingDelete ? (
+          <>
+            <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
+            <button style={styles.cancelRowBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+            {deleteError && <span style={styles.inlineError}>{deleteError}</span>}
+          </>
+        ) : (
+          <button style={styles.deleteRowBtn} onClick={() => setConfirmingDelete(true)}>✕</button>
+        ))}
       </div>
     </div>
   );
@@ -552,6 +567,9 @@ const styles = {
   approveBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   editRowBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#374151', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   deleteRowBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  cancelRowBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' },
+  inlineError: { fontSize: 11, color: '#ef4444' },
   pdfBtnSmall: { fontSize: 11, fontWeight: 600, color: '#1a56db', background: '#eff6ff', border: 'none', padding: '4px 10px', borderRadius: 6, textDecoration: 'none', cursor: 'pointer' },
   hint: { color: '#9ca3af', fontSize: 14 },
   empty: { textAlign: 'center', padding: '40px 20px' },

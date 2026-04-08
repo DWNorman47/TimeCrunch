@@ -161,6 +161,8 @@ function ItemUOMPanel({ item }) {
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [pendingRemoveUomId, setPendingRemoveUomId] = useState(null);
+  const [removeUomError, setRemoveUomError] = useState('');
 
   const load = () => {
     api.get(`/inventory/items/${item.id}/uoms`)
@@ -200,11 +202,12 @@ function ItemUOMPanel({ item }) {
   };
 
   const remove = async (uomId) => {
-    if (!confirm(t.removeUOMConfirm)) return;
+    setPendingRemoveUomId(null);
+    setRemoveUomError('');
     try {
       const rows = await api.delete(`/inventory/items/${item.id}/uoms/${uomId}`);
       setUOMs(rows.data);
-    } catch (err) { alert(err.response?.data?.error || t.failedRemoveUOM); }
+    } catch (err) { setRemoveUomError(err.response?.data?.error || t.failedRemoveUOM); }
   };
 
   return (
@@ -220,6 +223,7 @@ function ItemUOMPanel({ item }) {
       </div>
 
       {error && <div style={u.error}>{error}</div>}
+      {removeUomError && <div style={u.error}>{removeUomError}</div>}
 
       {addOpen && (
         <div style={u.addForm}>
@@ -283,7 +287,14 @@ function ItemUOMPanel({ item }) {
                     <td style={u.td}>{row.is_base ? <span style={u.baseBadge}>{t.uomBaseBadge}</span> : ''}</td>
                     <td style={{ ...u.td, whiteSpace: 'nowrap' }}>
                       <button style={u.iconBtn} onClick={() => { setEditingId(row.id); setEditForm({ unit: row.unit, unit_spec: row.unit_spec || '', factor: String(row.factor), is_base: row.is_base }); }}>✏️</button>
-                      {!row.is_base && <button style={u.iconBtn} onClick={() => remove(row.id)}>🗑️</button>}
+                      {!row.is_base && (pendingRemoveUomId === row.id ? (
+                        <>
+                          <button style={u.confirmRemoveBtn} onClick={() => remove(row.id)}>{t.confirm}</button>
+                          <button style={u.iconBtn} onClick={() => setPendingRemoveUomId(null)}>✕</button>
+                        </>
+                      ) : (
+                        <button style={u.iconBtn} onClick={() => setPendingRemoveUomId(row.id)}>🗑️</button>
+                      ))}
                     </td>
                   </>
                 )}
@@ -316,6 +327,7 @@ const u = {
   th:         { padding: '6px 8px', fontWeight: 700, color: '#6b7280', fontSize: 11, textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #e5e7eb' },
   td:         { padding: '8px 8px', color: '#374151', borderBottom: '1px solid #f3f4f6' },
   iconBtn:    { background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '2px 3px' },
+  confirmRemoveBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '2px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
   baseBadge:  { display: 'inline-block', padding: '1px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#1d4ed8' },
 };
 
@@ -335,6 +347,9 @@ export default function InventoryItems({ onItemChange }) {
   const [units, setUnits] = useState({ active: DEFAULT_UNITS, known: DEFAULT_UNITS });
   const [editingItem, setEditingItem] = useState(null); // null=none, false=new, obj=editing
   const [archiving, setArchiving] = useState(null);
+  const [pendingArchiveItemId, setPendingArchiveItemId] = useState(null);
+  const [archiveError, setArchiveError] = useState('');
+  const [restoreError, setRestoreError] = useState('');
   const [labelItem, setLabelItem] = useState(null);
 
   const load = async (p = page) => {
@@ -370,24 +385,26 @@ export default function InventoryItems({ onItemChange }) {
   };
 
   const archive = async item => {
-    if (!confirm(`Archive "${item.name}"? ${t.archiveItemMsg}`)) return;
+    setPendingArchiveItemId(null);
+    setArchiveError('');
     setArchiving(item.id);
     try {
       await api.delete(`/inventory/items/${item.id}`);
       load();
       onItemChange?.();
     } catch (err) {
-      alert(err.response?.data?.error || t.failedArchiveItem);
+      setArchiveError(err.response?.data?.error || t.failedArchiveItem);
     } finally {
       setArchiving(null);
     }
   };
 
   const restore = async item => {
+    setRestoreError('');
     try {
       await api.patch(`/inventory/items/${item.id}`, { active: true });
       load();
-    } catch { alert(t.failedRestoreItem); }
+    } catch { setRestoreError(t.failedRestoreItem); }
   };
 
   return (
@@ -476,7 +493,14 @@ export default function InventoryItems({ onItemChange }) {
                           <>
                             <button style={s.iconBtn} onClick={() => setLabelItem(item)} title="Print label">🏷️</button>
                             <button style={s.iconBtn} onClick={() => setEditingItem(item)} title="Edit">✏️</button>
-                            <button style={{ ...s.iconBtn, opacity: archiving === item.id ? 0.5 : 1 }} onClick={() => archive(item)} title="Archive">🗄️</button>
+                            {pendingArchiveItemId === item.id ? (
+                              <>
+                                <button style={s.confirmArchiveBtn} onClick={() => archive(item)} disabled={archiving === item.id}>{t.confirm}</button>
+                                <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(null)}>✕</button>
+                              </>
+                            ) : (
+                              <button style={{ ...s.iconBtn, opacity: archiving === item.id ? 0.5 : 1 }} onClick={() => setPendingArchiveItemId(item.id)} title="Archive">🗄️</button>
+                            )}
                           </>
                         ) : (
                           <button style={s.iconBtn} onClick={() => restore(item)} title="Restore">↩️</button>
@@ -499,6 +523,8 @@ export default function InventoryItems({ onItemChange }) {
           )}
         </>
       )}
+      {archiveError && <p style={s.inlineError}>{archiveError}</p>}
+      {restoreError && <p style={s.inlineError}>{restoreError}</p>}
       {labelItem && (
         <ItemLabelModal item={labelItem} onClose={() => setLabelItem(null)} />
       )}
@@ -544,6 +570,8 @@ const s = {
   td:          { padding: '10px 12px', fontSize: 14, color: '#374151' },
   badge:       { display: 'inline-block', padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700 },
   iconBtn:     { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: '2px 4px', marginLeft: 2 },
+  confirmArchiveBtn: { background: '#f59e0b', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  inlineError: { fontSize: 12, color: '#ef4444', padding: '4px 14px', margin: 0 },
   pagination:  { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderTop: '1px solid #e5e7eb', background: '#f9fafb' },
   pageInfo:    { fontSize: 13, color: '#6b7280', marginRight: 'auto' },
   pageBtn:     { padding: '5px 14px', background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 500 },

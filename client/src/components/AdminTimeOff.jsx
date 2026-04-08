@@ -23,6 +23,7 @@ export default function AdminTimeOff() {
   const [filter, setFilter] = useState('pending');
   const [reviewNote, setReviewNote] = useState({});
   const [acting, setActing] = useState(null);
+  const [actError, setActError] = useState('');
 
   const load = (status) => {
     setLoading(true);
@@ -42,7 +43,7 @@ export default function AdminTimeOff() {
       setRequests(prev => prev.map(x => x.id === id ? r.data : x));
       setReviewNote(prev => { const n = { ...prev }; delete n[id]; return n; });
     } catch (err) {
-      alert(err.response?.data?.error || t.actionFailed);
+      setActError(err.response?.data?.error || t.actionFailed);
     } finally { setActing(null); }
   };
 
@@ -122,17 +123,18 @@ export default function AdminTimeOff() {
                   <button
                     style={s.approveBtn}
                     disabled={acting === r.id + 'approve'}
-                    onClick={() => act(r.id, 'approve')}
+                    onClick={() => { setActError(''); act(r.id, 'approve'); }}
                   >
                     {acting === r.id + 'approve' ? '…' : `✓ ${t.filterApproved}`}
                   </button>
                   <button
                     style={s.denyBtn}
                     disabled={acting === r.id + 'deny'}
-                    onClick={() => act(r.id, 'deny')}
+                    onClick={() => { setActError(''); act(r.id, 'deny'); }}
                   >
                     {acting === r.id + 'deny' ? '…' : t.denyAction}
                   </button>
+                  {actError && <span style={s.actError}>{actError}</span>}
                 </div>
               )}
 
@@ -172,6 +174,7 @@ const s = {
   noteInput: { flex: 1, minWidth: 160, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13 },
   approveBtn: { background: '#059669', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' },
   denyBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' },
+  actError: { fontSize: 12, color: '#ef4444' },
   meta: { fontSize: 12, color: '#9ca3af', marginTop: 8 },
   empty: { color: '#9ca3af', fontSize: 14, textAlign: 'center', padding: '40px 0' },
 };

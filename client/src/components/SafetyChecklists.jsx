@@ -280,6 +280,8 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const items = sub.template_items ?? [];
 
   const checkItems = items.filter(i => i.type === 'check');
@@ -289,10 +291,10 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
   }).length;
 
   const handleDelete = async () => {
-    if (!confirm(t.deleteSubmissionConfirm)) return;
     setDeleting(true);
+    setDeleteError('');
     try { await api.delete(`/safety-checklists/${sub.id}`); onDeleted(sub.id); }
-    catch { alert(t.failedToDelete); }
+    catch { setDeleteError(t.failedToDelete); setConfirmingDelete(false); }
     finally { setDeleting(false); }
   };
 
@@ -343,9 +345,15 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
           {sub.notes && <p style={styles.subNotes}>{sub.notes}</p>}
           {isAdmin && (
             <div style={styles.cardActions}>
-              <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>
-                {deleting ? '...' : t.delete}
-              </button>
+              {confirmingDelete ? (
+                <>
+                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
+                  <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+                </>
+              ) : (
+                <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.delete}</button>
+              )}
+              {deleteError && <span style={styles.inlineError}>{deleteError}</span>}
             </div>
           )}
         </div>
@@ -367,6 +375,7 @@ export default function SafetyChecklists({ projects }) {
   const [filterProject, setFilterProject] = useState('');
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
+  const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
 
   // Attach template items to submissions for rendering
   const templatesById = Object.fromEntries(templates.map(t => [t.id, t]));
@@ -445,11 +454,18 @@ export default function SafetyChecklists({ projects }) {
                 </div>
                 <div style={styles.templateCardActions}>
                   <button style={styles.editBtn} onClick={() => { setEditingTemplate({ ...tmpl, items: tmpl.items?.map(i => ({ ...i, _id: Math.random() })) }); setShowTemplateForm(true); }}>{t.edit}</button>
-                  <button style={styles.deleteBtn} onClick={async () => {
-                    if (!confirm(t.deleteTemplateConfirm)) return;
-                    await api.delete(`/safety-checklists/templates/${tmpl.id}`);
-                    setTemplates(prev => prev.filter(x => x.id !== tmpl.id));
-                  }}>{t.delete}</button>
+                  {pendingDeleteTemplateId === tmpl.id ? (
+                    <>
+                      <button style={styles.confirmDeleteBtn} onClick={async () => {
+                        await api.delete(`/safety-checklists/templates/${tmpl.id}`);
+                        setTemplates(prev => prev.filter(x => x.id !== tmpl.id));
+                        setPendingDeleteTemplateId(null);
+                      }}>{t.confirm}</button>
+                      <button style={styles.cancelDeleteBtn} onClick={() => setPendingDeleteTemplateId(null)}>{t.cancel}</button>
+                    </>
+                  ) : (
+                    <button style={styles.deleteBtn} onClick={() => setPendingDeleteTemplateId(tmpl.id)}>{t.delete}</button>
+                  )}
                 </div>
               </div>
             ))}
@@ -552,6 +568,9 @@ const styles = {
   templateCardActions: { display: 'flex', gap: 8, flexShrink: 0 },
   editBtn: { background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb', padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  cancelDeleteBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  inlineError: { fontSize: 12, color: '#ef4444' },
   // Form
   formCard: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 20 },
   form: { display: 'flex', flexDirection: 'column', gap: 14 },

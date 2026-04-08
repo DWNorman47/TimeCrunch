@@ -141,7 +141,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.talkContent}</label>
-          <textarea style={styles.textarea} rows={5} maxLength={10000} placeholder={t.talkContentPlaceholder} value={form.content} onChange={e => set('content', e.target.value)} />
+          <textarea style={styles.textarea} rows={5} maxLength={5000} placeholder={t.talkContentPlaceholder} value={form.content} onChange={e => set('content', e.target.value)} />
         </div>
       </div>
 
@@ -236,6 +236,11 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
   const [quizAnswers, setQuizAnswers] = useState({});
   const [quizResult, setQuizResult] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [pendingDeleteAttachId, setPendingDeleteAttachId] = useState(null);
+  const [attachDeleteError, setAttachDeleteError] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const fileInputRef = React.useRef(null);
 
   const loadDetail = async () => {
@@ -265,16 +270,17 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
         size_bytes: file.size,
       });
       setAttachments(prev => [...(prev || []), r.data]);
-    } catch { alert(t.uploadFailed); }
+    } catch { setUploadError(t.uploadFailed); }
     finally { setUploading(false); }
   };
 
   const deleteAttachment = async attId => {
-    if (!confirm(t.removeAttachmentConfirm)) return;
+    setAttachDeleteError('');
     try {
       await api.delete(`/safety-talks/${talk.id}/attachments/${attId}`);
       setAttachments(prev => prev.filter(a => a.id !== attId));
-    } catch { alert(t.failedRemoveAttachment); }
+      setPendingDeleteAttachId(null);
+    } catch { setAttachDeleteError(t.failedRemoveAttachment); setPendingDeleteAttachId(null); }
   };
 
   const handleExpand = () => {
@@ -303,10 +309,10 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
   };
 
   const handleDelete = async () => {
-    if (!confirm(t.deleteTalkConfirm)) return;
+    setDeleteError('');
     setDeleting(true);
     try { await api.delete(`/safety-talks/${talk.id}`); onDeleted(talk.id); }
-    catch { alert(t.failedToDelete); }
+    catch { setDeleteError(t.failedToDelete); setConfirmingDelete(false); }
     finally { setDeleting(false); }
   };
 
@@ -400,6 +406,8 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                   </>
                 )}
               </div>
+              {uploadError && <p style={styles.error}>{uploadError}</p>}
+              {attachDeleteError && <p style={styles.error}>{attachDeleteError}</p>}
               {attachments === null ? (
                 <p style={styles.hint}>Loading...</p>
               ) : attachments.length === 0 ? (
@@ -411,9 +419,14 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                       <span style={styles.attachIcon}>{fileIcon(a.content_type)}</span>
                       <a href={a.url} target="_blank" rel="noopener noreferrer" style={styles.attachName}>{a.name}</a>
                       {a.size_bytes && <span style={styles.attachSize}>{formatBytes(a.size_bytes)}</span>}
-                      {isAdmin && (
-                        <button style={styles.attachDeleteBtn} onClick={() => deleteAttachment(a.id)}>✕</button>
-                      )}
+                      {isAdmin && (pendingDeleteAttachId === a.id ? (
+                        <>
+                          <button style={styles.confirmDeleteBtn} onClick={() => deleteAttachment(a.id)}>{t.confirm}</button>
+                          <button style={styles.attachCancelBtn} onClick={() => setPendingDeleteAttachId(null)}>{t.cancel}</button>
+                        </>
+                      ) : (
+                        <button style={styles.attachDeleteBtn} onClick={() => setPendingDeleteAttachId(a.id)}>✕</button>
+                      ))}
                     </div>
                   ))}
                 </div>
@@ -459,9 +472,15 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
 
           {isAdmin && (
             <div style={styles.cardActions}>
-              <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>
-                {deleting ? '...' : t.delete}
-              </button>
+              {confirmingDelete ? (
+                <>
+                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
+                  <button style={styles.cancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+                </>
+              ) : (
+                <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.delete}</button>
+              )}
+              {deleteError && <p style={{ ...styles.error, margin: 0 }}>{deleteError}</p>}
             </div>
           )}
         </div>
@@ -620,6 +639,8 @@ const styles = {
   attachName: { flex: 1, fontSize: 13, color: '#1a56db', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   attachSize: { fontSize: 11, color: '#9ca3af', flexShrink: 0 },
   attachDeleteBtn: { background: 'none', border: 'none', color: '#d1d5db', fontSize: 12, cursor: 'pointer', padding: '0 2px', flexShrink: 0 },
+  attachCancelBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 11, cursor: 'pointer', padding: '0 2px', flexShrink: 0 },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   // Quiz — form
   quizSection: { borderTop: '1px solid #f3f4f6', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 },
   quizSectionHead: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },

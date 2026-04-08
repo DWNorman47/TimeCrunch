@@ -159,6 +159,9 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
   });
   const [editSaving, setEditSaving] = useState(false);
   const [actionErr, setActionErr]   = useState('');
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [pendingRemoveLineId, setPendingRemoveLineId] = useState(null);
+  const [removeLineErr, setRemoveLineErr] = useState('');
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent]       = useState(false);
 
@@ -187,7 +190,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
   };
 
   const cancelPO = async () => {
-    if (!confirm(t.invPOCancelConfirm)) return;
+    setConfirmingCancel(false);
     setActionErr(''); setSaving(true);
     try {
       await api.delete(`/inventory/purchase-orders/${po.id}`);
@@ -234,12 +237,13 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
   };
 
   const removeLine = async (lineId) => {
-    if (!confirm(t.invPORemoveLineConfirm)) return;
+    setPendingRemoveLineId(null);
+    setRemoveLineErr('');
     try {
       const r = await api.delete(`/inventory/purchase-orders/${po.id}/lines/${lineId}`);
       setLines(r.data);
       onUpdate();
-    } catch (err) { alert(err.response?.data?.error || t.invPOFailedRemoveLine); }
+    } catch (err) { setRemoveLineErr(err.response?.data?.error || t.invPOFailedRemoveLine); }
   };
 
   const emailPO = async () => {
@@ -303,11 +307,16 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             {canReceive && (
               <button style={d.receiveBtn} onClick={() => setReceiveOpen(true)}>{t.invPOReceiveBtn}</button>
             )}
-            {!isFinished && (
-              <button style={d.cancelBtn} onClick={cancelPO} disabled={saving}>
+            {!isFinished && (confirmingCancel ? (
+              <>
+                <button style={d.confirmCancelBtn} onClick={cancelPO} disabled={saving}>{saving ? '…' : t.confirm}</button>
+                <button style={d.smallCancelBtn} onClick={() => setConfirmingCancel(false)}>{t.cancel}</button>
+              </>
+            ) : (
+              <button style={d.cancelBtn} onClick={() => setConfirmingCancel(true)}>
                 {isDraft ? t.invPODeleteBtn : t.invPOCancelBtn}
               </button>
-            )}
+            ))}
           </div>
         </div>
 
@@ -428,7 +437,14 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
                     </td>
                     {isDraft && (
                       <td style={d.td}>
-                        <button style={d.removeBtn} onClick={() => removeLine(line.id)} title="Remove line">🗑️</button>
+                        {pendingRemoveLineId === line.id ? (
+                          <>
+                            <button style={d.confirmLineRemoveBtn} onClick={() => removeLine(line.id)}>{t.confirm}</button>
+                            <button style={d.removeBtn} onClick={() => setPendingRemoveLineId(null)}>✕</button>
+                          </>
+                        ) : (
+                          <button style={d.removeBtn} onClick={() => setPendingRemoveLineId(line.id)} title="Remove line">🗑️</button>
+                        )}
                       </td>
                     )}
                   </tr>
@@ -456,6 +472,8 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
           </table>
         </div>
       )}
+
+      {removeLineErr && <div style={d.lineErr}>{removeLineErr}</div>}
 
       {/* Add line form */}
       {addingLine && (
@@ -709,6 +727,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
   const [selected, setSelected] = useState(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState('');
+  const [loadDetailError, setLoadDetailError] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
   const PO_PAGE = 100;
@@ -766,11 +785,12 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
   useEffect(() => { if (view === 'list') load(); }, [load, view]);
 
   const openDetail = async (po) => {
+    setLoadDetailError('');
     try {
       const r = await api.get(`/inventory/purchase-orders/${po.id}`);
       setSelected(r.data);
       setView('detail');
-    } catch { alert(t.invPOFailedLoadDetails); }
+    } catch { setLoadDetailError(t.invPOFailedLoadDetails); }
   };
 
   const handleSaved = (newPo) => {
@@ -827,6 +847,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
       </div>
 
       {error && <div style={l.error}>{error}</div>}
+      {loadDetailError && <div style={l.error}>{loadDetailError}</div>}
 
       {loading ? (
         <div style={l.empty}>{t.loading}</div>
@@ -921,6 +942,9 @@ const d = {
   submitBtn:    { padding: '7px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   receiveBtn:   { padding: '7px 16px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   cancelBtn:    { padding: '7px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fee2e2', color: '#dc2626', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  confirmCancelBtn: { padding: '7px 14px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  smallCancelBtn: { padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: 13, cursor: 'pointer' },
+  confirmLineRemoveBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '2px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
   error:        { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '8px 12px', marginTop: 8, fontSize: 13 },
   infoGrid:     { display: 'flex', flexWrap: 'wrap', gap: '8px 24px', marginTop: 4 },
   infoItem:     { display: 'flex', flexDirection: 'column', gap: 2 },

@@ -171,6 +171,7 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
   const [expanded, setExpanded] = useState(false);
   const [closing, setClosing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const handleClose = async () => {
     setClosing(true);
@@ -181,7 +182,6 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
   };
 
   const handleDelete = async () => {
-    if (!confirm(t.deleteIncidentConfirm)) return;
     setDeleting(true);
     try {
       await api.delete(`/incidents/${incident.id}`);
@@ -248,9 +248,14 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
               </button>
             )}
             {(!isAdmin || incident.status !== 'closed') && (
-              <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>
-                {deleting ? '…' : t.delete}
-              </button>
+              confirmingDelete ? (
+                <>
+                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                  <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+                </>
+              ) : (
+                <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.delete}</button>
+              )
             )}
           </div>
         </div>
@@ -402,6 +407,8 @@ const styles = {
   cardActions: { display: 'flex', gap: 8, marginTop: 14 },
   closeBtn: { background: '#059669', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  cancelDeleteBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   pendingBadge: { fontSize: 10, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 6, marginLeft: 6, verticalAlign: 'middle' },
   // Form
   form: { display: 'flex', flexDirection: 'column', gap: 16 },

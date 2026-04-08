@@ -131,12 +131,14 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
   const STATUS_LABELS = { open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed };
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const handleDelete = async () => {
-    if (!confirm(`${t.deleteRFIPrefix} #${rfi.rfi_number}?`)) return;
     setDeleting(true);
+    setDeleteError('');
     try { await api.delete(`/rfis/${rfi.id}`); onDeleted(rfi.id); }
-    catch { alert(t.failedToDelete); }
+    catch { setDeleteError(t.failedToDelete); setConfirmingDelete(false); }
     finally { setDeleting(false); }
   };
 
@@ -201,7 +203,15 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
                   <button style={styles.editBtn} onClick={() => onEdit(rfi)}>
                     {rfi.status === 'open' && !rfi.response ? t.addResponse : t.edit}
                   </button>
-                  <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.delete}</button>
+                  {confirmingDelete ? (
+                    <>
+                      <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                      <button style={styles.smallCancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+                    </>
+                  ) : (
+                    <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.delete}</button>
+                  )}
+                  {deleteError && <span style={styles.inlineError}>{deleteError}</span>}
                 </>
               )}
             </div>
@@ -369,6 +379,9 @@ const styles = {
   cardActions: { display: 'flex', gap: 8, marginTop: 14 },
   editBtn: { background: '#f3f4f6', border: 'none', color: '#374151', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  smallCancelBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  inlineError: { fontSize: 12, color: '#ef4444' },
   // Form
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   formTitle: { fontSize: 17, fontWeight: 700, margin: 0 },

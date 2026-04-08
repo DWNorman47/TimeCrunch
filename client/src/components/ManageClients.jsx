@@ -181,9 +181,10 @@ function DocUploadForm({ clientId, onUploaded }) {
 function DocList({ clientId, docs, onDeleted }) {
   const t = useT();
   const [deleting, setDeleting] = useState(null);
+  const [pendingDeleteDocId, setPendingDeleteDocId] = useState(null);
 
   const handleDelete = async doc => {
-    if (!confirm(t.deleteDocConfirm)) return;
+    setPendingDeleteDocId(null);
     setDeleting(doc.id);
     try {
       await api.delete(`/admin/clients/${clientId}/documents/${doc.id}`);
@@ -207,9 +208,16 @@ function DocList({ clientId, docs, onDeleted }) {
             <a href={doc.url} target="_blank" rel="noopener noreferrer" style={s.docName}>{doc.name}</a>
             {fmt(doc.size_bytes) && <span style={s.docSize}>{fmt(doc.size_bytes)}</span>}
             {exp && <span style={{ ...s.expiryBadge, color: exp.color, background: exp.bg }}>{exp.label}</span>}
-            <button style={s.docDeleteBtn} onClick={() => handleDelete(doc)} disabled={deleting === doc.id}>
-              {deleting === doc.id ? '…' : '✕'}
-            </button>
+            {pendingDeleteDocId === doc.id ? (
+              <>
+                <button style={s.confirmDocDeleteBtn} onClick={() => handleDelete(doc)}>{t.confirm}</button>
+                <button style={s.cancelDocDeleteBtn} onClick={() => setPendingDeleteDocId(null)}>{t.cancel}</button>
+              </>
+            ) : (
+              <button style={s.docDeleteBtn} onClick={() => setPendingDeleteDocId(doc.id)} disabled={deleting === doc.id}>
+                {deleting === doc.id ? '…' : '✕'}
+              </button>
+            )}
           </div>
         );
       })}
@@ -225,6 +233,7 @@ function ClientCard({ client, onEdit, onDeleted }) {
   const [docs, setDocs] = useState(null);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const loadDocs = async () => {
     if (docs !== null) return;
@@ -242,7 +251,7 @@ function ClientCard({ client, onEdit, onDeleted }) {
   };
 
   const handleDelete = async () => {
-    if (!confirm(t.removeClientConfirm)) return;
+    setConfirmingDelete(false);
     setDeleting(true);
     try {
       await api.delete(`/admin/clients/${client.id}`);
@@ -305,9 +314,14 @@ function ClientCard({ client, onEdit, onDeleted }) {
 
           <div style={s.cardActions}>
             <button style={s.editBtn} onClick={() => onEdit(client)}>{t.edit}</button>
-            <button style={s.deleteBtn} onClick={handleDelete} disabled={deleting}>
-              {deleting ? '…' : t.removeClient}
-            </button>
+            {confirmingDelete ? (
+              <>
+                <button style={s.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                <button style={s.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+              </>
+            ) : (
+              <button style={s.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.removeClient}</button>
+            )}
           </div>
         </div>
       )}
@@ -447,6 +461,8 @@ const s = {
   cardActions: { display: 'flex', gap: 8, marginTop: 16, borderTop: '1px solid #f3f4f6', paddingTop: 12 },
   editBtn: { background: '#f3f4f6', border: 'none', color: '#374151', padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '7px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  cancelDeleteBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '7px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   // Form
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   formTitle: { fontSize: 17, fontWeight: 700, margin: 0 },
@@ -484,4 +500,6 @@ const s = {
   docSize: { fontSize: 11, color: '#9ca3af', flexShrink: 0 },
   expiryBadge: { fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, flexShrink: 0 },
   docDeleteBtn: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '0 4px', flexShrink: 0 },
+  confirmDocDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '1px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
+  cancelDocDeleteBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 11, cursor: 'pointer', padding: '0 2px', flexShrink: 0 },
 };

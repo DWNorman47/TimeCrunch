@@ -275,6 +275,9 @@ function SupplierPanel() {
   const [form, setForm]           = useState({ name: '', contact_name: '', phone: '', email: '', website: '', notes: '' });
   const [saving, setSaving]       = useState(false);
   const [formErr, setFormErr]     = useState('');
+  const [pendingArchiveSupId, setPendingArchiveSupId] = useState(null);
+  const [archiveError, setArchiveError] = useState('');
+  const [restoreError, setRestoreError] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -325,18 +328,20 @@ function SupplierPanel() {
   };
 
   const archive = async (sup) => {
-    if (!confirm(`Archive "${sup.name}"?`)) return;
+    setPendingArchiveSupId(null);
+    setArchiveError('');
     try {
       await api.delete(`/inventory/suppliers/${sup.id}`);
       load();
-    } catch (err) { alert(err.response?.data?.error || t.invSetupFailedArchive); }
+    } catch (err) { setArchiveError(err.response?.data?.error || t.invSetupFailedArchive); }
   };
 
   const restore = async (sup) => {
+    setRestoreError('');
     try {
       await api.patch(`/inventory/suppliers/${sup.id}`, { active: true });
       load();
-    } catch { alert(t.invSetupFailedRestore); }
+    } catch { setRestoreError(t.invSetupFailedRestore); }
   };
 
   if (editing !== null) {
@@ -417,7 +422,14 @@ function SupplierPanel() {
                     <>
                       <span style={{ ...sp.badge, color: '#059669', background: '#d1fae5' }}>{t.invSetupActiveStatus}</span>
                       <button style={sp.iconBtn} onClick={() => openEdit(sup)} title="Edit">✏️</button>
-                      <button style={sp.iconBtn} onClick={() => archive(sup)} title="Archive">🗄️</button>
+                      {pendingArchiveSupId === sup.id ? (
+                        <>
+                          <button style={sp.confirmArchiveBtn} onClick={() => archive(sup)}>{t.confirm}</button>
+                          <button style={sp.iconBtn} onClick={() => setPendingArchiveSupId(null)}>✕</button>
+                        </>
+                      ) : (
+                        <button style={sp.iconBtn} onClick={() => setPendingArchiveSupId(sup.id)} title="Archive">🗄️</button>
+                      )}
                     </>
                   ) : (
                     <>
@@ -426,6 +438,8 @@ function SupplierPanel() {
                     </>
                   )}
                 </div>
+                {archiveError && <p style={sp.inlineError}>{archiveError}</p>}
+                {restoreError && <p style={sp.inlineError}>{restoreError}</p>}
               </div>
             </div>
           ))}
@@ -455,6 +469,8 @@ const sp = {
   cardActions: { display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 },
   badge:       { display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, marginRight: 4 },
   iconBtn:     { background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 3px' },
+  confirmArchiveBtn: { background: '#f59e0b', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  inlineError: { fontSize: 12, color: '#ef4444', margin: '4px 0 0' },
   formWrap:    { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20 },
   formTitle:   { fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 16 },
   row:         { display: 'flex', gap: 12, flexWrap: 'wrap' },
@@ -493,6 +509,9 @@ export default function InventorySetup({ projects }) {
   const [error,     setError]     = useState('');
   const [editing,   setEditing]   = useState(null); // null=list, false=new, obj=edit
   const [printItem, setPrintItem] = useState(null); // item to print label for
+  const [pendingArchiveItemId, setPendingArchiveItemId] = useState(null);
+  const [itemArchiveError, setItemArchiveError] = useState('');
+  const [itemRestoreError, setItemRestoreError] = useState('');
 
   // Parent cascade: store selected IDs for each level so child levels can filter
   const [parentSels, setParentSels] = useState({
@@ -589,20 +608,22 @@ export default function InventorySetup({ projects }) {
   };
 
   const archive = async item => {
-    if (!confirm(`Archive "${item.name}"?`)) return;
+    setPendingArchiveItemId(null);
+    setItemArchiveError('');
     try {
       await api.delete(`${level.apiPath}/${item.id}`);
       load();
     } catch (err) {
-      alert(err.response?.data?.error || t.invSetupFailedArchive);
+      setItemArchiveError(err.response?.data?.error || t.invSetupFailedArchive);
     }
   };
 
   const restore = async item => {
+    setItemRestoreError('');
     try {
       await api.patch(`${level.apiPath}/${item.id}`, { active: true });
       load();
-    } catch { alert(t.invSetupFailedRestore); }
+    } catch { setItemRestoreError(t.invSetupFailedRestore); }
   };
 
   // Which parent option list feeds the "Add new" form's parent selector
@@ -749,7 +770,14 @@ export default function InventorySetup({ projects }) {
                               <button style={s.iconBtn} onClick={() => setPrintItem(item)} title="Print QR Label">🏷</button>
                             )}
                             <button style={s.iconBtn} onClick={() => setEditing(item)} title="Edit">✏️</button>
-                            <button style={s.iconBtn} onClick={() => archive(item)} title="Archive">🗄️</button>
+                            {pendingArchiveItemId === item.id ? (
+                              <>
+                                <button style={s.confirmArchiveBtn} onClick={() => archive(item)}>{t.confirm}</button>
+                                <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(null)}>✕</button>
+                              </>
+                            ) : (
+                              <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(item.id)} title="Archive">🗄️</button>
+                            )}
                           </>
                         ) : (
                           <button style={s.iconBtn} onClick={() => restore(item)} title="Restore">↩️</button>
@@ -763,6 +791,8 @@ export default function InventorySetup({ projects }) {
           )}
         </>
       )}
+      {itemArchiveError && <p style={s.inlineError}>{itemArchiveError}</p>}
+      {itemRestoreError && <p style={s.inlineError}>{itemRestoreError}</p>}
       {printItem && (
         <BinLabelModal
           item={printItem}
@@ -806,4 +836,6 @@ const s = {
   cardActions:   { display: 'flex', alignItems: 'center', gap: 4 },
   badge:         { display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700 },
   iconBtn:       { background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 3px' },
+  confirmArchiveBtn: { background: '#f59e0b', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  inlineError:   { fontSize: 12, color: '#ef4444', margin: '4px 0 0' },
 };

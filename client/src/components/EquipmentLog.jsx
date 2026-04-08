@@ -154,6 +154,10 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
   const [hours, setHours] = useState([]);
   const [loadingHours, setLoadingHours] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [pendingDeleteEntryId, setPendingDeleteEntryId] = useState(null);
+  const [entryDeleteError, setEntryDeleteError] = useState('');
 
   const totalHours = parseFloat(item.total_hours || 0);
   const interval = item.maintenance_interval_hours;
@@ -176,20 +180,21 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
   };
 
   const handleDelete = async () => {
-    if (!confirm(t.removeEquipmentConfirm)) return;
     setDeleting(true);
+    setDeleteError('');
     try { await api.delete(`/equipment/${item.id}`); onDeleted(item.id); }
-    catch { alert(t.failedToRemove); }
+    catch { setDeleteError(t.failedToRemove); setConfirmingDelete(false); }
     finally { setDeleting(false); }
   };
 
   const handleDeleteEntry = async (entryId, entryHours) => {
-    if (!confirm(t.deleteHoursEntryConfirm)) return;
+    setEntryDeleteError('');
     try {
       await api.delete(`/equipment/hours/${entryId}`);
       setHours(prev => prev.filter(h => h.id !== entryId));
       onHoursLogged(item.id, -parseFloat(entryHours));
-    } catch { alert(t.failedToDeleteEntry); }
+      setPendingDeleteEntryId(null);
+    } catch { setEntryDeleteError(t.failedToDeleteEntry); setPendingDeleteEntryId(null); }
   };
 
   return (
@@ -243,7 +248,15 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
               {isAdmin && (
                 <>
                   <button style={styles.editBtn} onClick={() => onEdit(item)}>{t.edit}</button>
-                  <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.removeBtn}</button>
+                  {confirmingDelete ? (
+                    <>
+                      <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                      <button style={styles.cancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+                      {deleteError && <span style={styles.inlineError}>{deleteError}</span>}
+                    </>
+                  ) : (
+                    <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.removeBtn}</button>
+                  )}
                 </>
               )}
             </div>
@@ -280,13 +293,21 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
                         <td style={styles.htd}>{h.project_name || '—'}</td>
                         <td style={{ ...styles.htd, color: '#6b7280' }}>{h.notes || ''}</td>
                         <td style={styles.htd}>
-                          {!h.pending && <button style={styles.delEntryBtn} onClick={() => handleDeleteEntry(h.id, h.hours)}>✕</button>}
+                          {!h.pending && (pendingDeleteEntryId === h.id ? (
+                            <>
+                              <button style={styles.confirmEntryDeleteBtn} onClick={() => handleDeleteEntry(h.id, h.hours)}>{t.confirm}</button>
+                              <button style={styles.cancelEntryBtn} onClick={() => setPendingDeleteEntryId(null)}>{t.cancel}</button>
+                            </>
+                          ) : (
+                            <button style={styles.delEntryBtn} onClick={() => setPendingDeleteEntryId(h.id)}>✕</button>
+                          ))}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               )}
+              {entryDeleteError && <p style={styles.inlineError}>{entryDeleteError}</p>}
             </div>
           )}
         </div>
@@ -421,6 +442,10 @@ const styles = {
   logBtn: { background: '#059669', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
   editBtn: { background: '#f3f4f6', border: 'none', color: '#374151', padding: '7px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '7px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  confirmEntryDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '2px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  cancelEntryBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 11, cursor: 'pointer', padding: '2px 4px' },
+  inlineError: { fontSize: 12, color: '#ef4444', margin: '4px 0 0' },
   hoursHistory: { marginTop: 4 },
   historyTitle: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 8 },
   histTable: { width: '100%', borderCollapse: 'collapse', fontSize: 12 },

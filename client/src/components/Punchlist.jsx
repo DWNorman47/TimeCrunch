@@ -115,6 +115,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
   const [newCheckText, setNewCheckText] = useState('');
   const [addingCheck, setAddingCheck] = useState(false);
   const [editPhase, setEditPhase] = useState(initialItem.phase || '');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => { setItem(initialItem); setEditPhase(initialItem.phase || ''); }, [initialItem]);
 
@@ -155,7 +156,6 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
   };
 
   const handleDelete = async () => {
-    if (!confirm(t.deleteItemConfirm)) return;
     try { await api.delete(`/punchlist/${item.id}`); onDeleted(item.id); } catch {}
   };
 
@@ -298,7 +298,14 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
             <button style={styles.advanceBtn} onClick={advance} disabled={updating}>
               {updating ? '...' : nextLabel[item.status] || t.markDone}
             </button>
-            <button style={styles.deleteBtn} onClick={handleDelete}>{t.delete}</button>
+            {confirmingDelete ? (
+              <>
+                <button style={styles.confirmDeleteBtn} onClick={handleDelete}>{t.confirm}</button>
+                <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+              </>
+            ) : (
+              <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.delete}</button>
+            )}
           </div>
         </div>
       )}
@@ -482,6 +489,8 @@ const styles = {
   itemActions: { display: 'flex', gap: 8 },
   advanceBtn: { background: '#059669', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  cancelDeleteBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   // Form
   formCard: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 20 },
   form: { display: 'flex', flexDirection: 'column', gap: 14 },

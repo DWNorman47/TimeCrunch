@@ -64,6 +64,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
 
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [pendingDeleteEntry, setPendingDeleteEntry] = useState(null);
 
   useEffect(() => {
     api.get('/clock/status')
@@ -159,7 +160,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
 
   // ── Entry delete ─────────────────────────────────────────────────────────────
   async function doDelete(entry) {
-    if (!confirm(`Delete this entry (${entry.project_name || 'No project'}, ${minToDisplay(strToMin(entry.start_time))}–${minToDisplay(strToMin(entry.end_time))})?`)) return;
+    setPendingDeleteEntry(null);
     setDeletingId(entry.id);
     try {
       await api.delete(`/time-entries/${entry.id}`);
@@ -277,11 +278,18 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                           {seg.entry.status === 'rejected' && <span style={s.badgeRed}>Rejected</span>}
                         </div>
                         {!seg.entry.locked && (
-                          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
                             <button style={s.splitBtn} onClick={() => isSplitting ? closeSplit() : openSplit(seg.entry)}>
                               {isSplitting ? 'Cancel' : '✂ Split'}
                             </button>
-                            <button style={s.deleteBtn} onClick={() => doDelete(seg.entry)} disabled={deletingId === seg.entry.id}>✕</button>
+                            {pendingDeleteEntry?.id === seg.entry.id ? (
+                              <>
+                                <button style={s.confirmEntryDeleteBtn} onClick={() => doDelete(seg.entry)} disabled={deletingId === seg.entry.id}>✓</button>
+                                <button style={s.cancelEntryDeleteBtn} onClick={() => setPendingDeleteEntry(null)}>✕</button>
+                              </>
+                            ) : (
+                              <button style={s.deleteBtn} onClick={() => setPendingDeleteEntry(seg.entry)} disabled={deletingId === seg.entry.id}>✕</button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -482,6 +490,8 @@ const s = {
   badgeRed: { display: 'inline-block', marginTop: 4, fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, background: '#fee2e2', color: '#991b1b' },
   splitBtn: { flexShrink: 0, padding: '3px 10px', background: 'none', border: '1px solid #d1d5db', color: '#6b7280', borderRadius: 6, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' },
   deleteBtn: { flexShrink: 0, padding: '3px 8px', background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmEntryDeleteBtn: { flexShrink: 0, padding: '3px 8px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  cancelEntryDeleteBtn: { flexShrink: 0, padding: '3px 8px', background: 'none', border: '1px solid #e5e7eb', color: '#9ca3af', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   splitPanel: { marginTop: 10, paddingTop: 10, borderTop: '1px solid #e5e7eb' },
   gapChip: { display: 'block', width: '100%', textAlign: 'left', background: 'none', border: '1px dashed #d1d5db', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#9ca3af', cursor: 'pointer' },
   gapExpanded: { border: '1px solid #d1d5db', borderRadius: 8, padding: 12, background: '#f9fafb' },

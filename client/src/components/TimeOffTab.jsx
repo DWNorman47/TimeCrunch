@@ -26,6 +26,8 @@ export default function TimeOffTab() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [pendingCancelId, setPendingCancelId] = useState(null);
+  const [cancelError, setCancelError] = useState('');
 
   const load = () => {
     setLoading(true);
@@ -55,12 +57,13 @@ export default function TimeOffTab() {
   };
 
   const handleCancel = async (id) => {
-    if (!confirm(t.cancelRequestConfirm)) return;
+    setPendingCancelId(null);
+    setCancelError('');
     try {
       await api.delete(`/time-off/${id}`);
       setRequests(prev => prev.filter(r => r.id !== id));
     } catch (err) {
-      alert(err.response?.data?.error || t.couldNotCancel);
+      setCancelError(err.response?.data?.error || t.couldNotCancel);
     }
   };
 
@@ -134,8 +137,16 @@ export default function TimeOffTab() {
               <div style={s.meta}>
                 {t.submitted} {fmt(r.created_at)}
                 {r.status === 'pending' && (
-                  <button style={s.cancelBtn} onClick={() => handleCancel(r.id)}>{t.cancel}</button>
+                  pendingCancelId === r.id ? (
+                    <>
+                      <button style={s.confirmCancelBtn} onClick={() => handleCancel(r.id)}>{t.confirm}</button>
+                      <button style={s.cancelBtn} onClick={() => setPendingCancelId(null)}>{t.cancel}</button>
+                    </>
+                  ) : (
+                    <button style={s.cancelBtn} onClick={() => setPendingCancelId(r.id)}>{t.cancel}</button>
+                  )
                 )}
+                {cancelError && <span style={s.cancelError}>{cancelError}</span>}
               </div>
             </div>
           ))}
@@ -167,5 +178,7 @@ const s = {
   note: { fontSize: 13, color: '#6b7280', margin: '6px 0 0' },
   meta: { fontSize: 12, color: '#9ca3af', marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   cancelBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmCancelBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  cancelError: { fontSize: 11, color: '#ef4444', marginLeft: 8 },
   empty: { color: '#9ca3af', fontSize: 14, textAlign: 'center', padding: '32px 0' },
 };

@@ -44,6 +44,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
   const [pendingChecklist, setPendingChecklist] = useState(null); // { template_id, items, name }
   const [checklistAnswers, setChecklistAnswers] = useState({});
   const [checklistSubmitting, setChecklistSubmitting] = useState(false);
+  const [confirmingCancelClock, setConfirmingCancelClock] = useState(false);
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -175,7 +176,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
   };
 
   const handleCancelClockIn = async () => {
-    if (!confirm(t.cancelClockInConfirm)) return;
+    setConfirmingCancelClock(false);
     setLoading(true);
     try {
       await api.delete('/clock/cancel');
@@ -366,9 +367,16 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
             <button style={styles.clockOutBtn} className="clock-btn" onClick={handleClockOut} disabled={loading}>
               {loading ? t.clockingOut : t.clockOut}
             </button>
-            <button style={styles.cancelClockInBtn} onClick={handleCancelClockIn} disabled={loading}>
-              {t.cancelClockIn}
-            </button>
+            {confirmingCancelClock ? (
+              <>
+                <button style={styles.confirmCancelBtn} onClick={handleCancelClockIn} disabled={loading}>{t.confirm}</button>
+                <button style={styles.cancelClockInBtn} onClick={() => setConfirmingCancelClock(false)}>{t.cancel}</button>
+              </>
+            ) : (
+              <button style={styles.cancelClockInBtn} onClick={() => setConfirmingCancelClock(true)} disabled={loading}>
+                {t.cancelClockIn}
+              </button>
+            )}
           </>
         )}
       </div>
@@ -523,6 +531,7 @@ const styles = {
   switchCancelBtn: { padding: '9px 14px', background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: 'rgba(255,255,255,0.8)', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
   clockOutBtn: { width: '100%', padding: '13px', background: 'rgba(255,255,255,0.2)', color: '#fff', border: '2px solid rgba(255,255,255,0.5)', borderRadius: 8, fontSize: 16, fontWeight: 700, cursor: 'pointer' },
   cancelClockInBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: '2px 0', alignSelf: 'center' },
+  confirmCancelBtn: { background: 'rgba(239,68,68,0.85)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', alignSelf: 'center' },
   checklistGate: { background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 },
   checklistGateTitle: { fontSize: 14, fontWeight: 700, color: '#15803d' },
   checklistGateSub: { fontSize: 12, color: '#166534', marginTop: -6 },

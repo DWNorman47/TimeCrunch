@@ -60,6 +60,9 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   };
 
   // ── Scan Mode ────────────────────────────────────────────────────────────────
+  const [saveError, setSaveError] = useState('');
+  const [statusError, setStatusError] = useState('');
+  const [uncountedMsg, setUncountedMsg] = useState('');
   const [scanMode, setScanMode] = useState(false);
   const [currentBin, setCurrentBin] = useState(null); // { type, id, name }
   const [highlightedId, setHighlightedId] = useState(null);
@@ -148,17 +151,18 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       const r = await api.patch(`/inventory/cycle-counts/${count.id}/lines/${line.id}`, payload);
       setLines(prev => prev.map(l => l.id === line.id ? { ...l, ...r.data } : l));
     } catch (e) {
-      alert(e.response?.data?.error || t.invCycFailedSave);
+      setSaveError(e.response?.data?.error || t.invCycFailedSave);
     } finally {
       setSaving(null);
     }
   };
 
   const advanceStatus = async () => {
+    setStatusError('');
     try {
       const r = await api.patch(`/inventory/cycle-counts/${count.id}`, { status: 'in_progress' });
       setCountData(r.data);
-    } catch (e) { alert(e.response?.data?.error || t.invCycFailedStatus); }
+    } catch (e) { setStatusError(e.response?.data?.error || t.invCycFailedStatus); }
   };
 
   const complete = async () => {
@@ -383,7 +387,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
               </button>
               <button
                 style={{ ...d.completeBtn, opacity: uncounted > 0 ? 0.5 : 1 }}
-                onClick={() => uncounted > 0 ? alert(`${uncounted} ${t.invCycItemsNotCounted}`) : setConfirmOpen(true)}
+                onClick={() => uncounted > 0 ? setUncountedMsg(`${uncounted} ${t.invCycItemsNotCounted}`) : setConfirmOpen(true)}
               >
                 {t.invCycCompleteCount}
               </button>
@@ -392,6 +396,9 @@ function CycleCountDetail({ count, onBack, onComplete }) {
         </div>
       </div>
 
+      {saveError && <div style={d.error}>{saveError}</div>}
+      {statusError && <div style={d.error}>{statusError}</div>}
+      {uncountedMsg && <div style={d.warnMsg}>{uncountedMsg}</div>}
       {error && <div style={d.error}>{error}</div>}
 
       {/* ── Scan Panel ── */}
@@ -595,6 +602,8 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [loadDetailError, setLoadDetailError] = useState('');
 
   const CC_PAGE = 100;
 
@@ -630,7 +639,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
   useEffect(() => { load(); }, [load]);
 
   const startCount = async () => {
-    if (newCountType !== 'full' && !newLocationId) return alert(t.invCycSelectLocationAlert);
+    setCreateError('');
     setCreating(true);
     try {
       const payload = { count_type: newCountType, notes: null };
@@ -639,17 +648,18 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
       setSelected(r.data);
       load();
     } catch (e) {
-      alert(e.response?.data?.error || t.invCycFailedCreate);
+      setCreateError(e.response?.data?.error || t.invCycFailedCreate);
     } finally {
       setCreating(false); setNewLocationId('');
     }
   };
 
   const openCount = async (count) => {
+    setLoadDetailError('');
     try {
       const r = await api.get(`/inventory/cycle-counts/${count.id}`);
       setSelected(r.data);
-    } catch { alert(t.invCycFailedLoadDetails); }
+    } catch { setLoadDetailError(t.invCycFailedLoadDetails); }
   };
 
   const handleComplete = () => {
@@ -694,6 +704,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
         {newCountType && (
           <p style={s.typeDesc}>{COUNT_TYPES[newCountType]?.desc}</p>
         )}
+        {createError && <p style={s.inlineError}>{createError}</p>}
       </div>
 
       {/* Filters */}
@@ -717,6 +728,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
       </div>
 
       {error && <div style={s.error}>{error}</div>}
+      {loadDetailError && <p style={s.inlineError}>{loadDetailError}</p>}
 
       {loading ? (
         <div style={s.empty}>{t.loading}</div>
@@ -816,6 +828,8 @@ const d = {
   confirmBtn:    { padding: '9px 20px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
   rth:           { padding: '8px 10px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', textAlign: 'left', borderBottom: '2px solid #e5e7eb' },
   rtd:           { padding: '8px 10px', fontSize: 13, color: '#374151', borderBottom: '1px solid #f3f4f6' },
+  warnMsg:       { color: '#92400e', fontSize: 13, margin: '6px 0 0' },
+  inlineError:   { color: '#dc2626', fontSize: 13, margin: '6px 0 0' },
 };
 
 const s = {
@@ -841,4 +855,6 @@ const s = {
   progressBar:   { flex: 1, height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' },
   progressFill:  { height: '100%', background: '#2563eb', borderRadius: 3, transition: 'width 0.3s' },
   badge:         { display: 'inline-block', padding: '3px 12px', borderRadius: 12, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' },
+  inlineError:   { color: '#dc2626', fontSize: 13, margin: '6px 0 0' },
+  warnMsg:       { color: '#92400e', fontSize: 13, margin: '6px 0 0' },
 };

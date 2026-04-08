@@ -97,6 +97,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const [showHistory, setShowHistory] = useState(false);
   const [loadingArchived, setLoadingArchived] = useState(false);
   const [archivedFetched, setArchivedFetched] = useState(false);
+  const [pendingRemoveId, setPendingRemoveId] = useState(null);
 
   // ── Add form helpers ────────────────────────────────────────────────────────
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -308,8 +309,8 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     } finally { setLoadingArchived(false); }
   };
 
-  const handleRemove = async (id, name) => {
-    if (!confirm(`Deactivate "${name}"? Their time entries will be kept. You can restore them from Inactive.`)) return;
+  const handleRemove = async (id) => {
+    setPendingRemoveId(null);
     try {
       await api.delete(`/admin/workers/${id}`);
       onWorkerDeleted(id);
@@ -812,8 +813,15 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
                     {/* ── Remove ── */}
                     {identityEditable && !isEditing && (
-                      <div style={{ paddingTop: 4 }}>
-                        <button style={s.removeBtn} onClick={() => handleRemove(w.id, w.full_name)}>{t.removeUser}</button>
+                      <div style={{ paddingTop: 4, display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {pendingRemoveId === w.id ? (
+                          <>
+                            <button style={s.confirmRemoveBtn} onClick={() => handleRemove(w.id)}>{t.confirm}</button>
+                            <button style={s.cancelRemoveBtn} onClick={() => setPendingRemoveId(null)}>{t.cancel}</button>
+                          </>
+                        ) : (
+                          <button style={s.removeBtn} onClick={() => setPendingRemoveId(w.id)}>{t.removeUser}</button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -891,6 +899,8 @@ const s = {
   editBlock: { display: 'flex', flexDirection: 'column', gap: 10 },
   editActions: { display: 'flex', gap: 8 },
   removeBtn: { padding: '6px 14px', background: 'none', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
+  confirmRemoveBtn: { padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  cancelRemoveBtn: { padding: '6px 14px', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   inviteBanner: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, padding: '8px 10px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 7 },
   inviteBannerText: { fontSize: 12, color: '#92400e', flex: 1 },
   inviteBtn: { padding: '4px 12px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
