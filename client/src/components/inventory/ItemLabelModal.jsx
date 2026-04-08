@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
+import { useT } from '../../hooks/useT';
 
 // QR payload format: {"app":"opsfloa","item":true,"id":42,"sku":"SKU123","name":"2x4 Lumber"}
 // Scanned by the Count tab to auto-jump to that item in the count list.
@@ -17,6 +18,7 @@ export function parseItemQR(raw) {
 }
 
 export default function ItemLabelModal({ item, onClose }) {
+  const t = useT();
   const [qrDataUrl, setQrDataUrl] = useState('');
 
   useEffect(() => {
@@ -65,7 +67,7 @@ export default function ItemLabelModal({ item, onClose }) {
     <div style={s.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={s.modal}>
         <div style={s.header}>
-          <h3 style={s.title}>Item Label</h3>
+          <h3 style={s.title}>{t.itemLabelTitle}</h3>
           <button style={s.closeBtn} onClick={onClose}>✕</button>
         </div>
 
@@ -75,7 +77,7 @@ export default function ItemLabelModal({ item, onClose }) {
           {item.sku && <div style={s.previewSku}>{item.sku}</div>}
           {qrDataUrl
             ? <img src={qrDataUrl} alt="QR Code" style={s.qr} />
-            : <div style={s.qrPlaceholder}>Generating…</div>
+            : <div style={s.qrPlaceholder}>{t.labelModalGenerating}</div>
           }
           <div style={s.previewFooter}>OpsFloa Inventory · ID {item.id}</div>
         </div>
@@ -85,9 +87,9 @@ export default function ItemLabelModal({ item, onClose }) {
         </p>
 
         <div style={s.actions}>
-          <button style={s.cancelBtn} onClick={onClose}>Close</button>
+          <button style={s.cancelBtn} onClick={onClose}>{t.labelModalClose}</button>
           <button style={s.printBtn} onClick={printLabel} disabled={!qrDataUrl}>
-            🖨 Print Label
+            {t.labelModalPrint}
           </button>
         </div>
       </div>

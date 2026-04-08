@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
+import { useT } from '../../hooks/useT';
 
 export default function InventoryValuation({ locations }) {
+  const t = useT();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,7 +18,7 @@ export default function InventoryValuation({ locations }) {
       const r = await api.get(`/inventory/valuation?${params}`);
       setData(r.data);
     } catch {
-      setError('Failed to load valuation data.');
+      setError(t.invValFailedLoad);
     } finally {
       setLoading(false);
     }
@@ -35,7 +37,7 @@ export default function InventoryValuation({ locations }) {
       item.unit_cost != null ? parseFloat(item.unit_cost).toFixed(2) : '',
       parseFloat(item.total_value).toFixed(2),
     ].join(','));
-    const header = ['Item', 'SKU', 'Category', 'Unit', 'On Hand', 'Unit Cost', 'Total Value'].join(',');
+    const header = [t.invValColItem, 'SKU', t.colCategory, t.colUnit, t.invValColOnHand, t.colUnitCost, t.invValColTotalValue].join(',');
     const csv = [header, ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -66,15 +68,15 @@ export default function InventoryValuation({ locations }) {
       {/* Toolbar */}
       <div style={s.toolbar}>
         <select style={s.select} value={locationFilter} onChange={e => setLocationFilter(e.target.value)}>
-          <option value="">All Locations</option>
+          <option value="">{t.invCycAllLocations}</option>
           {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
         <label style={s.toggle}>
           <input type="checkbox" checked={showZero} onChange={e => setShowZero(e.target.checked)} />
-          Include zero stock
+          {t.invValIncludeZero}
         </label>
         <button style={s.csvBtn} onClick={downloadCSV} disabled={!data || visibleItems.length === 0}>
-          Download CSV
+          {t.invValDownloadCSV}
         </button>
       </div>
 
@@ -85,7 +87,7 @@ export default function InventoryValuation({ locations }) {
       ) : !data || visibleItems.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>💰</div>
-          <p>{showZero ? 'No items found.' : 'No items with stock on hand. Enable "Include zero stock" to see all items.'}</p>
+          <p>{showZero ? t.invValNoItems : t.invValNoStock}</p>
         </div>
       ) : (
         <>
@@ -93,13 +95,13 @@ export default function InventoryValuation({ locations }) {
             <table style={s.table}>
               <thead>
                 <tr style={s.thead}>
-                  <th style={s.th}>Item</th>
-                  <th style={s.th}>SKU</th>
-                  <th style={s.th}>Category</th>
-                  <th style={s.th}>Unit</th>
-                  <th style={{ ...s.th, textAlign: 'right' }}>On Hand</th>
-                  <th style={{ ...s.th, textAlign: 'right' }}>Unit Cost</th>
-                  <th style={{ ...s.th, textAlign: 'right' }}>Total Value</th>
+                  <th style={s.th}>{t.invValColItem}</th>
+                  <th style={s.th}>{t.colSku}</th>
+                  <th style={s.th}>{t.colCategory}</th>
+                  <th style={s.th}>{t.colUnit}</th>
+                  <th style={{ ...s.th, textAlign: 'right' }}>{t.invValColOnHand}</th>
+                  <th style={{ ...s.th, textAlign: 'right' }}>{t.colUnitCost}</th>
+                  <th style={{ ...s.th, textAlign: 'right' }}>{t.invValColTotalValue}</th>
                 </tr>
               </thead>
               <tbody>
@@ -114,7 +116,7 @@ export default function InventoryValuation({ locations }) {
                       {fmtQty(item.total_qty)}
                     </td>
                     <td style={{ ...s.td, textAlign: 'right', color: item.unit_cost == null ? '#9ca3af' : '#374151' }}>
-                      {item.unit_cost != null ? fmt(item.unit_cost) : <em>not set</em>}
+                      {item.unit_cost != null ? fmt(item.unit_cost) : <em>{t.invValNotSet}</em>}
                     </td>
                     <td style={{ ...s.td, textAlign: 'right', fontWeight: 700,
                       color: parseFloat(item.total_value) > 0 ? '#111827' : '#9ca3af' }}>
@@ -139,15 +141,15 @@ export default function InventoryValuation({ locations }) {
           {/* Per-location breakdown (when no location filter) */}
           {!locationFilter && visibleItems.some(item => item.locations?.length > 0) && (
             <details style={s.details}>
-              <summary style={s.detailsSummary}>Location breakdown</summary>
+              <summary style={s.detailsSummary}>{t.invValLocationBreakdown}</summary>
               <div style={s.tableWrap}>
                 <table style={s.table}>
                   <thead>
                     <tr style={s.thead}>
-                      <th style={s.th}>Item</th>
-                      <th style={s.th}>Location</th>
-                      <th style={{ ...s.th, textAlign: 'right' }}>Qty</th>
-                      <th style={{ ...s.th, textAlign: 'right' }}>Value</th>
+                      <th style={s.th}>{t.invValColItem}</th>
+                      <th style={s.th}>{t.invValColLocation}</th>
+                      <th style={{ ...s.th, textAlign: 'right' }}>{t.invValColQty}</th>
+                      <th style={{ ...s.th, textAlign: 'right' }}>{t.invValColValue}</th>
                     </tr>
                   </thead>
                   <tbody>

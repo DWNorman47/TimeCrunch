@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
+import { useT } from '../../hooks/useT';
 
 function formatBin(area_name, rack_name, bay_name, compartment_name) {
   return [area_name, rack_name, bay_name, compartment_name]
@@ -11,12 +12,16 @@ function formatDate(iso) {
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-const TYPE_LABELS = { receive: 'Receive', issue: 'Issue', transfer: 'Transfer', adjust: 'Adjust', count: 'Count', convert: 'Convert' };
 const TYPE_COLOR  = { receive: '#059669', issue: '#dc2626', transfer: '#2563eb', adjust: '#d97706', count: '#7c3aed', convert: '#0891b2' };
 
 // ── History Panel ─────────────────────────────────────────────────────────────
 
 function HistoryPanel({ item, onClose }) {
+  const t = useT();
+  const TYPE_LABELS = {
+    receive: t.invTxTypeReceive, issue: t.invTxTypeIssue, transfer: t.invTxTypeTransfer,
+    adjust: t.invTxTypeAdjust, count: t.invCycCycleCount, convert: t.invTxTypeConvert,
+  };
   const [rows, setRows]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
@@ -25,7 +30,7 @@ function HistoryPanel({ item, onClose }) {
     setLoading(true);
     api.get(`/inventory/transactions?item_id=${item.item_id}&limit=30`)
       .then(r => setRows(r.data))
-      .catch(() => setError('Failed to load history'))
+      .catch(() => setError(t.invStockFailedHistory))
       .finally(() => setLoading(false));
   }, [item.item_id]);
 
@@ -35,7 +40,7 @@ function HistoryPanel({ item, onClose }) {
         <div style={h.header}>
           <div>
             <div style={h.title}>{item.item_name}</div>
-            <div style={h.sub}>Recent stock movements (last 30)</div>
+            <div style={h.sub}>{t.invStockRecentMovements}</div>
           </div>
           <button style={h.close} onClick={onClose}>✕</button>
         </div>
@@ -43,18 +48,18 @@ function HistoryPanel({ item, onClose }) {
         {loading ? (
           <div style={h.empty}>Loading…</div>
         ) : rows.length === 0 ? (
-          <div style={h.empty}>No transactions found.</div>
+          <div style={h.empty}>{t.invStockNoHistory}</div>
         ) : (
           <div style={h.tableWrap}>
             <table style={h.table}>
               <thead>
                 <tr style={h.thead}>
-                  <th style={h.th}>Date</th>
-                  <th style={h.th}>Type</th>
-                  <th style={{ ...h.th, textAlign: 'right' }}>Qty</th>
-                  <th style={h.th}>Location</th>
-                  <th style={h.th}>By</th>
-                  <th style={h.th}>Notes</th>
+                  <th style={h.th}>{t.invTxColDate}</th>
+                  <th style={h.th}>{t.invTxColType}</th>
+                  <th style={{ ...h.th, textAlign: 'right' }}>{t.invTxColQty}</th>
+                  <th style={h.th}>{t.invPOReceivingLoc.replace(' *','')}</th>
+                  <th style={h.th}>{t.invTxColBy}</th>
+                  <th style={h.th}>{t.notes}</th>
                 </tr>
               </thead>
               <tbody>
@@ -112,6 +117,7 @@ const h = {
 // ── Quick Adjust Modal ────────────────────────────────────────────────────────
 
 function AdjustModal({ item, locations, onClose, onDone }) {
+  const t = useT();
   const [qty, setQty]       = useState('');
   const [locId, setLocId]   = useState(item.location_id || '');
   const [notes, setNotes]   = useState('');
@@ -120,8 +126,8 @@ function AdjustModal({ item, locations, onClose, onDone }) {
 
   const submit = async () => {
     const n = parseFloat(qty);
-    if (isNaN(n) || n === 0) { setError('Enter a non-zero adjustment quantity (+/−)'); return; }
-    if (!locId) { setError('Select a location'); return; }
+    if (isNaN(n) || n === 0) { setError(t.invStockQtyAdjError); return; }
+    if (!locId) { setError(t.invStockSelectLocError); return; }
     setSaving(true); setError('');
     try {
       await api.post('/inventory/transactions', {
@@ -133,7 +139,7 @@ function AdjustModal({ item, locations, onClose, onDone }) {
       });
       onDone();
     } catch (e) {
-      setError(e.response?.data?.error || 'Failed to save adjustment');
+      setError(e.response?.data?.error || t.invStockAdjFailed);
     } finally {
       setSaving(false);
     }
@@ -143,16 +149,16 @@ function AdjustModal({ item, locations, onClose, onDone }) {
     <div style={a.overlay} onClick={onClose}>
       <div style={a.modal} onClick={e => e.stopPropagation()}>
         <div style={a.header}>
-          <div style={a.title}>Quick Adjust — {item.item_name}</div>
+          <div style={a.title}>{t.invStockCurrentStock} — {item.item_name}</div>
           <button style={a.close} onClick={onClose}>✕</button>
         </div>
         <div style={a.body}>
           <div style={a.currentRow}>
-            <span style={a.currentLabel}>Current stock</span>
+            <span style={a.currentLabel}>{t.invStockCurrentStock}</span>
             <span style={a.currentQty}>{parseFloat(item.quantity) % 1 === 0 ? parseFloat(item.quantity).toFixed(0) : parseFloat(item.quantity).toFixed(2)} {item.unit}</span>
           </div>
           {error && <div style={a.error}>{error}</div>}
-          <label style={a.label}>Adjustment quantity (use − for decrease)</label>
+          <label style={a.label}>{t.invStockAdjQtyLabel}</label>
           <input
             type="number"
             step="any"
@@ -169,17 +175,17 @@ function AdjustModal({ item, locations, onClose, onDone }) {
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
           </select>
-          <label style={a.label}>Notes (optional)</label>
+          <label style={a.label}>{t.invStockAdjNotesLabel}</label>
           <input
             type="text"
-            placeholder="Reason for adjustment"
+            placeholder={t.invStockAdjReasonPlaceholder}
             value={notes}
             onChange={e => setNotes(e.target.value)}
             style={a.input}
           />
           <div style={a.actions}>
-            <button style={a.cancel} onClick={onClose} disabled={saving}>Cancel</button>
-            <button style={a.save} onClick={submit} disabled={saving}>{saving ? 'Saving…' : 'Save Adjustment'}</button>
+            <button style={a.cancel} onClick={onClose} disabled={saving}>{t.cancel}</button>
+            <button style={a.save} onClick={submit} disabled={saving}>{saving ? t.saving : t.invStockSaveAdj}</button>
           </div>
         </div>
       </div>
@@ -209,6 +215,7 @@ const a = {
 // ── Quick Issue Modal (workers) ───────────────────────────────────────────────
 
 function IssueModal({ item, projects, onClose, onDone }) {
+  const t = useT();
   const [qty, setQty]             = useState('');
   const [uomId, setUomId]         = useState(item.uom_id ? String(item.uom_id) : '');
   const [itemUoms, setItemUoms]   = useState([]);
@@ -241,10 +248,10 @@ function IssueModal({ item, projects, onClose, onDone }) {
 
   const submit = async () => {
     const n = parseFloat(qty);
-    if (isNaN(n) || n <= 0) { setError('Enter a positive quantity to issue'); return; }
+    if (isNaN(n) || n <= 0) { setError(t.invStockIssueQtyError); return; }
     // Only enforce client-side limit when issuing in the same UOM as stock
     if ((!uomId || uomId === String(item.uom_id)) && n > available) {
-      setError(`Cannot issue more than available (${available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} ${stockUnit})`);
+      setError(`${t.invStockCannotExceed} (${available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} ${stockUnit})`);
       return;
     }
     setSaving(true); setError('');
@@ -260,7 +267,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
       });
       onDone();
     } catch (e) {
-      setError(e.response?.data?.error || 'Failed to issue material');
+      setError(e.response?.data?.error || t.invStockIssueFailed);
     } finally {
       setSaving(false);
     }
@@ -270,7 +277,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
     <div style={a.overlay} onClick={onClose}>
       <div style={a.modal} onClick={e => e.stopPropagation()}>
         <div style={a.header}>
-          <div style={a.title}>Issue — {item.item_name}</div>
+          <div style={a.title}>{t.invTxTypeIssue} — {item.item_name}</div>
           <button style={a.close} onClick={onClose}>✕</button>
         </div>
         <div style={a.body}>
@@ -279,7 +286,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
             <span style={a.currentQty}>{available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} {stockUnit}</span>
           </div>
           {error && <div style={a.error}>{error}</div>}
-          <label style={a.label}>Quantity to issue *</label>
+          <label style={a.label}>{t.invStockQtyToIssue}</label>
           <input
             type="number"
             step="any"
@@ -302,7 +309,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
                 ))}
               </select>
               {availableInSelected && (
-                <div style={a.hint}>≈ {availableInSelected} available in this unit</div>
+                <div style={a.hint}>≈ {availableInSelected} {t.invStockAvailableInUnit}</div>
               )}
             </>
           )}
@@ -315,7 +322,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
               </select>
             </>
           )}
-          <label style={a.label}>Notes (optional)</label>
+          <label style={a.label}>{t.invStockAdjNotesLabel}</label>
           <input
             type="text"
             placeholder="e.g. Job site use"
@@ -324,9 +331,9 @@ function IssueModal({ item, projects, onClose, onDone }) {
             style={a.input}
           />
           <div style={a.actions}>
-            <button style={a.cancel} onClick={onClose} disabled={saving}>Cancel</button>
+            <button style={a.cancel} onClick={onClose} disabled={saving}>{t.cancel}</button>
             <button style={{ ...a.save, background: '#d97706' }} onClick={submit} disabled={saving}>
-              {saving ? 'Issuing…' : 'Issue Materials'}
+              {saving ? t.invStockIssuing : t.invStockIssueMaterials}
             </button>
           </div>
         </div>
@@ -338,6 +345,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
 // ── Main Stock Component ──────────────────────────────────────────────────────
 
 export default function InventoryStock({ isAdmin, locations, projects, onStockChange, onReorderClick }) {
+  const t = useT();
   const [stock, setStock]           = useState([]);
   const [lowItems, setLowItems]     = useState([]);
   const [locationFilter, setLocationFilter] = useState('');
@@ -358,7 +366,7 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
       setStock(s.data);
       setLowItems(l.data);
     } catch (e) {
-      setError('Failed to load stock');
+      setError(t.invStockFailedLoad);
     } finally {
       setLoading(false);
     }
@@ -368,9 +376,9 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
 
   const stockStatus = (qty, reorderPoint) => {
     const q = parseFloat(qty);
-    if (q <= 0) return { label: 'Out', color: '#dc2626', bg: '#fee2e2' };
-    if (reorderPoint > 0 && q <= reorderPoint) return { label: 'Low', color: '#d97706', bg: '#fef3c7' };
-    return { label: 'In Stock', color: '#059669', bg: '#d1fae5' };
+    if (q <= 0) return { label: t.invStockStatusOut, color: '#dc2626', bg: '#fee2e2' };
+    if (reorderPoint > 0 && q <= reorderPoint) return { label: t.invStockStatusLow, color: '#d97706', bg: '#fef3c7' };
+    return { label: t.invStockStatusInStock, color: '#059669', bg: '#d1fae5' };
   };
 
   const handleAdjustDone = () => {
@@ -390,10 +398,10 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
       {/* Low stock alert banner */}
       {isAdmin && lowItems.length > 0 && (
         <div style={s.alertBanner}>
-          <span>⚠️ {lowItems.length} item{lowItems.length !== 1 ? 's' : ''} at or below reorder point</span>
+          <span>⚠️ {lowItems.length} {t.invStockLowAlert}</span>
           {onReorderClick && (
             <button style={s.reorderBtn} onClick={onReorderClick}>
-              Create Reorder PO
+              {t.invStockCreateReorderPO}
             </button>
           )}
         </div>
@@ -402,12 +410,12 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
       {/* Filter bar */}
       <div style={s.filterBar}>
         <select style={s.select} value={locationFilter} onChange={e => setLocationFilter(e.target.value)}>
-          <option value="">All Locations</option>
+          <option value="">{t.invCycAllLocations}</option>
           {locations.filter(l => l.active).map(l => (
             <option key={l.id} value={l.id}>{l.name}</option>
           ))}
         </select>
-        <button style={s.refreshBtn} onClick={load}>Refresh</button>
+        <button style={s.refreshBtn} onClick={load}>{t.invStockRefresh}</button>
       </div>
 
       {error && <div style={s.error}>{error}</div>}
@@ -417,24 +425,24 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
       ) : stock.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>📦</div>
-          <p>No stock on hand{locationFilter ? ' at this location' : ''}.</p>
-          <p style={s.emptyHint}>Receive items through the Transactions tab to add stock.</p>
+          <p>{locationFilter ? t.invStockNoStockAtLoc : t.invStockNoStock}</p>
+          <p style={s.emptyHint}>{t.invStockReceiveHint}</p>
         </div>
       ) : (
         <div style={s.tableWrap}>
           <table style={s.table}>
             <thead>
               <tr style={s.thead}>
-                <th style={s.th}>Item</th>
-                <th style={s.th}>SKU</th>
-                <th style={s.th}>Category</th>
-                <th style={s.th}>Location</th>
-                <th style={s.th}>Bin</th>
-                <th style={{ ...s.th, textAlign: 'right' }}>Qty</th>
-                <th style={s.th}>Unit</th>
-                {isAdmin && <th style={{ ...s.th, textAlign: 'right' }}>Unit Cost</th>}
-                {isAdmin && <th style={{ ...s.th, textAlign: 'right' }}>Total Value</th>}
-                <th style={s.th}>Status</th>
+                <th style={s.th}>{t.invTxColItem}</th>
+                <th style={s.th}>{t.colSku}</th>
+                <th style={s.th}>{t.colCategory}</th>
+                <th style={s.th}>{t.invValColLocation}</th>
+                <th style={s.th}>{t.invStockColBin}</th>
+                <th style={{ ...s.th, textAlign: 'right' }}>{t.invTxColQty}</th>
+                <th style={s.th}>{t.colUnit}</th>
+                {isAdmin && <th style={{ ...s.th, textAlign: 'right' }}>{t.colUnitCost}</th>}
+                {isAdmin && <th style={{ ...s.th, textAlign: 'right' }}>{t.invValColTotalValue}</th>}
+                <th style={s.th}>{t.invStockColStatus}</th>
                 <th style={s.th}></th>
               </tr>
             </thead>
@@ -494,7 +502,7 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
                           style={s.issueBtn}
                           title="Issue material"
                           onClick={() => setIssueItem(row)}
-                        >Issue</button>
+                        >{t.invStockIssueBtn}</button>
                       )}
                     </td>
                   </tr>

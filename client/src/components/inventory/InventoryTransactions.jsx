@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import UomConversionModal from './UomConversionModal';
-
-const TYPE_LABELS = { receive: 'Receive', issue: 'Issue', transfer: 'Transfer', adjust: 'Adjust', convert: 'Convert' };
+import { useT } from '../../hooks/useT';
 const TYPE_COLORS = {
   receive:  { color: '#059669', bg: '#d1fae5' },
   issue:    { color: '#d97706', bg: '#fef3c7' },
@@ -12,6 +11,14 @@ const TYPE_COLORS = {
 };
 
 function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onConversionSaved }) {
+  const t = useT();
+  const TYPE_LABELS = {
+    receive:  t.invTxTypeReceive,
+    issue:    t.invTxTypeIssue,
+    transfer: t.invTxTypeTransfer,
+    adjust:   t.invTxTypeAdjust,
+    convert:  t.invTxTypeConvert,
+  };
   const [items, setItems] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [locationStock, setLocationStock] = useState(null); // { quantity, unit, uom_id } at from_location
@@ -133,9 +140,9 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
   const submit = async e => {
     e.preventDefault();
     setError(''); setWarning('');
-    if (!form.item_id) return setError('Select an item.');
+    if (!form.item_id) return setError(t.invTxSelectItemErr);
     const qty = parseFloat(form.quantity);
-    if (!form.quantity || isNaN(qty) || qty === 0) return setError('Enter a non-zero quantity.');
+    if (!form.quantity || isNaN(qty) || qty === 0) return setError(t.invTxNonZeroErr);
     setSaving(true);
     try {
       const payload = {
@@ -160,11 +167,11 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
       };
       const r = await api.post('/inventory/transactions', payload);
       if (r.data.warning === 'stock_negative') {
-        setWarning('Stock went negative at this location. Check your on-hand quantities.');
+        setWarning(t.invTxStockNegativeWarn);
       }
       onSave();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save transaction.');
+      setError(err.response?.data?.error || t.invTxFailedSave);
     } finally {
       setSaving(false);
     }
@@ -189,7 +196,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
 
   return (
     <form onSubmit={submit} style={f.form}>
-      <h3 style={f.title}>Log Movement</h3>
+      <h3 style={f.title}>{t.invTxLogMovement}</h3>
       {error   && <div style={f.error}>{error}</div>}
       {warning && <div style={f.warning}>{warning}</div>}
 
@@ -197,11 +204,11 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
         <div style={f.field}>
           <label style={f.label}>Type</label>
           <select style={f.input} value={form.type} onChange={e => set('type', e.target.value)}>
-            <option value="receive">Receive — add stock from supplier/delivery</option>
-            <option value="issue">Issue — consume or send to job site</option>
-            <option value="transfer">Transfer — move between locations</option>
-            <option value="adjust">Adjust — manual correction</option>
-            <option value="convert">Convert/Split — open a box, break a pallet, change units</option>
+            <option value="receive">{t.invTxTypeReceiveDesc}</option>
+            <option value="issue">{t.invTxTypeIssueDesc}</option>
+            <option value="transfer">{t.invTxTypeTransferDesc}</option>
+            <option value="adjust">{t.invTxTypeAdjustDesc}</option>
+            <option value="convert">{t.invTxTypeConvertDesc}</option>
           </select>
         </div>
       )}
@@ -220,9 +227,9 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
         </div>
         {itemUoms.length > 0 && (
           <div style={f.field}>
-            <label style={f.label}>{isConvert ? 'Convert From' : 'UOM'}</label>
+            <label style={f.label}>{isConvert ? t.invTxConvertFrom : 'UOM'}</label>
             <select style={f.input} value={form.uom_id} onChange={e => set('uom_id', e.target.value)}>
-              <option value="">Default unit</option>
+              <option value="">{t.invTxDefaultUnit}</option>
               {itemUoms.map(u => (
                 <option key={u.id} value={u.id}>
                   {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ' — base' : ''}
@@ -234,8 +241,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
         <div style={f.field}>
           <label style={f.label}>
             Quantity *
-            {form.type === 'adjust' && <span style={f.hint}> (+ to add, − to remove)</span>}
-            {isConvert && <span style={f.hint}> (qty to convert)</span>}
+            {form.type === 'adjust' && <span style={f.hint}> {t.invTxAdjHint}</span>}
+            {isConvert && <span style={f.hint}> {t.invTxConvertHint}</span>}
           </label>
           <input
             style={f.input} type="number" step="any"
@@ -248,7 +255,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
       {isConvert && (
         <div style={f.row}>
           <div style={f.field}>
-            <label style={f.label}>Convert To UOM *</label>
+            <label style={f.label}>{t.invTxConvertToUom}</label>
             <select style={f.input} value={form.to_uom_id} onChange={e => set('to_uom_id', e.target.value)}>
               <option value="">Select target UOM…</option>
               {itemUoms.filter(u => String(u.id) !== form.uom_id).map(u => (
@@ -260,8 +267,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
           </div>
           <div style={f.field}>
             <label style={f.label}>
-              Resulting Qty *
-              {suggestedToQty && <span style={f.hint}> — suggested: {suggestedToQty}</span>}
+              {t.invTxResultingQty}
+              {suggestedToQty && <span style={f.hint}> — {t.invTxSuggested} {suggestedToQty}</span>}
             </label>
             <input
               style={f.input} type="number" step="any" min="0"
@@ -275,7 +282,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
 
       {showFrom && (
         <div style={f.field}>
-          <label style={f.label}>From Location *</label>
+          <label style={f.label}>{t.invTxFromLoc}</label>
           <select style={f.input} value={form.from_location_id} onChange={e => set('from_location_id', e.target.value)}>
             <option value="">Select location…</option>
             {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -287,9 +294,9 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
               : locationStock.unit;
             return (
               <div style={f.stockHint}>
-                On hand: <strong>{qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)} {stockUnit}</strong>
+                {t.invTxOnHand} <strong>{qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2)} {stockUnit}</strong>
                 {locationStock.uom_unit && locationStock.unit !== locationStock.uom_unit && (
-                  <span style={{ color: '#6b7280' }}> — enter qty in any unit above; system converts automatically</span>
+                  <span style={{ color: '#6b7280' }}> {t.invTxSysConverts}</span>
                 )}
               </div>
             );
@@ -300,7 +307,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
       {(showTo || showToAdj) && (
         <>
           <div style={f.field}>
-            <label style={f.label}>{showToAdj ? 'Location *' : 'To Location *'}</label>
+            <label style={f.label}>{showToAdj ? t.invTxLocOnly : t.invTxToLoc}</label>
             <select style={f.input} value={form.to_location_id} onChange={e => set('to_location_id', e.target.value)}>
               <option value="">Select location…</option>
               {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -361,11 +368,11 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
         <>
           <div style={f.row}>
             <div style={f.field}>
-              <label style={f.label}>Unit Cost ($)</label>
+              <label style={f.label}>{t.invTxUnitCost}</label>
               <input style={f.input} type="number" min="0" step="0.01" value={form.unit_cost} onChange={e => set('unit_cost', e.target.value)} placeholder="From catalog" />
             </div>
             <div style={f.field}>
-              <label style={f.label}>Reference / PO #</label>
+              <label style={f.label}>{t.invTxRefPO}</label>
               <input style={f.input} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder="Optional" />
             </div>
           </div>
@@ -381,7 +388,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
             )}
             {(form.type === 'receive' || form.type === 'adjust') && (
               <div style={f.field}>
-                <label style={f.label}>Lot / Batch #</label>
+                <label style={f.label}>{t.invTxLotBatch}</label>
                 <input style={f.input} value={form.lot_number} onChange={e => set('lot_number', e.target.value)} placeholder="Optional" />
               </div>
             )}
@@ -395,8 +402,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
       </div>
 
       <div style={f.actions}>
-        <button type="button" style={f.cancelBtn} onClick={onCancel}>Cancel</button>
-        <button type="submit" style={f.saveBtn} disabled={saving}>{saving ? 'Saving…' : 'Log Transaction'}</button>
+        <button type="button" style={f.cancelBtn} onClick={onCancel}>{t.cancel}</button>
+        <button type="submit" style={f.saveBtn} disabled={saving}>{saving ? t.saving : t.invTxLogTx}</button>
       </div>
 
       {conversionPrompt && (
@@ -417,6 +424,14 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
 }
 
 export default function InventoryTransactions({ isAdmin, locations, projects, onTransaction, onConversionSaved }) {
+  const t = useT();
+  const TYPE_LABELS = {
+    receive:  t.invTxTypeReceive,
+    issue:    t.invTxTypeIssue,
+    transfer: t.invTxTypeTransfer,
+    adjust:   t.invTxTypeAdjust,
+    convert:  t.invTxTypeConvert,
+  };
   const [transactions, setTransactions] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -446,7 +461,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
       setTotal(r.data.total);
       setOffset(off);
     } catch {
-      setError('Failed to load transactions');
+      setError(t.invTxFailedLoad);
     } finally {
       setLoading(false);
     }
@@ -480,28 +495,28 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
           <div style={s.toolbar}>
             {isAdmin && (
               <select style={s.select} value={filters.type} onChange={e => setFilter('type', e.target.value)}>
-                <option value="">All Types</option>
+                <option value="">{t.invTxAllTypes}</option>
                 {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             )}
             <select style={s.select} value={filters.location_id} onChange={e => setFilter('location_id', e.target.value)}>
-              <option value="">All Locations</option>
+              <option value="">{t.invCycAllLocations}</option>
               {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
             <div style={s.dateWrap}>
-              <span style={s.dateLabel}>From</span>
+              <span style={s.dateLabel}>{t.invTxColFrom}</span>
               <input style={s.dateInput} type="date" value={filters.from} onChange={e => setFilter('from', e.target.value)} />
             </div>
             <div style={s.dateWrap}>
-              <span style={s.dateLabel}>To</span>
+              <span style={s.dateLabel}>{t.invTxColTo}</span>
               <input style={s.dateInput} type="date" value={filters.to} onChange={e => setFilter('to', e.target.value)} />
             </div>
             {(filters.from || filters.to) && (
-              <button style={s.clearDates} onClick={() => setFilters(f => ({ ...f, from: '', to: '' }))} title="Clear date range">✕ Dates</button>
+              <button style={s.clearDates} onClick={() => setFilters(f => ({ ...f, from: '', to: '' }))} title="Clear date range">{t.invTxClearDates}</button>
             )}
             {isAdmin && suppliers.length > 0 && (
               <select style={s.select} value={filters.supplier_id} onChange={e => setFilter('supplier_id', e.target.value)}>
-                <option value="">All Suppliers</option>
+                <option value="">{t.invTxAllSuppliers}</option>
                 {suppliers.map(sup => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
               </select>
             )}
@@ -509,7 +524,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
               <input
                 style={{ ...s.dateInput, minWidth: 120 }}
                 type="text"
-                placeholder="Lot # filter…"
+                placeholder={t.invTxLotFilter}
                 value={filters.lot_number}
                 onChange={e => setFilter('lot_number', e.target.value)}
               />
@@ -518,7 +533,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
               style={s.addBtn}
               onClick={() => setShowForm(true)}
             >
-              {isAdmin ? '+ Log Movement' : '+ Issue Materials'}
+              {isAdmin ? t.invTxLogMovementBtn : t.invTxIssueMaterialsBtn}
             </button>
           </div>
 
@@ -529,7 +544,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
           ) : transactions.length === 0 ? (
             <div style={s.empty}>
               <div style={s.emptyIcon}>↔️</div>
-              <p>No transactions yet.</p>
+              <p>{t.invTxNoTx}</p>
             </div>
           ) : (
             <>
@@ -537,17 +552,17 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
                 <table style={s.table}>
                   <thead>
                     <tr style={s.thead}>
-                      <th style={s.th}>Date</th>
-                      <th style={s.th}>Type</th>
-                      <th style={s.th}>Item</th>
-                      <th style={{ ...s.th, textAlign: 'right' }}>Qty</th>
-                      <th style={s.th}>From</th>
-                      <th style={s.th}>To</th>
-                      <th style={s.th}>Project</th>
-                      {isAdmin && <th style={s.th}>Supplier</th>}
-                      {isAdmin && <th style={s.th}>Lot #</th>}
-                      {isAdmin && <th style={s.th}>By</th>}
-                      <th style={s.th}>Notes</th>
+                      <th style={s.th}>{t.invTxColDate}</th>
+                      <th style={s.th}>{t.invTxColType}</th>
+                      <th style={s.th}>{t.invTxColItem}</th>
+                      <th style={{ ...s.th, textAlign: 'right' }}>{t.invTxColQty}</th>
+                      <th style={s.th}>{t.invTxColFrom}</th>
+                      <th style={s.th}>{t.invTxColTo}</th>
+                      <th style={s.th}>{t.project}</th>
+                      {isAdmin && <th style={s.th}>{t.invTxColSupplier}</th>}
+                      {isAdmin && <th style={s.th}>{t.invTxColLot}</th>}
+                      {isAdmin && <th style={s.th}>{t.invTxColBy}</th>}
+                      <th style={s.th}>{t.notes}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -580,10 +595,10 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
               </div>
               {total > transactions.length + offset && (
                 <div style={s.loadMore}>
-                  <button style={s.loadMoreBtn} onClick={() => load(offset + LIMIT)}>Load More</button>
+                  <button style={s.loadMoreBtn} onClick={() => load(offset + LIMIT)}>{t.invTxLoadMore}</button>
                 </div>
               )}
-              <p style={s.count}>Showing {Math.min(transactions.length, total)} of {total} transactions</p>
+              <p style={s.count}>{t.invTxShowing.replace('{n}', Math.min(transactions.length, total)).replace('{total}', total)}</p>
             </>
           )}
         </>

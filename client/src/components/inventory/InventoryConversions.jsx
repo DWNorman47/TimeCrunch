@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
+import { useT } from '../../hooks/useT';
 
 const DEFAULT_UNITS = ['each', 'box', 'bag', 'bundle', 'pallet', 'lb', 'kg', 'ft', 'm', 'sq ft', 'gal', 'L', 'roll', 'sheet', 'piece', 'other'];
 
@@ -15,6 +16,7 @@ function SectionHeader({ children, count, warn }) {
 }
 
 export default function InventoryConversions({ onConversionChange }) {
+  const t = useT();
   const [rows, setRows]       = useState([]);
   const [items, setItems]     = useState([]);
   const [units, setUnits]     = useState({ active: DEFAULT_UNITS, known: DEFAULT_UNITS });
@@ -48,7 +50,7 @@ export default function InventoryConversions({ onConversionChange }) {
       setRows(conv.data);
       setItems(itemList.data);
       setUnits(unitsRes.data);
-    } catch { setError('Failed to load.'); }
+    } catch { setError(t.invConvFailedLoad); }
     finally { setLoading(false); }
   }, []);
 
@@ -63,10 +65,10 @@ export default function InventoryConversions({ onConversionChange }) {
 
   const submitAdd = async () => {
     const unit = addUnit === 'other' ? addCustomUnit.trim() : addUnit;
-    if (!addItemId) return setAddError('Select an item.');
-    if (!unit) return setAddError('Enter a unit name.');
+    if (!addItemId) return setAddError(t.invConvSelectItemErr);
+    if (!unit) return setAddError(t.invConvEnterUnitErr);
     const f = parseFloat(addFactor);
-    if (!addFactor || isNaN(f) || f <= 0) return setAddError('Enter a positive factor (e.g. 30 for "1 box = 30 each").');
+    if (!addFactor || isNaN(f) || f <= 0) return setAddError(t.invConvEnterFactorErr);
     setAddSaving(true); setAddError('');
     try {
       await api.post(`/inventory/items/${addItemId}/uoms`, {
@@ -76,7 +78,7 @@ export default function InventoryConversions({ onConversionChange }) {
       load();
       onConversionChange?.();
     } catch (err) {
-      setAddError(err.response?.data?.error || 'Failed to save.');
+      setAddError(err.response?.data?.error || t.invSetupFailedSave);
       setAddSaving(false);
     }
   };
@@ -101,7 +103,7 @@ export default function InventoryConversions({ onConversionChange }) {
       load();
       onConversionChange?.();
     } catch (err) {
-      setSaveErr(err.response?.data?.error || 'Failed to save.');
+      setSaveErr(err.response?.data?.error || t.invSetupFailedSave);
     } finally { setSaving(false); }
   };
 
@@ -134,7 +136,7 @@ export default function InventoryConversions({ onConversionChange }) {
               onKeyDown={e => { if (e.key === 'Enter') saveEdit(row); if (e.key === 'Escape') cancelEdit(); }}
             />
           ) : isPending ? (
-            <span style={s.pendingBadge}>Not set</span>
+            <span style={s.pendingBadge}>{t.invConvNotSet}</span>
           ) : (
             <span style={s.factorBadge}>{factorNum % 1 === 0 ? factorNum.toFixed(0) : factorNum}</span>
           )}
@@ -144,18 +146,18 @@ export default function InventoryConversions({ onConversionChange }) {
             ? (parseFloat(editFactor) > 0
                 ? `1 ${row.unit} = ${parseFloat(editFactor) % 1 === 0 ? parseFloat(editFactor).toFixed(0) : parseFloat(editFactor)} ${row.base_unit}`
                 : '—')
-            : (meaning || <span style={{ color: '#d97706' }}>Enter factor to enable conversions</span>)}
+            : (meaning || <span style={{ color: '#d97706' }}>{t.invConvNeedsFactor}</span>)}
         </td>
         <td style={{ ...s.td, whiteSpace: 'nowrap' }}>
           {isEditing ? (
             <>
               {saveErr && <span style={s.inlineErr}>{saveErr} </span>}
-              <button style={s.saveBtn} onClick={() => saveEdit(row)} disabled={saving}>{saving ? '…' : 'Save'}</button>
-              <button style={s.cancelBtn} onClick={cancelEdit}>Cancel</button>
+              <button style={s.saveBtn} onClick={() => saveEdit(row)} disabled={saving}>{saving ? '…' : t.save}</button>
+              <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
             </>
           ) : (
             <button style={{ ...s.editBtn, ...(isPending ? s.editBtnPending : {}) }} onClick={() => startEdit(row)}>
-              {isPending ? 'Set Factor' : '✏️'}
+              {isPending ? t.invConvSetFactor : '✏️'}
             </button>
           )}
         </td>
@@ -166,11 +168,11 @@ export default function InventoryConversions({ onConversionChange }) {
   const tableHead = (
     <thead>
       <tr style={s.thead}>
-        <th style={s.th}>Item</th>
-        <th style={s.th}>Base Unit</th>
-        <th style={s.th}>Alt Unit</th>
-        <th style={{ ...s.th, textAlign: 'center' }}>Factor</th>
-        <th style={s.th}>Meaning</th>
+        <th style={s.th}>{t.invTxColItem}</th>
+        <th style={s.th}>{t.invConvColBase}</th>
+        <th style={s.th}>{t.invConvColAlt}</th>
+        <th style={{ ...s.th, textAlign: 'center' }}>{t.uomFactor}</th>
+        <th style={s.th}>{t.invConvColMeaning}</th>
         <th style={s.th}></th>
       </tr>
     </thead>
@@ -184,19 +186,19 @@ export default function InventoryConversions({ onConversionChange }) {
       {/* ── Add Conversion ──────────────────────────────────────────────────── */}
       <div style={s.addSection}>
         {!addOpen ? (
-          <button style={s.addBtn} onClick={() => setAddOpen(true)}>+ Add Conversion</button>
+          <button style={s.addBtn} onClick={() => setAddOpen(true)}>{t.invConvAddBtn}</button>
         ) : (
           <div style={s.addForm}>
-            <div style={s.addTitle}>Add UOM Conversion</div>
+            <div style={s.addTitle}>{t.invConvFormTitle}</div>
             {addError && <div style={s.addError}>{addError}</div>}
             <div style={s.addRow}>
               <div style={s.addField}>
-                <label style={s.addLabel}>Item *</label>
+                <label style={s.addLabel}>{t.invTxColItem} *</label>
                 <select style={s.addInput} value={addItemId} onChange={e => setAddItemId(e.target.value)}>
                   <option value="">Select item…</option>
                   {items.map(i => <option key={i.id} value={i.id}>{i.name}{i.sku ? ` (${i.sku})` : ''}</option>)}
                 </select>
-                {selectedItem && <div style={s.baseUomNote}>Base unit: <strong>{selectedItem.unit}</strong></div>}
+                {selectedItem && <div style={s.baseUomNote}>{t.invConvBaseUnitNote} <strong>{selectedItem.unit}</strong></div>}
               </div>
               <div style={s.addField}>
                 <label style={s.addLabel}>Alternate Unit *</label>
@@ -223,9 +225,9 @@ export default function InventoryConversions({ onConversionChange }) {
               </div>
             </div>
             <div style={s.addActions}>
-              <button style={s.cancelBtn} onClick={resetAdd} disabled={addSaving}>Cancel</button>
+              <button style={s.cancelBtn} onClick={resetAdd} disabled={addSaving}>{t.cancel}</button>
               <button style={s.saveBtn} onClick={submitAdd} disabled={addSaving}>
-                {addSaving ? 'Saving…' : 'Save Conversion'}
+                {addSaving ? t.saving : t.invConvSaveConversion}
               </button>
             </div>
           </div>
@@ -240,11 +242,8 @@ export default function InventoryConversions({ onConversionChange }) {
           {/* ── Needs Setup ───────────────────────────────────────────────── */}
           {pending.length > 0 && (
             <div style={s.section}>
-              <SectionHeader count={pending.length} warn>Needs Setup</SectionHeader>
-              <p style={s.sectionDesc}>
-                These units were added without a conversion factor. Workers may have used them already.
-                Set the correct factor so the system can convert quantities accurately.
-              </p>
+              <SectionHeader count={pending.length} warn>{t.invConvNeedsSetup}</SectionHeader>
+              <p style={s.sectionDesc}>{t.invConvNeedsSetupDesc}</p>
               <div style={s.tableWrap}>
                 <table style={s.table}>
                   {tableHead}
@@ -257,7 +256,7 @@ export default function InventoryConversions({ onConversionChange }) {
           {/* ── Configured ────────────────────────────────────────────────── */}
           {configured.length > 0 && (
             <div style={s.section}>
-              <SectionHeader count={configured.length}>Configured</SectionHeader>
+              <SectionHeader count={configured.length}>{t.invConvConfigured}</SectionHeader>
               <div style={s.tableWrap}>
                 <table style={s.table}>
                   {tableHead}
@@ -270,11 +269,8 @@ export default function InventoryConversions({ onConversionChange }) {
           {rows.length === 0 && (
             <div style={s.emptyState}>
               <div style={s.emptyIcon}>🔄</div>
-              <p style={s.emptyTitle}>No conversions defined yet</p>
-              <p style={s.emptySub}>
-                Use <strong>+ Add Conversion</strong> above to define pack sizes,
-                or edit items directly in the <strong>Items</strong> tab.
-              </p>
+              <p style={s.emptyTitle}>{t.invConvEmptyTitle}</p>
+              <p style={s.emptySub}>{t.invConvEmptySub}</p>
             </div>
           )}
         </>

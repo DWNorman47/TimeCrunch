@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
+import { useT } from '../../hooks/useT';
 
 // QR payload format: {"app":"opsfloa","bin":"area","id":42,"name":"Zone A"}
 // Scanned by the Count tab to auto-set the active bin context.
@@ -16,15 +17,16 @@ export function parseBinQR(raw) {
   return null;
 }
 
-const BIN_LABELS = {
-  area:        'Area',
-  rack:        'Rack',
-  bay:         'Bay',
-  compartment: 'Compartment',
-};
-
 export default function BinLabelModal({ item, binType, onClose }) {
+  const t = useT();
   const [qrDataUrl, setQrDataUrl] = useState('');
+
+  const BIN_LABELS = {
+    area:        t.binLabelArea,
+    rack:        t.binLabelRack,
+    bay:         t.binLabelBay,
+    compartment: t.binLabelCompartment,
+  };
 
   useEffect(() => {
     const payload = buildBinQRPayload(binType, item);
@@ -33,9 +35,10 @@ export default function BinLabelModal({ item, binType, onClose }) {
       .catch(console.error);
   }, [binType, item.id, item.name]);
 
+  const typeName = BIN_LABELS[binType] || binType;
+
   const printLabel = () => {
     if (!qrDataUrl) return;
-    const typeName   = BIN_LABELS[binType] || binType;
     const parentLine = item.parent_name
       ? `<div style="font-size:13px;color:#6b7280;margin-bottom:4px;">${item.parent_name}</div>`
       : '';
@@ -71,8 +74,6 @@ export default function BinLabelModal({ item, binType, onClose }) {
     win.document.close();
   };
 
-  const typeName = BIN_LABELS[binType] || binType;
-
   return (
     <div style={s.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={s.modal}>
@@ -87,7 +88,7 @@ export default function BinLabelModal({ item, binType, onClose }) {
           {item.parent_name && <div style={s.previewParent}>{item.parent_name}</div>}
           {qrDataUrl
             ? <img src={qrDataUrl} alt="QR Code" style={s.qr} />
-            : <div style={s.qrPlaceholder}>Generating…</div>
+            : <div style={s.qrPlaceholder}>{t.labelModalGenerating}</div>
           }
           <div style={s.previewFooter}>OpsFloa Inventory · ID {item.id}</div>
         </div>
@@ -98,9 +99,9 @@ export default function BinLabelModal({ item, binType, onClose }) {
         </p>
 
         <div style={s.actions}>
-          <button style={s.cancelBtn} onClick={onClose}>Close</button>
+          <button style={s.cancelBtn} onClick={onClose}>{t.labelModalClose}</button>
           <button style={s.printBtn} onClick={printLabel} disabled={!qrDataUrl}>
-            🖨 Print Label
+            {t.labelModalPrint}
           </button>
         </div>
       </div>

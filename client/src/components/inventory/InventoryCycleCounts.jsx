@@ -3,21 +3,28 @@ import api from '../../api';
 import { parseBinQR } from './BinLabelModal';
 import { parseItemQR } from './ItemLabelModal';
 import UomConversionModal from './UomConversionModal';
+import { useT } from '../../hooks/useT';
 
-const COUNT_TYPES = {
-  cycle:     { label: 'Cycle Count',     color: '#2563eb', bg: '#dbeafe',   desc: 'Count stock at a specific location' },
-  full:      { label: 'Full Count',      color: '#8b5cf6', bg: '#ede9fe',   desc: 'Count all items across every location' },
-  audit:     { label: 'Audit Count',     color: '#d97706', bg: '#fef3c7',   desc: 'Blind count — expected quantities hidden during counting' },
-  reconcile: { label: 'Reconcile Count', color: '#059669', bg: '#d1fae5',   desc: 'Recount items to resolve discrepancies' },
-};
+function useCountTypes(t) {
+  return {
+    cycle:     { label: t.invCycCycleCount,     color: '#2563eb', bg: '#dbeafe',   desc: t.invCycCycleDesc },
+    full:      { label: t.invCycFullCount,      color: '#8b5cf6', bg: '#ede9fe',   desc: t.invCycFullDesc },
+    audit:     { label: t.invCycAuditCount,     color: '#d97706', bg: '#fef3c7',   desc: t.invCycAuditDesc },
+    reconcile: { label: t.invCycReconcileCount, color: '#059669', bg: '#d1fae5',   desc: t.invCycReconcileDesc },
+  };
+}
 
-const STATUS_COLORS = {
-  draft:       { color: '#6b7280', bg: '#f3f4f6', label: 'Draft' },
-  in_progress: { color: '#2563eb', bg: '#dbeafe', label: 'In Progress' },
-  completed:   { color: '#059669', bg: '#d1fae5', label: 'Completed' },
-};
+function useStatusColors(t) {
+  return {
+    draft:       { color: '#6b7280', bg: '#f3f4f6', label: t.invCycDraft },
+    in_progress: { color: '#2563eb', bg: '#dbeafe', label: t.invCycInProgress },
+    completed:   { color: '#059669', bg: '#d1fae5', label: t.invCycCompleted },
+  };
+}
 
 function TypeBadge({ type }) {
+  const t = useT();
+  const COUNT_TYPES = useCountTypes(t);
   const ct = COUNT_TYPES[type] || COUNT_TYPES.cycle;
   return (
     <span style={{ padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700,
@@ -28,6 +35,9 @@ function TypeBadge({ type }) {
 }
 
 function CycleCountDetail({ count, onBack, onComplete }) {
+  const t = useT();
+  const COUNT_TYPES = useCountTypes(t);
+  const STATUS_COLORS = useStatusColors(t);
   const [lines, setLines] = useState(count.lines || []);
   const [countData, setCountData] = useState(count);
   const [saving, setSaving] = useState(null);
@@ -138,7 +148,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       const r = await api.patch(`/inventory/cycle-counts/${count.id}/lines/${line.id}`, payload);
       setLines(prev => prev.map(l => l.id === line.id ? { ...l, ...r.data } : l));
     } catch (e) {
-      alert(e.response?.data?.error || 'Failed to save count.');
+      alert(e.response?.data?.error || t.invCycFailedSave);
     } finally {
       setSaving(null);
     }
@@ -148,7 +158,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     try {
       const r = await api.patch(`/inventory/cycle-counts/${count.id}`, { status: 'in_progress' });
       setCountData(r.data);
-    } catch (e) { alert(e.response?.data?.error || 'Failed to update status.'); }
+    } catch (e) { alert(e.response?.data?.error || t.invCycFailedStatus); }
   };
 
   const complete = async () => {
@@ -158,7 +168,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       setConfirmOpen(false);
       setReportLines(lines); // show variance report
     } catch (e) {
-      setError(e.response?.data?.error || 'Failed to complete count.');
+      setError(e.response?.data?.error || t.invCycFailedComplete);
       setCompleting(false); setConfirmOpen(false);
     } finally {
       setCompleting(false);
@@ -328,13 +338,13 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const renderTableHead = (showExpected) => (
     <thead>
       <tr style={d.thead}>
-        <th style={d.th}>Item</th>
-        <th style={d.th}>SKU</th>
-        <th style={d.th}>Unit</th>
-        {showExpected && <th style={{ ...d.th, textAlign: 'right' }}>Expected</th>}
-        <th style={{ ...d.th, textAlign: 'right' }}>Counted</th>
-        {showExpected && <th style={{ ...d.th, textAlign: 'right' }}>Variance</th>}
-        <th style={d.th}>Counted By</th>
+        <th style={d.th}>{t.invCycColItem}</th>
+        <th style={d.th}>{t.invCycColSku}</th>
+        <th style={d.th}>{t.invCycColUnit}</th>
+        {showExpected && <th style={{ ...d.th, textAlign: 'right' }}>{t.invCycColExpected}</th>}
+        <th style={{ ...d.th, textAlign: 'right' }}>{t.invCycColCounted}</th>
+        {showExpected && <th style={{ ...d.th, textAlign: 'right' }}>{t.invCycColVariance}</th>}
+        <th style={d.th}>{t.invCycColCountedBy}</th>
       </tr>
     </thead>
   );
@@ -343,7 +353,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
 
   return (
     <div style={d.wrap}>
-      <button style={d.back} onClick={onBack}>← Back to Counts</button>
+      <button style={d.back} onClick={onBack}>{t.invCycBackToList}</button>
 
       <div style={d.header}>
         <div>
@@ -351,17 +361,17 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             <h2 style={d.title}>{COUNT_TYPES[countData.count_type]?.label || 'Count'} — {countData.location_name}</h2>
             <TypeBadge type={countData.count_type} />
           </div>
-          <p style={d.sub}>Started by {countData.started_by_name} · {new Date(countData.started_at).toLocaleDateString()}</p>
+          <p style={d.sub}>{t.invCycStartedBy} {countData.started_by_name} · {new Date(countData.started_at).toLocaleDateString()}</p>
           {isAudit && !isCompleted && (
             <p style={{ ...d.sub, color: '#d97706', fontWeight: 600, marginTop: 4 }}>
-              Audit mode: expected quantities are hidden until the count is completed.
+              {t.invCycAuditMode}
             </p>
           )}
         </div>
         <div style={d.headerRight}>
           <span style={{ ...d.statusBadge, color: sc.color, background: sc.bg }}>{sc.label}</span>
           {countData.status === 'draft' && (
-            <button style={d.advanceBtn} onClick={advanceStatus}>Start Counting</button>
+            <button style={d.advanceBtn} onClick={advanceStatus}>{t.invCycStartCounting}</button>
           )}
           {countData.status === 'in_progress' && (
             <>
@@ -369,13 +379,13 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 style={{ ...d.scanModeBtn, ...(scanMode ? d.scanModeBtnActive : {}) }}
                 onClick={() => { setScanMode(s => !s); setHighlightedId(null); setCurrentBin(null); }}
               >
-                {scanMode ? '📷 Scan Mode ON' : '📷 Scan Mode'}
+                {scanMode ? t.invCycScanModeOn : t.invCycScanMode}
               </button>
               <button
                 style={{ ...d.completeBtn, opacity: uncounted > 0 ? 0.5 : 1 }}
-                onClick={() => uncounted > 0 ? alert(`${uncounted} item(s) not yet counted.`) : setConfirmOpen(true)}
+                onClick={() => uncounted > 0 ? alert(`${uncounted} ${t.invCycItemsNotCounted}`) : setConfirmOpen(true)}
               >
-                Complete Count
+                {t.invCycCompleteCount}
               </button>
             </>
           )}
@@ -391,11 +401,11 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             <span style={d.scanBinLabel}>
               {currentBin
                 ? <>📍 <strong>{currentBin.name}</strong> <span style={{ color: '#9ca3af', fontSize: 12 }}>({currentBin.type})</span></>
-                : <span style={{ color: '#9ca3af' }}>📍 No bin scanned — scan a bin label to set location context</span>
+                : <span style={{ color: '#9ca3af' }}>📍 {t.invCycNoBinScanned}</span>
               }
             </span>
             {currentBin && (
-              <button style={d.scanClearBtn} onClick={() => setCurrentBin(null)}>Clear</button>
+              <button style={d.scanClearBtn} onClick={() => setCurrentBin(null)}>{t.invCycClearBin}</button>
             )}
           </div>
           <div style={d.scanInputRow}>
@@ -403,7 +413,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
               ref={scanInputRef}
               style={d.scanInput}
               type="text"
-              placeholder="Scan barcode or QR code here…"
+              placeholder={t.invCycScanPlaceholder}
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   processScan(e.target.value);
@@ -419,14 +429,12 @@ function CycleCountDetail({ count, onBack, onComplete }) {
               {scanFeedback.msg}
             </div>
           )}
-          <p style={d.scanHint}>
-            Scan a <strong>bin label QR code</strong> to set the active bin, or scan a <strong>product barcode/SKU</strong> to jump to that item. Bin context persists between scans.
-          </p>
+          <p style={d.scanHint}>{t.invCycScanHint}</p>
         </div>
       )}
 
       {lines.length === 0 ? (
-        <div style={d.empty}>No items were in stock when the count was created.</div>
+        <div style={d.empty}>{t.invCycNoItems}</div>
       ) : isFull ? (
         // Full count: render table grouped by location
         Object.entries(groupedLines).map(([locName, locLines]) => (
@@ -450,13 +458,13 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       )}
 
       {uncounted > 0 && countData.status === 'in_progress' && (
-        <p style={d.uncountedNote}>{uncounted} item{uncounted !== 1 ? 's' : ''} not yet counted.</p>
+        <p style={d.uncountedNote}>{uncounted} {t.invCycItemsNotCounted}</p>
       )}
 
       {reportLines && (
         <div style={d.modalOverlay}>
           <div style={{ ...d.modal, maxWidth: 560 }}>
-            <h3 style={d.modalTitle}>Count Complete — Variance Report</h3>
+            <h3 style={d.modalTitle}>{t.invCycVarianceReport}</h3>
             {(() => {
               const withVariance = reportLines.filter(l => {
                 if (l.counted_qty == null) return false;
@@ -470,8 +478,8 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 <>
                   <p style={d.modalBody}>
                     {withVariance.length === 0
-                      ? 'No variances — all counts matched expected quantities.'
-                      : `${withVariance.length} item${withVariance.length !== 1 ? 's' : ''} with variance, ${noVariance.length} matched.`}
+                      ? t.invCycNoVariances
+                      : `${withVariance.length} ${t.invCycWithVariance} ${noVariance.length} ${t.invCycMatched}`}
                   </p>
                   <div style={{ overflowX: 'auto', marginBottom: 16 }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -496,7 +504,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                                 {l.item_name}
                               </td>
                               <td style={{ ...d.rtd, textAlign: 'right', color: '#6b7280' }}>{expected} {l.unit}</td>
-                              <td style={{ ...d.rtd, textAlign: 'right' }}>{counted != null ? `${counted} ${l.unit}` : <em style={{ color: '#9ca3af' }}>not counted</em>}</td>
+                              <td style={{ ...d.rtd, textAlign: 'right' }}>{counted != null ? `${counted} ${l.unit}` : <em style={{ color: '#9ca3af' }}>{t.invCycNotCounted}</em>}</td>
                               <td style={{ ...d.rtd, textAlign: 'right', fontWeight: 700,
                                 color: variance === null ? '#9ca3af' : variance > 0 ? '#059669' : variance < 0 ? '#dc2626' : '#374151' }}>
                                 {variance === null ? '—' : variance > 0 ? `+${variance}` : variance}
@@ -511,9 +519,9 @@ function CycleCountDetail({ count, onBack, onComplete }) {
               );
             })()}
             <div style={d.modalActions}>
-              <button style={d.cancelBtn} onClick={() => { setReportLines(null); onComplete(); }}>Close</button>
+              <button style={d.cancelBtn} onClick={() => { setReportLines(null); onComplete(); }}>{t.cancel}</button>
               <button style={{ ...d.confirmBtn, background: '#2563eb' }} onClick={() => downloadVarianceCSV(reportLines)}>
-                Download CSV
+                {t.invCycDownloadCSV}
               </button>
             </div>
           </div>
@@ -523,10 +531,10 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       {confirmOpen && (
         <div style={d.modalOverlay}>
           <div style={d.modal}>
-            <h3 style={d.modalTitle}>Complete {COUNT_TYPES[countData.count_type]?.label || 'Count'}?</h3>
+            <h3 style={d.modalTitle}>{t.invCycConfirmComplete} {COUNT_TYPES[countData.count_type]?.label || ''}?</h3>
             {variantLines.length > 0 ? (
               <>
-                <p style={d.modalBody}>{variantLines.length} adjustment{variantLines.length !== 1 ? 's' : ''} will be posted to stock:</p>
+                <p style={d.modalBody}>{variantLines.length} {t.invCycAdjustments}</p>
                 <ul style={d.modalList}>
                   {variantLines.map(l => {
                     const v = parseFloat(l.counted_qty) - parseFloat(l.expected_qty);
@@ -539,12 +547,12 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 </ul>
               </>
             ) : (
-              <p style={d.modalBody}>No variances found. Stock will not be adjusted.</p>
+              <p style={d.modalBody}>{t.invCycNoVariancesConfirm}</p>
             )}
             <div style={d.modalActions}>
-              <button style={d.cancelBtn} onClick={() => setConfirmOpen(false)}>Cancel</button>
+              <button style={d.cancelBtn} onClick={() => setConfirmOpen(false)}>{t.cancel}</button>
               <button style={d.confirmBtn} onClick={complete} disabled={completing}>
-                {completing ? 'Completing…' : 'Confirm & Complete'}
+                {completing ? t.invCycCompleting : t.invCycConfirmBtn}
               </button>
             </div>
           </div>
@@ -571,6 +579,9 @@ function CycleCountDetail({ count, onBack, onComplete }) {
 }
 
 export default function InventoryCycleCounts({ locations, onComplete }) {
+  const t = useT();
+  const COUNT_TYPES = useCountTypes(t);
+  const STATUS_COLORS = useStatusColors(t);
   const [counts, setCounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -651,12 +662,12 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
           </select>
           {needsLocation && (
             <select style={s.select} value={newLocationId} onChange={e => setNewLocationId(e.target.value)}>
-              <option value="">Select location…</option>
+              <option value="">{t.invCycSelectLocation}</option>
               {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           )}
           <button style={s.startBtn} onClick={startCount} disabled={creating || (needsLocation && !newLocationId)}>
-            {creating ? 'Creating…' : '+ Start Count'}
+            {creating ? t.invCycCreating : t.invCycStartCount}
           </button>
         </div>
         {newCountType && (
@@ -667,19 +678,19 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
       {/* Filters */}
       <div style={s.filters}>
         <select style={s.select} value={filterType} onChange={e => setFilterType(e.target.value)}>
-          <option value="">All Types</option>
+          <option value="">{t.invCycAllTypes}</option>
           {Object.entries(COUNT_TYPES).map(([key, ct]) => (
             <option key={key} value={key}>{ct.label}</option>
           ))}
         </select>
         <select style={s.select} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-          <option value="">All Statuses</option>
-          <option value="draft">Draft</option>
-          <option value="in_progress">In Progress</option>
-          <option value="completed">Completed</option>
+          <option value="">{t.invCycAllStatuses}</option>
+          <option value="draft">{t.invCycDraft}</option>
+          <option value="in_progress">{t.invCycInProgress}</option>
+          <option value="completed">{t.invCycCompleted}</option>
         </select>
         <select style={s.select} value={filterLocation} onChange={e => setFilterLocation(e.target.value)}>
-          <option value="">All Locations</option>
+          <option value="">{t.invCycAllLocations}</option>
           {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
       </div>
@@ -687,11 +698,11 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
       {error && <div style={s.error}>{error}</div>}
 
       {loading ? (
-        <div style={s.empty}>Loading…</div>
+        <div style={s.empty}>{t.loading}</div>
       ) : counts.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>📋</div>
-          <p>No counts yet. Start one above.</p>
+          <p>{t.invCycNoCountsYet}</p>
         </div>
       ) : (
         <div style={s.list}>
@@ -704,8 +715,8 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
                   <div>
                     <div style={s.cardTitle}>{count.location_name}</div>
                     <div style={s.cardMeta}>
-                      Started by {count.started_by_name} · {new Date(count.started_at).toLocaleDateString()}
-                      {count.completed_at && ` · Completed ${new Date(count.completed_at).toLocaleDateString()}`}
+                      {t.invCycStartedBy} {count.started_by_name} · {new Date(count.started_at).toLocaleDateString()}
+                      {count.completed_at && ` · ${t.invCycCompleted} ${new Date(count.completed_at).toLocaleDateString()}`}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -714,7 +725,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
                   </div>
                 </div>
                 <div style={s.cardProgress}>
-                  <span style={s.cardProgressText}>{count.counted_count}/{count.line_count} items counted</span>
+                  <span style={s.cardProgressText}>{count.counted_count}/{count.line_count} {t.invCycItemsCounted}</span>
                   {count.status !== 'completed' && count.line_count > 0 && (
                     <div style={s.progressBar}>
                       <div style={{ ...s.progressFill, width: `${pct}%` }} />
