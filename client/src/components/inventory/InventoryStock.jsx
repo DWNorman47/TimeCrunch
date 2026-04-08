@@ -29,7 +29,7 @@ function HistoryPanel({ item, onClose }) {
   useEffect(() => {
     setLoading(true);
     api.get(`/inventory/transactions?item_id=${item.item_id}&limit=30`)
-      .then(r => setRows(r.data))
+      .then(r => setRows(r.data.transactions || r.data))
       .catch(() => setError(t.invStockFailedHistory))
       .finally(() => setLoading(false));
   }, [item.item_id]);
@@ -344,9 +344,14 @@ function IssueModal({ item, projects, onClose, onDone }) {
 
 // ── Main Stock Component ──────────────────────────────────────────────────────
 
+const STOCK_PAGE = 500;
+
 export default function InventoryStock({ isAdmin, locations, projects, onStockChange, onReorderClick }) {
   const t = useT();
   const [stock, setStock]           = useState([]);
+  const [stockTotal, setStockTotal] = useState(0);
+  const [stockOffset, setStockOffset] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [lowItems, setLowItems]     = useState([]);
   const [locationFilter, setLocationFilter] = useState('');
   const [loading, setLoading]       = useState(true);
@@ -356,14 +361,16 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
   const [issueItem, setIssueItem]     = useState(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setStockOffset(0);
     try {
-      const params = locationFilter ? `?location_id=${locationFilter}` : '';
+      const params = new URLSearchParams({ limit: STOCK_PAGE, offset: 0 });
+      if (locationFilter) params.set('location_id', locationFilter);
       const [s, l] = await Promise.all([
-        api.get(`/inventory/stock${params}`),
+        api.get(`/inventory/stock?${params}`),
         isAdmin ? api.get('/inventory/stock/low') : Promise.resolve({ data: [] }),
       ]);
-      setStock(s.data);
+      setStock(s.data.stock);
+      setStockTotal(s.data.total);
       setLowItems(l.data);
     } catch (e) {
       setError(t.invStockFailedLoad);
@@ -371,6 +378,19 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
       setLoading(false);
     }
   }, [locationFilter, isAdmin]);
+
+  const loadMore = async () => {
+    const nextOffset = stockOffset + STOCK_PAGE;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams({ limit: STOCK_PAGE, offset: nextOffset });
+      if (locationFilter) params.set('location_id', locationFilter);
+      const r = await api.get(`/inventory/stock?${params}`);
+      setStock(prev => [...prev, ...r.data.stock]);
+      setStockOffset(nextOffset);
+    } catch { /* non-fatal */ }
+    finally { setLoadingMore(false); }
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -421,7 +441,7 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
       {error && <div style={s.error}>{error}</div>}
 
       {loading ? (
-        <div style={s.empty}>Loading…</div>
+        <div style={s.empty}>{t.loading}</div>
       ) : stock.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>📦</div>
@@ -429,6 +449,7 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
           <p style={s.emptyHint}>{t.invStockReceiveHint}</p>
         </div>
       ) : (
+        <>
         <div style={s.tableWrap}>
           <table style={s.table}>
             <thead>
@@ -511,6 +532,17 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
             </tbody>
           </table>
         </div>
+        {stock.length < stockTotal && (
+          <div style={{ textAlign: 'center', padding: '16px 0' }}>
+            <button style={s.refreshBtn} onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? t.loading : t.loadMore}
+            </button>
+            <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>
+              {stock.length} / {stockTotal}
+            </span>
+          </div>
+        )}
+        </>
       )}
 
       {historyItem && (

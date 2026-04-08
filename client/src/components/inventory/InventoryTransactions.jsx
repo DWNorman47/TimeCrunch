@@ -89,7 +89,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
     if (!form.item_id || !locId || !['issue', 'transfer', 'convert'].includes(form.type)) return;
     api.get(`/inventory/stock?location_id=${locId}`)
       .then(r => {
-        const row = r.data.find(s => String(s.item_id) === String(form.item_id));
+        const row = (r.data.stock || r.data).find(s => String(s.item_id) === String(form.item_id));
         setLocationStock(row || null);
       })
       .catch(() => {});

@@ -2,27 +2,49 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
 
+const VAL_PAGE = 200;
+
 export default function InventoryValuation({ locations }) {
   const t = useT();
   const [data, setData] = useState(null);
+  const [valTotal, setValTotal] = useState(0);
+  const [valOffset, setValOffset] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [showZero, setShowZero] = useState(false);
 
   const load = useCallback(async () => {
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setValOffset(0);
     try {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ limit: VAL_PAGE, offset: 0 });
       if (locationFilter) params.set('location_id', locationFilter);
       const r = await api.get(`/inventory/valuation?${params}`);
       setData(r.data);
+      setValTotal(r.data.total);
     } catch {
       setError(t.invValFailedLoad);
     } finally {
       setLoading(false);
     }
   }, [locationFilter]);
+
+  const loadMoreVal = async () => {
+    const nextOffset = valOffset + VAL_PAGE;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams({ limit: VAL_PAGE, offset: nextOffset });
+      if (locationFilter) params.set('location_id', locationFilter);
+      const r = await api.get(`/inventory/valuation?${params}`);
+      setData(prev => ({
+        ...r.data,
+        items: [...(prev?.items || []), ...r.data.items],
+      }));
+      setValOffset(nextOffset);
+    } catch { /* non-fatal */ }
+    finally { setLoadingMore(false); }
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -83,7 +105,7 @@ export default function InventoryValuation({ locations }) {
       {error && <div style={s.error}>{error}</div>}
 
       {loading ? (
-        <div style={s.empty}>Loading…</div>
+        <div style={s.empty}>{t.loading}</div>
       ) : !data || visibleItems.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>💰</div>
@@ -137,6 +159,16 @@ export default function InventoryValuation({ locations }) {
               </tfoot>
             </table>
           </div>
+          {(data?.items?.length || 0) < valTotal && (
+            <div style={{ textAlign: 'center', padding: '16px 0' }}>
+              <button style={s.csvBtn} onClick={loadMoreVal} disabled={loadingMore}>
+                {loadingMore ? t.loading : t.loadMore}
+              </button>
+              <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>
+                {data?.items?.length || 0} / {valTotal}
+              </span>
+            </div>
+          )}
 
           {/* Per-location breakdown (when no location filter) */}
           {!locationFilter && visibleItems.some(item => item.locations?.length > 0) && (

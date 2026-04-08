@@ -583,6 +583,9 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
   const COUNT_TYPES = useCountTypes(t);
   const STATUS_COLORS = useStatusColors(t);
   const [counts, setCounts] = useState([]);
+  const [countsTotal, setCountsTotal] = useState(0);
+  const [countsOffset, setCountsOffset] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState(null);
@@ -593,18 +596,36 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
   const [filterType, setFilterType] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
 
+  const CC_PAGE = 100;
+
   const load = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setCountsOffset(0);
     try {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ limit: CC_PAGE, offset: 0 });
       if (filterStatus) params.set('status', filterStatus);
       if (filterType) params.set('count_type', filterType);
       if (filterLocation) params.set('location_id', filterLocation);
       const r = await api.get(`/inventory/cycle-counts?${params}`);
-      setCounts(r.data);
-    } catch { setError('Failed to load counts'); }
+      setCounts(r.data.counts);
+      setCountsTotal(r.data.total);
+    } catch { setError(t.invCycFailedLoad); }
     finally { setLoading(false); }
   }, [filterStatus, filterType, filterLocation]);
+
+  const loadMoreCounts = async () => {
+    const nextOffset = countsOffset + CC_PAGE;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams({ limit: CC_PAGE, offset: nextOffset });
+      if (filterStatus) params.set('status', filterStatus);
+      if (filterType) params.set('count_type', filterType);
+      if (filterLocation) params.set('location_id', filterLocation);
+      const r = await api.get(`/inventory/cycle-counts?${params}`);
+      setCounts(prev => [...prev, ...r.data.counts]);
+      setCountsOffset(nextOffset);
+    } catch { /* non-fatal */ }
+    finally { setLoadingMore(false); }
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -705,6 +726,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
           <p>{t.invCycNoCountsYet}</p>
         </div>
       ) : (
+        <>
         <div style={s.list}>
           {counts.map(count => {
             const sc = STATUS_COLORS[count.status] || STATUS_COLORS.draft;
@@ -736,6 +758,15 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
             );
           })}
         </div>
+        {counts.length < countsTotal && (
+          <div style={{ textAlign: 'center', padding: '16px 0' }}>
+            <button style={s.select} onClick={loadMoreCounts} disabled={loadingMore}>
+              {loadingMore ? t.loading : t.loadMore}
+            </button>
+            <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>{counts.length} / {countsTotal}</span>
+          </div>
+        )}
+        </>
       )}
     </div>
   );

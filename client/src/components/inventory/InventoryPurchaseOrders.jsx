@@ -703,11 +703,15 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
   const STATUS = useStatus(t);
   const [view, setView]         = useState('list'); // 'list' | 'create' | 'detail'
   const [pos, setPos]           = useState([]);
+  const [posTotal, setPosTotal] = useState(0);
+  const [posOffset, setPosOffset] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
+  const PO_PAGE = 100;
   const [suppliers, setSuppliers] = useState(suppliersProp || []);
   const [prefillItems, setPrefillItems] = useState(null); // null = no prefill
 
@@ -733,16 +737,31 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
   }, [prefillLowStock]);
 
   const load = useCallback(async () => {
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setPosOffset(0);
     try {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ limit: PO_PAGE, offset: 0 });
       if (filterStatus) params.set('status', filterStatus);
       if (filterSupplier) params.set('supplier_id', filterSupplier);
       const r = await api.get(`/inventory/purchase-orders?${params}`);
-      setPos(r.data);
+      setPos(r.data.orders);
+      setPosTotal(r.data.total);
     } catch { setError(t.invPOFailedLoad); }
     finally { setLoading(false); }
   }, [filterStatus, filterSupplier]);
+
+  const loadMorePos = async () => {
+    const nextOffset = posOffset + PO_PAGE;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams({ limit: PO_PAGE, offset: nextOffset });
+      if (filterStatus) params.set('status', filterStatus);
+      if (filterSupplier) params.set('supplier_id', filterSupplier);
+      const r = await api.get(`/inventory/purchase-orders?${params}`);
+      setPos(prev => [...prev, ...r.data.orders]);
+      setPosOffset(nextOffset);
+    } catch { /* non-fatal */ }
+    finally { setLoadingMore(false); }
+  };
 
   useEffect(() => { if (view === 'list') load(); }, [load, view]);
 
@@ -817,6 +836,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
           <p>{t.invPONoPOs}</p>
         </div>
       ) : (
+        <>
         <div style={l.list}>
           {pos.map(po => {
             const ordered  = parseFloat(po.total_ordered  || 0);
@@ -852,6 +872,15 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
             );
           })}
         </div>
+        {pos.length < posTotal && (
+          <div style={{ textAlign: 'center', padding: '16px 0' }}>
+            <button style={l.select} onClick={loadMorePos} disabled={loadingMore}>
+              {loadingMore ? t.loading : t.loadMore}
+            </button>
+            <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>{pos.length} / {posTotal}</span>
+          </div>
+        )}
+        </>
       )}
     </div>
   );

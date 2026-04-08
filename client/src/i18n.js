@@ -77,6 +77,7 @@ const translations = {
 
     // ── Shared admin ─────────────────────────────────────────────────────────
     loading: 'Loading...',
+    loadMore: 'Load more',
     from: 'From',
     to: 'To',
 
@@ -1337,6 +1338,7 @@ const translations = {
     invCycConfirmBtn: 'Confirm & Complete',
     invCycCompleting: 'Completing…',
     invCycNoCountsYet: 'No counts yet. Start one above.',
+    invCycFailedLoad: 'Failed to load counts.',
     invCycItemsCounted: 'items counted',
     invCycCreating: 'Creating…',
     invCycStartCount: '+ Start Count',
@@ -1591,6 +1593,7 @@ const translations = {
 
     // ── Shared admin ─────────────────────────────────────────────────────────
     loading: 'Cargando...',
+    loadMore: 'Cargar más',
     from: 'Desde',
     to: 'Hasta',
 
@@ -2850,6 +2853,7 @@ const translations = {
     invCycConfirmBtn: 'Confirmar y Completar',
     invCycCompleting: 'Completando…',
     invCycNoCountsYet: 'Sin conteos aún. Inicia uno arriba.',
+    invCycFailedLoad: 'Error al cargar los conteos.',
     invCycItemsCounted: 'artículos contados',
     invCycCreating: 'Creando…',
     invCycStartCount: '+ Iniciar Conteo',

@@ -497,7 +497,7 @@ router.delete('/locations/:id', requireAdmin, async (req, res) => {
 
 // GET /api/inventory/stock
 router.get('/stock', requireAuth, async (req, res) => {
-  const { location_id, item_id } = req.query;
+  const { location_id, item_id, limit = 500, offset = 0 } = req.query;
   const companyId = req.user.company_id;
   const admin = isAdmin(req);
   try {
@@ -505,6 +505,7 @@ router.get('/stock', requireAuth, async (req, res) => {
     const values = [companyId]; let idx = 2;
     if (location_id) { conditions.push(`s.location_id = $${idx++}`); values.push(location_id); }
     if (item_id) { conditions.push(`s.item_id = $${idx++}`); values.push(item_id); }
+    const whereClause = `${conditions.join(' AND ')} AND i.active = true AND l.active = true`;
     const result = await pool.query(
       `SELECT s.id, s.item_id, i.name as item_name, i.sku, i.category,
               COALESCE(u.unit, i.unit)           as unit,
@@ -525,11 +526,19 @@ router.get('/stock', requireAuth, async (req, res) => {
        LEFT JOIN inventory_racks        ir ON s.rack_id        = ir.id
        LEFT JOIN inventory_bays         ib ON s.bay_id         = ib.id
        LEFT JOIN inventory_compartments ic ON s.compartment_id = ic.id
-       WHERE ${conditions.join(' AND ')} AND i.active = true AND l.active = true
-       ORDER BY l.name, ia.name, ir.name, ib.name, i.name`,
+       WHERE ${whereClause}
+       ORDER BY l.name, ia.name, ir.name, ib.name, i.name
+       LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...values, parseInt(limit), parseInt(offset)]
+    );
+    const totalResult = await pool.query(
+      `SELECT COUNT(*) FROM inventory_stock s
+       JOIN inventory_items i ON s.item_id = i.id
+       JOIN inventory_locations l ON s.location_id = l.id
+       WHERE ${whereClause}`,
       values
     );
-    res.json(result.rows);
+    res.json({ stock: result.rows, total: parseInt(totalResult.rows[0].count) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -740,7 +749,7 @@ router.get('/transactions', requireAuth, async (req, res) => {
 
 // GET /api/inventory/cycle-counts
 router.get('/cycle-counts', requireAdmin, async (req, res) => {
-  const { location_id, status, count_type } = req.query;
+  const { location_id, status, count_type, limit = 100, offset = 0 } = req.query;
   const companyId = req.user.company_id;
   try {
     const conditions = ['cc.company_id = $1'];
@@ -752,19 +761,29 @@ router.get('/cycle-counts', requireAdmin, async (req, res) => {
       `SELECT cc.*, COALESCE(l.name, 'All Locations') as location_name,
               u.full_name as started_by_name,
               cu.full_name as completed_by_name,
-              COUNT(cl.id) AS line_count,
-              COUNT(cl.id) FILTER (WHERE cl.counted_qty IS NOT NULL) AS counted_count
+              COALESCE(agg.line_count,    0) AS line_count,
+              COALESCE(agg.counted_count, 0) AS counted_count
        FROM inventory_cycle_counts cc
        LEFT JOIN inventory_locations l ON cc.location_id = l.id
        JOIN users u ON cc.started_by = u.id
        LEFT JOIN users cu ON cc.completed_by = cu.id
-       LEFT JOIN inventory_cycle_count_lines cl ON cl.cycle_count_id = cc.id
+       LEFT JOIN (
+         SELECT cycle_count_id,
+                COUNT(*)                                         AS line_count,
+                COUNT(*) FILTER (WHERE counted_qty IS NOT NULL)  AS counted_count
+         FROM inventory_cycle_count_lines
+         GROUP BY cycle_count_id
+       ) agg ON agg.cycle_count_id = cc.id
        WHERE ${conditions.join(' AND ')}
-       GROUP BY cc.id, l.name, u.full_name, cu.full_name
-       ORDER BY cc.started_at DESC`,
+       ORDER BY cc.started_at DESC
+       LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...values, parseInt(limit), parseInt(offset)]
+    );
+    const totalResult = await pool.query(
+      `SELECT COUNT(*) FROM inventory_cycle_counts cc WHERE ${conditions.join(' AND ')}`,
       values
     );
-    res.json(result.rows);
+    res.json({ counts: result.rows, total: parseInt(totalResult.rows[0].count) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -828,13 +847,19 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
       }
 
       if (stock.rows.length > 0) {
-        const lineValues = stock.rows.map((r, i) => `($1, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4}, $${i * 4 + 5})`).join(', ');
-        const lineParams = [countId];
-        stock.rows.forEach(r => { lineParams.push(r.item_id); lineParams.push(r.location_id); lineParams.push(r.quantity); lineParams.push(r.uom_id || null); });
-        await client.query(
-          `INSERT INTO inventory_cycle_count_lines (cycle_count_id, item_id, location_id, expected_qty, stock_uom_id) VALUES ${lineValues}`,
-          lineParams
-        );
+        // Batch inserts in chunks of 500 to avoid oversized parameter lists and
+        // transaction log bloat when snapshotting large inventories (e.g. full counts).
+        const CHUNK = 500;
+        for (let start = 0; start < stock.rows.length; start += CHUNK) {
+          const chunk = stock.rows.slice(start, start + CHUNK);
+          const lineValues = chunk.map((r, i) => `($1, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4}, $${i * 4 + 5})`).join(', ');
+          const lineParams = [countId];
+          chunk.forEach(r => { lineParams.push(r.item_id); lineParams.push(r.location_id); lineParams.push(r.quantity); lineParams.push(r.uom_id || null); });
+          await client.query(
+            `INSERT INTO inventory_cycle_count_lines (cycle_count_id, item_id, location_id, expected_qty, stock_uom_id) VALUES ${lineValues}`,
+            lineParams
+          );
+        }
       }
 
       await client.query('COMMIT');
@@ -1231,30 +1256,44 @@ async function nextPONumber(client, companyId) {
 
 // GET /api/inventory/purchase-orders
 router.get('/purchase-orders', requireAdmin, async (req, res) => {
-  const { status, supplier_id } = req.query;
+  const { status, supplier_id, limit = 100, offset = 0 } = req.query;
   const companyId = req.user.company_id;
   try {
     const conditions = ['po.company_id = $1'];
     const values = [companyId]; let idx = 2;
     if (status) { conditions.push(`po.status = $${idx++}`); values.push(status); }
     if (supplier_id) { conditions.push(`po.supplier_id = $${idx++}`); values.push(supplier_id); }
+    // Aggregate line stats in a single pre-joined subquery instead of 3 correlated subqueries per PO row
     const result = await pool.query(
       `SELECT po.*,
               sup.name AS supplier_name,
               loc.name AS to_location_name,
               u.full_name AS created_by_name,
-              (SELECT COUNT(*)        FROM purchase_order_lines WHERE po_id = po.id) AS line_count,
-              (SELECT COALESCE(SUM(qty_ordered),  0) FROM purchase_order_lines WHERE po_id = po.id) AS total_ordered,
-              (SELECT COALESCE(SUM(qty_received), 0) FROM purchase_order_lines WHERE po_id = po.id) AS total_received
+              COALESCE(agg.line_count,     0) AS line_count,
+              COALESCE(agg.total_ordered,  0) AS total_ordered,
+              COALESCE(agg.total_received, 0) AS total_received
        FROM purchase_orders po
-       LEFT JOIN inventory_suppliers  sup ON po.supplier_id    = sup.id
-       LEFT JOIN inventory_locations  loc ON po.to_location_id = loc.id
+       LEFT JOIN inventory_suppliers sup ON po.supplier_id    = sup.id
+       LEFT JOIN inventory_locations loc ON po.to_location_id = loc.id
        JOIN  users u ON po.created_by = u.id
+       LEFT JOIN (
+         SELECT po_id,
+                COUNT(*)            AS line_count,
+                SUM(qty_ordered)    AS total_ordered,
+                SUM(qty_received)   AS total_received
+         FROM purchase_order_lines
+         GROUP BY po_id
+       ) agg ON agg.po_id = po.id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY po.created_at DESC`,
+       ORDER BY po.created_at DESC
+       LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...values, parseInt(limit), parseInt(offset)]
+    );
+    const totalResult = await pool.query(
+      `SELECT COUNT(*) FROM purchase_orders po WHERE ${conditions.join(' AND ')}`,
       values
     );
-    res.json(result.rows);
+    res.json({ orders: result.rows, total: parseInt(totalResult.rows[0].count) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -1688,11 +1727,25 @@ router.post('/purchase-orders/:id/email', requireAdmin, async (req, res) => {
 // GET /api/inventory/valuation
 router.get('/valuation', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
-  const { location_id } = req.query;
+  const { location_id, limit = 200, offset = 0 } = req.query;
   try {
     const conditions = ['i.company_id = $1', 'i.active = true'];
     const values = [companyId]; let idx = 2;
     if (location_id) { conditions.push(`s.location_id = $${idx++}`); values.push(location_id); }
+
+    const whereClause = conditions.join(' AND ');
+
+    // Grand total via dedicated aggregation — avoids shipping all rows to Node just to sum
+    const totalResult = await pool.query(
+      `SELECT COALESCE(SUM(s.quantity * COALESCE(i.unit_cost, 0)), 0) AS grand_total,
+              COUNT(DISTINCT i.id) AS total_items
+       FROM inventory_items i
+       LEFT JOIN inventory_stock s ON i.id = s.item_id AND s.company_id = i.company_id
+       LEFT JOIN inventory_locations l ON s.location_id = l.id AND l.active = true
+       WHERE ${whereClause}`,
+      values
+    );
+
     const result = await pool.query(
       `SELECT i.id, i.name, i.sku, i.category, i.unit, i.unit_cost,
               COALESCE(SUM(s.quantity), 0) AS total_qty,
@@ -1707,13 +1760,18 @@ router.get('/valuation', requireAdmin, async (req, res) => {
        FROM inventory_items i
        LEFT JOIN inventory_stock s ON i.id = s.item_id AND s.company_id = i.company_id
        LEFT JOIN inventory_locations l ON s.location_id = l.id AND l.active = true
-       WHERE ${conditions.join(' AND ')}
+       WHERE ${whereClause}
        GROUP BY i.id
-       ORDER BY i.name`,
-      values
+       ORDER BY i.name
+       LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...values, parseInt(limit), parseInt(offset)]
     );
-    const grandTotal = result.rows.reduce((sum, r) => sum + parseFloat(r.total_value || 0), 0);
-    res.json({ items: result.rows, grand_total: grandTotal });
+
+    res.json({
+      items: result.rows,
+      grand_total: parseFloat(totalResult.rows[0].grand_total),
+      total: parseInt(totalResult.rows[0].total_items),
+    });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
