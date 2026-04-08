@@ -1420,6 +1420,8 @@ const translations = {
     invPOCreatedBy: 'Created by',
     invPOOrderedOn: 'Ordered',
     invPOItems: 'items',
+    invPOFailedSave: 'Failed to save.',
+    invPOReceivingLocLabel: 'Location',
 
     // ── Entry Panel ───────────────────────────────────────────────────────────
     entryPanelEdit: 'Edit',
@@ -2931,6 +2933,8 @@ const translations = {
     invPOCreatedBy: 'Creado por',
     invPOOrderedOn: 'Ordenado',
     invPOItems: 'artículos',
+    invPOFailedSave: 'Error al guardar.',
+    invPOReceivingLocLabel: 'Ubicación',
 
     // ── Entry Panel ───────────────────────────────────────────────────────────
     entryPanelEdit: 'Editar',

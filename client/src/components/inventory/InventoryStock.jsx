@@ -57,7 +57,7 @@ function HistoryPanel({ item, onClose }) {
                   <th style={h.th}>{t.invTxColDate}</th>
                   <th style={h.th}>{t.invTxColType}</th>
                   <th style={{ ...h.th, textAlign: 'right' }}>{t.invTxColQty}</th>
-                  <th style={h.th}>{t.invPOReceivingLoc.replace(' *','')}</th>
+                  <th style={h.th}>{t.invPOReceivingLocLabel}</th>
                   <th style={h.th}>{t.invTxColBy}</th>
                   <th style={h.th}>{t.notes}</th>
                 </tr>

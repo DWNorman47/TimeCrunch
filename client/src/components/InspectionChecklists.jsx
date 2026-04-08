@@ -217,7 +217,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!form.name.trim() || !form.inspected_at) { setError('Name and date are required.'); return; }
+    if (!form.name.trim() || !form.inspected_at) { setError(t.inspNameDateRequired); return; }
     setSaving(true); setError('');
     try {
       const r = isEdit

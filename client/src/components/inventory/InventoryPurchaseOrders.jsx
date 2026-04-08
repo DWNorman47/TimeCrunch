@@ -209,7 +209,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
       setPo(r.data);
       setEditing(false);
       onUpdate();
-    } catch (err) { setActionErr(err.response?.data?.error || t.invPOFailedSubmit); }
+    } catch (err) { setActionErr(err.response?.data?.error || t.invPOFailedSave); }
     finally { setEditSaving(false); }
   };
 
