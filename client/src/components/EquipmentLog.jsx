@@ -42,17 +42,17 @@ function ItemForm({ initial, onSaved, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.name} *</label>
-          <input style={styles.input} type="text" placeholder="e.g. Excavator CAT 320" value={form.name} onChange={e => set('name', e.target.value)} required />
+          <input style={styles.input} type="text" placeholder="e.g. Excavator CAT 320" value={form.name} onChange={e => set('name', e.target.value)} required maxLength={255} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.equipmentType}</label>
-          <input style={styles.input} type="text" placeholder="e.g. Excavator, Skid Steer, Generator" value={form.type} onChange={e => set('type', e.target.value)} />
+          <input style={styles.input} type="text" placeholder="e.g. Excavator, Skid Steer, Generator" value={form.type} onChange={e => set('type', e.target.value)} maxLength={100} />
         </div>
       </div>
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.unitSerial}</label>
-          <input style={styles.input} type="text" placeholder="e.g. Unit 4, SN-12345" value={form.unit_number} onChange={e => set('unit_number', e.target.value)} />
+          <input style={styles.input} type="text" placeholder="e.g. Unit 4, SN-12345" value={form.unit_number} onChange={e => set('unit_number', e.target.value)} maxLength={100} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.maintenanceEvery} <span style={styles.optional}>({t.optional})</span></label>
@@ -61,7 +61,7 @@ function ItemForm({ initial, onSaved, onCancel }) {
       </div>
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.notes}</label>
-        <input style={styles.input} type="text" placeholder={t.optionalNotes} value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <input style={styles.input} type="text" placeholder={t.optionalNotes} value={form.notes} onChange={e => set('notes', e.target.value)} maxLength={1000} />
       </div>
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
@@ -129,12 +129,12 @@ function LogHoursForm({ item, projects, onLogged, onCancel }) {
         )}
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.operatorField}</label>
-          <input style={styles.input} type="text" placeholder={t.operatorField} value={form.operator_name} onChange={e => set('operator_name', e.target.value)} />
+          <input style={styles.input} type="text" placeholder={t.operatorField} value={form.operator_name} onChange={e => set('operator_name', e.target.value)} maxLength={255} />
         </div>
       </div>
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.notes} <span style={styles.optional}>({t.optional})</span></label>
-        <input style={styles.input} type="text" placeholder={t.optionalNotes} value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <input style={styles.input} type="text" placeholder={t.optionalNotes} value={form.notes} onChange={e => set('notes', e.target.value)} maxLength={1000} />
       </div>
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>

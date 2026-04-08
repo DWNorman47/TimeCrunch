@@ -4,6 +4,9 @@ const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const rateLimit = require('express-rate-limit');
 const pool = require('../db');
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function isValidEmail(email) { return EMAIL_RE.test(String(email).trim()); }
 const { requireAdmin, requirePlan, requireProAddon, requirePermission } = require('../middleware/auth');
 const { sendPushToUser, sendPushToAllWorkers } = require('../push');
 const { sendEmail } = require('../email');
@@ -809,6 +812,7 @@ const inviteLimiter = rateLimit({
 router.post('/workers/invite', requireAdmin, requirePermission('manage_workers'), inviteLimiter, async (req, res) => {
   const { full_name, email, role, language, hourly_rate } = req.body;
   if (!full_name || !email) return res.status(400).json({ error: 'full_name and email required' });
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'Invalid email address' });
   if (full_name.length > 100) return res.status(400).json({ error: 'Full name must be 100 characters or fewer' });
   const companyId = req.user.company_id;
   const assignedRole = role === 'admin' ? 'admin' : 'worker';
@@ -949,7 +953,9 @@ router.post('/workers', requireAdmin, requirePermission('manage_workers'), async
     return res.status(400).json({ error: 'hourly_rate must be a non-negative number' });
   }
   const assignedRate = (!isNaN(rateVal) && rateVal >= 0) ? rateVal : 30;
-  const assignedEmail = req.body.email?.trim() || null;
+  const rawEmail = req.body.email?.trim() || null;
+  if (rawEmail && !isValidEmail(rawEmail)) return res.status(400).json({ error: 'Invalid email address' });
+  const assignedEmail = rawEmail;
   const VALID_OT_RULES = ['daily', 'weekly', 'none'];
   const assignedRateType = ['hourly', 'daily'].includes(req.body.rate_type) ? req.body.rate_type : 'hourly';
   const assignedOTRule = VALID_OT_RULES.includes(req.body.overtime_rule) ? req.body.overtime_rule : 'daily';

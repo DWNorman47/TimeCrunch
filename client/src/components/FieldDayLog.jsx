@@ -441,7 +441,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
                       </span>
                       {r.pending && <span style={s.pendingBadge}>⏳ {t.pendingSync}</span>}
                       {r.lat && (
-                        <a href={`https://www.google.com/maps?q=${r.lat},${r.lng}`} target="_blank" rel="noreferrer" style={s.mapLink}>📍</a>
+                        <a href={`https://www.google.com/maps?q=${r.lat},${r.lng}`} target="_blank" rel="noopener noreferrer" style={s.mapLink}>📍</a>
                       )}
                       {isAdmin && !r.pending && r.status !== 'reviewed' && (
                         <button style={s.reviewBtn} onClick={() => handleReview(r.id)}>✓ {t.reviewBtn}</button>

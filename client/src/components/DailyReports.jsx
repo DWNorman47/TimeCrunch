@@ -178,7 +178,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.superintendent}</label>
-          <input style={styles.input} type="text" placeholder={t.superintendent} value={form.superintendent} onChange={e => set('superintendent', e.target.value)} />
+          <input style={styles.input} type="text" placeholder={t.superintendent} value={form.superintendent} onChange={e => set('superintendent', e.target.value)} maxLength={255} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>

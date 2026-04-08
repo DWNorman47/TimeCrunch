@@ -56,10 +56,8 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
     if (breakStart <= s || breakEnd >= e) { setSplitError(t.entryPanelBreakWithin); return; }
     setSplitSaving(true); setSplitError('');
     try {
-      await Promise.all([
-        api.patch(`/time-entries/${entry.id}`, { start_time: s, end_time: breakStart, notes: entry.notes, break_minutes: entry.break_minutes, mileage: entry.mileage }),
-        api.post('/time-entries', { project_id: entry.project_id, work_date: entry.work_date.substring(0, 10), start_time: breakEnd, end_time: entry.end_time, notes: entry.notes || undefined, client_id: crypto.randomUUID(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
-      ]);
+      await api.patch(`/time-entries/${entry.id}`, { start_time: s, end_time: breakStart, notes: entry.notes, break_minutes: entry.break_minutes, mileage: entry.mileage });
+      await api.post('/time-entries', { project_id: entry.project_id, work_date: entry.work_date.substring(0, 10), start_time: breakEnd, end_time: entry.end_time, notes: entry.notes || undefined, client_id: crypto.randomUUID(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
       await onRefresh();
       onClose?.();
     } catch (err) { setSplitError(err.response?.data?.error || t.entryPanelFailedSplit); }
@@ -74,10 +72,8 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
     if (at <= s || at >= e) { setSplitError(t.entryPanelSwitchWithin); return; }
     setSplitSaving(true); setSplitError('');
     try {
-      await Promise.all([
-        api.patch(`/time-entries/${entry.id}`, { start_time: s, end_time: at, notes: entry.notes, break_minutes: entry.break_minutes, mileage: entry.mileage }),
-        api.post('/time-entries', { project_id, work_date: entry.work_date.substring(0, 10), start_time: at, end_time: entry.end_time, client_id: crypto.randomUUID(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
-      ]);
+      await api.patch(`/time-entries/${entry.id}`, { start_time: s, end_time: at, notes: entry.notes, break_minutes: entry.break_minutes, mileage: entry.mileage });
+      await api.post('/time-entries', { project_id, work_date: entry.work_date.substring(0, 10), start_time: at, end_time: entry.end_time, client_id: crypto.randomUUID(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
       await onRefresh();
       onClose?.();
     } catch (err) { setSplitError(err.response?.data?.error || t.entryPanelFailedSplit); }

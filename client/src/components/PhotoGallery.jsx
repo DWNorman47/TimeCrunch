@@ -56,7 +56,7 @@ function Lightbox({ items, index, onClose }) {
           <span>{fmtDate(item.reported_at)}</span>
           {item.lat && (
             <a href={`https://www.google.com/maps?q=${item.lat},${item.lng}`}
-               target="_blank" rel="noreferrer" style={styles.mapLink}>
+               target="_blank" rel="noopener noreferrer" style={styles.mapLink}>
               📍 Map
             </a>
           )}
