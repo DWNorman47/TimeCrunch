@@ -243,7 +243,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       {/* Work Performed */}
       <div style={styles.section}>
         <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.workPerformed}</span></div>
-        <textarea style={styles.textarea} rows={4} placeholder={t.workPerformedPlaceholder} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
+        <textarea style={styles.textarea} rows={4} placeholder={t.workPerformedPlaceholder} maxLength={5000} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
       </div>
 
       {/* Equipment */}
@@ -265,7 +265,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
             <tbody>
               {equipment.map((e, i) => (
                 <tr key={i}>
-                  <td style={styles.td}><RowInput value={e.name} onChange={v => updateRow(equipment, setEquipment, i, 'name', v)} placeholder="e.g. Excavator" /></td>
+                  <td style={styles.td}><RowInput value={e.name} onChange={v => updateRow(equipment, setEquipment, i, 'name', v)} placeholder={t.equipmentNamePlaceholder} /></td>
                   <td style={styles.td}><RowInput value={e.quantity} onChange={v => updateRow(equipment, setEquipment, i, 'quantity', v)} type="number" min="1" style={{ width: 55 }} /></td>
                   <td style={styles.td}><RowInput value={e.hours} onChange={v => updateRow(equipment, setEquipment, i, 'hours', v)} type="number" min="0" placeholder="0" style={{ width: 55 }} /></td>
                   <td style={styles.td}><button style={styles.removeRowBtn} aria-label="Remove row" onClick={() => removeRow(equipment, setEquipment, i)}>✕</button></td>
@@ -307,13 +307,13 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       {/* Delays */}
       <div style={styles.section}>
         <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.delaysIssues}</span></div>
-        <textarea style={styles.textarea} rows={3} placeholder={t.delaysIssuesPlaceholder} value={form.delays_issues} onChange={e => set('delays_issues', e.target.value)} />
+        <textarea style={styles.textarea} rows={3} placeholder={t.delaysIssuesPlaceholder} maxLength={2000} value={form.delays_issues} onChange={e => set('delays_issues', e.target.value)} />
       </div>
 
       {/* Visitor log */}
       <div style={styles.section}>
         <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.visitorLog}</span></div>
-        <textarea style={styles.textarea} rows={2} placeholder={t.visitorLogPlaceholder} value={form.visitor_log} onChange={e => set('visitor_log', e.target.value)} />
+        <textarea style={styles.textarea} rows={2} placeholder={t.visitorLogPlaceholder} maxLength={2000} value={form.visitor_log} onChange={e => set('visitor_log', e.target.value)} />
       </div>
 
       {fieldPhotos.length > 0 && (

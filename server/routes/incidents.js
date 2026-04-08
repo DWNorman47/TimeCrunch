@@ -67,6 +67,10 @@ router.post('/', requireAuth, async (req, res) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(incident_date) || isNaN(Date.parse(incident_date))) {
     return res.status(400).json({ error: 'incident_date must be a valid date (YYYY-MM-DD)' });
   }
+  if (description.trim().length > 2000) return res.status(400).json({ error: 'description too long (max 2000 characters)' });
+  if (injured_name && injured_name.length > 255) return res.status(400).json({ error: 'injured_name too long (max 255 characters)' });
+  if (witnesses && witnesses.length > 500) return res.status(400).json({ error: 'witnesses too long (max 500 characters)' });
+  if (corrective_action && corrective_action.length > 2000) return res.status(400).json({ error: 'corrective_action too long (max 2000 characters)' });
 
   const companyId = req.user.company_id;
   try {

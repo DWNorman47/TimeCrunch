@@ -421,11 +421,11 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
                         <label style={s.fieldLabel}>Address / Location</label>
-                        <input style={s.editInput} value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="123 Main St, City, State" />
+                        <input style={s.editInput} maxLength={255} value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="123 Main St, City, State" />
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
                         <label style={s.fieldLabel}>Description</label>
-                        <textarea style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Brief project description..." />
+                        <textarea style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Brief project description..." />
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
                         <label style={s.fieldLabel}>Progress % (0–100)</label>

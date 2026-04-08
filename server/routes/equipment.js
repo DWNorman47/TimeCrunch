@@ -26,6 +26,10 @@ router.get('/', requireAuth, async (req, res) => {
 router.post('/', requireAdmin, async (req, res) => {
   const { name, type, unit_number, maintenance_interval_hours, notes } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+  if (name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+  if (type && type.length > 100) return res.status(400).json({ error: 'type too long (max 100 characters)' });
+  if (unit_number && unit_number.length > 100) return res.status(400).json({ error: 'unit_number too long (max 100 characters)' });
+  if (notes && notes.length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -42,6 +46,10 @@ router.post('/', requireAdmin, async (req, res) => {
 router.patch('/:id', requireAdmin, async (req, res) => {
   const { name, type, unit_number, maintenance_interval_hours, notes } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+  if (name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+  if (type && type.length > 100) return res.status(400).json({ error: 'type too long (max 100 characters)' });
+  if (unit_number && unit_number.length > 100) return res.status(400).json({ error: 'unit_number too long (max 100 characters)' });
+  if (notes && notes.length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -95,6 +103,8 @@ router.get('/:id/hours', requireAuth, async (req, res) => {
 router.post('/:id/hours', requireAuth, async (req, res) => {
   const { log_date, hours, project_id, operator_name, notes } = req.body;
   if (!log_date || !hours) return res.status(400).json({ error: 'log_date and hours are required' });
+  if (operator_name && operator_name.length > 255) return res.status(400).json({ error: 'operator_name too long (max 255 characters)' });
+  if (notes && notes.length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
   const companyId = req.user.company_id;
   // Verify item belongs to this company
   try {

@@ -68,23 +68,23 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
         )}
         <div style={{ ...styles.fieldGroup, flex: 3 }}>
           <label style={styles.label}>{t.subjectField} *</label>
-          <input style={styles.input} type="text" placeholder="Brief description of the question or request" value={form.subject} onChange={e => set('subject', e.target.value)} required />
+          <input style={styles.input} type="text" placeholder="Brief description of the question or request" maxLength={255} value={form.subject} onChange={e => set('subject', e.target.value)} required />
         </div>
       </div>
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.descriptionField} <span style={styles.optional}>({t.optional})</span></label>
-        <textarea style={styles.textarea} rows={3} placeholder="Detailed description, background, or relevant context…" value={form.description} onChange={e => set('description', e.target.value)} />
+        <textarea style={styles.textarea} rows={3} placeholder="Detailed description, background, or relevant context…" maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} />
       </div>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.directedTo}</label>
-          <input style={styles.input} type="text" placeholder="e.g. Architect, Structural Engineer, Owner" value={form.directed_to} onChange={e => set('directed_to', e.target.value)} />
+          <input style={styles.input} type="text" placeholder="e.g. Architect, Structural Engineer, Owner" maxLength={255} value={form.directed_to} onChange={e => set('directed_to', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.submittedBy}</label>
-          <input style={styles.input} type="text" placeholder="Name or company" value={form.submitted_by} onChange={e => set('submitted_by', e.target.value)} />
+          <input style={styles.input} type="text" placeholder="Name or company" maxLength={255} value={form.submitted_by} onChange={e => set('submitted_by', e.target.value)} />
         </div>
       </div>
 
@@ -110,7 +110,7 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       {isEdit && (
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.rfiResponse}</label>
-          <textarea style={styles.textarea} rows={3} placeholder="Enter the response or answer received…" value={form.response} onChange={e => set('response', e.target.value)} />
+          <textarea style={styles.textarea} rows={3} placeholder="Enter the response or answer received…" maxLength={2000} value={form.response} onChange={e => set('response', e.target.value)} />
         </div>
       )}
 

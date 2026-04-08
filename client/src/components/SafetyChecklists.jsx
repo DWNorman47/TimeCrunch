@@ -259,7 +259,7 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
       {items.length > 0 && (
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.additionalNotes}</label>
-          <textarea style={styles.textarea} rows={2} placeholder={t.anyObservations} value={notes} onChange={e => setNotes(e.target.value)} />
+          <textarea style={styles.textarea} rows={2} placeholder={t.anyObservations} maxLength={1000} value={notes} onChange={e => setNotes(e.target.value)} />
         </div>
       )}
 

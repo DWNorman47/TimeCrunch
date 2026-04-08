@@ -129,7 +129,7 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
       </div>
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.inspDescriptionField} <span style={styles.optional}>{t.inspOptional}</span></label>
-        <input style={styles.input} value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of when to use this checklist" />
+        <input style={styles.input} maxLength={255} value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of when to use this checklist" />
       </div>
 
       <div>
@@ -346,7 +346,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.notes} <span style={styles.optional}>{t.inspOptional}</span></label>
-        <textarea style={styles.textarea} rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="General notes about this inspection…" />
+        <textarea style={styles.textarea} rows={3} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="General notes about this inspection…" />
       </div>
 
       {error && <p style={styles.error}>{error}</p>}

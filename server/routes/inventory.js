@@ -201,6 +201,10 @@ router.get('/items', requireAuth, async (req, res) => {
 router.post('/items', requireAdmin, async (req, res) => {
   const { name, sku, description, category, unit = 'each', unit_cost, reorder_point = 0, reorder_qty = 0 } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  if (name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+  if (sku && sku.trim().length > 100) return res.status(400).json({ error: 'sku too long (max 100 characters)' });
+  if (description && description.trim().length > 1000) return res.status(400).json({ error: 'description too long (max 1000 characters)' });
+  if (category && category.trim().length > 100) return res.status(400).json({ error: 'category too long (max 100 characters)' });
   if (unit_cost !== undefined && unit_cost !== null && isNaN(parseFloat(unit_cost))) {
     return res.status(400).json({ error: 'unit_cost must be a number' });
   }
@@ -224,6 +228,10 @@ router.post('/items', requireAdmin, async (req, res) => {
 router.patch('/items/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const { name, sku, description, category, unit, unit_cost, reorder_point, reorder_qty, active } = req.body;
+  if (name !== undefined && name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+  if (sku !== undefined && sku && sku.trim().length > 100) return res.status(400).json({ error: 'sku too long (max 100 characters)' });
+  if (description !== undefined && description && description.trim().length > 1000) return res.status(400).json({ error: 'description too long (max 1000 characters)' });
+  if (category !== undefined && category && category.trim().length > 100) return res.status(400).json({ error: 'category too long (max 100 characters)' });
   if (unit_cost !== undefined && unit_cost !== null && isNaN(parseFloat(unit_cost))) {
     return res.status(400).json({ error: 'unit_cost must be a number' });
   }

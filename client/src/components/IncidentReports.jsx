@@ -103,7 +103,7 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
           <div style={styles.row}>
             <div style={styles.fieldGroup}>
               <label style={styles.label}>{t.injuredName}</label>
-              <input style={styles.input} type="text" placeholder={t.fullNamePlaceholder} value={form.injured_name} onChange={e => set('injured_name', e.target.value)} />
+              <input style={styles.input} type="text" placeholder={t.fullNamePlaceholder} maxLength={255} value={form.injured_name} onChange={e => set('injured_name', e.target.value)} />
             </div>
             <div style={styles.fieldGroup}>
               <label style={styles.label}>{t.bodyPartAffected}</label>
@@ -121,17 +121,17 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.descriptionField} *</label>
-        <textarea style={styles.textarea} rows={4} placeholder={t.describeWhatHappened} value={form.description} onChange={e => set('description', e.target.value)} required />
+        <textarea style={styles.textarea} rows={4} placeholder={t.describeWhatHappened} maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} required />
       </div>
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.witnessesLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
-        <input style={styles.input} type="text" placeholder={t.witnessesPlaceholder} value={form.witnesses} onChange={e => set('witnesses', e.target.value)} />
+        <input style={styles.input} type="text" placeholder={t.witnessesPlaceholder} maxLength={500} value={form.witnesses} onChange={e => set('witnesses', e.target.value)} />
       </div>
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.correctiveActionLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
-        <textarea style={styles.textarea} rows={3} placeholder={t.correctiveActionPlaceholder} value={form.corrective_action} onChange={e => set('corrective_action', e.target.value)} />
+        <textarea style={styles.textarea} rows={3} placeholder={t.correctiveActionPlaceholder} maxLength={2000} value={form.corrective_action} onChange={e => set('corrective_action', e.target.value)} />
       </div>
 
       <label style={styles.checkRow}>

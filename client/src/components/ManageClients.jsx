@@ -85,12 +85,12 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
 
       <div style={s.field}>
         <label style={s.label}>{t.address}</label>
-        <input style={s.input} value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, State 00000" />
+        <input style={s.input} maxLength={255} value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, State 00000" />
       </div>
 
       <div style={s.field}>
         <label style={s.label}>{t.notes} <span style={s.opt}>({t.optional})</span></label>
-        <textarea style={s.textarea} rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional information..." />
+        <textarea style={s.textarea} rows={2} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional information..." />
       </div>
 
       {error && <p style={s.error}>{error}</p>}

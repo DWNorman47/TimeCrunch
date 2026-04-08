@@ -37,6 +37,9 @@ router.post('/', requireAdmin, async (req, res) => {
   if (!subject || !date_submitted) {
     return res.status(400).json({ error: 'subject and date_submitted are required' });
   }
+  if (subject.length > 255) return res.status(400).json({ error: 'subject too long (max 255 characters)' });
+  if (directed_to && directed_to.length > 255) return res.status(400).json({ error: 'directed_to too long (max 255 characters)' });
+  if (submitted_by && submitted_by.length > 255) return res.status(400).json({ error: 'submitted_by too long (max 255 characters)' });
   if (description && description.length > 2000) return res.status(400).json({ error: 'description too long (max 2000 characters)' });
   const companyId = req.user.company_id;
   try {
@@ -69,6 +72,9 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   const directed_to = req.body.directed_to !== undefined ? (req.body.directed_to?.trim() || null) : undefined;
   const submitted_by = req.body.submitted_by !== undefined ? (req.body.submitted_by?.trim() || null) : undefined;
   const response = req.body.response !== undefined ? (req.body.response?.trim() || null) : undefined;
+  if (subject !== undefined && subject && subject.length > 255) return res.status(400).json({ error: 'subject too long (max 255 characters)' });
+  if (directed_to !== undefined && directed_to && directed_to.length > 255) return res.status(400).json({ error: 'directed_to too long (max 255 characters)' });
+  if (submitted_by !== undefined && submitted_by && submitted_by.length > 255) return res.status(400).json({ error: 'submitted_by too long (max 255 characters)' });
   if (description !== undefined && description && description.length > 2000) return res.status(400).json({ error: 'description too long (max 2000 characters)' });
   if (response !== undefined && response && response.length > 2000) return res.status(400).json({ error: 'response too long (max 2000 characters)' });
   try {
