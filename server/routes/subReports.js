@@ -40,6 +40,7 @@ router.post('/', requireAdmin, async (req, res) => {
   if (!report_date || !sub_company) {
     return res.status(400).json({ error: 'report_date and sub_company are required' });
   }
+  if (sub_company.length > 255) return res.status(400).json({ error: 'sub_company too long (max 255 characters)' });
   if (foreman_name && foreman_name.length > 255) return res.status(400).json({ error: 'foreman_name too long (max 255 characters)' });
   if (work_performed && work_performed.length > 2000) return res.status(400).json({ error: 'work_performed too long (max 2000 characters)' });
   if (notes && notes.length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
@@ -75,6 +76,7 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   if (!report_date || !sub_company) {
     return res.status(400).json({ error: 'report_date and sub_company are required' });
   }
+  if (sub_company.length > 255) return res.status(400).json({ error: 'sub_company too long (max 255 characters)' });
   if (foreman_name && foreman_name.length > 255) return res.status(400).json({ error: 'foreman_name too long (max 255 characters)' });
   if (work_performed && work_performed.length > 2000) return res.status(400).json({ error: 'work_performed too long (max 2000 characters)' });
   if (notes && notes.length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });

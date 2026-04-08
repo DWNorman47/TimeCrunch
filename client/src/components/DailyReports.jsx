@@ -27,12 +27,12 @@ function emptyRow(type) {
 
 // ── Editable table row ─────────────────────────────────────────────────────────
 
-function RowInput({ value, onChange, type = 'text', placeholder, style, min }) {
+function RowInput({ value, onChange, type = 'text', placeholder, style, min, maxLength }) {
   return (
     <input
       style={{ ...styles.cellInput, ...style }}
       type={type} value={value} placeholder={placeholder}
-      min={min}
+      min={min} maxLength={maxLength}
       onChange={e => onChange(e.target.value)}
     />
   );
@@ -228,10 +228,10 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
           <tbody>
             {manpower.map((m, i) => (
               <tr key={i}>
-                <td style={styles.td}><RowInput value={m.trade} onChange={v => updateRow(manpower, setManpower, i, 'trade', v)} placeholder="e.g. Carpenters" /></td>
+                <td style={styles.td}><RowInput value={m.trade} onChange={v => updateRow(manpower, setManpower, i, 'trade', v)} placeholder="e.g. Carpenters" maxLength={255} /></td>
                 <td style={styles.td}><RowInput value={m.worker_count} onChange={v => updateRow(manpower, setManpower, i, 'worker_count', v)} type="number" min="1" style={{ width: 55 }} /></td>
                 <td style={styles.td}><RowInput value={m.hours} onChange={v => updateRow(manpower, setManpower, i, 'hours', v)} type="number" min="0" placeholder="0" style={{ width: 55 }} /></td>
-                <td style={styles.td}><RowInput value={m.notes} onChange={v => updateRow(manpower, setManpower, i, 'notes', v)} placeholder={t.optional} /></td>
+                <td style={styles.td}><RowInput value={m.notes} onChange={v => updateRow(manpower, setManpower, i, 'notes', v)} placeholder={t.optional} maxLength={500} /></td>
                 <td style={styles.td}><button style={styles.removeRowBtn} aria-label="Remove row" onClick={() => removeRow(manpower, setManpower, i)}>✕</button></td>
               </tr>
             ))}
@@ -265,7 +265,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
             <tbody>
               {equipment.map((e, i) => (
                 <tr key={i}>
-                  <td style={styles.td}><RowInput value={e.name} onChange={v => updateRow(equipment, setEquipment, i, 'name', v)} placeholder={t.equipmentNamePlaceholder} /></td>
+                  <td style={styles.td}><RowInput value={e.name} onChange={v => updateRow(equipment, setEquipment, i, 'name', v)} placeholder={t.equipmentNamePlaceholder} maxLength={255} /></td>
                   <td style={styles.td}><RowInput value={e.quantity} onChange={v => updateRow(equipment, setEquipment, i, 'quantity', v)} type="number" min="1" style={{ width: 55 }} /></td>
                   <td style={styles.td}><RowInput value={e.hours} onChange={v => updateRow(equipment, setEquipment, i, 'hours', v)} type="number" min="0" placeholder="0" style={{ width: 55 }} /></td>
                   <td style={styles.td}><button style={styles.removeRowBtn} aria-label="Remove row" onClick={() => removeRow(equipment, setEquipment, i)}>✕</button></td>
@@ -294,7 +294,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
             <tbody>
               {materials.map((m, i) => (
                 <tr key={i}>
-                  <td style={styles.td}><RowInput value={m.description} onChange={v => updateRow(materials, setMaterials, i, 'description', v)} placeholder="e.g. Lumber 2x4" /></td>
+                  <td style={styles.td}><RowInput value={m.description} onChange={v => updateRow(materials, setMaterials, i, 'description', v)} placeholder="e.g. Lumber 2x4" maxLength={500} /></td>
                   <td style={styles.td}><RowInput value={m.quantity} onChange={v => updateRow(materials, setMaterials, i, 'quantity', v)} placeholder="e.g. 200 boards" /></td>
                   <td style={styles.td}><button style={styles.removeRowBtn} aria-label="Remove row" onClick={() => removeRow(materials, setMaterials, i)}>✕</button></td>
                 </tr>

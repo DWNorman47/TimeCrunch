@@ -22,7 +22,10 @@ router.get('/', requireAuth, async (req, res) => {
       conditions.push(`r.user_id = $${params.length}`);
     }
     if (project_id) { params.push(project_id); conditions.push(`r.project_id = $${params.length}`); }
-    if (status) { params.push(status); conditions.push(`r.status = $${params.length}`); }
+    if (status) {
+      if (!['draft', 'submitted', 'reviewed'].includes(status)) return res.status(400).json({ error: 'Invalid status' });
+      params.push(status); conditions.push(`r.status = $${params.length}`);
+    }
     if (from) { params.push(from); conditions.push(`COALESCE(r.report_date, r.reported_at::date) >= $${params.length}::date`); }
     if (to) { params.push(to); conditions.push(`COALESCE(r.report_date, r.reported_at::date) <= $${params.length}::date`); }
 

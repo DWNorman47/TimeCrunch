@@ -34,7 +34,10 @@ router.get('/', requireAuth, async (req, res) => {
     if (project_id) { params.push(project_id); conditions.push(`r.project_id = $${params.length}`); }
     if (from) { params.push(from); conditions.push(`r.report_date >= $${params.length}`); }
     if (to) { params.push(to); conditions.push(`r.report_date <= $${params.length}`); }
-    if (status) { params.push(status); conditions.push(`r.status = $${params.length}`); }
+    if (status) {
+      if (!['draft', 'submitted', 'reviewed'].includes(status)) return res.status(400).json({ error: 'Invalid status' });
+      params.push(status); conditions.push(`r.status = $${params.length}`);
+    }
 
     const result = await pool.query(
       `SELECT r.*, p.name as project_name, u.full_name as created_by_name,
@@ -121,6 +124,18 @@ router.post('/', requireAuth, async (req, res) => {
     );
     const reportId = result.rows[0].id;
 
+    // Validate sub-table row fields
+    for (const m of manpower) {
+      if (m.trade && m.trade.length > 255) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Manpower trade too long (max 255 characters)' }); }
+      if (m.notes && m.notes.length > 500) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Manpower notes too long (max 500 characters)' }); }
+    }
+    for (const e of equipment) {
+      if (e.name && e.name.length > 255) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Equipment name too long (max 255 characters)' }); }
+    }
+    for (const m of materials) {
+      if (m.description && m.description.length > 500) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Material description too long (max 500 characters)' }); }
+    }
+
     // Replace sub-tables
     await client.query('DELETE FROM daily_report_manpower WHERE report_id=$1', [reportId]);
     for (const m of manpower) {
@@ -199,6 +214,18 @@ router.patch('/:id', requireAuth, async (req, res) => {
        visitor_log?.trim() ?? existing.rows[0].visitor_log,
        status || null, req.params.id]
     );
+
+    // Validate sub-table row fields
+    for (const m of manpower) {
+      if (m.trade && m.trade.length > 255) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Manpower trade too long (max 255 characters)' }); }
+      if (m.notes && m.notes.length > 500) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Manpower notes too long (max 500 characters)' }); }
+    }
+    for (const e of equipment) {
+      if (e.name && e.name.length > 255) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Equipment name too long (max 255 characters)' }); }
+    }
+    for (const m of materials) {
+      if (m.description && m.description.length > 500) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Material description too long (max 500 characters)' }); }
+    }
 
     await client.query('DELETE FROM daily_report_manpower WHERE report_id=$1', [req.params.id]);
     for (const m of manpower) {

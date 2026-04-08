@@ -69,7 +69,10 @@ router.get('/', requireAuth, async (req, res) => {
   const conditions = ['i.company_id = $1'];
   const params = [req.user.company_id];
   if (project_id) { params.push(project_id); conditions.push(`i.project_id = $${params.length}`); }
-  if (status) { params.push(status); conditions.push(`i.status = $${params.length}`); }
+  if (status) {
+    if (!['pass', 'fail', 'partial'].includes(status)) return res.status(400).json({ error: 'Invalid status' });
+    params.push(status); conditions.push(`i.status = $${params.length}`);
+  }
   if (template_id) { params.push(template_id); conditions.push(`i.template_id = $${params.length}`); }
   if (from) { params.push(from); conditions.push(`i.inspected_at >= $${params.length}`); }
   if (to) { params.push(to); conditions.push(`i.inspected_at <= $${params.length}`); }

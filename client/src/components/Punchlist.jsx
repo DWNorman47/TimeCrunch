@@ -50,7 +50,7 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.titleField} *</label>
-          <input style={styles.input} type="text" placeholder="e.g. Patch drywall in office 2B" value={form.title} onChange={e => set('title', e.target.value)} />
+          <input style={styles.input} type="text" placeholder="e.g. Patch drywall in office 2B" maxLength={255} value={form.title} onChange={e => set('title', e.target.value)} />
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
@@ -78,14 +78,14 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
         )}
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.phaseField}</label>
-          <input style={styles.input} type="text" list="phase-suggestions" placeholder="e.g. Foundation, Rough-in" value={form.phase} onChange={e => set('phase', e.target.value)} />
+          <input style={styles.input} type="text" list="phase-suggestions" placeholder="e.g. Foundation, Rough-in" maxLength={255} value={form.phase} onChange={e => set('phase', e.target.value)} />
           <datalist id="phase-suggestions">
             {existingPhases.map(p => <option key={p} value={p} />)}
           </datalist>
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.locationField}</label>
-          <input style={styles.input} type="text" placeholder="e.g. 2nd floor, north wing" value={form.location} onChange={e => set('location', e.target.value)} />
+          <input style={styles.input} type="text" placeholder="e.g. 2nd floor, north wing" maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.descriptionField}</label>
@@ -238,6 +238,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
               type="text"
               list="phase-suggestions"
               placeholder={t.phaseEditPlaceholder}
+              maxLength={255}
               value={editPhase}
               onChange={e => setEditPhase(e.target.value)}
               onBlur={savePhase}
