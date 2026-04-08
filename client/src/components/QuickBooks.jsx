@@ -21,6 +21,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [pushing, setPushing] = useState(false);
   const [forcePush, setForcePush] = useState(false);
   const [error, setError] = useState('');
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 
   // Import state
   const [selectedWorkers, setSelectedWorkers] = useState(new Set());
@@ -77,7 +78,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   };
 
   const handleDisconnect = async () => {
-    if (!window.confirm(t.qboDisconnectConfirm)) return;
+    setConfirmingDisconnect(false);
     await api.delete('/qbo/disconnect');
     setStatus({ connected: false });
   };
@@ -199,7 +200,15 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 <span style={styles.connectedSince}> · {t.qboConnectedSince} {new Date(status.connected_at).toLocaleDateString()}</span>
               )}
             </div>
-            <button style={styles.disconnectBtn} onClick={handleDisconnect}>{t.qboDisconnect}</button>
+            {confirmingDisconnect ? (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: '#374151' }}>{t.qboDisconnectConfirm}</span>
+                <button style={styles.disconnectBtn} onClick={handleDisconnect}>{t.confirm}</button>
+                <button style={styles.cancelBtn} onClick={() => setConfirmingDisconnect(false)}>{t.cancel}</button>
+              </div>
+            ) : (
+              <button style={styles.disconnectBtn} onClick={() => setConfirmingDisconnect(true)}>{t.qboDisconnect}</button>
+            )}
           </div>
         ) : (
           <div>
@@ -466,6 +475,7 @@ const styles = {
   connectedSince: { fontSize: 13, color: '#6b7280', flex: 1 },
   connectBtn: { background: '#2CA01C', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 14, cursor: 'pointer' },
   disconnectBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 7, padding: '6px 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer', color: '#6b7280' },
+  cancelBtn: { background: '#e5e7eb', border: 'none', borderRadius: 7, padding: '6px 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer', color: '#374151' },
   error: { color: '#e53e3e', fontSize: 13, marginTop: 8 },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', padding: '8px 12px', fontSize: 13, fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' },

@@ -12,6 +12,9 @@ const { requireAuth } = require('../middleware/auth');
 // Hash a token for safe storage — raw token goes in the email, hash goes in the DB
 const sha256 = str => crypto.createHash('sha256').update(str).digest('hex');
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const isValidEmail = email => EMAIL_RE.test(String(email).trim());
+
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 15,
@@ -402,6 +405,7 @@ router.post('/resend-confirmation', async (req, res) => {
 router.post('/forgot-password', authLimiter, async (req, res) => {
   const { email, company } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
+  if (!isValidEmail(email)) return res.json({ success: true }); // silently drop — don't leak validation info
   try {
     let result;
     if (company && company.trim()) {

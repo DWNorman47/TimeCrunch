@@ -400,6 +400,7 @@ router.patch('/active-clock/:user_id', requireAdmin, requirePermission('manage_w
   const companyId = req.user.company_id;
   const { clock_in_time } = req.body;
   if (!clock_in_time) return res.status(400).json({ error: 'clock_in_time required' });
+  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(clock_in_time)) return res.status(400).json({ error: 'clock_in_time must be HH:MM or HH:MM:SS' });
   try {
     const result = await pool.query(
       `UPDATE active_clock SET clock_in_time = $1
@@ -815,8 +816,9 @@ router.post('/workers/invite', requireAdmin, requirePermission('manage_workers')
   if (!isValidEmail(email)) return res.status(400).json({ error: 'Invalid email address' });
   if (full_name.length > 100) return res.status(400).json({ error: 'Full name must be 100 characters or fewer' });
   const companyId = req.user.company_id;
+  const VALID_LANGUAGES = ['English', 'Spanish'];
   const assignedRole = role === 'admin' ? 'admin' : 'worker';
-  const assignedLanguage = language || 'English';
+  const assignedLanguage = VALID_LANGUAGES.includes(language) ? language : 'English';
   const rateVal = parseFloat(hourly_rate);
   if (hourly_rate !== undefined && (isNaN(rateVal) || rateVal < 0)) {
     return res.status(400).json({ error: 'hourly_rate must be a non-negative number' });
@@ -947,8 +949,9 @@ router.post('/workers', requireAdmin, requirePermission('manage_workers'), async
     return res.status(400).json({ error: 'username, password, and full_name required' });
   }
   const companyId = req.user.company_id;
+  const VALID_LANGUAGES = ['English', 'Spanish'];
   const assignedRole = role === 'admin' ? 'admin' : 'worker';
-  const assignedLanguage = req.body.language || 'English';
+  const assignedLanguage = VALID_LANGUAGES.includes(req.body.language) ? req.body.language : 'English';
   const rateVal = parseFloat(req.body.hourly_rate);
   if (req.body.hourly_rate !== undefined && (isNaN(rateVal) || rateVal < 0)) {
     return res.status(400).json({ error: 'hourly_rate must be a non-negative number' });
@@ -1016,10 +1019,21 @@ function computeGuaranteeShortfall(totalHours, guaranteedWeeklyHours, fromDate, 
 
 // Update a worker (full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, email, worker_type)
 router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
-  const { full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type } = req.body;
+  const { role, language, hourly_rate, rate_type, overtime_rule, worker_type } = req.body;
+  const full_name = req.body.full_name?.trim();
+  const first_name = req.body.first_name !== undefined ? (req.body.first_name?.trim() || null) : undefined;
+  const middle_name = req.body.middle_name !== undefined ? (req.body.middle_name?.trim() || null) : undefined;
+  const last_name = req.body.last_name !== undefined ? (req.body.last_name?.trim() || null) : undefined;
+  const username = req.body.username?.trim();
+  const email = req.body.email !== undefined ? (req.body.email?.trim() || null) : undefined;
   const hasGuarantee = 'guaranteed_weekly_hours' in req.body;
   if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && rate_type === undefined && overtime_rule === undefined && email === undefined && worker_type === undefined && !hasGuarantee) {
     return res.status(400).json({ error: 'At least one field required' });
+  }
+  if (email && !isValidEmail(email)) return res.status(400).json({ error: 'Invalid email address' });
+  const VALID_LANGUAGES = ['English', 'Spanish'];
+  if (language !== undefined && !VALID_LANGUAGES.includes(language)) {
+    return res.status(400).json({ error: 'Invalid language' });
   }
   const companyId = req.user.company_id;
   const assignedRole = role ? (role === 'admin' ? 'admin' : 'worker') : undefined;
@@ -1060,7 +1074,11 @@ router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), 
     if (overtime_rule !== undefined) { fields.push(`overtime_rule = $${idx++}`); values.push(overtime_rule); }
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email || null); }
     if (worker_type !== undefined) { fields.push(`worker_type = $${idx++}`); values.push(worker_type); }
-    if (req.body.invoice_name !== undefined) { fields.push(`invoice_name = $${idx++}`); values.push(req.body.invoice_name?.trim() || null); }
+    if (req.body.invoice_name !== undefined) {
+      const inv = req.body.invoice_name?.trim() || null;
+      if (inv && inv.length > 100) return res.status(400).json({ error: 'invoice_name must be 100 characters or fewer' });
+      fields.push(`invoice_name = $${idx++}`); values.push(inv);
+    }
     if (hasGuarantee) {
       const gv = req.body.guaranteed_weekly_hours;
       if (gv === null || gv === '' || gv === undefined) {

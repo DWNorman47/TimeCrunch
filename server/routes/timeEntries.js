@@ -60,6 +60,8 @@ router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
 
     const bm = parseInt(break_minutes) || 0;
     if (bm < 0) return res.status(400).json({ error: 'break_minutes must be non-negative' });
+    const mileageParsed = mileage != null ? parseFloat(mileage) : null;
+    const mileageVal = (mileageParsed != null && !isNaN(mileageParsed) && mileageParsed >= 0) ? mileageParsed : null;
     const cid = (typeof client_id === 'string' && client_id.length <= 36) ? client_id : null;
     const result = await pool.query(
       `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes, break_minutes, mileage, timezone, client_id, clock_source)
@@ -67,7 +69,7 @@ router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
        ON CONFLICT (user_id, client_id) WHERE client_id IS NOT NULL DO NOTHING
        RETURNING *`,
       [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notes || null,
-       bm, mileage != null ? parseFloat(mileage) : null, timezone || null, cid, 'log_entry']
+       bm, mileageVal, timezone || null, cid, 'log_entry']
     );
     if (result.rowCount === 0) return res.status(409).json({ error: 'Duplicate entry' });
     const entry = result.rows[0];
@@ -119,11 +121,12 @@ router.patch('/:id', requireAuth, async (req, res) => {
     if (locked.rowCount > 0) return res.status(403).json({ error: 'This entry is in a locked pay period' });
     const bm = parseInt(break_minutes) || 0;
     if (bm < 0) return res.status(400).json({ error: 'break_minutes must be non-negative' });
+    const mileageParsed = mileage != null ? parseFloat(mileage) : null;
+    const mileageVal = (mileageParsed != null && !isNaN(mileageParsed) && mileageParsed >= 0) ? mileageParsed : null;
     const result = await pool.query(
       `UPDATE time_entries SET start_time = $1, end_time = $2, notes = $3, break_minutes = $4, mileage = $5,
        status = 'pending', approval_note = NULL WHERE id = $6 RETURNING *`,
-      [start_time, end_time, notes || null, bm,
-       mileage != null ? parseFloat(mileage) : null, req.params.id]
+      [start_time, end_time, notes?.trim() || null, bm, mileageVal, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) {
