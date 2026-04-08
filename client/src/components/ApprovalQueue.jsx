@@ -363,7 +363,7 @@ export default function ApprovalQueue({ onCountChange }) {
                         <div style={styles.editTimesLabel}>Project</div>
                         <select style={styles.editProjectSelect} value={editProject} onChange={ev => setEditProject(ev.target.value)}>
                           <option value="">— No project —</option>
-                          {projects.filter(p => p.active !== false).map(p => (
+                          {(projects || []).filter(p => p.active !== false).map(p => (
                             <option key={p.id} value={p.id}>{p.name}</option>
                           ))}
                         </select>
@@ -396,7 +396,7 @@ export default function ApprovalQueue({ onCountChange }) {
                               <select style={styles.editProjectSelect} value={seg.project_id}
                                 onChange={ev => setSplitSegments(prev => prev.map((s, j) => j === i ? { ...s, project_id: ev.target.value } : s))}>
                                 <option value="">— No project —</option>
-                                {projects.filter(p => p.active !== false).map(p => (
+                                {(projects || []).filter(p => p.active !== false).map(p => (
                                   <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
                               </select>

@@ -54,7 +54,7 @@ router.post('/login', loginLimiter, async (req, res) => {
   const logFailure = (reason) => pool.query(
     'INSERT INTO login_failures (attempted_company, attempted_username, failure_reason, ip) VALUES ($1, $2, $3, $4)',
     [company_name, username, reason, ip]
-  ).catch(() => {});
+  ).catch(err => console.error('Failed to log login failure:', err));
   try {
     // Step 1: check company name
     const companyRes = await pool.query(

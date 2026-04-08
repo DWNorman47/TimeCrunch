@@ -2,6 +2,7 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
+const rateLimit = require('express-rate-limit');
 const pool = require('../db');
 const { requireAdmin, requirePlan, requireProAddon, requirePermission } = require('../middleware/auth');
 const { sendPushToUser, sendPushToAllWorkers } = require('../push');
@@ -798,7 +799,14 @@ router.get('/workers/check-username', requireAdmin, async (req, res) => {
 });
 
 // Invite a worker by email
-router.post('/workers/invite', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+const inviteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 50,
+  keyGenerator: req => String(req.user?.id || req.ip),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+router.post('/workers/invite', requireAdmin, requirePermission('manage_workers'), inviteLimiter, async (req, res) => {
   const { full_name, email, role, language, hourly_rate } = req.body;
   if (!full_name || !email) return res.status(400).json({ error: 'full_name and email required' });
   if (full_name.length > 100) return res.status(400).json({ error: 'Full name must be 100 characters or fewer' });
@@ -1812,7 +1820,7 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
                 ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600)::numeric, 2) as hours
          FROM time_entries
          WHERE company_id = $1 AND work_date >= CURRENT_DATE - 13
-         GROUP BY work_date ORDER BY work_date ASC`,
+         GROUP BY work_date ORDER BY work_date ASC LIMIT 14`,
         [companyId]
       ),
       // Hours per week for the last 12 weeks
@@ -1821,7 +1829,7 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
                 ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600)::numeric, 1) as hours
          FROM time_entries
          WHERE company_id = $1 AND work_date >= CURRENT_DATE - 83
-         GROUP BY week_start ORDER BY week_start ASC`,
+         GROUP BY week_start ORDER BY week_start ASC LIMIT 12`,
         [companyId]
       ),
       // Top projects by hours, last 30 days

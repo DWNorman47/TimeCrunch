@@ -37,15 +37,16 @@ router.post('/admin', requireAdmin, async (req, res) => {
       [user_id, companyId]
     );
     if (workerCheck.rowCount === 0) return res.status(400).json({ error: 'Worker not found' });
-    const result = await pool.query(
-      `INSERT INTO shifts (company_id, user_id, project_id, shift_date, start_time, end_time, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [companyId, user_id, project_id || null, shift_date, start_time, end_time, notes || null]
-    );
     const full = await pool.query(
-      `SELECT s.*, u.full_name as worker_name, p.name as project_name
-       FROM shifts s JOIN users u ON s.user_id = u.id LEFT JOIN projects p ON s.project_id = p.id
-       WHERE s.id = $1`, [result.rows[0].id]
+      `WITH inserted AS (
+         INSERT INTO shifts (company_id, user_id, project_id, shift_date, start_time, end_time, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+       )
+       SELECT s.*, u.full_name as worker_name, p.name as project_name
+       FROM inserted s
+       JOIN users u ON s.user_id = u.id
+       LEFT JOIN projects p ON s.project_id = p.id`,
+      [companyId, user_id, project_id || null, shift_date, start_time, end_time, notes || null]
     );
     const shift = full.rows[0];
     sendPushToUser(user_id, {

@@ -112,9 +112,9 @@ export default function AnalyticsDashboard() {
         />
         {(parseFloat(summary.mileage_this_month) > 0 || parseFloat(summary.mileage_this_week) > 0) && (
           <StatCard
-            label="Mileage This Month"
+            label={t.mileageThisMonth}
             value={`${summary.mileage_this_month} mi`}
-            sub={`${summary.mileage_this_week} mi this week`}
+            sub={t.mileageThisWeek.replace('{n}', summary.mileage_this_week)}
             color="#8b5cf6"
           />
         )}

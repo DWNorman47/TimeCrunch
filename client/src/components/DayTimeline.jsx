@@ -241,7 +241,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
   // ── Render ───────────────────────────────────────────────────────────────────
   if (segments === null) return null;
 
-  const activeProjects = projects.filter(p => p.active !== false);
+  const activeProjects = (projects || []).filter(p => p.active !== false);
 
   const isEmpty = segments.length === 0;
 

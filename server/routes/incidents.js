@@ -36,7 +36,7 @@ router.get('/', requireAuth, async (req, res) => {
 
   try {
     const result = await pool.query(
-      `${BASE_QUERY} WHERE ${conditions.join(' AND ')} ORDER BY i.incident_date DESC, i.created_at DESC`,
+      `${BASE_QUERY} WHERE ${conditions.join(' AND ')} ORDER BY i.incident_date DESC, i.created_at DESC LIMIT 1000`,
       params
     );
     res.json(result.rows);

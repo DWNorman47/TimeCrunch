@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadBase64 } = require('../r2');
@@ -47,7 +48,14 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/reimbursements — worker: submit a reimbursement
-router.post('/', async (req, res) => {
+const reimbLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 50,
+  keyGenerator: req => String(req.user?.id || req.ip),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+router.post('/', reimbLimiter, async (req, res) => {
   const { amount, description, category, expense_date, receipt, project_id } = req.body;
   if (!amount || !expense_date) {
     return res.status(400).json({ error: 'amount and expense_date are required' });
