@@ -300,11 +300,11 @@ const translations = {
     exportCSV: 'Export CSV',
     downloadPDF: 'Download PDF',
     preparingPDF: 'Preparing PDF...',
-    totalMetric: 'Total',
-    regularMetric: 'Regular',
-    overtimeMetric: 'Overtime',
-    prevailingMetric: 'Prevailing',
-    entriesMetric: 'Entries',
+    totalMetric: 'Total (12 mo)',
+    regularMetric: 'Regular (12 mo)',
+    overtimeMetric: 'Overtime (12 mo)',
+    prevailingMetric: 'Prevailing (12 mo)',
+    entriesMetric: 'Entries (12 mo)',
 
     // ── Manage Schedule ──────────────────────────────────────────────────────
     schedule: 'Schedule',
@@ -1309,11 +1309,11 @@ const translations = {
     exportCSV: 'Exportar CSV',
     downloadPDF: 'Descargar PDF',
     preparingPDF: 'Preparando PDF...',
-    totalMetric: 'Total',
-    regularMetric: 'Regular',
-    overtimeMetric: 'Horas Extra',
-    prevailingMetric: 'Prevaleciente',
-    entriesMetric: 'Entradas',
+    totalMetric: 'Total (12 m)',
+    regularMetric: 'Regular (12 m)',
+    overtimeMetric: 'H. Extra (12 m)',
+    prevailingMetric: 'Prev. (12 m)',
+    entriesMetric: 'Entradas (12 m)',
 
     // ── Manage Schedule ──────────────────────────────────────────────────────
     schedule: 'Horario',

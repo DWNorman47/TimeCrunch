@@ -573,6 +573,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
           SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600) as day_hours
         FROM time_entries
         WHERE wage_type = 'regular' AND company_id = $1
+          AND work_date >= CURRENT_DATE - INTERVAL '365 days'
         GROUP BY user_id, work_date
       ),
       weekly_regular AS (
@@ -603,6 +604,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600 ELSE 0 END), 0) as prevailing_hours
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
+        AND te.work_date >= CURRENT_DATE - INTERVAL '365 days'
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1 ${accessFilter}
       GROUP BY u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password
       ORDER BY u.role DESC, u.full_name
@@ -1854,7 +1856,9 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_approvals,
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('week', CURRENT_DATE) THEN mileage END), 0)::numeric, 1) as mileage_this_week,
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN mileage END), 0)::numeric, 1) as mileage_this_month
-         FROM time_entries WHERE company_id = $1`,
+         FROM time_entries WHERE company_id = $1
+           AND (work_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
+                OR status = 'pending')`,
         [companyId]
       ),
     ]);
