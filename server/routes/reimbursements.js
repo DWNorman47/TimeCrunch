@@ -11,7 +11,7 @@ const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
 //   active — shown in form dropdowns (defaults minus suppressed, plus custom)
 //   known  — all valid category values for display (all defaults + current custom)
 //            if a stored category isn't in "known", the client shows "Other"
-router.get('/categories', requireAuth, async (req, res) => {
+router.get('/categories', async (req, res) => {
   try {
     const all = await getAdvancedSettings(req.user.company_id);
     const cfg = all.reimbursement_categories;
@@ -28,7 +28,7 @@ router.get('/categories', requireAuth, async (req, res) => {
 });
 
 // GET /api/reimbursements — worker: list own reimbursements
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT r.id, r.amount, r.description, r.category, r.expense_date, r.receipt_url,
@@ -47,7 +47,7 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // POST /api/reimbursements — worker: submit a reimbursement
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', async (req, res) => {
   const { amount, description, category, expense_date, receipt, project_id } = req.body;
   if (!amount || !expense_date) {
     return res.status(400).json({ error: 'amount and expense_date are required' });
@@ -83,7 +83,7 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/reimbursements/:id — worker: delete own pending reimbursement
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `DELETE FROM reimbursements WHERE id = $1 AND company_id = $2 AND user_id = $3 AND status = 'pending'
@@ -104,7 +104,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 // --- Admin routes ---
 
 // POST /api/reimbursements/admin — admin: submit a reimbursement for any worker (or self)
-router.post('/admin', requireAuth, requireAdmin, async (req, res) => {
+router.post('/admin', requireAdmin, async (req, res) => {
   const { user_id, amount, description, category, expense_date, receipt, project_id, status = 'approved' } = req.body;
   if (!user_id || !amount || !expense_date) {
     return res.status(400).json({ error: 'user_id, amount, and expense_date are required' });
@@ -142,7 +142,7 @@ router.post('/admin', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // GET /api/reimbursements/admin — admin: list all reimbursements for company
-router.get('/admin', requireAuth, requireAdmin, async (req, res) => {
+router.get('/admin', requireAdmin, async (req, res) => {
   const { status, user_id } = req.query;
   const conditions = ['r.company_id = $1'];
   const params = [req.user.company_id];
@@ -169,7 +169,7 @@ router.get('/admin', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // PATCH /api/reimbursements/admin/:id — admin: approve or reject
-router.patch('/admin/:id', requireAuth, requireAdmin, async (req, res) => {
+router.patch('/admin/:id', requireAdmin, async (req, res) => {
   const { status, admin_notes } = req.body;
   if (!['approved', 'rejected', 'pending'].includes(status)) {
     return res.status(400).json({ error: 'status must be approved, rejected, or pending' });

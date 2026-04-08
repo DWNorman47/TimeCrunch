@@ -155,7 +155,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
           </div>
 
           {billData && billData.entries.length === 0 && (billData.reimbursements || []).length === 0 && (
-            <div style={{ marginTop: 12, color: '#9ca3af', fontSize: 14 }}>No entries for this period.</div>
+            <div style={{ marginTop: 12, color: '#9ca3af', fontSize: 14 }}>{t.noEntriesPeriod}</div>
           )}
           {billData && (billData.entries.length > 0 || (billData.reimbursements || []).length > 0) && (
             <div style={{ marginTop: 16 }}>
