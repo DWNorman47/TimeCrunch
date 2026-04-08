@@ -60,6 +60,9 @@ router.post('/', reimbLimiter, async (req, res) => {
   if (!amount || !expense_date) {
     return res.status(400).json({ error: 'amount and expense_date are required' });
   }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expense_date) || isNaN(Date.parse(expense_date))) {
+    return res.status(400).json({ error: 'expense_date must be a valid date (YYYY-MM-DD)' });
+  }
   const amt = parseFloat(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
 

@@ -76,9 +76,9 @@ function Lightbox({ photos, startIndex, onClose }) {
       )}
       {item.caption && <div style={s.lbCaption}>{item.caption}</div>}
       <div style={s.lbNav} onClick={e => e.stopPropagation()}>
-        <button style={s.lbBtn} onClick={() => setIdx(i => i - 1)} disabled={idx === 0}>‹</button>
+        <button style={s.lbBtn} aria-label="Previous photo" onClick={() => setIdx(i => i - 1)} disabled={idx === 0}>‹</button>
         <span style={s.lbCount}>{idx + 1} / {photos.length}</span>
-        <button style={s.lbBtn} onClick={() => setIdx(i => i + 1)} disabled={idx === photos.length - 1}>›</button>
+        <button style={s.lbBtn} aria-label="Next photo" onClick={() => setIdx(i => i + 1)} disabled={idx === photos.length - 1}>›</button>
       </div>
     </div>
   );

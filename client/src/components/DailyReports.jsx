@@ -66,8 +66,16 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
   const [error, setError] = useState('');
   const [suggesting, setSuggesting] = useState(false);
   const [gettingWeather, setGettingWeather] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = e => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
+  const set = (k, v) => { setDirty(true); setForm(f => ({ ...f, [k]: v })); };
 
   const weatherCodeToCondition = code => {
     if (code === 0) return 'sunny';
@@ -120,11 +128,12 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
   };
 
   const updateRow = (list, setList, i, key, value) => {
+    setDirty(true);
     const next = list.map((r, idx) => idx === i ? { ...r, [key]: value } : r);
     setList(next);
   };
-  const addRow = (list, setList, type) => setList([...list, emptyRow(type)]);
-  const removeRow = (list, setList, i) => setList(list.filter((_, idx) => idx !== i));
+  const addRow = (list, setList, type) => { setDirty(true); setList([...list, emptyRow(type)]); };
+  const removeRow = (list, setList, i) => { setDirty(true); setList(list.filter((_, idx) => idx !== i)); };
 
   const save = async (status) => {
     const isSub = status === 'submitted';
@@ -143,6 +152,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       } else {
         r = await api.patch(`/daily-reports/${initial.id}`, payload);
       }
+      setDirty(false);
       onSaved(r.data);
     } catch (err) {
       setError(err.response?.data?.error || t.failedToSave);
@@ -222,7 +232,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
                 <td style={styles.td}><RowInput value={m.worker_count} onChange={v => updateRow(manpower, setManpower, i, 'worker_count', v)} type="number" min="1" style={{ width: 55 }} /></td>
                 <td style={styles.td}><RowInput value={m.hours} onChange={v => updateRow(manpower, setManpower, i, 'hours', v)} type="number" min="0" placeholder="0" style={{ width: 55 }} /></td>
                 <td style={styles.td}><RowInput value={m.notes} onChange={v => updateRow(manpower, setManpower, i, 'notes', v)} placeholder={t.optional} /></td>
-                <td style={styles.td}><button style={styles.removeRowBtn} onClick={() => removeRow(manpower, setManpower, i)}>✕</button></td>
+                <td style={styles.td}><button style={styles.removeRowBtn} aria-label="Remove row" onClick={() => removeRow(manpower, setManpower, i)}>✕</button></td>
               </tr>
             ))}
           </tbody>
@@ -258,7 +268,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
                   <td style={styles.td}><RowInput value={e.name} onChange={v => updateRow(equipment, setEquipment, i, 'name', v)} placeholder="e.g. Excavator" /></td>
                   <td style={styles.td}><RowInput value={e.quantity} onChange={v => updateRow(equipment, setEquipment, i, 'quantity', v)} type="number" min="1" style={{ width: 55 }} /></td>
                   <td style={styles.td}><RowInput value={e.hours} onChange={v => updateRow(equipment, setEquipment, i, 'hours', v)} type="number" min="0" placeholder="0" style={{ width: 55 }} /></td>
-                  <td style={styles.td}><button style={styles.removeRowBtn} onClick={() => removeRow(equipment, setEquipment, i)}>✕</button></td>
+                  <td style={styles.td}><button style={styles.removeRowBtn} aria-label="Remove row" onClick={() => removeRow(equipment, setEquipment, i)}>✕</button></td>
                 </tr>
               ))}
             </tbody>
@@ -286,7 +296,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
                 <tr key={i}>
                   <td style={styles.td}><RowInput value={m.description} onChange={v => updateRow(materials, setMaterials, i, 'description', v)} placeholder="e.g. Lumber 2x4" /></td>
                   <td style={styles.td}><RowInput value={m.quantity} onChange={v => updateRow(materials, setMaterials, i, 'quantity', v)} placeholder="e.g. 200 boards" /></td>
-                  <td style={styles.td}><button style={styles.removeRowBtn} onClick={() => removeRow(materials, setMaterials, i)}>✕</button></td>
+                  <td style={styles.td}><button style={styles.removeRowBtn} aria-label="Remove row" onClick={() => removeRow(materials, setMaterials, i)}>✕</button></td>
                 </tr>
               ))}
             </tbody>
@@ -410,6 +420,7 @@ export default function DailyReports({ projects }) {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
   const [reports, setReports] = useState([]);
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // null=list, 'new'=new form, report=edit form
   const [filterProject, setFilterProject] = useState('');
@@ -421,6 +432,7 @@ export default function DailyReports({ projects }) {
       if (filterProject) params.project_id = filterProject;
       const r = await api.get('/daily-reports', { params });
       setReports(r.data);
+      setTruncated(r.data.length === 500);
     } finally { setLoading(false); }
   };
 
@@ -498,6 +510,7 @@ export default function DailyReports({ projects }) {
           </div>
         ) : (
           <div style={styles.reportList}>
+            {truncated && <div style={styles.truncatedBanner}>{t.resultsTruncated || 'Showing the 500 most recent reports. Use filters to narrow results.'}</div>}
             {reports.map(r => (
               <ReportRow
                 key={r.id}
@@ -524,6 +537,7 @@ const styles = {
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', flex: 1, maxWidth: 220 },
   newBtn: { background: '#059669', color: '#fff', border: 'none', padding: '9px 16px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0 },
   reportList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  truncatedBanner: { background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 7, padding: '8px 12px', fontSize: 13, color: '#92400e', marginBottom: 8 },
   reportRow: { background: '#fff', borderRadius: 10, padding: '12px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   rowLeft: { flex: 1, cursor: 'pointer', minWidth: 0 },
   rowDate: { fontWeight: 700, fontSize: 14, color: '#111827', marginBottom: 2 },

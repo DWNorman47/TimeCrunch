@@ -762,6 +762,7 @@ const translations = {
     reviewedBy: 'Reviewed by',
     newReport: '+ New Report',
     noDailyReports: 'No daily reports yet. Create one to start tracking.',
+    resultsTruncated: 'Showing the 500 most recent results. Use filters to narrow results.',
     crewEntry: 'crew entry',
     crewEntries: 'crew entries',
 
@@ -2297,6 +2298,7 @@ const translations = {
     reviewedBy: 'Revisado por',
     newReport: '+ Nuevo Reporte',
     noDailyReports: 'No hay reportes diarios aún. Cree uno para empezar.',
+    resultsTruncated: 'Mostrando los 500 resultados más recientes. Use filtros para reducir los resultados.',
     crewEntry: 'entrada de cuadrilla',
     crewEntries: 'entradas de cuadrilla',
 

@@ -850,13 +850,14 @@ router.post('/workers/invite', requireAdmin, requirePermission('manage_workers')
   }
 
   const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
   try {
     const result = await pool.query(
       `INSERT INTO users (company_id, username, password_hash, full_name, role, language, hourly_rate, email, invite_token, invite_token_expires, invite_pending)
        VALUES ($1, $2, '', $3, $4, $5, $6, $7, $8, $9, true)
        RETURNING id, username, full_name, role, language, hourly_rate, email`,
-      [companyId, username, full_name, assignedRole, assignedLanguage, assignedRate, email, token, expires]
+      [companyId, username, full_name, assignedRole, assignedLanguage, assignedRate, email, tokenHash, expires]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.invited', 'worker', result.rows[0].id, full_name, { email });
     const inviteUrl = `${process.env.APP_URL}/accept-invite?token=${token}`;

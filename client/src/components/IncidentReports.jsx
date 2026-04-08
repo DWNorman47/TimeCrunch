@@ -275,6 +275,7 @@ export default function IncidentReports({ projects }) {
   };
 
   const [incidents, setIncidents] = useState([]);
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState({});
@@ -284,6 +285,7 @@ export default function IncidentReports({ projects }) {
       const params = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
       const r = await api.get('/incidents', { params });
       setIncidents(r.data);
+      setTruncated(r.data.length === 500);
     } catch {}
   };
 
@@ -345,6 +347,7 @@ export default function IncidentReports({ projects }) {
         </div>
       ) : (
         <div style={styles.list}>
+          {truncated && <div style={styles.truncatedBanner}>{t.resultsTruncated || 'Showing the 500 most recent incidents. Use filters to narrow results.'}</div>}
           {incidents.map(i => (
             <IncidentCard
               key={i.id}
@@ -373,6 +376,7 @@ const styles = {
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151', flex: 1, minWidth: 120 },
   filterInput: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151' },
   list: { display: 'flex', flexDirection: 'column', gap: 10 },
+  truncatedBanner: { background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 7, padding: '8px 12px', fontSize: 13, color: '#92400e', marginBottom: 4 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { color: '#9ca3af', fontSize: 15 },

@@ -36,7 +36,7 @@ router.get('/', requireAuth, async (req, res) => {
 
   try {
     const result = await pool.query(
-      `${BASE_QUERY} WHERE ${conditions.join(' AND ')} ORDER BY i.incident_date DESC, i.created_at DESC LIMIT 1000`,
+      `${BASE_QUERY} WHERE ${conditions.join(' AND ')} ORDER BY i.incident_date DESC, i.created_at DESC LIMIT 500`,
       params
     );
     res.json(result.rows);
@@ -53,6 +53,9 @@ router.post('/', requireAuth, async (req, res) => {
 
   if (!incident_date || !type || !description?.trim()) {
     return res.status(400).json({ error: 'incident_date, type, and description are required' });
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(incident_date) || isNaN(Date.parse(incident_date))) {
+    return res.status(400).json({ error: 'incident_date must be a valid date (YYYY-MM-DD)' });
   }
 
   const companyId = req.user.company_id;

@@ -97,6 +97,9 @@ router.post('/', requireAuth, async (req, res) => {
   const { project_id, report_date, superintendent, weather_condition, weather_temp,
           work_performed, delays_issues, visitor_log, manpower = [], equipment = [], materials = [] } = req.body;
   if (!report_date) return res.status(400).json({ error: 'report_date required' });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(report_date) || isNaN(Date.parse(report_date))) {
+    return res.status(400).json({ error: 'report_date must be a valid date (YYYY-MM-DD)' });
+  }
   const companyId = req.user.company_id;
 
   const client = await pool.connect();
@@ -112,9 +115,9 @@ router.post('/', requireAuth, async (req, res) => {
        DO UPDATE SET superintendent=$4, weather_condition=$5, weather_temp=$6,
          work_performed=$7, delays_issues=$8, visitor_log=$9, updated_at=NOW()
        RETURNING id`,
-      [companyId, project_id || null, report_date, superintendent || null,
-       weather_condition || null, weather_temp || null, work_performed || null,
-       delays_issues || null, visitor_log || null, req.user.id]
+      [companyId, project_id || null, report_date, superintendent?.trim() || null,
+       weather_condition?.trim() || null, weather_temp || null, work_performed?.trim() || null,
+       delays_issues?.trim() || null, visitor_log?.trim() || null, req.user.id]
     );
     const reportId = result.rows[0].id;
 
@@ -188,12 +191,12 @@ router.patch('/:id', requireAuth, async (req, res) => {
       `UPDATE daily_reports SET superintendent=$1, weather_condition=$2, weather_temp=$3,
          work_performed=$4, delays_issues=$5, visitor_log=$6, status=COALESCE($7, status), updated_at=NOW()
        WHERE id=$8`,
-      [superintendent ?? existing.rows[0].superintendent,
-       weather_condition ?? existing.rows[0].weather_condition,
+      [superintendent?.trim() ?? existing.rows[0].superintendent,
+       weather_condition?.trim() ?? existing.rows[0].weather_condition,
        weather_temp ?? existing.rows[0].weather_temp,
-       work_performed ?? existing.rows[0].work_performed,
-       delays_issues ?? existing.rows[0].delays_issues,
-       visitor_log ?? existing.rows[0].visitor_log,
+       work_performed?.trim() ?? existing.rows[0].work_performed,
+       delays_issues?.trim() ?? existing.rows[0].delays_issues,
+       visitor_log?.trim() ?? existing.rows[0].visitor_log,
        status || null, req.params.id]
     );
 
