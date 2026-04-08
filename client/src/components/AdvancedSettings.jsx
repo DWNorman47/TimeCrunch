@@ -176,7 +176,7 @@ export default function AdvancedSettings() {
                 </CollapsibleCategory>
               )}
             </>
-          )}
+          ) : null}
         </div>
       )}
     </div>
