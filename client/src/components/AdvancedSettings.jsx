@@ -150,9 +150,9 @@ export default function AdvancedSettings() {
         <div style={s.body}>
           {error && <div style={s.errorMsg}>{error}</div>}
           {success && <div style={s.successMsg}>{success}</div>}
-          {!config ? (
+          {!config && !error ? (
             <div style={s.loading}>Loading…</div>
-          ) : (
+          ) : config ? (
             <>
               {config.reimbursement_categories && (
                 <CollapsibleCategory title="Reimbursement Categories">
