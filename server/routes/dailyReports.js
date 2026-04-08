@@ -157,8 +157,18 @@ router.post('/', requireAuth, async (req, res) => {
 // PATCH /daily-reports/:id — update (same payload as POST)
 router.patch('/:id', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
   const { superintendent, weather_condition, weather_temp, work_performed, delays_issues,
           visitor_log, status, manpower = [], equipment = [], materials = [] } = req.body;
+
+  // Validate status value and enforce transition rules
+  const VALID_STATUSES = ['draft', 'submitted', 'reviewed'];
+  if (status !== undefined && !VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status value' });
+  }
+  if (status === 'reviewed' && !isAdmin) {
+    return res.status(403).json({ error: 'Only admins can mark a report as reviewed' });
+  }
 
   const client = await pool.connect();
   try {
@@ -167,6 +177,12 @@ router.patch('/:id', requireAuth, async (req, res) => {
       'SELECT * FROM daily_reports WHERE id=$1 AND company_id=$2', [req.params.id, companyId]
     );
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Report not found' });
+
+    // Ownership check: workers may only edit their own reports
+    if (!isAdmin && existing.rows[0].created_by !== req.user.id) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'You can only edit your own reports' });
+    }
 
     await client.query(
       `UPDATE daily_reports SET superintendent=$1, weather_condition=$2, weather_temp=$3,

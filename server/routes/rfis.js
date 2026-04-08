@@ -67,7 +67,7 @@ router.patch('/:id', requireAdmin, async (req, res) => {
 
     // Auto-set status to 'answered' when response is added
     let newStatus = status ?? r.status;
-    if (response?.trim() && !response?.trim() === '' && r.status === 'open') newStatus = 'answered';
+    if (response?.trim() && r.status === 'open') newStatus = 'answered';
 
     const result = await pool.query(
       `UPDATE rfis SET project_id=$1, subject=$2, description=$3, directed_to=$4, submitted_by=$5,
