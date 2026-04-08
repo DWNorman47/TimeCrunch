@@ -250,7 +250,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.inspInspectionName}</label>
-          <input style={styles.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Daily Site Safety - Mar 25" />
+          <input style={styles.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Daily Site Safety - Mar 25" />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.date}</label>
@@ -261,11 +261,11 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.inspInspector} <span style={styles.optional}>{t.inspOptional}</span></label>
-          <input style={styles.input} value={form.inspector} onChange={e => set('inspector', e.target.value)} placeholder="Name of inspector" />
+          <input style={styles.input} maxLength={255} value={form.inspector} onChange={e => set('inspector', e.target.value)} placeholder="Name of inspector" />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.inspInspectionLocation} <span style={styles.optional}>{t.inspOptional}</span></label>
-          <input style={styles.input} value={form.location} onChange={e => set('location', e.target.value)} placeholder="Area or location inspected" />
+          <input style={styles.input} maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} placeholder="Area or location inspected" />
         </div>
       </div>
 

@@ -316,6 +316,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
           <textarea
             style={s.noteTextarea}
             rows={5}
+            maxLength={2000}
             placeholder={t.noteFieldPlaceholder}
             value={captureNote}
             onChange={e => setCaptureNote(e.target.value)}
