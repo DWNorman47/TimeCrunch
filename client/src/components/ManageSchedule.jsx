@@ -277,7 +277,7 @@ export default function ManageSchedule({ workers, projects }) {
           </div>
           <div style={{ ...styles.field, flex: 2 }}>
             <label style={styles.label}>{t.notes}</label>
-            <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.optional} />
+            <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.optional} maxLength={500} />
           </div>
           <div style={styles.field}>
             <label style={styles.label}>&nbsp;</label>
@@ -366,7 +366,7 @@ export default function ManageSchedule({ workers, projects }) {
             </div>
             <div style={{ ...styles.editField, flex: 2 }}>
               <label style={styles.editLabel}>{t.notes}</label>
-              <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} />
+              <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} maxLength={500} />
             </div>
           </div>
           <div style={styles.editActions}>

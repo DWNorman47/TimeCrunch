@@ -26,10 +26,12 @@ router.get('/admin', requireAdmin, async (req, res) => {
 
 // POST /admin/shifts — create a shift
 router.post('/admin', requireAdmin, async (req, res) => {
-  const { user_id, project_id, shift_date, start_time, end_time, notes } = req.body;
+  const { user_id, project_id, shift_date, start_time, end_time } = req.body;
+  const notes = req.body.notes?.trim() || null;
   if (!user_id || !shift_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'user_id, shift_date, start_time, end_time required' });
   }
+  if (notes && notes.length > 500) return res.status(400).json({ error: 'notes too long (max 500 characters)' });
   const companyId = req.user.company_id;
   try {
     const workerCheck = await pool.query(
@@ -46,7 +48,7 @@ router.post('/admin', requireAdmin, async (req, res) => {
        FROM inserted s
        JOIN users u ON s.user_id = u.id
        LEFT JOIN projects p ON s.project_id = p.id`,
-      [companyId, user_id, project_id || null, shift_date, start_time, end_time, notes || null]
+      [companyId, user_id, project_id || null, shift_date, start_time, end_time, notes]
     );
     const shift = full.rows[0];
     sendPushToUser(user_id, {
@@ -60,16 +62,18 @@ router.post('/admin', requireAdmin, async (req, res) => {
 
 // PATCH /admin/shifts/:id — edit a shift
 router.patch('/admin/:id', requireAdmin, async (req, res) => {
-  const { project_id, shift_date, start_time, end_time, notes } = req.body;
+  const { project_id, shift_date, start_time, end_time } = req.body;
+  const notes = req.body.notes?.trim() || null;
   if (!shift_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'shift_date, start_time, end_time required' });
   }
+  if (notes && notes.length > 500) return res.status(400).json({ error: 'notes too long (max 500 characters)' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
       `UPDATE shifts SET project_id = $1, shift_date = $2, start_time = $3, end_time = $4, notes = $5
        WHERE id = $6 AND company_id = $7 RETURNING *`,
-      [project_id || null, shift_date, start_time, end_time, notes || null, req.params.id, companyId]
+      [project_id || null, shift_date, start_time, end_time, notes, req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Shift not found' });
     const full = await pool.query(

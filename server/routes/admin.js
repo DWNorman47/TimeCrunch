@@ -315,7 +315,8 @@ router.get('/notifications', requireAdmin, async (req, res) => {
 // POST /admin/clock-in — admin clocks in a worker on their behalf
 router.post('/clock-in', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
-  const { user_id, project_id, notes } = req.body;
+  const { user_id, project_id } = req.body;
+  const notes = req.body.notes?.trim() || null;
   if (!user_id) return res.status(400).json({ error: 'user_id required' });
   try {
     // Verify worker belongs to this company
@@ -659,7 +660,8 @@ router.patch('/workers/:id/restore', requireAdmin, async (req, res) => {
 // Get a worker's entries for a date range (for bill generation)
 router.post('/workers/:id/entries', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
-  const { work_date, start_time, end_time, project_id, notes, break_minutes, mileage } = req.body;
+  const { work_date, start_time, end_time, project_id, break_minutes, mileage } = req.body;
+  const notes = req.body.notes?.trim() || null;
   if (!work_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'work_date, start_time, and end_time are required' });
   }
@@ -811,7 +813,9 @@ const inviteLimiter = rateLimit({
   legacyHeaders: false,
 });
 router.post('/workers/invite', requireAdmin, requirePermission('manage_workers'), inviteLimiter, async (req, res) => {
-  const { full_name, email, role, language, hourly_rate } = req.body;
+  const full_name = req.body.full_name?.trim();
+  const email = req.body.email?.trim();
+  const { role, language, hourly_rate } = req.body;
   if (!full_name || !email) return res.status(400).json({ error: 'full_name and email required' });
   if (!isValidEmail(email)) return res.status(400).json({ error: 'Invalid email address' });
   if (full_name.length > 100) return res.status(400).json({ error: 'Full name must be 100 characters or fewer' });
@@ -840,7 +844,7 @@ router.post('/workers/invite', requireAdmin, requirePermission('manage_workers')
   }
 
   // Auto-generate username from name
-  const parts = full_name.trim().toLowerCase().split(/\s+/);
+  const parts = full_name.toLowerCase().split(/\s+/);
   const base = parts.length > 1 ? parts[0][0] + parts[parts.length - 1] : parts[0];
   const baseUsername = base.replace(/[^a-z0-9]/g, '');
   let username = baseUsername;

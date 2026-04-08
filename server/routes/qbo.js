@@ -112,7 +112,7 @@ router.get('/employees', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
-    res.status(status).json({ error: err.message || 'Server error', code: err.code });
+    res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
 });
 
@@ -124,7 +124,7 @@ router.get('/customers', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
-    res.status(status).json({ error: err.message || 'Server error', code: err.code });
+    res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
 });
 
@@ -136,7 +136,7 @@ router.get('/vendors', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
-    res.status(status).json({ error: err.message || 'Server error', code: err.code });
+    res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
 });
 
