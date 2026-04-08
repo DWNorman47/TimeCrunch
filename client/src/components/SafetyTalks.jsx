@@ -78,8 +78,8 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
     e.preventDefault();
     if (!form.title.trim()) { setError(t.titleRequired); return; }
     for (let i = 0; i < questions.length; i++) {
-      if (!questions[i].question.trim()) { setError(`Question ${i + 1} is missing text.`); return; }
-      if (questions[i].options.filter(o => o.trim()).length < 2) { setError(`Question ${i + 1} needs at least 2 answer options.`); return; }
+      if (!questions[i].question.trim()) { setError(t.quizQuestionMissingText.replace('{n}', i + 1)); return; }
+      if (questions[i].options.filter(o => o.trim()).length < 2) { setError(t.quizQuestionNeedsOptions.replace('{n}', i + 1)); return; }
     }
     setSaving(true); setError('');
     try {
@@ -120,7 +120,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.topicTitle}</label>
-          <input style={styles.input} type="text" placeholder="e.g. Ladder Safety, PPE Requirements, Fall Protection" value={form.title} onChange={e => set('title', e.target.value)} />
+          <input style={styles.input} type="text" maxLength={200} placeholder="e.g. Ladder Safety, PPE Requirements, Fall Protection" value={form.title} onChange={e => set('title', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.date}</label>
@@ -141,7 +141,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.talkContent}</label>
-          <textarea style={styles.textarea} rows={5} placeholder={t.talkContentPlaceholder} value={form.content} onChange={e => set('content', e.target.value)} />
+          <textarea style={styles.textarea} rows={5} maxLength={10000} placeholder={t.talkContentPlaceholder} value={form.content} onChange={e => set('content', e.target.value)} />
         </div>
       </div>
 

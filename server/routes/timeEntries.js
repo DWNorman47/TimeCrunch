@@ -4,6 +4,16 @@ const { requireAuth } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem } = require('./inbox');
 const { sendEmail } = require('../email');
+const rateLimit = require('express-rate-limit');
+
+const entryWriteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 120, // generous — manual entry is rare, but admins can bulk-add
+  keyGenerator: req => String(req.user?.id || req.ip),
+  message: { error: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Get current user's entries
 router.get('/', requireAuth, async (req, res) => {
@@ -33,7 +43,7 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // Submit a time entry (wage_type inherited from project)
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
   const { project_id, work_date, start_time, end_time, notes, break_minutes, mileage, timezone, client_id } = req.body;
   if (!project_id || !work_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'project_id, work_date, start_time, and end_time are required' });

@@ -3,9 +3,20 @@ const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { haversineDistanceFt } = require('../utils/geoUtils');
 const { sendPushToCompanyAdmins } = require('../push');
-const { createInboxItem } = require('./inbox');
+const { createInboxItem, createInboxItemBatch } = require('./inbox');
 const { applySettingsRows, SETTINGS_DEFAULTS } = require('../settingsDefaults');
 const { sendEmail } = require('../email');
+const rateLimit = require('express-rate-limit');
+
+// Per-user limiter for clock actions (keyed by user ID once authenticated)
+const clockLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 60, // 60 clock-in/out actions per hour is far beyond any real usage
+  keyGenerator: req => String(req.user?.id || req.ip),
+  message: { error: 'Too many clock requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // GET /api/clock/status — returns active clock-in for this user, if any
 router.get('/status', requireAuth, async (req, res) => {
@@ -27,7 +38,7 @@ router.get('/status', requireAuth, async (req, res) => {
 const { validCoords } = require('../utils/geoUtils');
 
 // POST /api/clock/in
-router.post('/in', requireAuth, async (req, res) => {
+router.post('/in', requireAuth, clockLimiter, async (req, res) => {
   const { project_id, notes, lat, lng, local_work_date, timezone, location_denied, clock_in_time } = req.body;
   if ((lat != null || lng != null) && !validCoords(lat, lng)) {
     return res.status(400).json({ error: 'Invalid coordinates' });
@@ -144,9 +155,7 @@ router.post('/in', requireAuth, async (req, res) => {
             `SELECT id FROM users WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true`,
             [companyId]
           );
-          for (const a of adminRows.rows) {
-            createInboxItem(a.id, companyId, 'location_denied', title, body, '/admin#live');
-          }
+          createInboxItemBatch(adminRows.rows.map(a => a.id), companyId, 'location_denied', title, body, '/admin#live');
         }
 
         // Outside-hours notification
@@ -189,7 +198,7 @@ router.post('/in', requireAuth, async (req, res) => {
 });
 
 // POST /api/clock/out
-router.post('/out', requireAuth, async (req, res) => {
+router.post('/out', requireAuth, clockLimiter, async (req, res) => {
   const { lat, lng, break_minutes, mileage, local_clock_in, local_clock_out } = req.body;
   if ((lat != null || lng != null) && !validCoords(lat, lng)) {
     return res.status(400).json({ error: 'Invalid coordinates' });
@@ -327,9 +336,7 @@ async function _sendOvertimeAlert(worker, companyId, projectName, totalHours, th
     `SELECT id FROM users WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true`,
     [companyId]
   );
-  for (const a of adminRows.rows) {
-    createInboxItem(a.id, companyId, 'overtime_alert', title, body, '/admin#reports');
-  }
+  createInboxItemBatch(adminRows.rows.map(a => a.id), companyId, 'overtime_alert', title, body, '/admin#reports');
 }
 
 // DELETE /api/clock/cancel — discard an active clock-in without creating a time entry
