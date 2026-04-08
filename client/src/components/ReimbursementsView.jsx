@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 function fmtDate(str) {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
@@ -24,6 +25,7 @@ function StatusBadge({ status }) {
 }
 
 export default function ReimbursementsView() {
+  const t = useT();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
@@ -53,7 +55,7 @@ export default function ReimbursementsView() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
-      setReceiptFile(ev.target.result); // base64 data URL
+      setReceiptFile(ev.target.result);
       setReceiptPreview(ev.target.result);
     };
     reader.readAsDataURL(file);
@@ -61,7 +63,7 @@ export default function ReimbursementsView() {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!noReceipt && !receiptFile) { setError('Please attach a receipt or check "No Receipt Available".'); return; }
+    if (!noReceipt && !receiptFile) { setError(t.receiptRequired); return; }
     setSaving(true); setError(''); setSuccess('');
     try {
       await api.post('/reimbursements', {
@@ -72,25 +74,25 @@ export default function ReimbursementsView() {
         project_id: form.project_id || null,
         receipt: receiptFile || null,
       });
-      setSuccess('Reimbursement submitted successfully.');
+      setSuccess(t.submitSuccess);
       setShowForm(false);
       setForm({ amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), project_id: '' });
       setReceiptFile(null); setReceiptPreview(null); setNoReceipt(false);
       load();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to submit reimbursement');
+      setError(err.response?.data?.error || t.failedSave);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async id => {
-    if (!confirm('Delete this reimbursement?')) return;
+    if (!confirm(t.deleteReimbConfirm)) return;
     try {
       await api.delete(`/reimbursements/${id}`);
       setItems(prev => prev.filter(i => i.id !== id));
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to delete');
+      alert(err.response?.data?.error || t.failedSave);
     }
   };
 
@@ -99,9 +101,9 @@ export default function ReimbursementsView() {
   return (
     <div style={s.wrap}>
       <div style={s.header}>
-        <div style={s.title}>Reimbursements</div>
+        <div style={s.title}>{t.reimbursementsTitle}</div>
         <button style={s.addBtn} onClick={() => { setShowForm(v => !v); setError(''); setSuccess(''); }}>
-          {showForm ? '✕ Cancel' : '+ New Request'}
+          {showForm ? `✕ ${t.cancel}` : t.newRequest}
         </button>
       </div>
 
@@ -111,62 +113,62 @@ export default function ReimbursementsView() {
         <form onSubmit={handleSubmit} style={s.form}>
           <div style={s.formRow}>
             <div style={s.field}>
-              <label style={s.label}>Date *</label>
+              <label style={s.label}>{t.date} *</label>
               <input style={s.input} type="date" value={form.expense_date} onChange={e => setForm(f => ({ ...f, expense_date: e.target.value }))} required />
             </div>
             <div style={s.field}>
-              <label style={s.label}>Amount *</label>
+              <label style={s.label}>{t.amountLabel}</label>
               <input style={{ ...s.input, width: 110 }} type="number" min="0.01" step="0.01" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required />
             </div>
             <div style={s.field}>
-              <label style={s.label}>Category</label>
+              <label style={s.label}>{t.categoryLabel}</label>
               <select style={s.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                <option value="">Select…</option>
+                <option value="">{t.selectPlaceholder}</option>
                 {categories.active.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             {projects.length > 0 && (
               <div style={s.field}>
-                <label style={s.label}>Project</label>
+                <label style={s.label}>{t.project}</label>
                 <select style={s.input} value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}>
-                  <option value="">No project</option>
+                  <option value="">{t.noProject}</option>
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
             )}
           </div>
           <div style={s.field}>
-            <label style={s.label}>Description</label>
-            <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder="What was this expense for? (optional)" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+            <label style={s.label}>{t.descriptionLabel}</label>
+            <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder={t.descriptionPlaceholder} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
           <div style={s.field}>
-            <label style={s.label}>Receipt (photo or PDF)</label>
+            <label style={s.label}>{t.receiptLabel}</label>
             <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => { handleFileChange(e); setNoReceipt(false); }} />
             {!noReceipt && (
               <button type="button" style={s.uploadBtn} onClick={() => fileRef.current.click()}>
-                {receiptFile ? '✓ Receipt attached — change' : '📎 Attach Receipt'}
+                {receiptFile ? t.receiptAttached : t.attachReceipt}
               </button>
             )}
             {receiptPreview && !noReceipt && receiptPreview.startsWith('data:image') && (
               <img src={receiptPreview} alt="Receipt preview" style={s.preview} />
             )}
             {receiptPreview && !noReceipt && receiptPreview.startsWith('data:application/pdf') && (
-              <div style={s.pdfHint}>PDF attached</div>
+              <div style={s.pdfHint}>{t.pdfAttached}</div>
             )}
             <label style={s.checkLabel}>
               <input type="checkbox" checked={noReceipt} onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setReceiptFile(null); setReceiptPreview(null); } }} />
-              {' '}No receipt available
+              {' '}{t.noReceiptAvailable}
             </label>
           </div>
           {error && <div style={s.errorMsg}>{error}</div>}
           <button style={s.submitBtn} type="submit" disabled={saving}>
-            {saving ? 'Submitting…' : 'Submit Request'}
+            {saving ? t.submitting : t.submitRequest}
           </button>
         </form>
       )}
 
       {items.length === 0 && !showForm ? (
-        <div style={s.empty}>No reimbursements submitted yet.</div>
+        <div style={s.empty}>{t.noReimbursementsYet}</div>
       ) : (
         <div style={s.list}>
           {items.map(item => (
@@ -188,11 +190,11 @@ export default function ReimbursementsView() {
               <div style={s.meta}>
                 <span>{fmtDate(item.expense_date)}</span>
                 {item.receipt_url && (
-                  <a href={item.receipt_url} target="_blank" rel="noopener noreferrer" style={s.receiptLink}>View Receipt</a>
+                  <a href={item.receipt_url} target="_blank" rel="noopener noreferrer" style={s.receiptLink}>{t.viewReceipt}</a>
                 )}
               </div>
               {item.admin_notes && (
-                <div style={s.adminNote}>Admin note: {item.admin_notes}</div>
+                <div style={s.adminNote}>{t.adminNotePrefix}{item.admin_notes}</div>
               )}
             </div>
           ))}

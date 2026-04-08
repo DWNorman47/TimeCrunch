@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 const DEFAULT_CATEGORIES = ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'];
 
 function CategorySection({ cfg, onSave, saving }) {
+  const t = useT();
   const [suppressed, setSuppressed] = useState(cfg?.suppressed || []);
   const [custom, setCustom]         = useState(cfg?.custom || []);
   const [newCat, setNewCat]         = useState('');
@@ -37,7 +39,7 @@ function CategorySection({ cfg, onSave, saving }) {
 
   return (
     <div style={s.catSection}>
-      <div style={s.catLabel}>Default Categories</div>
+      <div style={s.catLabel}>{t.defaultCategories}</div>
       <div style={s.catList}>
         {DEFAULT_CATEGORIES.map(cat => {
           const active = !suppressed.includes(cat);
@@ -50,7 +52,7 @@ function CategorySection({ cfg, onSave, saving }) {
                 style={{ ...s.toggleBtn, background: active ? '#d1fae5' : '#f3f4f6', color: active ? '#065f46' : '#6b7280' }}
                 onClick={() => toggleDefault(cat)}
               >
-                {active ? 'Active' : 'Hidden'}
+                {active ? t.settingActive : t.settingHidden}
               </button>
             </div>
           );
@@ -59,12 +61,12 @@ function CategorySection({ cfg, onSave, saving }) {
 
       {custom.length > 0 && (
         <>
-          <div style={{ ...s.catLabel, marginTop: 12 }}>Custom Categories</div>
+          <div style={{ ...s.catLabel, marginTop: 12 }}>{t.customCategories}</div>
           <div style={s.catList}>
             {custom.map(cat => (
               <div key={cat} style={s.catRow}>
                 <span style={s.catName}>{cat}</span>
-                <button style={s.removeBtn} onClick={() => removeCustom(cat)}>Remove</button>
+                <button style={s.removeBtn} onClick={() => removeCustom(cat)}>{t.removeOption}</button>
               </div>
             ))}
           </div>
@@ -75,13 +77,13 @@ function CategorySection({ cfg, onSave, saving }) {
         <input
           style={s.addInput}
           type="text"
-          placeholder="Add custom category…"
+          placeholder={t.addCustomPlaceholder}
           value={newCat}
           onChange={e => setNewCat(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && addCustom()}
           maxLength={60}
         />
-        <button style={s.addBtn} onClick={addCustom} disabled={!newCat.trim()}>Add</button>
+        <button style={s.addBtn} onClick={addCustom} disabled={!newCat.trim()}>{t.addOption}</button>
       </div>
 
       {dirty && (
@@ -90,7 +92,7 @@ function CategorySection({ cfg, onSave, saving }) {
           onClick={() => onSave({ suppressed, custom })}
           disabled={saving}
         >
-          {saving ? 'Saving…' : 'Save Changes'}
+          {saving ? t.saving : t.saveChanges}
         </button>
       )}
     </div>
@@ -111,6 +113,7 @@ function CollapsibleCategory({ title, children }) {
 }
 
 export default function AdvancedSettings() {
+  const t = useT();
   const [open, setOpen]           = useState(false);
   const [config, setConfig]       = useState(null);
   const [saving, setSaving]       = useState(false);
@@ -121,7 +124,7 @@ export default function AdvancedSettings() {
     if (open && !config) {
       api.get('/admin/advanced-settings')
         .then(r => setConfig(r.data))
-        .catch(() => setError('Failed to load advanced settings'));
+        .catch(() => setError(t.advSettingsLoadFailed));
     }
   }, [open, config]);
 
@@ -130,10 +133,10 @@ export default function AdvancedSettings() {
     try {
       const r = await api.patch(`/admin/advanced-settings/${key}`, { suppressed, custom });
       setConfig(r.data);
-      setSuccess('Saved.');
+      setSuccess(t.advSettingsSaved);
       setTimeout(() => setSuccess(''), 2000);
     } catch {
-      setError('Failed to save');
+      setError(t.advSettingsFailed);
     } finally {
       setSaving(false);
     }
@@ -142,7 +145,7 @@ export default function AdvancedSettings() {
   return (
     <div style={s.wrap}>
       <button style={s.mainToggle} onClick={() => setOpen(o => !o)}>
-        <span style={s.mainToggleLabel}>Advanced Settings</span>
+        <span style={s.mainToggleLabel}>{t.advancedSettings}</span>
         <span style={s.chevron}>{open ? '▲' : '▼'}</span>
       </button>
 
@@ -151,11 +154,11 @@ export default function AdvancedSettings() {
           {error && <div style={s.errorMsg}>{error}</div>}
           {success && <div style={s.successMsg}>{success}</div>}
           {!config && !error ? (
-            <div style={s.loading}>Loading…</div>
+            <div style={s.loading}>{t.advSettingsLoading}</div>
           ) : config ? (
             <>
               {config.reimbursement_categories && (
-                <CollapsibleCategory title="Reimbursement Categories">
+                <CollapsibleCategory title={t.reimbursementCategoriesSection}>
                   <CategorySection
                     cfg={config.reimbursement_categories}
                     onSave={makeSaver('reimbursement_categories')}
@@ -164,7 +167,7 @@ export default function AdvancedSettings() {
                 </CollapsibleCategory>
               )}
               {config.item_units && (
-                <CollapsibleCategory title="Item Units">
+                <CollapsibleCategory title={t.itemUnitsSection}>
                   <CategorySection
                     cfg={config.item_units}
                     onSave={makeSaver('item_units')}
