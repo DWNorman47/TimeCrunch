@@ -75,7 +75,7 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
       <div style={f.row}>
         <div style={f.field}>
           <label style={f.label}>{t.itemNameLabel}</label>
-          <input style={f.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="2x4 Lumber, 3/4 Plywood…" required />
+          <input style={f.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="2x4 Lumber, 3/4 Plywood…" required />
         </div>
         <div style={f.field}>
           <label style={f.label}>{t.itemSkuLabel}</label>
@@ -83,6 +83,7 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
             <input
               ref={skuRef}
               style={{ ...f.input, ...(skuScanning ? f.skuScanning : {}) }}
+              maxLength={100}
               value={form.sku}
               onChange={e => set('sku', e.target.value)}
               placeholder={skuScanning ? t.scanBarcodeNow : t.optional}
@@ -108,7 +109,7 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
       <div style={f.row}>
         <div style={f.field}>
           <label style={f.label}>{t.itemCategoryLabel}</label>
-          <input style={f.input} value={form.category} onChange={e => set('category', e.target.value)} placeholder="Lumber, Electrical, Concrete…" />
+          <input style={f.input} maxLength={100} value={form.category} onChange={e => set('category', e.target.value)} placeholder="Lumber, Electrical, Concrete…" />
         </div>
         <div style={f.field}>
           <label style={f.label}>{t.itemUnitLabel}</label>
@@ -140,7 +141,7 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
       </div>
       <div style={f.field}>
         <label style={f.label}>{t.itemDescriptionLabel}</label>
-        <textarea style={{ ...f.input, minHeight: 60, resize: 'vertical' }} value={form.description} onChange={e => set('description', e.target.value)} />
+        <textarea style={{ ...f.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
       </div>
       <div style={f.actions}>
         <button type="button" style={f.cancelBtn} onClick={onCancel}>{t.cancel}</button>
