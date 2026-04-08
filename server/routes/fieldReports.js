@@ -35,7 +35,7 @@ router.get('/', requireAuth, async (req, res) => {
        LEFT JOIN field_report_photos ph ON ph.report_id = r.id
        WHERE ${conditions.join(' AND ')}
        GROUP BY r.id, u.full_name, p.name
-       ORDER BY r.reported_at DESC`,
+       ORDER BY r.reported_at DESC LIMIT 500`,
       params
     );
     res.json(result.rows);
@@ -223,7 +223,7 @@ router.get('/photos', requireAuth, async (req, res) => {
        JOIN users u ON r.user_id = u.id
        LEFT JOIN projects p ON r.project_id = p.id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY r.reported_at DESC, ph.id ASC`,
+       ORDER BY r.reported_at DESC, ph.id ASC LIMIT 500`,
       params
     );
     res.json(result.rows);

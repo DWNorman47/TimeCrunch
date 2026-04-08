@@ -533,6 +533,7 @@ const translations = {
     reviewedLabel: 'Reviewed',
     yesterday: 'Yesterday',
     failedToSave: 'Failed to save',
+    failedToLoad: 'Failed to load data.',
 
     // ── Punchlist ─────────────────────────────────────────────────────────────
     punchlistTitle: 'Punchlist',
@@ -2067,6 +2068,7 @@ const translations = {
     reviewedLabel: 'Revisado',
     yesterday: 'Ayer',
     failedToSave: 'Error al guardar',
+    failedToLoad: 'Error al cargar los datos.',
 
     // ── Punchlist ─────────────────────────────────────────────────────────────
     punchlistTitle: 'Lista de Pendientes',

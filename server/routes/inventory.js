@@ -1195,9 +1195,22 @@ router.get('/suppliers', requireAdmin, async (req, res) => {
 });
 
 // POST /api/inventory/suppliers
+function validateSupplierWebsite(website) {
+  if (!website?.trim()) return null; // optional field
+  try {
+    const parsed = new URL(website.trim());
+    if (!['http:', 'https:'].includes(parsed.protocol)) return 'website must use http or https';
+  } catch {
+    return 'website must be a valid URL';
+  }
+  return null;
+}
+
 router.post('/suppliers', requireAdmin, async (req, res) => {
   const { name, contact_name, phone, email, website, notes } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  const websiteErr = validateSupplierWebsite(website);
+  if (websiteErr) return res.status(400).json({ error: websiteErr });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -1222,7 +1235,11 @@ router.patch('/suppliers/:id', requireAdmin, async (req, res) => {
     if (contact_name !== undefined) { sets.push(`contact_name=$${idx++}`); vals.push(contact_name?.trim() || null); }
     if (phone !== undefined)        { sets.push(`phone=$${idx++}`);        vals.push(phone?.trim() || null); }
     if (email !== undefined)        { sets.push(`email=$${idx++}`);        vals.push(email?.trim() || null); }
-    if (website !== undefined)      { sets.push(`website=$${idx++}`);      vals.push(website?.trim() || null); }
+    if (website !== undefined) {
+      const websiteErr = validateSupplierWebsite(website);
+      if (websiteErr) return res.status(400).json({ error: websiteErr });
+      sets.push(`website=$${idx++}`); vals.push(website?.trim() || null);
+    }
     if (notes !== undefined)        { sets.push(`notes=$${idx++}`);        vals.push(notes?.trim() || null); }
     if (active !== undefined)       { sets.push(`active=$${idx++}`);       vals.push(!!active); }
     if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });

@@ -79,7 +79,7 @@ router.get('/', requireAuth, async (req, res) => {
        FROM inspections i
        LEFT JOIN projects p ON i.project_id = p.id
        LEFT JOIN users u ON i.created_by = u.id
-       WHERE ${conditions.join(' AND ')} ORDER BY i.inspected_at DESC`,
+       WHERE ${conditions.join(' AND ')} ORDER BY i.inspected_at DESC LIMIT 500`,
       params
     );
     res.json(result.rows);

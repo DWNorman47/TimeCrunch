@@ -33,7 +33,7 @@ router.get('/', requireAuth, async (req, res) => {
        GROUP BY pi.id, p.name, creator.full_name, assignee.full_name
        ORDER BY
          CASE pi.priority WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END,
-         pi.created_at DESC`,
+         pi.created_at DESC LIMIT 500`,
       params
     );
     res.json(result.rows);

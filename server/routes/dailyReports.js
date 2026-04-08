@@ -45,7 +45,7 @@ router.get('/', requireAuth, async (req, res) => {
        LEFT JOIN daily_report_manpower m ON m.report_id = r.id
        WHERE ${conditions.join(' AND ')}
        GROUP BY r.id, p.name, u.full_name
-       ORDER BY r.report_date DESC, r.created_at DESC`,
+       ORDER BY r.report_date DESC, r.created_at DESC LIMIT 500`,
       params
     );
     res.json(result.rows);

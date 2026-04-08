@@ -20,7 +20,7 @@ router.get('/', requireAuth, async (req, res) => {
   if (to) { params.push(to); conditions.push(`r.date_submitted <= $${params.length}`); }
   try {
     const result = await pool.query(
-      `${FULL_SELECT} WHERE ${conditions.join(' AND ')} ORDER BY r.rfi_number DESC`,
+      `${FULL_SELECT} WHERE ${conditions.join(' AND ')} ORDER BY r.rfi_number DESC LIMIT 500`,
       params
     );
     res.json(result.rows);

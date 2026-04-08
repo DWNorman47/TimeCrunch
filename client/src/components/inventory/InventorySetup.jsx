@@ -3,6 +3,10 @@ import api from '../../api';
 import BinLabelModal from './BinLabelModal';
 import { useT } from '../../hooks/useT';
 
+function isHttpUrl(url) {
+  try { return ['http:', 'https:'].includes(new URL(url).protocol); } catch { return false; }
+}
+
 // ── Level config ──────────────────────────────────────────────────────────────
 // Each level knows its API path, its parent's key name, and which parent level feeds it.
 
@@ -404,7 +408,7 @@ function SupplierPanel() {
                   <div style={sp.cardContacts}>
                     {sup.phone && <span style={sp.contact}>{sup.phone}</span>}
                     {sup.email && <a href={`mailto:${sup.email}`} style={sp.contactLink}>{sup.email}</a>}
-                    {sup.website && <a href={sup.website} target="_blank" rel="noopener noreferrer" style={sp.contactLink}>{sup.website.replace(/^https?:\/\//, '')}</a>}
+                    {sup.website && isHttpUrl(sup.website) && <a href={sup.website} target="_blank" rel="noopener noreferrer" style={sp.contactLink}>{sup.website.replace(/^https?:\/\//, '')}</a>}
                   </div>
                   {sup.notes && <div style={sp.cardNotes}>{sup.notes}</div>}
                 </div>
