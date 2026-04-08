@@ -752,13 +752,15 @@ router.get('/cycle-counts', requireAdmin, async (req, res) => {
       `SELECT cc.*, COALESCE(l.name, 'All Locations') as location_name,
               u.full_name as started_by_name,
               cu.full_name as completed_by_name,
-              (SELECT COUNT(*) FROM inventory_cycle_count_lines WHERE cycle_count_id = cc.id) as line_count,
-              (SELECT COUNT(*) FROM inventory_cycle_count_lines WHERE cycle_count_id = cc.id AND counted_qty IS NOT NULL) as counted_count
+              COUNT(cl.id) AS line_count,
+              COUNT(cl.id) FILTER (WHERE cl.counted_qty IS NOT NULL) AS counted_count
        FROM inventory_cycle_counts cc
        LEFT JOIN inventory_locations l ON cc.location_id = l.id
        JOIN users u ON cc.started_by = u.id
        LEFT JOIN users cu ON cc.completed_by = cu.id
+       LEFT JOIN inventory_cycle_count_lines cl ON cl.cycle_count_id = cc.id
        WHERE ${conditions.join(' AND ')}
+       GROUP BY cc.id, l.name, u.full_name, cu.full_name
        ORDER BY cc.started_at DESC`,
       values
     );

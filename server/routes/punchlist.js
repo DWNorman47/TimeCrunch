@@ -22,13 +22,15 @@ router.get('/', requireAuth, async (req, res) => {
       `SELECT pi.*, p.name as project_name,
               creator.full_name as created_by_name,
               assignee.full_name as assigned_to_name,
-              (SELECT COUNT(*) FROM punchlist_checklist_items WHERE punchlist_id = pi.id) as checklist_total,
-              (SELECT COUNT(*) FROM punchlist_checklist_items WHERE punchlist_id = pi.id AND checked = true) as checked_count
+              COUNT(ci.id) AS checklist_total,
+              COUNT(ci.id) FILTER (WHERE ci.checked = true) AS checked_count
        FROM punchlist_items pi
        LEFT JOIN projects p ON pi.project_id = p.id
        LEFT JOIN users creator ON pi.created_by = creator.id
        LEFT JOIN users assignee ON pi.assigned_to = assignee.id
+       LEFT JOIN punchlist_checklist_items ci ON ci.punchlist_id = pi.id
        WHERE ${conditions.join(' AND ')}
+       GROUP BY pi.id, p.name, creator.full_name, assignee.full_name
        ORDER BY
          CASE pi.priority WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END,
          pi.created_at DESC`,
