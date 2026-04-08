@@ -112,7 +112,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.templateNameLabel}</label>
-          <input style={styles.input} type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daily Site Safety" />
+          <input style={styles.input} type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t.checklistNamePlaceholder} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.descriptionField}</label>
@@ -136,8 +136,8 @@ function TemplateForm({ initial, onSaved, onCancel }) {
               onChange={e => updateItem(item._id, 'label', e.target.value)}
             />
             <select style={styles.typeSelect} value={item.type} onChange={e => updateItem(item._id, 'type', e.target.value)}>
-              <option value="check">Checkbox</option>
-              <option value="text">Text</option>
+              <option value="check">{t.checklistTypeCheckbox}</option>
+              <option value="text">{t.checklistTypeText}</option>
             </select>
             <button type="button" style={styles.removeItemBtn} onClick={() => removeItem(item._id)}>✕</button>
           </div>
@@ -206,7 +206,7 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
           </select>
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Date</label>
+          <label style={styles.label}>{t.date}</label>
           <input style={styles.input} type="date" value={checkDate} onChange={e => setCheckDate(e.target.value)} />
         </div>
         {projects.length > 0 && (

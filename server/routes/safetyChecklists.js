@@ -79,7 +79,8 @@ router.get('/', requireAuth, async (req, res) => {
        FROM safety_checklist_submissions s
        LEFT JOIN projects p ON s.project_id = p.id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY s.check_date DESC, s.created_at DESC`,
+       ORDER BY s.check_date DESC, s.created_at DESC
+       LIMIT 500`,
       params
     );
     res.json(result.rows);

@@ -572,8 +572,8 @@ export default function InspectionChecklists({ projects }) {
               {templates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
             </select>
           )}
-          <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title="From date" />
-          <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title="To date" />
+          <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title={t.fromDate} />
+          <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title={t.toDate} />
         </div>
       )}
 

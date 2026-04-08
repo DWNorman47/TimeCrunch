@@ -22,7 +22,8 @@ router.get('/', requireAdmin, async (req, res) => {
        LEFT JOIN projects p ON s.project_id = p.id
        LEFT JOIN users u ON s.created_by = u.id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY s.report_date DESC, s.created_at DESC`,
+       ORDER BY s.report_date DESC, s.created_at DESC
+       LIMIT 500`,
       params
     );
     res.json(result.rows);

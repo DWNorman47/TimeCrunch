@@ -43,7 +43,8 @@ router.get('/', requireAuth, async (req, res) => {
 // POST /punchlist
 router.post('/', requireAuth, async (req, res) => {
   const { project_id, title, description, location, priority, assigned_to, phase } = req.body;
-  if (!title) return res.status(400).json({ error: 'title required' });
+  if (!title?.trim()) return res.status(400).json({ error: 'title required' });
+  if (title.length > 255) return res.status(400).json({ error: 'title too long (max 255 characters)' });
   const companyId = req.user.company_id;
 
   try {

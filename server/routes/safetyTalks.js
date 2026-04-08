@@ -29,7 +29,8 @@ router.get('/', requireAuth, async (req, res) => {
        LEFT JOIN safety_talk_questions q ON q.talk_id = st.id
        WHERE ${conditions.join(' AND ')}
        GROUP BY st.id, p.name, u.full_name
-       ORDER BY st.talk_date DESC, st.created_at DESC`,
+       ORDER BY st.talk_date DESC, st.created_at DESC
+       LIMIT 500`,
       params
     );
     res.json(result.rows);
@@ -82,7 +83,8 @@ router.get('/:id', requireAuth, async (req, res) => {
 // POST /safety-talks
 router.post('/', requireAuth, async (req, res) => {
   const { project_id, title, content, given_by, talk_date, questions, pass_threshold } = req.body;
-  if (!title) return res.status(400).json({ error: 'title required' });
+  if (!title?.trim()) return res.status(400).json({ error: 'title required' });
+  if (title.length > 200) return res.status(400).json({ error: 'title too long (max 200 characters)' });
   if (!talk_date) return res.status(400).json({ error: 'talk_date required' });
   const companyId = req.user.company_id;
 
