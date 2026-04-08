@@ -54,20 +54,21 @@ router.get('/', requireAuth, async (req, res) => {
 
 // POST /incidents — submit a new incident report
 router.post('/', requireAuth, async (req, res) => {
-  const {
-    incident_date, incident_time, type, project_id,
-    injured_name, body_part, treatment, work_stopped,
-    description, witnesses, corrective_action,
-  } = req.body;
+  const { incident_date, incident_time, type, project_id, treatment, work_stopped } = req.body;
+  const description        = req.body.description?.trim() || null;
+  const injured_name       = req.body.injured_name?.trim() || null;
+  const body_part          = req.body.body_part?.trim() || null;
+  const witnesses          = req.body.witnesses?.trim() || null;
+  const corrective_action  = req.body.corrective_action?.trim() || null;
 
-  if (!incident_date || !type || !description?.trim()) {
+  if (!incident_date || !type || !description) {
     return res.status(400).json({ error: 'incident_date, type, and description are required' });
   }
   if (!VALID_INCIDENT_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid type' });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(incident_date) || isNaN(Date.parse(incident_date))) {
     return res.status(400).json({ error: 'incident_date must be a valid date (YYYY-MM-DD)' });
   }
-  if (description.trim().length > 2000) return res.status(400).json({ error: 'description too long (max 2000 characters)' });
+  if (description.length > 2000) return res.status(400).json({ error: 'description too long (max 2000 characters)' });
   if (injured_name && injured_name.length > 255) return res.status(400).json({ error: 'injured_name too long (max 255 characters)' });
   if (witnesses && witnesses.length > 500) return res.status(400).json({ error: 'witnesses too long (max 500 characters)' });
   if (corrective_action && corrective_action.length > 2000) return res.status(400).json({ error: 'corrective_action too long (max 2000 characters)' });
@@ -82,9 +83,9 @@ router.post('/', requireAuth, async (req, res) => {
       [
         companyId, req.user.id, project_id || null,
         incident_date, incident_time || null, type,
-        injured_name || null, body_part || null, treatment || null,
-        work_stopped || false, description.trim(),
-        witnesses || null, corrective_action || null,
+        injured_name, body_part, treatment || null,
+        work_stopped || false, description,
+        witnesses, corrective_action,
       ]
     );
     const report = result.rows[0];

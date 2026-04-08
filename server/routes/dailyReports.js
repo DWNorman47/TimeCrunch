@@ -215,15 +215,19 @@ router.patch('/:id', requireAuth, async (req, res) => {
        status || null, req.params.id]
     );
 
-    // Validate sub-table row fields
+    // Validate sub-table row fields (trim first so length checks are accurate)
     for (const m of manpower) {
+      m.trade = m.trade?.trim() || null;
+      m.notes = m.notes?.trim() || null;
       if (m.trade && m.trade.length > 255) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Manpower trade too long (max 255 characters)' }); }
       if (m.notes && m.notes.length > 500) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Manpower notes too long (max 500 characters)' }); }
     }
     for (const e of equipment) {
+      e.name = e.name?.trim() || null;
       if (e.name && e.name.length > 255) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Equipment name too long (max 255 characters)' }); }
     }
     for (const m of materials) {
+      m.description = m.description?.trim() || null;
       if (m.description && m.description.length > 500) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Material description too long (max 500 characters)' }); }
     }
 
@@ -232,7 +236,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       if (!m.trade && !m.worker_count) continue;
       await client.query(
         'INSERT INTO daily_report_manpower (report_id, trade, worker_count, hours, notes) VALUES ($1,$2,$3,$4,$5)',
-        [req.params.id, m.trade || null, parseInt(m.worker_count) || 1, m.hours ? parseFloat(m.hours) : null, m.notes || null]
+        [req.params.id, m.trade, parseInt(m.worker_count) || 1, m.hours ? parseFloat(m.hours) : null, m.notes]
       );
     }
     await client.query('DELETE FROM daily_report_equipment WHERE report_id=$1', [req.params.id]);

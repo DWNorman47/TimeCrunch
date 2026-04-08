@@ -56,7 +56,9 @@ const reimbLimiter = rateLimit({
   legacyHeaders: false,
 });
 router.post('/', reimbLimiter, async (req, res) => {
-  const { amount, description, category, expense_date, receipt, project_id } = req.body;
+  const { amount, expense_date, receipt, project_id } = req.body;
+  const description = req.body.description?.trim() || null;
+  const category    = req.body.category?.trim() || null;
   if (!amount || !expense_date) {
     return res.status(400).json({ error: 'amount and expense_date are required' });
   }

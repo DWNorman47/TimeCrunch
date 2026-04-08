@@ -23,7 +23,7 @@ router.post('/templates', requireAdmin, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO safety_checklist_templates (company_id, name, description, items, created_by)
        VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [req.user.company_id, name.trim(), description || null, JSON.stringify(items || []), req.user.id]
+      [req.user.company_id, name.trim(), description?.trim() || null, JSON.stringify(items || []), req.user.id]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
@@ -43,7 +43,7 @@ router.patch('/templates/:id', requireAdmin, async (req, res) => {
       `UPDATE safety_checklist_templates SET
          name=$1, description=$2, items=$3, updated_at=NOW()
        WHERE id=$4 AND company_id=$5 RETURNING *`,
-      [name?.trim() ?? t.name, description ?? t.description,
+      [name?.trim() ?? t.name, description !== undefined ? (description?.trim() || null) : t.description,
        JSON.stringify(items ?? t.items), req.params.id, req.user.company_id]
     );
     res.json(result.rows[0]);
