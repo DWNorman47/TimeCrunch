@@ -11,12 +11,14 @@ router.post('/', requireAuth, async (req, res) => {
   if (!start_date || !end_date) return res.status(400).json({ error: 'start_date and end_date are required' });
   if (end_date < start_date) return res.status(400).json({ error: 'end_date must be on or after start_date' });
   if (type && !VALID_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid type' });
+  const noteTrimmed = note?.trim() || null;
+  if (noteTrimmed && noteTrimmed.length > 500) return res.status(400).json({ error: 'Note must be 500 characters or fewer' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
       `INSERT INTO time_off_requests (company_id, user_id, type, start_date, end_date, note)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [companyId, req.user.id, type || 'vacation', start_date, end_date, note || null]
+      [companyId, req.user.id, type || 'vacation', start_date, end_date, noteTrimmed]
     );
     // Notify admins
     setImmediate(async () => {
@@ -37,7 +39,7 @@ router.post('/', requireAuth, async (req, res) => {
           <b>Dates:</b> ${start_date} – ${end_date}${note ? `<br/><b>Note:</b> ${note}` : ''}</p>
           <p>Log in to OpsFloa to approve or deny.</p>`;
         for (const admin of admins.rows) sendEmail(admin.email, subject, body);
-      } catch {}
+      } catch (err) { console.error('Time off request notification error:', err); }
     });
     res.status(201).json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
@@ -81,7 +83,8 @@ router.get('/', requireAdmin, async (req, res) => {
 
 // PATCH /time-off/:id/approve
 router.patch('/:id/approve', requireAdmin, async (req, res) => {
-  const { review_note } = req.body;
+  const review_note = req.body.review_note?.trim() || null;
+  if (review_note && review_note.length > 500) return res.status(400).json({ error: 'Review note must be 500 characters or fewer' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -98,7 +101,7 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
           sendEmail(worker.rows[0].email, 'Time off approved ✓',
             `<p>Hi ${worker.rows[0].full_name},</p><p>Your time off request (<b>${row.start_date?.toString().substring(0,10)}</b> – <b>${row.end_date?.toString().substring(0,10)}</b>) has been <b style="color:#059669">approved</b>.</p>${review_note ? `<p>Note: ${review_note}</p>` : ''}<p>— OpsFloa</p>`);
         }
-      } catch {}
+      } catch (err) { console.error('Time off approval notification error:', err); }
     });
     res.json(row);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
@@ -106,7 +109,8 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
 
 // PATCH /time-off/:id/deny
 router.patch('/:id/deny', requireAdmin, async (req, res) => {
-  const { review_note } = req.body;
+  const review_note = req.body.review_note?.trim() || null;
+  if (review_note && review_note.length > 500) return res.status(400).json({ error: 'Review note must be 500 characters or fewer' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -123,7 +127,7 @@ router.patch('/:id/deny', requireAdmin, async (req, res) => {
           sendEmail(worker.rows[0].email, 'Time off request denied',
             `<p>Hi ${worker.rows[0].full_name},</p><p>Your time off request (<b>${row.start_date?.toString().substring(0,10)}</b> – <b>${row.end_date?.toString().substring(0,10)}</b>) was <b style="color:#ef4444">denied</b>.${review_note ? ` Reason: ${review_note}` : ''}</p><p>— OpsFloa</p>`);
         }
-      } catch {}
+      } catch (err) { console.error('Time off denial notification error:', err); }
     });
     res.json(row);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }

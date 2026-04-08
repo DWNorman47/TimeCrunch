@@ -117,6 +117,7 @@ export default function AdminTimeOff() {
                   <input
                     style={s.noteInput}
                     placeholder={t.reviewNotePlaceholder}
+                    maxLength={500}
                     value={reviewNote[r.id] || ''}
                     onChange={e => setReviewNote(prev => ({ ...prev, [r.id]: e.target.value }))}
                   />

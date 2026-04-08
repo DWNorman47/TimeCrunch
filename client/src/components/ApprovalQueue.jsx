@@ -135,7 +135,7 @@ export default function ApprovalQueue({ onCountChange }) {
       setEntries(prev => prev.map(e => e.id === id ? { ...e, ...updated.data } : e));
       setEditingId(null);
     } catch (err) {
-      setEditSaveError(err.response?.data?.error || 'Failed to save.');
+      setEditSaveError(err.response?.data?.error || t.failedToSave);
     } finally {
       setEditSaving(false);
     }
@@ -174,7 +174,7 @@ export default function ApprovalQueue({ onCountChange }) {
       });
       setSplittingId(null);
     } catch (err) {
-      setSplitError(err.response?.data?.error || 'Failed to split entry.');
+      setSplitError(err.response?.data?.error || t.entryPanelFailedSplit);
     } finally {
       setSplitSaving(false);
     }
@@ -196,7 +196,7 @@ export default function ApprovalQueue({ onCountChange }) {
       setRecentApproved(prev => prev.filter(e => e.id !== id));
       fetch(); // refresh pending queue
     } catch (err) {
-      setUnapproveError(err.response?.data?.error || 'Failed to unapprove entry');
+      setUnapproveError(err.response?.data?.error || t.failedUnapprove);
     } finally { setUnapproving(null); }
   };
 
@@ -431,7 +431,7 @@ export default function ApprovalQueue({ onCountChange }) {
                     </div>
                   ) : rejectingId === e.id ? (
                     <div style={styles.rejectForm}>
-                      <input style={styles.rejectInput} placeholder={t.reasonOptional} value={rejectNote} onChange={ev => setRejectNote(ev.target.value)} autoFocus />
+                      <input style={styles.rejectInput} placeholder={t.reasonOptional} maxLength={500} value={rejectNote} onChange={ev => setRejectNote(ev.target.value)} autoFocus />
                       <button style={styles.confirmRejectBtn} onClick={() => submitReject(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.confirmReject}</button>
                       <button style={styles.cancelBtn} onClick={() => { setRejectingId(null); setRejectNote(''); }}>{t.cancel}</button>
                     </div>

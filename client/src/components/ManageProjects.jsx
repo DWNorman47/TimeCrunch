@@ -78,7 +78,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
         setArchivedConflict({ id: data.archived_id, name: data.archived_name });
         setError(data.error);
       } else {
-        setError(data?.error || 'Failed to create project');
+        setError(data?.error || t.failedCreateProject);
       }
     } finally {
       setSaving(false);

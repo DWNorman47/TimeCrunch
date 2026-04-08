@@ -63,6 +63,7 @@ export default function BillingPanel() {
   const [plans, setPlans] = useState(null);
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState(null);
+  const [billingError, setBillingError] = useState('');
   const [annual, setAnnual] = useState(false);
   const [workerCount, setWorkerCount] = useState(15);
   const [addQbo, setAddQbo] = useState(false);
@@ -78,7 +79,8 @@ export default function BillingPanel() {
   }, []);
 
   const checkout = async (priceId, opts = {}) => {
-    if (!priceId) return alert('Stripe not fully configured. Set STRIPE_PRICE_* environment variables.');
+    if (!priceId) { setBillingError(t.stripeNotConfigured); return; }
+    setBillingError('');
     setRedirecting(priceId);
     try {
       const r = await api.post('/stripe/checkout', {
@@ -91,18 +93,19 @@ export default function BillingPanel() {
       });
       window.location.href = r.data.url;
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to start checkout');
+      setBillingError(err.response?.data?.error || t.checkoutFailed);
       setRedirecting(null);
     }
   };
 
   const portal = async () => {
+    setBillingError('');
     setRedirecting('portal');
     try {
       const r = await api.post('/stripe/portal');
       window.location.href = r.data.url;
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to open billing portal');
+      setBillingError(err.response?.data?.error || t.portalFailed);
       setRedirecting(null);
     }
   };
@@ -153,6 +156,8 @@ export default function BillingPanel() {
         </div>
         <StatusBadge status={sub} trialEndsAt={status?.trial_ends_at} plan={currentPlan} t={t} />
       </div>
+
+      {billingError && <p style={s.billingError}>{billingError}</p>}
 
       {sub === 'past_due' && (
         <div style={s.alert}>
@@ -465,4 +470,5 @@ const s = {
   addonTitle: { fontSize: 15, fontWeight: 700, color: '#92400e' },
   trialCta: { background: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: 10, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 },
   ctaBtn: { background: '#059669', color: '#fff', border: 'none', padding: '12px', borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: 'pointer' },
+  billingError: { color: '#dc2626', fontSize: 13, margin: '0 0 12px' },
 };

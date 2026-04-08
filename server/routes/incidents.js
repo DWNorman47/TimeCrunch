@@ -3,6 +3,9 @@ const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToCompanyAdmins } = require('../push');
 
+const VALID_INCIDENT_TYPES = ['near_miss', 'first_aid', 'recordable', 'lost_time', 'property_damage', 'other'];
+const VALID_INCIDENT_STATUSES = ['open', 'under_review', 'closed'];
+
 const INCIDENT_COLS = `
   i.*, u.full_name AS reporter_name, p.name AS project_name`;
 
@@ -29,8 +32,14 @@ router.get('/', requireAuth, async (req, res) => {
     conditions.push(`i.user_id = $${params.length}`);
   }
   if (project_id) { params.push(project_id); conditions.push(`i.project_id = $${params.length}`); }
-  if (type) { params.push(type); conditions.push(`i.type = $${params.length}`); }
-  if (status) { params.push(status); conditions.push(`i.status = $${params.length}`); }
+  if (type) {
+    if (!VALID_INCIDENT_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid type' });
+    params.push(type); conditions.push(`i.type = $${params.length}`);
+  }
+  if (status) {
+    if (!VALID_INCIDENT_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+    params.push(status); conditions.push(`i.status = $${params.length}`);
+  }
   if (from) { params.push(from); conditions.push(`i.incident_date >= $${params.length}`); }
   if (to) { params.push(to); conditions.push(`i.incident_date <= $${params.length}`); }
 
@@ -54,6 +63,7 @@ router.post('/', requireAuth, async (req, res) => {
   if (!incident_date || !type || !description?.trim()) {
     return res.status(400).json({ error: 'incident_date, type, and description are required' });
   }
+  if (!VALID_INCIDENT_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid type' });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(incident_date) || isNaN(Date.parse(incident_date))) {
     return res.status(400).json({ error: 'incident_date must be a valid date (YYYY-MM-DD)' });
   }

@@ -89,7 +89,7 @@ router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
         const subject = `Time entry submitted: ${req.user.full_name}`;
         const body = `<p><b>${req.user.full_name}</b> submitted a time entry for <b>${work_date}</b> (${start_time}–${end_time}).</p><p>— OpsFloa</p>`;
         for (const admin of admins.rows) sendEmail(admin.email, subject, body);
-      } catch {}
+      } catch (err) { console.error('Entry notification error:', err); }
     });
   } catch (err) {
     console.error(err);

@@ -136,7 +136,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
       closeGap();
       toast('Entry added', 'success');
     } catch (err) {
-      toast(err.response?.data?.error || 'Failed to add entry', 'error');
+      toast(err.response?.data?.error || t.failedSaveEntry, 'error');
     } finally { setSaving(false); }
   }
 
@@ -154,7 +154,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
       closeGap();
       toast('Entries added', 'success');
     } catch (err) {
-      toast(err.response?.data?.error || 'Failed to add entries', 'error');
+      toast(err.response?.data?.error || t.failedToSave, 'error');
     } finally { setSaving(false); }
   }
 
@@ -167,7 +167,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
       toast('Entry deleted', 'success');
       onRefresh();
     } catch (err) {
-      toast(err.response?.data?.error || 'Failed to delete entry', 'error');
+      toast(err.response?.data?.error || t.failedDeleteEntry, 'error');
     } finally { setDeletingId(null); }
   }
 
@@ -208,7 +208,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
       toast('Break inserted', 'success');
       onRefresh();
     } catch (err) {
-      toast(err.response?.data?.error || 'Failed to split entry', 'error');
+      toast(err.response?.data?.error || t.entryPanelFailedSplit, 'error');
     } finally { setSaving(false); }
   }
 
@@ -235,7 +235,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
       toast('Project switch inserted', 'success');
       onRefresh();
     } catch (err) {
-      toast(err.response?.data?.error || 'Failed to split entry', 'error');
+      toast(err.response?.data?.error || t.entryPanelFailedSplit, 'error');
     } finally { setSaving(false); }
   }
 

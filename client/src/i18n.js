@@ -535,6 +535,8 @@ const translations = {
     yesterday: 'Yesterday',
     failedToSave: 'Failed to save',
     failedToLoad: 'Failed to load data.',
+    failedUnapprove: 'Failed to unapprove entry.',
+    failedCreateProject: 'Failed to create project.',
 
     // ── Punchlist ─────────────────────────────────────────────────────────────
     punchlistTitle: 'Punchlist',
@@ -926,6 +928,9 @@ const translations = {
     manageSub: 'Manage Subscription',
     addonQBO: 'QuickBooks Online Sync',
     billingTitle: 'Billing & Subscription',
+    checkoutFailed: 'Failed to start checkout. Please try again.',
+    portalFailed: 'Failed to open billing portal. Please try again.',
+    stripeNotConfigured: 'Billing is not fully configured. Please contact support.',
 
     // ── Admin: Time Off ───────────────────────────────────────────────────────
     filterPending: 'Pending',
@@ -2073,6 +2078,8 @@ const translations = {
     yesterday: 'Ayer',
     failedToSave: 'Error al guardar',
     failedToLoad: 'Error al cargar los datos.',
+    failedUnapprove: 'Error al desaprobar la entrada.',
+    failedCreateProject: 'Error al crear el proyecto.',
 
     // ── Punchlist ─────────────────────────────────────────────────────────────
     punchlistTitle: 'Lista de Pendientes',
@@ -2464,6 +2471,9 @@ const translations = {
     manageSub: 'Administrar Suscripción',
     addonQBO: 'Sincronización con QuickBooks Online',
     billingTitle: 'Facturación y Suscripción',
+    checkoutFailed: 'No se pudo iniciar el pago. Por favor intente de nuevo.',
+    portalFailed: 'No se pudo abrir el portal de facturación. Por favor intente de nuevo.',
+    stripeNotConfigured: 'La facturación no está configurada correctamente. Contacte soporte.',
 
     // ── Admin: Time Off ───────────────────────────────────────────────────────
     filterPending: 'Pendiente',
