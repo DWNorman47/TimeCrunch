@@ -1294,6 +1294,11 @@ export default function ProjectsPage() {
               />
             )}
 
+            {!loading && projects.length >= 500 && (
+              <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 13, color: '#92400e' }}>
+                Showing the first 500 projects. Use search or filters to find others.
+              </div>
+            )}
             {loading ? (
               <p style={styles.loadingText}>Loading…</p>
             ) : projects.length === 0 ? (

@@ -317,8 +317,12 @@ const u = {
   baseBadge:  { display: 'inline-block', padding: '1px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#1d4ed8' },
 };
 
+const PAGE_SIZE = 100;
+
 export default function InventoryItems({ onItemChange }) {
   const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showInactive, setShowInactive] = useState(false);
@@ -330,18 +334,19 @@ export default function InventoryItems({ onItemChange }) {
   const [archiving, setArchiving] = useState(null);
   const [labelItem, setLabelItem] = useState(null);
 
-  const load = async () => {
+  const load = async (p = page) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ active: showInactive ? 'all' : 'true' });
+      const params = new URLSearchParams({ active: showInactive ? 'all' : 'true', limit: PAGE_SIZE, offset: p * PAGE_SIZE });
       if (search) params.set('search', search);
       if (categoryFilter) params.set('category', categoryFilter);
-      const [items, cats, unitsRes] = await Promise.all([
+      const [itemsRes, cats, unitsRes] = await Promise.all([
         api.get(`/inventory/items?${params}`),
         api.get('/inventory/items/categories'),
         api.get('/inventory/units'),
       ]);
-      setItems(items.data);
+      setItems(itemsRes.data.items);
+      setTotal(itemsRes.data.total);
       setCategories(cats.data);
       setUnits(unitsRes.data);
     } catch (e) {
@@ -351,9 +356,9 @@ export default function InventoryItems({ onItemChange }) {
     }
   };
 
-  useEffect(() => { load(); }, [showInactive, categoryFilter]);
+  useEffect(() => { setPage(0); load(0); }, [showInactive, categoryFilter]);
 
-  const handleSearch = e => { e.preventDefault(); load(); };
+  const handleSearch = e => { e.preventDefault(); setPage(0); load(0); };
 
   const handleSave = () => {
     setEditingItem(null);
@@ -478,6 +483,15 @@ export default function InventoryItems({ onItemChange }) {
                   ))}
                 </tbody>
               </table>
+              {total > PAGE_SIZE && (
+                <div style={s.pagination}>
+                  <span style={s.pageInfo}>
+                    {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
+                  </span>
+                  <button style={s.pageBtn} disabled={page === 0} onClick={() => { const p = page - 1; setPage(p); load(p); }}>← Prev</button>
+                  <button style={s.pageBtn} disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => { const p = page + 1; setPage(p); load(p); }}>Next →</button>
+                </div>
+              )}
             </div>
           )}
         </>
@@ -527,4 +541,7 @@ const s = {
   td:          { padding: '10px 12px', fontSize: 14, color: '#374151' },
   badge:       { display: 'inline-block', padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700 },
   iconBtn:     { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: '2px 4px', marginLeft: 2 },
+  pagination:  { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderTop: '1px solid #e5e7eb', background: '#f9fafb' },
+  pageInfo:    { fontSize: 13, color: '#6b7280', marginRight: 'auto' },
+  pageBtn:     { padding: '5px 14px', background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 500 },
 };

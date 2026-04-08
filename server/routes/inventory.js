@@ -161,8 +161,13 @@ async function processPhotos(photos, companyId) {
 // ── Items ─────────────────────────────────────────────────────────────────────
 
 // GET /api/inventory/items
+// Paginated when ?limit=N&offset=M → returns { items, total }
+// Without limit → returns array (capped at 500, for dropdowns)
 router.get('/items', requireAuth, async (req, res) => {
-  const { search, category, active = 'true' } = req.query;
+  const { search, category, active = 'true', limit, offset } = req.query;
+  const paginate = limit !== undefined;
+  const pageLimit = Math.min(Math.max(parseInt(limit) || 100, 1), 500);
+  const pageOffset = Math.max(parseInt(offset) || 0, 0);
   const companyId = req.user.company_id;
   const admin = isAdmin(req);
   try {
@@ -178,13 +183,16 @@ router.get('/items', requireAuth, async (req, res) => {
       conditions.push(`(name ILIKE $${idx} OR sku ILIKE $${idx} OR category ILIKE $${idx})`);
       values.push(`%${search}%`); idx++;
     }
-    const result = await pool.query(
-      `SELECT id, name, sku, description, category, unit,
-              ${admin ? 'unit_cost,' : ''}
-              reorder_point, reorder_qty, active, created_at
-       FROM inventory_items WHERE ${conditions.join(' AND ')} ORDER BY name`,
-      values
-    );
+    const cols = `id, name, sku, description, category, unit, ${admin ? 'unit_cost,' : ''} reorder_point, reorder_qty, active, created_at`;
+    const where = `FROM inventory_items WHERE ${conditions.join(' AND ')}`;
+    if (paginate) {
+      const [countRes, result] = await Promise.all([
+        pool.query(`SELECT COUNT(*) ${where}`, values),
+        pool.query(`SELECT ${cols} ${where} ORDER BY name LIMIT $${idx} OFFSET $${idx + 1}`, [...values, pageLimit, pageOffset]),
+      ]);
+      return res.json({ items: result.rows, total: parseInt(countRes.rows[0].count) });
+    }
+    const result = await pool.query(`SELECT ${cols} ${where} ORDER BY name LIMIT 500`, values);
     res.json(result.rows);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
