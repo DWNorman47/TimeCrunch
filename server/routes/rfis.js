@@ -72,6 +72,8 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   const directed_to = req.body.directed_to !== undefined ? (req.body.directed_to?.trim() || null) : undefined;
   const submitted_by = req.body.submitted_by !== undefined ? (req.body.submitted_by?.trim() || null) : undefined;
   const response = req.body.response !== undefined ? (req.body.response?.trim() || null) : undefined;
+  const VALID_STATUSES = ['open', 'answered', 'closed'];
+  if (status !== undefined && !VALID_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status value' });
   if (subject !== undefined && subject && subject.length > 255) return res.status(400).json({ error: 'subject too long (max 255 characters)' });
   if (directed_to !== undefined && directed_to && directed_to.length > 255) return res.status(400).json({ error: 'directed_to too long (max 255 characters)' });
   if (submitted_by !== undefined && submitted_by && submitted_by.length > 255) return res.status(400).json({ error: 'submitted_by too long (max 255 characters)' });
