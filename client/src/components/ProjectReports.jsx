@@ -84,6 +84,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
           {parseFloat(p.regular_hours) > 0 && <Metric label={t.regularLabel} value={fmtHours(parseFloat(p.regular_hours))} color="#2563eb" />}
           {parseFloat(p.overtime_hours) > 0 && <Metric label={t.overtimeLabel} value={fmtHours(parseFloat(p.overtime_hours))} color="#dc2626" />}
           {parseFloat(p.prevailing_hours) > 0 && <Metric label={t.prevailingLabel} value={fmtHours(parseFloat(p.prevailing_hours))} color="#d97706" />}
+          {parseFloat(p.estimated_cost) > 0 && <Metric label={t.projEstCost} value={formatCurrency(parseFloat(p.estimated_cost), currency)} color="#059669" />}
         </div>
         <div style={styles.barContainer}>
           <HoursBar regular={parseFloat(p.regular_hours)} overtime={parseFloat(p.overtime_hours)} prevailing={parseFloat(p.prevailing_hours)} />

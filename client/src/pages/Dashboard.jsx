@@ -17,6 +17,7 @@ import { useOffline } from '../contexts/OfflineContext';
 import OfflineBanner from '../components/OfflineBanner';
 import SignatureModal from '../components/SignatureModal';
 import TimeOffTab from '../components/TimeOffTab';
+import AvailabilityTab from '../components/AvailabilityTab';
 import WorkerSchedule from '../components/WorkerSchedule';
 import ReimbursementsView from '../components/ReimbursementsView';
 
@@ -436,6 +437,7 @@ ${signatureDataUrl ? `
           {settings?.module_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); history.replaceState(null, '', '#timesheet'); }}>📋 Timesheet</button>}
           <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); history.replaceState(null, '', '#timeoff'); }}>🏖 Time Off</button>
           {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); history.replaceState(null, '', '#schedule'); }}>📅 Schedule</button>}
+          {settings?.feature_scheduling !== false && <button style={tab === 'availability' ? styles.tabActive : styles.tab} onClick={() => { setTab('availability'); history.replaceState(null, '', '#availability'); }}>📆 Availability</button>}
           <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>💳 Expenses</button>
         </div>
 
@@ -474,6 +476,8 @@ ${signatureDataUrl ? `
         )}
 
         {tab === 'timeoff' && <TimeOffTab />}
+
+        {tab === 'availability' && <AvailabilityTab />}
 
         {tab === 'schedule' && <WorkerSchedule />}
 

@@ -96,6 +96,8 @@ export default function ApprovalQueue({ onCountChange }) {
   const [unapproveError, setUnapproveError] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [approvingSelected, setApprovingSelected] = useState(false);
 
   const fetch = () => {
     setLoading(true);
@@ -230,6 +232,29 @@ export default function ApprovalQueue({ onCountChange }) {
   }, {});
   const sortedDays = Object.keys(entriesByDay).sort((a, b) => b.localeCompare(a));
 
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => setSelectedIds(new Set(visibleEntries.map(e => e.id)));
+  const deselectAll = () => setSelectedIds(new Set());
+
+  const approveSelected = async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    setApprovingSelected(true);
+    try {
+      await api.post('/admin/entries/bulk-approve', { ids });
+      setEntries(prev => prev.filter(e => !selectedIds.has(e.id)));
+      setSelectedIds(new Set());
+      fetchRecentApproved();
+    } finally { setApprovingSelected(false); }
+  };
+
   const approveAll = async () => {
     const targets = visibleEntries;
     setConfirmingApproveAll(false);
@@ -266,7 +291,14 @@ export default function ApprovalQueue({ onCountChange }) {
                 ))}
               </select>
             )}
-            {confirmingApproveAll ? (
+            {selectedIds.size > 0 ? (
+              <>
+                <button style={styles.approveSelectedBtn} onClick={approveSelected} disabled={approvingSelected}>
+                  {approvingSelected ? t.aqApprovingSelected : `${t.aqApproveSelected} (${selectedIds.size})`}
+                </button>
+                <button style={styles.cancelApproveAllBtn} onClick={deselectAll}>{t.cancel}</button>
+              </>
+            ) : confirmingApproveAll ? (
               <>
                 <button style={styles.approveAllBtn} onClick={approveAll} disabled={approvingAll}>
                   {approvingAll ? t.aqApprovingAll : t.confirm}
@@ -274,9 +306,14 @@ export default function ApprovalQueue({ onCountChange }) {
                 <button style={styles.cancelApproveAllBtn} onClick={() => setConfirmingApproveAll(false)}>{t.cancel}</button>
               </>
             ) : (
-              <button style={styles.approveAllBtn} onClick={() => setConfirmingApproveAll(true)} disabled={approvingAll || visibleEntries.length === 0}>
-                {workerFilter ? `${t.approve} ${workerFilter.split(' ')[0]}'s` : t.aqApproveAll}
-              </button>
+              <>
+                <button style={styles.selectAllBtn} onClick={selectedIds.size > 0 ? deselectAll : selectAll}>
+                  {selectedIds.size > 0 ? t.aqDeselectAll : t.aqSelectAll}
+                </button>
+                <button style={styles.approveAllBtn} onClick={() => setConfirmingApproveAll(true)} disabled={approvingAll || visibleEntries.length === 0}>
+                  {workerFilter ? `${t.approve} ${workerFilter.split(' ')[0]}'s` : t.aqApproveAll}
+                </button>
+              </>
             )}
           </>
         )}
@@ -329,7 +366,13 @@ export default function ApprovalQueue({ onCountChange }) {
                 <span style={styles.dayCount}>{entriesByDay[day].length}</span>
               </div>
               {entriesByDay[day].map(e => (
-                <div key={e.id} style={styles.row}>
+                <div key={e.id} style={{ ...styles.row, ...(selectedIds.has(e.id) ? styles.rowSelected : {}) }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(e.id)}
+                    onChange={() => toggleSelect(e.id)}
+                    style={styles.rowCheckbox}
+                  />
                   <div style={styles.rowMain}>
                     <div style={styles.worker}>{e.worker_name}</div>
                     <div style={styles.detail}>
@@ -533,6 +576,10 @@ const styles = {
   dayHeader: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 0 6px', borderBottom: '1px solid #e5e7eb', marginBottom: 8 },
   dayCount:  { background: '#f3f4f6', color: '#6b7280', borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700, textTransform: 'none', letterSpacing: 0 },
   row: { border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
+  rowSelected: { background: '#f0f7ff', borderColor: '#93c5fd' },
+  rowCheckbox: { marginTop: 3, flexShrink: 0, cursor: 'pointer', width: 15, height: 15 },
+  selectAllBtn: { padding: '4px 12px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#374151' },
+  approveSelectedBtn: { background: '#059669', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   rowMain: { flex: 1, minWidth: 200 },
   worker: { fontWeight: 700, fontSize: 15, marginBottom: 4 },
   detail: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#555', flexWrap: 'wrap' },

@@ -1,8 +1,87 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
+
+function WorkerDocuments({ workerId }) {
+  const t = useT();
+  const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    api.get(`/admin/workers/${workerId}/documents`)
+      .then(r => setDocs(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [workerId]);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { setUploadError(t.docsUploadError); return; }
+    setUploading(true); setUploadError('');
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const r = await api.post(`/admin/workers/${workerId}/documents`, { name: file.name, data: ev.target.result });
+        setDocs(prev => [r.data, ...prev]);
+      } catch { setUploadError(t.docsUploadError); }
+      finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDelete = async (docId) => {
+    await api.delete(`/admin/workers/${workerId}/documents/${docId}`).catch(() => {});
+    setDocs(prev => prev.filter(d => d.id !== docId));
+  };
+
+  const fmtSize = (b) => b ? (b < 1024 * 1024 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`) : '';
+
+  return (
+    <div style={ds.section}>
+      <div style={ds.header}>
+        <span style={ds.title}>{t.docsTitle}</span>
+        <label style={ds.uploadBtn}>
+          <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={handleUpload} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx" />
+          {uploading ? t.docsUploading : `+ ${t.docsUpload}`}
+        </label>
+      </div>
+      {uploadError && <p style={ds.error}>{uploadError}</p>}
+      {loading ? null : docs.length === 0 ? (
+        <p style={ds.empty}>{t.docsNoDocuments}</p>
+      ) : (
+        <div style={ds.list}>
+          {docs.map(d => (
+            <div key={d.id} style={ds.docRow}>
+              <a href={d.url} target="_blank" rel="noopener noreferrer" style={ds.docName}>{d.name}</a>
+              <span style={ds.docMeta}>{fmtSize(d.size_bytes)}{d.uploaded_by_name ? ` · ${d.uploaded_by_name}` : ''}</span>
+              <button style={ds.deleteBtn} onClick={() => handleDelete(d.id)}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const ds = {
+  section: { marginTop: 12, paddingTop: 12, borderTop: '1px solid #f3f4f6' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  title: { fontSize: 13, fontWeight: 700, color: '#374151' },
+  uploadBtn: { background: '#eff6ff', color: '#1a56db', border: '1px solid #bfdbfe', borderRadius: 6, padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  list: { display: 'flex', flexDirection: 'column', gap: 6 },
+  docRow: { display: 'flex', alignItems: 'center', gap: 10, background: '#f9fafb', borderRadius: 6, padding: '6px 10px' },
+  docName: { flex: 1, fontSize: 13, color: '#1a56db', textDecoration: 'none', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  docMeta: { fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' },
+  deleteBtn: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 12, padding: '0 2px', lineHeight: 1 },
+  error: { fontSize: 12, color: '#ef4444', margin: '4px 0' },
+  empty: { fontSize: 12, color: '#9ca3af', margin: '4px 0' },
+};
 
 const LANGUAGES = ['English', 'Spanish'];
 
@@ -810,6 +889,9 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                         )}
                       </div>
                     )}
+
+                    {/* ── Documents ── */}
+                    {!isEditing && <WorkerDocuments workerId={w.id} />}
 
                     {/* ── Remove ── */}
                     {identityEditable && !isEditing && (

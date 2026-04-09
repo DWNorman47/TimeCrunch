@@ -1265,6 +1265,11 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
 router.get('/projects/metrics', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
+    const rateResult = await pool.query(
+      `SELECT value FROM settings WHERE company_id = $1 AND key = 'default_hourly_rate'`,
+      [companyId]
+    );
+    const defaultRate = parseFloat(rateResult.rows[0]?.value ?? 30);
     const result = await pool.query(
       `WITH daily_regular AS (
         SELECT project_id, work_date,
@@ -1279,13 +1284,22 @@ router.get('/projects/metrics', requireAdmin, async (req, res) => {
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE((SELECT SUM(LEAST(day_hours, 8)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as regular_hours,
         COALESCE((SELECT SUM(GREATEST(day_hours - 8, 0)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as overtime_hours,
-        COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600 ELSE 0 END), 0) as prevailing_hours
+        COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600 ELSE 0 END), 0) as prevailing_hours,
+        COALESCE((
+          SELECT SUM(
+            EXTRACT(EPOCH FROM (CASE WHEN te2.end_time < te2.start_time THEN te2.end_time + INTERVAL '1 day' - te2.start_time ELSE te2.end_time - te2.start_time END)) / 3600
+            * COALESCE(u2.hourly_rate, $2)
+          )
+          FROM time_entries te2
+          JOIN users u2 ON te2.user_id = u2.id
+          WHERE te2.project_id = p.id AND te2.company_id = $1
+        ), 0) as estimated_cost
       FROM projects p
       LEFT JOIN time_entries te ON te.project_id = p.id
       WHERE p.active = true AND p.company_id = $1
       GROUP BY p.id, p.name
       ORDER BY p.name`,
-      [companyId]
+      [companyId, defaultRate]
     );
     res.json(result.rows);
   } catch (err) {
@@ -2013,6 +2027,28 @@ router.get('/entries/recently-approved', requireAdmin, requirePermission('approv
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// POST /admin/entries/bulk-approve — approve a specific set of entry IDs
+router.post('/entries/bulk-approve', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
+  if (ids.length > 200) return res.status(400).json({ error: 'Max 200 entries per bulk approve' });
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `UPDATE time_entries SET status = 'approved', locked = true, approved_by = $1, approved_at = NOW()
+       WHERE id = ANY($2::int[]) AND company_id = $3 AND status = 'pending'
+       RETURNING id, user_id, work_date, start_time, end_time`,
+      [req.user.id, ids, companyId]
+    );
+    for (const row of result.rows) {
+      sendPushToUser(row.user_id, { title: 'Time entry approved', body: 'An admin approved your time entry.', url: '/dashboard' });
+      createInboxItem(row.user_id, companyId, 'approval', 'Time entry approved ✓',
+        `Your entry for ${row.work_date?.toString().substring(0,10)} (${row.start_time}–${row.end_time}) was approved.`, '/dashboard');
+    }
+    res.json({ approved: result.rowCount });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /admin/entries/approve-all — approve every pending entry for this company
@@ -2902,6 +2938,56 @@ router.delete('/clients/:id/documents/:docId', requireAdmin, async (req, res) =>
     const { deleteByUrl } = require('../r2');
     await deleteByUrl(doc.rows[0].url).catch(() => {});
     await pool.query('DELETE FROM client_documents WHERE id=$1', [req.params.docId]);
+    res.json({ deleted: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Worker Documents ────────────────────────────────────────────────────────
+
+const { uploadBase64, deleteByUrl } = require('../r2');
+
+router.get('/workers/:id/documents', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT d.id, d.name, d.url, d.size_bytes, d.mime_type, d.created_at, u.full_name as uploaded_by_name
+       FROM worker_documents d LEFT JOIN users u ON d.uploaded_by = u.id
+       WHERE d.user_id = $1 AND d.company_id = $2 ORDER BY d.created_at DESC`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.post('/workers/:id/documents', requireAdmin, async (req, res) => {
+  const { name, data } = req.body; // data = base64 data URL
+  if (!name || !data) return res.status(400).json({ error: 'name and data required' });
+  if (name.length > 255) return res.status(400).json({ error: 'name too long' });
+  const companyId = req.user.company_id;
+  try {
+    const workerCheck = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
+    if (workerCheck.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
+    const uploaded = await uploadBase64(data, 'documents');
+    const result = await pool.query(
+      `INSERT INTO worker_documents (company_id, user_id, name, url, size_bytes, mime_type, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [companyId, req.params.id, name, uploaded.url, uploaded.sizeBytes || null,
+       data.match(/^data:([^;]+)/)?.[1] || null, req.user.id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.delete('/workers/:id/documents/:docId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const doc = await pool.query(
+      'SELECT url FROM worker_documents WHERE id = $1 AND user_id = $2 AND company_id = $3',
+      [req.params.docId, req.params.id, companyId]
+    );
+    if (doc.rowCount === 0) return res.status(404).json({ error: 'Document not found' });
+    await pool.query('DELETE FROM worker_documents WHERE id = $1', [req.params.docId]);
+    deleteByUrl(doc.rows[0].url).catch(() => {});
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });

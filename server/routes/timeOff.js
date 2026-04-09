@@ -3,6 +3,7 @@ const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendEmail } = require('../email');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
+const { createInboxItem, createInboxItemBatch } = require('./inbox');
 
 const VALID_TYPES = ['vacation', 'sick', 'personal', 'other'];
 
@@ -40,6 +41,12 @@ router.post('/', requireAuth, async (req, res) => {
           <b>Dates:</b> ${start_date} – ${end_date}${note ? `<br/><b>Note:</b> ${note}` : ''}</p>
           <p>Log in to OpsFloa to approve or deny.</p>`;
         for (const admin of admins.rows) sendEmail(admin.email, subject, body);
+        // Inbox notification for all admins
+        const adminIds = await pool.query(`SELECT id FROM users WHERE company_id = $1 AND role = 'admin'`, [companyId]);
+        createInboxItemBatch(adminIds.rows.map(a => a.id), companyId, 'timeoff_request',
+          `Time off request: ${req.user.full_name}`,
+          `${typeLabel} · ${start_date} – ${end_date}`,
+          '/timeclock#timeoff');
       } catch (err) { console.error('Time off request notification error:', err); }
     });
     res.status(201).json(result.rows[0]);
@@ -110,6 +117,8 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
           body: `${startStr} – ${endStr}${review_note ? ': ' + review_note : ''}`,
           url: '/dashboard#time-off',
         });
+        createInboxItem(row.user_id, companyId, 'timeoff_approved', 'Time off approved ✓',
+          `${startStr} – ${endStr}${review_note ? ' · ' + review_note : ''}`, '/dashboard#timeoff');
 
         // Flag any scheduled shifts during the approved time-off period
         const conflictResult = await pool.query(
@@ -164,6 +173,8 @@ router.patch('/:id/deny', requireAdmin, async (req, res) => {
           body: `${denyStartStr} – ${denyEndStr}${review_note ? ': ' + review_note : ''}`,
           url: '/dashboard#time-off',
         });
+        createInboxItem(row.user_id, companyId, 'timeoff_denied', 'Time off request denied',
+          `${denyStartStr} – ${denyEndStr}${review_note ? ' · ' + review_note : ''}`, '/dashboard#timeoff');
       } catch (err) { console.error('Time off denial notification error:', err); }
     });
     res.json(row);

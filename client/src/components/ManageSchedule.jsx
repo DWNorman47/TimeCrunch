@@ -184,7 +184,9 @@ export default function ManageSchedule({ workers, projects }) {
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('grid');
-  const [form, setForm] = useState({ user_id: '', project_id: '', shift_date: toISO(new Date()), start_time: '08:00', end_time: '17:00', notes: '' });
+  const [form, setForm] = useState({ user_id: '', project_id: '', shift_date: toISO(new Date()), start_time: '08:00', end_time: '17:00', notes: '', repeat: 'none' });
+  const [availability, setAvailability] = useState([]); // [{ user_id, day_of_week, start_time, end_time }]
+  const [availabilityWarning, setAvailabilityWarning] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(null);
@@ -258,6 +260,10 @@ export default function ManageSchedule({ workers, projects }) {
   }, [from, to]);
 
   useEffect(() => {
+    api.get('/availability/admin').then(r => setAvailability(r.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     const today = toISO(new Date());
     const dateInView = today >= from && today <= to ? today : from;
     setForm(f => ({ ...f, shift_date: dateInView }));
@@ -268,6 +274,21 @@ export default function ManageSchedule({ workers, projects }) {
   const addShift = async e => {
     e.preventDefault();
     if (!form.user_id) { setError(t.selectAWorker); return; }
+
+    // Check worker availability
+    const shiftDay = new Date(form.shift_date + 'T00:00:00').getDay();
+    const workerAvail = availability.find(a => String(a.user_id) === String(form.user_id) && a.day_of_week === shiftDay);
+    if (workerAvail) {
+      const availStart = workerAvail.start_time.substring(0, 5);
+      const availEnd = workerAvail.end_time.substring(0, 5);
+      if (form.start_time < availStart || form.end_time > availEnd) {
+        setAvailabilityWarning(t.msAvailabilityWarning);
+      } else {
+        setAvailabilityWarning('');
+      }
+    } else {
+      setAvailabilityWarning('');
+    }
 
     // Check for overlapping shift for the same worker on the same day
     const existing = shifts.filter(s =>
@@ -287,13 +308,31 @@ export default function ManageSchedule({ workers, projects }) {
       setOverlapWarning('');
     }
 
+    // Generate dates for recurring
+    const baseDates = [form.shift_date];
+    if (form.repeat === 'weekly-4') {
+      for (let i = 1; i < 4; i++) baseDates.push(toISO(addDays(new Date(form.shift_date + 'T00:00:00'), i * 7)));
+    } else if (form.repeat === 'biweekly-4') {
+      for (let i = 1; i < 4; i++) baseDates.push(toISO(addDays(new Date(form.shift_date + 'T00:00:00'), i * 14)));
+    } else if (form.repeat === 'monthly-3') {
+      for (let i = 1; i < 3; i++) {
+        const d = new Date(form.shift_date + 'T00:00:00');
+        d.setMonth(d.getMonth() + i);
+        baseDates.push(toISO(d));
+      }
+    }
+
     setSaving(true); setError('');
     try {
-      const r = await api.post('/shifts/admin', form);
-      setShifts(prev => [...prev, r.data].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
-      setForm(f => ({ ...f, notes: '' }));
-      setOverlapWarning('');
-      toast(t.shiftAdded, 'success');
+      const newShifts = [];
+      for (const date of baseDates) {
+        const r = await api.post('/shifts/admin', { ...form, shift_date: date });
+        newShifts.push(r.data);
+      }
+      setShifts(prev => [...prev, ...newShifts].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
+      setForm(f => ({ ...f, notes: '', repeat: 'none' }));
+      setOverlapWarning(''); setAvailabilityWarning('');
+      toast(baseDates.length > 1 ? `${baseDates.length} shifts added` : t.shiftAdded, 'success');
     } catch (err) {
       setError(err.response?.data?.error || t.failedSaveShift);
     } finally { setSaving(false); }
@@ -440,10 +479,20 @@ export default function ManageSchedule({ workers, projects }) {
             <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.optional} maxLength={500} />
           </div>
           <div style={styles.field}>
+            <label style={styles.label}>{t.msRepeat}</label>
+            <select style={styles.input} value={form.repeat} onChange={e => set('repeat', e.target.value)}>
+              <option value="none">{t.msRepeatNone}</option>
+              <option value="weekly-4">{t.msRepeatWeekly4}</option>
+              <option value="biweekly-4">{t.msRepeatBiweekly4}</option>
+              <option value="monthly-3">{t.msRepeatMonthly3}</option>
+            </select>
+          </div>
+          <div style={styles.field}>
             <label style={styles.label}>&nbsp;</label>
             <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? '...' : t.addShift}</button>
           </div>
         </div>
+        {availabilityWarning && <p style={styles.overlapWarning}>📅 {availabilityWarning}</p>}
         {overlapWarning && <p style={styles.overlapWarning}>⚠ {overlapWarning}</p>}
         {error && <p style={styles.error}>{error}</p>}
       </form>

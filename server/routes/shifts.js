@@ -2,6 +2,7 @@ const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
+const { createInboxItem } = require('./inbox');
 
 // GET /admin/shifts?from=&to= — all company shifts in range
 router.get('/admin', requireAdmin, async (req, res) => {
@@ -51,11 +52,9 @@ router.post('/admin', requireAdmin, async (req, res) => {
       [companyId, user_id, project_id || null, shift_date, start_time, end_time, notes]
     );
     const shift = full.rows[0];
-    sendPushToUser(user_id, {
-      title: 'New shift assigned',
-      body: `${shift.shift_date} · ${shift.start_time.substring(0, 5)}–${shift.end_time.substring(0, 5)}${shift.project_name ? ' · ' + shift.project_name : ''}`,
-      url: '/dashboard',
-    });
+    const shiftBody = `${shift.shift_date} · ${shift.start_time.substring(0, 5)}–${shift.end_time.substring(0, 5)}${shift.project_name ? ' · ' + shift.project_name : ''}`;
+    sendPushToUser(user_id, { title: 'New shift assigned', body: shiftBody, url: '/dashboard' });
+    createInboxItem(user_id, companyId, 'shift_assigned', 'New shift assigned', shiftBody, '/dashboard#schedule');
     res.status(201).json(shift);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -82,11 +81,9 @@ router.patch('/admin/:id', requireAdmin, async (req, res) => {
        WHERE s.id = $1`, [req.params.id]
     );
     const shift = full.rows[0];
-    sendPushToUser(shift.user_id, {
-      title: 'Shift updated',
-      body: `${shift.shift_date?.toString().substring(0,10)} · ${start_time.substring(0,5)}–${end_time.substring(0,5)}`,
-      url: '/dashboard',
-    });
+    const updBody = `${shift.shift_date?.toString().substring(0,10)} · ${start_time.substring(0,5)}–${end_time.substring(0,5)}`;
+    sendPushToUser(shift.user_id, { title: 'Shift updated', body: updBody, url: '/dashboard' });
+    createInboxItem(shift.user_id, req.user.company_id, 'shift_updated', 'Shift updated', updBody, '/dashboard#schedule');
     res.json(shift);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -103,11 +100,9 @@ router.delete('/admin/:id', requireAdmin, async (req, res) => {
     if (full.rowCount === 0) return res.status(404).json({ error: 'Shift not found' });
     const shift = full.rows[0];
     await pool.query('DELETE FROM shifts WHERE id = $1', [req.params.id]);
-    sendPushToUser(shift.user_id, {
-      title: 'Shift cancelled',
-      body: `${shift.shift_date?.toString().substring(0, 10)} · ${shift.start_time.substring(0, 5)}–${shift.end_time.substring(0, 5)}${shift.project_name ? ' · ' + shift.project_name : ''}`,
-      url: '/dashboard',
-    });
+    const cancelBody = `${shift.shift_date?.toString().substring(0, 10)} · ${shift.start_time.substring(0, 5)}–${shift.end_time.substring(0, 5)}${shift.project_name ? ' · ' + shift.project_name : ''}`;
+    sendPushToUser(shift.user_id, { title: 'Shift cancelled', body: cancelBody, url: '/dashboard' });
+    createInboxItem(shift.user_id, req.user.company_id, 'shift_cancelled', 'Shift cancelled', cancelBody, '/dashboard#schedule');
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
