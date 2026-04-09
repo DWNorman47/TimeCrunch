@@ -2,13 +2,8 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
 
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const DAYS_ES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-
 export default function AvailabilityTab() {
   const t = useT();
-  const isEs = document.documentElement.lang === 'es';
-  const dayNames = isEs ? DAYS_ES : DAYS;
 
   // State: array indexed by day_of_week (0=Sun)
   // { enabled: bool, start_time: '08:00', end_time: '17:00' }
@@ -81,7 +76,7 @@ export default function AvailabilityTab() {
                 onChange={() => toggleDay(i)}
                 style={{ marginRight: 8 }}
               />
-              <span style={s.dayName}>{dayNames[i]}</span>
+              <span style={s.dayName}>{t.availDays[i]}</span>
             </label>
             {d.enabled && (
               <div style={s.timeRow}>
@@ -100,7 +95,7 @@ export default function AvailabilityTab() {
                 />
               </div>
             )}
-            {!d.enabled && <span style={s.unavailable}>Unavailable</span>}
+            {!d.enabled && <span style={s.unavailable}>{t.availUnavailable}</span>}
           </div>
         ))}
       </div>

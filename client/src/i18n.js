@@ -396,6 +396,8 @@ const translations = {
     availSave: 'Save Availability',
     availSaved: 'Availability saved',
     availAvailable: 'Available',
+    availUnavailable: 'Unavailable',
+    availDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
 
     // ── Project cost tracking ─────────────────────────────────────────────────
     projEstCost: 'Est. labor cost',
@@ -2149,6 +2151,8 @@ const translations = {
     availSave: 'Guardar disponibilidad',
     availSaved: 'Disponibilidad guardada',
     availAvailable: 'Disponible',
+    availUnavailable: 'No disponible',
+    availDays: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
     projEstCost: 'Costo laboral est.',
     docsTitle: 'Documentos',
     docsUpload: 'Subir documento',

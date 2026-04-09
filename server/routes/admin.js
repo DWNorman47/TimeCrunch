@@ -2035,18 +2035,24 @@ router.post('/entries/bulk-approve', requireAdmin, requirePermission('approve_en
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
   if (ids.length > 200) return res.status(400).json({ error: 'Max 200 entries per bulk approve' });
   const companyId = req.user.company_id;
+  const accessIds = req.user.worker_access_ids;
+  const accessFilter = accessIds && accessIds.length ? `AND user_id = ANY($4)` : '';
+  const params = accessIds && accessIds.length
+    ? [req.user.id, ids, companyId, accessIds]
+    : [req.user.id, ids, companyId];
   try {
     const result = await pool.query(
       `UPDATE time_entries SET status = 'approved', locked = true, approved_by = $1, approved_at = NOW()
-       WHERE id = ANY($2::int[]) AND company_id = $3 AND status = 'pending'
+       WHERE id = ANY($2::int[]) AND company_id = $3 AND status = 'pending' ${accessFilter}
        RETURNING id, user_id, work_date, start_time, end_time`,
-      [req.user.id, ids, companyId]
+      params
     );
     for (const row of result.rows) {
       sendPushToUser(row.user_id, { title: 'Time entry approved', body: 'An admin approved your time entry.', url: '/dashboard' });
       createInboxItem(row.user_id, companyId, 'approval', 'Time entry approved ✓',
         `Your entry for ${row.work_date?.toString().substring(0,10)} (${row.start_time}–${row.end_time}) was approved.`, '/dashboard');
     }
+    await logAudit(companyId, req.user.id, req.user.full_name, 'entries.bulk_approved', 'time_entry', null, null, { count: result.rowCount, ids });
     res.json({ approved: result.rowCount });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });

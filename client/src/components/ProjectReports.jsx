@@ -92,8 +92,8 @@ function ProjectCard({ project: p, currency = 'USD' }) {
         {p.budget_hours && (
           <BudgetBar used={parseFloat(p.total_hours)} budget={parseFloat(p.budget_hours)} label="hrs" />
         )}
-        {p.budget_dollars && (
-          <BudgetBar used={parseFloat(p.total_hours) * 30} budget={parseFloat(p.budget_dollars)} label="$" money currency={currency} />
+        {p.budget_dollars && parseFloat(p.estimated_cost) >= 0 && (
+          <BudgetBar used={parseFloat(p.estimated_cost)} budget={parseFloat(p.budget_dollars)} label="$" money currency={currency} />
         )}
       </div>
 

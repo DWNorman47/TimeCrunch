@@ -283,7 +283,7 @@ export default function ApprovalQueue({ onCountChange }) {
               <select
                 style={styles.filterSelect}
                 value={workerFilter}
-                onChange={e => setWorkerFilter(e.target.value)}
+                onChange={e => { setWorkerFilter(e.target.value); setSelectedIds(new Set()); }}
               >
                 <option value="">{t.allWorkers}</option>
                 {workerNames.map(n => (
