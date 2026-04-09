@@ -201,8 +201,8 @@ export default function Dashboard() {
       }
 
       const badge = isPrev
-        ? `<span style="background:#d97706;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">Prevailing</span>`
-        : `<span style="background:#2563eb;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">Regular</span>`;
+        ? `<span style="background:#d97706;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">${t.prevailing}</span>`
+        : `<span style="background:#2563eb;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">${t.regular}</span>`;
       return `<tr>
         <td>${fmtDate(e.work_date)}</td>
         ${showProject ? `<td>${e.project_name || '—'}</td>` : ''}
@@ -219,13 +219,13 @@ export default function Dashboard() {
 
     // Summary rows
     const sumRows = [
-      regularHours > 0 ? `<tr><td>Regular Hours</td><td style="text-align:right">${fmtH(regularHours)}</td></tr>` : '',
-      overtimeEnabled && overtimeHours > 0 ? `<tr><td>Overtime Hours</td><td style="text-align:right">${fmtH(overtimeHours)}</td></tr>` : '',
-      prevailingHours > 0 ? `<tr><td>Prevailing Hours</td><td style="text-align:right">${fmtH(prevailingHours)}</td></tr>` : '',
-      `<tr style="border-top:1px solid #e5e7eb;font-weight:600"><td>Total Hours</td><td style="text-align:right">${fmtH(totalHours)}</td></tr>`,
-      workerRate > 0 && regularHours > 0 ? `<tr><td>Regular Pay (${fmtMoney(workerRate)}/hr)</td><td style="text-align:right">${fmtMoney(regularPay)}</td></tr>` : '',
-      overtimeEnabled && overtimeHours > 0 && workerRate > 0 ? `<tr><td>Overtime Pay (${otMultiplier}×)</td><td style="text-align:right">${fmtMoney(overtimePay)}</td></tr>` : '',
-      prevRate > 0 && prevailingHours > 0 ? `<tr><td>Prevailing Pay (${fmtMoney(prevRate)}/hr)</td><td style="text-align:right">${fmtMoney(prevailingPay)}</td></tr>` : '',
+      regularHours > 0 ? `<tr><td>${t.regularHours}</td><td style="text-align:right">${fmtH(regularHours)}</td></tr>` : '',
+      overtimeEnabled && overtimeHours > 0 ? `<tr><td>${t.overtimeHours}</td><td style="text-align:right">${fmtH(overtimeHours)}</td></tr>` : '',
+      prevailingHours > 0 ? `<tr><td>${t.prevailingHours}</td><td style="text-align:right">${fmtH(prevailingHours)}</td></tr>` : '',
+      `<tr style="border-top:1px solid #e5e7eb;font-weight:600"><td>${t.totalHours}</td><td style="text-align:right">${fmtH(totalHours)}</td></tr>`,
+      workerRate > 0 && regularHours > 0 ? `<tr><td>${t.regularPay} (${fmtMoney(workerRate)}/hr)</td><td style="text-align:right">${fmtMoney(regularPay)}</td></tr>` : '',
+      overtimeEnabled && overtimeHours > 0 && workerRate > 0 ? `<tr><td>${t.overtimePay} (${otMultiplier}×)</td><td style="text-align:right">${fmtMoney(overtimePay)}</td></tr>` : '',
+      prevRate > 0 && prevailingHours > 0 ? `<tr><td>${t.prevailingPay} (${fmtMoney(prevRate)}/hr)</td><td style="text-align:right">${fmtMoney(prevailingPay)}</td></tr>` : '',
     ].filter(Boolean).join('');
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice — ${workerName}</title><style>
@@ -262,51 +262,49 @@ tr:last-child td{border-bottom:none}
 <div class="header">
   <div>
     <div class="brand">Ops Flow Assist</div>
-    <div class="brand-sub">Employee Time Invoice</div>
+    <div class="brand-sub">${t.employeeTimeInvoice}</div>
   </div>
   <div>
-    <div class="inv-title">INVOICE</div>
+    <div class="inv-title">${t.invoiceLabel}</div>
     <div class="inv-meta">
-      Invoice #:<strong>${invoiceNo}</strong><br>
-      Invoice Date:<strong>${invoiceDate}</strong>
+      ${t.pdfInvoiceNo}<strong>${invoiceNo}</strong><br>
+      ${t.pdfInvoiceDate}<strong>${invoiceDate}</strong>
     </div>
   </div>
 </div>
 
 <div class="parties">
   <div>
-    <div class="party-label">From</div>
+    <div class="party-label">${t.from}</div>
     <div class="party-name">${workerName}</div>
     <div class="party-detail">${workerEmail}</div>
   </div>
   <div>
-    <div class="party-label">Bill To</div>
+    <div class="party-label">${t.billTo}</div>
     <div class="party-detail">${billToLines.map((l, i) => i === 0 ? `<span class="party-name">${l}</span>` : l).join('<br>')}</div>
   </div>
 </div>
 
 <div class="period-bar">
-  <span class="period-label">Pay Period</span>
+  <span class="period-label">${t.payPeriod}</span>
   <span class="period-val">${periodStart} – ${periodEnd}</span>
 </div>
 
 <table>
   <thead><tr>
-    <th>Date</th>${showProject ? '<th>Project</th>' : ''}<th>Description</th><th>Clock In</th><th>Clock Out</th>${showRateType ? '<th>Rate Type</th>' : ''}<th style="text-align:right">Hours</th>
+    <th>${t.date}</th>${showProject ? `<th>${t.project}</th>` : ''}<th>${t.descriptionLabel}</th><th>${t.clockIn}</th><th>${t.clockOut}</th>${showRateType ? `<th>${t.rateTypeLabel}</th>` : ''}<th style="text-align:right">${t.hours}</th>
   </tr></thead>
   <tbody>${rows}</tbody>
 </table>
 
 <div class="summary-wrap">
   <div class="thank-you">
-    Thank you for reviewing this invoice.<br>
-    Please approve all time entries in OpsFloa<br>
-    and process payment at your earliest convenience.
+    ${t.thankYouInvoice}
   </div>
   <div class="sum-table">
     <table style="width:100%;border-collapse:collapse">
       ${sumRows}
-      <tr class="total-row"><td>Total Due</td><td style="text-align:right">${totalPay > 0 ? fmtMoney(totalPay) : '—'}</td></tr>
+      <tr class="total-row"><td>${t.totalDue}</td><td style="text-align:right">${totalPay > 0 ? fmtMoney(totalPay) : '—'}</td></tr>
     </table>
   </div>
 </div>
@@ -315,12 +313,12 @@ ${signatureDataUrl ? `
 <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end">
   <div style="text-align:center">
     <img src="${signatureDataUrl}" style="height:60px;display:block;margin-bottom:4px" />
-    <div style="font-size:11px;color:#9ca3af;border-top:1px solid #d1d5db;padding-top:4px;min-width:200px">${workerName} — Digital Signature</div>
+    <div style="font-size:11px;color:#9ca3af;border-top:1px solid #d1d5db;padding-top:4px;min-width:200px">${workerName} — ${t.pdfDigitalSignature}</div>
   </div>
 </div>` : ''}
 
 <div class="footer">
-  <span>Generated by Ops Flow Assist</span>
+  <span>${t.pdfGeneratedBy}</span>
   <span>${invoiceDate}</span>
 </div>
 

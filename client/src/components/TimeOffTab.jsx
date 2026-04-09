@@ -121,7 +121,7 @@ export default function TimeOffTab() {
                   {TYPE_LABELS[r.type] || r.type}
                 </span>
                 <span style={{ ...s.statusBadge, color: STATUS_COLORS[r.status] || '#6b7280' }}>
-                  {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+                  {({ pending: t.pending, approved: t.approved, denied: t.filterDenied }[r.status] || r.status)}
                 </span>
               </div>
               <div style={s.dates}>

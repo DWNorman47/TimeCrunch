@@ -83,13 +83,13 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
           confirmingBulkDelete ? (
             <>
               <button style={styles.confirmBulkDeleteBtn} onClick={handleBulkDelete} disabled={bulkDeleting}>
-                {bulkDeleting ? 'Deleting\u2026' : `Confirm delete ${selectedIds.size}`}
+                {bulkDeleting ? t.elDeleting : `${t.elConfirmDelete} ${selectedIds.size}`}
               </button>
               <button style={styles.cancelBulkDeleteBtn} onClick={() => setConfirmingBulkDelete(false)}>{t.cancel}</button>
             </>
           ) : (
             <button style={styles.bulkDeleteBtn} onClick={() => { setBulkDeleteError(''); setConfirmingBulkDelete(true); }} disabled={bulkDeleting}>
-              {`Delete ${selectedIds.size} selected`}
+              {`${t.elDeleteSelected} ${selectedIds.size}`}
             </button>
           )
         )}
@@ -131,11 +131,11 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                       </span>
                     </div>
                     <div style={styles.entryRight}>
-                      {e.status === 'approved' && <span style={styles.badgeGreen}>Approved</span>}
-                      {e.status === 'rejected' && <span style={styles.badgeRed}>Rejected</span>}
+                      {e.status === 'approved' && <span style={styles.badgeGreen}>{t.approved}</span>}
+                      {e.status === 'rejected' && <span style={styles.badgeRed}>{t.rejected}</span>}
                       {e.locked && <span style={styles.badgeLock}>🔒</span>}
                       {e.pending && <span style={styles.badgePending}>⏳</span>}
-                      {!e.pending && (!e.status || e.status === 'pending') && <span style={styles.badgePending}>Pending</span>}
+                      {!e.pending && (!e.status || e.status === 'pending') && <span style={styles.badgePending}>{t.pending}</span>}
                       <span style={{ ...styles.wageChip, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                         {e.wage_type === 'prevailing' ? t.prevailing : t.regular}
                       </span>
@@ -147,8 +147,8 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                     <>
                       {(e.break_minutes > 0 || e.mileage > 0 || e.notes) && (
                         <div style={styles.entryMeta}>
-                          {e.break_minutes > 0 && <span style={styles.metaTag}>☕ {e.break_minutes}m break</span>}
-                          {e.mileage > 0 && <span style={styles.metaTag}>🚗 {parseFloat(e.mileage).toFixed(1)} mi</span>}
+                          {e.break_minutes > 0 && <span style={styles.metaTag}>☕ {e.break_minutes}m {t.elBreak}</span>}
+                          {e.mileage > 0 && <span style={styles.metaTag}>🚗 {parseFloat(e.mileage).toFixed(1)} {t.miChip}</span>}
                           {e.notes && <span style={styles.notes}>{e.notes}</span>}
                         </div>
                       )}

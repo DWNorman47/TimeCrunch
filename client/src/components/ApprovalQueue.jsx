@@ -248,7 +248,7 @@ export default function ApprovalQueue({ onCountChange }) {
         <h3 style={styles.title}>{t.approvalQueue}</h3>
         {entries.length > 0 && (
           <>
-            <span style={styles.badge}>{visibleEntries.length}{workerFilter ? '' : ' pending'}</span>
+            <span style={styles.badge}>{visibleEntries.length}{workerFilter ? '' : ' ' + t.aqPending}</span>
             {workerNames.length > 1 && (
               <select
                 style={styles.filterSelect}
@@ -264,13 +264,13 @@ export default function ApprovalQueue({ onCountChange }) {
             {confirmingApproveAll ? (
               <>
                 <button style={styles.approveAllBtn} onClick={approveAll} disabled={approvingAll}>
-                  {approvingAll ? 'Approving...' : 'Confirm'}
+                  {approvingAll ? t.aqApprovingAll : t.confirm}
                 </button>
-                <button style={styles.cancelApproveAllBtn} onClick={() => setConfirmingApproveAll(false)}>Cancel</button>
+                <button style={styles.cancelApproveAllBtn} onClick={() => setConfirmingApproveAll(false)}>{t.cancel}</button>
               </>
             ) : (
               <button style={styles.approveAllBtn} onClick={() => setConfirmingApproveAll(true)} disabled={approvingAll || visibleEntries.length === 0}>
-                {`✓ Approve${workerFilter ? ` ${workerFilter.split(' ')[0]}'s` : ' All'}`}
+                {workerFilter ? `${t.approve} ${workerFilter.split(' ')[0]}'s` : t.aqApproveAll}
               </button>
             )}
           </>
@@ -289,7 +289,7 @@ export default function ApprovalQueue({ onCountChange }) {
             </p>
           )}
           {visibleEntries.length === 0 && workerFilter && (
-            <p style={styles.empty}>No pending entries for {workerFilter}.</p>
+            <p style={styles.empty}>{t.aqNoPendingFor} {workerFilter}.</p>
           )}
           {sortedDays.map(day => (
             <div key={day}>
@@ -306,7 +306,7 @@ export default function ApprovalQueue({ onCountChange }) {
                       <span style={styles.sep}>·</span>
                       <span>{formatTime(e.start_time)} – {formatTime(e.end_time)} ({formatHours(e.start_time, e.end_time)})</span>
                       <span style={{ ...styles.wageTag, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
-                        {e.wage_type === 'prevailing' ? 'Prevailing' : 'Regular'}
+                        {e.wage_type === 'prevailing' ? t.prevailing : t.regular}
                       </span>
                     </div>
                     {e.worker_signed_at && (
@@ -316,14 +316,14 @@ export default function ApprovalQueue({ onCountChange }) {
                     {e.clock_source && e.clock_source !== 'worker' && (
                       <div style={styles.sourceBadge}>
                         {e.clock_source === 'admin'
-                          ? `Clocked in by admin${e.clocked_in_by_name ? ': ' + e.clocked_in_by_name : ''}`
-                          : 'Log entry'}
+                          ? `${t.aqClockedInByAdmin}${e.clocked_in_by_name ? ': ' + e.clocked_in_by_name : ''}`
+                          : t.aqLogEntry}
                       </div>
                     )}
                     {(e.clock_in_lat || e.clock_out_lat) && (
                       <div style={styles.locationRow}>
                         <button style={styles.locationBtn} onClick={() => setOpenMapId(openMapId === e.id ? null : e.id)}>
-                          📍 {openMapId === e.id ? 'Hide Map' : 'View Location'}
+                          📍 {openMapId === e.id ? t.aqHideMap : t.aqViewLocation}
                         </button>
                         {openMapId === e.id && (() => {
                           const positions = [
@@ -335,17 +335,17 @@ export default function ApprovalQueue({ onCountChange }) {
                               <MapContainer center={positions[0]} zoom={14} style={styles.map} scrollWheelZoom={false}>
                                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' />
                                 <FitBounds positions={positions} />
-                                {e.clock_in_lat && <Marker position={[parseFloat(e.clock_in_lat), parseFloat(e.clock_in_lng)]} icon={clockInIcon}><Popup>🟢 Clock In<br />{e.worker_name}</Popup></Marker>}
-                                {e.clock_out_lat && <Marker position={[parseFloat(e.clock_out_lat), parseFloat(e.clock_out_lng)]} icon={clockOutIcon}><Popup>🔴 Clock Out<br />{e.worker_name}</Popup></Marker>}
+                                {e.clock_in_lat && <Marker position={[parseFloat(e.clock_in_lat), parseFloat(e.clock_in_lng)]} icon={clockInIcon}><Popup>🟢 {t.clockIn}<br />{e.worker_name}</Popup></Marker>}
+                                {e.clock_out_lat && <Marker position={[parseFloat(e.clock_out_lat), parseFloat(e.clock_out_lng)]} icon={clockOutIcon}><Popup>🔴 {t.clockOut}<br />{e.worker_name}</Popup></Marker>}
                               </MapContainer>
                               <div style={styles.mapLegend}>
                                 {e.clock_in_lat
-                                  ? <span style={styles.mapLegendItem}><span style={{ color: '#16a34a' }}>●</span> Clock-in location</span>
-                                  : <span style={styles.mapLegendMissing}>No clock-in location captured</span>
+                                  ? <span style={styles.mapLegendItem}><span style={{ color: '#16a34a' }}>●</span> {t.aqClockInLegend}</span>
+                                  : <span style={styles.mapLegendMissing}>{t.aqNoClockInLoc}</span>
                                 }
                                 {e.clock_out_lat
-                                  ? <span style={styles.mapLegendItem}><span style={{ color: '#dc2626' }}>●</span> Clock-out location</span>
-                                  : <span style={styles.mapLegendMissing}>No clock-out location captured</span>
+                                  ? <span style={styles.mapLegendItem}><span style={{ color: '#dc2626' }}>●</span> {t.aqClockOutLegend}</span>
+                                  : <span style={styles.mapLegendMissing}>{t.aqNoClockOutLoc}</span>
                                 }
                               </div>
                             </div>
@@ -363,52 +363,52 @@ export default function ApprovalQueue({ onCountChange }) {
                     <div style={styles.editTimesForm}>
                       <div style={styles.editTimesRow}>
                         <div>
-                          <div style={styles.editTimesLabel}>Start</div>
+                          <div style={styles.editTimesLabel}>{t.start}</div>
                           <input type="time" style={styles.editTimeInput} value={editStart} onChange={ev => setEditStart(ev.target.value)} />
                         </div>
                         <div>
-                          <div style={styles.editTimesLabel}>End</div>
+                          <div style={styles.editTimesLabel}>{t.end}</div>
                           <input type="time" style={styles.editTimeInput} value={editEnd} onChange={ev => setEditEnd(ev.target.value)} />
                         </div>
                       </div>
                       <div style={{ marginTop: 8 }}>
-                        <div style={styles.editTimesLabel}>Project</div>
+                        <div style={styles.editTimesLabel}>{t.project}</div>
                         <select style={styles.editProjectSelect} value={editProject} onChange={ev => setEditProject(ev.target.value)}>
-                          <option value="">— No project —</option>
+                          <option value="">{t.aqNoProject}</option>
                           {(projects || []).filter(p => p.active !== false).map(p => (
                             <option key={p.id} value={p.id}>{p.name}</option>
                           ))}
                         </select>
                       </div>
                       <div style={styles.editTimesActions}>
-                        <button style={styles.saveTimesBtn} onClick={() => { setEditSaveError(''); saveEdit(e.id); }} disabled={editSaving}>{editSaving ? '...' : 'Save'}</button>
-                        <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+                        <button style={styles.saveTimesBtn} onClick={() => { setEditSaveError(''); saveEdit(e.id); }} disabled={editSaving}>{editSaving ? '...' : t.save}</button>
+                        <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
                         {editSaveError && <span style={styles.inlineError}>{editSaveError}</span>}
                       </div>
                     </div>
                   ) : splittingId === e.id ? (
                     <div style={styles.splitForm}>
-                      <div style={styles.splitTitle}>Split Entry</div>
+                      <div style={styles.splitTitle}>{t.aqSplitEntry}</div>
                       {splitError && <div style={styles.splitError}>{splitError}</div>}
                       {splitSegments.map((seg, i) => (
                         <div key={seg._key} style={styles.splitSegment}>
-                          <div style={styles.splitSegLabel}>Segment {i + 1}</div>
+                          <div style={styles.splitSegLabel}>{t.aqSegment} {i + 1}</div>
                           <div style={styles.splitSegRow}>
                             <div>
-                              <div style={styles.editTimesLabel}>Start</div>
+                              <div style={styles.editTimesLabel}>{t.start}</div>
                               <input type="time" style={styles.editTimeInput} value={seg.start_time}
                                 onChange={ev => setSplitSegments(prev => prev.map((s, j) => j === i ? { ...s, start_time: ev.target.value } : s))} />
                             </div>
                             <div>
-                              <div style={styles.editTimesLabel}>End</div>
+                              <div style={styles.editTimesLabel}>{t.end}</div>
                               <input type="time" style={styles.editTimeInput} value={seg.end_time}
                                 onChange={ev => setSplitSegments(prev => prev.map((s, j) => j === i ? { ...s, end_time: ev.target.value } : s))} />
                             </div>
                             <div style={{ flex: 1, minWidth: 120 }}>
-                              <div style={styles.editTimesLabel}>Project</div>
+                              <div style={styles.editTimesLabel}>{t.project}</div>
                               <select style={styles.editProjectSelect} value={seg.project_id}
                                 onChange={ev => setSplitSegments(prev => prev.map((s, j) => j === i ? { ...s, project_id: ev.target.value } : s))}>
-                                <option value="">— No project —</option>
+                                <option value="">{t.aqNoProject}</option>
                                 {(projects || []).filter(p => p.active !== false).map(p => (
                                   <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
@@ -423,10 +423,10 @@ export default function ApprovalQueue({ onCountChange }) {
                       <button style={styles.splitAddBtn} onClick={() => {
                         const last = splitSegments[splitSegments.length - 1];
                         setSplitSegments(prev => [...prev, { _key: Date.now(), start_time: last.end_time, end_time: last.end_time, project_id: '' }]);
-                      }}>+ Add segment</button>
+                      }}>{t.aqAddSegment}</button>
                       <div style={styles.editTimesActions}>
-                        <button style={styles.saveTimesBtn} onClick={() => saveSplit(e.id)} disabled={splitSaving}>{splitSaving ? '...' : 'Split & Save'}</button>
-                        <button style={styles.cancelBtn} onClick={() => setSplittingId(null)}>Cancel</button>
+                        <button style={styles.saveTimesBtn} onClick={() => saveSplit(e.id)} disabled={splitSaving}>{splitSaving ? '...' : t.aqSplitSave}</button>
+                        <button style={styles.cancelBtn} onClick={() => setSplittingId(null)}>{t.cancel}</button>
                       </div>
                     </div>
                   ) : rejectingId === e.id ? (
@@ -453,7 +453,7 @@ export default function ApprovalQueue({ onCountChange }) {
       {recentApproved.length > 0 && (
         <div style={styles.recentSection}>
           <button style={styles.recentToggle} onClick={() => setShowRecent(v => !v)}>
-            <span>Recently Approved ({recentApproved.length})</span>
+            <span>{t.aqRecentlyApproved} ({recentApproved.length})</span>
             <span>{showRecent ? '▾' : '▸'}</span>
           </button>
           {showRecent && (
@@ -472,7 +472,7 @@ export default function ApprovalQueue({ onCountChange }) {
                       onClick={() => { setUnapproveError(''); unapprove(e.id); }}
                       disabled={unapproving === e.id}
                     >
-                      {unapproving === e.id ? '…' : '↩ Unapprove'}
+                      {unapproving === e.id ? '…' : t.aqUnapprove}
                     </button>
                     {unapproveError && unapproving === null && <span style={styles.inlineError}>{unapproveError}</span>}
                   </div>
