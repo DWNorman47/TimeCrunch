@@ -1306,6 +1306,10 @@ const translations = {
     invTxFailedLoad: 'Failed to load transactions',
     invTxOnHand: 'On hand:',
     invTxSysConverts: '— enter qty in any unit above; system converts automatically',
+    invTxBaseUnit: 'base',
+    invTxQtyPlaceholder: 'qty',
+    invTxAdjQtyPlaceholder: '±qty',
+    invTxTargetQtyPlaceholder: 'qty in target UOM',
 
     // ── Inventory Stock ───────────────────────────────────────────────────────
     invStockFailedLoad: 'Failed to load stock',
@@ -1349,6 +1353,7 @@ const translations = {
     invStockProjectLabel: 'Project (optional)',
     invStockNoProject: 'No project',
     invStockIssuePlaceholder: 'e.g. Job site use',
+    invStockQtyPlaceholder: 'e.g. 5',
 
     // ── Inventory Cycle Counts ────────────────────────────────────────────────
     invCycCycleCount: 'Cycle Count',
@@ -2925,6 +2930,10 @@ const translations = {
     invTxFailedLoad: 'Error al cargar transacciones',
     invTxOnHand: 'En mano:',
     invTxSysConverts: '— ingresa cant. en cualquier unidad; el sistema convierte automáticamente',
+    invTxBaseUnit: 'base',
+    invTxQtyPlaceholder: 'cant.',
+    invTxAdjQtyPlaceholder: '±cant.',
+    invTxTargetQtyPlaceholder: 'cant. en UOM destino',
 
     // ── Inventory Stock ───────────────────────────────────────────────────────
     invStockFailedLoad: 'Error al cargar stock',
@@ -2968,6 +2977,7 @@ const translations = {
     invStockProjectLabel: 'Proyecto (opcional)',
     invStockNoProject: 'Sin proyecto',
     invStockIssuePlaceholder: 'ej. Uso en obra',
+    invStockQtyPlaceholder: 'ej. 5',
 
     // ── Inventory Cycle Counts ────────────────────────────────────────────────
     invCycCycleCount: 'Conteo Cíclico',

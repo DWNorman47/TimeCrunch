@@ -304,7 +304,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
             type="number"
             step="any"
             min="0.001"
-            placeholder="e.g. 5"
+            placeholder={t.invStockQtyPlaceholder}
             value={qty}
             onChange={e => setQty(e.target.value)}
             style={a.input}
@@ -317,7 +317,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
                 <option value="">{t.invStockDefaultUnit} ({item.unit})</option>
                 {itemUoms.map(u => (
                   <option key={u.id} value={u.id}>
-                    {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ' — base' : ''}
+                    {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ` — ${t.invTxBaseUnit}` : ''}
                   </option>
                 ))}
               </select>

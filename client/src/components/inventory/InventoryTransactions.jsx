@@ -232,7 +232,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
               <option value="">{t.invTxDefaultUnit}</option>
               {itemUoms.map(u => (
                 <option key={u.id} value={u.id}>
-                  {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ' — base' : ''}
+                  {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ` — ${t.invTxBaseUnit}` : ''}
                 </option>
               ))}
             </select>
@@ -248,7 +248,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
             style={f.input} type="number" step="any"
             min={form.type === 'adjust' ? undefined : 0}
             value={form.quantity} onChange={e => set('quantity', e.target.value)}
-            placeholder={form.type === 'adjust' ? '±qty' : 'qty'}
+            placeholder={form.type === 'adjust' ? t.invTxAdjQtyPlaceholder : t.invTxQtyPlaceholder}
           />
         </div>
       </div>
@@ -275,7 +275,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
               style={f.input} type="number" step="any" min="0"
               value={form.to_quantity}
               onChange={e => set('to_quantity', e.target.value)}
-              placeholder={suggestedToQty || 'qty in target UOM'}
+              placeholder={suggestedToQty || t.invTxTargetQtyPlaceholder}
             />
           </div>
         </div>
@@ -513,7 +513,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
               <input style={s.dateInput} type="date" value={filters.to} onChange={e => setFilter('to', e.target.value)} />
             </div>
             {(filters.from || filters.to) && (
-              <button style={s.clearDates} onClick={() => setFilters(f => ({ ...f, from: '', to: '' }))} title="Clear date range">{t.invTxClearDates}</button>
+              <button style={s.clearDates} onClick={() => setFilters(f => ({ ...f, from: '', to: '' }))} title={t.invTxClearDates}>{t.invTxClearDates}</button>
             )}
             {isAdmin && suppliers.length > 0 && (
               <select style={s.select} value={filters.supplier_id} onChange={e => setFilter('supplier_id', e.target.value)}>
