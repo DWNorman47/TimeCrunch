@@ -243,7 +243,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       {/* Work Performed */}
       <div style={styles.section}>
         <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.workPerformed}</span></div>
-        <textarea style={styles.textarea} rows={4} placeholder={t.workPerformedPlaceholder} maxLength={5000} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
+        <textarea style={styles.textarea} rows={4} placeholder={t.workPerformedPlaceholder} maxLength={2000} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
       </div>
 
       {/* Equipment */}

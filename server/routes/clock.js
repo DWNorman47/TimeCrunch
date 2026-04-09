@@ -228,26 +228,33 @@ router.post('/out', requireAuth, clockLimiter, async (req, res) => {
     const start_time = local_clock_in || `${pad(clockInTime.getUTCHours())}:${pad(clockInTime.getUTCMinutes())}:${pad(clockInTime.getUTCSeconds())}`;
     const end_time = local_clock_out || `${pad(clockOutTime.getUTCHours())}:${pad(clockOutTime.getUTCMinutes())}:${pad(clockOutTime.getUTCSeconds())}`;
 
-    // Create the time entry
-    const entryResult = await pool.query(
-      `INSERT INTO time_entries
-         (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
-          clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, break_minutes, mileage, timezone,
-          clock_source, clocked_in_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-       RETURNING *`,
-      [
-        companyId, req.user.id, clock.project_id, clock.work_date,
-        start_time, end_time, wage_type, clock.notes || null,
-        clock.clock_in_lat, clock.clock_in_lng, lat || null, lng || null,
-        parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
-        clock.timezone || null,
-        clock.clock_source, clock.clocked_in_by,
-      ]
-    );
-
-    // Remove the active clock row
-    await pool.query('DELETE FROM active_clock WHERE user_id = $1', [req.user.id]);
+    // Create the time entry and remove active clock atomically
+    const txClient = await pool.connect();
+    let entryResult;
+    try {
+      await txClient.query('BEGIN');
+      entryResult = await txClient.query(
+        `INSERT INTO time_entries
+           (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
+            clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, break_minutes, mileage, timezone,
+            clock_source, clocked_in_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         RETURNING *`,
+        [
+          companyId, req.user.id, clock.project_id, clock.work_date,
+          start_time, end_time, wage_type, clock.notes || null,
+          clock.clock_in_lat, clock.clock_in_lng, lat || null, lng || null,
+          parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
+          clock.timezone || null,
+          clock.clock_source, clock.clocked_in_by,
+        ]
+      );
+      await txClient.query('DELETE FROM active_clock WHERE user_id = $1', [req.user.id]);
+      await txClient.query('COMMIT');
+    } catch (err) {
+      await txClient.query('ROLLBACK');
+      throw err;
+    } finally { txClient.release(); }
 
     // Overtime alert — fire-and-forget, never block the response
     try {

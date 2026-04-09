@@ -92,6 +92,11 @@ router.patch('/:id', requireAuth, async (req, res) => {
   const description = req.body.description !== undefined ? (req.body.description?.trim() || null) : undefined;
   const location = req.body.location !== undefined ? (req.body.location?.trim() || null) : undefined;
 
+  const VALID_STATUSES  = ['open', 'in_progress', 'resolved', 'verified'];
+  const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+  if (status   !== undefined && !VALID_STATUSES.includes(status))   return res.status(400).json({ error: 'Invalid status value' });
+  if (priority !== undefined && !VALID_PRIORITIES.includes(priority)) return res.status(400).json({ error: 'Invalid priority value' });
+
   try {
     const existing = await pool.query(
       'SELECT * FROM punchlist_items WHERE id=$1 AND company_id=$2', [req.params.id, companyId]
