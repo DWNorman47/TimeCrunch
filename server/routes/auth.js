@@ -624,7 +624,7 @@ router.post('/mfa/disable', requireAuth, async (req, res) => {
 
 // Update language
 router.post('/update-language', requireAuth, async (req, res) => {
-  const { language } = req.body;
+  const language = req.body.language?.trim();
   if (!language) return res.status(400).json({ error: 'language required' });
   try {
     await pool.query('UPDATE users SET language = $1 WHERE id = $2', [language, req.user.id]);

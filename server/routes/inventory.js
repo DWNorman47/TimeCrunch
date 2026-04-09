@@ -381,7 +381,7 @@ router.patch('/items/:id/uoms/:uomId', requireAdmin, async (req, res) => {
       const sets = [], vals = [req.params.uomId]; let idx = 2;
       if (unit     !== undefined) { sets.push(`unit=$${idx++}`);      vals.push(unit.trim()); }
       if ('unit_spec' in req.body) { sets.push(`unit_spec=$${idx++}`); vals.push(unit_spec?.trim() || null); }
-      if (factor   !== undefined) { sets.push(`factor=$${idx++}`);    vals.push(parseFloat(factor)); }
+      if (factor   !== undefined) { const f = parseFloat(factor); if (isNaN(f) || f <= 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'factor must be a positive number' }); } sets.push(`factor=$${idx++}`); vals.push(f); }
       if (is_base  !== undefined) { sets.push(`is_base=$${idx++}`);   vals.push(!!is_base); }
       if (active   !== undefined) { sets.push(`active=$${idx++}`);    vals.push(!!active); }
       if (sets.length === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'No fields to update' }); }
