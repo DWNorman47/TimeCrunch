@@ -388,6 +388,7 @@ const translations = {
     msRepeatBiweekly4: 'Every 2 weeks · 4 total',
     msRepeatMonthly3: 'Monthly · 3 total',
     msCreatingShifts: 'Creating shifts…',
+    msCancelSeries: 'Cancel Series',
     msAvailabilityWarning: 'Outside this worker\'s stated availability.',
 
     // ── Worker availability ───────────────────────────────────────────────────
@@ -2145,6 +2146,7 @@ const translations = {
     msRepeatBiweekly4: 'Cada 2 semanas · 4 total',
     msRepeatMonthly3: 'Mensual · 3 total',
     msCreatingShifts: 'Creando turnos…',
+    msCancelSeries: 'Cancelar Serie',
     msAvailabilityWarning: 'Fuera de la disponibilidad indicada por este trabajador.',
     availTitle: 'Mi Disponibilidad',
     availSubtitle: 'Indica a tu manager cuándo estás generalmente disponible.',

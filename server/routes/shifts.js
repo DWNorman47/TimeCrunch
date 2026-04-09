@@ -2,7 +2,7 @@ const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
-const { createInboxItem } = require('./inbox');
+const { createInboxItem, createInboxItemBatch } = require('./inbox');
 
 // GET /admin/shifts?from=&to= — all company shifts in range
 router.get('/admin', requireAdmin, async (req, res) => {
@@ -27,7 +27,7 @@ router.get('/admin', requireAdmin, async (req, res) => {
 
 // POST /admin/shifts — create a shift
 router.post('/admin', requireAdmin, async (req, res) => {
-  const { user_id, project_id, shift_date, start_time, end_time } = req.body;
+  const { user_id, project_id, shift_date, start_time, end_time, recurrence_group_id } = req.body;
   const notes = req.body.notes?.trim() || null;
   if (!user_id || !shift_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'user_id, shift_date, start_time, end_time required' });
@@ -42,14 +42,14 @@ router.post('/admin', requireAdmin, async (req, res) => {
     if (workerCheck.rowCount === 0) return res.status(400).json({ error: 'Worker not found' });
     const full = await pool.query(
       `WITH inserted AS (
-         INSERT INTO shifts (company_id, user_id, project_id, shift_date, start_time, end_time, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+         INSERT INTO shifts (company_id, user_id, project_id, shift_date, start_time, end_time, notes, recurrence_group_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *
        )
        SELECT s.*, u.full_name as worker_name, p.name as project_name
        FROM inserted s
        JOIN users u ON s.user_id = u.id
        LEFT JOIN projects p ON s.project_id = p.id`,
-      [companyId, user_id, project_id || null, shift_date, start_time, end_time, notes]
+      [companyId, user_id, project_id || null, shift_date, start_time, end_time, notes, recurrence_group_id || null]
     );
     const shift = full.rows[0];
     const shiftBody = `${shift.shift_date} · ${shift.start_time.substring(0, 5)}–${shift.end_time.substring(0, 5)}${shift.project_name ? ' · ' + shift.project_name : ''}`;
@@ -122,13 +122,46 @@ router.patch('/:id/cant-make-it', requireAuth, async (req, res) => {
     if (cant_make_it) {
       const dateStr = shift.shift_date?.toString().substring(0, 10) || '';
       const timeStr = shift.start_time?.substring(0, 5) || '';
+      const cantBody = `${req.user.full_name} can't make their shift on ${dateStr} · ${timeStr}`;
       sendPushToCompanyAdmins(req.user.company_id, {
         title: `${req.user.full_name} can't make their shift`,
         body: `${dateStr} · ${timeStr}`,
         url: '/timeclock#manage',
       });
+      const adminIds = await pool.query(
+        `SELECT id FROM users WHERE company_id = $1 AND role = 'admin' AND active = true`,
+        [req.user.company_id]
+      );
+      createInboxItemBatch(adminIds.rows.map(a => a.id), req.user.company_id, 'shift_cantmake',
+        'Worker unavailable for shift', cantBody, '/timeclock#manage');
     }
     res.json(shift);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /admin/shifts/series/:groupId — cancel all future shifts in a recurrence group
+router.delete('/admin/series/:groupId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { groupId } = req.params;
+  try {
+    // Only delete today-and-future shifts so past records are preserved
+    const result = await pool.query(
+      `DELETE FROM shifts
+       WHERE recurrence_group_id = $1 AND company_id = $2 AND shift_date >= CURRENT_DATE
+       RETURNING id, user_id, shift_date, start_time, end_time`,
+      [groupId, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'No upcoming shifts found in this series' });
+    // Notify each affected worker once
+    const notified = new Set();
+    for (const shift of result.rows) {
+      if (notified.has(shift.user_id)) continue;
+      notified.add(shift.user_id);
+      sendPushToUser(shift.user_id, { title: 'Recurring shifts cancelled', body: 'A series of your scheduled shifts has been cancelled.', url: '/dashboard' });
+      createInboxItemBatch([shift.user_id], companyId, 'shift_cancelled', 'Recurring shifts cancelled',
+        'A series of your scheduled shifts has been cancelled.', '/dashboard#schedule');
+    }
+    res.json({ deleted: result.rowCount });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

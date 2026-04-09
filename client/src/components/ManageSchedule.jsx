@@ -30,7 +30,7 @@ function PillContent({ s }) {
         <div style={styles.pillCantNote}>{s.cant_make_it_note}</div>
       )}
       {s.project_name && <div style={styles.pillProject}>{s.project_name}</div>}
-      <div style={styles.pillTime}>{fmtTime(s.start_time)}–{fmtTime(s.end_time)}</div>
+      <div style={styles.pillTime}>{fmtTime(s.start_time)}–{fmtTime(s.end_time)}{s.recurrence_group_id ? ' ↻' : ''}</div>
       {s.notes && <div style={styles.pillNotes}>{s.notes}</div>}
     </>
   );
@@ -325,8 +325,9 @@ export default function ManageSchedule({ workers, projects }) {
     setSaving(true); setError('');
     try {
       const newShifts = [];
+      const groupId = baseDates.length > 1 ? crypto.randomUUID() : undefined;
       for (const date of baseDates) {
-        const r = await api.post('/shifts/admin', { ...form, shift_date: date });
+        const r = await api.post('/shifts/admin', { ...form, shift_date: date, recurrence_group_id: groupId });
         newShifts.push(r.data);
       }
       setShifts(prev => [...prev, ...newShifts].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
@@ -371,6 +372,18 @@ export default function ManageSchedule({ workers, projects }) {
       setShifts(prev => prev.filter(s => s.id !== id));
       if (editingId === id) setEditingId(null);
     } finally { setDeleting(null); }
+  };
+
+  const cancelSeries = async groupId => {
+    setDeleting(groupId);
+    try {
+      const r = await api.delete(`/shifts/admin/series/${groupId}`);
+      const today = toISO(new Date());
+      setShifts(prev => prev.filter(s => !(s.recurrence_group_id === groupId && s.shift_date >= today)));
+      setEditingId(null);
+      toast(`${r.data.deleted} shift${r.data.deleted !== 1 ? 's' : ''} cancelled`, 'success');
+    } catch { toast(t.failedSaveShift, 'error'); }
+    finally { setDeleting(null); }
   };
 
   const duplicateShift = async s => {
@@ -598,6 +611,11 @@ export default function ManageSchedule({ workers, projects }) {
             </div>
             <div style={styles.editActionsRight}>
               <button style={styles.dupBtn} onClick={() => duplicateShift(editingShift)}>{t.copy}</button>
+              {editingShift.recurrence_group_id && (
+                <button style={styles.seriesBtn} onClick={() => cancelSeries(editingShift.recurrence_group_id)} disabled={deleting === editingShift.recurrence_group_id}>
+                  {deleting === editingShift.recurrence_group_id ? '…' : t.msCancelSeries}
+                </button>
+              )}
               <button style={styles.deleteBtn} onClick={() => deleteShift(editingShift.id)} disabled={deleting === editingShift.id}>
                 {deleting === editingShift.id ? '…' : t.del}
               </button>
@@ -659,6 +677,7 @@ const styles = {
   saveBtn: { background: '#059669', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   cancelBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '7px 18px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   dupBtn: { background: '#d1fae5', border: 'none', color: '#065f46', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 16px', borderRadius: 6 },
+  seriesBtn: { background: '#fef3c7', border: 'none', color: '#92400e', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 16px', borderRadius: 6 },
   deleteBtn: { background: '#fee2e2', border: 'none', color: '#b91c1c', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 16px', borderRadius: 6 },
   viewToggle: { display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid #d1d5db' },
   viewBtn: { background: '#fff', border: 'none', padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#374151' },

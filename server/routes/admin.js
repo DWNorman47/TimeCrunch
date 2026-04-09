@@ -2047,10 +2047,19 @@ router.post('/entries/bulk-approve', requireAdmin, requirePermission('approve_en
        RETURNING id, user_id, work_date, start_time, end_time`,
       params
     );
+    // Group by worker so each gets one push (not one per entry)
+    const byWorker = {};
     for (const row of result.rows) {
-      sendPushToUser(row.user_id, { title: 'Time entry approved', body: 'An admin approved your time entry.', url: '/dashboard' });
-      createInboxItem(row.user_id, companyId, 'approval', 'Time entry approved ✓',
-        `Your entry for ${row.work_date?.toString().substring(0,10)} (${row.start_time}–${row.end_time}) was approved.`, '/dashboard');
+      if (!byWorker[row.user_id]) byWorker[row.user_id] = [];
+      byWorker[row.user_id].push(row);
+    }
+    for (const [userId, rows] of Object.entries(byWorker)) {
+      const count = rows.length;
+      const pushBody = count === 1
+        ? `Your entry for ${rows[0].work_date?.toString().substring(0,10)} (${rows[0].start_time}–${rows[0].end_time}) was approved.`
+        : `${count} time entries were approved.`;
+      sendPushToUser(parseInt(userId), { title: 'Time entry approved', body: pushBody, url: '/dashboard' });
+      createInboxItem(parseInt(userId), companyId, 'approval', 'Time entry approved ✓', pushBody, '/dashboard');
     }
     await logAudit(companyId, req.user.id, req.user.full_name, 'entries.bulk_approved', 'time_entry', null, null, { count: result.rowCount, ids });
     res.json({ approved: result.rowCount });
