@@ -1142,35 +1142,46 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
 
 // Helper: check if all lines are in a final state and auto-complete the count
 async function checkAutoComplete(companyId, countId, completedById) {
+  // 'audited' is also final (auditor submitted, no reconciler was available)
+  const FINAL_STATUSES = `'accepted','reconciled','overridden','audited'`;
   const pending = await pool.query(
     `SELECT COUNT(*) FROM inventory_cycle_count_lines
      WHERE cycle_count_id = $1
-       AND line_status NOT IN ('accepted','reconciled','overridden')`,
+       AND line_status NOT IN (${FINAL_STATUSES})`,
     [countId]
   );
   if (parseInt(pending.rows[0].count) > 0) return false;
 
-  // All lines final — post adjustment transactions and complete
   const lines = await pool.query(
     'SELECT * FROM inventory_cycle_count_lines WHERE cycle_count_id = $1',
     [countId]
   );
-  const cc = await pool.query(
-    'SELECT * FROM inventory_cycle_counts WHERE id = $1 AND company_id = $2',
-    [countId, companyId]
-  );
-  if (cc.rowCount === 0 || cc.rows[0].status === 'completed') return false;
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const linesWithVariance = lines.rows.filter(l => parseFloat(l.variance) !== 0);
-    const isFullCount = cc.rows[0].count_type === 'full';
+
+    // Atomically claim the count — prevents double-completion from concurrent submits
+    const claim = await client.query(
+      `UPDATE inventory_cycle_counts SET status='completed', completed_by=$1, completed_at=NOW()
+       WHERE id=$2 AND company_id=$3 AND status='in_progress'
+       RETURNING *`,
+      [completedById, countId, companyId]
+    );
+    if (claim.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return false; // Already completed or not found
+    }
+
+    const cc = claim.rows[0];
+    const isFullCount = cc.count_type === 'full';
     const typeLabel = { reconcile: 'Reconcile count adjustment', audit: 'Audit count adjustment',
-      full: 'Full count adjustment' }[cc.rows[0].count_type] || 'Cycle count adjustment';
+      full: 'Full count adjustment' }[cc.count_type] || 'Cycle count adjustment';
+
+    const linesWithVariance = lines.rows.filter(l => parseFloat(l.variance) !== 0);
     for (const line of linesWithVariance) {
       const delta = parseFloat(line.variance);
-      const locationId = isFullCount ? line.location_id : cc.rows[0].location_id;
+      const locationId = isFullCount ? line.location_id : cc.location_id;
       await client.query(
         `INSERT INTO inventory_transactions
          (company_id, type, item_id, quantity, to_location_id, performed_by, notes, uom_id)
@@ -1179,10 +1190,6 @@ async function checkAutoComplete(companyId, countId, completedById) {
       );
       await applyStockDelta(client, companyId, line.item_id, locationId, delta, {}, line.stock_uom_id || null);
     }
-    await client.query(
-      `UPDATE inventory_cycle_counts SET status='completed', completed_by=$1, completed_at=NOW() WHERE id=$2`,
-      [completedById, countId]
-    );
     await client.query('COMMIT');
     return true;
   } catch (err) {

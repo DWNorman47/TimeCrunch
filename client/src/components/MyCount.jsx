@@ -142,8 +142,9 @@ export default function MyCount() {
       await enqueuePendingSync(payload);
       setState(assignment.assignment_id, { submitted: true, submitting: false });
       // Update local cache to mark as submitted so it disappears from the list
-      setAssignments(prev => prev.filter(a => a.assignment_id !== assignment.assignment_id));
-      await setCached(CACHE_KEY, assignments.filter(a => a.assignment_id !== assignment.assignment_id));
+      const remaining = assignments.filter(a => a.assignment_id !== assignment.assignment_id);
+      setAssignments(remaining);
+      await setCached(CACHE_KEY, remaining);
       loadPendingCount();
       return;
     }
@@ -157,8 +158,9 @@ export default function MyCount() {
       });
       setState(assignment.assignment_id, { submitted: true, submitting: false });
       // Remove from list
-      setAssignments(prev => prev.filter(a => a.assignment_id !== assignment.assignment_id));
-      await setCached(CACHE_KEY, assignments.filter(a => a.assignment_id !== assignment.assignment_id));
+      const remaining = assignments.filter(a => a.assignment_id !== assignment.assignment_id);
+      setAssignments(remaining);
+      await setCached(CACHE_KEY, remaining);
     } catch (e) {
       setState(assignment.assignment_id, {
         submitting: false,
