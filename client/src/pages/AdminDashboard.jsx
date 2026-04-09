@@ -7,7 +7,6 @@ import WorkerMetrics from '../components/WorkerMetrics';
 import ProjectReports from '../components/ProjectReports';
 import LiveWorkers from '../components/LiveWorkers';
 import ApprovalQueue from '../components/ApprovalQueue';
-import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import ManagePayPeriods from '../components/ManagePayPeriods';
 import ManageSchedule from '../components/ManageSchedule';
 import ExportPanel from '../components/ExportPanel';
@@ -80,7 +79,7 @@ export default function AdminDashboard() {
   // Permission helper — null admin_permissions means full access
   const canDo = key => !user?.admin_permissions || user.admin_permissions[key] === true;
 
-  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'timeoff', 'expenses', 'manage'];
+  const ALL_TABS = ['live', 'approvals', 'reports', 'timeoff', 'expenses', 'manage'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
 
@@ -146,7 +145,6 @@ export default function AdminDashboard() {
           onChange={switchTab}
           tabs={[
             { id: 'live', label: t.tabLive },
-            ...(settings?.feature_analytics !== false && canDo('view_reports') ? [{ id: 'analytics', label: t.tabAnalytics }] : []),
             ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
             { id: 'timeoff', label: '🏖 Time Off' },
@@ -175,14 +173,6 @@ export default function AdminDashboard() {
             ) : (
               <LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} />
             )}
-          </>
-        ) : tab === 'analytics' ? (
-          <>
-            <h2 style={styles.heading}>{t.tabAnalytics}</h2>
-            {plan.isBusiness
-              ? <AnalyticsDashboard />
-              : <UpgradePrompt requiredPlan="business" feature={t.fullAnalytics} />
-            }
           </>
         ) : tab === 'approvals' ? (
           <>
