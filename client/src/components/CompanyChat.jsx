@@ -29,7 +29,12 @@ function WorkerChat({ userId }) {
     return () => { clearInterval(pollRef.current); document.removeEventListener('visibilitychange', onVisible); };
   }, []);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    if (bottomRef.current) {
+      const container = bottomRef.current.parentElement;
+      if (container) container.scrollTop = container.scrollHeight;
+    }
+  }, [messages]);
 
   const send = async e => {
     e.preventDefault();
@@ -82,7 +87,12 @@ function AdminChat({ workers }) {
     return () => clearInterval(pollRef.current);
   }, [selectedId]);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    if (bottomRef.current) {
+      const container = bottomRef.current.parentElement;
+      if (container) container.scrollTop = container.scrollHeight;
+    }
+  }, [messages]);
 
   const send = async e => {
     e.preventDefault();
