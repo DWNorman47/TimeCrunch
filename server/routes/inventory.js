@@ -795,8 +795,8 @@ router.get('/cycle-counts', requireAdmin, async (req, res) => {
        LEFT JOIN users cu ON cc.completed_by = cu.id
        LEFT JOIN (
          SELECT cycle_count_id,
-                COUNT(*)                                         AS line_count,
-                COUNT(*) FILTER (WHERE counted_qty IS NOT NULL)  AS counted_count
+                COUNT(*) AS line_count,
+                COUNT(*) FILTER (WHERE line_status IN ('accepted','reconciled','overridden','audited')) AS counted_count
          FROM inventory_cycle_count_lines
          GROUP BY cycle_count_id
        ) agg ON agg.cycle_count_id = cc.id
@@ -1404,7 +1404,8 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   const { line_id, role, counted_qty, counted_uom_id, notes } = req.body;
   const VALID_ROLES = ['counter', 'auditor', 'reconciler'];
-  if (!line_id) return res.status(400).json({ error: 'line_id required' });
+  const lineId = parseInt(line_id);
+  if (!line_id || isNaN(lineId)) return res.status(400).json({ error: 'line_id must be a valid integer' });
   if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'role must be counter, auditor, or reconciler' });
   const qty = parseFloat(counted_qty);
   if (isNaN(qty) || qty < 0) return res.status(400).json({ error: 'counted_qty must be a non-negative number' });
@@ -1426,14 +1427,14 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
        SET status='submitted', counted_qty=$1, counted_uom_id=$2, notes=$3, submitted_at=NOW()
        WHERE line_id=$4 AND cycle_count_id=$5 AND user_id=$6 AND role=$7 AND status='pending'
        RETURNING *`,
-      [qty, resolvedCountedUomId, notesTrimmed, line_id, req.params.id, req.user.id, role]
+      [qty, resolvedCountedUomId, notesTrimmed, lineId, req.params.id, req.user.id, role]
     );
     if (assignment.rowCount === 0) {
       // Distinguish "no assignment" from "already submitted"
       const exists = await pool.query(
         `SELECT status FROM inventory_count_assignments
          WHERE line_id=$1 AND cycle_count_id=$2 AND user_id=$3 AND role=$4`,
-        [line_id, req.params.id, req.user.id, role]
+        [lineId, req.params.id, req.user.id, role]
       );
       if (exists.rowCount === 0) return res.status(403).json({ error: 'No assignment found for this line/role' });
       return res.status(409).json({ error: 'Already submitted' });
@@ -1445,10 +1446,16 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
        FROM inventory_cycle_count_lines l
        JOIN inventory_items i ON l.item_id = i.id
        WHERE l.id=$1 AND l.cycle_count_id=$2`,
-      [line_id, req.params.id]
+      [lineId, req.params.id]
     );
     if (lineRow.rowCount === 0) return res.status(404).json({ error: 'Line not found' });
     const line = lineRow.rows[0];
+
+    // Reject if line is already in a final state (e.g. admin override) to prevent overwriting it
+    const SUBMIT_FINAL = ['accepted', 'reconciled', 'overridden', 'audited'];
+    if (SUBMIT_FINAL.includes(line.line_status)) {
+      return res.status(409).json({ error: 'Line is already in a final state and cannot be re-submitted' });
+    }
 
     // Compute variance in stock UOM units
     let variance = qty - parseFloat(line.expected_qty);
@@ -1477,7 +1484,7 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
         `UPDATE inventory_cycle_count_lines
          SET counted_qty=$1, counted_uom_id=$2, counted_by=$3, counted_at=NOW(), variance=$4
          WHERE id=$5`,
-        [qty, resolvedCountedUomId, req.user.id, variance, line_id]
+        [qty, resolvedCountedUomId, req.user.id, variance, lineId]
       );
 
       // Decide: sample for audit?
@@ -1498,7 +1505,7 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
             `INSERT INTO inventory_count_assignments (line_id, cycle_count_id, user_id, role)
              VALUES ($1,$2,$3,'auditor')
              ON CONFLICT (line_id, role) DO UPDATE SET user_id=$3, status='pending', submitted_at=NULL`,
-            [line_id, req.params.id, auditorId]
+            [lineId, req.params.id, auditorId]
           );
           newLineStatus = 'needs_audit';
         } else {
@@ -1528,7 +1535,7 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
         // Find a reconciler who is not the counter or auditor of this line
         const counterAssignment = await pool.query(
           `SELECT user_id FROM inventory_count_assignments WHERE line_id=$1 AND role='counter'`,
-          [line_id]
+          [lineId]
         );
         const counterUserId = counterAssignment.rows[0]?.user_id;
         const reconcilers = await pool.query(
@@ -1543,7 +1550,7 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
             `INSERT INTO inventory_count_assignments (line_id, cycle_count_id, user_id, role)
              VALUES ($1,$2,$3,'reconciler')
              ON CONFLICT (line_id, role) DO UPDATE SET user_id=$3, status='pending', submitted_at=NULL`,
-            [line_id, req.params.id, reconcilers.rows[0].user_id]
+            [lineId, req.params.id, reconcilers.rows[0].user_id]
           );
           newLineStatus = 'needs_reconcile';
         } else {
@@ -1559,14 +1566,14 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
         `UPDATE inventory_cycle_count_lines
          SET counted_qty=$1, counted_uom_id=$2, variance=$3
          WHERE id=$4`,
-        [qty, resolvedCountedUomId, variance, line_id]
+        [qty, resolvedCountedUomId, variance, lineId]
       );
       newLineStatus = 'reconciled';
     }
 
     await pool.query(
       `UPDATE inventory_cycle_count_lines SET line_status=$1 WHERE id=$2`,
-      [newLineStatus, line_id]
+      [newLineStatus, lineId]
     );
 
     // Check for auto-complete

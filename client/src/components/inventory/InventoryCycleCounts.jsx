@@ -84,14 +84,14 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     try {
       const r = await api.post(`/inventory/cycle-counts/${count.id}/workers`, { users: [{ user_id: userId, roles }] });
       setWorkers(r.data);
-    } catch (e) { setSaveError(e.response?.data?.error || 'Failed to save worker'); }
+    } catch (e) { setSaveError(e.response?.data?.error || t.invCycFailedSaveWorker); }
   };
 
   const removeWorker = async (userId) => {
     try {
       await api.delete(`/inventory/cycle-counts/${count.id}/workers/${userId}`);
       setWorkers(prev => prev.filter(w => w.user_id !== userId));
-    } catch (e) { setSaveError(e.response?.data?.error || 'Failed to remove worker'); }
+    } catch (e) { setSaveError(e.response?.data?.error || t.invCycFailedRemoveWorker); }
   };
 
   const distribute = async () => {
@@ -103,7 +103,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       setAssignments(detail.data.assignments || []);
       setCountData(detail.data);
       if (r.data.assigned === 0) setSaveError('No unassigned lines found to distribute.');
-    } catch (e) { setSaveError(e.response?.data?.error || 'Failed to distribute'); }
+    } catch (e) { setSaveError(e.response?.data?.error || t.invCycFailedDistribute); }
     finally { setDistributing(false); }
   };
 
@@ -112,7 +112,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     try {
       const r = await api.post(`/inventory/cycle-counts/${count.id}/reopen`);
       setCountData(r.data);
-    } catch (e) { setError(e.response?.data?.error || 'Failed to reopen count'); }
+    } catch (e) { setError(e.response?.data?.error || t.invCycFailedReopen); }
     finally { setReopening(false); }
   };
 
@@ -130,7 +130,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
         setReportLines(lines.map(l => l.id === overrideModal.line.id ? { ...l, ...r.data.line } : l));
       }
       setOverrideModal(null); setOverrideQty(''); setOverrideNotes('');
-    } catch (e) { setSaveError(e.response?.data?.error || 'Failed to override'); }
+    } catch (e) { setSaveError(e.response?.data?.error || t.invCycFailedOverride); }
     finally { setOverriding(false); }
   };
 
@@ -421,7 +421,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
         {!isCompleted && (
           <td style={d.td}>
             <button style={d.overrideBtn} onClick={() => { setOverrideModal({ line }); setOverrideQty(line.counted_qty != null ? String(line.counted_qty) : ''); setOverrideNotes(''); }}>
-              Override
+              {t.invCycOverride}
             </button>
           </td>
         )}
@@ -439,7 +439,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
         <th style={{ ...d.th, textAlign: 'right' }}>{t.invCycColCounted}</th>
         {showExpected && <th style={{ ...d.th, textAlign: 'right' }}>{t.invCycColVariance}</th>}
         <th style={d.th}>{t.invCycColCountedBy}</th>
-        <th style={d.th}>Status</th>
+        <th style={d.th}>{t.invCycColStatus}</th>
         {!isCompleted && <th style={d.th} />}
       </tr>
     </thead>
@@ -487,7 +487,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
           )}
           {countData.status === 'completed' && (
             <button style={{ ...d.advanceBtn, background: '#6b7280' }} onClick={reopen} disabled={reopening}>
-              {reopening ? 'Reopening…' : 'Reopen Count'}
+              {reopening ? t.invCycReopening : t.invCycReopenCount}
             </button>
           )}
         </div>
@@ -501,11 +501,11 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       {/* ── Tab Navigation ── */}
       <div style={d.tabRow}>
         <button style={{ ...d.tab, ...(tab === 'lines' ? d.tabActive : {}) }} onClick={() => setTab('lines')}>
-          Count Lines ({lines.length})
+          {t.invCycTabLines} ({lines.length})
         </button>
         <button style={{ ...d.tab, ...(tab === 'workers' ? d.tabActive : {}) }}
           onClick={() => { setTab('workers'); loadAllWorkers(); }}>
-          Workers ({workers.length})
+          {t.invCycTabWorkers} ({workers.length})
         </button>
       </div>
 
@@ -513,15 +513,15 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       {tab === 'workers' && (
         <div style={d.workersPanel}>
           <div style={d.workersPanelHeader}>
-            <strong style={{ fontSize: 14 }}>Assign Workers</strong>
+            <strong style={{ fontSize: 14 }}>{t.invCycAssignWorkers}</strong>
             {!isCompleted && (
               <button style={d.distributeBtn} onClick={distribute} disabled={distributing || workers.filter(w => w.roles.includes('counter')).length === 0}>
-                {distributing ? 'Distributing…' : 'Distribute Lines'}
+                {distributing ? t.invCycDistributing : t.invCycDistributeLines}
               </button>
             )}
           </div>
           <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 12px' }}>
-            Select workers and their roles. Click Distribute to auto-assign count lines round-robin by area to counters.
+            {t.invCycWorkersPanelDesc}
           </p>
 
           {/* Existing assigned workers */}
@@ -548,7 +548,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                     ))}
                   </div>
                   {!isCompleted && (
-                    <button style={d.removeWorkerBtn} onClick={() => removeWorker(w.user_id)}>Remove</button>
+                    <button style={d.removeWorkerBtn} onClick={() => removeWorker(w.user_id)}>{t.invCycRemoveWorker}</button>
                   )}
                 </div>
               ))}
@@ -558,7 +558,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
           {/* Add worker from company list */}
           {!isCompleted && (
             <div>
-              <p style={{ fontSize: 12, fontWeight: 600, color: '#374151', margin: '0 0 6px' }}>Add Worker:</p>
+              <p style={{ fontSize: 12, fontWeight: 600, color: '#374151', margin: '0 0 6px' }}>{t.invCycAddWorker}</p>
               <select style={d.workerSelect}
                 value=""
                 onChange={e => {
@@ -567,7 +567,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                   if (workers.find(w => w.user_id === uid)) return;
                   saveWorker(uid, ['counter']);
                 }}>
-                <option value="">Select worker to add…</option>
+                <option value="">{t.invCycSelectWorker}</option>
                 {allWorkers
                   .filter(w => !workers.find(x => x.user_id === w.id))
                   .map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
@@ -578,7 +578,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
           {/* Assignment summary by line */}
           {assignments.length > 0 && (
             <div style={{ marginTop: 20 }}>
-              <p style={{ fontSize: 12, fontWeight: 600, color: '#374151', margin: '0 0 8px' }}>Line Assignments ({assignments.length})</p>
+              <p style={{ fontSize: 12, fontWeight: 600, color: '#374151', margin: '0 0 8px' }}>{t.invCycLineAssignments} ({assignments.length})</p>
               <div style={{ fontSize: 12, color: '#6b7280' }}>
                 {(['counter', 'auditor', 'reconciler']).map(role => {
                   const roleAssignments = assignments.filter(a => a.role === role);
@@ -786,13 +786,13 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       {overrideModal && (
         <div style={d.modalOverlay}>
           <div style={d.modal}>
-            <h3 style={d.modalTitle}>Override: {overrideModal.line.item_name}</h3>
+            <h3 style={d.modalTitle}>{t.invCycOverrideTitle}: {overrideModal.line.item_name}</h3>
             <p style={d.modalBody}>
-              Expected: {parseFloat(overrideModal.line.expected_qty)} {overrideModal.line.unit}.
-              This manually sets the final counted quantity and accepts the line.
+              {t.invCycOverrideExpected}: {parseFloat(overrideModal.line.expected_qty)} {overrideModal.line.unit}.
+              {' '}{t.invCycOverrideDesc}
             </p>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Counted Qty</label>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>{t.invCycOverrideCounted}</label>
               <input type="number" min="0" step="any"
                 style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
                 value={overrideQty} onChange={e => setOverrideQty(e.target.value)} />
@@ -807,7 +807,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
               <button style={d.cancelBtn} onClick={() => setOverrideModal(null)}>Cancel</button>
               <button style={{ ...d.confirmBtn, background: '#7c3aed' }}
                 onClick={submitOverride} disabled={overriding || overrideQty === ''}>
-                {overriding ? 'Saving…' : 'Override'}
+                {overriding ? t.invCycOverrideSaving : t.invCycOverride}
               </button>
             </div>
           </div>
