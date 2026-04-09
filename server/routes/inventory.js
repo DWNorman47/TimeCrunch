@@ -945,8 +945,9 @@ router.patch('/cycle-counts/:id', requireAdmin, async (req, res) => {
     if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
     if (cc.rows[0].status === 'completed') return res.status(409).json({ error: 'Cannot modify a completed count' });
     if (status && status !== 'in_progress') return res.status(400).json({ error: 'Can only advance status to in_progress' });
+    if (notes !== undefined && notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
     const sets = [], vals = [req.params.id, companyId]; let idx = 3;
-    if (notes !== undefined) { sets.push(`notes=$${idx++}`); vals.push(notes); }
+    if (notes !== undefined) { sets.push(`notes=$${idx++}`); vals.push(notes?.trim() || null); }
     if (status === 'in_progress') { sets.push(`status='in_progress'`); }
     if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
     const result = await pool.query(
@@ -1482,9 +1483,12 @@ router.delete('/purchase-orders/:id', requireAdmin, async (req, res) => {
 router.post('/purchase-orders/:id/lines', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const { item_id, qty_ordered, unit_cost, uom_id, notes } = req.body;
-  if (!item_id || !qty_ordered || parseFloat(qty_ordered) <= 0) {
+  const qtyOrdered = parseFloat(qty_ordered);
+  if (!item_id || !qty_ordered || isNaN(qtyOrdered) || qtyOrdered <= 0) {
     return res.status(400).json({ error: 'item_id and positive qty_ordered required' });
   }
+  const unitCostVal = unit_cost != null && unit_cost !== '' ? parseFloat(unit_cost) : null;
+  if (unitCostVal !== null && isNaN(unitCostVal)) return res.status(400).json({ error: 'unit_cost must be a number' });
   try {
     const po = await pool.query(
       'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
@@ -1497,8 +1501,8 @@ router.post('/purchase-orders/:id/lines', requireAdmin, async (req, res) => {
     await pool.query(
       `INSERT INTO purchase_order_lines (po_id, item_id, qty_ordered, unit_cost, uom_id, notes)
        VALUES ($1,$2,$3,$4,$5,$6)`,
-      [req.params.id, parseInt(item_id), parseFloat(qty_ordered),
-       unit_cost != null ? parseFloat(unit_cost) : null,
+      [req.params.id, parseInt(item_id), qtyOrdered,
+       unitCostVal,
        uom_id ? parseInt(uom_id) : null, notes?.trim() || null]
     );
     const lines = await pool.query(
