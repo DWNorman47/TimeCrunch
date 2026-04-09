@@ -18,15 +18,30 @@ router.get('/mine', requireAuth, async (req, res) => {
 router.put('/', requireAuth, async (req, res) => {
   const { availability } = req.body; // [{ day_of_week, start_time, end_time }]
   if (!Array.isArray(availability)) return res.status(400).json({ error: 'availability must be an array' });
+  if (availability.length > 7) return res.status(400).json({ error: 'Maximum 7 availability entries (one per day)' });
+
+  const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+  for (const a of availability) {
+    const dow = parseInt(a.day_of_week);
+    if (isNaN(dow) || dow < 0 || dow > 6) return res.status(400).json({ error: 'day_of_week must be 0–6' });
+    if (!TIME_RE.test(a.start_time)) return res.status(400).json({ error: 'start_time must be HH:MM' });
+    if (!TIME_RE.test(a.end_time)) return res.status(400).json({ error: 'end_time must be HH:MM' });
+    if (a.start_time >= a.end_time) return res.status(400).json({ error: 'start_time must be before end_time' });
+  }
+  // Deduplicate by day_of_week (last one wins) to avoid UNIQUE constraint errors
+  const seen = new Map();
+  for (const a of availability) seen.set(parseInt(a.day_of_week), a);
+  const deduped = [...seen.values()];
+
   const userId = req.user.id;
   const companyId = req.user.company_id;
   try {
     await pool.query('DELETE FROM worker_availability WHERE user_id = $1', [userId]);
-    if (availability.length > 0) {
-      const values = availability.map((_, i) =>
+    if (deduped.length > 0) {
+      const values = deduped.map((_, i) =>
         `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`
       ).join(', ');
-      const params = availability.flatMap(a => [userId, companyId, a.day_of_week, a.start_time, a.end_time]);
+      const params = deduped.flatMap(a => [userId, companyId, parseInt(a.day_of_week), a.start_time, a.end_time]);
       await pool.query(
         `INSERT INTO worker_availability (user_id, company_id, day_of_week, start_time, end_time) VALUES ${values}`,
         params
