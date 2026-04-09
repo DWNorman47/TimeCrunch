@@ -1051,12 +1051,17 @@ router.patch('/cycle-counts/:id/lines/:lineId', requireAdmin, async (req, res) =
         [resolvedCountedUomId, req.params.lineId]
       );
       if (lineRow.rowCount > 0) {
-        const { expected_qty, stock_factor, counted_factor } = lineRow.rows[0];
-        const stockF   = parseFloat(stock_factor   || 1);
-        const countedF = parseFloat(counted_factor || 1);
-        // Convert counted qty to stock UOM: qty_in_stock_uom = qty * (counted_factor / stock_factor)
-        const qtyInStockUom = qty * (countedF / stockF);
-        const variance = qtyInStockUom - parseFloat(expected_qty);
+        const { expected_qty, stock_uom_id, stock_factor, counted_factor } = lineRow.rows[0];
+        let variance;
+        // Only apply UOM conversion when a different UOM is specified; otherwise variance is
+        // a direct comparison in stock UOM (matches the pattern in submit and override routes).
+        if (resolvedCountedUomId && resolvedCountedUomId !== stock_uom_id) {
+          const stockF   = parseFloat(stock_factor   || 1);
+          const countedF = parseFloat(counted_factor || 1);
+          variance = qty * (countedF / stockF) - parseFloat(expected_qty);
+        } else {
+          variance = qty - parseFloat(expected_qty);
+        }
         sets.push(`variance=$${idx++}`); vals.push(variance);
       }
       // Admin direct-entry marks the line accepted so the complete flow and progress bar work correctly
@@ -1070,6 +1075,10 @@ router.patch('/cycle-counts/:id/lines/:lineId', requireAdmin, async (req, res) =
       vals
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Line not found' });
+    // Trigger auto-complete so admin direct-entry counts complete without a manual step
+    if (counted_qty !== undefined) {
+      await checkAutoComplete(companyId, parseInt(req.params.id), req.user.id);
+    }
     res.json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -1251,6 +1260,7 @@ router.post('/cycle-counts/:id/workers', requireAdmin, async (req, res) => {
       const userId = parseInt(w.user_id);
       if (!userId) continue;
       const roles = Array.isArray(w.roles) ? w.roles.filter(r => VALID_ROLES.includes(r)) : [];
+      if (roles.length === 0) continue; // skip workers with no valid roles — they can't be assigned
       // Verify worker belongs to company
       const workerCheck = await pool.query('SELECT id FROM users WHERE id=$1 AND company_id=$2', [userId, companyId]);
       if (workerCheck.rowCount === 0) continue;
