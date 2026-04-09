@@ -43,8 +43,8 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
         </div>
         <div style={m.body}>
           <p style={m.desc}>
-            No conversion is defined yet for <strong>{uomLabel}</strong>.
-            How many <strong>{baseUnit}</strong> are in 1 <strong>{uomLabel}</strong>?
+            {t.uomConvDescPre} <strong>{uomLabel}</strong>.{' '}
+            {t.uomConvDescHow} <strong>{baseUnit}</strong> {t.uomConvDescAreIn} <strong>{uomLabel}</strong>?
           </p>
           <p style={m.sub}>{t.uomConvExample}</p>
           {error && <div style={m.error}>{error}</div>}
@@ -54,7 +54,7 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
               type="number"
               min="0.0001"
               step="any"
-              placeholder="e.g. 30"
+              placeholder={t.uomConvFactorPlaceholder}
               value={factor}
               onChange={e => setFactor(e.target.value)}
               style={m.input}

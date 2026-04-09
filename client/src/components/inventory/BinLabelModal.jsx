@@ -78,7 +78,7 @@ export default function BinLabelModal({ item, binType, onClose }) {
     <div style={s.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={s.modal}>
         <div style={s.header}>
-          <h3 style={s.title}>Bin Label — {typeName}</h3>
+          <h3 style={s.title}>{t.labelModalTitle} — {typeName}</h3>
           <button style={s.closeBtn} onClick={onClose}>✕</button>
         </div>
 
@@ -94,8 +94,7 @@ export default function BinLabelModal({ item, binType, onClose }) {
         </div>
 
         <p style={s.hint}>
-          Scanning this QR code while in the Count tab will automatically set the
-          active bin to <strong>{item.name}</strong>.
+          {t.labelModalHint} <strong>{item.name}</strong>.
         </p>
 
         <div style={s.actions}>

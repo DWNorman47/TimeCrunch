@@ -1160,6 +1160,15 @@ const translations = {
     invConvEmptySub: 'Use + Add Conversion above to define pack sizes, or edit items in the Items tab.',
     invConvFailedLoad: 'Failed to load.',
     invConvBaseUnitNote: 'Base unit:',
+    invConvEnterPositive: 'Enter a positive number.',
+    invConvAltUnitLabel: 'Alternate Unit',
+    invConvUnitNamePlaceholder: 'Unit name…',
+    invConvSpecLabel: 'Spec',
+    invConvSpecPlaceholder: 'e.g. 30 ct',
+    invConvFactorLabel: 'Factor',
+    invConvFactorPlaceholder: 'e.g. 30',
+    invConvHowMany: 'how many',
+    invConvPerOne: 'per 1',
 
     // ── Inventory Valuation ───────────────────────────────────────────────────
     invValIncludeZero: 'Include zero stock',
@@ -1180,7 +1189,10 @@ const translations = {
     labelModalClose: 'Close',
     labelModalPrint: '🖨 Print Label',
     labelModalGenerating: 'Generating…',
+    labelModalTitle: 'Bin Label',
+    labelModalHint: 'Scanning this QR code while in the Count tab will automatically set the active bin to',
     itemLabelTitle: 'Item Label',
+    itemLabelHint: 'Scanning this QR code during a count will jump directly to',
     binLabelArea: 'Area',
     binLabelRack: 'Rack',
     binLabelBay: 'Bay',
@@ -1193,6 +1205,10 @@ const translations = {
     uomConvFailed: 'Failed to save conversion.',
     uomConvSkip: 'Skip for now',
     uomConvSave: 'Save Conversion',
+    uomConvDescPre: 'No conversion is defined yet for',
+    uomConvDescHow: 'How many',
+    uomConvDescAreIn: 'are in 1',
+    uomConvFactorPlaceholder: 'e.g. 30',
 
     // ── Inventory Setup ───────────────────────────────────────────────────────
     invSetupLocations: 'Locations',
@@ -1225,7 +1241,12 @@ const translations = {
     invSetupEditSupplierTitle: 'Edit Supplier',
     invSetupActiveStatus: 'Active',
     invSetupArchivedStatus: 'Archived',
+    invSetupArchivedSuffix: '(archived)',
     invSetupShowArchived: 'Show archived',
+    invSetupIsRequired: 'is required.',
+    invSetupNoPrefix: 'No',
+    invSetupNoSuffix: 'yet.',
+    invSetupIn: 'in',
 
     // ── Inventory Transactions ────────────────────────────────────────────────
     invTxLogMovement: 'Log Movement',
@@ -2753,6 +2774,15 @@ const translations = {
     invConvEmptySub: 'Usa + Agregar Conversión para definir tamaños de paquete, o edita artículos en la pestaña Artículos.',
     invConvFailedLoad: 'Error al cargar.',
     invConvBaseUnitNote: 'Unidad base:',
+    invConvEnterPositive: 'Ingresa un número positivo.',
+    invConvAltUnitLabel: 'Unidad Alternativa',
+    invConvUnitNamePlaceholder: 'Nombre de unidad…',
+    invConvSpecLabel: 'Especificación',
+    invConvSpecPlaceholder: 'ej. 30 pzas',
+    invConvFactorLabel: 'Factor',
+    invConvFactorPlaceholder: 'ej. 30',
+    invConvHowMany: 'cuántos',
+    invConvPerOne: 'por 1',
 
     // ── Inventory Valuation ───────────────────────────────────────────────────
     invValIncludeZero: 'Incluir stock cero',
@@ -2773,7 +2803,10 @@ const translations = {
     labelModalClose: 'Cerrar',
     labelModalPrint: '🖨 Imprimir Etiqueta',
     labelModalGenerating: 'Generando…',
+    labelModalTitle: 'Etiqueta de Contenedor',
+    labelModalHint: 'Escanear este código QR en la pestaña de Conteo establecerá automáticamente el contenedor activo a',
     itemLabelTitle: 'Etiqueta de Artículo',
+    itemLabelHint: 'Escanear este código QR durante un conteo saltará directamente a',
     binLabelArea: 'Área',
     binLabelRack: 'Estante',
     binLabelBay: 'Bahía',
@@ -2786,6 +2819,10 @@ const translations = {
     uomConvFailed: 'Error al guardar la conversión.',
     uomConvSkip: 'Omitir por ahora',
     uomConvSave: 'Guardar Conversión',
+    uomConvDescPre: 'No hay conversión definida aún para',
+    uomConvDescHow: 'Cuántos',
+    uomConvDescAreIn: 'hay en 1',
+    uomConvFactorPlaceholder: 'ej. 30',
 
     // ── Inventory Setup ───────────────────────────────────────────────────────
     invSetupLocations: 'Ubicaciones',
@@ -2818,7 +2855,12 @@ const translations = {
     invSetupEditSupplierTitle: 'Editar Proveedor',
     invSetupActiveStatus: 'Activo',
     invSetupArchivedStatus: 'Archivado',
+    invSetupArchivedSuffix: '(archivado)',
     invSetupShowArchived: 'Mostrar archivados',
+    invSetupIsRequired: 'es requerido.',
+    invSetupNoPrefix: 'Sin',
+    invSetupNoSuffix: 'aún.',
+    invSetupIn: 'en',
 
     // ── Inventory Transactions ────────────────────────────────────────────────
     invTxLogMovement: 'Registrar Movimiento',

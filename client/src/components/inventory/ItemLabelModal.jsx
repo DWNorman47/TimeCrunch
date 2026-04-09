@@ -83,7 +83,7 @@ export default function ItemLabelModal({ item, onClose }) {
         </div>
 
         <p style={s.hint}>
-          Scanning this QR code during a count will jump directly to <strong>{item.name}</strong>.
+          {t.itemLabelHint} <strong>{item.name}</strong>.
         </p>
 
         <div style={s.actions}>

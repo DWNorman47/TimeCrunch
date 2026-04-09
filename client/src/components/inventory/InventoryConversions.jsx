@@ -95,7 +95,7 @@ export default function InventoryConversions({ onConversionChange }) {
 
   const saveEdit = async (row) => {
     const n = parseFloat(editFactor);
-    if (!editFactor || isNaN(n) || n <= 0) { setSaveErr('Enter a positive number.'); return; }
+    if (!editFactor || isNaN(n) || n <= 0) { setSaveErr(t.invConvEnterPositive); return; }
     setSaving(true); setSaveErr('');
     try {
       await api.patch(`/inventory/items/${row.item_id}/uoms/${row.uom_id}`, { factor: n });
@@ -132,7 +132,7 @@ export default function InventoryConversions({ onConversionChange }) {
               onChange={e => setEditFactor(e.target.value)}
               style={s.factorInput}
               autoFocus
-              placeholder="e.g. 30"
+              placeholder={t.invConvFactorPlaceholder}
               onKeyDown={e => { if (e.key === 'Enter') saveEdit(row); if (e.key === 'Escape') cancelEdit(); }}
             />
           ) : isPending ? (
@@ -195,33 +195,33 @@ export default function InventoryConversions({ onConversionChange }) {
               <div style={s.addField}>
                 <label style={s.addLabel}>{t.invTxColItem} *</label>
                 <select style={s.addInput} value={addItemId} onChange={e => setAddItemId(e.target.value)}>
-                  <option value="">Select item…</option>
+                  <option value="">{t.invTxSelectItem}</option>
                   {items.map(i => <option key={i.id} value={i.id}>{i.name}{i.sku ? ` (${i.sku})` : ''}</option>)}
                 </select>
                 {selectedItem && <div style={s.baseUomNote}>{t.invConvBaseUnitNote} <strong>{selectedItem.unit}</strong></div>}
               </div>
               <div style={s.addField}>
-                <label style={s.addLabel}>Alternate Unit *</label>
+                <label style={s.addLabel}>{t.invConvAltUnitLabel} *</label>
                 <select style={s.addInput} value={addUnit} onChange={e => setAddUnit(e.target.value)}>
                   {units.active.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
                 {addUnit === 'other' && (
                   <input style={{ ...s.addInput, marginTop: 4 }} value={addCustomUnit}
-                    onChange={e => setAddCustomUnit(e.target.value)} placeholder="Unit name…" />
+                    onChange={e => setAddCustomUnit(e.target.value)} placeholder={t.invConvUnitNamePlaceholder} />
                 )}
               </div>
               <div style={s.addField}>
-                <label style={s.addLabel}>Spec <span style={s.optional}>(optional)</span></label>
-                <input style={s.addInput} value={addSpec} onChange={e => setAddSpec(e.target.value)} placeholder="e.g. 30 ct" />
+                <label style={s.addLabel}>{t.invConvSpecLabel} <span style={s.optional}>({t.optional.toLowerCase()})</span></label>
+                <input style={s.addInput} value={addSpec} onChange={e => setAddSpec(e.target.value)} placeholder={t.invConvSpecPlaceholder} />
               </div>
               <div style={s.addField}>
                 <label style={s.addLabel}>
-                  Factor * <span style={s.optional}>
-                    {selectedItem ? `how many ${selectedItem.unit} per 1 ${addUnit === 'other' ? (addCustomUnit || 'unit') : addUnit}` : ''}
+                  {t.invConvFactorLabel} * <span style={s.optional}>
+                    {selectedItem ? `${t.invConvHowMany} ${selectedItem.unit} ${t.invConvPerOne} ${addUnit === 'other' ? (addCustomUnit || 'unit') : addUnit}` : ''}
                   </span>
                 </label>
                 <input style={s.addInput} type="number" min="0.0001" step="any"
-                  value={addFactor} onChange={e => setAddFactor(e.target.value)} placeholder="e.g. 30" />
+                  value={addFactor} onChange={e => setAddFactor(e.target.value)} placeholder={t.invConvFactorPlaceholder} />
               </div>
             </div>
             <div style={s.addActions}>

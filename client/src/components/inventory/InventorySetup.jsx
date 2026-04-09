@@ -145,7 +145,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
     e.preventDefault();
     setError('');
     if (!form.name.trim()) return setError(t.invSetupNameRequired);
-    if (level.parentKey && !form[level.parentKey]) return setError(`${levelSingular} is required.`);
+    if (level.parentKey && !form[level.parentKey]) return setError(`${levelSingular} ${t.invSetupIsRequired}`);
     setSaving(true);
     try {
       const payload = {
@@ -179,7 +179,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       {/* Parent selector (only for new items on non-location levels) */}
       {!isLocation && !item && (
         <div style={ef.field}>
-          <label style={ef.label}>{level.parentLabel} *</label>
+          <label style={ef.label}>{LEVEL_SGl[level.parentLevel] || level.parentLabel} *</label>
           <select
             style={ef.input}
             value={form[level.parentKey]}
@@ -641,16 +641,16 @@ export default function InventorySetup({ projects }) {
   const parentFilters = () => {
     const filters = [];
     if (['areas','racks','bays','compartments'].includes(levelKey)) {
-      filters.push({ label: 'Location', key: 'location_id', options: parentOpts.locations });
+      filters.push({ label: t.invSetupLocationSgl, key: 'location_id', options: parentOpts.locations });
     }
     if (['racks','bays','compartments'].includes(levelKey)) {
-      filters.push({ label: 'Area', key: 'area_id', options: parentOpts.areas });
+      filters.push({ label: t.invSetupAreaSgl, key: 'area_id', options: parentOpts.areas });
     }
     if (['bays','compartments'].includes(levelKey)) {
-      filters.push({ label: 'Rack', key: 'rack_id', options: parentOpts.racks });
+      filters.push({ label: t.invSetupRackSgl, key: 'rack_id', options: parentOpts.racks });
     }
     if (levelKey === 'compartments') {
-      filters.push({ label: 'Bay', key: 'bay_id', options: parentOpts.bays });
+      filters.push({ label: t.invSetupBaySgl, key: 'bay_id', options: parentOpts.bays });
     }
     return filters;
   };
@@ -692,7 +692,7 @@ export default function InventorySetup({ projects }) {
                 onChange={e => setParentSels(p => ({ ...p, [f.key]: e.target.value }))}
               >
                 <option value="">{t.invCycAllLocations}</option>
-                {f.options.map(o => <option key={o.id} value={o.id}>{o.name}{!o.active ? ' (archived)' : ''}</option>)}
+                {f.options.map(o => <option key={o.id} value={o.id}>{o.name}{!o.active ? ` ${t.invSetupArchivedSuffix}` : ''}</option>)}
               </select>
             </div>
           ))}
@@ -729,7 +729,7 @@ export default function InventorySetup({ projects }) {
           ) : items.length === 0 ? (
             <div style={s.empty}>
               <div style={s.emptyIcon}>📍</div>
-              <p>No {(LEVEL_LABELS[level.key] || level.label).toLowerCase()} yet.</p>
+              <p>{t.invSetupNoPrefix} {(LEVEL_LABELS[level.key] || level.label).toLowerCase()} {t.invSetupNoSuffix}</p>
             </div>
           ) : (
             <div style={s.list}>
@@ -739,7 +739,7 @@ export default function InventorySetup({ projects }) {
                     <div style={s.cardInfo}>
                       <div style={s.cardName}>{item.name}</div>
                       {item.parent_name && (
-                        <div style={s.cardParent}>in {item.parent_name}</div>
+                        <div style={s.cardParent}>{t.invSetupIn} {item.parent_name}</div>
                       )}
                       {item.address && <div style={s.cardAddress}>{item.address}</div>}
                       {item.notes && <div style={s.cardNotes}>{item.notes}</div>}
