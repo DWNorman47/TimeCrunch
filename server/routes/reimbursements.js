@@ -186,10 +186,12 @@ router.get('/admin', requireAdmin, async (req, res) => {
 
 // PATCH /api/reimbursements/admin/:id — admin: approve or reject
 router.patch('/admin/:id', requireAdmin, async (req, res) => {
-  const { status, admin_notes } = req.body;
+  const { status } = req.body;
+  const admin_notes = req.body.admin_notes?.trim() || null;
   if (!['approved', 'rejected', 'pending'].includes(status)) {
     return res.status(400).json({ error: 'status must be approved, rejected, or pending' });
   }
+  if (admin_notes && admin_notes.length > 1000) return res.status(400).json({ error: 'admin_notes too long (max 1000 characters)' });
   try {
     const { rows } = await pool.query(
       `UPDATE reimbursements
@@ -197,7 +199,7 @@ router.patch('/admin/:id', requireAdmin, async (req, res) => {
        WHERE id = $3 AND company_id = $4
        RETURNING id, amount, description, category, expense_date, receipt_url,
                  status, admin_notes, created_at, project_id`,
-      [status, admin_notes?.trim() || null, req.params.id, req.user.company_id]
+      [status, admin_notes, req.params.id, req.user.company_id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);

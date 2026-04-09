@@ -44,11 +44,12 @@ router.get('/', requireAuth, async (req, res) => {
 
 // Submit a time entry (wage_type inherited from project)
 router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
-  const { project_id, work_date, start_time, end_time, notes, break_minutes, mileage, timezone, client_id } = req.body;
+  const { project_id, work_date, start_time, end_time, break_minutes, mileage, timezone, client_id } = req.body;
+  const notesTrimmed = req.body.notes?.trim() || null;
   if (!project_id || !work_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'project_id, work_date, start_time, and end_time are required' });
   }
-  if (notes && notes.length > 500) return res.status(400).json({ error: 'Notes must be 500 characters or fewer' });
+  if (notesTrimmed && notesTrimmed.length > 500) return res.status(400).json({ error: 'Notes must be 500 characters or fewer' });
   const companyId = req.user.company_id;
   try {
     const projectResult = await pool.query(
@@ -68,7 +69,7 @@ router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        ON CONFLICT (user_id, client_id) WHERE client_id IS NOT NULL DO NOTHING
        RETURNING *`,
-      [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notes || null,
+      [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notesTrimmed,
        bm, mileageVal, timezone || null, cid, 'log_entry']
     );
     if (result.rowCount === 0) return res.status(409).json({ error: 'Duplicate entry' });

@@ -91,6 +91,7 @@ router.get('/', requireAuth, async (req, res) => {
 
 // POST /inspections
 router.post('/', requireAdmin, async (req, res) => {
+  const VALID_STATUSES = ['pass', 'fail', 'partial'];
   const { template_id, project_id, results, status, inspected_at } = req.body;
   const name = req.body.name?.trim();
   const inspector = req.body.inspector?.trim() || null;
@@ -99,7 +100,11 @@ router.post('/', requireAdmin, async (req, res) => {
   if (!name || !inspected_at) {
     return res.status(400).json({ error: 'name and inspected_at are required' });
   }
+  if (name.length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+  if (inspector && inspector.length > 255) return res.status(400).json({ error: 'inspector too long (max 255 characters)' });
+  if (location && location.length > 255) return res.status(400).json({ error: 'location too long (max 255 characters)' });
   if (notes && notes.length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+  if (status && !VALID_STATUSES.includes(status)) return res.status(400).json({ error: 'status must be pass, fail, or partial' });
   try {
     const result = await pool.query(
       `INSERT INTO inspections (company_id, template_id, project_id, name, inspector, location,
@@ -115,12 +120,17 @@ router.post('/', requireAdmin, async (req, res) => {
 
 // PATCH /inspections/:id
 router.patch('/:id', requireAdmin, async (req, res) => {
+  const VALID_STATUSES = ['pass', 'fail', 'partial'];
   const { project_id, results, status, inspected_at } = req.body;
   const name = req.body.name !== undefined ? (req.body.name?.trim() || null) : undefined;
   const inspector = req.body.inspector !== undefined ? (req.body.inspector?.trim() || null) : undefined;
   const location = req.body.location !== undefined ? (req.body.location?.trim() || null) : undefined;
   const notes = req.body.notes !== undefined ? (req.body.notes?.trim() || null) : undefined;
+  if (name !== undefined && name && name.length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+  if (inspector !== undefined && inspector && inspector.length > 255) return res.status(400).json({ error: 'inspector too long (max 255 characters)' });
+  if (location !== undefined && location && location.length > 255) return res.status(400).json({ error: 'location too long (max 255 characters)' });
   if (notes !== undefined && notes && notes.length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+  if (status !== undefined && !VALID_STATUSES.includes(status)) return res.status(400).json({ error: 'status must be pass, fail, or partial' });
   try {
     const existing = await pool.query(
       'SELECT * FROM inspections WHERE id=$1 AND company_id=$2',

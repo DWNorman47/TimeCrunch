@@ -318,6 +318,7 @@ router.post('/clock-in', requireAdmin, requirePermission('manage_workers'), asyn
   const { user_id, project_id } = req.body;
   const notes = req.body.notes?.trim() || null;
   if (!user_id) return res.status(400).json({ error: 'user_id required' });
+  if (notes && notes.length > 500) return res.status(400).json({ error: 'notes too long (max 500 characters)' });
   try {
     // Verify worker belongs to this company
     const workerRow = await pool.query(

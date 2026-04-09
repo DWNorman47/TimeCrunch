@@ -82,6 +82,7 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
               onChange={e => setNotes(e.target.value)}
               placeholder={t.reasonPlaceholder}
               rows={2}
+              maxLength={1000}
             />
           </div>
           {error && <div style={s.error}>{error}</div>}

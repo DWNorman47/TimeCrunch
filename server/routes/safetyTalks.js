@@ -152,6 +152,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
   const title = req.body.title !== undefined ? (req.body.title?.trim() || null) : undefined;
   const content = req.body.content !== undefined ? (req.body.content?.trim() || null) : undefined;
   const given_by = req.body.given_by !== undefined ? (req.body.given_by?.trim() || null) : undefined;
+  if (title !== undefined && title && title.length > 200) return res.status(400).json({ error: 'title too long (max 200 characters)' });
   if (content !== undefined && content && content.length > 5000) return res.status(400).json({ error: 'content too long (max 5000 characters)' });
   if (given_by !== undefined && given_by && given_by.length > 255) return res.status(400).json({ error: 'given_by too long (max 255 characters)' });
   const client = await pool.connect();

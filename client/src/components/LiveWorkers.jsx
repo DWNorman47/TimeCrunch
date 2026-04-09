@@ -372,6 +372,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                 onChange={e => setClockInNotes(e.target.value)}
                 rows={3}
                 placeholder="Add a note..."
+                maxLength={500}
               />
             </div>
             <div style={styles.modalActions}>
