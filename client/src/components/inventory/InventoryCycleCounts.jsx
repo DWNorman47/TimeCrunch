@@ -110,8 +110,14 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const reopen = async () => {
     setReopening(true);
     try {
-      const r = await api.post(`/inventory/cycle-counts/${count.id}/reopen`);
-      setCountData(r.data);
+      await api.post(`/inventory/cycle-counts/${count.id}/reopen`);
+      // Reload full detail so lines and assignments reflect the reset server state.
+      // Without this, lines still show 'accepted' and the Complete button is immediately
+      // enabled — clicking it produces a confusing 422 error from the server.
+      const detail = await api.get(`/inventory/cycle-counts/${count.id}`);
+      setCountData(detail.data);
+      setLines(detail.data.lines || []);
+      setAssignments(detail.data.assignments || []);
     } catch (e) { setError(e.response?.data?.error || t.invCycFailedReopen); }
     finally { setReopening(false); }
   };
@@ -224,7 +230,12 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       // Always send counted_uom_id so the server can compute correct variance
       payload.counted_uom_id = (countedUomId !== undefined ? countedUomId : lineUomSelections[line.id]) ?? null;
       const r = await api.patch(`/inventory/cycle-counts/${count.id}/lines/${line.id}`, payload);
-      setLines(prev => prev.map(l => l.id === line.id ? { ...l, ...r.data } : l));
+      const updatedLine = r.data.line ?? r.data; // backwards-compat if server ever returns raw line
+      setLines(prev => prev.map(l => l.id === line.id ? { ...l, ...updatedLine } : l));
+      if (r.data.auto_completed) {
+        setCountData(prev => ({ ...prev, status: 'completed' }));
+        setReportLines(prev => (prev ?? lines).map(l => l.id === line.id ? { ...l, ...updatedLine } : l));
+      }
     } catch (e) {
       setSaveError(e.response?.data?.error || t.invCycFailedSave);
     } finally {

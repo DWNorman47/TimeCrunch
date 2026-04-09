@@ -1076,10 +1076,11 @@ router.patch('/cycle-counts/:id/lines/:lineId', requireAdmin, async (req, res) =
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Line not found' });
     // Trigger auto-complete so admin direct-entry counts complete without a manual step
+    let autoCompleted = false;
     if (counted_qty !== undefined) {
-      await checkAutoComplete(companyId, parseInt(req.params.id), req.user.id);
+      autoCompleted = await checkAutoComplete(companyId, parseInt(req.params.id), req.user.id);
     }
-    res.json(result.rows[0]);
+    res.json({ line: result.rows[0], auto_completed: autoCompleted });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
