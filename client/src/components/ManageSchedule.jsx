@@ -70,6 +70,9 @@ function DroppableDay({ date, isToday, children }) {
 }
 
 function SummaryView({ shifts, days }) {
+  const t = useT();
+  const [cantOnly, setCantOnly] = useState(false);
+
   // Build worker → day → shifts map
   const workerMap = {};
   shifts.forEach(s => {
@@ -79,11 +82,24 @@ function SummaryView({ shifts, days }) {
     if (!workerMap[name].byDay[key]) workerMap[name].byDay[key] = [];
     workerMap[name].byDay[key].push(s);
   });
-  const rows = Object.values(workerMap).sort((a, b) => a.name.localeCompare(b.name));
-  if (rows.length === 0) return <p style={{ color: '#9ca3af', fontSize: 13, padding: '16px 0' }}>No shifts this week.</p>;
+  let rows = Object.values(workerMap).sort((a, b) => a.name.localeCompare(b.name));
+  if (cantOnly) rows = rows.filter(row => Object.values(row.byDay).some(arr => arr.some(s => s.cant_make_it)));
+
+  const hasCantFlags = shifts.some(s => s.cant_make_it);
+
+  if (Object.values(workerMap).length === 0) return <p style={{ color: '#9ca3af', fontSize: 13, padding: '16px 0' }}>{t.msNoShiftsWeek}</p>;
 
   return (
     <div style={styles.summaryWrap}>
+      {hasCantFlags && (
+        <label style={styles.cantOnlyToggle}>
+          <input type="checkbox" checked={cantOnly} onChange={e => setCantOnly(e.target.checked)} />
+          {' '}{t.msCantOnly}
+        </label>
+      )}
+      {cantOnly && rows.length === 0 && (
+        <p style={{ color: '#9ca3af', fontSize: 13, padding: '8px 0' }}>No workers have flagged this week.</p>
+      )}
       <table style={styles.summaryTable}>
         <thead>
           <tr>
@@ -364,8 +380,8 @@ export default function ManageSchedule({ workers, projects }) {
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>{t.nextWeek}</button>
         <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>{t.today}</button>
         <div style={styles.viewToggle}>
-          <button style={{ ...styles.viewBtn, ...(viewMode === 'grid' ? styles.viewBtnActive : {}) }} onClick={() => setViewMode('grid')}>Grid</button>
-          <button style={{ ...styles.viewBtn, ...(viewMode === 'summary' ? styles.viewBtnActive : {}) }} onClick={() => setViewMode('summary')}>Summary</button>
+          <button style={{ ...styles.viewBtn, ...(viewMode === 'grid' ? styles.viewBtnActive : {}) }} onClick={() => setViewMode('grid')}>{t.msViewGrid}</button>
+          <button style={{ ...styles.viewBtn, ...(viewMode === 'summary' ? styles.viewBtnActive : {}) }} onClick={() => setViewMode('summary')}>{t.msViewSummary}</button>
         </div>
         {!dragMode
           ? <button style={styles.dragModeBtn} onClick={enterDragMode}>{t.rearrange}</button>
@@ -529,4 +545,5 @@ const styles = {
   summaryProject: { fontSize: 10, fontWeight: 400, color: '#6b7280', marginTop: 1 },
   summaryRowCant: { background: '#fff9f9' },
   summaryCantDot: { marginLeft: 5, fontSize: 10, color: '#dc2626', fontWeight: 700 },
+  cantOnlyToggle: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#dc2626', marginBottom: 10, cursor: 'pointer' },
 };

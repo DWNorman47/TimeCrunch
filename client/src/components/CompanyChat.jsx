@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
 
 function formatTime(str) {
   return new Date(str).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 // Worker view — shows their own private thread with admin
-function WorkerChat({ userId }) {
+function WorkerChat({ onRead }) {
   const { user } = useAuth();
+  const t = useT();
   const [messages, setMessages] = useState([]);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
@@ -17,7 +19,10 @@ function WorkerChat({ userId }) {
   const pollRef = useRef(null);
 
   const load = () =>
-    api.get('/chat').then(r => setMessages(r.data)).catch(() => {}).finally(() => setLoading(false));
+    api.get('/chat').then(r => {
+      setMessages(r.data);
+      onRead?.();
+    }).catch(() => {}).finally(() => setLoading(false));
 
   useEffect(() => {
     load();
@@ -50,11 +55,11 @@ function WorkerChat({ userId }) {
   return (
     <div style={styles.wrap}>
       <div style={styles.header}>
-        <span style={styles.title}>💬 Messages with Admin</span>
-        <span style={styles.sub}>Private — only you and your manager can see this</span>
+        <span style={styles.title}>💬 {t.chatMessagesWithAdmin}</span>
+        <span style={styles.sub}>{t.chatPrivateNote}</span>
       </div>
-      <Thread messages={messages} loading={loading} currentUserId={user?.id} bottomRef={bottomRef} />
-      <ChatForm body={body} setBody={setBody} sending={sending} onSubmit={send} />
+      <Thread messages={messages} loading={loading} currentUserId={user?.id} bottomRef={bottomRef} t={t} />
+      <ChatForm body={body} setBody={setBody} sending={sending} onSubmit={send} t={t} />
     </div>
   );
 }
@@ -62,18 +67,37 @@ function WorkerChat({ userId }) {
 // Admin view — worker picker + thread
 function AdminChat({ workers }) {
   const { user } = useAuth();
+  const t = useT();
   const [selectedId, setSelectedId] = useState('');
   const [threads, setThreads] = useState([]); // workers with recent messages
   const [messages, setMessages] = useState([]);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [unreadByWorker, setUnreadByWorker] = useState({}); // workerId → last_at of unread message
   const bottomRef = useRef(null);
   const pollRef = useRef(null);
 
-  // Load worker thread list
+  // Load worker thread list and check for unread
+  const loadThreads = () =>
+    api.get('/chat').then(r => {
+      setThreads(r.data);
+      // Compare thread last_at against per-worker last-read stored in localStorage
+      const unread = {};
+      r.data.forEach(thread => {
+        const key = `chatLastRead_admin_${thread.worker_id}`;
+        const lastRead = localStorage.getItem(key);
+        if (!lastRead || new Date(thread.last_at) > new Date(lastRead)) {
+          unread[thread.worker_id] = true;
+        }
+      });
+      setUnreadByWorker(unread);
+    }).catch(() => {});
+
   useEffect(() => {
-    api.get('/chat').then(r => setThreads(r.data)).catch(() => {});
+    loadThreads();
+    const iv = setInterval(loadThreads, 60000);
+    return () => clearInterval(iv);
   }, []);
 
   // Load selected worker's thread
@@ -81,7 +105,12 @@ function AdminChat({ workers }) {
     if (!selectedId) { setMessages([]); return; }
     setLoading(true);
     clearInterval(pollRef.current);
-    const fetch = () => api.get(`/chat?worker_id=${selectedId}`).then(r => setMessages(r.data)).catch(() => {}).finally(() => setLoading(false));
+    const fetch = () => api.get(`/chat?worker_id=${selectedId}`).then(r => {
+      setMessages(r.data);
+      // Mark as read
+      localStorage.setItem(`chatLastRead_admin_${selectedId}`, new Date().toISOString());
+      setUnreadByWorker(prev => { const n = { ...prev }; delete n[selectedId]; return n; });
+    }).catch(() => {}).finally(() => setLoading(false));
     fetch();
     pollRef.current = setInterval(fetch, 30000);
     return () => clearInterval(pollRef.current);
@@ -110,38 +139,38 @@ function AdminChat({ workers }) {
   return (
     <div style={styles.wrap}>
       <div style={styles.header}>
-        <span style={styles.title}>💬 Worker Messages</span>
-        <span style={styles.sub}>Private — visible only to you and the selected worker</span>
+        <span style={styles.title}>💬 {t.chatWorkerMessages}</span>
+        <span style={styles.sub}>{t.chatAdminPrivateNote}</span>
       </div>
       <div style={styles.workerPicker}>
         <select style={styles.pickerSelect} value={selectedId} onChange={e => setSelectedId(e.target.value)}>
-          <option value="">Select a worker...</option>
+          <option value="">{t.chatSelectWorker}</option>
           {workers.filter(w => w.role !== 'admin').map(w => (
             <option key={w.id} value={w.id}>
-              {w.full_name}{workerHasThread(w.id) ? ' 💬' : ''}
+              {w.full_name}{workerHasThread(w.id) ? ' 💬' : ''}{unreadByWorker[w.id] ? ' 🔴' : ''}
             </option>
           ))}
         </select>
       </div>
       {selectedId ? (
         <>
-          <Thread messages={messages} loading={loading} currentUserId={user?.id} bottomRef={bottomRef} />
-          <ChatForm body={body} setBody={setBody} sending={sending} onSubmit={send} />
+          <Thread messages={messages} loading={loading} currentUserId={user?.id} bottomRef={bottomRef} t={t} />
+          <ChatForm body={body} setBody={setBody} sending={sending} onSubmit={send} t={t} />
         </>
       ) : (
-        <p style={styles.hint}>Select a worker above to view or start a conversation.</p>
+        <p style={styles.hint}>{t.chatSelectHint}</p>
       )}
     </div>
   );
 }
 
-function Thread({ messages, loading, currentUserId, bottomRef }) {
+function Thread({ messages, loading, currentUserId, bottomRef, t }) {
   return (
     <div style={styles.thread}>
       {loading ? (
-        <p style={styles.hintCenter}>Loading...</p>
+        <p style={styles.hintCenter}>{t.loading}</p>
       ) : messages.length === 0 ? (
-        <p style={styles.hintCenter}>No messages yet.</p>
+        <p style={styles.hintCenter}>{t.chatNoMessages}</p>
       ) : (
         messages.map(m => {
           const isMine = m.sender_id === currentUserId;
@@ -166,29 +195,29 @@ function Thread({ messages, loading, currentUserId, bottomRef }) {
   );
 }
 
-function ChatForm({ body, setBody, sending, onSubmit }) {
+function ChatForm({ body, setBody, sending, onSubmit, t }) {
   return (
     <form onSubmit={onSubmit} style={styles.form}>
       <input
         style={styles.input}
         value={body}
         onChange={e => setBody(e.target.value)}
-        placeholder="Type a message..."
+        placeholder={t.chatPlaceholder}
         maxLength={1000}
         disabled={sending}
       />
       <button style={styles.sendBtn} type="submit" disabled={sending || !body.trim()}>
-        {sending ? '...' : 'Send'}
+        {sending ? '...' : t.chatSend}
       </button>
     </form>
   );
 }
 
-export default function CompanyChat({ workers }) {
+export default function CompanyChat({ workers, onRead }) {
   const { user } = useAuth();
   if (!user) return null;
   if (user.role === 'admin') return <AdminChat workers={workers || []} />;
-  return <WorkerChat userId={user.id} />;
+  return <WorkerChat userId={user.id} onRead={onRead} />;
 }
 
 const styles = {

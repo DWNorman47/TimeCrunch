@@ -33,6 +33,7 @@ export default function WorkerSchedule() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [flagging, setFlagging] = useState(null);
+  const [pendingFlag, setPendingFlag] = useState(null); // { id, note }
 
   useEffect(() => {
     api.get('/shifts/mine')
@@ -41,12 +42,26 @@ export default function WorkerSchedule() {
       .finally(() => setLoading(false));
   }, []);
 
-  const toggleCantMakeIt = async (shift) => {
-    setFlagging(shift.id);
-    const newVal = !shift.cant_make_it;
+  const confirmCantMakeIt = async () => {
+    if (!pendingFlag) return;
+    const { id, note } = pendingFlag;
+    setFlagging(id);
+    setPendingFlag(null);
     try {
-      const r = await api.patch(`/shifts/${shift.id}/cant-make-it`, { cant_make_it: newVal });
-      setShifts(prev => prev.map(s => s.id === shift.id ? { ...s, cant_make_it: r.data.cant_make_it } : s));
+      const r = await api.patch(`/shifts/${id}/cant-make-it`, { cant_make_it: true, note: note || '' });
+      setShifts(prev => prev.map(s => s.id === id ? { ...s, cant_make_it: r.data.cant_make_it, cant_make_it_note: r.data.cant_make_it_note } : s));
+    } catch {
+      // silently ignore
+    } finally {
+      setFlagging(null);
+    }
+  };
+
+  const undoCantMakeIt = async (shift) => {
+    setFlagging(shift.id);
+    try {
+      const r = await api.patch(`/shifts/${shift.id}/cant-make-it`, { cant_make_it: false });
+      setShifts(prev => prev.map(s => s.id === shift.id ? { ...s, cant_make_it: r.data.cant_make_it, cant_make_it_note: null } : s));
     } catch {
       // silently ignore
     } finally {
@@ -101,14 +116,43 @@ export default function WorkerSchedule() {
                   {s.cant_make_it && (
                     <span style={styles.cantBadge}>{t.wsCantMakeIt}</span>
                   )}
-                  <button
-                    style={s.cant_make_it ? styles.undoBtn : styles.cantBtn}
-                    onClick={() => toggleCantMakeIt(s)}
-                    disabled={flagging === s.id}
-                  >
-                    {flagging === s.id ? '…' : s.cant_make_it ? t.wsUndo : t.wsCantMakeIt}
-                  </button>
+                  {s.cant_make_it ? (
+                    <button
+                      style={styles.undoBtn}
+                      onClick={() => undoCantMakeIt(s)}
+                      disabled={flagging === s.id}
+                    >
+                      {flagging === s.id ? '…' : t.wsUndo}
+                    </button>
+                  ) : pendingFlag?.id === s.id ? null : (
+                    <button
+                      style={styles.cantBtn}
+                      onClick={() => setPendingFlag({ id: s.id, note: '' })}
+                      disabled={flagging === s.id}
+                    >
+                      {flagging === s.id ? '…' : t.wsCantMakeIt}
+                    </button>
+                  )}
                 </div>
+                {pendingFlag?.id === s.id && (
+                  <div style={styles.noteBox}>
+                    <input
+                      style={styles.noteInput}
+                      placeholder={t.wsAddNote}
+                      value={pendingFlag.note}
+                      onChange={e => setPendingFlag(p => ({ ...p, note: e.target.value }))}
+                      maxLength={200}
+                      autoFocus
+                    />
+                    <div style={styles.noteActions}>
+                      <button style={styles.confirmBtn} onClick={confirmCantMakeIt}>{t.wsConfirm}</button>
+                      <button style={styles.cancelNoteBtn} onClick={() => setPendingFlag(null)}>{t.cancel || 'Cancel'}</button>
+                    </div>
+                  </div>
+                )}
+                {s.cant_make_it && s.cant_make_it_note && (
+                  <div style={styles.cantNote}>{s.cant_make_it_note}</div>
+                )}
               </div>
             ))}
           </div>
@@ -134,6 +178,12 @@ const styles = {
   cantBadge: { fontSize: 11, fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: 10 },
   cantBtn: { marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' },
   undoBtn: { marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: '#6b7280', background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' },
+  noteBox: { marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 },
+  noteInput: { fontSize: 12, padding: '6px 10px', border: '1px solid #fca5a5', borderRadius: 6, outline: 'none', color: '#374151' },
+  noteActions: { display: 'flex', gap: 6 },
+  confirmBtn: { fontSize: 12, fontWeight: 700, background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' },
+  cancelNoteBtn: { fontSize: 12, fontWeight: 600, background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#6b7280' },
+  cantNote: { fontSize: 11, color: '#dc2626', fontStyle: 'italic', marginTop: 4 },
   emptyBox: { textAlign: 'center', padding: '48px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { color: '#9ca3af', fontSize: 15 },

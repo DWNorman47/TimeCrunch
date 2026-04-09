@@ -184,7 +184,7 @@ const translations = {
     reject: '✕ Reject',
     failedLoadPending: 'Failed to load pending entries.',
     allCaughtUp: 'All caught up — no pending entries.',
-    showingOldest200: 'Showing the oldest 200 pending entries. Approve or reject these to see more.',
+    showingOldest200: 'Showing the 200 most recent pending entries. Approve or reject some to load older ones.',
     workerSigned: '✍ Worker signed',
     clockInLocation: '📍 Clock-in location',
     clockOutLocation: '📍 Clock-out location',
@@ -366,6 +366,31 @@ const translations = {
     wsNoShifts: 'No upcoming shifts scheduled.',
     wsCantMakeIt: "Can't make it",
     wsUndo: '↩ Undo',
+    wsAddNote: 'Add a note (optional)...',
+    wsConfirm: 'Confirm',
+
+    // ── Manage Schedule — summary/grid view ──────────────────────────────────
+    msViewGrid: 'Grid',
+    msViewSummary: 'Summary',
+    msNoShiftsWeek: 'No shifts this week.',
+    msCantOnly: "Can't make it only",
+
+    // ── Analytics date range ──────────────────────────────────────────────────
+    ad14Days: '14 days',
+    ad30Days: '30 days',
+    ad90Days: '90 days',
+    adCustom: 'Custom',
+
+    // ── Company Chat ──────────────────────────────────────────────────────────
+    chatMessagesWithAdmin: 'Messages with Admin',
+    chatPrivateNote: 'Private — only you and your manager can see this',
+    chatWorkerMessages: 'Worker Messages',
+    chatAdminPrivateNote: 'Private — visible only to you and the selected worker',
+    chatSelectWorker: 'Select a worker...',
+    chatSelectHint: 'Select a worker above to view or start a conversation.',
+    chatNoMessages: 'No messages yet.',
+    chatPlaceholder: 'Type a message...',
+    chatSend: 'Send',
 
     // ── Manage Rates ─────────────────────────────────────────────────────────
     ratesWages: 'Wages',
@@ -1870,7 +1895,7 @@ const translations = {
     reject: '✕ Rechazar',
     failedLoadPending: 'Error al cargar entradas pendientes.',
     allCaughtUp: 'Al día — no hay entradas pendientes.',
-    showingOldest200: 'Mostrando las 200 entradas pendientes más antiguas. Aprueba o rechaza estas para ver más.',
+    showingOldest200: 'Mostrando las 200 entradas pendientes más recientes. Aprueba o rechaza algunas para cargar las más antiguas.',
     workerSigned: '✍ Trabajador firmó',
     clockInLocation: '📍 Ubicación de entrada',
     clockOutLocation: '📍 Ubicación de salida',
@@ -2052,6 +2077,31 @@ const translations = {
     wsNoShifts: 'No hay turnos próximos programados.',
     wsCantMakeIt: 'No puedo asistir',
     wsUndo: '↩ Deshacer',
+    wsAddNote: 'Agrega una nota (opcional)...',
+    wsConfirm: 'Confirmar',
+
+    // ── Manage Schedule — summary/grid view ──────────────────────────────────
+    msViewGrid: 'Cuadrícula',
+    msViewSummary: 'Resumen',
+    msNoShiftsWeek: 'No hay turnos esta semana.',
+    msCantOnly: 'Solo los que no pueden asistir',
+
+    // ── Analytics date range ──────────────────────────────────────────────────
+    ad14Days: '14 días',
+    ad30Days: '30 días',
+    ad90Days: '90 días',
+    adCustom: 'Personalizado',
+
+    // ── Company Chat ──────────────────────────────────────────────────────────
+    chatMessagesWithAdmin: 'Mensajes con el administrador',
+    chatPrivateNote: 'Privado — solo tú y tu gerente pueden verlo',
+    chatWorkerMessages: 'Mensajes de trabajadores',
+    chatAdminPrivateNote: 'Privado — visible solo para ti y el trabajador seleccionado',
+    chatSelectWorker: 'Selecciona un trabajador...',
+    chatSelectHint: 'Selecciona un trabajador arriba para ver o iniciar una conversación.',
+    chatNoMessages: 'No hay mensajes aún.',
+    chatPlaceholder: 'Escribe un mensaje...',
+    chatSend: 'Enviar',
 
     // ── Manage Rates ─────────────────────────────────────────────────────────
     ratesWages: 'Salarios',

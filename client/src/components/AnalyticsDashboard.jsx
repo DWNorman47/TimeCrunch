@@ -9,11 +9,7 @@ const BLUE = '#1a56db';
 const GREEN = '#059669';
 const ORANGE = '#d97706';
 
-const PRESETS = [
-  { label: '14 days', days: 14 },
-  { label: '30 days', days: 30 },
-  { label: '90 days', days: 90 },
-];
+const PRESET_DAYS = [14, 30, 90];
 
 function toLocalDate(d) {
   return d.toLocaleDateString('en-CA'); // YYYY-MM-DD
@@ -71,6 +67,13 @@ function formatWeek(dateStr) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function presetLabel(days, t) {
+  if (days === 14) return t.ad14Days;
+  if (days === 30) return t.ad30Days;
+  if (days === 90) return t.ad90Days;
+  return `${days}d`;
+}
+
 export default function AnalyticsDashboard() {
   const t = useT();
   const [data, setData] = useState(null);
@@ -100,38 +103,39 @@ export default function AnalyticsDashboard() {
 
   const { summary, daily_hours, weekly_hours, project_hours, worker_hours } = data;
 
-  // Fill daily chart
+  // Fill daily chart — build a date range and zero-fill missing days
   const dailyMap = Object.fromEntries(daily_hours.map(d => [d.date, parseFloat(d.hours)]));
-  const dayCount = showCustom
-    ? (customFrom && customTo ? Math.min(90, Math.round((new Date(customTo) - new Date(customFrom)) / 86400000) + 1) : 14)
-    : preset;
   const dailyFilled = [];
-  for (let i = dayCount - 1; i >= 0; i--) {
-    const d = new Date();
-    if (showCustom && customFrom) {
-      const start = new Date(customFrom + 'T00:00:00');
-      const end = customTo ? new Date(customTo + 'T00:00:00') : new Date();
-      const range = Math.round((end - start) / 86400000);
-      const dd = new Date(start);
-      dd.setDate(start.getDate() + (range - i));
-      if (dd > end) continue;
-      const key = toLocalDate(dd);
+  if (showCustom && customFrom && customTo) {
+    const start = new Date(customFrom + 'T00:00:00');
+    const end = new Date(customTo + 'T00:00:00');
+    const rangeDays = Math.min(90, Math.round((end - start) / 86400000) + 1);
+    for (let i = 0; i < rangeDays; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const key = toLocalDate(d);
       dailyFilled.push({ date: key, hours: dailyMap[key] || 0 });
-      continue;
     }
-    d.setDate(d.getDate() - i);
-    const key = toLocalDate(d);
-    dailyFilled.push({ date: key, hours: dailyMap[key] || 0 });
+  } else if (!showCustom) {
+    for (let i = preset - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = toLocalDate(d);
+      dailyFilled.push({ date: key, hours: dailyMap[key] || 0 });
+    }
+  } else {
+    // Custom mode but dates not fully set — show whatever server returned
+    daily_hours.forEach(d => dailyFilled.push({ date: d.date, hours: parseFloat(d.hours) }));
   }
 
   // Fill weekly chart
   const weeklyMap = Object.fromEntries((weekly_hours || []).map(d => [d.week_start, parseFloat(d.hours)]));
   const weeklyFilled = [];
-  const weekCount = showCustom ? (weekly_hours?.length || 0) : Math.ceil(preset / 7);
   if (showCustom) {
     // Use server data as-is for custom range
     (weekly_hours || []).forEach(w => weeklyFilled.push({ week_start: w.week_start, hours: parseFloat(w.hours) }));
   } else {
+    const weekCount = Math.ceil(preset / 7);
     for (let i = weekCount - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - d.getDay() - i * 7);
@@ -141,28 +145,28 @@ export default function AnalyticsDashboard() {
   }
 
   const rangeLabel = showCustom
-    ? (customFrom && customTo ? `${customFrom} – ${customTo}` : 'Custom range')
-    : `Last ${preset} days`;
+    ? (customFrom && customTo ? `${customFrom} – ${customTo}` : t.adCustom)
+    : presetLabel(preset, t);
 
   return (
     <div style={styles.wrap}>
       {/* Date range controls */}
       <div style={styles.rangeRow}>
         <div style={styles.presetGroup}>
-          {PRESETS.map(p => (
+          {PRESET_DAYS.map(days => (
             <button
-              key={p.days}
-              style={{ ...styles.presetBtn, ...((!showCustom && preset === p.days) ? styles.presetBtnActive : {}) }}
-              onClick={() => { setPreset(p.days); setShowCustom(false); }}
+              key={days}
+              style={{ ...styles.presetBtn, ...((!showCustom && preset === days) ? styles.presetBtnActive : {}) }}
+              onClick={() => { setPreset(days); setShowCustom(false); }}
             >
-              {p.label}
+              {presetLabel(days, t)}
             </button>
           ))}
           <button
             style={{ ...styles.presetBtn, ...(showCustom ? styles.presetBtnActive : {}) }}
             onClick={() => { setShowCustom(true); if (!customFrom) setCustomFrom(daysAgo(30)); if (!customTo) setCustomTo(today()); }}
           >
-            Custom
+            {t.adCustom}
           </button>
         </div>
         {showCustom && (

@@ -41,6 +41,7 @@ export default function Dashboard() {
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'clock');
   const [entryView, setEntryView] = useState('list');
   const [shiftPrefill, setShiftPrefill] = useState(null);
+  const [chatUnread, setChatUnread] = useState(false);
 
   const handleFillFromShift = shift => {
     setShiftPrefill(shift);
@@ -109,6 +110,23 @@ export default function Dashboard() {
     if (!onSync) return;
     return onSync(count => { if (count > 0) refreshEntries(); });
   }, [onSync]);
+
+  // Background chat unread check (only when not on messages tab)
+  useEffect(() => {
+    if (tab === 'messages') return;
+    const check = () => {
+      api.get('/chat').then(r => {
+        const lastRead = localStorage.getItem('chatLastRead');
+        const hasUnread = r.data.some(
+          m => m.sender_id !== user?.id && (!lastRead || new Date(m.created_at) > new Date(lastRead))
+        );
+        setChatUnread(hasUnread);
+      }).catch(() => {});
+    };
+    check();
+    const iv = setInterval(check, 60000);
+    return () => clearInterval(iv);
+  }, [tab, user?.id]);
 
   const handleEntryAdded = entry => {
     setEntries(prev => [entry, ...prev]);
@@ -402,14 +420,26 @@ ${signatureDataUrl ? `
       <main style={styles.main} className="mobile-main">
         <div style={styles.tabs} className="tab-bar">
           {settings?.module_timeclock !== false && <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); history.replaceState(null, '', '#clock'); }}>🕐 Clock</button>}
-          {settings?.module_timeclock !== false && <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => { setTab('messages'); history.replaceState(null, '', '#messages'); }}>💬 Messages</button>}
+          {settings?.module_timeclock !== false && (
+            <button
+              style={tab === 'messages' ? styles.tabActive : styles.tab}
+              onClick={() => {
+                setTab('messages');
+                history.replaceState(null, '', '#messages');
+                setChatUnread(false);
+                localStorage.setItem('chatLastRead', new Date().toISOString());
+              }}
+            >
+              💬 Messages{chatUnread && <span style={styles.unreadDot} />}
+            </button>
+          )}
           {settings?.module_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); history.replaceState(null, '', '#timesheet'); }}>📋 Timesheet</button>}
           <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); history.replaceState(null, '', '#timeoff'); }}>🏖 Time Off</button>
           {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); history.replaceState(null, '', '#schedule'); }}>📅 Schedule</button>}
           <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>💳 Expenses</button>
         </div>
 
-        {tab === 'messages' && <CompanyChat />}
+        {tab === 'messages' && <CompanyChat onRead={() => { setChatUnread(false); localStorage.setItem('chatLastRead', new Date().toISOString()); }} />}
 
         {tab === 'clock' && (
           <>
@@ -470,7 +500,8 @@ const styles = {
   main: { maxWidth: 700, margin: '24px auto', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 20 },
   tabs: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 10, padding: 4, width: '100%' },
   tab: { flex: 1, padding: '14px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#666', cursor: 'pointer', textAlign: 'center' },
-  tabActive: { flex: 1, padding: '14px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', textAlign: 'center' },
+  tabActive: { flex: 1, padding: '14px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', textAlign: 'center', position: 'relative' },
+  unreadDot: { display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#ef4444', marginLeft: 4, verticalAlign: 'middle', flexShrink: 0 },
   timesheetToolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
   viewToggle: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 8, padding: 3, width: 'fit-content' },
   exportBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '6px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
