@@ -6,10 +6,6 @@ import EntryList from '../components/EntryList';
 import TimesheetView from '../components/TimesheetView';
 import UpcomingShifts from '../components/UpcomingShifts';
 import WorkerSummary from '../components/WorkerSummary';
-import ChangePassword from '../components/ChangePassword';
-import MFASetup from '../components/MFASetup';
-import PayStubView from '../components/PayStubView';
-import NotificationSetup from '../components/NotificationSetup';
 import TimesheetSignOff from '../components/TimesheetSignOff';
 import CompanyChat from '../components/CompanyChat';
 import AppSwitcher from '../components/AppSwitcher';
@@ -23,7 +19,6 @@ import SignatureModal from '../components/SignatureModal';
 import TimeOffTab from '../components/TimeOffTab';
 import WorkerSchedule from '../components/WorkerSchedule';
 import ReimbursementsView from '../components/ReimbursementsView';
-import MyCount from '../components/MyCount';
 
 const isPwa = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
@@ -37,9 +32,8 @@ export default function Dashboard() {
   const [companyInfo, setCompanyInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
-  const TABS = ['clock', 'messages', 'timesheet', 'timeoff', 'schedule', 'reimbursements', 'mycount', 'account'];
+  const TABS = ['clock', 'messages', 'timesheet', 'timeoff', 'schedule', 'reimbursements'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'clock');
   const [entryView, setEntryView] = useState('list');
@@ -83,9 +77,9 @@ export default function Dashboard() {
 
   // When timeclock feature is off, redirect away from clock-only tabs
   useEffect(() => {
-    if (settings && settings.module_timeclock === false && tab !== 'account') {
-      setTab('account');
-      window.location.hash = 'account';
+    if (settings && settings.module_timeclock === false && ['clock', 'messages', 'timesheet'].includes(tab)) {
+      setTab('timeoff');
+      window.location.hash = 'timeoff';
     }
   }, [settings]);
 
@@ -359,7 +353,6 @@ ${signatureDataUrl ? `
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
-      {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
       {showSignatureModal && (
         <SignatureModal
           onConfirm={sig => { setShowSignatureModal(false); handleExportPDF(sig); }}
@@ -376,8 +369,6 @@ ${signatureDataUrl ? `
           <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); window.location.hash = 'timeoff'; }}>🏖 Time Off</button>
           {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); window.location.hash = 'schedule'; }}>📅 Schedule</button>}
           <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); window.location.hash = 'reimbursements'; }}>💳 Expenses</button>
-          {settings?.module_inventory !== false && <button style={tab === 'mycount' ? styles.tabActive : styles.tab} onClick={() => { setTab('mycount'); window.location.hash = 'mycount'; }}>📦 My Count</button>}
-          <button style={tab === 'account' ? styles.tabActive : styles.tab} onClick={() => { setTab('account'); window.location.hash = 'account'; }}>👤 Account</button>
         </div>
 
         {tab === 'messages' && <CompanyChat />}
@@ -420,27 +411,6 @@ ${signatureDataUrl ? `
 
         {tab === 'reimbursements' && <ReimbursementsView />}
 
-        {tab === 'mycount' && <MyCount />}
-
-        {tab === 'account' && (
-          <>
-            <NotificationSetup />
-            <div style={styles.accountCard} className="mobile-card">
-              <div style={styles.accountRow}>
-                <div>
-                  <div style={styles.accountLabel}>Password</div>
-                  <div style={styles.accountSub}>Change your login password</div>
-                </div>
-                <button style={styles.accountBtn} onClick={() => setShowChangePassword(true)}>Change Password</button>
-              </div>
-            </div>
-            <MFASetup />
-            <div style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '8px 0 4px' }}>
-              Need help? Email us at <a href="mailto:info@opsfloa.com" style={{ color: '#1a56db' }}>info@opsfloa.com</a>
-            </div>
-            {!loading && (settings?.show_worker_wages ?? false) && <PayStubView user={user} settings={settings} companyInfo={companyInfo} />}
-          </>
-        )}
       </main>
     </div>
   );
@@ -466,9 +436,4 @@ const styles = {
   exportBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '6px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   toggleBtn: { padding: '6px 14px', background: 'none', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#666', cursor: 'pointer' },
   toggleActive: { padding: '6px 14px', background: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
-  accountCard: { background: '#fff', borderRadius: 12, padding: '14px 18px', boxShadow: '0 1px 6px rgba(0,0,0,0.06)' },
-  accountRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
-  accountLabel: { fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 2 },
-  accountSub: { fontSize: 12, color: '#6b7280' },
-  accountBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '7px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
 };
