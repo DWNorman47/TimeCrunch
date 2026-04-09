@@ -1266,41 +1266,49 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
 router.get('/projects/metrics', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
-    const rateResult = await pool.query(
-      `SELECT value FROM settings WHERE company_id = $1 AND key = 'default_hourly_rate'`,
-      [companyId]
-    );
-    const defaultRate = parseFloat(rateResult.rows[0]?.value ?? 30);
+    const metricsSettings = await getSettings(companyId);
+    const defaultRate = metricsSettings.default_hourly_rate || 30;
+    const otThreshold = metricsSettings.overtime_threshold || 8;
     const result = await pool.query(
       `WITH daily_regular AS (
         SELECT project_id, work_date,
-          SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600) as day_hours
+          SUM(
+            EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600
+            - COALESCE(break_minutes, 0)::float / 60
+          ) as day_hours
         FROM time_entries
-        WHERE wage_type = 'regular' AND company_id = $1
+        WHERE wage_type = 'regular' AND company_id = $1 AND status != 'rejected'
         GROUP BY project_id, work_date
       )
       SELECT p.id, p.name, p.budget_hours, p.budget_dollars,
         COUNT(te.id) as total_entries,
         COUNT(DISTINCT te.user_id) as worker_count,
-        COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
-        COALESCE((SELECT SUM(LEAST(day_hours, 8)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as regular_hours,
-        COALESCE((SELECT SUM(GREATEST(day_hours - 8, 0)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as overtime_hours,
-        COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600 ELSE 0 END), 0) as prevailing_hours,
+        COALESCE(SUM(
+          EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600
+          - COALESCE(te.break_minutes, 0)::float / 60
+        ), 0) as total_hours,
+        COALESCE((SELECT SUM(LEAST(day_hours, $2)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as regular_hours,
+        COALESCE((SELECT SUM(GREATEST(day_hours - $2, 0)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as overtime_hours,
+        COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN
+          EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600
+          - COALESCE(te.break_minutes, 0)::float / 60
+        ELSE 0 END), 0) as prevailing_hours,
         COALESCE((
           SELECT SUM(
-            EXTRACT(EPOCH FROM (CASE WHEN te2.end_time < te2.start_time THEN te2.end_time + INTERVAL '1 day' - te2.start_time ELSE te2.end_time - te2.start_time END)) / 3600
-            * COALESCE(u2.hourly_rate, $2)
+            (EXTRACT(EPOCH FROM (CASE WHEN te2.end_time < te2.start_time THEN te2.end_time + INTERVAL '1 day' - te2.start_time ELSE te2.end_time - te2.start_time END)) / 3600
+             - COALESCE(te2.break_minutes, 0)::float / 60)
+            * COALESCE(u2.hourly_rate, $3)
           )
           FROM time_entries te2
           JOIN users u2 ON te2.user_id = u2.id
-          WHERE te2.project_id = p.id AND te2.company_id = $1
+          WHERE te2.project_id = p.id AND te2.company_id = $1 AND te2.status != 'rejected'
         ), 0) as estimated_cost
       FROM projects p
-      LEFT JOIN time_entries te ON te.project_id = p.id
+      LEFT JOIN time_entries te ON te.project_id = p.id AND te.status != 'rejected'
       WHERE p.active = true AND p.company_id = $1
       GROUP BY p.id, p.name
       ORDER BY p.name`,
-      [companyId, defaultRate]
+      [companyId, otThreshold, defaultRate]
     );
     res.json(result.rows);
   } catch (err) {
