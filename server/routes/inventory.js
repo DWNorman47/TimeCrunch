@@ -1088,13 +1088,14 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
       [req.params.id]
     );
 
-    // Block if any line uncounted
-    const uncounted = lines.rows.filter(l => l.counted_qty === null);
-    if (uncounted.length > 0) {
-      const itemIds = uncounted.map(l => l.item_id);
+    // Block if any line is not in a final state
+    const FINAL_STATUSES = ['accepted', 'reconciled', 'overridden', 'audited'];
+    const notFinal = lines.rows.filter(l => !FINAL_STATUSES.includes(l.line_status));
+    if (notFinal.length > 0) {
+      const itemIds = notFinal.map(l => l.item_id);
       const items = await pool.query('SELECT id, name FROM inventory_items WHERE id = ANY($1)', [itemIds]);
       const names = items.rows.map(i => i.name);
-      return res.status(422).json({ error: `${uncounted.length} item(s) not yet counted: ${names.join(', ')}` });
+      return res.status(422).json({ error: `${notFinal.length} item(s) not yet in a final state: ${names.join(', ')}` });
     }
 
     const client = await pool.connect();
@@ -1565,7 +1566,7 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
 
     // Check for auto-complete
     let autoCompleted = false;
-    if (['accepted', 'reconciled', 'overridden'].includes(newLineStatus)) {
+    if (['accepted', 'reconciled', 'overridden', 'audited'].includes(newLineStatus)) {
       autoCompleted = await checkAutoComplete(companyId, parseInt(req.params.id), req.user.id);
     }
 
