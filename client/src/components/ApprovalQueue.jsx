@@ -319,6 +319,9 @@ export default function ApprovalQueue({ onCountChange }) {
           {visibleEntries.length === 0 && workerFilter && (
             <p style={styles.empty}>{t.aqNoPendingFor} {workerFilter}.</p>
           )}
+          {visibleEntries.length === 0 && !workerFilter && (dateFrom || dateTo) && (
+            <p style={styles.empty}>No entries found for this date range.</p>
+          )}
           {sortedDays.map(day => (
             <div key={day}>
               <div style={styles.dayHeader}>

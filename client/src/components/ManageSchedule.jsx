@@ -22,7 +22,10 @@ function fmtTime(t) { const [h, m] = t.split(':'); const hr = parseInt(h); retur
 function PillContent({ s }) {
   return (
     <>
-      <div style={styles.pillWorker}>{s.worker_name}</div>
+      <div style={styles.pillWorker}>
+        {s.worker_name}
+        {s.cant_make_it && <span style={styles.pillCantBadge}>✗ Can't make it</span>}
+      </div>
       {s.project_name && <div style={styles.pillProject}>{s.project_name}</div>}
       <div style={styles.pillTime}>{fmtTime(s.start_time)}–{fmtTime(s.end_time)}</div>
       {s.notes && <div style={styles.pillNotes}>{s.notes}</div>}
@@ -37,7 +40,7 @@ function DraggableShift({ s, editingId, startEdit, setEditingId, dragMode }) {
 
   return (
     <div ref={setNodeRef}>
-      <div style={{ ...styles.shiftPill, ...(isEditing ? styles.shiftPillActive : {}), opacity: isDragging ? 0.35 : 1, cursor: dragMode ? 'grab' : 'default' }} {...(dragMode ? { ...listeners, ...attributes } : {})}>
+      <div style={{ ...styles.shiftPill, ...(isEditing ? styles.shiftPillActive : {}), ...(s.cant_make_it ? styles.shiftPillCant : {}), opacity: isDragging ? 0.35 : 1, cursor: dragMode ? 'grab' : 'default' }} {...(dragMode ? { ...listeners, ...attributes } : {})}>
         <PillContent s={s} />
         <div style={styles.pillActions} onPointerDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
           <button style={isEditing ? styles.editPillBtnActive : styles.editPillBtn} onClick={() => isEditing ? setEditingId(null) : startEdit(s)}>
@@ -66,12 +69,80 @@ function DroppableDay({ date, isToday, children }) {
   );
 }
 
+function SummaryView({ shifts, days }) {
+  // Build worker → day → shifts map
+  const workerMap = {};
+  shifts.forEach(s => {
+    const name = s.worker_name;
+    if (!workerMap[name]) workerMap[name] = { name, byDay: {} };
+    const key = s.shift_date.substring(0, 10);
+    if (!workerMap[name].byDay[key]) workerMap[name].byDay[key] = [];
+    workerMap[name].byDay[key].push(s);
+  });
+  const rows = Object.values(workerMap).sort((a, b) => a.name.localeCompare(b.name));
+  if (rows.length === 0) return <p style={{ color: '#9ca3af', fontSize: 13, padding: '16px 0' }}>No shifts this week.</p>;
+
+  return (
+    <div style={styles.summaryWrap}>
+      <table style={styles.summaryTable}>
+        <thead>
+          <tr>
+            <th style={styles.summaryThWorker}>Worker</th>
+            {days.map(day => {
+              const isToday = toISO(day) === toISO(new Date());
+              return (
+                <th key={toISO(day)} style={{ ...styles.summaryTh, color: isToday ? '#1a56db' : '#374151' }}>
+                  <div>{day.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                  <div style={{ fontWeight: 400, fontSize: 10 }}>{day.getDate()}</div>
+                </th>
+              );
+            })}
+            <th style={styles.summaryThTotal}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(row => {
+            const total = Object.values(row.byDay).reduce((n, arr) => n + arr.length, 0);
+            const hasCant = Object.values(row.byDay).some(arr => arr.some(s => s.cant_make_it));
+            return (
+              <tr key={row.name} style={hasCant ? styles.summaryRowCant : {}}>
+                <td style={styles.summaryTdWorker}>
+                  {row.name}
+                  {hasCant && <span style={styles.summaryCantDot} title="Can't make it">✗</span>}
+                </td>
+                {days.map(day => {
+                  const key = toISO(day);
+                  const dayShifts = row.byDay[key] || [];
+                  return (
+                    <td key={key} style={styles.summaryTd}>
+                      {dayShifts.length === 0 ? (
+                        <span style={styles.summaryEmpty}>–</span>
+                      ) : dayShifts.map((s, i) => (
+                        <div key={i} style={{ ...styles.summaryShift, ...(s.cant_make_it ? styles.summaryShiftCant : {}) }}>
+                          {fmtTime(s.start_time)}–{fmtTime(s.end_time)}
+                          {s.project_name && <div style={styles.summaryProject}>{s.project_name}</div>}
+                        </div>
+                      ))}
+                    </td>
+                  );
+                })}
+                <td style={styles.summaryTdTotal}>{total}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function ManageSchedule({ workers, projects }) {
   const toast = useToast();
   const t = useT();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('grid');
   const [form, setForm] = useState({ user_id: '', project_id: '', shift_date: toISO(new Date()), start_time: '08:00', end_time: '17:00', notes: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -292,6 +363,10 @@ export default function ManageSchedule({ workers, projects }) {
         <span style={styles.weekLabel}>{fmtDay(days[0])} – {fmtDay(days[6])}</span>
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>{t.nextWeek}</button>
         <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>{t.today}</button>
+        <div style={styles.viewToggle}>
+          <button style={{ ...styles.viewBtn, ...(viewMode === 'grid' ? styles.viewBtnActive : {}) }} onClick={() => setViewMode('grid')}>Grid</button>
+          <button style={{ ...styles.viewBtn, ...(viewMode === 'summary' ? styles.viewBtnActive : {}) }} onClick={() => setViewMode('summary')}>Summary</button>
+        </div>
         {!dragMode
           ? <button style={styles.dragModeBtn} onClick={enterDragMode}>{t.rearrange}</button>
           : (
@@ -308,7 +383,9 @@ export default function ManageSchedule({ workers, projects }) {
         }
       </div>
 
-      {loading ? <p style={{ color: '#888', fontSize: 13 }}>{t.loading}</p> : (
+      {loading ? <p style={{ color: '#888', fontSize: 13 }}>{t.loading}</p> : viewMode === 'summary' ? (
+        <SummaryView shifts={shifts} days={days} />
+      ) : (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={styles.grid}>
             {days.map(day => {
@@ -411,11 +488,13 @@ const styles = {
   dayHead: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 },
   emptyDay: { flex: 1, background: '#f9fafb', borderRadius: 4, minHeight: 40 },
   shiftPill: { background: '#eff6ff', borderLeft: '3px solid #1a56db', borderRadius: 5, padding: '5px 7px', fontSize: 11 },
-  pillWorker: { fontWeight: 700, color: '#1e3a5f', marginBottom: 1 },
+  pillWorker: { fontWeight: 700, color: '#1e3a5f', marginBottom: 1, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
+  pillCantBadge: { fontSize: 9, fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '1px 5px', borderRadius: 4, whiteSpace: 'nowrap' },
   pillProject: { color: '#6b7280', fontSize: 10 },
   pillTime: { fontWeight: 600, color: '#1a56db', marginTop: 2 },
   pillNotes: { color: '#9ca3af', fontSize: 10, fontStyle: 'italic' },
   shiftPillActive: { background: '#dbeafe', borderLeftColor: '#1d4ed8' },
+  shiftPillCant: { background: '#fff5f5', borderLeftColor: '#ef4444' },
   pillActions: { display: 'flex', gap: 4, marginTop: 6 },
   editPillBtn: { flex: 1, background: '#dbeafe', border: 'none', color: '#1d4ed8', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 9px', borderRadius: 5, lineHeight: 1 },
   editPillBtnActive: { flex: 1, background: '#bfdbfe', border: 'none', color: '#1e40af', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 9px', borderRadius: 5, lineHeight: 1 },
@@ -433,4 +512,21 @@ const styles = {
   cancelBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '7px 18px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   dupBtn: { background: '#d1fae5', border: 'none', color: '#065f46', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 16px', borderRadius: 6 },
   deleteBtn: { background: '#fee2e2', border: 'none', color: '#b91c1c', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 16px', borderRadius: 6 },
+  viewToggle: { display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid #d1d5db' },
+  viewBtn: { background: '#fff', border: 'none', padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#374151' },
+  viewBtnActive: { background: '#1a56db', color: '#fff' },
+  summaryWrap: { overflowX: 'auto' },
+  summaryTable: { width: '100%', borderCollapse: 'collapse', fontSize: 12 },
+  summaryThWorker: { textAlign: 'left', padding: '6px 10px', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', minWidth: 130 },
+  summaryTh: { textAlign: 'center', padding: '6px 6px', fontWeight: 700, borderBottom: '2px solid #e5e7eb', minWidth: 80 },
+  summaryThTotal: { textAlign: 'center', padding: '6px 8px', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', width: 50 },
+  summaryTdWorker: { padding: '8px 10px', fontWeight: 700, color: '#111827', borderBottom: '1px solid #f3f4f6', verticalAlign: 'top', whiteSpace: 'nowrap' },
+  summaryTd: { padding: '6px', borderBottom: '1px solid #f3f4f6', verticalAlign: 'top', textAlign: 'center' },
+  summaryTdTotal: { padding: '8px', borderBottom: '1px solid #f3f4f6', textAlign: 'center', fontWeight: 700, color: '#374151' },
+  summaryEmpty: { color: '#d1d5db' },
+  summaryShift: { background: '#eff6ff', color: '#1e3a5f', borderRadius: 4, padding: '3px 5px', marginBottom: 2, fontWeight: 600, lineHeight: 1.3 },
+  summaryShiftCant: { background: '#fff5f5', color: '#b91c1c' },
+  summaryProject: { fontSize: 10, fontWeight: 400, color: '#6b7280', marginTop: 1 },
+  summaryRowCant: { background: '#fff9f9' },
+  summaryCantDot: { marginLeft: 5, fontSize: 10, color: '#dc2626', fontWeight: 700 },
 };

@@ -1852,58 +1852,91 @@ router.delete('/projects/:id', requireAdmin, requirePermission('manage_projects'
   }
 });
 
-// GET /admin/analytics
+// GET /admin/analytics?from=YYYY-MM-DD&to=YYYY-MM-DD
 router.get('/analytics', requireAdmin, requirePermission('view_reports'), requirePlan('business'), async (req, res) => {
   const companyId = req.user.company_id;
+  const { from, to } = req.query;
+  // Validate dates if provided
+  const fromDate = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : null;
+  const toDate = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : null;
+  const hoursExpr = `EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600`;
   try {
     const [daily, weekly, projects, workers, summary] = await Promise.all([
-      // Hours per day for the last 14 days
-      pool.query(
-        `SELECT work_date::text as date,
-                ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600)::numeric, 2) as hours
-         FROM time_entries
-         WHERE company_id = $1 AND work_date >= CURRENT_DATE - 13
-         GROUP BY work_date ORDER BY work_date ASC LIMIT 14`,
-        [companyId]
-      ),
-      // Hours per week for the last 12 weeks
-      pool.query(
-        `SELECT to_char(date_trunc('week', work_date), 'YYYY-MM-DD') as week_start,
-                ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600)::numeric, 1) as hours
-         FROM time_entries
-         WHERE company_id = $1 AND work_date >= CURRENT_DATE - 83
-         GROUP BY week_start ORDER BY week_start ASC LIMIT 12`,
-        [companyId]
-      ),
-      // Top projects by hours, last 30 days
+      // Hours per day — custom range or last 14 days
+      fromDate || toDate
+        ? pool.query(
+            `SELECT work_date::text as date,
+                    ROUND(SUM(${hoursExpr})::numeric, 2) as hours
+             FROM time_entries
+             WHERE company_id = $1
+               AND ($2::date IS NULL OR work_date >= $2::date)
+               AND ($3::date IS NULL OR work_date <= $3::date)
+             GROUP BY work_date ORDER BY work_date ASC LIMIT 90`,
+            [companyId, fromDate, toDate]
+          )
+        : pool.query(
+            `SELECT work_date::text as date,
+                    ROUND(SUM(${hoursExpr})::numeric, 2) as hours
+             FROM time_entries
+             WHERE company_id = $1 AND work_date >= CURRENT_DATE - 13
+             GROUP BY work_date ORDER BY work_date ASC LIMIT 14`,
+            [companyId]
+          ),
+      // Hours per week — custom range or last 12 weeks
+      fromDate || toDate
+        ? pool.query(
+            `SELECT to_char(date_trunc('week', work_date), 'YYYY-MM-DD') as week_start,
+                    ROUND(SUM(${hoursExpr})::numeric, 1) as hours
+             FROM time_entries
+             WHERE company_id = $1
+               AND ($2::date IS NULL OR work_date >= $2::date)
+               AND ($3::date IS NULL OR work_date <= $3::date)
+             GROUP BY week_start ORDER BY week_start ASC`,
+            [companyId, fromDate, toDate]
+          )
+        : pool.query(
+            `SELECT to_char(date_trunc('week', work_date), 'YYYY-MM-DD') as week_start,
+                    ROUND(SUM(${hoursExpr})::numeric, 1) as hours
+             FROM time_entries
+             WHERE company_id = $1 AND work_date >= CURRENT_DATE - 83
+             GROUP BY week_start ORDER BY week_start ASC LIMIT 12`,
+            [companyId]
+          ),
+      // Top projects by hours
       pool.query(
         `SELECT p.name,
-                ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600)::numeric, 2) as hours
+                ROUND(SUM(${hoursExpr})::numeric, 2) as hours
          FROM time_entries te
          JOIN projects p ON te.project_id = p.id
-         WHERE te.company_id = $1 AND te.work_date >= CURRENT_DATE - 29
+         WHERE te.company_id = $1
+           AND ($2::date IS NULL OR te.work_date >= $2::date)
+           AND ($3::date IS NULL OR te.work_date <= $3::date)
+           ${!fromDate && !toDate ? 'AND te.work_date >= CURRENT_DATE - 29' : ''}
          GROUP BY p.name ORDER BY hours DESC LIMIT 10`,
-        [companyId]
+        [companyId, fromDate, toDate]
       ),
-      // Top workers by hours, last 30 days
+      // Top workers by hours
       pool.query(
         `SELECT u.full_name as name,
-                ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600)::numeric, 2) as hours
+                ROUND(SUM(${hoursExpr})::numeric, 2) as hours
          FROM time_entries te
          JOIN users u ON te.user_id = u.id
-         WHERE te.company_id = $1 AND te.work_date >= CURRENT_DATE - 29
+         WHERE te.company_id = $1
+           AND ($2::date IS NULL OR te.work_date >= $2::date)
+           AND ($3::date IS NULL OR te.work_date <= $3::date)
+           ${!fromDate && !toDate ? 'AND te.work_date >= CURRENT_DATE - 29' : ''}
          GROUP BY u.full_name ORDER BY hours DESC LIMIT 10`,
-        [companyId]
+        [companyId, fromDate, toDate]
       ),
-      // Summary stats
+      // Summary stats — always current (this week / this month)
       pool.query(
         `SELECT
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('week', CURRENT_DATE)
-             THEN EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600 END), 0)::numeric, 1) as hours_this_week,
+             THEN ${hoursExpr} END), 0)::numeric, 1) as hours_this_week,
            COUNT(DISTINCT CASE WHEN work_date >= date_trunc('week', CURRENT_DATE) THEN user_id END) as active_workers_this_week,
            COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN user_id END) as active_workers_this_month,
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE)
-             THEN EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600 END), 0)::numeric, 1) as hours_this_month,
+             THEN ${hoursExpr} END), 0)::numeric, 1) as hours_this_month,
            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_approvals,
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('week', CURRENT_DATE) THEN mileage END), 0)::numeric, 1) as mileage_this_week,
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN mileage END), 0)::numeric, 1) as mileage_this_month

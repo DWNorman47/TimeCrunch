@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { sendPushToUser } = require('../push');
+const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 
 // GET /admin/shifts?from=&to= — all company shifts in range
 router.get('/admin', requireAdmin, async (req, res) => {
@@ -123,7 +123,17 @@ router.patch('/:id/cant-make-it', requireAuth, async (req, res) => {
       [!!cant_make_it, note?.trim() || null, req.params.id, req.user.id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Shift not found' });
-    res.json(result.rows[0]);
+    const shift = result.rows[0];
+    if (cant_make_it) {
+      const dateStr = shift.shift_date?.toString().substring(0, 10) || '';
+      const timeStr = shift.start_time?.substring(0, 5) || '';
+      sendPushToCompanyAdmins(req.user.company_id, {
+        title: `${req.user.full_name} can't make their shift`,
+        body: `${dateStr} · ${timeStr}`,
+        url: '/timeclock#manage',
+      });
+    }
+    res.json(shift);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

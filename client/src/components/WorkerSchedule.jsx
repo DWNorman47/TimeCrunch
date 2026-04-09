@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
-function fmtDate(d) {
+function fmtDate(d, t) {
   const date = new Date(d + 'T00:00:00');
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
 
-  if (date.getTime() === today.getTime()) return 'Today';
-  if (date.getTime() === tomorrow.getTime()) return 'Tomorrow';
+  if (date.getTime() === today.getTime()) return t.wsToday;
+  if (date.getTime() === tomorrow.getTime()) return t.wsTomorrow;
   return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
-function fmtTime(t) {
-  if (!t) return '';
-  const [h, m] = t.split(':');
+function fmtTime(ts) {
+  if (!ts) return '';
+  const [h, m] = ts.split(':');
   const hour = parseInt(h);
   return `${hour % 12 || 12}:${m} ${hour < 12 ? 'AM' : 'PM'}`;
 }
@@ -27,10 +28,11 @@ function isToday(dateStr) {
 }
 
 export default function WorkerSchedule() {
+  const t = useT();
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [flagging, setFlagging] = useState(null); // shift id being toggled
+  const [flagging, setFlagging] = useState(null);
 
   useEffect(() => {
     api.get('/shifts/mine')
@@ -46,7 +48,7 @@ export default function WorkerSchedule() {
       const r = await api.patch(`/shifts/${shift.id}/cant-make-it`, { cant_make_it: newVal });
       setShifts(prev => prev.map(s => s.id === shift.id ? { ...s, cant_make_it: r.data.cant_make_it } : s));
     } catch {
-      // silently ignore — could show a toast here
+      // silently ignore
     } finally {
       setFlagging(null);
     }
@@ -57,11 +59,10 @@ export default function WorkerSchedule() {
   if (shifts.length === 0) return (
     <div style={styles.emptyBox}>
       <div style={styles.emptyIcon}>📅</div>
-      <p style={styles.emptyText}>No upcoming shifts scheduled.</p>
+      <p style={styles.emptyText}>{t.wsNoShifts}</p>
     </div>
   );
 
-  // Group by date
   const byDate = {};
   shifts.forEach(s => {
     const key = s.shift_date.toString().substring(0, 10);
@@ -71,15 +72,15 @@ export default function WorkerSchedule() {
 
   return (
     <div style={styles.wrap}>
-      <h2 style={styles.heading}>Your Schedule</h2>
+      <h2 style={styles.heading}>{t.wsYourSchedule}</h2>
       <div style={styles.list}>
         {Object.entries(byDate).map(([date, dayShifts]) => (
           <div key={date} style={styles.dayGroup}>
             <div style={styles.dateLabel}>
               <span style={{ ...styles.dateName, color: isToday(date) ? '#1a56db' : '#374151' }}>
-                {fmtDate(date)}
+                {fmtDate(date, t)}
               </span>
-              {isToday(date) && <span style={styles.todayBadge}>Today</span>}
+              {isToday(date) && <span style={styles.todayBadge}>{t.wsToday}</span>}
             </div>
             {dayShifts.map(s => (
               <div key={s.id} style={{
@@ -98,14 +99,14 @@ export default function WorkerSchedule() {
                 )}
                 <div style={styles.shiftFooter}>
                   {s.cant_make_it && (
-                    <span style={styles.cantBadge}>Can't make it</span>
+                    <span style={styles.cantBadge}>{t.wsCantMakeIt}</span>
                   )}
                   <button
                     style={s.cant_make_it ? styles.undoBtn : styles.cantBtn}
                     onClick={() => toggleCantMakeIt(s)}
                     disabled={flagging === s.id}
                   >
-                    {flagging === s.id ? '…' : s.cant_make_it ? '↩ Undo' : "Can't make it"}
+                    {flagging === s.id ? '…' : s.cant_make_it ? t.wsUndo : t.wsCantMakeIt}
                   </button>
                 </div>
               </div>

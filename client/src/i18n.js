@@ -359,6 +359,14 @@ const translations = {
     failedDuplicateShift: 'Failed to duplicate shift',
     someShiftsFailed: 'Some shifts failed to save',
 
+    // ── Worker Schedule (worker view) ─────────────────────────────────────────
+    wsYourSchedule: 'Your Schedule',
+    wsToday: 'Today',
+    wsTomorrow: 'Tomorrow',
+    wsNoShifts: 'No upcoming shifts scheduled.',
+    wsCantMakeIt: "Can't make it",
+    wsUndo: '↩ Undo',
+
     // ── Manage Rates ─────────────────────────────────────────────────────────
     ratesWages: 'Wages',
     ratesWagesDesc: 'Default rates used when calculating worker pay',
@@ -2036,6 +2044,14 @@ const translations = {
     shiftDuplicated: 'Turno duplicado',
     failedDuplicateShift: 'Error al duplicar el turno',
     someShiftsFailed: 'Algunos turnos no se pudieron guardar',
+
+    // ── Worker Schedule (worker view) ─────────────────────────────────────────
+    wsYourSchedule: 'Tu Horario',
+    wsToday: 'Hoy',
+    wsTomorrow: 'Mañana',
+    wsNoShifts: 'No hay turnos próximos programados.',
+    wsCantMakeIt: 'No puedo asistir',
+    wsUndo: '↩ Deshacer',
 
     // ── Manage Rates ─────────────────────────────────────────────────────────
     ratesWages: 'Salarios',
