@@ -279,7 +279,8 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     URL.revokeObjectURL(url);
   };
 
-  const uncounted = lines.filter(l => l.counted_qty === null || l.counted_qty === undefined).length;
+  const FINAL_LINE_STATUSES = ['accepted', 'reconciled', 'overridden', 'audited'];
+  const uncounted = lines.filter(l => !FINAL_LINE_STATUSES.includes(l.line_status)).length;
   const variantLines = lines.filter(l => {
     if (l.counted_qty === null || l.counted_qty === undefined) return false;
     return parseFloat(l.variance ?? (parseFloat(l.counted_qty) - parseFloat(l.expected_qty))) !== 0;
@@ -674,11 +675,11 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             {(() => {
               const withVariance = reportLines.filter(l => {
                 if (l.counted_qty == null) return false;
-                return parseFloat(l.counted_qty) - parseFloat(l.expected_qty) !== 0;
+                return parseFloat(l.variance ?? (parseFloat(l.counted_qty) - parseFloat(l.expected_qty))) !== 0;
               });
               const noVariance = reportLines.filter(l => {
                 if (l.counted_qty == null) return true;
-                return parseFloat(l.counted_qty) - parseFloat(l.expected_qty) === 0;
+                return parseFloat(l.variance ?? (parseFloat(l.counted_qty) - parseFloat(l.expected_qty))) === 0;
               });
               return (
                 <>
@@ -701,7 +702,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                         {[...withVariance, ...noVariance].map((l, i) => {
                           const expected = parseFloat(l.expected_qty);
                           const counted  = l.counted_qty != null ? parseFloat(l.counted_qty) : null;
-                          const variance = counted != null ? counted - expected : null;
+                          const variance = l.variance != null ? parseFloat(l.variance) : (counted != null ? counted - expected : null);
                           const isVar    = variance !== null && variance !== 0;
                           return (
                             <tr key={l.id} style={{ background: isVar ? '#fff7ed' : (i % 2 === 0 ? '#fafafa' : '#fff') }}>
@@ -743,7 +744,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 <p style={d.modalBody}>{variantLines.length} {t.invCycAdjustments}</p>
                 <ul style={d.modalList}>
                   {variantLines.map(l => {
-                    const v = parseFloat(l.counted_qty) - parseFloat(l.expected_qty);
+                    const v = l.variance != null ? parseFloat(l.variance) : parseFloat(l.counted_qty) - parseFloat(l.expected_qty);
                     return (
                       <li key={l.id} style={d.modalListItem}>
                         {isFull && l.location_name ? `${l.location_name} — ` : ''}{l.item_name}: {v > 0 ? `+${v}` : v} {l.unit}

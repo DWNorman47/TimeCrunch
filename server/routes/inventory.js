@@ -1015,7 +1015,7 @@ router.patch('/cycle-counts/:id', requireAdmin, async (req, res) => {
 });
 
 // PATCH /api/inventory/cycle-counts/:id/lines/:lineId
-router.patch('/cycle-counts/:id/lines/:lineId', requireAuth, async (req, res) => {
+router.patch('/cycle-counts/:id/lines/:lineId', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const { counted_qty, counted_uom_id, notes } = req.body;
   try {
@@ -1122,12 +1122,17 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
         await applyStockDelta(client, companyId, line.item_id, locationId, delta, {}, stockUomId);
       }
 
-      // Mark count complete
-      await client.query(
+      // Atomically claim completion — prevent double-posting if auto-complete fired concurrently
+      const claim = await client.query(
         `UPDATE inventory_cycle_counts SET status='completed', completed_by=$1, completed_at=NOW()
-         WHERE id=$2`,
+         WHERE id=$2 AND status='in_progress'
+         RETURNING id`,
         [req.user.id, req.params.id]
       );
+      if (claim.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'Count was already completed' });
+      }
 
       await client.query('COMMIT');
       res.json({ success: true, adjustments_posted: linesWithVariance.length });
