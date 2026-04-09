@@ -1059,6 +1059,8 @@ router.patch('/cycle-counts/:id/lines/:lineId', requireAdmin, async (req, res) =
         const variance = qtyInStockUom - parseFloat(expected_qty);
         sets.push(`variance=$${idx++}`); vals.push(variance);
       }
+      // Admin direct-entry marks the line accepted so the complete flow and progress bar work correctly
+      sets.push(`line_status='accepted'`);
     }
     if (notes !== undefined) { sets.push(`notes=$${idx++}`); vals.push(notes); }
     if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
