@@ -103,9 +103,16 @@ export default function MyCount() {
             notes: sync.notes || null,
           });
           await removePendingSync(sync.id);
-        } catch {
-          // Leave failed items in queue; they'll retry next sync
-          break;
+        } catch (e) {
+          const status = e.response?.status;
+          if (status && status >= 400 && status < 500) {
+            // 4xx = permanent client error (already submitted, no assignment, etc.)
+            // Remove from queue so it doesn't block subsequent items on every reconnect
+            await removePendingSync(sync.id);
+          } else {
+            // Network error or 5xx — stop and retry next time
+            break;
+          }
         }
       }
     } finally {

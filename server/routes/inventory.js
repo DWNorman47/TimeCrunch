@@ -1105,7 +1105,7 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
       await client.query('BEGIN');
 
       // Post adjust transactions for lines with non-zero variance
-      const linesWithVariance = lines.rows.filter(l => parseFloat(l.variance) !== 0);
+      const linesWithVariance = lines.rows.filter(l => l.variance != null && parseFloat(l.variance) !== 0);
       const isFullCount = cc.rows[0].count_type === 'full';
       for (const line of linesWithVariance) {
         const delta = parseFloat(line.variance); // in stock UOM units
@@ -1189,7 +1189,7 @@ async function checkAutoComplete(companyId, countId, completedById) {
     const typeLabel = { reconcile: 'Reconcile count adjustment', audit: 'Audit count adjustment',
       full: 'Full count adjustment' }[cc.count_type] || 'Cycle count adjustment';
 
-    const linesWithVariance = linesResult.rows.filter(l => parseFloat(l.variance) !== 0);
+    const linesWithVariance = linesResult.rows.filter(l => l.variance != null && parseFloat(l.variance) !== 0);
     for (const line of linesWithVariance) {
       const delta = parseFloat(line.variance);
       const locationId = isFullCount ? line.location_id : cc.location_id;
@@ -1587,7 +1587,7 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
     const updatedLine = await pool.query(
       `SELECT l.*, i.name as item_name FROM inventory_cycle_count_lines l
        JOIN inventory_items i ON l.item_id = i.id WHERE l.id=$1`,
-      [line_id]
+      [lineId]
     );
     res.json({ line: updatedLine.rows[0], auto_completed: autoCompleted });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
@@ -1656,6 +1656,13 @@ router.post('/cycle-counts/:id/reopen', requireAdmin, async (req, res) => {
       [req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Completed count not found' });
+    // Reset all line statuses to pending so re-completion requires intentional re-evaluation
+    // of every line and cannot immediately re-trigger auto-complete (which would double-post
+    // stock adjustment transactions for lines that haven't been changed).
+    await pool.query(
+      `UPDATE inventory_cycle_count_lines SET line_status='pending' WHERE cycle_count_id=$1`,
+      [req.params.id]
+    );
     res.json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
