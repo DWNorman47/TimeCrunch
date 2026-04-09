@@ -1,5 +1,5 @@
 const FEATURE_KEYS = ['feature_scheduling', 'feature_analytics', 'feature_chat', 'feature_prevailing_wage', 'module_field', 'module_timeclock', 'module_projects', 'module_inventory', 'module_analytics', 'feature_project_integration', 'feature_overtime', 'feature_geolocation', 'feature_inactive_alerts', 'feature_overtime_alerts', 'feature_broadcast', 'feature_media_gallery', 'show_worker_wages', 'notification_use_work_hours', 'media_delete_on_project_archive', 'notify_timeoff_requests', 'notify_budget_alerts', 'notify_entry_submitted', 'report_weekly_payroll', 'report_weekly_low_stock', 'report_monthly_valuation'];
-const STRING_KEYS = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id'];
+const STRING_KEYS = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id', 'cycle_count_reconcile_threshold_type'];
 
 // Defaults available to all authenticated users
 const SETTINGS_DEFAULTS = {
@@ -20,6 +20,9 @@ const ADMIN_SETTINGS_DEFAULTS = {
   notification_use_work_hours: true,
   chat_retention_days: 3,
   company_timezone: '',
+  cycle_count_audit_pct: 15,
+  cycle_count_reconcile_threshold: 0,
+  cycle_count_reconcile_threshold_type: 'units',
 };
 
 function applySettingsRows(rows, defaults) {

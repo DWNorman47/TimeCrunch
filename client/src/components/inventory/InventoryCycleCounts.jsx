@@ -50,6 +50,18 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const [lineInputValues, setLineInputValues]     = useState({}); // { [lineId]: string }
   const [itemUomCache, setItemUomCache]           = useState({}); // { [itemId]: [uoms] }
   const [conversionPrompt, setConversionPrompt]   = useState(null); // { lineId, itemId, uom, baseUnit }
+  // Workers + assignments
+  const [workers, setWorkers] = useState(count.workers || []);
+  const [assignments, setAssignments] = useState(count.assignments || []);
+  const [tab, setTab] = useState('lines'); // 'lines' | 'workers'
+  const [allWorkers, setAllWorkers] = useState([]);
+  const [workersLoaded, setWorkersLoaded] = useState(false);
+  const [distributing, setDistributing] = useState(false);
+  const [reopening, setReopening] = useState(false);
+  const [overrideModal, setOverrideModal] = useState(null); // { line }
+  const [overrideQty, setOverrideQty] = useState('');
+  const [overrideNotes, setOverrideNotes] = useState('');
+  const [overriding, setOverriding] = useState(false);
 
   const fetchItemUoms = async (itemId) => {
     if (itemUomCache[itemId]) return;
@@ -57,6 +69,69 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       const r = await api.get(`/inventory/items/${itemId}/uoms`);
       setItemUomCache(prev => ({ ...prev, [itemId]: r.data.filter(u => u.active) }));
     } catch {}
+  };
+
+  const loadAllWorkers = async () => {
+    if (workersLoaded) return;
+    try {
+      const r = await api.get('/admin/workers');
+      setAllWorkers(r.data || []);
+      setWorkersLoaded(true);
+    } catch {}
+  };
+
+  const saveWorker = async (userId, roles) => {
+    try {
+      const r = await api.post(`/inventory/cycle-counts/${count.id}/workers`, { users: [{ user_id: userId, roles }] });
+      setWorkers(r.data);
+    } catch (e) { setSaveError(e.response?.data?.error || 'Failed to save worker'); }
+  };
+
+  const removeWorker = async (userId) => {
+    try {
+      await api.delete(`/inventory/cycle-counts/${count.id}/workers/${userId}`);
+      setWorkers(prev => prev.filter(w => w.user_id !== userId));
+    } catch (e) { setSaveError(e.response?.data?.error || 'Failed to remove worker'); }
+  };
+
+  const distribute = async () => {
+    setDistributing(true);
+    try {
+      const r = await api.post(`/inventory/cycle-counts/${count.id}/distribute`);
+      // Reload assignments
+      const detail = await api.get(`/inventory/cycle-counts/${count.id}`);
+      setAssignments(detail.data.assignments || []);
+      setCountData(detail.data);
+      if (r.data.assigned === 0) setSaveError('No unassigned lines found to distribute.');
+    } catch (e) { setSaveError(e.response?.data?.error || 'Failed to distribute'); }
+    finally { setDistributing(false); }
+  };
+
+  const reopen = async () => {
+    setReopening(true);
+    try {
+      const r = await api.post(`/inventory/cycle-counts/${count.id}/reopen`);
+      setCountData(r.data);
+    } catch (e) { setError(e.response?.data?.error || 'Failed to reopen count'); }
+    finally { setReopening(false); }
+  };
+
+  const submitOverride = async () => {
+    if (!overrideModal) return;
+    setOverriding(true);
+    try {
+      const r = await api.post(`/inventory/cycle-counts/${count.id}/lines/${overrideModal.line.id}/override`, {
+        counted_qty: parseFloat(overrideQty),
+        notes: overrideNotes,
+      });
+      setLines(prev => prev.map(l => l.id === overrideModal.line.id ? { ...l, ...r.data.line } : l));
+      if (r.data.auto_completed) {
+        setCountData(prev => ({ ...prev, status: 'completed' }));
+        setReportLines(lines.map(l => l.id === overrideModal.line.id ? { ...l, ...r.data.line } : l));
+      }
+      setOverrideModal(null); setOverrideQty(''); setOverrideNotes('');
+    } catch (e) { setSaveError(e.response?.data?.error || 'Failed to override'); }
+    finally { setOverriding(false); }
   };
 
   // ── Scan Mode ────────────────────────────────────────────────────────────────
@@ -335,6 +410,20 @@ function CycleCountDetail({ count, onBack, onComplete }) {
           </td>
         )}
         <td style={{ ...d.td, fontSize: 13, color: '#6b7280' }}>{line.counted_by_name || '—'}</td>
+        <td style={d.td}>
+          {line.line_status && line.line_status !== 'pending' && (
+            <span style={{ ...d.lineStatusBadge, ...lineStatusStyle(line.line_status) }}>
+              {line.line_status.replace(/_/g, ' ')}
+            </span>
+          )}
+        </td>
+        {!isCompleted && (
+          <td style={d.td}>
+            <button style={d.overrideBtn} onClick={() => { setOverrideModal({ line }); setOverrideQty(line.counted_qty != null ? String(line.counted_qty) : ''); setOverrideNotes(''); }}>
+              Override
+            </button>
+          </td>
+        )}
       </tr>
     );
   };
@@ -349,6 +438,8 @@ function CycleCountDetail({ count, onBack, onComplete }) {
         <th style={{ ...d.th, textAlign: 'right' }}>{t.invCycColCounted}</th>
         {showExpected && <th style={{ ...d.th, textAlign: 'right' }}>{t.invCycColVariance}</th>}
         <th style={d.th}>{t.invCycColCountedBy}</th>
+        <th style={d.th}>Status</th>
+        {!isCompleted && <th style={d.th} />}
       </tr>
     </thead>
   );
@@ -393,6 +484,11 @@ function CycleCountDetail({ count, onBack, onComplete }) {
               </button>
             </>
           )}
+          {countData.status === 'completed' && (
+            <button style={{ ...d.advanceBtn, background: '#6b7280' }} onClick={reopen} disabled={reopening}>
+              {reopening ? 'Reopening…' : 'Reopen Count'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -400,6 +496,109 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       {statusError && <div style={d.error}>{statusError}</div>}
       {uncountedMsg && <div style={d.warnMsg}>{uncountedMsg}</div>}
       {error && <div style={d.error}>{error}</div>}
+
+      {/* ── Tab Navigation ── */}
+      <div style={d.tabRow}>
+        <button style={{ ...d.tab, ...(tab === 'lines' ? d.tabActive : {}) }} onClick={() => setTab('lines')}>
+          Count Lines ({lines.length})
+        </button>
+        <button style={{ ...d.tab, ...(tab === 'workers' ? d.tabActive : {}) }}
+          onClick={() => { setTab('workers'); loadAllWorkers(); }}>
+          Workers ({workers.length})
+        </button>
+      </div>
+
+      {/* ── Workers Panel ── */}
+      {tab === 'workers' && (
+        <div style={d.workersPanel}>
+          <div style={d.workersPanelHeader}>
+            <strong style={{ fontSize: 14 }}>Assign Workers</strong>
+            {!isCompleted && (
+              <button style={d.distributeBtn} onClick={distribute} disabled={distributing || workers.filter(w => w.roles.includes('counter')).length === 0}>
+                {distributing ? 'Distributing…' : 'Distribute Lines'}
+              </button>
+            )}
+          </div>
+          <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 12px' }}>
+            Select workers and their roles. Click Distribute to auto-assign count lines round-robin by area to counters.
+          </p>
+
+          {/* Existing assigned workers */}
+          {workers.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              {workers.map(w => (
+                <div key={w.user_id} style={d.workerRow}>
+                  <span style={d.workerName}>{w.full_name}</span>
+                  <div style={d.rolesRow}>
+                    {['counter', 'auditor', 'reconciler'].map(role => (
+                      <label key={role} style={d.roleLabel}>
+                        <input type="checkbox" style={{ marginRight: 4 }}
+                          checked={w.roles.includes(role)}
+                          disabled={isCompleted}
+                          onChange={e => {
+                            const newRoles = e.target.checked
+                              ? [...w.roles, role]
+                              : w.roles.filter(r => r !== role);
+                            saveWorker(w.user_id, newRoles);
+                          }}
+                        />
+                        {role.charAt(0).toUpperCase() + role.slice(1)}
+                      </label>
+                    ))}
+                  </div>
+                  {!isCompleted && (
+                    <button style={d.removeWorkerBtn} onClick={() => removeWorker(w.user_id)}>Remove</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add worker from company list */}
+          {!isCompleted && (
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 600, color: '#374151', margin: '0 0 6px' }}>Add Worker:</p>
+              <select style={d.workerSelect}
+                value=""
+                onChange={e => {
+                  const uid = parseInt(e.target.value);
+                  if (!uid) return;
+                  if (workers.find(w => w.user_id === uid)) return;
+                  saveWorker(uid, ['counter']);
+                }}>
+                <option value="">Select worker to add…</option>
+                {allWorkers
+                  .filter(w => !workers.find(x => x.user_id === w.id))
+                  .map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Assignment summary by line */}
+          {assignments.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: '#374151', margin: '0 0 8px' }}>Line Assignments ({assignments.length})</p>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>
+                {(['counter', 'auditor', 'reconciler']).map(role => {
+                  const roleAssignments = assignments.filter(a => a.role === role);
+                  if (roleAssignments.length === 0) return null;
+                  const byWorker = roleAssignments.reduce((acc, a) => {
+                    const key = a.worker_name;
+                    acc[key] = (acc[key] || 0) + 1;
+                    return acc;
+                  }, {});
+                  return (
+                    <div key={role} style={{ marginBottom: 8 }}>
+                      <strong style={{ textTransform: 'capitalize' }}>{role}s:</strong>{' '}
+                      {Object.entries(byWorker).map(([name, cnt]) => `${name} (${cnt})`).join(' · ')}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Scan Panel ── */}
       {scanMode && (
@@ -440,9 +639,9 @@ function CycleCountDetail({ count, onBack, onComplete }) {
         </div>
       )}
 
-      {lines.length === 0 ? (
+      {tab === 'lines' && lines.length === 0 ? (
         <div style={d.empty}>{t.invCycNoItems}</div>
-      ) : isFull ? (
+      ) : tab === 'lines' && isFull ? (
         // Full count: render table grouped by location
         Object.entries(groupedLines).map(([locName, locLines]) => (
           <div key={locName} style={{ marginBottom: 24 }}>
@@ -455,16 +654,16 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             </div>
           </div>
         ))
-      ) : (
+      ) : tab === 'lines' ? (
         <div style={d.tableWrap}>
           <table style={d.table}>
             {renderTableHead(showExpected)}
             <tbody>{lines.map((line, i) => renderLine(line, i))}</tbody>
           </table>
         </div>
-      )}
+      ) : null}
 
-      {uncounted > 0 && countData.status === 'in_progress' && (
+      {tab === 'lines' && uncounted > 0 && countData.status === 'in_progress' && (
         <p style={d.uncountedNote}>{uncounted} {t.invCycItemsNotCounted}</p>
       )}
 
@@ -580,6 +779,38 @@ function CycleCountDetail({ count, onBack, onComplete }) {
           }}
           onDismiss={() => setConversionPrompt(null)}
         />
+      )}
+
+      {/* ── Override Modal ── */}
+      {overrideModal && (
+        <div style={d.modalOverlay}>
+          <div style={d.modal}>
+            <h3 style={d.modalTitle}>Override: {overrideModal.line.item_name}</h3>
+            <p style={d.modalBody}>
+              Expected: {parseFloat(overrideModal.line.expected_qty)} {overrideModal.line.unit}.
+              This manually sets the final counted quantity and accepts the line.
+            </p>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Counted Qty</label>
+              <input type="number" min="0" step="any"
+                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
+                value={overrideQty} onChange={e => setOverrideQty(e.target.value)} />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Notes (optional)</label>
+              <input type="text" maxLength={500}
+                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
+                value={overrideNotes} onChange={e => setOverrideNotes(e.target.value)} />
+            </div>
+            <div style={d.modalActions}>
+              <button style={d.cancelBtn} onClick={() => setOverrideModal(null)}>Cancel</button>
+              <button style={{ ...d.confirmBtn, background: '#7c3aed' }}
+                onClick={submitOverride} disabled={overriding || overrideQty === ''}>
+                {overriding ? 'Saving…' : 'Override'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -784,6 +1015,20 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
   );
 }
 
+function lineStatusStyle(status) {
+  const map = {
+    pending:          { color: '#6b7280', background: '#f3f4f6' },
+    counted:          { color: '#2563eb', background: '#dbeafe' },
+    needs_audit:      { color: '#d97706', background: '#fef3c7' },
+    audited:          { color: '#7c3aed', background: '#ede9fe' },
+    needs_reconcile:  { color: '#dc2626', background: '#fee2e2' },
+    reconciled:       { color: '#059669', background: '#d1fae5' },
+    accepted:         { color: '#059669', background: '#d1fae5' },
+    overridden:       { color: '#6b7280', background: '#e5e7eb' },
+  };
+  return map[status] || { color: '#6b7280', background: '#f3f4f6' };
+}
+
 const d = {
   wrap:          { padding: 16 },
   back:          { background: 'none', border: 'none', color: '#2563eb', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 16, padding: 0 },
@@ -830,6 +1075,23 @@ const d = {
   rtd:           { padding: '8px 10px', fontSize: 13, color: '#374151', borderBottom: '1px solid #f3f4f6' },
   warnMsg:       { color: '#92400e', fontSize: 13, margin: '6px 0 0' },
   inlineError:   { color: '#dc2626', fontSize: 13, margin: '6px 0 0' },
+  // Tabs
+  tabRow:        { display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e5e7eb' },
+  tab:           { padding: '8px 16px', background: 'none', border: 'none', fontSize: 14, fontWeight: 600, color: '#6b7280', cursor: 'pointer', borderBottom: '2px solid transparent', marginBottom: -2 },
+  tabActive:     { color: '#2563eb', borderBottom: '2px solid #2563eb' },
+  // Workers panel
+  workersPanel:  { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginBottom: 16 },
+  workersPanelHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  distributeBtn: { padding: '7px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  workerRow:     { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #e5e7eb', flexWrap: 'wrap' },
+  workerName:    { fontSize: 14, fontWeight: 600, color: '#111827', flex: 1, minWidth: 120 },
+  rolesRow:      { display: 'flex', gap: 12, flexWrap: 'wrap' },
+  roleLabel:     { fontSize: 13, color: '#374151', display: 'flex', alignItems: 'center', cursor: 'pointer' },
+  removeWorkerBtn: { padding: '3px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', fontSize: 12, color: '#dc2626', cursor: 'pointer' },
+  workerSelect:  { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151', width: '100%' },
+  // Line status
+  lineStatusBadge: { padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' },
+  overrideBtn:   { padding: '3px 8px', borderRadius: 6, border: '1px solid #7c3aed', background: '#fff', color: '#7c3aed', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
 };
 
 const s = {

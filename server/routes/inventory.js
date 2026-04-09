@@ -6,6 +6,7 @@ const { checkStorageLimit, incrementStorage } = require('../storage');
 const { sendPushToCompanyAdmins } = require('../push');
 const { createInboxItemBatch } = require('./inbox');
 const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
+const { applySettingsRows, ADMIN_SETTINGS_DEFAULTS } = require('../settingsDefaults');
 
 // GET /api/inventory/units — active units for this company
 router.get('/units', requireAuth, async (req, res) => {
@@ -912,6 +913,37 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// GET /api/inventory/cycle-counts/my-assignments — worker's pending assignments across all active counts
+router.get('/cycle-counts/my-assignments', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT a.id as assignment_id, a.line_id, a.role, a.status as assignment_status,
+              a.counted_qty, a.counted_uom_id, a.notes as assignment_notes, a.submitted_at,
+              l.item_id, l.expected_qty, l.line_status, l.stock_uom_id,
+              l.location_id as line_location_id,
+              l.reconcile_threshold, l.reconcile_threshold_type,
+              i.name as item_name, i.sku, i.unit,
+              su.unit as stock_uom_unit, su.factor as stock_uom_factor,
+              loc.name as location_name,
+              cc.id as count_id, cc.count_type, cc.status as count_status, cc.location_id,
+              ccl.name as count_location_name
+       FROM inventory_count_assignments a
+       JOIN inventory_cycle_count_lines l ON a.line_id = l.id
+       JOIN inventory_cycle_counts cc ON a.cycle_count_id = cc.id
+       JOIN inventory_items i ON l.item_id = i.id
+       LEFT JOIN inventory_locations loc ON l.location_id = loc.id
+       LEFT JOIN inventory_locations ccl ON cc.location_id = ccl.id
+       LEFT JOIN inventory_item_uoms su ON l.stock_uom_id = su.id
+       WHERE a.user_id = $1 AND cc.company_id = $2
+         AND cc.status = 'in_progress'
+       ORDER BY cc.id, loc.name NULLS LAST, i.name`,
+      [req.user.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // GET /api/inventory/cycle-counts/:id
 router.get('/cycle-counts/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
@@ -928,17 +960,34 @@ router.get('/cycle-counts/:id', requireAdmin, async (req, res) => {
       [req.params.id, companyId]
     );
     if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
-    const lines = await pool.query(
-      `SELECT l.*, i.name as item_name, i.unit, i.sku, u.full_name as counted_by_name,
-              loc.name as location_name
-       FROM inventory_cycle_count_lines l
-       JOIN inventory_items i ON l.item_id = i.id
-       LEFT JOIN users u ON l.counted_by = u.id
-       LEFT JOIN inventory_locations loc ON l.location_id = loc.id
-       WHERE l.cycle_count_id = $1 ORDER BY loc.name NULLS FIRST, i.name`,
-      [req.params.id]
-    );
-    res.json({ ...cc.rows[0], lines: lines.rows });
+    const [lines, workers, assignments] = await Promise.all([
+      pool.query(
+        `SELECT l.*, i.name as item_name, i.unit, i.sku, u.full_name as counted_by_name,
+                loc.name as location_name,
+                su.unit as stock_uom_unit, su.factor as stock_uom_factor,
+                cu.unit as counted_uom_unit
+         FROM inventory_cycle_count_lines l
+         JOIN inventory_items i ON l.item_id = i.id
+         LEFT JOIN users u ON l.counted_by = u.id
+         LEFT JOIN inventory_locations loc ON l.location_id = loc.id
+         LEFT JOIN inventory_item_uoms su ON l.stock_uom_id = su.id
+         LEFT JOIN inventory_item_uoms cu ON l.counted_uom_id = cu.id
+         WHERE l.cycle_count_id = $1 ORDER BY loc.name NULLS FIRST, i.name`,
+        [req.params.id]
+      ),
+      pool.query(
+        `SELECT cw.user_id, cw.roles, u.full_name FROM inventory_count_workers cw
+         JOIN users u ON cw.user_id = u.id WHERE cw.cycle_count_id=$1 ORDER BY u.full_name`,
+        [req.params.id]
+      ),
+      pool.query(
+        `SELECT a.line_id, a.role, a.user_id, a.status as assignment_status, u.full_name as worker_name
+         FROM inventory_count_assignments a JOIN users u ON a.user_id = u.id
+         WHERE a.cycle_count_id=$1`,
+        [req.params.id]
+      ),
+    ]);
+    res.json({ ...cc.rows[0], lines: lines.rows, workers: workers.rows, assignments: assignments.rows });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -1086,6 +1135,493 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
     } finally {
       client.release();
     }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Cycle Count Worker Assignments ────────────────────────────────────────────
+
+// Helper: check if all lines are in a final state and auto-complete the count
+async function checkAutoComplete(companyId, countId, completedById) {
+  const pending = await pool.query(
+    `SELECT COUNT(*) FROM inventory_cycle_count_lines
+     WHERE cycle_count_id = $1
+       AND line_status NOT IN ('accepted','reconciled','overridden')`,
+    [countId]
+  );
+  if (parseInt(pending.rows[0].count) > 0) return false;
+
+  // All lines final — post adjustment transactions and complete
+  const lines = await pool.query(
+    'SELECT * FROM inventory_cycle_count_lines WHERE cycle_count_id = $1',
+    [countId]
+  );
+  const cc = await pool.query(
+    'SELECT * FROM inventory_cycle_counts WHERE id = $1 AND company_id = $2',
+    [countId, companyId]
+  );
+  if (cc.rowCount === 0 || cc.rows[0].status === 'completed') return false;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const linesWithVariance = lines.rows.filter(l => parseFloat(l.variance) !== 0);
+    const isFullCount = cc.rows[0].count_type === 'full';
+    const typeLabel = { reconcile: 'Reconcile count adjustment', audit: 'Audit count adjustment',
+      full: 'Full count adjustment' }[cc.rows[0].count_type] || 'Cycle count adjustment';
+    for (const line of linesWithVariance) {
+      const delta = parseFloat(line.variance);
+      const locationId = isFullCount ? line.location_id : cc.rows[0].location_id;
+      await client.query(
+        `INSERT INTO inventory_transactions
+         (company_id, type, item_id, quantity, to_location_id, performed_by, notes, uom_id)
+         VALUES ($1,'adjust',$2,$3,$4,$5,$6,$7)`,
+        [companyId, line.item_id, Math.abs(delta), locationId, completedById, typeLabel, line.stock_uom_id || null]
+      );
+      await applyStockDelta(client, companyId, line.item_id, locationId, delta, {}, line.stock_uom_id || null);
+    }
+    await client.query(
+      `UPDATE inventory_cycle_counts SET status='completed', completed_by=$1, completed_at=NOW() WHERE id=$2`,
+      [completedById, countId]
+    );
+    await client.query('COMMIT');
+    return true;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// GET /api/inventory/cycle-counts/:id/workers
+router.get('/cycle-counts/:id/workers', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const cc = await pool.query(
+      'SELECT id FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    const result = await pool.query(
+      `SELECT cw.id, cw.user_id, cw.roles, cw.assigned_at,
+              u.full_name, u.role as user_role
+       FROM inventory_count_workers cw
+       JOIN users u ON cw.user_id = u.id
+       WHERE cw.cycle_count_id = $1 ORDER BY u.full_name`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/cycle-counts/:id/workers — upsert worker roles
+// Body: { users: [{ user_id, roles: ['counter','auditor','reconciler'] }] }
+router.post('/cycle-counts/:id/workers', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { users } = req.body;
+  const VALID_ROLES = ['counter', 'auditor', 'reconciler'];
+  if (!Array.isArray(users) || users.length === 0) return res.status(400).json({ error: 'users array required' });
+  try {
+    const cc = await pool.query(
+      'SELECT id, status FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    if (cc.rows[0].status === 'completed') return res.status(409).json({ error: 'Cannot modify a completed count' });
+
+    for (const w of users) {
+      const userId = parseInt(w.user_id);
+      if (!userId) continue;
+      const roles = Array.isArray(w.roles) ? w.roles.filter(r => VALID_ROLES.includes(r)) : [];
+      // Verify worker belongs to company
+      const workerCheck = await pool.query('SELECT id FROM users WHERE id=$1 AND company_id=$2', [userId, companyId]);
+      if (workerCheck.rowCount === 0) continue;
+      await pool.query(
+        `INSERT INTO inventory_count_workers (cycle_count_id, user_id, roles)
+         VALUES ($1,$2,$3)
+         ON CONFLICT (cycle_count_id, user_id) DO UPDATE SET roles = $3`,
+        [req.params.id, userId, roles]
+      );
+    }
+    // Return updated worker list
+    const result = await pool.query(
+      `SELECT cw.id, cw.user_id, cw.roles, cw.assigned_at, u.full_name, u.role as user_role
+       FROM inventory_count_workers cw JOIN users u ON cw.user_id = u.id
+       WHERE cw.cycle_count_id = $1 ORDER BY u.full_name`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /api/inventory/cycle-counts/:id/workers/:userId
+router.delete('/cycle-counts/:id/workers/:userId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const cc = await pool.query(
+      'SELECT id, status FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    if (cc.rows[0].status === 'completed') return res.status(409).json({ error: 'Cannot modify a completed count' });
+    await pool.query(
+      'DELETE FROM inventory_count_workers WHERE cycle_count_id=$1 AND user_id=$2',
+      [req.params.id, req.params.userId]
+    );
+    res.json({ removed: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/cycle-counts/:id/distribute — round-robin assign lines to counters by location group
+router.post('/cycle-counts/:id/distribute', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const cc = await pool.query(
+      'SELECT * FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    if (cc.rows[0].status === 'completed') return res.status(409).json({ error: 'Count is already completed' });
+
+    // Get counters for this count
+    const countersResult = await pool.query(
+      `SELECT user_id FROM inventory_count_workers
+       WHERE cycle_count_id=$1 AND 'counter' = ANY(roles)
+       ORDER BY user_id`,
+      [req.params.id]
+    );
+    if (countersResult.rowCount === 0) return res.status(400).json({ error: 'No counters assigned to this count' });
+    const counters = countersResult.rows.map(r => r.user_id);
+
+    // Get unassigned (no counter assignment) lines, grouped by location
+    const lines = await pool.query(
+      `SELECT l.id, l.location_id, loc.name as location_name
+       FROM inventory_cycle_count_lines l
+       LEFT JOIN inventory_locations loc ON l.location_id = loc.id
+       LEFT JOIN inventory_count_assignments a ON a.line_id = l.id AND a.role = 'counter'
+       WHERE l.cycle_count_id = $1 AND a.id IS NULL
+       ORDER BY loc.name NULLS FIRST, l.id`,
+      [req.params.id]
+    );
+
+    if (lines.rowCount === 0) return res.json({ assigned: 0 });
+
+    // Group lines by location name (or null for locationless)
+    const groups = {};
+    for (const line of lines.rows) {
+      const key = line.location_name || '__none__';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(line.id);
+    }
+
+    // Round-robin: assign each location group to next counter
+    let counterIdx = 0;
+    let assigned = 0;
+    for (const locationGroup of Object.values(groups)) {
+      const userId = counters[counterIdx % counters.length];
+      counterIdx++;
+      for (const lineId of locationGroup) {
+        await pool.query(
+          `INSERT INTO inventory_count_assignments (line_id, cycle_count_id, user_id, role)
+           VALUES ($1,$2,$3,'counter')
+           ON CONFLICT (line_id, role) DO UPDATE SET user_id = $3`,
+          [lineId, req.params.id, userId]
+        );
+        assigned++;
+      }
+    }
+
+    // Auto-advance to in_progress if still draft
+    if (cc.rows[0].status === 'draft') {
+      await pool.query(
+        `UPDATE inventory_cycle_counts SET status='in_progress' WHERE id=$1`,
+        [req.params.id]
+      );
+    }
+
+    res.json({ assigned });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// PATCH /api/inventory/cycle-counts/:id/workers/:userId/lines — reassign specific lines to a different counter
+// Body: { line_ids: [id, ...], user_id: newUserId }
+router.patch('/cycle-counts/:id/workers/:userId/lines', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { line_ids, user_id: newUserId } = req.body;
+  if (!Array.isArray(line_ids) || line_ids.length === 0) return res.status(400).json({ error: 'line_ids array required' });
+  if (!newUserId) return res.status(400).json({ error: 'user_id required' });
+  try {
+    const cc = await pool.query(
+      'SELECT id FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    // Verify new user is a counter for this count
+    const counterCheck = await pool.query(
+      `SELECT id FROM inventory_count_workers WHERE cycle_count_id=$1 AND user_id=$2 AND 'counter' = ANY(roles)`,
+      [req.params.id, newUserId]
+    );
+    if (counterCheck.rowCount === 0) return res.status(400).json({ error: 'Target worker is not a counter for this count' });
+
+    for (const lineId of line_ids) {
+      await pool.query(
+        `UPDATE inventory_count_assignments SET user_id=$1
+         WHERE line_id=$2 AND cycle_count_id=$3 AND role='counter' AND status='pending'`,
+        [newUserId, lineId, req.params.id]
+      );
+    }
+    res.json({ reassigned: line_ids.length });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/cycle-counts/:id/submit — worker submits a count, audit, or reconcile
+// Body: { line_id, role, counted_qty, counted_uom_id, notes }
+router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { line_id, role, counted_qty, counted_uom_id, notes } = req.body;
+  const VALID_ROLES = ['counter', 'auditor', 'reconciler'];
+  if (!line_id) return res.status(400).json({ error: 'line_id required' });
+  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'role must be counter, auditor, or reconciler' });
+  const qty = parseFloat(counted_qty);
+  if (isNaN(qty) || qty < 0) return res.status(400).json({ error: 'counted_qty must be a non-negative number' });
+  const notesTrimmed = notes?.trim()?.slice(0, 500) || null;
+
+  try {
+    // Verify count belongs to company and is active
+    const cc = await pool.query(
+      'SELECT * FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    if (cc.rows[0].status !== 'in_progress') return res.status(409).json({ error: 'Count is not in progress' });
+
+    // Verify assignment exists for this worker/line/role
+    const assignment = await pool.query(
+      `SELECT a.* FROM inventory_count_assignments a
+       WHERE a.line_id=$1 AND a.cycle_count_id=$2 AND a.user_id=$3 AND a.role=$4`,
+      [line_id, req.params.id, req.user.id, role]
+    );
+    if (assignment.rowCount === 0) return res.status(403).json({ error: 'No assignment found for this line/role' });
+    if (assignment.rows[0].status === 'submitted') return res.status(409).json({ error: 'Already submitted' });
+
+    // Fetch line for UOM variance computation
+    const lineRow = await pool.query(
+      `SELECT l.*, i.name as item_name
+       FROM inventory_cycle_count_lines l
+       JOIN inventory_items i ON l.item_id = i.id
+       WHERE l.id=$1 AND l.cycle_count_id=$2`,
+      [line_id, req.params.id]
+    );
+    if (lineRow.rowCount === 0) return res.status(404).json({ error: 'Line not found' });
+    const line = lineRow.rows[0];
+
+    // Compute variance in stock UOM units
+    const resolvedCountedUomId = counted_uom_id != null ? parseInt(counted_uom_id) : null;
+    let variance = qty - parseFloat(line.expected_qty);
+    if (resolvedCountedUomId && resolvedCountedUomId !== line.stock_uom_id) {
+      const uomRow = await pool.query(
+        `SELECT cu.factor as counted_factor, su.factor as stock_factor
+         FROM inventory_item_uoms cu, inventory_item_uoms su
+         WHERE cu.id=$1 AND su.id=$2`,
+        [resolvedCountedUomId, line.stock_uom_id]
+      );
+      if (uomRow.rowCount > 0) {
+        const { counted_factor, stock_factor } = uomRow.rows[0];
+        const qtyInStockUom = qty * (parseFloat(counted_factor) / parseFloat(stock_factor));
+        variance = qtyInStockUom - parseFloat(line.expected_qty);
+      }
+    }
+
+    // Mark assignment submitted
+    await pool.query(
+      `UPDATE inventory_count_assignments
+       SET status='submitted', counted_qty=$1, counted_uom_id=$2, notes=$3, submitted_at=NOW()
+       WHERE id=$4`,
+      [qty, resolvedCountedUomId, notesTrimmed, assignment.rows[0].id]
+    );
+
+    // Update line counted values and status
+    let newLineStatus = line.line_status;
+    const settingsRows = await pool.query('SELECT key, value FROM settings WHERE company_id=$1', [companyId]);
+    const settings = applySettingsRows(settingsRows.rows, ADMIN_SETTINGS_DEFAULTS);
+
+    if (role === 'counter') {
+      // Update the line's counted values
+      await pool.query(
+        `UPDATE inventory_cycle_count_lines
+         SET counted_qty=$1, counted_uom_id=$2, counted_by=$3, counted_at=NOW(), variance=$4
+         WHERE id=$5`,
+        [qty, resolvedCountedUomId, req.user.id, variance, line_id]
+      );
+
+      // Decide: sample for audit?
+      const auditPct = parseFloat(settings.cycle_count_audit_pct) || 15;
+      const shouldAudit = Math.random() * 100 < auditPct;
+
+      if (shouldAudit) {
+        // Find an auditor for this count who is not the counter (prefer different location)
+        const auditors = await pool.query(
+          `SELECT user_id FROM inventory_count_workers
+           WHERE cycle_count_id=$1 AND 'auditor' = ANY(roles) AND user_id != $2
+           ORDER BY RANDOM() LIMIT 1`,
+          [req.params.id, req.user.id]
+        );
+        if (auditors.rowCount > 0) {
+          const auditorId = auditors.rows[0].user_id;
+          await pool.query(
+            `INSERT INTO inventory_count_assignments (line_id, cycle_count_id, user_id, role)
+             VALUES ($1,$2,$3,'auditor')
+             ON CONFLICT (line_id, role) DO UPDATE SET user_id=$3, status='pending', submitted_at=NULL`,
+            [line_id, req.params.id, auditorId]
+          );
+          newLineStatus = 'needs_audit';
+        } else {
+          newLineStatus = 'accepted'; // No auditor available — accept directly
+        }
+      } else {
+        newLineStatus = 'accepted';
+      }
+
+    } else if (role === 'auditor') {
+      // Check if variance exceeds reconcile threshold
+      const threshold = parseFloat(line.reconcile_threshold ?? settings.cycle_count_reconcile_threshold) || 0;
+      const thresholdType = line.reconcile_threshold_type || settings.cycle_count_reconcile_threshold_type || 'units';
+      let exceeds = false;
+      if (threshold > 0) {
+        const absVariance = Math.abs(variance);
+        if (thresholdType === 'pct') {
+          const pct = parseFloat(line.expected_qty) !== 0
+            ? (absVariance / Math.abs(parseFloat(line.expected_qty))) * 100 : 0;
+          exceeds = pct > threshold;
+        } else {
+          exceeds = absVariance > threshold;
+        }
+      }
+
+      if (exceeds) {
+        // Find a reconciler who is not the counter or auditor of this line
+        const counterAssignment = await pool.query(
+          `SELECT user_id FROM inventory_count_assignments WHERE line_id=$1 AND role='counter'`,
+          [line_id]
+        );
+        const counterUserId = counterAssignment.rows[0]?.user_id;
+        const reconcilers = await pool.query(
+          `SELECT user_id FROM inventory_count_workers
+           WHERE cycle_count_id=$1 AND 'reconciler' = ANY(roles)
+             AND user_id != $2 AND user_id != $3
+           ORDER BY RANDOM() LIMIT 1`,
+          [req.params.id, req.user.id, counterUserId || 0]
+        );
+        if (reconcilers.rowCount > 0) {
+          await pool.query(
+            `INSERT INTO inventory_count_assignments (line_id, cycle_count_id, user_id, role)
+             VALUES ($1,$2,$3,'reconciler')
+             ON CONFLICT (line_id, role) DO UPDATE SET user_id=$3, status='pending', submitted_at=NULL`,
+            [line_id, req.params.id, reconcilers.rows[0].user_id]
+          );
+          newLineStatus = 'needs_reconcile';
+        } else {
+          newLineStatus = 'audited'; // No reconciler available — accept as audited
+        }
+      } else {
+        newLineStatus = 'accepted';
+      }
+
+    } else if (role === 'reconciler') {
+      // Update variance with reconciler's count
+      await pool.query(
+        `UPDATE inventory_cycle_count_lines
+         SET counted_qty=$1, counted_uom_id=$2, variance=$3
+         WHERE id=$4`,
+        [qty, resolvedCountedUomId, variance, line_id]
+      );
+      newLineStatus = 'reconciled';
+    }
+
+    await pool.query(
+      `UPDATE inventory_cycle_count_lines SET line_status=$1 WHERE id=$2`,
+      [newLineStatus, line_id]
+    );
+
+    // Check for auto-complete
+    let autoCompleted = false;
+    if (['accepted', 'reconciled', 'overridden'].includes(newLineStatus)) {
+      autoCompleted = await checkAutoComplete(companyId, parseInt(req.params.id), req.user.id);
+    }
+
+    const updatedLine = await pool.query(
+      `SELECT l.*, i.name as item_name FROM inventory_cycle_count_lines l
+       JOIN inventory_items i ON l.item_id = i.id WHERE l.id=$1`,
+      [line_id]
+    );
+    res.json({ line: updatedLine.rows[0], auto_completed: autoCompleted });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/cycle-counts/:id/lines/:lineId/override — admin override a line's final value
+router.post('/cycle-counts/:id/lines/:lineId/override', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { counted_qty, counted_uom_id, notes } = req.body;
+  const qty = parseFloat(counted_qty);
+  if (isNaN(qty) || qty < 0) return res.status(400).json({ error: 'counted_qty must be a non-negative number' });
+  const notesTrimmed = notes?.trim()?.slice(0, 500) || null;
+  try {
+    const cc = await pool.query(
+      'SELECT * FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    if (cc.rows[0].status === 'completed' && !req.body.force) return res.status(409).json({ error: 'Count is completed. Use reopen first.' });
+
+    const lineRow = await pool.query(
+      'SELECT * FROM inventory_cycle_count_lines WHERE id=$1 AND cycle_count_id=$2',
+      [req.params.lineId, req.params.id]
+    );
+    if (lineRow.rowCount === 0) return res.status(404).json({ error: 'Line not found' });
+    const line = lineRow.rows[0];
+
+    const resolvedUomId = counted_uom_id != null ? parseInt(counted_uom_id) : line.stock_uom_id;
+    let variance = qty - parseFloat(line.expected_qty);
+    if (resolvedUomId && resolvedUomId !== line.stock_uom_id) {
+      const uomRow = await pool.query(
+        `SELECT cu.factor as cf, su.factor as sf FROM inventory_item_uoms cu, inventory_item_uoms su
+         WHERE cu.id=$1 AND su.id=$2`,
+        [resolvedUomId, line.stock_uom_id]
+      );
+      if (uomRow.rowCount > 0) {
+        variance = qty * (parseFloat(uomRow.rows[0].cf) / parseFloat(uomRow.rows[0].sf)) - parseFloat(line.expected_qty);
+      }
+    }
+
+    await pool.query(
+      `UPDATE inventory_cycle_count_lines
+       SET counted_qty=$1, counted_uom_id=$2, variance=$3, notes=$4,
+           counted_by=$5, counted_at=NOW(), line_status='overridden'
+       WHERE id=$6`,
+      [qty, resolvedUomId, variance, notesTrimmed, req.user.id, req.params.lineId]
+    );
+
+    const autoCompleted = await checkAutoComplete(companyId, parseInt(req.params.id), req.user.id);
+    const updatedLine = await pool.query(
+      'SELECT * FROM inventory_cycle_count_lines WHERE id=$1', [req.params.lineId]
+    );
+    res.json({ line: updatedLine.rows[0], auto_completed: autoCompleted });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/cycle-counts/:id/reopen — admin reopens a completed count
+router.post('/cycle-counts/:id/reopen', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `UPDATE inventory_cycle_counts
+       SET status='in_progress', completed_by=NULL, completed_at=NULL
+       WHERE id=$1 AND company_id=$2 AND status='completed'
+       RETURNING *`,
+      [req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Completed count not found' });
+    res.json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

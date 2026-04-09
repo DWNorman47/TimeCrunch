@@ -96,6 +96,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     company_timezone: settings?.company_timezone ?? '',
     invoice_signature: settings?.invoice_signature ?? 'optional',
     default_temp_password: settings?.default_temp_password ?? '',
+    cycle_count_audit_pct: String(settings?.cycle_count_audit_pct ?? 15),
+    cycle_count_reconcile_threshold: String(settings?.cycle_count_reconcile_threshold ?? 0),
+    cycle_count_reconcile_threshold_type: settings?.cycle_count_reconcile_threshold_type ?? 'units',
     media_retention_days: String(settings?.media_retention_days ?? 0),
     media_delete_on_project_archive: settings?.media_delete_on_project_archive ?? false,
     notify_timeoff_requests: settings?.notify_timeoff_requests ?? true,
@@ -161,6 +164,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       company_timezone: settings.company_timezone ?? '',
       invoice_signature: settings.invoice_signature ?? 'optional',
       default_temp_password: settings.default_temp_password ?? '',
+      cycle_count_audit_pct: String(settings.cycle_count_audit_pct ?? 15),
+      cycle_count_reconcile_threshold: String(settings.cycle_count_reconcile_threshold ?? 0),
+      cycle_count_reconcile_threshold_type: settings.cycle_count_reconcile_threshold_type ?? 'units',
       media_retention_days: String(settings.media_retention_days ?? 0),
       media_delete_on_project_archive: settings.media_delete_on_project_archive ?? false,
       notify_timeoff_requests: settings.notify_timeoff_requests ?? true,
@@ -209,6 +215,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         company_timezone: form.company_timezone,
         invoice_signature: form.invoice_signature,
         default_temp_password: form.default_temp_password,
+        cycle_count_audit_pct: parseFloat(form.cycle_count_audit_pct) || 15,
+        cycle_count_reconcile_threshold: parseFloat(form.cycle_count_reconcile_threshold) || 0,
+        cycle_count_reconcile_threshold_type: form.cycle_count_reconcile_threshold_type,
         media_retention_days: parseFloat(form.media_retention_days) || 0,
         media_delete_on_project_archive: form.media_delete_on_project_archive,
         notify_timeoff_requests: form.notify_timeoff_requests,
@@ -604,6 +613,36 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={{ ...styles.toggleKnob, transform: form.module_inventory ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
+          {form.module_inventory && (
+            <>
+              <div style={styles.row}>
+                <div>
+                  <div style={styles.label}>Cycle Count — Audit %</div>
+                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Percentage of counted items randomly selected for audit (0–100)</div>
+                </div>
+                <input style={{ ...styles.input, width: 70 }} type="number" min="0" max="100" step="1"
+                  value={form.cycle_count_audit_pct}
+                  onChange={e => set('cycle_count_audit_pct', e.target.value)} />
+              </div>
+              <div style={styles.row}>
+                <div>
+                  <div style={styles.label}>Cycle Count — Reconcile Threshold</div>
+                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Variance that triggers reconciliation (0 = never)</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input style={{ ...styles.input, width: 80 }} type="number" min="0" step="any"
+                    value={form.cycle_count_reconcile_threshold}
+                    onChange={e => set('cycle_count_reconcile_threshold', e.target.value)} />
+                  <select style={{ ...styles.input, width: 90 }}
+                    value={form.cycle_count_reconcile_threshold_type}
+                    onChange={e => set('cycle_count_reconcile_threshold_type', e.target.value)}>
+                    <option value="units">units</option>
+                    <option value="pct">%</option>
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Analytics</div>

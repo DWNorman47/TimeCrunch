@@ -23,6 +23,7 @@ import SignatureModal from '../components/SignatureModal';
 import TimeOffTab from '../components/TimeOffTab';
 import WorkerSchedule from '../components/WorkerSchedule';
 import ReimbursementsView from '../components/ReimbursementsView';
+import MyCount from '../components/MyCount';
 
 const isPwa = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
@@ -38,7 +39,7 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
-  const TABS = ['clock', 'messages', 'timesheet', 'timeoff', 'schedule', 'reimbursements', 'account'];
+  const TABS = ['clock', 'messages', 'timesheet', 'timeoff', 'schedule', 'reimbursements', 'mycount', 'account'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'clock');
   const [entryView, setEntryView] = useState('list');
@@ -377,6 +378,7 @@ ${signatureDataUrl ? `
           <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); window.location.hash = 'timeoff'; }}>🏖 Time Off</button>
           {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); window.location.hash = 'schedule'; }}>📅 Schedule</button>}
           <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); window.location.hash = 'reimbursements'; }}>💳 Expenses</button>
+          {settings?.module_inventory !== false && <button style={tab === 'mycount' ? styles.tabActive : styles.tab} onClick={() => { setTab('mycount'); window.location.hash = 'mycount'; }}>📦 My Count</button>}
           <button style={tab === 'account' ? styles.tabActive : styles.tab} onClick={() => { setTab('account'); window.location.hash = 'account'; }}>👤 Account</button>
         </div>
 
@@ -419,6 +421,8 @@ ${signatureDataUrl ? `
         {tab === 'schedule' && <WorkerSchedule />}
 
         {tab === 'reimbursements' && <ReimbursementsView />}
+
+        {tab === 'mycount' && <MyCount />}
 
         {tab === 'account' && (
           <>
