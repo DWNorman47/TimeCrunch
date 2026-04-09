@@ -1608,7 +1608,7 @@ router.post('/cycle-counts/:id/lines/:lineId/override', requireAdmin, async (req
       [req.params.id, companyId]
     );
     if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
-    if (cc.rows[0].status === 'completed' && !req.body.force) return res.status(409).json({ error: 'Count is completed. Use reopen first.' });
+    if (cc.rows[0].status === 'completed') return res.status(409).json({ error: 'Count is completed. Use reopen first.' });
 
     const lineRow = await pool.query(
       'SELECT * FROM inventory_cycle_count_lines WHERE id=$1 AND cycle_count_id=$2',
@@ -1663,6 +1663,14 @@ router.post('/cycle-counts/:id/reopen', requireAdmin, async (req, res) => {
     // stock adjustment transactions for lines that haven't been changed).
     await pool.query(
       `UPDATE inventory_cycle_count_lines SET line_status='pending' WHERE cycle_count_id=$1`,
+      [req.params.id]
+    );
+    // Delete all assignments so the count can be redistributed fresh.
+    // Leaving submitted assignments in place blocks distribution (UNIQUE on line_id+role
+    // prevents new assignments) and hides lines from My Count (my-assignments filters
+    // out submitted). Admin must redistribute after reopen.
+    await pool.query(
+      `DELETE FROM inventory_count_assignments WHERE cycle_count_id=$1`,
       [req.params.id]
     );
     res.json(result.rows[0]);

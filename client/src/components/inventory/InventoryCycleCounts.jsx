@@ -259,7 +259,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     const rows = reportData.map(l => {
       const expected = parseFloat(l.expected_qty);
       const counted  = l.counted_qty != null ? parseFloat(l.counted_qty) : '';
-      const variance = counted !== '' ? counted - expected : '';
+      const variance = l.variance != null ? l.variance : (counted !== '' ? counted - expected : '');
       return [
         `"${l.item_name.replace(/"/g, '""')}"`,
         l.sku || '',
