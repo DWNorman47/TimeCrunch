@@ -86,15 +86,16 @@ router.post('/', requireAuth, async (req, res) => {
       try {
         uploaded = await Promise.all(
           photos.map(p => {
+            const caption = p.caption?.trim()?.slice(0, 500) || null;
             if (p.url?.startsWith('data:')) {
               return uploadBase64(p.url).then(({ url, sizeBytes }) => ({
                 url,
                 sizeBytes,
-                caption: p.caption || null,
+                caption,
                 media_type: p.media_type || 'photo',
               }));
             }
-            return Promise.resolve({ url: p.url, sizeBytes: 0, caption: p.caption || null, media_type: p.media_type || 'photo' });
+            return Promise.resolve({ url: p.url, sizeBytes: 0, caption, media_type: p.media_type || 'photo' });
           })
         );
       } catch (uploadErr) {

@@ -41,6 +41,7 @@ const { validCoords } = require('../utils/geoUtils');
 router.post('/in', requireAuth, clockLimiter, async (req, res) => {
   const { project_id, lat, lng, local_work_date, timezone, location_denied, clock_in_time } = req.body;
   const notes = req.body.notes?.trim() || null;
+  if (notes && notes.length > 500) return res.status(400).json({ error: 'notes too long (max 500 characters)' });
   if ((lat != null || lng != null) && !validCoords(lat, lng)) {
     return res.status(400).json({ error: 'Invalid coordinates' });
   }

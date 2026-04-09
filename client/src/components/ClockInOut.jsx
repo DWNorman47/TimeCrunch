@@ -425,6 +425,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
             placeholder={t.notesPlaceholder}
             value={notes}
             onChange={e => setNotes(e.target.value)}
+            maxLength={500}
           />
         </div>
         {projectHasGeofence && (
@@ -459,6 +460,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
                       placeholder={t.notesPlaceholder}
                       value={checklistAnswers[i] || ''}
                       onChange={e => setChecklistAnswers(a => ({ ...a, [i]: e.target.value }))}
+                      maxLength={500}
                     />
                   </>
                 ) : (
