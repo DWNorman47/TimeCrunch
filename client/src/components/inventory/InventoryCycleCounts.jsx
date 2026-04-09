@@ -38,6 +38,16 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const t = useT();
   const COUNT_TYPES = useCountTypes(t);
   const STATUS_COLORS = useStatusColors(t);
+  const ROLE_LABELS = {
+    counter:    t.invCycRoleCounter,
+    auditor:    t.invCycRoleAuditor,
+    reconciler: t.invCycRoleReconciler,
+  };
+  const ROLE_LABELS_PLURAL = {
+    counter:    t.invCycRoleCounters,
+    auditor:    t.invCycRoleAuditors,
+    reconciler: t.invCycRoleReconcilers,
+  };
   const [lines, setLines] = useState(count.lines || []);
   const [countData, setCountData] = useState(count);
   const [saving, setSaving] = useState(null);
@@ -102,7 +112,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       const detail = await api.get(`/inventory/cycle-counts/${count.id}`);
       setAssignments(detail.data.assignments || []);
       setCountData(detail.data);
-      if (r.data.assigned === 0) setSaveError('No unassigned lines found to distribute.');
+      if (r.data.assigned === 0) setSaveError(t.invCycNoLinesDistribute);
     } catch (e) { setSaveError(e.response?.data?.error || t.invCycFailedDistribute); }
     finally { setDistributing(false); }
   };
@@ -191,7 +201,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     if (bin) {
       setCurrentBin(bin);
       setHighlightedId(null);
-      showFeedback(`Bin set: ${bin.name}`);
+      showFeedback(`${t.invCycBinSetFeedback} ${bin.name}`);
       return;
     }
 
@@ -201,9 +211,9 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       const match = lines.find(l => l.item_id === itemQR.id);
       if (match) {
         setHighlightedId(match.id);
-        showFeedback(`Found: ${match.item_name}`);
+        showFeedback(`${t.invCycFoundFeedback} ${match.item_name}`);
       } else {
-        showFeedback(`Item "${itemQR.name}" not in this count`, true);
+        showFeedback(`"${itemQR.name}" ${t.invCycItemNotInCount}`, true);
       }
       return;
     }
@@ -214,9 +224,9 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     );
     if (match) {
       setHighlightedId(match.id);
-      showFeedback(`Found: ${match.item_name}`);
+      showFeedback(`${t.invCycFoundFeedback} ${match.item_name}`);
     } else {
-      showFeedback(`"${value}" not found in this count`, true);
+      showFeedback(`"${value}" ${t.invCycNotFoundInCount}`, true);
     }
   };
 
@@ -303,7 +313,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   // Group lines by location for full counts
   const groupedLines = isFull
     ? lines.reduce((acc, line) => {
-        const loc = line.location_name || 'Unknown Location';
+        const loc = line.location_name || t.invCycUnknownLocation;
         if (!acc[loc]) acc[loc] = [];
         acc[loc].push(line);
         return acc;
@@ -397,7 +407,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                   >
                     {availableUoms.map(u => (
                       <option key={u.id} value={u.id}>
-                        {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ' — base' : ''}
+                        {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ` — ${t.invTxBaseUnit}` : ''}
                       </option>
                     ))}
                   </select>
@@ -466,7 +476,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       <div style={d.header}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <h2 style={d.title}>{COUNT_TYPES[countData.count_type]?.label || 'Count'} — {countData.location_name}</h2>
+            <h2 style={d.title}>{COUNT_TYPES[countData.count_type]?.label || t.invCycCountLabel} — {countData.location_name}</h2>
             <TypeBadge type={countData.count_type} />
           </div>
           <p style={d.sub}>{t.invCycStartedBy} {countData.started_by_name} · {new Date(countData.started_at).toLocaleDateString()}</p>
@@ -555,7 +565,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                             saveWorker(w.user_id, newRoles);
                           }}
                         />
-                        {role.charAt(0).toUpperCase() + role.slice(1)}
+                        {ROLE_LABELS[role] || role}
                       </label>
                     ))}
                   </div>
@@ -602,7 +612,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                   }, {});
                   return (
                     <div key={role} style={{ marginBottom: 8 }}>
-                      <strong style={{ textTransform: 'capitalize' }}>{role}s:</strong>{' '}
+                      <strong>{ROLE_LABELS_PLURAL[role] || role}</strong>{' '}
                       {Object.entries(byWorker).map(([name, cnt]) => `${name} (${cnt})`).join(' · ')}
                     </div>
                   );
