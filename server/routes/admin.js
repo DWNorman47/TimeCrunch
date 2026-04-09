@@ -1979,9 +1979,15 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
   const companyId = req.user.company_id;
   const LIMIT = 200;
   const accessIds = req.user.worker_access_ids;
+  const { from, to } = req.query;
   try {
-    const workerFilter = accessIds && accessIds.length ? `AND te.user_id = ANY($3)` : '';
-    const params = accessIds && accessIds.length ? [companyId, LIMIT + 1, accessIds] : [companyId, LIMIT + 1];
+    const conditions = [`te.company_id = $1`, `te.status = 'pending'`];
+    const params = [companyId];
+    if (accessIds && accessIds.length) { params.push(accessIds); conditions.push(`te.user_id = ANY($${params.length})`); }
+    if (from) { params.push(from); conditions.push(`te.work_date >= $${params.length}`); }
+    if (to) { params.push(to); conditions.push(`te.work_date <= $${params.length}`); }
+    params.push(LIMIT + 1);
+    const limitIdx = params.length;
     const result = await pool.query(
       `SELECT te.*, COALESCE(u.invoice_name, u.full_name) as worker_name, u.email as worker_email, p.name as project_name,
               te.clock_source, te.clocked_in_by, admin_u.full_name AS clocked_in_by_name
@@ -1989,9 +1995,9 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
        JOIN users u ON te.user_id = u.id
        LEFT JOIN projects p ON te.project_id = p.id
        LEFT JOIN users admin_u ON te.clocked_in_by = admin_u.id
-       WHERE te.company_id = $1 AND te.status = 'pending' ${workerFilter}
+       WHERE ${conditions.join(' AND ')}
        ORDER BY te.worker_signed_at DESC NULLS LAST, te.work_date DESC, te.start_time DESC
-       LIMIT $2`,
+       LIMIT $${limitIdx}`,
       params
     );
     const has_more = result.rows.length > LIMIT;

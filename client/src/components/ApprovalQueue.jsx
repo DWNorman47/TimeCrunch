@@ -102,8 +102,11 @@ export default function ApprovalQueue({ onCountChange }) {
   const fetch = () => {
     setLoading(true);
     setFetchError(false);
+    const params = {};
+    if (dateFrom) params.from = dateFrom;
+    if (dateTo) params.to = dateTo;
     Promise.all([
-      api.get('/admin/entries/pending'),
+      api.get('/admin/entries/pending', { params }),
       api.get('/projects'),
     ])
       .then(([r, p]) => { setEntries(r.data.entries); setHasMore(r.data.has_more); setProjects(p.data); })
@@ -336,8 +339,9 @@ export default function ApprovalQueue({ onCountChange }) {
             onChange={e => setDateTo(e.target.value)}
             title="To date"
           />
+          <button style={styles.applyDateBtn} onClick={() => { setSelectedIds(new Set()); fetch(); }}>{t.apply}</button>
           {(dateFrom || dateTo) && (
-            <button style={styles.clearDateBtn} onClick={() => { setDateFrom(''); setDateTo(''); }}>✕</button>
+            <button style={styles.clearDateBtn} onClick={() => { setDateFrom(''); setDateTo(''); setSelectedIds(new Set()); fetch(); }}>✕</button>
           )}
         </div>
       )}
@@ -565,6 +569,7 @@ const styles = {
   header: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 },
   dateFilterRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 },
   dateInput: { padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, color: '#374151', minHeight: 'unset' },
+  applyDateBtn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '4px 10px', cursor: 'pointer' },
   clearDateBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 13, cursor: 'pointer', padding: '0 4px', lineHeight: 1, minHeight: 'unset' },
   title: { fontSize: 17, fontWeight: 700, margin: 0 },
   badge: { background: '#fef3c7', color: '#b45309', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 700 },

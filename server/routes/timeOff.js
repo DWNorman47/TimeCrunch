@@ -30,20 +30,18 @@ router.post('/', requireAuth, async (req, res) => {
           [companyId]
         );
         if (setting.rows[0]?.value === '0') return;
+        const typeLabel = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' }[type || 'vacation'];
         const admins = await pool.query(
-          `SELECT email FROM users WHERE company_id = $1 AND role = 'admin' AND email IS NOT NULL`,
+          `SELECT id, email FROM users WHERE company_id = $1 AND role = 'admin' AND active = true`,
           [companyId]
         );
-        const typeLabel = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' }[type || 'vacation'];
         const subject = `Time off request: ${req.user.full_name}`;
-        const body = `<p><b>${req.user.full_name}</b> submitted a time off request.</p>
+        const emailBody = `<p><b>${req.user.full_name}</b> submitted a time off request.</p>
           <p><b>Type:</b> ${typeLabel}<br/>
           <b>Dates:</b> ${start_date} – ${end_date}${note ? `<br/><b>Note:</b> ${note}` : ''}</p>
           <p>Log in to OpsFloa to approve or deny.</p>`;
-        for (const admin of admins.rows) sendEmail(admin.email, subject, body);
-        // Inbox notification for all admins
-        const adminIds = await pool.query(`SELECT id FROM users WHERE company_id = $1 AND role = 'admin'`, [companyId]);
-        createInboxItemBatch(adminIds.rows.map(a => a.id), companyId, 'timeoff_request',
+        for (const admin of admins.rows) if (admin.email) sendEmail(admin.email, subject, emailBody);
+        createInboxItemBatch(admins.rows.map(a => a.id), companyId, 'timeoff_request',
           `Time off request: ${req.user.full_name}`,
           `${typeLabel} · ${start_date} – ${end_date}`,
           '/timeclock#timeoff');
@@ -138,7 +136,6 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
             body: `${startStr} – ${endStr} · Review schedule`,
             url: '/timeclock#manage',
           });
-          console.log(`[time-off] Flagged ${conflictResult.rowCount} shift(s) for worker ${row.user_id} during approved time off`);
         }
       } catch (err) { console.error('Time off approval notification error:', err); }
     });

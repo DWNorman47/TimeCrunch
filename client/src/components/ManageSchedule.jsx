@@ -73,7 +73,7 @@ function DroppableDay({ date, isToday, children }) {
 }
 
 function exportCSV(shifts, days) {
-  const header = ['Date', 'Worker', 'Project', 'Start', 'End', 'Notes', "Can't Make It", 'Reason'];
+  const header = ['Date', 'Worker', 'Project', 'Start', 'End', 'Notes', "Can't Make It", 'Reason', 'Series ID'];
   const rows = shifts.map(s => [
     s.shift_date.substring(0, 10),
     s.worker_name,
@@ -83,6 +83,7 @@ function exportCSV(shifts, days) {
     s.notes || '',
     s.cant_make_it ? 'Yes' : 'No',
     s.cant_make_it_note || '',
+    s.recurrence_group_id || '',
   ]);
   const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const a = document.createElement('a');
@@ -359,9 +360,11 @@ export default function ManageSchedule({ workers, projects }) {
       } catch { failed++; }
     }
     setCopyingWeek(false);
+    if (failed === shifts.length) { toast(t.msCopyFailed, 'error'); return; }
     if (failed > 0) toast(t.msCopyFailed, 'error');
     else toast(t.msCopyDone, 'success');
     // Navigate to next week to show the copies
+    setShifts(prev => [...prev, ...results].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
     setWeekStart(d => addDays(d, 7));
   };
 
