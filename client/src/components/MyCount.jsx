@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api';
 import { getCached, setCached, isFresh, enqueuePendingSync, getPendingSyncs, removePendingSync } from '../offlineDb';
+import { useT } from '../hooks/useT';
 
 const CACHE_KEY = 'my-count-assignments';
 
@@ -30,6 +31,7 @@ function roleBg(role) {
 }
 
 export default function MyCount() {
+  const t = useT();
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(!navigator.onLine);
@@ -135,7 +137,7 @@ export default function MyCount() {
     const state = getState(assignment.assignment_id);
     const qty = parseFloat(state.qty);
     if (isNaN(qty) || qty < 0) {
-      setState(assignment.assignment_id, { error: 'Enter a valid quantity' });
+      setState(assignment.assignment_id, { error: t.myCountErrQty });
       return;
     }
     setState(assignment.assignment_id, { submitting: true, error: '' });
@@ -175,7 +177,7 @@ export default function MyCount() {
     } catch (e) {
       setState(assignment.assignment_id, {
         submitting: false,
-        error: e.response?.data?.error || 'Failed to submit. You can try again.',
+        error: e.response?.data?.error || t.myCountErrSubmit,
       });
     }
   };
@@ -183,32 +185,30 @@ export default function MyCount() {
   const groups = groupByCount(assignments);
   const isAuditRole = (role) => role === 'auditor';
 
-  if (loading) return <div style={s.loading}>Loading your count assignments…</div>;
+  if (loading) return <div style={s.loading}>{t.myCountLoading}</div>;
 
   return (
     <div style={s.wrap}>
       <div style={s.headerRow}>
-        <h2 style={s.title}>My Count</h2>
+        <h2 style={s.title}>{t.myCountTitle}</h2>
         <button style={s.refreshBtn} onClick={() => load(true)} disabled={offline}>
-          {offline ? 'Offline' : 'Refresh'}
+          {offline ? t.myCountOffline : t.myCountRefresh}
         </button>
       </div>
 
       {offline && (
-        <div style={s.offlineBanner}>
-          You are offline. Counts you submit will be queued and sent when you reconnect.
-        </div>
+        <div style={s.offlineBanner}>{t.myCountOfflineBanner}</div>
       )}
 
       {syncing && (
-        <div style={s.syncBanner}>Syncing {pendingCount} queued submission{pendingCount !== 1 ? 's' : ''}…</div>
+        <div style={s.syncBanner}>{t.myCountSyncing} {pendingCount} {t.myCountQueuedSuffix}</div>
       )}
 
       {!syncing && pendingCount > 0 && (
         <div style={s.pendingBanner}>
-          {pendingCount} submission{pendingCount !== 1 ? 's' : ''} queued offline.{' '}
+          {pendingCount} {t.myCountPendingPrefix}{' '}
           {!offline && (
-            <button style={s.syncNowBtn} onClick={drainQueue}>Sync now</button>
+            <button style={s.syncNowBtn} onClick={drainQueue}>{t.myCountSyncNow}</button>
           )}
         </div>
       )}
@@ -216,10 +216,8 @@ export default function MyCount() {
       {groups.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>✅</div>
-          <p>No pending count assignments.</p>
-          <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>
-            When an admin assigns you items to count, audit, or reconcile, they'll appear here.
-          </p>
+          <p>{t.myCountEmpty}</p>
+          <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>{t.myCountEmptyHint}</p>
         </div>
       ) : (
         groups.map(group => (
@@ -247,13 +245,13 @@ export default function MyCount() {
                     </div>
                     {!hideExpected && (
                       <div style={s.expected}>
-                        Expected: <strong>{parseFloat(a.expected_qty)} {a.stock_uom_unit || a.unit}</strong>
+                        {t.myCountExpected}: <strong>{parseFloat(a.expected_qty)} {a.stock_uom_unit || a.unit}</strong>
                       </div>
                     )}
                     <div style={s.inputRow}>
                       <div style={s.inputGroup}>
                         <label style={s.inputLabel}>
-                          {a.role === 'auditor' ? 'Audit count' : a.role === 'reconciler' ? 'Reconcile count' : 'Counted qty'}
+                          {a.role === 'auditor' ? t.myCountRoleAuditor : a.role === 'reconciler' ? t.myCountRoleReconciler : t.myCountRoleCounter}
                         </label>
                         <input
                           type="number"
@@ -267,14 +265,14 @@ export default function MyCount() {
                         <span style={s.unit}>{a.stock_uom_unit || a.unit}</span>
                       </div>
                       <div style={s.inputGroup}>
-                        <label style={s.inputLabel}>Notes</label>
+                        <label style={s.inputLabel}>{t.myCountNotes}</label>
                         <input
                           type="text"
                           style={s.notesInput}
                           maxLength={500}
                           value={state.notes}
                           onChange={e => setState(a.assignment_id, { notes: e.target.value })}
-                          placeholder="Optional"
+                          placeholder={t.myCountNotesPlaceholder}
                         />
                       </div>
                     </div>
@@ -284,7 +282,7 @@ export default function MyCount() {
                       onClick={() => submit(a)}
                       disabled={state.submitting || state.qty === ''}
                     >
-                      {state.submitting ? 'Submitting…' : offline ? 'Queue Offline' : 'Submit'}
+                      {state.submitting ? t.myCountSubmitting : offline ? t.myCountQueueOffline : t.myCountSubmit}
                     </button>
                   </div>
                 );

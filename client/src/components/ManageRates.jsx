@@ -215,7 +215,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         company_timezone: form.company_timezone,
         invoice_signature: form.invoice_signature,
         default_temp_password: form.default_temp_password,
-        cycle_count_audit_pct: parseFloat(form.cycle_count_audit_pct) || 15,
+        cycle_count_audit_pct: isNaN(parseFloat(form.cycle_count_audit_pct)) ? 15 : parseFloat(form.cycle_count_audit_pct),
         cycle_count_reconcile_threshold: parseFloat(form.cycle_count_reconcile_threshold) || 0,
         cycle_count_reconcile_threshold_type: form.cycle_count_reconcile_threshold_type,
         media_retention_days: parseFloat(form.media_retention_days) || 0,

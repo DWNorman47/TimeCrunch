@@ -1389,14 +1389,16 @@ router.patch('/cycle-counts/:id/workers/:userId/lines', requireAdmin, async (req
     );
     if (counterCheck.rowCount === 0) return res.status(400).json({ error: 'Target worker is not a counter for this count' });
 
+    let reassigned = 0;
     for (const lineId of validLineIds) {
-      await pool.query(
+      const r = await pool.query(
         `UPDATE inventory_count_assignments SET user_id=$1
-         WHERE line_id=$2 AND cycle_count_id=$3 AND role='counter' AND status='pending'`,
-        [newUserId, lineId, req.params.id]
+         WHERE line_id=$2 AND cycle_count_id=$3 AND user_id=$4 AND role='counter' AND status='pending'`,
+        [newUserId, lineId, req.params.id, req.params.userId]
       );
+      reassigned += r.rowCount;
     }
-    res.json({ reassigned: validLineIds.length });
+    res.json({ reassigned });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -1490,7 +1492,7 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
       );
 
       // Decide: sample for audit?
-      const auditPct = parseFloat(settings.cycle_count_audit_pct) || 15;
+      const auditPct = settings.cycle_count_audit_pct ?? 15;
       const shouldAudit = Math.random() * 100 < auditPct;
 
       if (shouldAudit) {
