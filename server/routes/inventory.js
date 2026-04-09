@@ -448,7 +448,10 @@ const VALID_LOCATION_TYPES = ['warehouse', 'job_site', 'truck', 'other'];
 router.post('/locations', requireAdmin, async (req, res) => {
   const { name, type = 'warehouse', project_id, notes, address } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  if (name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
   if (!VALID_LOCATION_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid location type' });
+  if (notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+  if (address && address.trim().length > 500) return res.status(400).json({ error: 'address too long (max 500 characters)' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -467,6 +470,9 @@ router.patch('/locations/:id', requireAdmin, async (req, res) => {
   try {
     const existing = await pool.query('SELECT id FROM inventory_locations WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Location not found' });
+    if (name !== undefined && name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+    if (notes !== undefined && notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+    if (address !== undefined && address && address.trim().length > 500) return res.status(400).json({ error: 'address too long (max 500 characters)' });
     const sets = [], vals = [req.params.id, companyId]; let idx = 3;
     if (name !== undefined) { sets.push(`name=$${idx++}`); vals.push(name.trim()); }
     if (type !== undefined) { if (!VALID_LOCATION_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid location type' }); sets.push(`type=$${idx++}`); vals.push(type); }
@@ -1347,6 +1353,8 @@ router.get('/purchase-orders', requireAdmin, async (req, res) => {
 // POST /api/inventory/purchase-orders
 router.post('/purchase-orders', requireAdmin, async (req, res) => {
   const { supplier_id, order_date, expected_date, to_location_id, notes, reference_no, lines = [] } = req.body;
+  if (notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+  if (reference_no && reference_no.trim().length > 100) return res.status(400).json({ error: 'reference_no too long (max 100 characters)' });
   const companyId = req.user.company_id;
   const client = await pool.connect();
   try {
@@ -1423,6 +1431,8 @@ router.get('/purchase-orders/:id', requireAdmin, async (req, res) => {
 router.patch('/purchase-orders/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const { supplier_id, order_date, expected_date, to_location_id, notes, reference_no, status } = req.body;
+  if (notes !== undefined && notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+  if (reference_no !== undefined && reference_no && reference_no.trim().length > 100) return res.status(400).json({ error: 'reference_no too long (max 100 characters)' });
   try {
     const existing = await pool.query(
       'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
@@ -1489,6 +1499,7 @@ router.post('/purchase-orders/:id/lines', requireAdmin, async (req, res) => {
   }
   const unitCostVal = unit_cost != null && unit_cost !== '' ? parseFloat(unit_cost) : null;
   if (unitCostVal !== null && isNaN(unitCostVal)) return res.status(400).json({ error: 'unit_cost must be a number' });
+  if (notes && notes.trim().length > 500) return res.status(400).json({ error: 'notes too long (max 500 characters)' });
   try {
     const po = await pool.query(
       'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',

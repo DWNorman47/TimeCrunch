@@ -220,6 +220,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
               value={form.address}
               onChange={e => set('address', e.target.value)}
               placeholder="123 Main St, City, State 12345"
+              maxLength={500}
             />
           </div>
         </>
@@ -232,6 +233,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
           value={form.notes}
           onChange={e => set('notes', e.target.value)}
           placeholder="Optional description or map reference…"
+          maxLength={1000}
         />
       </div>
 

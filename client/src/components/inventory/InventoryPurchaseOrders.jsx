@@ -348,7 +348,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             </div>
             <div style={{ ...d.editField, flexBasis: '100%' }}>
               <label style={d.editLabel}>{t.notes}</label>
-              <textarea style={{ ...d.editInput, minHeight: 52, resize: 'vertical' }} value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} />
+              <textarea style={{ ...d.editInput, minHeight: 52, resize: 'vertical' }} value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} maxLength={1000} />
             </div>
           </div>
         ) : (
@@ -506,7 +506,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             <div style={d.addLineField}>
               <label style={d.editLabel}>{t.notes}</label>
               <input style={d.editInput} value={newLine.notes}
-                onChange={e => setNewLine(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
+                onChange={e => setNewLine(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" maxLength={500} />
             </div>
             <div style={d.addLineBtns}>
               <button style={d.cancelEditBtn} onClick={() => { setAddingLine(false); setLineErr(''); }}>{t.cancel}</button>
@@ -649,7 +649,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
 
       <div style={c.field}>
         <label style={c.label}>{t.notes}</label>
-        <textarea style={{ ...c.input, minHeight: 52, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <textarea style={{ ...c.input, minHeight: 52, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} maxLength={1000} />
       </div>
 
       <div style={c.linesHeader}>
@@ -692,7 +692,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
                   </td>
                   <td style={c.td}>
                     <input style={c.cellInput} value={line.notes}
-                      onChange={e => updateLine(line.key, 'notes', e.target.value)} placeholder="Optional" />
+                      onChange={e => updateLine(line.key, 'notes', e.target.value)} placeholder="Optional" maxLength={500} />
                   </td>
                   <td style={c.td}>
                     <button style={c.removeBtn} onClick={() => removeLine(line.key)}>✕</button>
