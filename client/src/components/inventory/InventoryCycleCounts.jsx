@@ -256,17 +256,18 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     try {
       await api.post(`/inventory/cycle-counts/${count.id}/complete`);
       setConfirmOpen(false);
+      setCountData(prev => ({ ...prev, status: 'completed' }));
       setReportLines(lines); // show variance report
     } catch (e) {
+      // Keep the confirm dialog open so the admin can retry; show error above it
       setError(e.response?.data?.error || t.invCycFailedComplete);
-      setCompleting(false); setConfirmOpen(false);
     } finally {
       setCompleting(false);
     }
   };
 
   const downloadVarianceCSV = (reportData) => {
-    const header = ['Item', 'SKU', 'Unit', 'Expected Qty', 'Counted Qty', 'Variance'];
+    const header = [t.invCycColItem, t.invCycColSku, t.invCycColUnit, t.invCycColExpected, t.invCycColCounted, t.invCycColVariance];
     const rows = reportData.map(l => {
       const expected = parseFloat(l.expected_qty);
       const counted  = l.counted_qty != null ? parseFloat(l.counted_qty) : '';
@@ -703,10 +704,10 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                       <thead>
                         <tr style={{ background: '#f9fafb' }}>
-                          <th style={d.rth}>Item</th>
-                          <th style={{ ...d.rth, textAlign: 'right' }}>Expected</th>
-                          <th style={{ ...d.rth, textAlign: 'right' }}>Counted</th>
-                          <th style={{ ...d.rth, textAlign: 'right' }}>Variance</th>
+                          <th style={d.rth}>{t.invCycColItem}</th>
+                          <th style={{ ...d.rth, textAlign: 'right' }}>{t.invCycColExpected}</th>
+                          <th style={{ ...d.rth, textAlign: 'right' }}>{t.invCycColCounted}</th>
+                          <th style={{ ...d.rth, textAlign: 'right' }}>{t.invCycColVariance}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -809,13 +810,13 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 value={overrideQty} onChange={e => setOverrideQty(e.target.value)} />
             </div>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Notes (optional)</label>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>{t.notesOptional}</label>
               <input type="text" maxLength={500}
                 style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
                 value={overrideNotes} onChange={e => setOverrideNotes(e.target.value)} />
             </div>
             <div style={d.modalActions}>
-              <button style={d.cancelBtn} onClick={() => setOverrideModal(null)}>Cancel</button>
+              <button style={d.cancelBtn} onClick={() => setOverrideModal(null)}>{t.cancel}</button>
               <button style={{ ...d.confirmBtn, background: '#7c3aed' }}
                 onClick={submitOverride} disabled={overriding || overrideQty === ''}>
                 {overriding ? t.invCycOverrideSaving : t.invCycOverride}
