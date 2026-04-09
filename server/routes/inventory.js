@@ -937,6 +937,7 @@ router.get('/cycle-counts/my-assignments', requireAuth, async (req, res) => {
        LEFT JOIN inventory_item_uoms su ON l.stock_uom_id = su.id
        WHERE a.user_id = $1 AND cc.company_id = $2
          AND cc.status = 'in_progress'
+         AND a.status = 'pending'
        ORDER BY cc.id, loc.name NULLS LAST, i.name`,
       [req.user.id, companyId]
     );
@@ -1273,6 +1274,12 @@ router.delete('/cycle-counts/:id/workers/:userId', requireAdmin, async (req, res
     if (cc.rows[0].status === 'completed') return res.status(409).json({ error: 'Cannot modify a completed count' });
     await pool.query(
       'DELETE FROM inventory_count_workers WHERE cycle_count_id=$1 AND user_id=$2',
+      [req.params.id, req.params.userId]
+    );
+    // Also remove their pending assignments so they can no longer submit
+    await pool.query(
+      `DELETE FROM inventory_count_assignments
+       WHERE cycle_count_id=$1 AND user_id=$2 AND status='pending'`,
       [req.params.id, req.params.userId]
     );
     res.json({ removed: true });

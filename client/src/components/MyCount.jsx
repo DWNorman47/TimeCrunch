@@ -37,6 +37,7 @@ export default function MyCount() {
   const [syncing, setSyncing] = useState(false);
   const [submitStates, setSubmitStates] = useState({}); // { [assignmentId]: { qty, notes, submitting, submitted, error } }
   const mounted = useRef(true);
+  const drainingRef = useRef(false); // ref-based guard so event handlers always see current value
 
   useEffect(() => () => { mounted.current = false; }, []);
 
@@ -84,9 +85,11 @@ export default function MyCount() {
     };
   }, [load, loadPendingCount]);
 
-  // Drain the offline sync queue when we come back online
+  // Drain the offline sync queue when we come back online.
+  // Uses a ref guard so the online event handler (captured at mount) always sees the current lock.
   const drainQueue = useCallback(async () => {
-    if (syncing) return;
+    if (drainingRef.current) return;
+    drainingRef.current = true;
     setSyncing(true);
     try {
       const syncs = await getPendingSyncs();
@@ -106,13 +109,14 @@ export default function MyCount() {
         }
       }
     } finally {
+      drainingRef.current = false;
       if (mounted.current) {
         setSyncing(false);
         loadPendingCount();
         load(true); // refresh assignments after drain
       }
     }
-  }, [syncing, load, loadPendingCount]);
+  }, [load, loadPendingCount]);
 
   const getState = (assignmentId) => submitStates[assignmentId] || { qty: '', notes: '', submitting: false, submitted: false, error: '' };
   const setState = (assignmentId, patch) => setSubmitStates(prev => ({
