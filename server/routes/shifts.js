@@ -112,6 +112,21 @@ router.delete('/admin/:id', requireAdmin, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// PATCH /shifts/:id/cant-make-it — worker flags they can't attend
+router.patch('/:id/cant-make-it', requireAuth, async (req, res) => {
+  const { cant_make_it, note } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE shifts SET cant_make_it = $1, cant_make_it_note = $2
+       WHERE id = $3 AND user_id = $4
+       RETURNING *`,
+      [!!cant_make_it, note?.trim() || null, req.params.id, req.user.id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Shift not found' });
+    res.json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // GET /shifts/mine — worker's upcoming shifts
 router.get('/mine', requireAuth, async (req, res) => {
   try {

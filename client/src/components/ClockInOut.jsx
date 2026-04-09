@@ -22,7 +22,7 @@ function formatElapsed(seconds) {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
-export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabled = true, projectsEnabled = true }) {
+export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geolocationEnabled = true, projectsEnabled = true }) {
   const { isOffline, queueCount, onSync, sendToSW } = useOffline() || {};
   const [status, setStatus] = useState(null); // null = loading, false = not clocked in, object = clocked in
   const [clockInForm, setClockInForm] = useState({ selectedProject: '', notes: '' });
@@ -51,6 +51,16 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
   useEffect(() => {
     api.get('/clock/status').then(r => setStatus(r.data || false)).catch(() => setStatus(false));
   }, []);
+
+  // Pre-select last used project when projects load and no project is already chosen
+  useEffect(() => {
+    if (!projects || projects.length === 0) return;
+    if (clockInForm.selectedProject) return; // already set (persisted or user chose)
+    const last = localStorage.getItem('lastProjectId');
+    if (last && projects.find(p => String(p.id) === last)) {
+      setSelectedProject(last);
+    }
+  }, [projects]);
 
   // Refresh clock status after offline queue syncs
   useEffect(() => {
@@ -137,11 +147,14 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
       const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, location_denied: loc.permissionDenied || false, clock_in_time });
       if (r.data?.offline) {
         // Queued offline — show a pending state
-        setStatus({ offline_queued: true, project_name: projects.find(p => p.id == selectedProject)?.name });
+        const offlineStatus = { offline_queued: true, project_name: projects.find(p => p.id == selectedProject)?.name };
+        setStatus(offlineStatus);
         setNotes('');
         clearClockInPersisted();
       } else {
         setStatus(r.data);
+        localStorage.setItem('lastProjectId', String(selectedProject));
+        onClockedIn?.(r.data);
         setNotes('');
         clearClockInPersisted();
       }

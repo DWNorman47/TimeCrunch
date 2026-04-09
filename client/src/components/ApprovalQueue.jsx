@@ -94,6 +94,8 @@ export default function ApprovalQueue({ onCountChange }) {
   const [confirmingApproveAll, setConfirmingApproveAll] = useState(false);
   const [editSaveError, setEditSaveError] = useState('');
   const [unapproveError, setUnapproveError] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const fetch = () => {
     setLoading(true);
@@ -210,9 +212,12 @@ export default function ApprovalQueue({ onCountChange }) {
     } finally { setWorking(null); }
   };
 
-  const visibleEntries = workerFilter
-    ? entries.filter(e => e.worker_name === workerFilter)
-    : entries;
+  const visibleEntries = entries.filter(e => {
+    if (workerFilter && e.worker_name !== workerFilter) return false;
+    if (dateFrom && e.work_date.substring(0, 10) < dateFrom) return false;
+    if (dateTo && e.work_date.substring(0, 10) > dateTo) return false;
+    return true;
+  });
 
   const workerNames = [...new Set(entries.map(e => e.worker_name))].sort();
 
@@ -276,6 +281,29 @@ export default function ApprovalQueue({ onCountChange }) {
           </>
         )}
       </div>
+
+      {entries.length > 0 && (
+        <div style={styles.dateFilterRow}>
+          <input
+            type="date"
+            style={styles.dateInput}
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            title="From date"
+          />
+          <span style={{ fontSize: 12, color: '#9ca3af' }}>–</span>
+          <input
+            type="date"
+            style={styles.dateInput}
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            title="To date"
+          />
+          {(dateFrom || dateTo) && (
+            <button style={styles.clearDateBtn} onClick={() => { setDateFrom(''); setDateTo(''); }}>✕</button>
+          )}
+        </div>
+      )}
 
       {fetchError ? (
         <p style={styles.fetchError}>{t.failedLoadPending} <button style={styles.retryBtn} onClick={fetch}>{t.retry}</button></p>
@@ -488,7 +516,10 @@ export default function ApprovalQueue({ onCountChange }) {
 
 const styles = {
   card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 24 },
-  header: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 },
+  header: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 },
+  dateFilterRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 },
+  dateInput: { padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, color: '#374151', minHeight: 'unset' },
+  clearDateBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 13, cursor: 'pointer', padding: '0 4px', lineHeight: 1, minHeight: 'unset' },
   title: { fontSize: 17, fontWeight: 700, margin: 0 },
   badge: { background: '#fef3c7', color: '#b45309', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 700 },
   filterSelect: { padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, color: '#374151', background: '#fff' },

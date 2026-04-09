@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ClockInOut from '../components/ClockInOut';
 import TimeEntryForm from '../components/TimeEntryForm';
@@ -33,6 +33,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [headerClock, setHeaderClock] = useState(null); // null=loading, false=not clocked in, {clock_in_time}=clocked in
+  const [headerElapsed, setHeaderElapsed] = useState(0);
+  const headerTimerRef = useRef(null);
   const TABS = ['clock', 'messages', 'timesheet', 'timeoff', 'schedule', 'reimbursements'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'clock');
@@ -75,6 +78,24 @@ export default function Dashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Fetch clock status for header timer (independent of ClockInOut component)
+  useEffect(() => {
+    api.get('/clock/status').then(r => setHeaderClock(r.data || false)).catch(() => setHeaderClock(false));
+  }, []);
+
+  // Tick header elapsed timer while clocked in
+  useEffect(() => {
+    clearInterval(headerTimerRef.current);
+    if (headerClock && headerClock.clock_in_time) {
+      const tick = () => setHeaderElapsed(Math.floor((Date.now() - new Date(headerClock.clock_in_time)) / 1000));
+      tick();
+      headerTimerRef.current = setInterval(tick, 1000);
+    } else {
+      setHeaderElapsed(0);
+    }
+    return () => clearInterval(headerTimerRef.current);
+  }, [headerClock]);
+
   // When timeclock feature is off, redirect away from clock-only tabs
   useEffect(() => {
     if (settings && settings.module_timeclock === false && ['clock', 'messages', 'timesheet'].includes(tab)) {
@@ -91,6 +112,11 @@ export default function Dashboard() {
 
   const handleEntryAdded = entry => {
     setEntries(prev => [entry, ...prev]);
+    setHeaderClock(false); // worker clocked out
+  };
+
+  const handleClockedIn = clockStatus => {
+    setHeaderClock(clockStatus); // worker clocked in
   };
   const handleEntryDeleted = id => setEntries(prev => prev.filter(e => e.id !== id));
   const handleEntryUpdated = entry => setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, ...entry } : e));
@@ -323,6 +349,12 @@ ${signatureDataUrl ? `
     win.print();
   };
 
+  const fmtHeaderElapsed = secs => {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+
   const handleLanguageChange = async lang => {
     try {
       await api.post('/auth/update-language', { language: lang });
@@ -347,10 +379,16 @@ ${signatureDataUrl ? `
               <option value="English" style={{ color: '#111827', background: '#fff' }}>EN</option>
               <option value="Spanish" style={{ color: '#111827', background: '#fff' }}>ES</option>
             </select>
+            {headerClock && <span style={styles.headerTimer} className="header-clock-timer-desktop">⏱ {fmtHeaderElapsed(headerElapsed)}</span>}
             <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
           </div>
         </div>
-        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
+        {user?.company_name && (
+          <div className="company-name-row">
+            <span className="company-name">{user.company_name}</span>
+            {headerClock && <span className="header-clock-timer-mobile" style={styles.headerTimerMobile}>⏱ {fmtHeaderElapsed(headerElapsed)}</span>}
+          </div>
+        )}
       </header>
 
       {showSignatureModal && (
@@ -375,7 +413,7 @@ ${signatureDataUrl ? `
 
         {tab === 'clock' && (
           <>
-            <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} geolocationEnabled={settings?.feature_geolocation ?? false} projectsEnabled={settings?.feature_project_integration !== false} />
+            <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} onClockedIn={handleClockedIn} t={t} geolocationEnabled={settings?.feature_geolocation ?? false} projectsEnabled={settings?.feature_project_integration !== false} />
             <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} prefill={shiftPrefill} projectsEnabled={settings?.feature_project_integration !== false} />
           </>
         )}
@@ -427,6 +465,8 @@ const styles = {
   userName: { fontSize: 14 },
   langSelect: { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', padding: '5px 8px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600 },
+  headerTimer: { fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)', background: 'rgba(255,255,255,0.15)', padding: '4px 10px', borderRadius: 6, fontVariantNumeric: 'tabular-nums' },
+  headerTimerMobile: { fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.9)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 },
   main: { maxWidth: 700, margin: '24px auto', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 20 },
   tabs: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 10, padding: 4, width: '100%' },
   tab: { flex: 1, padding: '14px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#666', cursor: 'pointer', textAlign: 'center' },
