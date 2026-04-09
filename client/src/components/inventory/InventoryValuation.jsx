@@ -59,7 +59,7 @@ export default function InventoryValuation({ locations }) {
       item.unit_cost != null ? parseFloat(item.unit_cost).toFixed(2) : '',
       parseFloat(item.total_value).toFixed(2),
     ].join(','));
-    const header = [t.invValColItem, 'SKU', t.colCategory, t.colUnit, t.invValColOnHand, t.colUnitCost, t.invValColTotalValue].join(',');
+    const header = [t.invValColItem, t.colSku, t.colCategory, t.colUnit, t.invValColOnHand, t.colUnitCost, t.invValColTotalValue].join(',');
     const csv = [header, ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);

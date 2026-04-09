@@ -123,6 +123,7 @@ function AdjustModal({ item, locations, onClose, onDone }) {
   const [notes, setNotes]   = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
+  const [warning, setWarning] = useState('');
 
   const submit = async () => {
     const n = parseFloat(qty);
@@ -130,14 +131,18 @@ function AdjustModal({ item, locations, onClose, onDone }) {
     if (!locId) { setError(t.invStockSelectLocError); return; }
     setSaving(true); setError('');
     try {
-      await api.post('/inventory/transactions', {
+      const r = await api.post('/inventory/transactions', {
         type: 'adjust',
         item_id: item.item_id,
         quantity: n,
         to_location_id: parseInt(locId),
         notes: notes.trim() || undefined,
       });
-      onDone();
+      if (r.data.warning === 'stock_negative') {
+        setWarning(t.invTxStockNegativeWarn);
+      } else {
+        onDone();
+      }
     } catch (e) {
       setError(e.response?.data?.error || t.invStockAdjFailed);
     } finally {
@@ -158,6 +163,7 @@ function AdjustModal({ item, locations, onClose, onDone }) {
             <span style={a.currentQty}>{parseFloat(item.quantity) % 1 === 0 ? parseFloat(item.quantity).toFixed(0) : parseFloat(item.quantity).toFixed(2)} {item.unit}</span>
           </div>
           {error && <div style={a.error}>{error}</div>}
+          {warning && <div style={{ ...a.error, background: '#fef3c7', color: '#92400e' }}>{warning}</div>}
           <label style={a.label}>{t.invStockAdjQtyLabel}</label>
           <input
             type="number"
@@ -185,8 +191,8 @@ function AdjustModal({ item, locations, onClose, onDone }) {
             maxLength={1000}
           />
           <div style={a.actions}>
-            <button style={a.cancel} onClick={onClose} disabled={saving}>{t.cancel}</button>
-            <button style={a.save} onClick={submit} disabled={saving}>{saving ? t.saving : t.invStockSaveAdj}</button>
+            <button style={a.cancel} onClick={warning ? onDone : onClose} disabled={saving}>{warning ? t.back : t.cancel}</button>
+            {!warning && <button style={a.save} onClick={submit} disabled={saving}>{saving ? t.saving : t.invStockSaveAdj}</button>}
           </div>
         </div>
       </div>
@@ -224,6 +230,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
   const [notes, setNotes]         = useState('');
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState('');
+  const [warning, setWarning]     = useState('');
 
   const available = parseFloat(item.quantity);
   const stockUnit = item.unit_spec ? `${item.unit} (${item.unit_spec})` : item.unit;
@@ -257,7 +264,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
     }
     setSaving(true); setError('');
     try {
-      await api.post('/inventory/transactions', {
+      const r = await api.post('/inventory/transactions', {
         type: 'issue',
         item_id: item.item_id,
         quantity: n,
@@ -266,7 +273,11 @@ function IssueModal({ item, projects, onClose, onDone }) {
         project_id: projectId ? parseInt(projectId) : undefined,
         notes: notes.trim() || undefined,
       });
-      onDone();
+      if (r.data.warning === 'stock_negative') {
+        setWarning(t.invTxStockNegativeWarn);
+      } else {
+        onDone();
+      }
     } catch (e) {
       setError(e.response?.data?.error || t.invStockIssueFailed);
     } finally {
@@ -287,6 +298,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
             <span style={a.currentQty}>{available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} {stockUnit}</span>
           </div>
           {error && <div style={a.error}>{error}</div>}
+          {warning && <div style={{ ...a.error, background: '#fef3c7', color: '#92400e' }}>{warning}</div>}
           <label style={a.label}>{t.invStockQtyToIssue}</label>
           <input
             type="number"
@@ -333,10 +345,10 @@ function IssueModal({ item, projects, onClose, onDone }) {
             maxLength={1000}
           />
           <div style={a.actions}>
-            <button style={a.cancel} onClick={onClose} disabled={saving}>{t.cancel}</button>
-            <button style={{ ...a.save, background: '#d97706' }} onClick={submit} disabled={saving}>
+            <button style={a.cancel} onClick={warning ? onDone : onClose} disabled={saving}>{warning ? t.back : t.cancel}</button>
+            {!warning && <button style={{ ...a.save, background: '#d97706' }} onClick={submit} disabled={saving}>
               {saving ? t.invStockIssuing : t.invStockIssueMaterials}
-            </button>
+            </button>}
           </div>
         </div>
       </div>
@@ -405,7 +417,7 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
 
   const downloadCSV = () => {
     if (!stock.length) return;
-    const header = [t.invTxColItem, 'SKU', t.colCategory, t.invValColLocation, t.invStockColBin,
+    const header = [t.invTxColItem, t.colSku, t.colCategory, t.invValColLocation, t.invStockColBin,
       t.invTxColQty, t.colUnit, t.colUnitCost, t.invValColTotalValue, t.invStockColStatus].join(',');
     const rows = stock.map(row => {
       const qty = parseFloat(row.quantity);
