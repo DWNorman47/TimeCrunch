@@ -175,6 +175,14 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
   const canReceive  = ['submitted', 'partial'].includes(po.status);
   const isFinished  = ['received', 'cancelled'].includes(po.status);
 
+  const nextActionText = {
+    draft:     t.invPONextActionDraft,
+    submitted: t.invPONextActionSubmitted,
+    partial:   t.invPONextActionPartial,
+    received:  t.invPONextActionReceived,
+    cancelled: t.invPONextActionCancelled,
+  }[po.status];
+
   const totalOrdered  = lines.reduce((s, l) => s + parseFloat(l.qty_ordered), 0);
   const totalReceived = lines.reduce((s, l) => s + parseFloat(l.qty_received), 0);
 
@@ -281,7 +289,12 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             </div>
           </div>
           <div style={d.headerActions}>
-            <StatusBadge status={po.status} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+              <StatusBadge status={po.status} />
+              {nextActionText && (
+                <span style={d.nextActionHint}>{nextActionText}</span>
+              )}
+            </div>
             {isDraft && !editing && (
               <>
                 <button style={d.editBtn} onClick={() => setEditing(true)}>{t.invPOEditBtn}</button>
@@ -936,7 +949,8 @@ const d = {
   headerTop:    { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 12 },
   poNumber:     { fontSize: 20, fontWeight: 800, color: '#111827' },
   poMeta:       { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-  headerActions:{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  headerActions:{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' },
+  nextActionHint: { fontSize: 12, color: '#6b7280', fontStyle: 'italic', textAlign: 'right', maxWidth: 260 },
   editBtn:      { padding: '7px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' },
   cancelEditBtn:{ padding: '7px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' },
   submitBtn:    { padding: '7px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },

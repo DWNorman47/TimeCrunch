@@ -482,18 +482,22 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
 
   return (
     <div style={s.wrap}>
-      {showForm ? (
-        <TransactionForm
-          isAdmin={isAdmin}
-          locations={locations}
-          projects={projects}
-          onSave={handleSave}
-          onCancel={() => setShowForm(false)}
-          onConversionSaved={onConversionSaved}
-        />
-      ) : (
-        <>
-          <div style={s.toolbar}>
+      {showForm && (
+        <div style={s.formOverlay} onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
+          <div style={s.formModal}>
+            <TransactionForm
+              isAdmin={isAdmin}
+              locations={locations}
+              projects={projects}
+              onSave={handleSave}
+              onCancel={() => setShowForm(false)}
+              onConversionSaved={onConversionSaved}
+            />
+          </div>
+        </div>
+      )}
+      <>
+        <div style={s.toolbar}>
             {isAdmin && (
               <select style={s.select} value={filters.type} onChange={e => setFilter('type', e.target.value)}>
                 <option value="">{t.invTxAllTypes}</option>
@@ -603,7 +607,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
             </>
           )}
         </>
-      )}
+      </>
     </div>
   );
 }
@@ -628,6 +632,8 @@ const f = {
 
 const s = {
   wrap:        { padding: 16 },
+  formOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 150, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 16, overflowY: 'auto' },
+  formModal:   { background: '#fff', borderRadius: 12, width: '100%', maxWidth: 720, marginTop: 24, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', maxHeight: 'calc(100vh - 48px)', overflowY: 'auto' },
   toolbar:     { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 },
   select:      { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151' },
   dateWrap:    { display: 'flex', alignItems: 'center', gap: 5 },

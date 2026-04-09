@@ -23,7 +23,7 @@ function formatElapsed(seconds) {
 }
 
 export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabled = true, projectsEnabled = true }) {
-  const { isOffline, queueCount, onSync } = useOffline() || {};
+  const { isOffline, queueCount, onSync, sendToSW } = useOffline() || {};
   const [status, setStatus] = useState(null); // null = loading, false = not clocked in, object = clocked in
   const [clockInForm, setClockInForm] = useState({ selectedProject: '', notes: '' });
   const { clearPersisted: clearClockInPersisted } = useFormPersist('clock-in', clockInForm, setClockInForm);
@@ -45,6 +45,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
   const [checklistAnswers, setChecklistAnswers] = useState({});
   const [checklistSubmitting, setChecklistSubmitting] = useState(false);
   const [confirmingCancelClock, setConfirmingCancelClock] = useState(false);
+  const [clockOutSummary, setClockOutSummary] = useState(null); // { seconds, projectName }
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -104,6 +105,13 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [!!status?.clock_in_time, geolocationEnabled]);
+
+  // Auto-dismiss clock-out summary after 5s
+  useEffect(() => {
+    if (!clockOutSummary) return;
+    const id = setTimeout(() => setClockOutSummary(null), 5000);
+    return () => clearTimeout(id);
+  }, [clockOutSummary]);
 
   const toLocalTime = d => {
     const pad = n => String(n).padStart(2, '0');
@@ -212,6 +220,8 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
         // Queued offline — stay "clocked in" locally until sync
         setStatus(prev => ({ ...prev, clock_out_queued: true }));
       } else {
+        const summarySeconds = elapsed;
+        const summaryProject = status.project_name;
         onEntryAdded({ ...r.data, project_name: status.project_name });
         setStatus(false);
         setSelectedProject('');
@@ -219,6 +229,7 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
         setMileageAdded(false);
         setBreakMinutes('');
         setMileage('');
+        setClockOutSummary({ seconds: summarySeconds, projectName: summaryProject });
       }
     } catch (err) {
       setError(err.response?.data?.error || t.clockOutFailed);
@@ -261,9 +272,18 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
 
   const offlineBanner = (isOffline || queueCount > 0) && (
     <div style={styles.offlineBanner}>
-      {isOffline ? t.offlineWarning : null}
-      {queueCount > 0 && !isOffline ? `${queueCount} punch${queueCount !== 1 ? 'es' : ''} pending sync...` : null}
-      {queueCount > 0 && isOffline ? ` ${queueCount} punch${queueCount !== 1 ? 'es' : ''} queued.` : null}
+      <span>
+        {isOffline
+          ? t.offlineWarning
+          : `${queueCount} ${queueCount !== 1 ? t.syncPendingPunches : t.syncPendingPunch}`}
+        {queueCount > 0 && isOffline ? ` · ${queueCount} ${queueCount !== 1 ? t.syncQueuedPunches : t.syncQueuedPunch}` : null}
+      </span>
+      {!isOffline && queueCount > 0 && (
+        <span style={{ display: 'flex', gap: 8, marginLeft: 8 }}>
+          <button style={styles.syncRetryBtn} onClick={() => sendToSW?.({ type: 'REPLAY_QUEUE' })}>{t.syncRetry}</button>
+          <button style={styles.syncClearBtn} onClick={() => sendToSW?.({ type: 'CLEAR_QUEUE' })}>{t.syncClear}</button>
+        </span>
+      )}
     </div>
   );
 
@@ -400,6 +420,17 @@ export default function ClockInOut({ projects, onEntryAdded, t, geolocationEnabl
   return (
     <div style={styles.card}>
       {offlineBanner}
+      {clockOutSummary && (
+        <div style={styles.clockOutSummary}>
+          <div style={styles.clockOutSummaryCheck}>✓</div>
+          <div style={styles.clockOutSummaryBody}>
+            <div style={styles.clockOutSummaryTitle}>{t.clockOutSummaryTitle}</div>
+            <div style={styles.clockOutSummaryProject}>{clockOutSummary.projectName}</div>
+            <div style={styles.clockOutSummaryDuration}>{t.clockOutSummaryDuration}: <strong>{formatElapsed(clockOutSummary.seconds)}</strong></div>
+          </div>
+          <button style={styles.clockOutSummaryDismiss} onClick={() => setClockOutSummary(null)}>✕</button>
+        </div>
+      )}
       <h2 style={styles.heading}>{t.clockIn}</h2>
       <div style={styles.form}>
         {projectsEnabled && <div>
@@ -547,6 +578,15 @@ const styles = {
   noProjectsIcon: { fontSize: 36, marginBottom: 10 },
   noProjectsTitle: { fontWeight: 700, fontSize: 16, color: '#374151', marginBottom: 6 },
   noProjectsText: { fontSize: 13, color: '#9ca3af', lineHeight: 1.5 },
-  offlineBanner: { background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 7, padding: '8px 12px', fontSize: 13, fontWeight: 500, marginBottom: 12 },
+  offlineBanner: { background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 7, padding: '8px 12px', fontSize: 13, fontWeight: 500, marginBottom: 12, display: 'flex', alignItems: 'center' },
   offlineBannerDark: { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', borderRadius: 7, padding: '8px 12px', fontSize: 12, fontWeight: 500 },
+  syncRetryBtn: { background: '#92400e', color: '#fff', border: 'none', borderRadius: 5, padding: '2px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  syncClearBtn: { background: 'none', border: 'none', color: '#92400e', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: 0 },
+  clockOutSummary: { background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 },
+  clockOutSummaryCheck: { fontSize: 24, color: '#16a34a', fontWeight: 700, flexShrink: 0 },
+  clockOutSummaryBody: { flex: 1 },
+  clockOutSummaryTitle: { fontSize: 15, fontWeight: 700, color: '#15803d' },
+  clockOutSummaryProject: { fontSize: 13, color: '#374151', marginTop: 2 },
+  clockOutSummaryDuration: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  clockOutSummaryDismiss: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 18, cursor: 'pointer', padding: '0 4px', lineHeight: 1, flexShrink: 0 },
 };

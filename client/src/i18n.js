@@ -19,6 +19,8 @@ const translations = {
     selectProjectFirst: 'Select a project first',
     clockInFailed: 'Clock-in failed',
     clockOutFailed: 'Clock-out failed',
+    clockOutSummaryTitle: 'Clocked Out',
+    clockOutSummaryDuration: 'Shift duration',
 
     // TimeEntryForm
     logTime: 'Log Time',
@@ -400,6 +402,12 @@ const translations = {
 
     // ── ClockInOut ───────────────────────────────────────────────────────────
     offlineWarning: 'You are offline — punches will sync when reconnected.',
+    syncRetry: 'Retry',
+    syncClear: 'Clear',
+    syncPendingPunch: 'punch pending sync',
+    syncPendingPunches: 'punches pending sync',
+    syncQueuedPunch: 'punch queued',
+    syncQueuedPunches: 'punches queued',
     clockingStatus: 'Loading clock status...',
     offlineClockOutWarn: 'Offline — clock-out will sync when reconnected.',
     clockInQueuedOffline: 'Clock-in queued offline',
@@ -1479,6 +1487,11 @@ const translations = {
     invPOPartial: 'Partial',
     invPOReceived: 'Received',
     invPOCancelled: 'Cancelled',
+    invPONextActionDraft: 'Add items and submit to send to your supplier.',
+    invPONextActionSubmitted: 'Awaiting delivery — click Receive when goods arrive.',
+    invPONextActionPartial: 'Partially received — receive remaining items when they arrive.',
+    invPONextActionReceived: 'All items have been received.',
+    invPONextActionCancelled: 'This order has been cancelled.',
     invPOReceiveTitle: 'Receive Items',
     invPOSelectReceiveLoc: 'Select a receiving location.',
     invPOEnterQty: 'Enter a quantity for at least one line.',
@@ -1657,6 +1670,8 @@ const translations = {
     selectProjectFirst: 'Selecciona un proyecto primero',
     clockInFailed: 'Error al registrar entrada',
     clockOutFailed: 'Error al registrar salida',
+    clockOutSummaryTitle: 'Salida Registrada',
+    clockOutSummaryDuration: 'Duración del turno',
 
     // TimeEntryForm
     logTime: 'Registrar Tiempo',
@@ -2038,6 +2053,12 @@ const translations = {
 
     // ── ClockInOut ───────────────────────────────────────────────────────────
     offlineWarning: 'Estás sin conexión — los registros se sincronizarán al reconectarte.',
+    syncRetry: 'Reintentar',
+    syncClear: 'Limpiar',
+    syncPendingPunch: 'registro pendiente de sincronización',
+    syncPendingPunches: 'registros pendientes de sincronización',
+    syncQueuedPunch: 'registro en cola',
+    syncQueuedPunches: 'registros en cola',
     clockingStatus: 'Cargando estado del reloj...',
     offlineClockOutWarn: 'Sin conexión — la salida se sincronizará al reconectarte.',
     clockInQueuedOffline: 'Entrada en cola sin conexión',
@@ -3116,6 +3137,11 @@ const translations = {
     invPOPartial: 'Parcial',
     invPOReceived: 'Recibido',
     invPOCancelled: 'Cancelado',
+    invPONextActionDraft: 'Agrega artículos y envía la orden a tu proveedor.',
+    invPONextActionSubmitted: 'En espera de entrega — haz clic en Recibir cuando lleguen los productos.',
+    invPONextActionPartial: 'Recibido parcialmente — recibe los artículos restantes cuando lleguen.',
+    invPONextActionReceived: 'Todos los artículos han sido recibidos.',
+    invPONextActionCancelled: 'Esta orden ha sido cancelada.',
     invPOReceiveTitle: 'Recibir Artículos',
     invPOSelectReceiveLoc: 'Selecciona una ubicación de recepción.',
     invPOEnterQty: 'Ingresa una cantidad para al menos una línea.',
