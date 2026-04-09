@@ -1153,11 +1153,6 @@ async function checkAutoComplete(companyId, countId, completedById) {
   );
   if (parseInt(pending.rows[0].count) > 0) return false;
 
-  const lines = await pool.query(
-    'SELECT * FROM inventory_cycle_count_lines WHERE cycle_count_id = $1',
-    [countId]
-  );
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -1174,12 +1169,19 @@ async function checkAutoComplete(companyId, countId, completedById) {
       return false; // Already completed or not found
     }
 
+    // Fetch lines inside the transaction so we see the latest committed variance values
+    // (a reconciler could have updated variance between the pending-count check and here)
+    const linesResult = await client.query(
+      'SELECT * FROM inventory_cycle_count_lines WHERE cycle_count_id = $1',
+      [countId]
+    );
+
     const cc = claim.rows[0];
     const isFullCount = cc.count_type === 'full';
     const typeLabel = { reconcile: 'Reconcile count adjustment', audit: 'Audit count adjustment',
       full: 'Full count adjustment' }[cc.count_type] || 'Cycle count adjustment';
 
-    const linesWithVariance = lines.rows.filter(l => parseFloat(l.variance) !== 0);
+    const linesWithVariance = linesResult.rows.filter(l => parseFloat(l.variance) !== 0);
     for (const line of linesWithVariance) {
       const delta = parseFloat(line.variance);
       const locationId = isFullCount ? line.location_id : cc.location_id;
@@ -1364,6 +1366,8 @@ router.patch('/cycle-counts/:id/workers/:userId/lines', requireAdmin, async (req
   const { line_ids, user_id: newUserId } = req.body;
   if (!Array.isArray(line_ids) || line_ids.length === 0) return res.status(400).json({ error: 'line_ids array required' });
   if (!newUserId) return res.status(400).json({ error: 'user_id required' });
+  const validLineIds = line_ids.map(id => parseInt(id)).filter(id => !isNaN(id));
+  if (validLineIds.length === 0) return res.status(400).json({ error: 'line_ids must be integers' });
   try {
     const cc = await pool.query(
       'SELECT id FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
@@ -1377,14 +1381,14 @@ router.patch('/cycle-counts/:id/workers/:userId/lines', requireAdmin, async (req
     );
     if (counterCheck.rowCount === 0) return res.status(400).json({ error: 'Target worker is not a counter for this count' });
 
-    for (const lineId of line_ids) {
+    for (const lineId of validLineIds) {
       await pool.query(
         `UPDATE inventory_count_assignments SET user_id=$1
          WHERE line_id=$2 AND cycle_count_id=$3 AND role='counter' AND status='pending'`,
         [newUserId, lineId, req.params.id]
       );
     }
-    res.json({ reassigned: line_ids.length });
+    res.json({ reassigned: validLineIds.length });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -1399,6 +1403,7 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
   const qty = parseFloat(counted_qty);
   if (isNaN(qty) || qty < 0) return res.status(400).json({ error: 'counted_qty must be a non-negative number' });
   const notesTrimmed = notes?.trim()?.slice(0, 500) || null;
+  const resolvedCountedUomId = counted_uom_id != null ? parseInt(counted_uom_id) : null;
 
   try {
     // Verify count belongs to company and is active
@@ -1409,14 +1414,24 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
     if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
     if (cc.rows[0].status !== 'in_progress') return res.status(409).json({ error: 'Count is not in progress' });
 
-    // Verify assignment exists for this worker/line/role
+    // Atomically claim the assignment — prevents duplicate submissions from concurrent requests
     const assignment = await pool.query(
-      `SELECT a.* FROM inventory_count_assignments a
-       WHERE a.line_id=$1 AND a.cycle_count_id=$2 AND a.user_id=$3 AND a.role=$4`,
-      [line_id, req.params.id, req.user.id, role]
+      `UPDATE inventory_count_assignments
+       SET status='submitted', counted_qty=$1, counted_uom_id=$2, notes=$3, submitted_at=NOW()
+       WHERE line_id=$4 AND cycle_count_id=$5 AND user_id=$6 AND role=$7 AND status='pending'
+       RETURNING *`,
+      [qty, resolvedCountedUomId, notesTrimmed, line_id, req.params.id, req.user.id, role]
     );
-    if (assignment.rowCount === 0) return res.status(403).json({ error: 'No assignment found for this line/role' });
-    if (assignment.rows[0].status === 'submitted') return res.status(409).json({ error: 'Already submitted' });
+    if (assignment.rowCount === 0) {
+      // Distinguish "no assignment" from "already submitted"
+      const exists = await pool.query(
+        `SELECT status FROM inventory_count_assignments
+         WHERE line_id=$1 AND cycle_count_id=$2 AND user_id=$3 AND role=$4`,
+        [line_id, req.params.id, req.user.id, role]
+      );
+      if (exists.rowCount === 0) return res.status(403).json({ error: 'No assignment found for this line/role' });
+      return res.status(409).json({ error: 'Already submitted' });
+    }
 
     // Fetch line for UOM variance computation
     const lineRow = await pool.query(
@@ -1430,7 +1445,6 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
     const line = lineRow.rows[0];
 
     // Compute variance in stock UOM units
-    const resolvedCountedUomId = counted_uom_id != null ? parseInt(counted_uom_id) : null;
     let variance = qty - parseFloat(line.expected_qty);
     if (resolvedCountedUomId && resolvedCountedUomId !== line.stock_uom_id) {
       const uomRow = await pool.query(
@@ -1445,14 +1459,6 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
         variance = qtyInStockUom - parseFloat(line.expected_qty);
       }
     }
-
-    // Mark assignment submitted
-    await pool.query(
-      `UPDATE inventory_count_assignments
-       SET status='submitted', counted_qty=$1, counted_uom_id=$2, notes=$3, submitted_at=NOW()
-       WHERE id=$4`,
-      [qty, resolvedCountedUomId, notesTrimmed, assignment.rows[0].id]
-    );
 
     // Update line counted values and status
     let newLineStatus = line.line_status;
