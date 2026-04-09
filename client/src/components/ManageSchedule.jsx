@@ -196,6 +196,8 @@ export default function ManageSchedule({ workers, projects }) {
   const [preDragShifts, setPreDragShifts] = useState(null);
   const [pendingMoves, setPendingMoves] = useState({});
   const [savingMoves, setSavingMoves] = useState(false);
+  const [overlapWarning, setOverlapWarning] = useState('');
+  const [copyingWeek, setCopyingWeek] = useState(false);
 
   const activeSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -266,15 +268,61 @@ export default function ManageSchedule({ workers, projects }) {
   const addShift = async e => {
     e.preventDefault();
     if (!form.user_id) { setError(t.selectAWorker); return; }
+
+    // Check for overlapping shift for the same worker on the same day
+    const existing = shifts.filter(s =>
+      String(s.user_id) === String(form.user_id) &&
+      s.shift_date.substring(0, 10) === form.shift_date
+    );
+    const newStart = form.start_time;
+    const newEnd = form.end_time;
+    const hasOverlap = existing.some(s => {
+      const eStart = s.start_time.substring(0, 5);
+      const eEnd = s.end_time.substring(0, 5);
+      return newStart < eEnd && newEnd > eStart;
+    });
+    if (hasOverlap) {
+      setOverlapWarning(t.msOverlapWarning);
+    } else {
+      setOverlapWarning('');
+    }
+
     setSaving(true); setError('');
     try {
       const r = await api.post('/shifts/admin', form);
       setShifts(prev => [...prev, r.data].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
       setForm(f => ({ ...f, notes: '' }));
+      setOverlapWarning('');
       toast(t.shiftAdded, 'success');
     } catch (err) {
       setError(err.response?.data?.error || t.failedSaveShift);
     } finally { setSaving(false); }
+  };
+
+  const copyWeek = async () => {
+    if (shifts.length === 0) return;
+    setCopyingWeek(true);
+    let failed = 0;
+    const results = [];
+    for (const s of shifts) {
+      const nextDate = toISO(addDays(new Date(s.shift_date.substring(0, 10) + 'T00:00:00'), 7));
+      try {
+        const r = await api.post('/shifts/admin', {
+          user_id: s.user_id,
+          project_id: s.project_id || '',
+          shift_date: nextDate,
+          start_time: s.start_time.substring(0, 5),
+          end_time: s.end_time.substring(0, 5),
+          notes: s.notes || '',
+        });
+        results.push(r.data);
+      } catch { failed++; }
+    }
+    setCopyingWeek(false);
+    if (failed > 0) toast(t.msCopyFailed, 'error');
+    else toast(t.msCopyDone, 'success');
+    // Navigate to next week to show the copies
+    setWeekStart(d => addDays(d, 7));
   };
 
   const deleteShift = async id => {
@@ -396,6 +444,7 @@ export default function ManageSchedule({ workers, projects }) {
             <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? '...' : t.addShift}</button>
           </div>
         </div>
+        {overlapWarning && <p style={styles.overlapWarning}>⚠ {overlapWarning}</p>}
         {error && <p style={styles.error}>{error}</p>}
       </form>
 
@@ -405,6 +454,11 @@ export default function ManageSchedule({ workers, projects }) {
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>{t.nextWeek}</button>
         <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>{t.today}</button>
         <button style={styles.exportBtn} onClick={() => exportCSV(shifts, days)} title="Export week as CSV">⬇ CSV</button>
+        {shifts.length > 0 && (
+          <button style={styles.copyWeekBtn} onClick={copyWeek} disabled={copyingWeek} title={t.msCopyWeek}>
+            {copyingWeek ? t.msCopying : '⧉ ' + t.msCopyWeek}
+          </button>
+        )}
         <div style={styles.viewToggle}>
           <button style={{ ...styles.viewBtn, ...(viewMode === 'grid' ? styles.viewBtnActive : {}) }} onClick={() => setViewMode('grid')}>{t.msViewGrid}</button>
           <button style={{ ...styles.viewBtn, ...(viewMode === 'summary' ? styles.viewBtnActive : {}) }} onClick={() => setViewMode('summary')}>{t.msViewSummary}</button>
@@ -516,6 +570,8 @@ const styles = {
   input: { padding: '7px 9px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13 },
   addBtn: { padding: '7px 14px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' },
   error: { color: '#e53e3e', fontSize: 13, marginTop: 4 },
+  overlapWarning: { color: '#d97706', fontSize: 13, marginTop: 4, background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '5px 10px' },
+  copyWeekBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: '#6b7280', whiteSpace: 'nowrap' },
   weekNav: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' },
   navBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 10px', fontSize: 13, cursor: 'pointer', color: '#374151' },
   weekLabel: { fontWeight: 600, fontSize: 14, color: '#111827', flex: 1 },

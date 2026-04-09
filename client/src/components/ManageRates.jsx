@@ -451,6 +451,27 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </label>
           </div>
           <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.ratesShiftReminderHour}</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Hour to send tomorrow's shift push notifications</div>
+            </div>
+            <select style={styles.input} value={form.shift_reminder_hour} onChange={e => set('shift_reminder_hour', e.target.value)}>
+              {Array.from({ length: 24 }, (_, h) => (
+                <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
+              ))}
+            </select>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.ratesPtoAnnualDays}</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.ratesPtoAnnualDaysDesc}</div>
+            </div>
+            <div style={styles.inputGroup}>
+              <input style={styles.input} type="number" min="0" max="365" step="1" value={form.pto_annual_days} onChange={e => set('pto_annual_days', e.target.value)} />
+              <span style={styles.suffix}>{t.ratesDays}</span>
+            </div>
+          </div>
+          <div style={styles.row}>
             <label style={styles.label}>{t.ratesClearChat}</label>
             <div style={styles.inputGroup}>
               <input style={styles.input} type="number" min="1" max="90" step="1" value={form.chat_retention_days} onChange={e => set('chat_retention_days', e.target.value)} required />

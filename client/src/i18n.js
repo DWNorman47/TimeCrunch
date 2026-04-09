@@ -375,6 +375,12 @@ const translations = {
     msNoShiftsWeek: 'No shifts this week.',
     msCantOnly: "Can't make it only",
     msCantOnlyNoFlags: 'No workers have flagged this week.',
+    msCopyWeek: 'Copy to Next Week',
+    msCopying: 'Copying…',
+    msCopyDone: 'Week copied to next week',
+    msCopyFailed: 'Some shifts failed to copy',
+    msOverlapWarning: 'This worker already has an overlapping shift on this day.',
+    msExpectedToday: 'Expected today — not clocked in',
 
     // ── Analytics date range ──────────────────────────────────────────────────
     ad14Days: '14 days',
@@ -414,6 +420,9 @@ const translations = {
     ratesAlertInactive: 'Alert if worker inactive for',
     ratesDays: 'days',
     ratesWorkHours: 'Work hours range',
+    ratesShiftReminderHour: 'Send shift reminders at',
+    ratesPtoAnnualDays: 'Annual PTO days per worker',
+    ratesPtoAnnualDaysDesc: 'Set to 0 to hide PTO balance tracking',
     ratesClearChat: 'Clear chat messages after',
     ratesWorkerAccess: 'Worker Access',
     ratesWorkerAccessDesc: 'Control what workers can see in their dashboard',
@@ -517,6 +526,10 @@ const translations = {
     noTimeOffYet: 'No time off requests yet.',
     day: 'day',
     days: 'days',
+    ptoBalance: 'PTO Balance',
+    ptoUsed: 'used',
+    ptoRemaining: 'remaining',
+    ptoOf: 'of',
 
     // ── WelcomeModal ─────────────────────────────────────────────────────────
     welcomeBrand: 'OpsFloA · Ops Flow Assist',
@@ -2087,6 +2100,12 @@ const translations = {
     msNoShiftsWeek: 'No hay turnos esta semana.',
     msCantOnly: 'Solo los que no pueden asistir',
     msCantOnlyNoFlags: 'Ningún trabajador ha marcado esta semana.',
+    msCopyWeek: 'Copiar a la próxima semana',
+    msCopying: 'Copiando…',
+    msCopyDone: 'Semana copiada a la próxima semana',
+    msCopyFailed: 'Algunos turnos no se pudieron copiar',
+    msOverlapWarning: 'Este trabajador ya tiene un turno que se superpone en este día.',
+    msExpectedToday: 'Esperado hoy — no ha fichado',
 
     // ── Analytics date range ──────────────────────────────────────────────────
     ad14Days: '14 días',
@@ -2126,6 +2145,9 @@ const translations = {
     ratesAlertInactive: 'Alertar si el trabajador inactivo por',
     ratesDays: 'días',
     ratesWorkHours: 'Rango de horas de trabajo',
+    ratesShiftReminderHour: 'Enviar recordatorios de turno a las',
+    ratesPtoAnnualDays: 'Días de PTO anuales por trabajador',
+    ratesPtoAnnualDaysDesc: 'Establezca 0 para ocultar el seguimiento de PTO',
     ratesClearChat: 'Borrar mensajes de chat después de',
     ratesWorkerAccess: 'Acceso de Trabajadores',
     ratesWorkerAccessDesc: 'Controla lo que los trabajadores pueden ver en su panel',
@@ -2229,6 +2251,10 @@ const translations = {
     noTimeOffYet: 'No hay solicitudes de tiempo libre aún.',
     day: 'día',
     days: 'días',
+    ptoBalance: 'Saldo de PTO',
+    ptoUsed: 'usados',
+    ptoRemaining: 'restantes',
+    ptoOf: 'de',
 
     // ── WelcomeModal ─────────────────────────────────────────────────────────
     welcomeBrand: 'OpsFloA · Asistente de Operaciones',

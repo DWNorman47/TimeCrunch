@@ -236,7 +236,7 @@ export default function AdminDashboard() {
             {!collapsedSections.export && (plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />)}
           </>
         ) : tab === 'timeoff' ? (
-          <AdminTimeOff />
+          <AdminTimeOff settings={settings} />
         ) : tab === 'expenses' ? (
           <ReimbursementsAdmin />
         ) : tab === 'manage' ? (

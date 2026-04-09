@@ -16,7 +16,7 @@ function days(start, end) {
   return Math.round((e - s) / 86400000) + 1;
 }
 
-export default function AdminTimeOff() {
+export default function AdminTimeOff({ settings }) {
   const t = useT();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,10 +25,23 @@ export default function AdminTimeOff() {
   const [acting, setActing] = useState(null);
   const [actError, setActError] = useState('');
 
+  const annualDays = settings?.pto_annual_days || 0;
+
+  // Compute used days per worker from approved requests in current year
+  const currentYear = new Date().getFullYear();
+  const usedByWorker = {};
+  requests.forEach(r => {
+    if (r.status !== 'approved') return;
+    const year = new Date(r.start_date.toString().substring(0, 10) + 'T00:00:00').getFullYear();
+    if (year !== currentYear) return;
+    const d = days(r.start_date.toString(), r.end_date.toString());
+    usedByWorker[r.worker_name] = (usedByWorker[r.worker_name] || 0) + d;
+  });
+
   const load = (status) => {
     setLoading(true);
-    const params = status !== 'all' ? { status } : {};
-    api.get('/time-off', { params })
+    // Load all to compute balances accurately; filter client-side if needed
+    api.get('/time-off', { params: {} })
       .then(r => setRequests(r.data))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -65,8 +78,9 @@ export default function AdminTimeOff() {
     all: t.filterAll,
   };
 
-  const pending = requests.filter(r => r.status === 'pending');
-  const rest = requests.filter(r => r.status !== 'pending');
+  const visible = filter === 'all' ? requests : requests.filter(r => r.status === filter);
+  const pending = visible.filter(r => r.status === 'pending');
+  const rest = visible.filter(r => r.status !== 'pending');
 
   return (
     <div>
@@ -83,16 +97,24 @@ export default function AdminTimeOff() {
 
       {loading ? (
         <p style={s.empty}>{t.loading}</p>
-      ) : requests.length === 0 ? (
+      ) : visible.length === 0 ? (
         <p style={s.empty}>{t.noTimeOffRequests}</p>
       ) : (
         <div style={s.list}>
           {[...pending, ...rest].map(r => {
             const d = days(r.start_date.toString(), r.end_date.toString());
+            const workerUsed = usedByWorker[r.worker_name] || 0;
             return (
             <div key={r.id} style={s.card}>
               <div style={s.cardTop}>
-                <div style={s.workerName}>{r.worker_name}</div>
+                <div>
+                  <div style={s.workerName}>{r.worker_name}</div>
+                  {annualDays > 0 && (
+                    <div style={s.ptoBadge}>
+                      {workerUsed} / {annualDays} {t.days} {t.ptoUsed} · {Math.max(0, annualDays - workerUsed)} {t.ptoRemaining}
+                    </div>
+                  )}
+                </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <span style={{ ...s.typeBadge, background: TYPE_COLORS[r.type] + '22', color: TYPE_COLORS[r.type] }}>
                     {TYPE_LABELS[r.type] || r.type}
@@ -166,6 +188,7 @@ const s = {
   card: { background: '#fff', borderRadius: 12, padding: '16px 18px', boxShadow: '0 1px 6px rgba(0,0,0,0.07)' },
   cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 8 },
   workerName: { fontSize: 15, fontWeight: 700, color: '#111827' },
+  ptoBadge: { fontSize: 11, color: '#6b7280', marginTop: 2 },
   typeBadge: { fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em' },
   statusBadge: { fontSize: 12, fontWeight: 700 },
   dates: { fontSize: 15, fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: 8 },

@@ -28,11 +28,15 @@ export default function TimeOffTab() {
   const [showForm, setShowForm] = useState(false);
   const [pendingCancelId, setPendingCancelId] = useState(null);
   const [cancelError, setCancelError] = useState('');
+  const [balance, setBalance] = useState(null);
 
   const load = () => {
     setLoading(true);
-    api.get('/time-off/mine')
-      .then(r => setRequests(r.data))
+    Promise.all([
+      api.get('/time-off/mine'),
+      api.get('/time-off/balance'),
+    ])
+      .then(([r, b]) => { setRequests(r.data); setBalance(b.data); })
       .catch(() => {})
       .finally(() => setLoading(false));
   };
@@ -75,6 +79,18 @@ export default function TimeOffTab() {
           {showForm ? t.cancel : t.newRequest}
         </button>
       </div>
+      {balance && balance.annual_days > 0 && (
+        <div style={s.balanceBar}>
+          <span style={s.balanceLabel}>{t.ptoBalance}:</span>
+          <span style={s.balanceUsed}>{balance.used_days} {t.ptoUsed}</span>
+          <span style={s.balanceSep}>·</span>
+          <span style={s.balanceRemaining}>{balance.remaining_days} {t.ptoRemaining}</span>
+          <span style={s.balanceSep}>{t.ptoOf} {balance.annual_days} {t.days}</span>
+          <div style={s.balanceBar2}>
+            <div style={{ ...s.balanceFill, width: `${Math.min(100, (balance.used_days / balance.annual_days) * 100)}%` }} />
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={handleSubmit} style={s.form}>
@@ -181,4 +197,11 @@ const s = {
   confirmCancelBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   cancelError: { fontSize: 11, color: '#ef4444', marginLeft: 8 },
   empty: { color: '#9ca3af', fontSize: 14, textAlign: 'center', padding: '32px 0' },
+  balanceBar: { display: 'flex', alignItems: 'center', gap: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 14px', marginBottom: 14, flexWrap: 'wrap' },
+  balanceLabel: { fontSize: 13, fontWeight: 700, color: '#166534' },
+  balanceUsed: { fontSize: 13, color: '#374151', fontWeight: 600 },
+  balanceSep: { fontSize: 12, color: '#9ca3af' },
+  balanceRemaining: { fontSize: 13, color: '#059669', fontWeight: 700 },
+  balanceBar2: { flex: '1 1 100%', height: 4, background: '#d1fae5', borderRadius: 4, marginTop: 4, overflow: 'hidden' },
+  balanceFill: { height: '100%', background: '#059669', borderRadius: 4, transition: 'width 0.3s' },
 };

@@ -105,6 +105,11 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
           sendEmail(worker.rows[0].email, 'Time off approved ✓',
             `<p>Hi ${worker.rows[0].full_name},</p><p>Your time off request (<b>${startStr}</b> – <b>${endStr}</b>) has been <b style="color:#059669">approved</b>.</p>${review_note ? `<p>Note: ${review_note}</p>` : ''}<p>— OpsFloa</p>`);
         }
+        sendPushToUser(row.user_id, {
+          title: 'Time off approved ✓',
+          body: `${startStr} – ${endStr}${review_note ? ': ' + review_note : ''}`,
+          url: '/dashboard#time-off',
+        });
 
         // Flag any scheduled shifts during the approved time-off period
         const conflictResult = await pool.query(
@@ -147,14 +152,42 @@ router.patch('/:id/deny', requireAdmin, async (req, res) => {
     const row = result.rows[0];
     setImmediate(async () => {
       try {
+        const denyStartStr = row.start_date?.toString().substring(0, 10);
+        const denyEndStr = row.end_date?.toString().substring(0, 10);
         const worker = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [row.user_id]);
         if (worker.rows[0]?.email) {
           sendEmail(worker.rows[0].email, 'Time off request denied',
-            `<p>Hi ${worker.rows[0].full_name},</p><p>Your time off request (<b>${row.start_date?.toString().substring(0,10)}</b> – <b>${row.end_date?.toString().substring(0,10)}</b>) was <b style="color:#ef4444">denied</b>.${review_note ? ` Reason: ${review_note}` : ''}</p><p>— OpsFloa</p>`);
+            `<p>Hi ${worker.rows[0].full_name},</p><p>Your time off request (<b>${denyStartStr}</b> – <b>${denyEndStr}</b>) was <b style="color:#ef4444">denied</b>.${review_note ? ` Reason: ${review_note}` : ''}</p><p>— OpsFloa</p>`);
         }
+        sendPushToUser(row.user_id, {
+          title: 'Time off request denied',
+          body: `${denyStartStr} – ${denyEndStr}${review_note ? ': ' + review_note : ''}`,
+          url: '/dashboard#time-off',
+        });
       } catch (err) { console.error('Time off denial notification error:', err); }
     });
     res.json(row);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /time-off/balance — worker's PTO balance for the current year
+router.get('/balance', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const [settingResult, usedResult] = await Promise.all([
+      pool.query(`SELECT value FROM settings WHERE company_id = $1 AND key = 'pto_annual_days'`, [companyId]),
+      pool.query(
+        `SELECT COALESCE(SUM(end_date - start_date + 1), 0) AS used_days
+         FROM time_off_requests
+         WHERE user_id = $1 AND company_id = $2
+           AND status = 'approved'
+           AND EXTRACT(YEAR FROM start_date) = EXTRACT(YEAR FROM CURRENT_DATE)`,
+        [req.user.id, companyId]
+      ),
+    ]);
+    const annualDays = parseFloat(settingResult.rows[0]?.value ?? 0);
+    const usedDays = parseInt(usedResult.rows[0]?.used_days ?? 0);
+    res.json({ annual_days: annualDays, used_days: usedDays, remaining_days: Math.max(0, annualDays - usedDays) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

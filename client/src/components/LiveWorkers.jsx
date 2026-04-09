@@ -57,10 +57,18 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   const [clockInNotes, setClockInNotes] = useState('');
   const [clockInSaving, setClockInSaving] = useState(false);
   const [allWorkers, setAllWorkers] = useState([]);
+  const [todayShifts, setTodayShifts] = useState([]);
 
   const fetchActive = () => {
     api.get('/admin/active-clocks')
       .then(r => { setWorkers(r.data); setLastUpdated(new Date()); })
+      .catch(() => {});
+  };
+
+  const fetchTodayShifts = () => {
+    const today = new Date().toLocaleDateString('en-CA');
+    api.get('/shifts/admin', { params: { from: today, to: today } })
+      .then(r => setTodayShifts(r.data))
       .catch(() => {});
   };
 
@@ -73,7 +81,8 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   useEffect(() => {
     fetchActive();
     fetchInactive();
-    intervalRef.current = setInterval(fetchActive, 30000);
+    fetchTodayShifts();
+    intervalRef.current = setInterval(() => { fetchActive(); fetchTodayShifts(); }, 30000);
     const onVisible = () => {
       if (document.visibilityState === 'visible') fetchActive();
     };
@@ -254,6 +263,27 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
         <div style={styles.empty}>{t.noWorkersOnProject}</div>
       ) : (
         <>
+          {(() => {
+            const clockedInIds = new Set(workers.map(w => String(w.user_id)));
+            const expected = todayShifts.filter(s => !clockedInIds.has(String(s.user_id)) && !s.cant_make_it);
+            if (expected.length === 0) return null;
+            return (
+              <div style={styles.expectedSection}>
+                <div style={styles.expectedTitle}>{t.msExpectedToday}</div>
+                <div style={styles.expectedList}>
+                  {expected.map(s => (
+                    <div key={s.id} style={styles.expectedPill}>
+                      <span style={styles.expectedName}>{s.worker_name}</span>
+                      <span style={styles.expectedTime}>
+                        {s.start_time.substring(0, 5)}–{s.end_time.substring(0, 5)}
+                        {s.project_name ? ` · ${s.project_name}` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           <div style={styles.workerList}>
             {filtered.map(w => (
               <div key={w.user_id} style={styles.workerCard}>
@@ -432,6 +462,12 @@ const styles = {
   inactiveDays: { color: '#b45309', fontWeight: 700 },
   dismissBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 16, cursor: 'pointer', padding: '0 4px', lineHeight: 1 },
   clockInWorkerBtn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  expectedSection: { background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '12px 16px' },
+  expectedTitle: { fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 8 },
+  expectedList: { display: 'flex', flexWrap: 'wrap', gap: 6 },
+  expectedPill: { background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8, padding: '5px 12px', fontSize: 12 },
+  expectedName: { fontWeight: 700, color: '#78350f', marginRight: 6 },
+  expectedTime: { color: '#92400e' },
   adminBadge: { fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 4, padding: '2px 7px', fontWeight: 600 },
   cardActions: { marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
   clockOutBtn: { padding: '5px 14px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
