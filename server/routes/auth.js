@@ -511,7 +511,7 @@ router.post('/accept-invite', authLimiter, async (req, res) => {
 });
 
 // Change password
-router.post('/change-password', requireAuth, async (req, res) => {
+router.post('/change-password', requireAuth, authLimiter, async (req, res) => {
   const { current_password, new_password } = req.body;
   if (!current_password || !new_password) {
     return res.status(400).json({ error: 'current_password and new_password required' });
