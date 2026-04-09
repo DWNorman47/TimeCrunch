@@ -54,6 +54,7 @@ export default function AdminDashboard() {
   const [billing, setBilling] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [pendingReimbursements, setPendingReimbursements] = useState(0);
+  const [chatUnread, setChatUnread] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState(() => {
     try { return JSON.parse(localStorage.getItem('opsfloa_report_sections') || '{}'); } catch { return {}; }
   });
@@ -76,6 +77,24 @@ export default function AdminDashboard() {
     const interval = setInterval(fetchPending, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  // Background chat unread check — show dot on Live tab when workers have messaged
+  useEffect(() => {
+    if (tab === 'live') return; // CompanyChat handles read state when visible
+    const check = () => {
+      api.get('/chat').then(r => {
+        const hasUnread = r.data.some(thread => {
+          const key = `chatLastRead_admin_${thread.worker_id}`;
+          const lastRead = localStorage.getItem(key);
+          return !lastRead || new Date(thread.last_at) > new Date(lastRead);
+        });
+        setChatUnread(hasUnread);
+      }).catch(() => {});
+    };
+    check();
+    const iv = setInterval(check, 60000);
+    return () => clearInterval(iv);
+  }, [tab]);
   // Permission helper — null admin_permissions means full access
   const canDo = key => !user?.admin_permissions || user.admin_permissions[key] === true;
 
@@ -144,7 +163,7 @@ export default function AdminDashboard() {
           active={tab}
           onChange={switchTab}
           tabs={[
-            { id: 'live', label: t.tabLive },
+            { id: 'live', label: t.tabLive, dot: chatUnread && settings?.feature_chat !== false ? '#3b82f6' : null },
             ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
             { id: 'timeoff', label: '🏖 Time Off' },

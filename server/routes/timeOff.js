@@ -2,6 +2,7 @@ const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendEmail } = require('../email');
+const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 
 const VALID_TYPES = ['vacation', 'sick', 'personal', 'other'];
 
@@ -94,12 +95,36 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Request not found or already reviewed' });
     const row = result.rows[0];
+    const startStr = row.start_date?.toString().substring(0, 10);
+    const endStr = row.end_date?.toString().substring(0, 10);
+
     setImmediate(async () => {
       try {
         const worker = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [row.user_id]);
         if (worker.rows[0]?.email) {
           sendEmail(worker.rows[0].email, 'Time off approved ✓',
-            `<p>Hi ${worker.rows[0].full_name},</p><p>Your time off request (<b>${row.start_date?.toString().substring(0,10)}</b> – <b>${row.end_date?.toString().substring(0,10)}</b>) has been <b style="color:#059669">approved</b>.</p>${review_note ? `<p>Note: ${review_note}</p>` : ''}<p>— OpsFloa</p>`);
+            `<p>Hi ${worker.rows[0].full_name},</p><p>Your time off request (<b>${startStr}</b> – <b>${endStr}</b>) has been <b style="color:#059669">approved</b>.</p>${review_note ? `<p>Note: ${review_note}</p>` : ''}<p>— OpsFloa</p>`);
+        }
+
+        // Flag any scheduled shifts during the approved time-off period
+        const conflictResult = await pool.query(
+          `UPDATE shifts SET cant_make_it = true, cant_make_it_note = 'Time off approved'
+           WHERE user_id = $1 AND company_id = $2
+             AND shift_date >= $3::date AND shift_date <= $4::date
+             AND cant_make_it = false
+           RETURNING id, shift_date, start_time, end_time`,
+          [row.user_id, companyId, startStr, endStr]
+        );
+
+        if (conflictResult.rowCount > 0) {
+          // Notify admins of the conflicts
+          const workerName = worker.rows[0]?.full_name || 'Worker';
+          sendPushToCompanyAdmins(companyId, {
+            title: `${workerName} has ${conflictResult.rowCount} shift${conflictResult.rowCount !== 1 ? 's' : ''} during approved time off`,
+            body: `${startStr} – ${endStr} · Review schedule`,
+            url: '/timeclock#manage',
+          });
+          console.log(`[time-off] Flagged ${conflictResult.rowCount} shift(s) for worker ${row.user_id} during approved time off`);
         }
       } catch (err) { console.error('Time off approval notification error:', err); }
     });

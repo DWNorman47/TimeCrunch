@@ -374,6 +374,7 @@ const translations = {
     msViewSummary: 'Summary',
     msNoShiftsWeek: 'No shifts this week.',
     msCantOnly: "Can't make it only",
+    msCantOnlyNoFlags: 'No workers have flagged this week.',
 
     // ── Analytics date range ──────────────────────────────────────────────────
     ad14Days: '14 days',
@@ -2085,6 +2086,7 @@ const translations = {
     msViewSummary: 'Resumen',
     msNoShiftsWeek: 'No hay turnos esta semana.',
     msCantOnly: 'Solo los que no pueden asistir',
+    msCantOnlyNoFlags: 'Ningún trabajador ha marcado esta semana.',
 
     // ── Analytics date range ──────────────────────────────────────────────────
     ad14Days: '14 días',

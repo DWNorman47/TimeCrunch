@@ -147,4 +147,6 @@ app.listen(PORT, () => {
   startMediaRetentionJob();
   const { startScheduledReportsJob } = require('./jobs/scheduledReports');
   startScheduledReportsJob();
+  const { startCron } = require('./cron');
+  startCron();
 });

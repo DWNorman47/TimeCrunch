@@ -26,6 +26,9 @@ function PillContent({ s }) {
         {s.worker_name}
         {s.cant_make_it && <span style={styles.pillCantBadge}>✗ Can't make it</span>}
       </div>
+      {s.cant_make_it && s.cant_make_it_note && (
+        <div style={styles.pillCantNote}>{s.cant_make_it_note}</div>
+      )}
       {s.project_name && <div style={styles.pillProject}>{s.project_name}</div>}
       <div style={styles.pillTime}>{fmtTime(s.start_time)}–{fmtTime(s.end_time)}</div>
       {s.notes && <div style={styles.pillNotes}>{s.notes}</div>}
@@ -69,6 +72,25 @@ function DroppableDay({ date, isToday, children }) {
   );
 }
 
+function exportCSV(shifts, days) {
+  const header = ['Date', 'Worker', 'Project', 'Start', 'End', 'Notes', "Can't Make It", 'Reason'];
+  const rows = shifts.map(s => [
+    s.shift_date.substring(0, 10),
+    s.worker_name,
+    s.project_name || '',
+    s.start_time.substring(0, 5),
+    s.end_time.substring(0, 5),
+    s.notes || '',
+    s.cant_make_it ? 'Yes' : 'No',
+    s.cant_make_it_note || '',
+  ]);
+  const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = `schedule-${days[0].toLocaleDateString('en-CA')}.csv`;
+  a.click();
+}
+
 function SummaryView({ shifts, days }) {
   const t = useT();
   const [cantOnly, setCantOnly] = useState(false);
@@ -98,7 +120,7 @@ function SummaryView({ shifts, days }) {
         </label>
       )}
       {cantOnly && rows.length === 0 && (
-        <p style={{ color: '#9ca3af', fontSize: 13, padding: '8px 0' }}>No workers have flagged this week.</p>
+        <p style={{ color: '#9ca3af', fontSize: 13, padding: '8px 0' }}>{t.msCantOnlyNoFlags}</p>
       )}
       <table style={styles.summaryTable}>
         <thead>
@@ -137,6 +159,9 @@ function SummaryView({ shifts, days }) {
                         <div key={i} style={{ ...styles.summaryShift, ...(s.cant_make_it ? styles.summaryShiftCant : {}) }}>
                           {fmtTime(s.start_time)}–{fmtTime(s.end_time)}
                           {s.project_name && <div style={styles.summaryProject}>{s.project_name}</div>}
+                          {s.cant_make_it && s.cant_make_it_note && (
+                            <div style={styles.summaryCantNote}>{s.cant_make_it_note}</div>
+                          )}
                         </div>
                       ))}
                     </td>
@@ -379,6 +404,7 @@ export default function ManageSchedule({ workers, projects }) {
         <span style={styles.weekLabel}>{fmtDay(days[0])} – {fmtDay(days[6])}</span>
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>{t.nextWeek}</button>
         <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>{t.today}</button>
+        <button style={styles.exportBtn} onClick={() => exportCSV(shifts, days)} title="Export week as CSV">⬇ CSV</button>
         <div style={styles.viewToggle}>
           <button style={{ ...styles.viewBtn, ...(viewMode === 'grid' ? styles.viewBtnActive : {}) }} onClick={() => setViewMode('grid')}>{t.msViewGrid}</button>
           <button style={{ ...styles.viewBtn, ...(viewMode === 'summary' ? styles.viewBtnActive : {}) }} onClick={() => setViewMode('summary')}>{t.msViewSummary}</button>
@@ -506,6 +532,7 @@ const styles = {
   shiftPill: { background: '#eff6ff', borderLeft: '3px solid #1a56db', borderRadius: 5, padding: '5px 7px', fontSize: 11 },
   pillWorker: { fontWeight: 700, color: '#1e3a5f', marginBottom: 1, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
   pillCantBadge: { fontSize: 9, fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '1px 5px', borderRadius: 4, whiteSpace: 'nowrap' },
+  pillCantNote: { fontSize: 9, color: '#dc2626', fontStyle: 'italic', marginTop: 1 },
   pillProject: { color: '#6b7280', fontSize: 10 },
   pillTime: { fontWeight: 600, color: '#1a56db', marginTop: 2 },
   pillNotes: { color: '#9ca3af', fontSize: 10, fontStyle: 'italic' },
@@ -531,19 +558,21 @@ const styles = {
   viewToggle: { display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid #d1d5db' },
   viewBtn: { background: '#fff', border: 'none', padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#374151' },
   viewBtnActive: { background: '#1a56db', color: '#fff' },
-  summaryWrap: { overflowX: 'auto' },
-  summaryTable: { width: '100%', borderCollapse: 'collapse', fontSize: 12 },
-  summaryThWorker: { textAlign: 'left', padding: '6px 10px', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', minWidth: 130 },
-  summaryTh: { textAlign: 'center', padding: '6px 6px', fontWeight: 700, borderBottom: '2px solid #e5e7eb', minWidth: 80 },
-  summaryThTotal: { textAlign: 'center', padding: '6px 8px', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', width: 50 },
-  summaryTdWorker: { padding: '8px 10px', fontWeight: 700, color: '#111827', borderBottom: '1px solid #f3f4f6', verticalAlign: 'top', whiteSpace: 'nowrap' },
-  summaryTd: { padding: '6px', borderBottom: '1px solid #f3f4f6', verticalAlign: 'top', textAlign: 'center' },
+  summaryWrap: { overflowX: 'auto', WebkitOverflowScrolling: 'touch' },
+  summaryTable: { borderCollapse: 'collapse', fontSize: 12, minWidth: 520 },
+  summaryThWorker: { textAlign: 'left', padding: '6px 10px', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', minWidth: 100, maxWidth: 140 },
+  summaryTh: { textAlign: 'center', padding: '6px 4px', fontWeight: 700, borderBottom: '2px solid #e5e7eb', minWidth: 60 },
+  summaryThTotal: { textAlign: 'center', padding: '6px 8px', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', width: 40 },
+  summaryTdWorker: { padding: '8px 10px', fontWeight: 700, color: '#111827', borderBottom: '1px solid #f3f4f6', verticalAlign: 'top', whiteSpace: 'nowrap', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' },
+  summaryTd: { padding: '4px', borderBottom: '1px solid #f3f4f6', verticalAlign: 'top', textAlign: 'center' },
   summaryTdTotal: { padding: '8px', borderBottom: '1px solid #f3f4f6', textAlign: 'center', fontWeight: 700, color: '#374151' },
   summaryEmpty: { color: '#d1d5db' },
-  summaryShift: { background: '#eff6ff', color: '#1e3a5f', borderRadius: 4, padding: '3px 5px', marginBottom: 2, fontWeight: 600, lineHeight: 1.3 },
+  summaryShift: { background: '#eff6ff', color: '#1e3a5f', borderRadius: 4, padding: '3px 4px', marginBottom: 2, fontWeight: 600, lineHeight: 1.3, whiteSpace: 'nowrap' },
   summaryShiftCant: { background: '#fff5f5', color: '#b91c1c' },
   summaryProject: { fontSize: 10, fontWeight: 400, color: '#6b7280', marginTop: 1 },
   summaryRowCant: { background: '#fff9f9' },
   summaryCantDot: { marginLeft: 5, fontSize: 10, color: '#dc2626', fontWeight: 700 },
   cantOnlyToggle: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#dc2626', marginBottom: 10, cursor: 'pointer' },
+  exportBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: '#6b7280' },
+  summaryCantNote: { fontSize: 9, color: '#b91c1c', fontStyle: 'italic', marginTop: 2 },
 };
