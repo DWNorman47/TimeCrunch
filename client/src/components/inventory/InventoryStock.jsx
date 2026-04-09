@@ -182,6 +182,7 @@ function AdjustModal({ item, locations, onClose, onDone }) {
             value={notes}
             onChange={e => setNotes(e.target.value)}
             style={a.input}
+            maxLength={1000}
           />
           <div style={a.actions}>
             <button style={a.cancel} onClick={onClose} disabled={saving}>{t.cancel}</button>
@@ -329,6 +330,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
             value={notes}
             onChange={e => setNotes(e.target.value)}
             style={a.input}
+            maxLength={1000}
           />
           <div style={a.actions}>
             <button style={a.cancel} onClick={onClose} disabled={saving}>{t.cancel}</button>

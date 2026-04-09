@@ -354,6 +354,8 @@ router.post('/clock-in', requireAdmin, requirePermission('manage_workers'), asyn
 router.post('/clock-out/:user_id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
   const { break_minutes, mileage } = req.body;
+  const mileageVal = mileage != null && mileage !== '' ? parseFloat(mileage) : null;
+  if (mileageVal !== null && isNaN(mileageVal)) return res.status(400).json({ error: 'mileage must be a number' });
   try {
     const clockResult = await pool.query(
       `SELECT ac.*, p.wage_type, p.name AS project_name
@@ -385,7 +387,7 @@ router.post('/clock-out/:user_id', requireAdmin, requirePermission('manage_worke
           companyId, clock.user_id, clock.project_id, clock.work_date,
           start_time, end_time, clock.wage_type || 'regular', clock.notes || null,
           clock.clock_in_lat, clock.clock_in_lng,
-          parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
+          parseInt(break_minutes) || 0, mileageVal,
           clock.timezone || null,
           clock.clock_source, clock.clocked_in_by,
         ]
@@ -674,6 +676,8 @@ router.post('/workers/:id/entries', requireAdmin, requirePermission('manage_work
   if (!work_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'work_date, start_time, and end_time are required' });
   }
+  const entryMileageVal = mileage != null && mileage !== '' ? parseFloat(mileage) : null;
+  if (entryMileageVal !== null && isNaN(entryMileageVal)) return res.status(400).json({ error: 'mileage must be a number' });
   try {
     const workerRow = await pool.query(
       'SELECT id FROM users WHERE id = $1 AND company_id = $2 AND active = true',
@@ -697,7 +701,7 @@ router.post('/workers/:id/entries', requireAdmin, requirePermission('manage_work
       [
         companyId, req.params.id, project_id || null, work_date,
         start_time, end_time, wage_type, notes || null,
-        parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
+        parseInt(break_minutes) || 0, entryMileageVal,
         req.user.id,
       ]
     );
