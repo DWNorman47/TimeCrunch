@@ -100,7 +100,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (settings && settings.module_timeclock === false && ['clock', 'messages', 'timesheet'].includes(tab)) {
       setTab('timeoff');
-      window.location.hash = 'timeoff';
+      history.replaceState(null, '', '#timeoff');
     }
   }, [settings]);
 
@@ -401,12 +401,12 @@ ${signatureDataUrl ? `
 
       <main style={styles.main} className="mobile-main">
         <div style={styles.tabs} className="tab-bar">
-          {settings?.module_timeclock !== false && <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); window.location.hash = 'clock'; }}>🕐 Clock</button>}
-          {settings?.module_timeclock !== false && <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => { setTab('messages'); window.location.hash = 'messages'; }}>💬 Messages</button>}
-          {settings?.module_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); window.location.hash = 'timesheet'; }}>📋 Timesheet</button>}
-          <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); window.location.hash = 'timeoff'; }}>🏖 Time Off</button>
-          {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); window.location.hash = 'schedule'; }}>📅 Schedule</button>}
-          <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); window.location.hash = 'reimbursements'; }}>💳 Expenses</button>
+          {settings?.module_timeclock !== false && <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); history.replaceState(null, '', '#clock'); }}>🕐 Clock</button>}
+          {settings?.module_timeclock !== false && <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => { setTab('messages'); history.replaceState(null, '', '#messages'); }}>💬 Messages</button>}
+          {settings?.module_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); history.replaceState(null, '', '#timesheet'); }}>📋 Timesheet</button>}
+          <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); history.replaceState(null, '', '#timeoff'); }}>🏖 Time Off</button>
+          {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); history.replaceState(null, '', '#schedule'); }}>📅 Schedule</button>}
+          <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>💳 Expenses</button>
         </div>
 
         {tab === 'messages' && <CompanyChat />}

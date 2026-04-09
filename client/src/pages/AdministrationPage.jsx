@@ -312,7 +312,7 @@ export default function AdministrationPage() {
 
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ADMIN_TABS.includes(hashTab) ? hashTab : 'company');
-  const switchTab = t => { setTab(t); window.location.hash = t; };
+  const switchTab = t => { setTab(t); history.replaceState(null, '', '#' + t); };
 
   // Shared state for ManageWorkers and QuickBooks
   const [workers, setWorkers] = useState([]);

@@ -35,7 +35,7 @@ export default function InventoryPage() {
   };
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(INV_TABS.includes(hashTab) ? hashTab : 'stock');
-  const switchTab = t => { setTab(t); window.location.hash = t; };
+  const switchTab = t => { setTab(t); history.replaceState(null, '', '#' + t); };
 
   useEffect(() => {
     const init = async () => {

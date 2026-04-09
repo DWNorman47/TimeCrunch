@@ -86,7 +86,7 @@ export default function AdminDashboard() {
 
   const switchTab = t => {
     setTab(t);
-    window.location.hash = t;
+    history.replaceState(null, '', '#' + t);
   };
 
   useEffect(() => {
