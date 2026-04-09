@@ -607,7 +607,6 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
             </>
           )}
         </>
-      </>
     </div>
   );
 }
