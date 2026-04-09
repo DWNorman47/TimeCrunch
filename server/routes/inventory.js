@@ -2377,8 +2377,9 @@ router.post('/purchase-orders/:id/email', requireAdmin, async (req, res) => {
           </thead>
           <tbody>${tableRows}</tbody>
           ${hasAnyPricing ? `<tfoot><tr style="background:#f0fdf4;border-top:2px solid #d1fae5">
-            <td colspan="${3 + (lines[0]?.notes ? 1 : 0)}" style="padding:10px;font-weight:700">Order Total</td>
+            <td colspan="3" style="padding:10px;font-weight:700">Order Total</td>
             <td colspan="2" style="padding:10px;text-align:right;font-weight:800;font-size:16px">${fmt(lineTotal)}</td>
+            <td></td>
           </tr></tfoot>` : ''}
         </table>
 

@@ -344,7 +344,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             </div>
             <div style={d.editField}>
               <label style={d.editLabel}>{t.invPOSupplierRef}</label>
-              <input style={d.editInput} value={editForm.reference_no} onChange={e => setEditForm(f => ({ ...f, reference_no: e.target.value }))} placeholder="Supplier's order #" />
+              <input style={d.editInput} value={editForm.reference_no} onChange={e => setEditForm(f => ({ ...f, reference_no: e.target.value }))} placeholder={t.invPOSupplierRef} />
             </div>
             <div style={{ ...d.editField, flexBasis: '100%' }}>
               <label style={d.editLabel}>{t.notes}</label>
@@ -501,12 +501,12 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
               <label style={d.editLabel}>{t.invPOColUnitCost}</label>
               <input style={d.editInput} type="number" min="0" step="0.01"
                 value={newLine.unit_cost} onChange={e => setNewLine(f => ({ ...f, unit_cost: e.target.value }))}
-                placeholder="Optional" />
+                placeholder={t.optional} />
             </div>
             <div style={d.addLineField}>
               <label style={d.editLabel}>{t.notes}</label>
               <input style={d.editInput} value={newLine.notes}
-                onChange={e => setNewLine(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" maxLength={500} />
+                onChange={e => setNewLine(f => ({ ...f, notes: e.target.value }))} placeholder={t.optional} maxLength={500} />
             </div>
             <div style={d.addLineBtns}>
               <button style={d.cancelEditBtn} onClick={() => { setAddingLine(false); setLineErr(''); }}>{t.cancel}</button>
@@ -643,7 +643,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
         </div>
         <div style={c.field}>
           <label style={c.label}>{t.invPOSupplierRef}</label>
-          <input style={c.input} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder="Optional" />
+          <input style={c.input} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder={t.optional} />
         </div>
       </div>
 
@@ -692,7 +692,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
                   </td>
                   <td style={c.td}>
                     <input style={c.cellInput} value={line.notes}
-                      onChange={e => updateLine(line.key, 'notes', e.target.value)} placeholder="Optional" maxLength={500} />
+                      onChange={e => updateLine(line.key, 'notes', e.target.value)} placeholder={t.optional} maxLength={500} />
                   </td>
                   <td style={c.td}>
                     <button style={c.removeBtn} onClick={() => removeLine(line.key)}>✕</button>

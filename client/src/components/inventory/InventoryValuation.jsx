@@ -150,7 +150,7 @@ export default function InventoryValuation({ locations }) {
               <tfoot>
                 <tr style={s.totalRow}>
                   <td colSpan={6} style={{ ...s.td, fontWeight: 700, fontSize: 14 }}>
-                    Total — {visibleItems.length} item{visibleItems.length !== 1 ? 's' : ''}
+                    {t.invValTotalRow} — {visibleItems.length} {visibleItems.length !== 1 ? t.invValItems : t.invValItem}
                   </td>
                   <td style={{ ...s.td, textAlign: 'right', fontWeight: 800, fontSize: 15, color: '#111827' }}>
                     {fmt(data.grand_total)}

@@ -557,20 +557,20 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
                     <td style={{ ...s.td, whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
                       <button
                         style={s.histBtn}
-                        title="View history"
+                        title={t.invStockViewHistory}
                         onClick={() => setHistoryItem(row)}
                       >📋</button>
                       {isAdmin && (
                         <button
                           style={s.adjBtn}
-                          title="Quick adjust"
+                          title={t.invStockQuickAdjust}
                           onClick={() => setAdjustItem(row)}
                         >±</button>
                       )}
                       {!isAdmin && qty > 0 && (
                         <button
                           style={s.issueBtn}
-                          title="Issue material"
+                          title={t.invStockIssueMaterials}
                           onClick={() => setIssueItem(row)}
                         >{t.invStockIssueBtn}</button>
                       )}

@@ -1184,6 +1184,9 @@ const translations = {
     invValColValue: 'Value',
     invValColQty: 'Qty',
     invValFailedLoad: 'Failed to load valuation data.',
+    invValTotalRow: 'Total',
+    invValItem: 'item',
+    invValItems: 'items',
 
     // ── Label Modals ──────────────────────────────────────────────────────────
     labelModalClose: 'Close',
@@ -1318,6 +1321,8 @@ const translations = {
     invStockStatusLow: 'Low',
     invStockStatusInStock: 'In Stock',
     invStockIssueBtn: 'Issue',
+    invStockViewHistory: 'View history',
+    invStockQuickAdjust: 'Quick adjust',
     invStockFailedHistory: 'Failed to load history',
     invStockRecentMovements: 'Recent stock movements (last 30)',
     invStockNoHistory: 'No transactions found.',
@@ -2798,6 +2803,9 @@ const translations = {
     invValColValue: 'Valor',
     invValColQty: 'Cant.',
     invValFailedLoad: 'Error al cargar datos de valoración.',
+    invValTotalRow: 'Total',
+    invValItem: 'artículo',
+    invValItems: 'artículos',
 
     // ── Label Modals ──────────────────────────────────────────────────────────
     labelModalClose: 'Cerrar',
@@ -2932,6 +2940,8 @@ const translations = {
     invStockStatusLow: 'Bajo',
     invStockStatusInStock: 'En Stock',
     invStockIssueBtn: 'Emitir',
+    invStockViewHistory: 'Ver historial',
+    invStockQuickAdjust: 'Ajuste rápido',
     invStockFailedHistory: 'Error al cargar historial',
     invStockRecentMovements: 'Movimientos recientes (últimos 30)',
     invStockNoHistory: 'No se encontraron transacciones.',
