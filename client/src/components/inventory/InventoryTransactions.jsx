@@ -374,7 +374,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
             </div>
             <div style={f.field}>
               <label style={f.label}>{t.invTxRefPO}</label>
-              <input style={f.input} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder="Optional" />
+              <input style={f.input} maxLength={100} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder="Optional" />
             </div>
           </div>
           <div style={f.row}>
@@ -399,7 +399,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
 
       <div style={f.field}>
         <label style={f.label}>Notes</label>
-        <textarea style={{ ...f.input, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <textarea style={{ ...f.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
       </div>
 
       <div style={f.actions}>

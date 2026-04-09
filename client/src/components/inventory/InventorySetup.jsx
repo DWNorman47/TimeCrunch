@@ -352,21 +352,21 @@ function SupplierPanel() {
         <div style={sp.row}>
           <div style={sp.field}>
             <label style={sp.label}>{t.invSetupNameField}</label>
-            <input style={sp.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Supply Co." />
+            <input style={sp.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Supply Co." />
           </div>
           <div style={sp.field}>
             <label style={sp.label}>{t.invSetupContactName}</label>
-            <input style={sp.input} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" />
+            <input style={sp.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" />
           </div>
         </div>
         <div style={sp.row}>
           <div style={sp.field}>
             <label style={sp.label}>{t.invSetupPhone}</label>
-            <input style={sp.input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 555-5555" />
+            <input style={sp.input} maxLength={50} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 555-5555" />
           </div>
           <div style={sp.field}>
             <label style={sp.label}>{t.invSetupEmail}</label>
-            <input style={sp.input} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="orders@supplier.com" />
+            <input style={sp.input} type="email" maxLength={255} value={form.email} onChange={e => set('email', e.target.value)} placeholder="orders@supplier.com" />
           </div>
           <div style={sp.field}>
             <label style={sp.label}>{t.invSetupWebsite}</label>
@@ -375,7 +375,7 @@ function SupplierPanel() {
         </div>
         <div style={sp.field}>
           <label style={sp.label}>{t.notes}</label>
-          <textarea style={{ ...sp.input, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} />
+          <textarea style={{ ...sp.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
         </div>
         <div style={sp.actions}>
           <button style={sp.cancelBtn} onClick={() => setEditing(null)}>{t.cancel}</button>

@@ -442,10 +442,13 @@ router.get('/locations', requireAuth, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+const VALID_LOCATION_TYPES = ['warehouse', 'job_site', 'truck', 'other'];
+
 // POST /api/inventory/locations
 router.post('/locations', requireAdmin, async (req, res) => {
   const { name, type = 'warehouse', project_id, notes, address } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  if (!VALID_LOCATION_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid location type' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -466,7 +469,7 @@ router.patch('/locations/:id', requireAdmin, async (req, res) => {
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Location not found' });
     const sets = [], vals = [req.params.id, companyId]; let idx = 3;
     if (name !== undefined) { sets.push(`name=$${idx++}`); vals.push(name.trim()); }
-    if (type !== undefined) { sets.push(`type=$${idx++}`); vals.push(type); }
+    if (type !== undefined) { if (!VALID_LOCATION_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid location type' }); sets.push(`type=$${idx++}`); vals.push(type); }
     if (project_id !== undefined) { sets.push(`project_id=$${idx++}`); vals.push(project_id || null); }
     if (notes !== undefined) { sets.push(`notes=$${idx++}`); vals.push(notes?.trim() || null); }
     if (address !== undefined) { sets.push(`address=$${idx++}`); vals.push(address?.trim() || null); }
@@ -604,6 +607,8 @@ router.post('/transactions', requireAuth, async (req, res) => {
   if (type === 'transfer' && (!from_location_id || !to_location_id)) return res.status(400).json({ error: 'from_location_id and to_location_id required for transfer' });
   if (type === 'transfer' && from_location_id === to_location_id) return res.status(400).json({ error: 'from and to locations must differ' });
   if (type === 'adjust' && !to_location_id) return res.status(400).json({ error: 'to_location_id required for adjust' });
+  if (notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+  if (reference_no && reference_no.trim().length > 100) return res.status(400).json({ error: 'reference_no too long (max 100 characters)' });
   if (type === 'convert') {
     if (!from_location_id) return res.status(400).json({ error: 'from_location_id required for convert' });
     if (!to_uom_id)        return res.status(400).json({ error: 'to_uom_id required for convert' });
@@ -1217,6 +1222,11 @@ function validateSupplierWebsite(website) {
 router.post('/suppliers', requireAdmin, async (req, res) => {
   const { name, contact_name, phone, email, website, notes } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  if (name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+  if (contact_name && contact_name.trim().length > 255) return res.status(400).json({ error: 'contact_name too long (max 255 characters)' });
+  if (phone && phone.trim().length > 50) return res.status(400).json({ error: 'phone too long (max 50 characters)' });
+  if (email && email.trim().length > 255) return res.status(400).json({ error: 'email too long (max 255 characters)' });
+  if (notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
   const websiteErr = validateSupplierWebsite(website);
   if (websiteErr) return res.status(400).json({ error: websiteErr });
   const companyId = req.user.company_id;
@@ -1238,6 +1248,11 @@ router.patch('/suppliers/:id', requireAdmin, async (req, res) => {
   try {
     const existing = await pool.query('SELECT id FROM inventory_suppliers WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Supplier not found' });
+    if (name !== undefined && name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+    if (contact_name !== undefined && contact_name && contact_name.trim().length > 255) return res.status(400).json({ error: 'contact_name too long (max 255 characters)' });
+    if (phone !== undefined && phone && phone.trim().length > 50) return res.status(400).json({ error: 'phone too long (max 50 characters)' });
+    if (email !== undefined && email && email.trim().length > 255) return res.status(400).json({ error: 'email too long (max 255 characters)' });
+    if (notes !== undefined && notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
     const sets = [], vals = [req.params.id, companyId]; let idx = 3;
     if (name !== undefined)         { sets.push(`name=$${idx++}`);         vals.push(name.trim()); }
     if (contact_name !== undefined) { sets.push(`contact_name=$${idx++}`); vals.push(contact_name?.trim() || null); }
