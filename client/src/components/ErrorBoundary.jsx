@@ -25,7 +25,7 @@ export default class ErrorBoundary extends React.Component {
             <button style={styles.btn} onClick={() => window.location.reload()}>Reload page</button>
             <details style={styles.details}>
               <summary style={styles.summary}>Error details</summary>
-              <pre style={styles.pre}>{this.state.error.message}</pre>
+              <pre style={styles.pre}>{this.state.error.stack || this.state.error.message}</pre>
             </details>
           </div>
         </div>
