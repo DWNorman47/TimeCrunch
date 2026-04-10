@@ -73,7 +73,7 @@ export default function ManagePayPeriods() {
           </div>
           <div style={{ ...styles.field, flex: 2 }}>
             <label style={styles.label}>{t.labelOptional}</label>
-            <input style={styles.input} type="text" value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="e.g. Week of Mar 10" />
+            <input style={styles.input} type="text" maxLength={100} value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="e.g. Week of Mar 10" />
           </div>
           <div style={styles.field}>
             <label style={styles.label}>&nbsp;</label>

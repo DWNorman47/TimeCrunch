@@ -28,7 +28,7 @@ export default function FieldPage() {
   const FIELD_TABS = ['notes', 'daily', 'punchlist', 'safety', 'checklists', 'incident', 'gallery', 'subs', 'equip', 'rfi', 'inspect'];
   const hashTab = window.location.hash.replace('#', '');
   const [fieldTab, setFieldTab] = useState(FIELD_TABS.includes(hashTab) ? hashTab : 'notes');
-  const switchTab = t => { setFieldTab(t); window.location.hash = t; };
+  const switchTab = t => { setFieldTab(t); history.replaceState(null, '', '#' + t); };
 
   useEffect(() => {
     const init = async () => {
@@ -42,15 +42,18 @@ export default function FieldPage() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <div style={styles.logoGroup}>
-          <AppSwitcher currentApp="field" userRole={user?.role} features={features} />
-          {user?.company_name && <span style={styles.companyName}>{user.company_name}</span>}
+      <header style={styles.header} className="app-header">
+        <div style={styles.headerTopRow}>
+          <div style={styles.logoGroup}>
+            <AppSwitcher currentApp="field" userRole={user?.role} features={features} />
+            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
+          </div>
+          <div style={styles.headerRight}>
+            {!isAdmin && <span style={styles.userName}>{user?.full_name}</span>}
+            <button style={styles.headerBtn} onClick={logout}>Logout</button>
+          </div>
         </div>
-        <div style={styles.headerRight}>
-          {!isAdmin && <span style={styles.userName}>{user?.full_name}</span>}
-          <button style={styles.headerBtn} onClick={logout}>Logout</button>
-        </div>
+        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
       <main style={styles.main}>
@@ -107,11 +110,12 @@ export default function FieldPage() {
 
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9' },
-  header: { background: '#059669', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', height: 'calc(56px + env(safe-area-inset-top))', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  header: { background: '#059669', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 'calc(56px + env(safe-area-inset-top))', position: 'sticky', top: 0, zIndex: 100 },
+  headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
-  companyName: { fontSize: 14, fontWeight: 400, opacity: 0.75 },
+  companyName: { fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' },
   headerRight: { display: 'flex', alignItems: 'center', gap: 10 },
   userName: { fontSize: 14, opacity: 0.85 },
-  headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' },
+  headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   main: { maxWidth: 860, margin: '0 auto', padding: '24px 16px' },
 };

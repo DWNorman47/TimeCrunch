@@ -1,12 +1,35 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadBase64 } = require('../r2');
 const { incrementStorage, decrementStorage, checkStorageLimit } = require('../storage');
+const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
+
+// GET /api/reimbursements/categories
+// Returns:
+//   active — shown in form dropdowns (defaults minus suppressed, plus custom)
+//   known  — all valid category values for display (all defaults + current custom)
+//            if a stored category isn't in "known", the client shows "Other"
+router.get('/categories', async (req, res) => {
+  try {
+    const all = await getAdvancedSettings(req.user.company_id);
+    const cfg = all.reimbursement_categories;
+    const active = [
+      ...cfg.defaults.filter(c => !cfg.suppressed.includes(c)),
+      ...cfg.custom,
+    ];
+    const known = [...cfg.defaults, ...cfg.custom];
+    res.json({ active, known });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // GET /api/reimbursements — worker: list own reimbursements
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT r.id, r.amount, r.description, r.category, r.expense_date, r.receipt_url,
@@ -25,10 +48,22 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // POST /api/reimbursements — worker: submit a reimbursement
-router.post('/', requireAuth, async (req, res) => {
-  const { amount, description, category, expense_date, receipt, project_id } = req.body;
+const reimbLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 50,
+  keyGenerator: req => String(req.user?.id || req.ip),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+router.post('/', reimbLimiter, async (req, res) => {
+  const { amount, expense_date, receipt, project_id } = req.body;
+  const description = req.body.description?.trim() || null;
+  const category    = req.body.category?.trim() || null;
   if (!amount || !expense_date) {
     return res.status(400).json({ error: 'amount and expense_date are required' });
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expense_date) || isNaN(Date.parse(expense_date))) {
+    return res.status(400).json({ error: 'expense_date must be a valid date (YYYY-MM-DD)' });
   }
   const amt = parseFloat(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
@@ -61,7 +96,7 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/reimbursements/:id — worker: delete own pending reimbursement
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `DELETE FROM reimbursements WHERE id = $1 AND company_id = $2 AND user_id = $3 AND status = 'pending'
@@ -82,10 +117,13 @@ router.delete('/:id', requireAuth, async (req, res) => {
 // --- Admin routes ---
 
 // POST /api/reimbursements/admin — admin: submit a reimbursement for any worker (or self)
-router.post('/admin', requireAuth, requireAdmin, async (req, res) => {
+router.post('/admin', requireAdmin, async (req, res) => {
   const { user_id, amount, description, category, expense_date, receipt, project_id, status = 'approved' } = req.body;
   if (!user_id || !amount || !expense_date) {
     return res.status(400).json({ error: 'user_id, amount, and expense_date are required' });
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expense_date) || isNaN(Date.parse(expense_date))) {
+    return res.status(400).json({ error: 'expense_date must be a valid date (YYYY-MM-DD)' });
   }
   const amt = parseFloat(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
@@ -120,7 +158,7 @@ router.post('/admin', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // GET /api/reimbursements/admin — admin: list all reimbursements for company
-router.get('/admin', requireAuth, requireAdmin, async (req, res) => {
+router.get('/admin', requireAdmin, async (req, res) => {
   const { status, user_id } = req.query;
   const conditions = ['r.company_id = $1'];
   const params = [req.user.company_id];
@@ -147,11 +185,13 @@ router.get('/admin', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // PATCH /api/reimbursements/admin/:id — admin: approve or reject
-router.patch('/admin/:id', requireAuth, requireAdmin, async (req, res) => {
-  const { status, admin_notes } = req.body;
+router.patch('/admin/:id', requireAdmin, async (req, res) => {
+  const { status } = req.body;
+  const admin_notes = req.body.admin_notes?.trim() || null;
   if (!['approved', 'rejected', 'pending'].includes(status)) {
     return res.status(400).json({ error: 'status must be approved, rejected, or pending' });
   }
+  if (admin_notes && admin_notes.length > 1000) return res.status(400).json({ error: 'admin_notes too long (max 1000 characters)' });
   try {
     const { rows } = await pool.query(
       `UPDATE reimbursements
@@ -159,7 +199,7 @@ router.patch('/admin/:id', requireAuth, requireAdmin, async (req, res) => {
        WHERE id = $3 AND company_id = $4
        RETURNING id, amount, description, category, expense_date, receipt_url,
                  status, admin_notes, created_at, project_id`,
-      [status, admin_notes || null, req.params.id, req.user.company_id]
+      [status, admin_notes, req.params.id, req.user.company_id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);

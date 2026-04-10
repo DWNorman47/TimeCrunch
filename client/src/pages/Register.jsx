@@ -84,6 +84,7 @@ export default function Register() {
           <input
             style={styles.input}
             placeholder="Acme Construction"
+            maxLength={100}
             value={form.company_name}
             onChange={e => set('company_name', e.target.value)}
             onBlur={e => set('company_name', e.target.value.trim())}
@@ -126,6 +127,7 @@ export default function Register() {
           <input
             style={styles.input}
             placeholder="jsmith"
+            maxLength={50}
             value={form.username}
             autoComplete="off"
             onChange={e => { setUsernameEdited(!!e.target.value); set('username', e.target.value); }}

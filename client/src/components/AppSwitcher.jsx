@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-// Workers see: Time Clock, Field, Inventory (locked)
-// Admins see: above + Projects, Administration, Analytics
+// Workers see: Time Clock, Field, Inventory, Account
+// Admins see: Time Clock, Field, Inventory, Projects, Administration, Analytics
 const APPS = [
   {
     id: 'timeclock',
@@ -39,6 +39,19 @@ const APPS = [
       </svg>
     ),
     path: '/inventory',
+  },
+  {
+    id: 'account',
+    name: 'Account',
+    bg: '#64748b',
+    workerOnly: true,
+    icon: (
+      <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+        <circle cx="10" cy="7" r="3.5" />
+        <path d="M2.5 17c0-3.6 3.4-6.5 7.5-6.5s7.5 2.9 7.5 6.5" />
+      </svg>
+    ),
+    path: '/account',
   },
   {
     id: 'projects',
@@ -88,11 +101,12 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const visibleApps = APPS.filter(a => {
     if (a.adminOnly && !isAdmin) return false;
+    if (a.workerOnly && isAdmin) return false;
     if (a.id === 'field' && features?.module_field === false) return false;
     if (a.id === 'projects' && features?.module_projects === false) return false;
     if (a.id === 'inventory' && features?.module_inventory === false) return false;
     if (a.id === 'analytics' && features?.module_analytics === false) return false;
-    // Only hide Time Clock from admins when toggle is off; workers still need it for Account tab
+    // Only hide Time Clock from admins when toggle is off
     if (a.id === 'timeclock' && features?.module_timeclock === false && isAdmin) return false;
     return true;
   });

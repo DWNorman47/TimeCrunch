@@ -91,12 +91,22 @@ export default function ApprovalQueue({ onCountChange }) {
   const [splitSegments, setSplitSegments] = useState([]);
   const [splitSaving, setSplitSaving] = useState(false);
   const [splitError, setSplitError] = useState('');
+  const [confirmingApproveAll, setConfirmingApproveAll] = useState(false);
+  const [editSaveError, setEditSaveError] = useState('');
+  const [unapproveError, setUnapproveError] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [approvingSelected, setApprovingSelected] = useState(false);
 
   const fetch = () => {
     setLoading(true);
     setFetchError(false);
+    const params = {};
+    if (dateFrom) params.from = dateFrom;
+    if (dateTo) params.to = dateTo;
     Promise.all([
-      api.get('/admin/entries/pending'),
+      api.get('/admin/entries/pending', { params }),
       api.get('/projects'),
     ])
       .then(([r, p]) => { setEntries(r.data.entries); setHasMore(r.data.has_more); setProjects(p.data); })
@@ -132,7 +142,7 @@ export default function ApprovalQueue({ onCountChange }) {
       setEntries(prev => prev.map(e => e.id === id ? { ...e, ...updated.data } : e));
       setEditingId(null);
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to save.');
+      setEditSaveError(err.response?.data?.error || t.failedToSave);
     } finally {
       setEditSaving(false);
     }
@@ -145,8 +155,8 @@ export default function ApprovalQueue({ onCountChange }) {
     // Pre-fill two segments covering the full time range
     const mid = midTime(e.start_time.substring(0, 5), e.end_time.substring(0, 5));
     setSplitSegments([
-      { start_time: e.start_time.substring(0, 5), end_time: mid, project_id: e.project_id ? String(e.project_id) : '' },
-      { start_time: mid, end_time: e.end_time.substring(0, 5), project_id: '' },
+      { _key: 0, start_time: e.start_time.substring(0, 5), end_time: mid, project_id: e.project_id ? String(e.project_id) : '' },
+      { _key: 1, start_time: mid, end_time: e.end_time.substring(0, 5), project_id: '' },
     ]);
   };
 
@@ -171,7 +181,7 @@ export default function ApprovalQueue({ onCountChange }) {
       });
       setSplittingId(null);
     } catch (err) {
-      setSplitError(err.response?.data?.error || 'Failed to split entry.');
+      setSplitError(err.response?.data?.error || t.entryPanelFailedSplit);
     } finally {
       setSplitSaving(false);
     }
@@ -193,7 +203,7 @@ export default function ApprovalQueue({ onCountChange }) {
       setRecentApproved(prev => prev.filter(e => e.id !== id));
       fetch(); // refresh pending queue
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to unapprove entry');
+      setUnapproveError(err.response?.data?.error || t.failedUnapprove);
     } finally { setUnapproving(null); }
   };
 
@@ -207,9 +217,12 @@ export default function ApprovalQueue({ onCountChange }) {
     } finally { setWorking(null); }
   };
 
-  const visibleEntries = workerFilter
-    ? entries.filter(e => e.worker_name === workerFilter)
-    : entries;
+  const visibleEntries = entries.filter(e => {
+    if (workerFilter && e.worker_name !== workerFilter) return false;
+    if (dateFrom && e.work_date.substring(0, 10) < dateFrom) return false;
+    if (dateTo && e.work_date.substring(0, 10) > dateTo) return false;
+    return true;
+  });
 
   const workerNames = [...new Set(entries.map(e => e.worker_name))].sort();
 
@@ -222,9 +235,32 @@ export default function ApprovalQueue({ onCountChange }) {
   }, {});
   const sortedDays = Object.keys(entriesByDay).sort((a, b) => b.localeCompare(a));
 
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => setSelectedIds(new Set(visibleEntries.map(e => e.id)));
+  const deselectAll = () => setSelectedIds(new Set());
+
+  const approveSelected = async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    setApprovingSelected(true);
+    try {
+      await api.post('/admin/entries/bulk-approve', { ids });
+      setEntries(prev => prev.filter(e => !selectedIds.has(e.id)));
+      setSelectedIds(new Set());
+      fetchRecentApproved();
+    } finally { setApprovingSelected(false); }
+  };
+
   const approveAll = async () => {
     const targets = visibleEntries;
-    if (!confirm(`Approve ${targets.length} entr${targets.length === 1 ? 'y' : 'ies'}${workerFilter ? ` for ${workerFilter}` : ''}? This cannot be undone.`)) return;
+    setConfirmingApproveAll(false);
     setApprovingAll(true);
     try {
       if (workerFilter) {
@@ -245,12 +281,12 @@ export default function ApprovalQueue({ onCountChange }) {
         <h3 style={styles.title}>{t.approvalQueue}</h3>
         {entries.length > 0 && (
           <>
-            <span style={styles.badge}>{visibleEntries.length}{workerFilter ? '' : ' pending'}</span>
+            <span style={styles.badge}>{visibleEntries.length}{workerFilter ? '' : ' ' + t.aqPending}</span>
             {workerNames.length > 1 && (
               <select
                 style={styles.filterSelect}
                 value={workerFilter}
-                onChange={e => setWorkerFilter(e.target.value)}
+                onChange={e => { setWorkerFilter(e.target.value); setSelectedIds(new Set()); }}
               >
                 <option value="">{t.allWorkers}</option>
                 {workerNames.map(n => (
@@ -258,12 +294,57 @@ export default function ApprovalQueue({ onCountChange }) {
                 ))}
               </select>
             )}
-            <button style={styles.approveAllBtn} onClick={approveAll} disabled={approvingAll || visibleEntries.length === 0}>
-              {approvingAll ? 'Approving...' : `✓ Approve${workerFilter ? ` ${workerFilter.split(' ')[0]}'s` : ' All'}`}
-            </button>
+            {selectedIds.size > 0 ? (
+              <>
+                <button style={styles.approveSelectedBtn} onClick={approveSelected} disabled={approvingSelected}>
+                  {approvingSelected ? t.aqApprovingSelected : `${t.aqApproveSelected} (${selectedIds.size})`}
+                </button>
+                <button style={styles.cancelApproveAllBtn} onClick={deselectAll}>{t.cancel}</button>
+              </>
+            ) : confirmingApproveAll ? (
+              <>
+                <button style={styles.approveAllBtn} onClick={approveAll} disabled={approvingAll}>
+                  {approvingAll ? t.aqApprovingAll : t.confirm}
+                </button>
+                <button style={styles.cancelApproveAllBtn} onClick={() => setConfirmingApproveAll(false)}>{t.cancel}</button>
+              </>
+            ) : (
+              <>
+                <button style={styles.selectAllBtn} onClick={selectedIds.size > 0 ? deselectAll : selectAll}>
+                  {selectedIds.size > 0 ? t.aqDeselectAll : t.aqSelectAll}
+                </button>
+                <button style={styles.approveAllBtn} onClick={() => setConfirmingApproveAll(true)} disabled={approvingAll || visibleEntries.length === 0}>
+                  {workerFilter ? `${t.approve} ${workerFilter.split(' ')[0]}'s` : t.aqApproveAll}
+                </button>
+              </>
+            )}
           </>
         )}
       </div>
+
+      {entries.length > 0 && (
+        <div style={styles.dateFilterRow}>
+          <input
+            type="date"
+            style={styles.dateInput}
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            title="From date"
+          />
+          <span style={{ fontSize: 12, color: '#9ca3af' }}>–</span>
+          <input
+            type="date"
+            style={styles.dateInput}
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            title="To date"
+          />
+          <button style={styles.applyDateBtn} onClick={() => { setSelectedIds(new Set()); fetch(); }}>{t.apply}</button>
+          {(dateFrom || dateTo) && (
+            <button style={styles.clearDateBtn} onClick={() => { setDateFrom(''); setDateTo(''); setSelectedIds(new Set()); fetch(); }}>✕</button>
+          )}
+        </div>
+      )}
 
       {fetchError ? (
         <p style={styles.fetchError}>{t.failedLoadPending} <button style={styles.retryBtn} onClick={fetch}>{t.retry}</button></p>
@@ -277,7 +358,10 @@ export default function ApprovalQueue({ onCountChange }) {
             </p>
           )}
           {visibleEntries.length === 0 && workerFilter && (
-            <p style={styles.empty}>No pending entries for {workerFilter}.</p>
+            <p style={styles.empty}>{t.aqNoPendingFor} {workerFilter}.</p>
+          )}
+          {visibleEntries.length === 0 && !workerFilter && (dateFrom || dateTo) && (
+            <p style={styles.empty}>No entries found for this date range.</p>
           )}
           {sortedDays.map(day => (
             <div key={day}>
@@ -286,7 +370,13 @@ export default function ApprovalQueue({ onCountChange }) {
                 <span style={styles.dayCount}>{entriesByDay[day].length}</span>
               </div>
               {entriesByDay[day].map(e => (
-                <div key={e.id} style={styles.row}>
+                <div key={e.id} style={{ ...styles.row, ...(selectedIds.has(e.id) ? styles.rowSelected : {}) }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(e.id)}
+                    onChange={() => toggleSelect(e.id)}
+                    style={styles.rowCheckbox}
+                  />
                   <div style={styles.rowMain}>
                     <div style={styles.worker}>{e.worker_name}</div>
                     <div style={styles.detail}>
@@ -294,7 +384,7 @@ export default function ApprovalQueue({ onCountChange }) {
                       <span style={styles.sep}>·</span>
                       <span>{formatTime(e.start_time)} – {formatTime(e.end_time)} ({formatHours(e.start_time, e.end_time)})</span>
                       <span style={{ ...styles.wageTag, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
-                        {e.wage_type === 'prevailing' ? 'Prevailing' : 'Regular'}
+                        {e.wage_type === 'prevailing' ? t.prevailing : t.regular}
                       </span>
                     </div>
                     {e.worker_signed_at && (
@@ -304,14 +394,14 @@ export default function ApprovalQueue({ onCountChange }) {
                     {e.clock_source && e.clock_source !== 'worker' && (
                       <div style={styles.sourceBadge}>
                         {e.clock_source === 'admin'
-                          ? `Clocked in by admin${e.clocked_in_by_name ? ': ' + e.clocked_in_by_name : ''}`
-                          : 'Log entry'}
+                          ? `${t.aqClockedInByAdmin}${e.clocked_in_by_name ? ': ' + e.clocked_in_by_name : ''}`
+                          : t.aqLogEntry}
                       </div>
                     )}
                     {(e.clock_in_lat || e.clock_out_lat) && (
                       <div style={styles.locationRow}>
                         <button style={styles.locationBtn} onClick={() => setOpenMapId(openMapId === e.id ? null : e.id)}>
-                          📍 {openMapId === e.id ? 'Hide Map' : 'View Location'}
+                          📍 {openMapId === e.id ? t.aqHideMap : t.aqViewLocation}
                         </button>
                         {openMapId === e.id && (() => {
                           const positions = [
@@ -323,17 +413,17 @@ export default function ApprovalQueue({ onCountChange }) {
                               <MapContainer center={positions[0]} zoom={14} style={styles.map} scrollWheelZoom={false}>
                                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' />
                                 <FitBounds positions={positions} />
-                                {e.clock_in_lat && <Marker position={[parseFloat(e.clock_in_lat), parseFloat(e.clock_in_lng)]} icon={clockInIcon}><Popup>🟢 Clock In<br />{e.worker_name}</Popup></Marker>}
-                                {e.clock_out_lat && <Marker position={[parseFloat(e.clock_out_lat), parseFloat(e.clock_out_lng)]} icon={clockOutIcon}><Popup>🔴 Clock Out<br />{e.worker_name}</Popup></Marker>}
+                                {e.clock_in_lat && <Marker position={[parseFloat(e.clock_in_lat), parseFloat(e.clock_in_lng)]} icon={clockInIcon}><Popup>🟢 {t.clockIn}<br />{e.worker_name}</Popup></Marker>}
+                                {e.clock_out_lat && <Marker position={[parseFloat(e.clock_out_lat), parseFloat(e.clock_out_lng)]} icon={clockOutIcon}><Popup>🔴 {t.clockOut}<br />{e.worker_name}</Popup></Marker>}
                               </MapContainer>
                               <div style={styles.mapLegend}>
                                 {e.clock_in_lat
-                                  ? <span style={styles.mapLegendItem}><span style={{ color: '#16a34a' }}>●</span> Clock-in location</span>
-                                  : <span style={styles.mapLegendMissing}>No clock-in location captured</span>
+                                  ? <span style={styles.mapLegendItem}><span style={{ color: '#16a34a' }}>●</span> {t.aqClockInLegend}</span>
+                                  : <span style={styles.mapLegendMissing}>{t.aqNoClockInLoc}</span>
                                 }
                                 {e.clock_out_lat
-                                  ? <span style={styles.mapLegendItem}><span style={{ color: '#dc2626' }}>●</span> Clock-out location</span>
-                                  : <span style={styles.mapLegendMissing}>No clock-out location captured</span>
+                                  ? <span style={styles.mapLegendItem}><span style={{ color: '#dc2626' }}>●</span> {t.aqClockOutLegend}</span>
+                                  : <span style={styles.mapLegendMissing}>{t.aqNoClockOutLoc}</span>
                                 }
                               </div>
                             </div>
@@ -351,52 +441,53 @@ export default function ApprovalQueue({ onCountChange }) {
                     <div style={styles.editTimesForm}>
                       <div style={styles.editTimesRow}>
                         <div>
-                          <div style={styles.editTimesLabel}>Start</div>
+                          <div style={styles.editTimesLabel}>{t.start}</div>
                           <input type="time" style={styles.editTimeInput} value={editStart} onChange={ev => setEditStart(ev.target.value)} />
                         </div>
                         <div>
-                          <div style={styles.editTimesLabel}>End</div>
+                          <div style={styles.editTimesLabel}>{t.end}</div>
                           <input type="time" style={styles.editTimeInput} value={editEnd} onChange={ev => setEditEnd(ev.target.value)} />
                         </div>
                       </div>
                       <div style={{ marginTop: 8 }}>
-                        <div style={styles.editTimesLabel}>Project</div>
+                        <div style={styles.editTimesLabel}>{t.project}</div>
                         <select style={styles.editProjectSelect} value={editProject} onChange={ev => setEditProject(ev.target.value)}>
-                          <option value="">— No project —</option>
-                          {projects.filter(p => p.active !== false).map(p => (
+                          <option value="">{t.aqNoProject}</option>
+                          {(projects || []).filter(p => p.active !== false).map(p => (
                             <option key={p.id} value={p.id}>{p.name}</option>
                           ))}
                         </select>
                       </div>
                       <div style={styles.editTimesActions}>
-                        <button style={styles.saveTimesBtn} onClick={() => saveEdit(e.id)} disabled={editSaving}>{editSaving ? '...' : 'Save'}</button>
-                        <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>Cancel</button>
+                        <button style={styles.saveTimesBtn} onClick={() => { setEditSaveError(''); saveEdit(e.id); }} disabled={editSaving}>{editSaving ? '...' : t.save}</button>
+                        <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
+                        {editSaveError && <span style={styles.inlineError}>{editSaveError}</span>}
                       </div>
                     </div>
                   ) : splittingId === e.id ? (
                     <div style={styles.splitForm}>
-                      <div style={styles.splitTitle}>Split Entry</div>
+                      <div style={styles.splitTitle}>{t.aqSplitEntry}</div>
                       {splitError && <div style={styles.splitError}>{splitError}</div>}
                       {splitSegments.map((seg, i) => (
-                        <div key={i} style={styles.splitSegment}>
-                          <div style={styles.splitSegLabel}>Segment {i + 1}</div>
+                        <div key={seg._key} style={styles.splitSegment}>
+                          <div style={styles.splitSegLabel}>{t.aqSegment} {i + 1}</div>
                           <div style={styles.splitSegRow}>
                             <div>
-                              <div style={styles.editTimesLabel}>Start</div>
+                              <div style={styles.editTimesLabel}>{t.start}</div>
                               <input type="time" style={styles.editTimeInput} value={seg.start_time}
                                 onChange={ev => setSplitSegments(prev => prev.map((s, j) => j === i ? { ...s, start_time: ev.target.value } : s))} />
                             </div>
                             <div>
-                              <div style={styles.editTimesLabel}>End</div>
+                              <div style={styles.editTimesLabel}>{t.end}</div>
                               <input type="time" style={styles.editTimeInput} value={seg.end_time}
                                 onChange={ev => setSplitSegments(prev => prev.map((s, j) => j === i ? { ...s, end_time: ev.target.value } : s))} />
                             </div>
                             <div style={{ flex: 1, minWidth: 120 }}>
-                              <div style={styles.editTimesLabel}>Project</div>
+                              <div style={styles.editTimesLabel}>{t.project}</div>
                               <select style={styles.editProjectSelect} value={seg.project_id}
                                 onChange={ev => setSplitSegments(prev => prev.map((s, j) => j === i ? { ...s, project_id: ev.target.value } : s))}>
-                                <option value="">— No project —</option>
-                                {projects.filter(p => p.active !== false).map(p => (
+                                <option value="">{t.aqNoProject}</option>
+                                {(projects || []).filter(p => p.active !== false).map(p => (
                                   <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
                               </select>
@@ -409,16 +500,16 @@ export default function ApprovalQueue({ onCountChange }) {
                       ))}
                       <button style={styles.splitAddBtn} onClick={() => {
                         const last = splitSegments[splitSegments.length - 1];
-                        setSplitSegments(prev => [...prev, { start_time: last.end_time, end_time: last.end_time, project_id: '' }]);
-                      }}>+ Add segment</button>
+                        setSplitSegments(prev => [...prev, { _key: Date.now(), start_time: last.end_time, end_time: last.end_time, project_id: '' }]);
+                      }}>{t.aqAddSegment}</button>
                       <div style={styles.editTimesActions}>
-                        <button style={styles.saveTimesBtn} onClick={() => saveSplit(e.id)} disabled={splitSaving}>{splitSaving ? '...' : 'Split & Save'}</button>
-                        <button style={styles.cancelBtn} onClick={() => setSplittingId(null)}>Cancel</button>
+                        <button style={styles.saveTimesBtn} onClick={() => saveSplit(e.id)} disabled={splitSaving}>{splitSaving ? '...' : t.aqSplitSave}</button>
+                        <button style={styles.cancelBtn} onClick={() => setSplittingId(null)}>{t.cancel}</button>
                       </div>
                     </div>
                   ) : rejectingId === e.id ? (
                     <div style={styles.rejectForm}>
-                      <input style={styles.rejectInput} placeholder={t.reasonOptional} value={rejectNote} onChange={ev => setRejectNote(ev.target.value)} autoFocus />
+                      <input style={styles.rejectInput} placeholder={t.reasonOptional} maxLength={500} value={rejectNote} onChange={ev => setRejectNote(ev.target.value)} autoFocus />
                       <button style={styles.confirmRejectBtn} onClick={() => submitReject(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.confirmReject}</button>
                       <button style={styles.cancelBtn} onClick={() => { setRejectingId(null); setRejectNote(''); }}>{t.cancel}</button>
                     </div>
@@ -440,7 +531,7 @@ export default function ApprovalQueue({ onCountChange }) {
       {recentApproved.length > 0 && (
         <div style={styles.recentSection}>
           <button style={styles.recentToggle} onClick={() => setShowRecent(v => !v)}>
-            <span>Recently Approved ({recentApproved.length})</span>
+            <span>{t.aqRecentlyApproved} ({recentApproved.length})</span>
             <span>{showRecent ? '▾' : '▸'}</span>
           </button>
           {showRecent && (
@@ -453,13 +544,16 @@ export default function ApprovalQueue({ onCountChange }) {
                     <span style={styles.recentTime}>{formatTime(e.start_time)} – {formatTime(e.end_time)}</span>
                     {e.project_name && <span style={styles.recentProject}>{e.project_name}</span>}
                   </div>
-                  <button
-                    style={styles.unapproveBtn}
-                    onClick={() => unapprove(e.id)}
-                    disabled={unapproving === e.id}
-                  >
-                    {unapproving === e.id ? '…' : '↩ Unapprove'}
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                    <button
+                      style={styles.unapproveBtn}
+                      onClick={() => { setUnapproveError(''); unapprove(e.id); }}
+                      disabled={unapproving === e.id}
+                    >
+                      {unapproving === e.id ? '…' : t.aqUnapprove}
+                    </button>
+                    {unapproveError && unapproving === null && <span style={styles.inlineError}>{unapproveError}</span>}
+                  </div>
                 </div>
               ))}
             </div>
@@ -472,7 +566,11 @@ export default function ApprovalQueue({ onCountChange }) {
 
 const styles = {
   card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 24 },
-  header: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 },
+  header: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 },
+  dateFilterRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 },
+  dateInput: { padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, color: '#374151', minHeight: 'unset' },
+  applyDateBtn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '4px 10px', cursor: 'pointer' },
+  clearDateBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 13, cursor: 'pointer', padding: '0 4px', lineHeight: 1, minHeight: 'unset' },
   title: { fontSize: 17, fontWeight: 700, margin: 0 },
   badge: { background: '#fef3c7', color: '#b45309', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 700 },
   filterSelect: { padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, color: '#374151', background: '#fff' },
@@ -483,6 +581,10 @@ const styles = {
   dayHeader: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 0 6px', borderBottom: '1px solid #e5e7eb', marginBottom: 8 },
   dayCount:  { background: '#f3f4f6', color: '#6b7280', borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700, textTransform: 'none', letterSpacing: 0 },
   row: { border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
+  rowSelected: { background: '#f0f7ff', borderColor: '#93c5fd' },
+  rowCheckbox: { marginTop: 3, flexShrink: 0, cursor: 'pointer', width: 15, height: 15 },
+  selectAllBtn: { padding: '4px 12px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#374151' },
+  approveSelectedBtn: { background: '#059669', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   rowMain: { flex: 1, minWidth: 200 },
   worker: { fontWeight: 700, fontSize: 15, marginBottom: 4 },
   detail: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#555', flexWrap: 'wrap' },
@@ -526,6 +628,8 @@ const styles = {
   recentTime: { color: '#6b7280' },
   recentProject: { background: '#e0e7ff', color: '#3730a3', borderRadius: 6, padding: '1px 7px', fontSize: 11, fontWeight: 600 },
   unapproveBtn: { padding: '5px 12px', background: '#fff', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  cancelApproveAllBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '5px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
+  inlineError: { fontSize: 12, color: '#ef4444' },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 6 },
   signedTag: { display: 'inline-block', marginTop: 4, background: '#ede9fe', color: '#5b21b6', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
   locationRow: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 },

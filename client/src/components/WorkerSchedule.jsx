@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
-function fmtDate(d) {
+function fmtDate(d, t) {
   const date = new Date(d + 'T00:00:00');
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
 
-  if (date.getTime() === today.getTime()) return 'Today';
-  if (date.getTime() === tomorrow.getTime()) return 'Tomorrow';
+  if (date.getTime() === today.getTime()) return t.wsToday;
+  if (date.getTime() === tomorrow.getTime()) return t.wsTomorrow;
   return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
-function fmtTime(t) {
-  if (!t) return '';
-  const [h, m] = t.split(':');
+function fmtTime(ts) {
+  if (!ts) return '';
+  const [h, m] = ts.split(':');
   const hour = parseInt(h);
   return `${hour % 12 || 12}:${m} ${hour < 12 ? 'AM' : 'PM'}`;
 }
@@ -27,9 +28,12 @@ function isToday(dateStr) {
 }
 
 export default function WorkerSchedule() {
+  const t = useT();
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [flagging, setFlagging] = useState(null);
+  const [pendingFlag, setPendingFlag] = useState(null); // { id, note }
 
   useEffect(() => {
     api.get('/shifts/mine')
@@ -38,16 +42,42 @@ export default function WorkerSchedule() {
       .finally(() => setLoading(false));
   }, []);
 
+  const confirmCantMakeIt = async () => {
+    if (!pendingFlag) return;
+    const { id, note } = pendingFlag;
+    setFlagging(id);
+    setPendingFlag(null);
+    try {
+      const r = await api.patch(`/shifts/${id}/cant-make-it`, { cant_make_it: true, note: note || '' });
+      setShifts(prev => prev.map(s => s.id === id ? { ...s, cant_make_it: r.data.cant_make_it, cant_make_it_note: r.data.cant_make_it_note } : s));
+    } catch {
+      // silently ignore
+    } finally {
+      setFlagging(null);
+    }
+  };
+
+  const undoCantMakeIt = async (shift) => {
+    setFlagging(shift.id);
+    try {
+      const r = await api.patch(`/shifts/${shift.id}/cant-make-it`, { cant_make_it: false });
+      setShifts(prev => prev.map(s => s.id === shift.id ? { ...s, cant_make_it: r.data.cant_make_it, cant_make_it_note: null } : s));
+    } catch {
+      // silently ignore
+    } finally {
+      setFlagging(null);
+    }
+  };
+
   if (loading) return <p style={styles.empty}>Loading…</p>;
   if (error) return <p style={styles.empty}>{error}</p>;
   if (shifts.length === 0) return (
     <div style={styles.emptyBox}>
       <div style={styles.emptyIcon}>📅</div>
-      <p style={styles.emptyText}>No upcoming shifts scheduled.</p>
+      <p style={styles.emptyText}>{t.wsNoShifts}</p>
     </div>
   );
 
-  // Group by date
   const byDate = {};
   shifts.forEach(s => {
     const key = s.shift_date.toString().substring(0, 10);
@@ -57,18 +87,22 @@ export default function WorkerSchedule() {
 
   return (
     <div style={styles.wrap}>
-      <h2 style={styles.heading}>Your Schedule</h2>
+      <h2 style={styles.heading}>{t.wsYourSchedule}</h2>
       <div style={styles.list}>
         {Object.entries(byDate).map(([date, dayShifts]) => (
           <div key={date} style={styles.dayGroup}>
             <div style={styles.dateLabel}>
               <span style={{ ...styles.dateName, color: isToday(date) ? '#1a56db' : '#374151' }}>
-                {fmtDate(date)}
+                {fmtDate(date, t)}
               </span>
-              {isToday(date) && <span style={styles.todayBadge}>Today</span>}
+              {isToday(date) && <span style={styles.todayBadge}>{t.wsToday}</span>}
             </div>
             {dayShifts.map(s => (
-              <div key={s.id} style={{ ...styles.shiftCard, borderLeftColor: isToday(date) ? '#1a56db' : '#e5e7eb' }}>
+              <div key={s.id} style={{
+                ...styles.shiftCard,
+                borderLeftColor: s.cant_make_it ? '#ef4444' : isToday(date) ? '#1a56db' : '#e5e7eb',
+                opacity: s.cant_make_it ? 0.75 : 1,
+              }}>
                 <div style={styles.shiftTime}>
                   {fmtTime(s.start_time)} – {fmtTime(s.end_time)}
                 </div>
@@ -77,6 +111,47 @@ export default function WorkerSchedule() {
                 )}
                 {s.notes && (
                   <div style={styles.shiftNotes}>{s.notes}</div>
+                )}
+                <div style={styles.shiftFooter}>
+                  {s.cant_make_it && (
+                    <span style={styles.cantBadge}>{t.wsCantMakeIt}</span>
+                  )}
+                  {s.cant_make_it ? (
+                    <button
+                      style={styles.undoBtn}
+                      onClick={() => undoCantMakeIt(s)}
+                      disabled={flagging === s.id}
+                    >
+                      {flagging === s.id ? '…' : t.wsUndo}
+                    </button>
+                  ) : pendingFlag?.id === s.id ? null : (
+                    <button
+                      style={styles.cantBtn}
+                      onClick={() => setPendingFlag({ id: s.id, note: '' })}
+                      disabled={flagging === s.id}
+                    >
+                      {flagging === s.id ? '…' : t.wsCantMakeIt}
+                    </button>
+                  )}
+                </div>
+                {pendingFlag?.id === s.id && (
+                  <div style={styles.noteBox}>
+                    <input
+                      style={styles.noteInput}
+                      placeholder={t.wsAddNote}
+                      value={pendingFlag.note}
+                      onChange={e => setPendingFlag(p => ({ ...p, note: e.target.value }))}
+                      maxLength={200}
+                      autoFocus
+                    />
+                    <div style={styles.noteActions}>
+                      <button style={styles.confirmBtn} onClick={confirmCantMakeIt}>{t.wsConfirm}</button>
+                      <button style={styles.cancelNoteBtn} onClick={() => setPendingFlag(null)}>{t.cancel || 'Cancel'}</button>
+                    </div>
+                  </div>
+                )}
+                {s.cant_make_it && s.cant_make_it_note && (
+                  <div style={styles.cantNote}>{s.cant_make_it_note}</div>
                 )}
               </div>
             ))}
@@ -99,6 +174,16 @@ const styles = {
   shiftTime: { fontSize: 18, fontWeight: 800, color: '#111827', marginBottom: 4 },
   shiftProject: { fontSize: 13, fontWeight: 600, color: '#1a56db', marginBottom: 2 },
   shiftNotes: { fontSize: 12, color: '#6b7280', marginTop: 4, lineHeight: 1.4 },
+  shiftFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, gap: 8 },
+  cantBadge: { fontSize: 11, fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: 10 },
+  cantBtn: { marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' },
+  undoBtn: { marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: '#6b7280', background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' },
+  noteBox: { marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 },
+  noteInput: { fontSize: 12, padding: '6px 10px', border: '1px solid #fca5a5', borderRadius: 6, outline: 'none', color: '#374151' },
+  noteActions: { display: 'flex', gap: 6 },
+  confirmBtn: { fontSize: 12, fontWeight: 700, background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' },
+  cancelNoteBtn: { fontSize: 12, fontWeight: 600, background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#6b7280' },
+  cantNote: { fontSize: 11, color: '#dc2626', fontStyle: 'italic', marginTop: 4 },
   emptyBox: { textAlign: 'center', padding: '48px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { color: '#9ca3af', fontSize: 15 },

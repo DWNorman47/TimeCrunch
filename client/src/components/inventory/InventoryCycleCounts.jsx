@@ -3,21 +3,28 @@ import api from '../../api';
 import { parseBinQR } from './BinLabelModal';
 import { parseItemQR } from './ItemLabelModal';
 import UomConversionModal from './UomConversionModal';
+import { useT } from '../../hooks/useT';
 
-const COUNT_TYPES = {
-  cycle:     { label: 'Cycle Count',     color: '#2563eb', bg: '#dbeafe',   desc: 'Count stock at a specific location' },
-  full:      { label: 'Full Count',      color: '#8b5cf6', bg: '#ede9fe',   desc: 'Count all items across every location' },
-  audit:     { label: 'Audit Count',     color: '#d97706', bg: '#fef3c7',   desc: 'Blind count — expected quantities hidden during counting' },
-  reconcile: { label: 'Reconcile Count', color: '#059669', bg: '#d1fae5',   desc: 'Recount items to resolve discrepancies' },
-};
+function useCountTypes(t) {
+  return {
+    cycle:     { label: t.invCycCycleCount,     color: '#2563eb', bg: '#dbeafe',   desc: t.invCycCycleDesc },
+    full:      { label: t.invCycFullCount,      color: '#8b5cf6', bg: '#ede9fe',   desc: t.invCycFullDesc },
+    audit:     { label: t.invCycAuditCount,     color: '#d97706', bg: '#fef3c7',   desc: t.invCycAuditDesc },
+    reconcile: { label: t.invCycReconcileCount, color: '#059669', bg: '#d1fae5',   desc: t.invCycReconcileDesc },
+  };
+}
 
-const STATUS_COLORS = {
-  draft:       { color: '#6b7280', bg: '#f3f4f6', label: 'Draft' },
-  in_progress: { color: '#2563eb', bg: '#dbeafe', label: 'In Progress' },
-  completed:   { color: '#059669', bg: '#d1fae5', label: 'Completed' },
-};
+function useStatusColors(t) {
+  return {
+    draft:       { color: '#6b7280', bg: '#f3f4f6', label: t.invCycDraft },
+    in_progress: { color: '#2563eb', bg: '#dbeafe', label: t.invCycInProgress },
+    completed:   { color: '#059669', bg: '#d1fae5', label: t.invCycCompleted },
+  };
+}
 
 function TypeBadge({ type }) {
+  const t = useT();
+  const COUNT_TYPES = useCountTypes(t);
   const ct = COUNT_TYPES[type] || COUNT_TYPES.cycle;
   return (
     <span style={{ padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700,
@@ -28,6 +35,19 @@ function TypeBadge({ type }) {
 }
 
 function CycleCountDetail({ count, onBack, onComplete }) {
+  const t = useT();
+  const COUNT_TYPES = useCountTypes(t);
+  const STATUS_COLORS = useStatusColors(t);
+  const ROLE_LABELS = {
+    counter:    t.invCycRoleCounter,
+    auditor:    t.invCycRoleAuditor,
+    reconciler: t.invCycRoleReconciler,
+  };
+  const ROLE_LABELS_PLURAL = {
+    counter:    t.invCycRoleCounters,
+    auditor:    t.invCycRoleAuditors,
+    reconciler: t.invCycRoleReconcilers,
+  };
   const [lines, setLines] = useState(count.lines || []);
   const [countData, setCountData] = useState(count);
   const [saving, setSaving] = useState(null);
@@ -40,6 +60,18 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const [lineInputValues, setLineInputValues]     = useState({}); // { [lineId]: string }
   const [itemUomCache, setItemUomCache]           = useState({}); // { [itemId]: [uoms] }
   const [conversionPrompt, setConversionPrompt]   = useState(null); // { lineId, itemId, uom, baseUnit }
+  // Workers + assignments
+  const [workers, setWorkers] = useState(count.workers || []);
+  const [assignments, setAssignments] = useState(count.assignments || []);
+  const [tab, setTab] = useState('lines'); // 'lines' | 'workers'
+  const [allWorkers, setAllWorkers] = useState([]);
+  const [workersLoaded, setWorkersLoaded] = useState(false);
+  const [distributing, setDistributing] = useState(false);
+  const [reopening, setReopening] = useState(false);
+  const [overrideModal, setOverrideModal] = useState(null); // { line }
+  const [overrideQty, setOverrideQty] = useState('');
+  const [overrideNotes, setOverrideNotes] = useState('');
+  const [overriding, setOverriding] = useState(false);
 
   const fetchItemUoms = async (itemId) => {
     if (itemUomCache[itemId]) return;
@@ -49,7 +81,79 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     } catch {}
   };
 
+  const loadAllWorkers = async () => {
+    if (workersLoaded) return;
+    try {
+      const r = await api.get('/admin/workers');
+      setAllWorkers(r.data || []);
+      setWorkersLoaded(true);
+    } catch {}
+  };
+
+  const saveWorker = async (userId, roles) => {
+    try {
+      const r = await api.post(`/inventory/cycle-counts/${count.id}/workers`, { users: [{ user_id: userId, roles }] });
+      setWorkers(r.data);
+    } catch (e) { setSaveError(e.response?.data?.error || t.invCycFailedSaveWorker); }
+  };
+
+  const removeWorker = async (userId) => {
+    try {
+      await api.delete(`/inventory/cycle-counts/${count.id}/workers/${userId}`);
+      setWorkers(prev => prev.filter(w => w.user_id !== userId));
+    } catch (e) { setSaveError(e.response?.data?.error || t.invCycFailedRemoveWorker); }
+  };
+
+  const distribute = async () => {
+    setDistributing(true);
+    try {
+      const r = await api.post(`/inventory/cycle-counts/${count.id}/distribute`);
+      // Reload assignments
+      const detail = await api.get(`/inventory/cycle-counts/${count.id}`);
+      setAssignments(detail.data.assignments || []);
+      setCountData(detail.data);
+      if (r.data.assigned === 0) setSaveError(t.invCycNoLinesDistribute);
+    } catch (e) { setSaveError(e.response?.data?.error || t.invCycFailedDistribute); }
+    finally { setDistributing(false); }
+  };
+
+  const reopen = async () => {
+    setReopening(true);
+    try {
+      await api.post(`/inventory/cycle-counts/${count.id}/reopen`);
+      // Reload full detail so lines and assignments reflect the reset server state.
+      // Without this, lines still show 'accepted' and the Complete button is immediately
+      // enabled — clicking it produces a confusing 422 error from the server.
+      const detail = await api.get(`/inventory/cycle-counts/${count.id}`);
+      setCountData(detail.data);
+      setLines(detail.data.lines || []);
+      setAssignments(detail.data.assignments || []);
+    } catch (e) { setError(e.response?.data?.error || t.invCycFailedReopen); }
+    finally { setReopening(false); }
+  };
+
+  const submitOverride = async () => {
+    if (!overrideModal) return;
+    setOverriding(true);
+    try {
+      const r = await api.post(`/inventory/cycle-counts/${count.id}/lines/${overrideModal.line.id}/override`, {
+        counted_qty: parseFloat(overrideQty),
+        notes: overrideNotes,
+      });
+      setLines(prev => prev.map(l => l.id === overrideModal.line.id ? { ...l, ...r.data.line } : l));
+      if (r.data.auto_completed) {
+        setCountData(prev => ({ ...prev, status: 'completed' }));
+        setReportLines(lines.map(l => l.id === overrideModal.line.id ? { ...l, ...r.data.line } : l));
+      }
+      setOverrideModal(null); setOverrideQty(''); setOverrideNotes('');
+    } catch (e) { setSaveError(e.response?.data?.error || t.invCycFailedOverride); }
+    finally { setOverriding(false); }
+  };
+
   // ── Scan Mode ────────────────────────────────────────────────────────────────
+  const [saveError, setSaveError] = useState('');
+  const [statusError, setStatusError] = useState('');
+  const [uncountedMsg, setUncountedMsg] = useState('');
   const [scanMode, setScanMode] = useState(false);
   const [currentBin, setCurrentBin] = useState(null); // { type, id, name }
   const [highlightedId, setHighlightedId] = useState(null);
@@ -97,7 +201,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     if (bin) {
       setCurrentBin(bin);
       setHighlightedId(null);
-      showFeedback(`Bin set: ${bin.name}`);
+      showFeedback(`${t.invCycBinSetFeedback} ${bin.name}`);
       return;
     }
 
@@ -107,9 +211,9 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       const match = lines.find(l => l.item_id === itemQR.id);
       if (match) {
         setHighlightedId(match.id);
-        showFeedback(`Found: ${match.item_name}`);
+        showFeedback(`${t.invCycFoundFeedback} ${match.item_name}`);
       } else {
-        showFeedback(`Item "${itemQR.name}" not in this count`, true);
+        showFeedback(`"${itemQR.name}" ${t.invCycItemNotInCount}`, true);
       }
       return;
     }
@@ -120,9 +224,9 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     );
     if (match) {
       setHighlightedId(match.id);
-      showFeedback(`Found: ${match.item_name}`);
+      showFeedback(`${t.invCycFoundFeedback} ${match.item_name}`);
     } else {
-      showFeedback(`"${value}" not found in this count`, true);
+      showFeedback(`"${value}" ${t.invCycNotFoundInCount}`, true);
     }
   };
 
@@ -136,19 +240,25 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       // Always send counted_uom_id so the server can compute correct variance
       payload.counted_uom_id = (countedUomId !== undefined ? countedUomId : lineUomSelections[line.id]) ?? null;
       const r = await api.patch(`/inventory/cycle-counts/${count.id}/lines/${line.id}`, payload);
-      setLines(prev => prev.map(l => l.id === line.id ? { ...l, ...r.data } : l));
+      const updatedLine = r.data.line ?? r.data; // backwards-compat if server ever returns raw line
+      setLines(prev => prev.map(l => l.id === line.id ? { ...l, ...updatedLine } : l));
+      if (r.data.auto_completed) {
+        setCountData(prev => ({ ...prev, status: 'completed' }));
+        setReportLines(prev => (prev ?? lines).map(l => l.id === line.id ? { ...l, ...updatedLine } : l));
+      }
     } catch (e) {
-      alert(e.response?.data?.error || 'Failed to save count.');
+      setSaveError(e.response?.data?.error || t.invCycFailedSave);
     } finally {
       setSaving(null);
     }
   };
 
   const advanceStatus = async () => {
+    setStatusError('');
     try {
       const r = await api.patch(`/inventory/cycle-counts/${count.id}`, { status: 'in_progress' });
       setCountData(r.data);
-    } catch (e) { alert(e.response?.data?.error || 'Failed to update status.'); }
+    } catch (e) { setStatusError(e.response?.data?.error || t.invCycFailedStatus); }
   };
 
   const complete = async () => {
@@ -156,21 +266,22 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     try {
       await api.post(`/inventory/cycle-counts/${count.id}/complete`);
       setConfirmOpen(false);
+      setCountData(prev => ({ ...prev, status: 'completed' }));
       setReportLines(lines); // show variance report
     } catch (e) {
-      setError(e.response?.data?.error || 'Failed to complete count.');
-      setCompleting(false); setConfirmOpen(false);
+      // Keep the confirm dialog open so the admin can retry; show error above it
+      setError(e.response?.data?.error || t.invCycFailedComplete);
     } finally {
       setCompleting(false);
     }
   };
 
   const downloadVarianceCSV = (reportData) => {
-    const header = ['Item', 'SKU', 'Unit', 'Expected Qty', 'Counted Qty', 'Variance'];
+    const header = [t.invCycColItem, t.invCycColSku, t.invCycColUnit, t.invCycColExpected, t.invCycColCounted, t.invCycColVariance];
     const rows = reportData.map(l => {
       const expected = parseFloat(l.expected_qty);
       const counted  = l.counted_qty != null ? parseFloat(l.counted_qty) : '';
-      const variance = counted !== '' ? counted - expected : '';
+      const variance = l.variance != null ? l.variance : (counted !== '' ? counted - expected : '');
       return [
         `"${l.item_name.replace(/"/g, '""')}"`,
         l.sku || '',
@@ -190,7 +301,8 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     URL.revokeObjectURL(url);
   };
 
-  const uncounted = lines.filter(l => l.counted_qty === null || l.counted_qty === undefined).length;
+  const FINAL_LINE_STATUSES = ['accepted', 'reconciled', 'overridden', 'audited'];
+  const uncounted = lines.filter(l => !FINAL_LINE_STATUSES.includes(l.line_status)).length;
   const variantLines = lines.filter(l => {
     if (l.counted_qty === null || l.counted_qty === undefined) return false;
     return parseFloat(l.variance ?? (parseFloat(l.counted_qty) - parseFloat(l.expected_qty))) !== 0;
@@ -201,7 +313,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   // Group lines by location for full counts
   const groupedLines = isFull
     ? lines.reduce((acc, line) => {
-        const loc = line.location_name || 'Unknown Location';
+        const loc = line.location_name || t.invCycUnknownLocation;
         if (!acc[loc]) acc[loc] = [];
         acc[loc].push(line);
         return acc;
@@ -295,7 +407,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                   >
                     {availableUoms.map(u => (
                       <option key={u.id} value={u.id}>
-                        {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ' — base' : ''}
+                        {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ` — ${t.invTxBaseUnit}` : ''}
                       </option>
                     ))}
                   </select>
@@ -321,6 +433,20 @@ function CycleCountDetail({ count, onBack, onComplete }) {
           </td>
         )}
         <td style={{ ...d.td, fontSize: 13, color: '#6b7280' }}>{line.counted_by_name || '—'}</td>
+        <td style={d.td}>
+          {line.line_status && line.line_status !== 'pending' && (
+            <span style={{ ...d.lineStatusBadge, ...lineStatusStyle(line.line_status) }}>
+              {line.line_status.replace(/_/g, ' ')}
+            </span>
+          )}
+        </td>
+        {!isCompleted && (
+          <td style={d.td}>
+            <button style={d.overrideBtn} onClick={() => { setOverrideModal({ line }); setOverrideQty(line.counted_qty != null ? String(line.counted_qty) : ''); setOverrideNotes(''); }}>
+              {t.invCycOverride}
+            </button>
+          </td>
+        )}
       </tr>
     );
   };
@@ -328,13 +454,15 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const renderTableHead = (showExpected) => (
     <thead>
       <tr style={d.thead}>
-        <th style={d.th}>Item</th>
-        <th style={d.th}>SKU</th>
-        <th style={d.th}>Unit</th>
-        {showExpected && <th style={{ ...d.th, textAlign: 'right' }}>Expected</th>}
-        <th style={{ ...d.th, textAlign: 'right' }}>Counted</th>
-        {showExpected && <th style={{ ...d.th, textAlign: 'right' }}>Variance</th>}
-        <th style={d.th}>Counted By</th>
+        <th style={d.th}>{t.invCycColItem}</th>
+        <th style={d.th}>{t.invCycColSku}</th>
+        <th style={d.th}>{t.invCycColUnit}</th>
+        {showExpected && <th style={{ ...d.th, textAlign: 'right' }}>{t.invCycColExpected}</th>}
+        <th style={{ ...d.th, textAlign: 'right' }}>{t.invCycColCounted}</th>
+        {showExpected && <th style={{ ...d.th, textAlign: 'right' }}>{t.invCycColVariance}</th>}
+        <th style={d.th}>{t.invCycColCountedBy}</th>
+        <th style={d.th}>{t.invCycColStatus}</th>
+        {!isCompleted && <th style={d.th} />}
       </tr>
     </thead>
   );
@@ -343,25 +471,25 @@ function CycleCountDetail({ count, onBack, onComplete }) {
 
   return (
     <div style={d.wrap}>
-      <button style={d.back} onClick={onBack}>← Back to Counts</button>
+      <button style={d.back} onClick={onBack}>{t.invCycBackToList}</button>
 
       <div style={d.header}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <h2 style={d.title}>{COUNT_TYPES[countData.count_type]?.label || 'Count'} — {countData.location_name}</h2>
+            <h2 style={d.title}>{COUNT_TYPES[countData.count_type]?.label || t.invCycCountLabel} — {countData.location_name}</h2>
             <TypeBadge type={countData.count_type} />
           </div>
-          <p style={d.sub}>Started by {countData.started_by_name} · {new Date(countData.started_at).toLocaleDateString()}</p>
+          <p style={d.sub}>{t.invCycStartedBy} {countData.started_by_name} · {new Date(countData.started_at).toLocaleDateString()}</p>
           {isAudit && !isCompleted && (
             <p style={{ ...d.sub, color: '#d97706', fontWeight: 600, marginTop: 4 }}>
-              Audit mode: expected quantities are hidden until the count is completed.
+              {t.invCycAuditMode}
             </p>
           )}
         </div>
         <div style={d.headerRight}>
           <span style={{ ...d.statusBadge, color: sc.color, background: sc.bg }}>{sc.label}</span>
           {countData.status === 'draft' && (
-            <button style={d.advanceBtn} onClick={advanceStatus}>Start Counting</button>
+            <button style={d.advanceBtn} onClick={advanceStatus}>{t.invCycStartCounting}</button>
           )}
           {countData.status === 'in_progress' && (
             <>
@@ -369,20 +497,131 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 style={{ ...d.scanModeBtn, ...(scanMode ? d.scanModeBtnActive : {}) }}
                 onClick={() => { setScanMode(s => !s); setHighlightedId(null); setCurrentBin(null); }}
               >
-                {scanMode ? '📷 Scan Mode ON' : '📷 Scan Mode'}
+                {scanMode ? t.invCycScanModeOn : t.invCycScanMode}
               </button>
               <button
                 style={{ ...d.completeBtn, opacity: uncounted > 0 ? 0.5 : 1 }}
-                onClick={() => uncounted > 0 ? alert(`${uncounted} item(s) not yet counted.`) : setConfirmOpen(true)}
+                onClick={() => uncounted > 0 ? setUncountedMsg(`${uncounted} ${t.invCycItemsNotCounted}`) : setConfirmOpen(true)}
               >
-                Complete Count
+                {t.invCycCompleteCount}
               </button>
             </>
+          )}
+          {countData.status === 'completed' && (
+            <button style={{ ...d.advanceBtn, background: '#6b7280' }} onClick={reopen} disabled={reopening}>
+              {reopening ? t.invCycReopening : t.invCycReopenCount}
+            </button>
           )}
         </div>
       </div>
 
+      {saveError && <div style={d.error}>{saveError}</div>}
+      {statusError && <div style={d.error}>{statusError}</div>}
+      {uncountedMsg && <div style={d.warnMsg}>{uncountedMsg}</div>}
       {error && <div style={d.error}>{error}</div>}
+
+      {/* ── Tab Navigation ── */}
+      <div style={d.tabRow}>
+        <button style={{ ...d.tab, ...(tab === 'lines' ? d.tabActive : {}) }} onClick={() => setTab('lines')}>
+          {t.invCycTabLines} ({lines.length})
+        </button>
+        <button style={{ ...d.tab, ...(tab === 'workers' ? d.tabActive : {}) }}
+          onClick={() => { setTab('workers'); loadAllWorkers(); }}>
+          {t.invCycTabWorkers} ({workers.length})
+        </button>
+      </div>
+
+      {/* ── Workers Panel ── */}
+      {tab === 'workers' && (
+        <div style={d.workersPanel}>
+          <div style={d.workersPanelHeader}>
+            <strong style={{ fontSize: 14 }}>{t.invCycAssignWorkers}</strong>
+            {!isCompleted && (
+              <button style={d.distributeBtn} onClick={distribute} disabled={distributing || workers.filter(w => w.roles.includes('counter')).length === 0}>
+                {distributing ? t.invCycDistributing : t.invCycDistributeLines}
+              </button>
+            )}
+          </div>
+          <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 12px' }}>
+            {t.invCycWorkersPanelDesc}
+          </p>
+
+          {/* Existing assigned workers */}
+          {workers.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              {workers.map(w => (
+                <div key={w.user_id} style={d.workerRow}>
+                  <span style={d.workerName}>{w.full_name}</span>
+                  <div style={d.rolesRow}>
+                    {['counter', 'auditor', 'reconciler'].map(role => (
+                      <label key={role} style={d.roleLabel}>
+                        <input type="checkbox" style={{ marginRight: 4 }}
+                          checked={w.roles.includes(role)}
+                          disabled={isCompleted}
+                          onChange={e => {
+                            const newRoles = e.target.checked
+                              ? [...w.roles, role]
+                              : w.roles.filter(r => r !== role);
+                            saveWorker(w.user_id, newRoles);
+                          }}
+                        />
+                        {ROLE_LABELS[role] || role}
+                      </label>
+                    ))}
+                  </div>
+                  {!isCompleted && (
+                    <button style={d.removeWorkerBtn} onClick={() => removeWorker(w.user_id)}>{t.invCycRemoveWorker}</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add worker from company list */}
+          {!isCompleted && (
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 600, color: '#374151', margin: '0 0 6px' }}>{t.invCycAddWorker}</p>
+              <select style={d.workerSelect}
+                value=""
+                onChange={e => {
+                  const uid = parseInt(e.target.value);
+                  if (!uid) return;
+                  if (workers.find(w => w.user_id === uid)) return;
+                  saveWorker(uid, ['counter']);
+                }}>
+                <option value="">{t.invCycSelectWorker}</option>
+                {allWorkers
+                  .filter(w => !workers.find(x => x.user_id === w.id))
+                  .map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Assignment summary by line */}
+          {assignments.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: '#374151', margin: '0 0 8px' }}>{t.invCycLineAssignments} ({assignments.length})</p>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>
+                {(['counter', 'auditor', 'reconciler']).map(role => {
+                  const roleAssignments = assignments.filter(a => a.role === role);
+                  if (roleAssignments.length === 0) return null;
+                  const byWorker = roleAssignments.reduce((acc, a) => {
+                    const key = a.worker_name;
+                    acc[key] = (acc[key] || 0) + 1;
+                    return acc;
+                  }, {});
+                  return (
+                    <div key={role} style={{ marginBottom: 8 }}>
+                      <strong>{ROLE_LABELS_PLURAL[role] || role}</strong>{' '}
+                      {Object.entries(byWorker).map(([name, cnt]) => `${name} (${cnt})`).join(' · ')}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Scan Panel ── */}
       {scanMode && (
@@ -391,11 +630,11 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             <span style={d.scanBinLabel}>
               {currentBin
                 ? <>📍 <strong>{currentBin.name}</strong> <span style={{ color: '#9ca3af', fontSize: 12 }}>({currentBin.type})</span></>
-                : <span style={{ color: '#9ca3af' }}>📍 No bin scanned — scan a bin label to set location context</span>
+                : <span style={{ color: '#9ca3af' }}>📍 {t.invCycNoBinScanned}</span>
               }
             </span>
             {currentBin && (
-              <button style={d.scanClearBtn} onClick={() => setCurrentBin(null)}>Clear</button>
+              <button style={d.scanClearBtn} onClick={() => setCurrentBin(null)}>{t.invCycClearBin}</button>
             )}
           </div>
           <div style={d.scanInputRow}>
@@ -403,7 +642,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
               ref={scanInputRef}
               style={d.scanInput}
               type="text"
-              placeholder="Scan barcode or QR code here…"
+              placeholder={t.invCycScanPlaceholder}
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   processScan(e.target.value);
@@ -419,15 +658,13 @@ function CycleCountDetail({ count, onBack, onComplete }) {
               {scanFeedback.msg}
             </div>
           )}
-          <p style={d.scanHint}>
-            Scan a <strong>bin label QR code</strong> to set the active bin, or scan a <strong>product barcode/SKU</strong> to jump to that item. Bin context persists between scans.
-          </p>
+          <p style={d.scanHint}>{t.invCycScanHint}</p>
         </div>
       )}
 
-      {lines.length === 0 ? (
-        <div style={d.empty}>No items were in stock when the count was created.</div>
-      ) : isFull ? (
+      {tab === 'lines' && lines.length === 0 ? (
+        <div style={d.empty}>{t.invCycNoItems}</div>
+      ) : tab === 'lines' && isFull ? (
         // Full count: render table grouped by location
         Object.entries(groupedLines).map(([locName, locLines]) => (
           <div key={locName} style={{ marginBottom: 24 }}>
@@ -440,54 +677,54 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             </div>
           </div>
         ))
-      ) : (
+      ) : tab === 'lines' ? (
         <div style={d.tableWrap}>
           <table style={d.table}>
             {renderTableHead(showExpected)}
             <tbody>{lines.map((line, i) => renderLine(line, i))}</tbody>
           </table>
         </div>
-      )}
+      ) : null}
 
-      {uncounted > 0 && countData.status === 'in_progress' && (
-        <p style={d.uncountedNote}>{uncounted} item{uncounted !== 1 ? 's' : ''} not yet counted.</p>
+      {tab === 'lines' && uncounted > 0 && countData.status === 'in_progress' && (
+        <p style={d.uncountedNote}>{uncounted} {t.invCycItemsNotCounted}</p>
       )}
 
       {reportLines && (
         <div style={d.modalOverlay}>
           <div style={{ ...d.modal, maxWidth: 560 }}>
-            <h3 style={d.modalTitle}>Count Complete — Variance Report</h3>
+            <h3 style={d.modalTitle}>{t.invCycVarianceReport}</h3>
             {(() => {
               const withVariance = reportLines.filter(l => {
                 if (l.counted_qty == null) return false;
-                return parseFloat(l.counted_qty) - parseFloat(l.expected_qty) !== 0;
+                return parseFloat(l.variance ?? (parseFloat(l.counted_qty) - parseFloat(l.expected_qty))) !== 0;
               });
               const noVariance = reportLines.filter(l => {
                 if (l.counted_qty == null) return true;
-                return parseFloat(l.counted_qty) - parseFloat(l.expected_qty) === 0;
+                return parseFloat(l.variance ?? (parseFloat(l.counted_qty) - parseFloat(l.expected_qty))) === 0;
               });
               return (
                 <>
                   <p style={d.modalBody}>
                     {withVariance.length === 0
-                      ? 'No variances — all counts matched expected quantities.'
-                      : `${withVariance.length} item${withVariance.length !== 1 ? 's' : ''} with variance, ${noVariance.length} matched.`}
+                      ? t.invCycNoVariances
+                      : `${withVariance.length} ${t.invCycWithVariance} ${noVariance.length} ${t.invCycMatched}`}
                   </p>
                   <div style={{ overflowX: 'auto', marginBottom: 16 }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                       <thead>
                         <tr style={{ background: '#f9fafb' }}>
-                          <th style={d.rth}>Item</th>
-                          <th style={{ ...d.rth, textAlign: 'right' }}>Expected</th>
-                          <th style={{ ...d.rth, textAlign: 'right' }}>Counted</th>
-                          <th style={{ ...d.rth, textAlign: 'right' }}>Variance</th>
+                          <th style={d.rth}>{t.invCycColItem}</th>
+                          <th style={{ ...d.rth, textAlign: 'right' }}>{t.invCycColExpected}</th>
+                          <th style={{ ...d.rth, textAlign: 'right' }}>{t.invCycColCounted}</th>
+                          <th style={{ ...d.rth, textAlign: 'right' }}>{t.invCycColVariance}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {[...withVariance, ...noVariance].map((l, i) => {
                           const expected = parseFloat(l.expected_qty);
                           const counted  = l.counted_qty != null ? parseFloat(l.counted_qty) : null;
-                          const variance = counted != null ? counted - expected : null;
+                          const variance = l.variance != null ? parseFloat(l.variance) : (counted != null ? counted - expected : null);
                           const isVar    = variance !== null && variance !== 0;
                           return (
                             <tr key={l.id} style={{ background: isVar ? '#fff7ed' : (i % 2 === 0 ? '#fafafa' : '#fff') }}>
@@ -496,7 +733,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                                 {l.item_name}
                               </td>
                               <td style={{ ...d.rtd, textAlign: 'right', color: '#6b7280' }}>{expected} {l.unit}</td>
-                              <td style={{ ...d.rtd, textAlign: 'right' }}>{counted != null ? `${counted} ${l.unit}` : <em style={{ color: '#9ca3af' }}>not counted</em>}</td>
+                              <td style={{ ...d.rtd, textAlign: 'right' }}>{counted != null ? `${counted} ${l.unit}` : <em style={{ color: '#9ca3af' }}>{t.invCycNotCounted}</em>}</td>
                               <td style={{ ...d.rtd, textAlign: 'right', fontWeight: 700,
                                 color: variance === null ? '#9ca3af' : variance > 0 ? '#059669' : variance < 0 ? '#dc2626' : '#374151' }}>
                                 {variance === null ? '—' : variance > 0 ? `+${variance}` : variance}
@@ -511,9 +748,9 @@ function CycleCountDetail({ count, onBack, onComplete }) {
               );
             })()}
             <div style={d.modalActions}>
-              <button style={d.cancelBtn} onClick={() => { setReportLines(null); onComplete(); }}>Close</button>
+              <button style={d.cancelBtn} onClick={() => { setReportLines(null); onComplete(); }}>{t.cancel}</button>
               <button style={{ ...d.confirmBtn, background: '#2563eb' }} onClick={() => downloadVarianceCSV(reportLines)}>
-                Download CSV
+                {t.invCycDownloadCSV}
               </button>
             </div>
           </div>
@@ -523,13 +760,13 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       {confirmOpen && (
         <div style={d.modalOverlay}>
           <div style={d.modal}>
-            <h3 style={d.modalTitle}>Complete {COUNT_TYPES[countData.count_type]?.label || 'Count'}?</h3>
+            <h3 style={d.modalTitle}>{t.invCycConfirmComplete} {COUNT_TYPES[countData.count_type]?.label || ''}?</h3>
             {variantLines.length > 0 ? (
               <>
-                <p style={d.modalBody}>{variantLines.length} adjustment{variantLines.length !== 1 ? 's' : ''} will be posted to stock:</p>
+                <p style={d.modalBody}>{variantLines.length} {t.invCycAdjustments}</p>
                 <ul style={d.modalList}>
                   {variantLines.map(l => {
-                    const v = parseFloat(l.counted_qty) - parseFloat(l.expected_qty);
+                    const v = l.variance != null ? parseFloat(l.variance) : parseFloat(l.counted_qty) - parseFloat(l.expected_qty);
                     return (
                       <li key={l.id} style={d.modalListItem}>
                         {isFull && l.location_name ? `${l.location_name} — ` : ''}{l.item_name}: {v > 0 ? `+${v}` : v} {l.unit}
@@ -539,12 +776,12 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 </ul>
               </>
             ) : (
-              <p style={d.modalBody}>No variances found. Stock will not be adjusted.</p>
+              <p style={d.modalBody}>{t.invCycNoVariancesConfirm}</p>
             )}
             <div style={d.modalActions}>
-              <button style={d.cancelBtn} onClick={() => setConfirmOpen(false)}>Cancel</button>
+              <button style={d.cancelBtn} onClick={() => setConfirmOpen(false)}>{t.cancel}</button>
               <button style={d.confirmBtn} onClick={complete} disabled={completing}>
-                {completing ? 'Completing…' : 'Confirm & Complete'}
+                {completing ? t.invCycCompleting : t.invCycConfirmBtn}
               </button>
             </div>
           </div>
@@ -566,12 +803,50 @@ function CycleCountDetail({ count, onBack, onComplete }) {
           onDismiss={() => setConversionPrompt(null)}
         />
       )}
+
+      {/* ── Override Modal ── */}
+      {overrideModal && (
+        <div style={d.modalOverlay}>
+          <div style={d.modal}>
+            <h3 style={d.modalTitle}>{t.invCycOverrideTitle}: {overrideModal.line.item_name}</h3>
+            <p style={d.modalBody}>
+              {t.invCycOverrideExpected}: {parseFloat(overrideModal.line.expected_qty)} {overrideModal.line.unit}.
+              {' '}{t.invCycOverrideDesc}
+            </p>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>{t.invCycOverrideCounted}</label>
+              <input type="number" min="0" step="any"
+                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
+                value={overrideQty} onChange={e => setOverrideQty(e.target.value)} />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>{t.notesOptional}</label>
+              <input type="text" maxLength={500}
+                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
+                value={overrideNotes} onChange={e => setOverrideNotes(e.target.value)} />
+            </div>
+            <div style={d.modalActions}>
+              <button style={d.cancelBtn} onClick={() => setOverrideModal(null)}>{t.cancel}</button>
+              <button style={{ ...d.confirmBtn, background: '#7c3aed' }}
+                onClick={submitOverride} disabled={overriding || overrideQty === ''}>
+                {overriding ? t.invCycOverrideSaving : t.invCycOverride}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function InventoryCycleCounts({ locations, onComplete }) {
+  const t = useT();
+  const COUNT_TYPES = useCountTypes(t);
+  const STATUS_COLORS = useStatusColors(t);
   const [counts, setCounts] = useState([]);
+  const [countsTotal, setCountsTotal] = useState(0);
+  const [countsOffset, setCountsOffset] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState(null);
@@ -581,24 +856,44 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [loadDetailError, setLoadDetailError] = useState('');
+
+  const CC_PAGE = 100;
 
   const load = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setCountsOffset(0);
     try {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ limit: CC_PAGE, offset: 0 });
       if (filterStatus) params.set('status', filterStatus);
       if (filterType) params.set('count_type', filterType);
       if (filterLocation) params.set('location_id', filterLocation);
       const r = await api.get(`/inventory/cycle-counts?${params}`);
-      setCounts(r.data);
-    } catch { setError('Failed to load counts'); }
+      setCounts(r.data.counts);
+      setCountsTotal(r.data.total);
+    } catch { setError(t.invCycFailedLoad); }
     finally { setLoading(false); }
   }, [filterStatus, filterType, filterLocation]);
+
+  const loadMoreCounts = async () => {
+    const nextOffset = countsOffset + CC_PAGE;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams({ limit: CC_PAGE, offset: nextOffset });
+      if (filterStatus) params.set('status', filterStatus);
+      if (filterType) params.set('count_type', filterType);
+      if (filterLocation) params.set('location_id', filterLocation);
+      const r = await api.get(`/inventory/cycle-counts?${params}`);
+      setCounts(prev => [...prev, ...r.data.counts]);
+      setCountsOffset(nextOffset);
+    } catch { /* non-fatal */ }
+    finally { setLoadingMore(false); }
+  };
 
   useEffect(() => { load(); }, [load]);
 
   const startCount = async () => {
-    if (newCountType !== 'full' && !newLocationId) return alert('Select a location.');
+    setCreateError('');
     setCreating(true);
     try {
       const payload = { count_type: newCountType, notes: null };
@@ -607,17 +902,18 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
       setSelected(r.data);
       load();
     } catch (e) {
-      alert(e.response?.data?.error || 'Failed to create count.');
+      setCreateError(e.response?.data?.error || t.invCycFailedCreate);
     } finally {
       setCreating(false); setNewLocationId('');
     }
   };
 
   const openCount = async (count) => {
+    setLoadDetailError('');
     try {
       const r = await api.get(`/inventory/cycle-counts/${count.id}`);
       setSelected(r.data);
-    } catch { alert('Failed to load count details.'); }
+    } catch { setLoadDetailError(t.invCycFailedLoadDetails); }
   };
 
   const handleComplete = () => {
@@ -651,49 +947,52 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
           </select>
           {needsLocation && (
             <select style={s.select} value={newLocationId} onChange={e => setNewLocationId(e.target.value)}>
-              <option value="">Select location…</option>
+              <option value="">{t.invCycSelectLocation}</option>
               {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           )}
           <button style={s.startBtn} onClick={startCount} disabled={creating || (needsLocation && !newLocationId)}>
-            {creating ? 'Creating…' : '+ Start Count'}
+            {creating ? t.invCycCreating : t.invCycStartCount}
           </button>
         </div>
         {newCountType && (
           <p style={s.typeDesc}>{COUNT_TYPES[newCountType]?.desc}</p>
         )}
+        {createError && <p style={s.inlineError}>{createError}</p>}
       </div>
 
       {/* Filters */}
       <div style={s.filters}>
         <select style={s.select} value={filterType} onChange={e => setFilterType(e.target.value)}>
-          <option value="">All Types</option>
+          <option value="">{t.invCycAllTypes}</option>
           {Object.entries(COUNT_TYPES).map(([key, ct]) => (
             <option key={key} value={key}>{ct.label}</option>
           ))}
         </select>
         <select style={s.select} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-          <option value="">All Statuses</option>
-          <option value="draft">Draft</option>
-          <option value="in_progress">In Progress</option>
-          <option value="completed">Completed</option>
+          <option value="">{t.invCycAllStatuses}</option>
+          <option value="draft">{t.invCycDraft}</option>
+          <option value="in_progress">{t.invCycInProgress}</option>
+          <option value="completed">{t.invCycCompleted}</option>
         </select>
         <select style={s.select} value={filterLocation} onChange={e => setFilterLocation(e.target.value)}>
-          <option value="">All Locations</option>
+          <option value="">{t.invCycAllLocations}</option>
           {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
       </div>
 
       {error && <div style={s.error}>{error}</div>}
+      {loadDetailError && <p style={s.inlineError}>{loadDetailError}</p>}
 
       {loading ? (
-        <div style={s.empty}>Loading…</div>
+        <div style={s.empty}>{t.loading}</div>
       ) : counts.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>📋</div>
-          <p>No counts yet. Start one above.</p>
+          <p>{t.invCycNoCountsYet}</p>
         </div>
       ) : (
+        <>
         <div style={s.list}>
           {counts.map(count => {
             const sc = STATUS_COLORS[count.status] || STATUS_COLORS.draft;
@@ -704,8 +1003,8 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
                   <div>
                     <div style={s.cardTitle}>{count.location_name}</div>
                     <div style={s.cardMeta}>
-                      Started by {count.started_by_name} · {new Date(count.started_at).toLocaleDateString()}
-                      {count.completed_at && ` · Completed ${new Date(count.completed_at).toLocaleDateString()}`}
+                      {t.invCycStartedBy} {count.started_by_name} · {new Date(count.started_at).toLocaleDateString()}
+                      {count.completed_at && ` · ${t.invCycCompleted} ${new Date(count.completed_at).toLocaleDateString()}`}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -714,7 +1013,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
                   </div>
                 </div>
                 <div style={s.cardProgress}>
-                  <span style={s.cardProgressText}>{count.counted_count}/{count.line_count} items counted</span>
+                  <span style={s.cardProgressText}>{count.counted_count}/{count.line_count} {t.invCycItemsCounted}</span>
                   {count.status !== 'completed' && count.line_count > 0 && (
                     <div style={s.progressBar}>
                       <div style={{ ...s.progressFill, width: `${pct}%` }} />
@@ -725,9 +1024,32 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
             );
           })}
         </div>
+        {counts.length < countsTotal && (
+          <div style={{ textAlign: 'center', padding: '16px 0' }}>
+            <button style={s.loadMoreBtn} onClick={loadMoreCounts} disabled={loadingMore}>
+              {loadingMore ? t.loading : t.loadMore}
+            </button>
+            <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>{counts.length} / {countsTotal}</span>
+          </div>
+        )}
+        </>
       )}
     </div>
   );
+}
+
+function lineStatusStyle(status) {
+  const map = {
+    pending:          { color: '#6b7280', background: '#f3f4f6' },
+    counted:          { color: '#2563eb', background: '#dbeafe' },
+    needs_audit:      { color: '#d97706', background: '#fef3c7' },
+    audited:          { color: '#7c3aed', background: '#ede9fe' },
+    needs_reconcile:  { color: '#dc2626', background: '#fee2e2' },
+    reconciled:       { color: '#059669', background: '#d1fae5' },
+    accepted:         { color: '#059669', background: '#d1fae5' },
+    overridden:       { color: '#6b7280', background: '#e5e7eb' },
+  };
+  return map[status] || { color: '#6b7280', background: '#f3f4f6' };
 }
 
 const d = {
@@ -774,10 +1096,30 @@ const d = {
   confirmBtn:    { padding: '9px 20px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
   rth:           { padding: '8px 10px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', textAlign: 'left', borderBottom: '2px solid #e5e7eb' },
   rtd:           { padding: '8px 10px', fontSize: 13, color: '#374151', borderBottom: '1px solid #f3f4f6' },
+  warnMsg:       { color: '#92400e', fontSize: 13, margin: '6px 0 0' },
+  inlineError:   { color: '#dc2626', fontSize: 13, margin: '6px 0 0' },
+  // Tabs
+  tabRow:        { display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e5e7eb' },
+  tab:           { padding: '8px 16px', background: 'none', border: 'none', fontSize: 14, fontWeight: 600, color: '#6b7280', cursor: 'pointer', borderBottom: '2px solid transparent', marginBottom: -2 },
+  tabActive:     { color: '#2563eb', borderBottom: '2px solid #2563eb' },
+  // Workers panel
+  workersPanel:  { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginBottom: 16 },
+  workersPanelHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  distributeBtn: { padding: '7px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  workerRow:     { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #e5e7eb', flexWrap: 'wrap' },
+  workerName:    { fontSize: 14, fontWeight: 600, color: '#111827', flex: 1, minWidth: 120 },
+  rolesRow:      { display: 'flex', gap: 12, flexWrap: 'wrap' },
+  roleLabel:     { fontSize: 13, color: '#374151', display: 'flex', alignItems: 'center', cursor: 'pointer' },
+  removeWorkerBtn: { padding: '3px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', fontSize: 12, color: '#dc2626', cursor: 'pointer' },
+  workerSelect:  { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151', width: '100%' },
+  // Line status
+  lineStatusBadge: { padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' },
+  overrideBtn:   { padding: '3px 8px', borderRadius: 6, border: '1px solid #7c3aed', background: '#fff', color: '#7c3aed', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
 };
 
 const s = {
   wrap:          { padding: 16 },
+  loadMoreBtn:   { padding: '8px 20px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, color: '#374151', cursor: 'pointer' },
   startCard:     { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginBottom: 12 },
   startRow:      { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
   typeSelect:    { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151', minWidth: 160 },
@@ -798,4 +1140,6 @@ const s = {
   progressBar:   { flex: 1, height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' },
   progressFill:  { height: '100%', background: '#2563eb', borderRadius: 3, transition: 'width 0.3s' },
   badge:         { display: 'inline-block', padding: '3px 12px', borderRadius: 12, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' },
+  inlineError:   { color: '#dc2626', fontSize: 13, margin: '6px 0 0' },
+  warnMsg:       { color: '#92400e', fontSize: 13, margin: '6px 0 0' },
 };

@@ -2,7 +2,11 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
+const rateLimit = require('express-rate-limit');
 const pool = require('../db');
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function isValidEmail(email) { return EMAIL_RE.test(String(email).trim()); }
 const { requireAdmin, requirePlan, requireProAddon, requirePermission } = require('../middleware/auth');
 const { sendPushToUser, sendPushToAllWorkers } = require('../push');
 const { sendEmail } = require('../email');
@@ -211,6 +215,79 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
   }
 });
 
+// ── Advanced Settings ──────────────────────────────────────────────────────────
+
+const ADVANCED_SETTING_KEYS = ['reimbursement_categories', 'item_units'];
+
+// Hardcoded defaults — never stored in DB unless overridden
+const ADVANCED_DEFAULTS = {
+  reimbursement_categories: {
+    defaults: ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'],
+    suppressed: [],
+    custom: [],
+  },
+  item_units: {
+    defaults: ['each', 'box', 'bag', 'bundle', 'pallet', 'lb', 'kg', 'ft', 'm', 'sq ft', 'gal', 'L', 'roll', 'sheet', 'piece', 'other'],
+    suppressed: [],
+    custom: [],
+  },
+};
+
+async function getAdvancedSettings(companyId) {
+  const result = await pool.query(
+    'SELECT key, value FROM advanced_settings WHERE company_id = $1',
+    [companyId]
+  );
+  const out = {};
+  for (const key of ADVANCED_SETTING_KEYS) {
+    const row = result.rows.find(r => r.key === key);
+    const def = ADVANCED_DEFAULTS[key];
+    out[key] = row ? { ...def, ...row.value } : { ...def };
+  }
+  return out;
+}
+
+router.get('/advanced-settings', requireAdmin, async (req, res) => {
+  try {
+    res.json(await getAdvancedSettings(req.user.company_id));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.patch('/advanced-settings/:key', requireAdmin, requirePermission('manage_settings'), async (req, res) => {
+  const { key } = req.params;
+  if (!ADVANCED_SETTING_KEYS.includes(key))
+    return res.status(400).json({ error: 'Unknown advanced setting key' });
+  const companyId = req.user.company_id;
+  try {
+    const def = ADVANCED_DEFAULTS[key];
+    let value = {};
+
+    if (key === 'reimbursement_categories' || key === 'item_units') {
+      const suppressed = Array.isArray(req.body.suppressed)
+        ? req.body.suppressed.filter(s => def.defaults.includes(s))
+        : [];
+      const custom = Array.isArray(req.body.custom)
+        ? req.body.custom.map(s => String(s).trim()).filter(Boolean)
+        : [];
+      value = { suppressed, custom };
+    }
+
+    await pool.query(
+      `INSERT INTO advanced_settings (company_id, key, value, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (company_id, key) DO UPDATE SET value = $3, updated_at = NOW()`,
+      [companyId, key, JSON.stringify(value)]
+    );
+    res.json(await getAdvancedSettings(companyId));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Notifications — inactive workers
 router.get('/notifications', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
@@ -238,8 +315,10 @@ router.get('/notifications', requireAdmin, async (req, res) => {
 // POST /admin/clock-in — admin clocks in a worker on their behalf
 router.post('/clock-in', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
-  const { user_id, project_id, notes } = req.body;
+  const { user_id, project_id } = req.body;
+  const notes = req.body.notes?.trim() || null;
   if (!user_id) return res.status(400).json({ error: 'user_id required' });
+  if (notes && notes.length > 500) return res.status(400).json({ error: 'notes too long (max 500 characters)' });
   try {
     // Verify worker belongs to this company
     const workerRow = await pool.query(
@@ -276,6 +355,8 @@ router.post('/clock-in', requireAdmin, requirePermission('manage_workers'), asyn
 router.post('/clock-out/:user_id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
   const { break_minutes, mileage } = req.body;
+  const mileageVal = mileage != null && mileage !== '' ? parseFloat(mileage) : null;
+  if (mileageVal !== null && isNaN(mileageVal)) return res.status(400).json({ error: 'mileage must be a number' });
   try {
     const clockResult = await pool.query(
       `SELECT ac.*, p.wage_type, p.name AS project_name
@@ -293,23 +374,32 @@ router.post('/clock-out/:user_id', requireAdmin, requirePermission('manage_worke
     const start_time = `${pad(clockInTime.getUTCHours())}:${pad(clockInTime.getUTCMinutes())}:${pad(clockInTime.getUTCSeconds())}`;
     const end_time = `${pad(clockOutTime.getUTCHours())}:${pad(clockOutTime.getUTCMinutes())}:${pad(clockOutTime.getUTCSeconds())}`;
 
-    const entryResult = await pool.query(
-      `INSERT INTO time_entries
-         (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
-          clock_in_lat, clock_in_lng, break_minutes, mileage, timezone, clock_source, clocked_in_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-       RETURNING *`,
-      [
-        companyId, clock.user_id, clock.project_id, clock.work_date,
-        start_time, end_time, clock.wage_type || 'regular', clock.notes || null,
-        clock.clock_in_lat, clock.clock_in_lng,
-        parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
-        clock.timezone || null,
-        clock.clock_source, clock.clocked_in_by,
-      ]
-    );
+    const client = await pool.connect();
+    let entryResult;
+    try {
+      await client.query('BEGIN');
+      entryResult = await client.query(
+        `INSERT INTO time_entries
+           (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
+            clock_in_lat, clock_in_lng, break_minutes, mileage, timezone, clock_source, clocked_in_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         RETURNING *`,
+        [
+          companyId, clock.user_id, clock.project_id, clock.work_date,
+          start_time, end_time, clock.wage_type || 'regular', clock.notes || null,
+          clock.clock_in_lat, clock.clock_in_lng,
+          parseInt(break_minutes) || 0, mileageVal,
+          clock.timezone || null,
+          clock.clock_source, clock.clocked_in_by,
+        ]
+      );
+      await client.query('DELETE FROM active_clock WHERE user_id = $1', [clock.user_id]);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally { client.release(); }
 
-    await pool.query('DELETE FROM active_clock WHERE user_id = $1', [clock.user_id]);
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.clocked_out_by_admin', 'user', parseInt(req.params.user_id), null);
     res.json(entryResult.rows[0]);
   } catch (err) {
@@ -323,6 +413,7 @@ router.patch('/active-clock/:user_id', requireAdmin, requirePermission('manage_w
   const companyId = req.user.company_id;
   const { clock_in_time } = req.body;
   if (!clock_in_time) return res.status(400).json({ error: 'clock_in_time required' });
+  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(clock_in_time)) return res.status(400).json({ error: 'clock_in_time must be HH:MM or HH:MM:SS' });
   try {
     const result = await pool.query(
       `UPDATE active_clock SET clock_in_time = $1
@@ -500,6 +591,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
           SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600) as day_hours
         FROM time_entries
         WHERE wage_type = 'regular' AND company_id = $1
+          AND work_date >= CURRENT_DATE - INTERVAL '365 days'
         GROUP BY user_id, work_date
       ),
       weekly_regular AS (
@@ -530,6 +622,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600 ELSE 0 END), 0) as prevailing_hours
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
+        AND te.work_date >= CURRENT_DATE - INTERVAL '365 days'
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1 ${accessFilter}
       GROUP BY u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password
       ORDER BY u.role DESC, u.full_name
@@ -549,7 +642,7 @@ router.get('/workers/archived', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, full_name, username, role, language, hourly_rate
-       FROM users WHERE active = false AND company_id = $1 ORDER BY full_name`,
+       FROM users WHERE active = false AND company_id = $1 ORDER BY full_name LIMIT 500`,
       [companyId]
     );
     res.json(result.rows);
@@ -579,10 +672,13 @@ router.patch('/workers/:id/restore', requireAdmin, async (req, res) => {
 // Get a worker's entries for a date range (for bill generation)
 router.post('/workers/:id/entries', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
-  const { work_date, start_time, end_time, project_id, notes, break_minutes, mileage } = req.body;
+  const { work_date, start_time, end_time, project_id, break_minutes, mileage } = req.body;
+  const notes = req.body.notes?.trim() || null;
   if (!work_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'work_date, start_time, and end_time are required' });
   }
+  const entryMileageVal = mileage != null && mileage !== '' ? parseFloat(mileage) : null;
+  if (entryMileageVal !== null && isNaN(entryMileageVal)) return res.status(400).json({ error: 'mileage must be a number' });
   try {
     const workerRow = await pool.query(
       'SELECT id FROM users WHERE id = $1 AND company_id = $2 AND active = true',
@@ -606,7 +702,7 @@ router.post('/workers/:id/entries', requireAdmin, requirePermission('manage_work
       [
         companyId, req.params.id, project_id || null, work_date,
         start_time, end_time, wage_type, notes || null,
-        parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
+        parseInt(break_minutes) || 0, entryMileageVal,
         req.user.id,
       ]
     );
@@ -678,7 +774,13 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
     const { shortfall: guaranteeShortfall, minHours: guaranteeMinHours, weeks: guaranteeWeeks } =
       computeGuaranteeShortfall(totalHours, worker.guaranteed_weekly_hours, from, to);
     const guaranteeCost = guaranteeShortfall * rate;
-    const totalCost = regularCost + overtimeCost + prevailingCost + guaranteeCost;
+    // Round each cost component to cents so displayed line items always sum to the total
+    const roundedRegularCost = Math.round(regularCost * 100) / 100;
+    const roundedOvertimeCost = Math.round(overtimeCost * 100) / 100;
+    const roundedPrevailingCost = Math.round(prevailingCost * 100) / 100;
+    const roundedGuaranteeCost = Math.round(guaranteeCost * 100) / 100;
+    const roundedReimbTotal = Math.round(reimbursementTotal * 100) / 100;
+    const totalCost = roundedRegularCost + roundedOvertimeCost + roundedPrevailingCost + roundedGuaranteeCost;
 
     res.json({
       worker,
@@ -686,11 +788,11 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
       reimbursements,
       summary: {
         total_hours: totalHours, regular_hours: regularHours, overtime_hours: overtimeHours, prevailing_hours: prevailingHours,
-        rate, regular_cost: regularCost, overtime_cost: overtimeCost, prevailing_cost: prevailingCost,
+        rate, regular_cost: roundedRegularCost, overtime_cost: roundedOvertimeCost, prevailing_cost: roundedPrevailingCost,
         guarantee_shortfall_hours: guaranteeShortfall, guarantee_min_hours: guaranteeMinHours,
-        guarantee_weeks: guaranteeWeeks, guarantee_cost: guaranteeCost,
-        reimbursement_total: reimbursementTotal,
-        total_cost: totalCost + reimbursementTotal,
+        guarantee_weeks: guaranteeWeeks, guarantee_cost: roundedGuaranteeCost,
+        reimbursement_total: roundedReimbTotal,
+        total_cost: totalCost + roundedReimbTotal,
         overtime_multiplier: settings.overtime_multiplier, prevailing_wage_rate: settings.prevailing_wage_rate,
       },
       period: { from: from || null, to: to || null },
@@ -717,13 +819,24 @@ router.get('/workers/check-username', requireAdmin, async (req, res) => {
 });
 
 // Invite a worker by email
-router.post('/workers/invite', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
-  const { full_name, email, role, language, hourly_rate } = req.body;
+const inviteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 50,
+  keyGenerator: req => String(req.user?.id || req.ip),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+router.post('/workers/invite', requireAdmin, requirePermission('manage_workers'), inviteLimiter, async (req, res) => {
+  const full_name = req.body.full_name?.trim();
+  const email = req.body.email?.trim();
+  const { role, language, hourly_rate } = req.body;
   if (!full_name || !email) return res.status(400).json({ error: 'full_name and email required' });
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'Invalid email address' });
   if (full_name.length > 100) return res.status(400).json({ error: 'Full name must be 100 characters or fewer' });
   const companyId = req.user.company_id;
+  const VALID_LANGUAGES = ['English', 'Spanish'];
   const assignedRole = role === 'admin' ? 'admin' : 'worker';
-  const assignedLanguage = language || 'English';
+  const assignedLanguage = VALID_LANGUAGES.includes(language) ? language : 'English';
   const rateVal = parseFloat(hourly_rate);
   if (hourly_rate !== undefined && (isNaN(rateVal) || rateVal < 0)) {
     return res.status(400).json({ error: 'hourly_rate must be a non-negative number' });
@@ -745,7 +858,7 @@ router.post('/workers/invite', requireAdmin, requirePermission('manage_workers')
   }
 
   // Auto-generate username from name
-  const parts = full_name.trim().toLowerCase().split(/\s+/);
+  const parts = full_name.toLowerCase().split(/\s+/);
   const base = parts.length > 1 ? parts[0][0] + parts[parts.length - 1] : parts[0];
   const baseUsername = base.replace(/[^a-z0-9]/g, '');
   let username = baseUsername;
@@ -757,13 +870,14 @@ router.post('/workers/invite', requireAdmin, requirePermission('manage_workers')
   }
 
   const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
   try {
     const result = await pool.query(
       `INSERT INTO users (company_id, username, password_hash, full_name, role, language, hourly_rate, email, invite_token, invite_token_expires, invite_pending)
        VALUES ($1, $2, '', $3, $4, $5, $6, $7, $8, $9, true)
        RETURNING id, username, full_name, role, language, hourly_rate, email`,
-      [companyId, username, full_name, assignedRole, assignedLanguage, assignedRate, email, token, expires]
+      [companyId, username, full_name, assignedRole, assignedLanguage, assignedRate, email, tokenHash, expires]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.invited', 'worker', result.rows[0].id, full_name, { email });
     const inviteUrl = `${process.env.APP_URL}/accept-invite?token=${token}`;
@@ -853,14 +967,17 @@ router.post('/workers', requireAdmin, requirePermission('manage_workers'), async
     return res.status(400).json({ error: 'username, password, and full_name required' });
   }
   const companyId = req.user.company_id;
+  const VALID_LANGUAGES = ['English', 'Spanish'];
   const assignedRole = role === 'admin' ? 'admin' : 'worker';
-  const assignedLanguage = req.body.language || 'English';
+  const assignedLanguage = VALID_LANGUAGES.includes(req.body.language) ? req.body.language : 'English';
   const rateVal = parseFloat(req.body.hourly_rate);
   if (req.body.hourly_rate !== undefined && (isNaN(rateVal) || rateVal < 0)) {
     return res.status(400).json({ error: 'hourly_rate must be a non-negative number' });
   }
   const assignedRate = (!isNaN(rateVal) && rateVal >= 0) ? rateVal : 30;
-  const assignedEmail = req.body.email?.trim() || null;
+  const rawEmail = req.body.email?.trim() || null;
+  if (rawEmail && !isValidEmail(rawEmail)) return res.status(400).json({ error: 'Invalid email address' });
+  const assignedEmail = rawEmail;
   const VALID_OT_RULES = ['daily', 'weekly', 'none'];
   const assignedRateType = ['hourly', 'daily'].includes(req.body.rate_type) ? req.body.rate_type : 'hourly';
   const assignedOTRule = VALID_OT_RULES.includes(req.body.overtime_rule) ? req.body.overtime_rule : 'daily';
@@ -920,10 +1037,21 @@ function computeGuaranteeShortfall(totalHours, guaranteedWeeklyHours, fromDate, 
 
 // Update a worker (full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, email, worker_type)
 router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
-  const { full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type } = req.body;
+  const { role, language, hourly_rate, rate_type, overtime_rule, worker_type } = req.body;
+  const full_name = req.body.full_name?.trim();
+  const first_name = req.body.first_name !== undefined ? (req.body.first_name?.trim() || null) : undefined;
+  const middle_name = req.body.middle_name !== undefined ? (req.body.middle_name?.trim() || null) : undefined;
+  const last_name = req.body.last_name !== undefined ? (req.body.last_name?.trim() || null) : undefined;
+  const username = req.body.username?.trim();
+  const email = req.body.email !== undefined ? (req.body.email?.trim() || null) : undefined;
   const hasGuarantee = 'guaranteed_weekly_hours' in req.body;
   if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && rate_type === undefined && overtime_rule === undefined && email === undefined && worker_type === undefined && !hasGuarantee) {
     return res.status(400).json({ error: 'At least one field required' });
+  }
+  if (email && !isValidEmail(email)) return res.status(400).json({ error: 'Invalid email address' });
+  const VALID_LANGUAGES = ['English', 'Spanish'];
+  if (language !== undefined && !VALID_LANGUAGES.includes(language)) {
+    return res.status(400).json({ error: 'Invalid language' });
   }
   const companyId = req.user.company_id;
   const assignedRole = role ? (role === 'admin' ? 'admin' : 'worker') : undefined;
@@ -964,7 +1092,11 @@ router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), 
     if (overtime_rule !== undefined) { fields.push(`overtime_rule = $${idx++}`); values.push(overtime_rule); }
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email || null); }
     if (worker_type !== undefined) { fields.push(`worker_type = $${idx++}`); values.push(worker_type); }
-    if (req.body.invoice_name !== undefined) { fields.push(`invoice_name = $${idx++}`); values.push(req.body.invoice_name?.trim() || null); }
+    if (req.body.invoice_name !== undefined) {
+      const inv = req.body.invoice_name?.trim() || null;
+      if (inv && inv.length > 100) return res.status(400).json({ error: 'invoice_name must be 100 characters or fewer' });
+      fields.push(`invoice_name = $${idx++}`); values.push(inv);
+    }
     if (hasGuarantee) {
       const gv = req.body.guaranteed_weekly_hours;
       if (gv === null || gv === '' || gv === undefined) {
@@ -1077,6 +1209,7 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
        WHERE te.project_id = $1
+         AND te.status = 'approved'
          AND ($2::date IS NULL OR te.work_date >= $2::date)
          AND ($3::date IS NULL OR te.work_date <= $3::date)
        ORDER BY te.work_date ASC, te.start_time ASC`,
@@ -1133,27 +1266,49 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
 router.get('/projects/metrics', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
+    const metricsSettings = await getSettings(companyId);
+    const defaultRate = metricsSettings.default_hourly_rate || 30;
+    const otThreshold = metricsSettings.overtime_threshold || 8;
     const result = await pool.query(
       `WITH daily_regular AS (
         SELECT project_id, work_date,
-          SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600) as day_hours
+          SUM(
+            EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600
+            - COALESCE(break_minutes, 0)::float / 60
+          ) as day_hours
         FROM time_entries
-        WHERE wage_type = 'regular' AND company_id = $1
+        WHERE wage_type = 'regular' AND company_id = $1 AND status != 'rejected'
         GROUP BY project_id, work_date
       )
       SELECT p.id, p.name, p.budget_hours, p.budget_dollars,
         COUNT(te.id) as total_entries,
         COUNT(DISTINCT te.user_id) as worker_count,
-        COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
-        COALESCE((SELECT SUM(LEAST(day_hours, 8)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as regular_hours,
-        COALESCE((SELECT SUM(GREATEST(day_hours - 8, 0)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as overtime_hours,
-        COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600 ELSE 0 END), 0) as prevailing_hours
+        COALESCE(SUM(
+          EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600
+          - COALESCE(te.break_minutes, 0)::float / 60
+        ), 0) as total_hours,
+        COALESCE((SELECT SUM(LEAST(day_hours, $2)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as regular_hours,
+        COALESCE((SELECT SUM(GREATEST(day_hours - $2, 0)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as overtime_hours,
+        COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN
+          EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600
+          - COALESCE(te.break_minutes, 0)::float / 60
+        ELSE 0 END), 0) as prevailing_hours,
+        COALESCE((
+          SELECT SUM(
+            (EXTRACT(EPOCH FROM (CASE WHEN te2.end_time < te2.start_time THEN te2.end_time + INTERVAL '1 day' - te2.start_time ELSE te2.end_time - te2.start_time END)) / 3600
+             - COALESCE(te2.break_minutes, 0)::float / 60)
+            * COALESCE(u2.hourly_rate, $3)
+          )
+          FROM time_entries te2
+          JOIN users u2 ON te2.user_id = u2.id
+          WHERE te2.project_id = p.id AND te2.company_id = $1 AND te2.status != 'rejected'
+        ), 0) as estimated_cost
       FROM projects p
-      LEFT JOIN time_entries te ON te.project_id = p.id
+      LEFT JOIN time_entries te ON te.project_id = p.id AND te.status != 'rejected'
       WHERE p.active = true AND p.company_id = $1
       GROUP BY p.id, p.name
       ORDER BY p.name`,
-      [companyId]
+      [companyId, otThreshold, defaultRate]
     );
     res.json(result.rows);
   } catch (err) {
@@ -1185,7 +1340,7 @@ router.get('/projects', requireAdmin, async (req, res) => {
 router.get('/projects/archived', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
-    const result = await pool.query('SELECT * FROM projects WHERE active = false AND company_id = $1 ORDER BY name', [companyId]);
+    const result = await pool.query('SELECT * FROM projects WHERE active = false AND company_id = $1 ORDER BY name LIMIT 500', [companyId]);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -1665,7 +1820,7 @@ router.post('/projects/:id/merge-into/:target_id', requireAdmin, requirePermissi
         'equipment_hours', 'rfis', 'safety_checklist_submissions',
       ];
       for (const table of intTables) {
-        await client.query(`UPDATE ${table} SET project_id = $1 WHERE project_id = $2`, [targetId, sourceId]);
+        await client.query(`UPDATE ${table} SET project_id = $1 WHERE project_id = $2 AND company_id = $3`, [targetId, sourceId, companyId]);
       }
       // inspections stores project_id as UUID/text column
       await client.query(
@@ -1720,62 +1875,97 @@ router.delete('/projects/:id', requireAdmin, requirePermission('manage_projects'
   }
 });
 
-// GET /admin/analytics
+// GET /admin/analytics?from=YYYY-MM-DD&to=YYYY-MM-DD
 router.get('/analytics', requireAdmin, requirePermission('view_reports'), requirePlan('business'), async (req, res) => {
   const companyId = req.user.company_id;
+  const { from, to } = req.query;
+  // Validate dates if provided
+  const fromDate = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : null;
+  const toDate = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : null;
+  const hoursExpr = `EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600`;
   try {
     const [daily, weekly, projects, workers, summary] = await Promise.all([
-      // Hours per day for the last 14 days
-      pool.query(
-        `SELECT work_date::text as date,
-                ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600)::numeric, 2) as hours
-         FROM time_entries
-         WHERE company_id = $1 AND work_date >= CURRENT_DATE - 13
-         GROUP BY work_date ORDER BY work_date ASC`,
-        [companyId]
-      ),
-      // Hours per week for the last 12 weeks
-      pool.query(
-        `SELECT to_char(date_trunc('week', work_date), 'YYYY-MM-DD') as week_start,
-                ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600)::numeric, 1) as hours
-         FROM time_entries
-         WHERE company_id = $1 AND work_date >= CURRENT_DATE - 83
-         GROUP BY week_start ORDER BY week_start ASC`,
-        [companyId]
-      ),
-      // Top projects by hours, last 30 days
+      // Hours per day — custom range or last 14 days
+      fromDate || toDate
+        ? pool.query(
+            `SELECT work_date::text as date,
+                    ROUND(SUM(${hoursExpr})::numeric, 2) as hours
+             FROM time_entries
+             WHERE company_id = $1
+               AND ($2::date IS NULL OR work_date >= $2::date)
+               AND ($3::date IS NULL OR work_date <= $3::date)
+             GROUP BY work_date ORDER BY work_date ASC LIMIT 90`,
+            [companyId, fromDate, toDate]
+          )
+        : pool.query(
+            `SELECT work_date::text as date,
+                    ROUND(SUM(${hoursExpr})::numeric, 2) as hours
+             FROM time_entries
+             WHERE company_id = $1 AND work_date >= CURRENT_DATE - 13
+             GROUP BY work_date ORDER BY work_date ASC LIMIT 14`,
+            [companyId]
+          ),
+      // Hours per week — custom range or last 12 weeks
+      fromDate || toDate
+        ? pool.query(
+            `SELECT to_char(date_trunc('week', work_date), 'YYYY-MM-DD') as week_start,
+                    ROUND(SUM(${hoursExpr})::numeric, 1) as hours
+             FROM time_entries
+             WHERE company_id = $1
+               AND ($2::date IS NULL OR work_date >= $2::date)
+               AND ($3::date IS NULL OR work_date <= $3::date)
+             GROUP BY week_start ORDER BY week_start ASC`,
+            [companyId, fromDate, toDate]
+          )
+        : pool.query(
+            `SELECT to_char(date_trunc('week', work_date), 'YYYY-MM-DD') as week_start,
+                    ROUND(SUM(${hoursExpr})::numeric, 1) as hours
+             FROM time_entries
+             WHERE company_id = $1 AND work_date >= CURRENT_DATE - 83
+             GROUP BY week_start ORDER BY week_start ASC LIMIT 12`,
+            [companyId]
+          ),
+      // Top projects by hours
       pool.query(
         `SELECT p.name,
-                ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600)::numeric, 2) as hours
+                ROUND(SUM(${hoursExpr})::numeric, 2) as hours
          FROM time_entries te
          JOIN projects p ON te.project_id = p.id
-         WHERE te.company_id = $1 AND te.work_date >= CURRENT_DATE - 29
+         WHERE te.company_id = $1
+           AND ($2::date IS NULL OR te.work_date >= $2::date)
+           AND ($3::date IS NULL OR te.work_date <= $3::date)
+           ${!fromDate && !toDate ? 'AND te.work_date >= CURRENT_DATE - 29' : ''}
          GROUP BY p.name ORDER BY hours DESC LIMIT 10`,
-        [companyId]
+        [companyId, fromDate, toDate]
       ),
-      // Top workers by hours, last 30 days
+      // Top workers by hours
       pool.query(
         `SELECT u.full_name as name,
-                ROUND(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600)::numeric, 2) as hours
+                ROUND(SUM(${hoursExpr})::numeric, 2) as hours
          FROM time_entries te
          JOIN users u ON te.user_id = u.id
-         WHERE te.company_id = $1 AND te.work_date >= CURRENT_DATE - 29
+         WHERE te.company_id = $1
+           AND ($2::date IS NULL OR te.work_date >= $2::date)
+           AND ($3::date IS NULL OR te.work_date <= $3::date)
+           ${!fromDate && !toDate ? 'AND te.work_date >= CURRENT_DATE - 29' : ''}
          GROUP BY u.full_name ORDER BY hours DESC LIMIT 10`,
-        [companyId]
+        [companyId, fromDate, toDate]
       ),
-      // Summary stats
+      // Summary stats — always current (this week / this month)
       pool.query(
         `SELECT
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('week', CURRENT_DATE)
-             THEN EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600 END), 0)::numeric, 1) as hours_this_week,
+             THEN ${hoursExpr} END), 0)::numeric, 1) as hours_this_week,
            COUNT(DISTINCT CASE WHEN work_date >= date_trunc('week', CURRENT_DATE) THEN user_id END) as active_workers_this_week,
            COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN user_id END) as active_workers_this_month,
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE)
-             THEN EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600 END), 0)::numeric, 1) as hours_this_month,
+             THEN ${hoursExpr} END), 0)::numeric, 1) as hours_this_month,
            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_approvals,
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('week', CURRENT_DATE) THEN mileage END), 0)::numeric, 1) as mileage_this_week,
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN mileage END), 0)::numeric, 1) as mileage_this_month
-         FROM time_entries WHERE company_id = $1`,
+         FROM time_entries WHERE company_id = $1
+           AND (work_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
+                OR status = 'pending')`,
         [companyId]
       ),
     ]);
@@ -1798,9 +1988,15 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
   const companyId = req.user.company_id;
   const LIMIT = 200;
   const accessIds = req.user.worker_access_ids;
+  const { from, to } = req.query;
   try {
-    const workerFilter = accessIds && accessIds.length ? `AND te.user_id = ANY($3)` : '';
-    const params = accessIds && accessIds.length ? [companyId, LIMIT + 1, accessIds] : [companyId, LIMIT + 1];
+    const conditions = [`te.company_id = $1`, `te.status = 'pending'`];
+    const params = [companyId];
+    if (accessIds && accessIds.length) { params.push(accessIds); conditions.push(`te.user_id = ANY($${params.length})`); }
+    if (from) { params.push(from); conditions.push(`te.work_date >= $${params.length}`); }
+    if (to) { params.push(to); conditions.push(`te.work_date <= $${params.length}`); }
+    params.push(LIMIT + 1);
+    const limitIdx = params.length;
     const result = await pool.query(
       `SELECT te.*, COALESCE(u.invoice_name, u.full_name) as worker_name, u.email as worker_email, p.name as project_name,
               te.clock_source, te.clocked_in_by, admin_u.full_name AS clocked_in_by_name
@@ -1808,9 +2004,9 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
        JOIN users u ON te.user_id = u.id
        LEFT JOIN projects p ON te.project_id = p.id
        LEFT JOIN users admin_u ON te.clocked_in_by = admin_u.id
-       WHERE te.company_id = $1 AND te.status = 'pending' ${workerFilter}
+       WHERE ${conditions.join(' AND ')}
        ORDER BY te.worker_signed_at DESC NULLS LAST, te.work_date DESC, te.start_time DESC
-       LIMIT $2`,
+       LIMIT $${limitIdx}`,
       params
     );
     const has_more = result.rows.length > LIMIT;
@@ -1846,6 +2042,43 @@ router.get('/entries/recently-approved', requireAdmin, requirePermission('approv
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// POST /admin/entries/bulk-approve — approve a specific set of entry IDs
+router.post('/entries/bulk-approve', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
+  if (ids.length > 200) return res.status(400).json({ error: 'Max 200 entries per bulk approve' });
+  const companyId = req.user.company_id;
+  const accessIds = req.user.worker_access_ids;
+  const accessFilter = accessIds && accessIds.length ? `AND user_id = ANY($4)` : '';
+  const params = accessIds && accessIds.length
+    ? [req.user.id, ids, companyId, accessIds]
+    : [req.user.id, ids, companyId];
+  try {
+    const result = await pool.query(
+      `UPDATE time_entries SET status = 'approved', locked = true, approved_by = $1, approved_at = NOW()
+       WHERE id = ANY($2::int[]) AND company_id = $3 AND status = 'pending' ${accessFilter}
+       RETURNING id, user_id, work_date, start_time, end_time`,
+      params
+    );
+    // Group by worker so each gets one push (not one per entry)
+    const byWorker = {};
+    for (const row of result.rows) {
+      if (!byWorker[row.user_id]) byWorker[row.user_id] = [];
+      byWorker[row.user_id].push(row);
+    }
+    for (const [userId, rows] of Object.entries(byWorker)) {
+      const count = rows.length;
+      const pushBody = count === 1
+        ? `Your entry for ${rows[0].work_date?.toString().substring(0,10)} (${rows[0].start_time}–${rows[0].end_time}) was approved.`
+        : `${count} time entries were approved.`;
+      sendPushToUser(parseInt(userId), { title: 'Time entry approved', body: pushBody, url: '/dashboard' });
+      createInboxItem(parseInt(userId), companyId, 'approval', 'Time entry approved ✓', pushBody, '/dashboard');
+    }
+    await logAudit(companyId, req.user.id, req.user.full_name, 'entries.bulk_approved', 'time_entry', null, null, { count: result.rowCount, ids });
+    res.json({ approved: result.rowCount });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /admin/entries/approve-all — approve every pending entry for this company
@@ -1930,8 +2163,8 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
             [companyId]
           );
           await pool.query(
-            `UPDATE projects SET budget_alert_pct = $1 WHERE id = $2`,
-            [threshold, pid]
+            `UPDATE projects SET budget_alert_pct = $1 WHERE id = $2 AND company_id = $3`,
+            [threshold, pid, companyId]
           );
           if (notifSetting.rows[0]?.value === '0') return;
 
@@ -2739,4 +2972,56 @@ router.delete('/clients/:id/documents/:docId', requireAdmin, async (req, res) =>
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// ── Worker Documents ────────────────────────────────────────────────────────
+
+const { uploadBase64, deleteByUrl } = require('../r2');
+
+router.get('/workers/:id/documents', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT d.id, d.name, d.url, d.size_bytes, d.mime_type, d.created_at, u.full_name as uploaded_by_name
+       FROM worker_documents d LEFT JOIN users u ON d.uploaded_by = u.id
+       WHERE d.user_id = $1 AND d.company_id = $2 ORDER BY d.created_at DESC`,
+      [req.params.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.post('/workers/:id/documents', requireAdmin, async (req, res) => {
+  const { name, data } = req.body; // data = base64 data URL
+  if (!name || !data) return res.status(400).json({ error: 'name and data required' });
+  if (name.length > 255) return res.status(400).json({ error: 'name too long' });
+  const companyId = req.user.company_id;
+  try {
+    const workerCheck = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
+    if (workerCheck.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
+    const uploaded = await uploadBase64(data, 'documents');
+    const result = await pool.query(
+      `INSERT INTO worker_documents (company_id, user_id, name, url, size_bytes, mime_type, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [companyId, req.params.id, name, uploaded.url, uploaded.sizeBytes || null,
+       data.match(/^data:([^;]+)/)?.[1] || null, req.user.id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+router.delete('/workers/:id/documents/:docId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const doc = await pool.query(
+      'SELECT url FROM worker_documents WHERE id = $1 AND user_id = $2 AND company_id = $3',
+      [req.params.docId, req.params.id, companyId]
+    );
+    if (doc.rowCount === 0) return res.status(404).json({ error: 'Document not found' });
+    await pool.query('DELETE FROM worker_documents WHERE id = $1', [req.params.docId]);
+    deleteByUrl(doc.rows[0].url).catch(() => {});
+    res.json({ deleted: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 module.exports = router;
+module.exports.getAdvancedSettings = getAdvancedSettings;
+module.exports.ADVANCED_DEFAULTS = ADVANCED_DEFAULTS;

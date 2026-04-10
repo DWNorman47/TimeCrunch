@@ -153,6 +153,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const [docsOpen, setDocsOpen] = useState(false);
   const [docsLoaded, setDocsLoaded] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [pendingDocDelete, setPendingDocDelete] = useState(null);
 
   const m = metrics || {};
   const fmtHours = h => {
@@ -720,14 +721,15 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                         <a href={doc.url} target="_blank" rel="noopener noreferrer" style={styles.docName}>{doc.name}</a>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                           {doc.size_bytes > 0 && <span style={styles.docSize}>{(doc.size_bytes / 1024).toFixed(0)} KB</span>}
-                          <button
-                            style={styles.docDelete}
-                            onClick={async () => {
-                              if (!window.confirm(`Delete "${doc.name}"?`)) return;
-                              await api.delete(`/admin/projects/${project.id}/documents/${doc.id}`);
-                              setDocs(d => d.filter(x => x.id !== doc.id));
-                            }}
-                          >✕</button>
+                          {pendingDocDelete === doc.id ? (
+                            <>
+                              <span style={{ fontSize: 12, color: '#374151' }}>Delete?</span>
+                              <button style={styles.docDeleteConfirm} onClick={async () => { setPendingDocDelete(null); await api.delete(`/admin/projects/${project.id}/documents/${doc.id}`); setDocs(d => d.filter(x => x.id !== doc.id)); }}>Yes</button>
+                              <button style={styles.docDeleteCancel} onClick={() => setPendingDocDelete(null)}>No</button>
+                            </>
+                          ) : (
+                            <button style={styles.docDelete} aria-label={`Delete ${doc.name}`} onClick={() => setPendingDocDelete(doc.id)}>✕</button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1218,14 +1220,17 @@ export default function ProjectsPage() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <div style={styles.logoGroup}>
-          <AppSwitcher currentApp="projects" userRole={user?.role} features={features} />
-          {user?.company_name && <span style={styles.companyName}>{user.company_name}</span>}
+      <header style={styles.header} className="app-header">
+        <div style={styles.headerTopRow}>
+          <div style={styles.logoGroup}>
+            <AppSwitcher currentApp="projects" userRole={user?.role} features={features} />
+            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
+          </div>
+          <div style={styles.headerRight}>
+            <button style={styles.headerBtn} onClick={logout}>Logout</button>
+          </div>
         </div>
-        <div style={styles.headerRight}>
-          <button style={styles.headerBtn} onClick={logout}>Logout</button>
-        </div>
+        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
       <main style={styles.main}>
@@ -1294,6 +1299,11 @@ export default function ProjectsPage() {
               />
             )}
 
+            {!loading && projects.length >= 500 && (
+              <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 13, color: '#92400e' }}>
+                Showing the first 500 projects. Use search or filters to find others.
+              </div>
+            )}
             {loading ? (
               <p style={styles.loadingText}>Loading…</p>
             ) : projects.length === 0 ? (
@@ -1357,11 +1367,12 @@ export default function ProjectsPage() {
 
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9', display: 'flex', flexDirection: 'column' },
-  header: { background: '#8b5cf6', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 },
+  header: { background: '#8b5cf6', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', top: 0, zIndex: 100, minHeight: 'calc(56px + env(safe-area-inset-top))' },
+  headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
-  companyName: { fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)' },
+  companyName: { fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' },
   headerRight: { display: 'flex', gap: 12, alignItems: 'center' },
-  headerBtn: { background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', padding: '7px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   main: { flex: 1, padding: '24px 20px', maxWidth: 1100, margin: '0 auto', width: '100%' },
   pageHeader: { marginBottom: 24 },
   pageTitle: { fontSize: 28, fontWeight: 800, color: '#111827', margin: 0 },
@@ -1443,6 +1454,8 @@ const styles = {
   docName: { fontSize: 13, color: '#1a56db', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0, textDecoration: 'none' },
   docSize: { fontSize: 11, color: '#9ca3af' },
   docDelete: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '2px 4px', lineHeight: 1 },
+  docDeleteConfirm: { background: '#dc2626', color: '#fff', border: 'none', borderRadius: 5, padding: '2px 8px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  docDeleteCancel: { background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 5, padding: '2px 8px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   uploadBtn: { display: 'inline-block', marginTop: 6, background: '#f3f4f6', border: '1px dashed #d1d5db', borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, color: '#6b7280' },
   rfiForm: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, padding: '12px', background: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' },
   rfiInput: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, background: '#fff', width: '100%', boxSizing: 'border-box' },

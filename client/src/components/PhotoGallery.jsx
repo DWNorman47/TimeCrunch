@@ -56,7 +56,7 @@ function Lightbox({ items, index, onClose }) {
           <span>{fmtDate(item.reported_at)}</span>
           {item.lat && (
             <a href={`https://www.google.com/maps?q=${item.lat},${item.lng}`}
-               target="_blank" rel="noreferrer" style={styles.mapLink}>
+               target="_blank" rel="noopener noreferrer" style={styles.mapLink}>
               📍 Map
             </a>
           )}
@@ -124,8 +124,8 @@ export default function PhotoGallery({ projects }) {
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
-        <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title="From date" />
-        <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title="To date" />
+        <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title={t.fromDate} />
+        <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title={t.toDate} />
       </div>
 
       {lightbox !== null && (

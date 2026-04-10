@@ -2,7 +2,15 @@ const cron = require('node-cron');
 const pool = require('../db');
 const { sendPushToCompanyAdmins } = require('../push');
 const { sendEmail } = require('../email');
-const { createInboxItem } = require('../routes/inbox');
+const { createInboxItemBatch } = require('../routes/inbox');
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 async function checkInactiveWorkers() {
   try {
@@ -56,8 +64,9 @@ async function checkInactiveWorkers() {
         `SELECT id FROM users WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true`,
         [companyId]
       );
-      for (const a of adminRows.rows) {
-        createInboxItem(a.id, companyId, 'inactive_workers', alertTitle, alertBody, '/admin#reports');
+      const adminIds = adminRows.rows.map(a => a.id);
+      if (adminIds.length > 0) {
+        createInboxItemBatch(adminIds, companyId, 'inactive_workers', alertTitle, alertBody, '/admin#reports');
       }
 
       // Email to first admin with an email address
@@ -75,8 +84,8 @@ async function checkInactiveWorkers() {
             : null;
           const lastStr = daysSince === null ? 'No entries yet' : `${daysSince} day${daysSince !== 1 ? 's' : ''} ago`;
           return `<tr>
-            <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6">${r.full_name}</td>
-            <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;color:#6b7280">${lastStr}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6">${escHtml(r.full_name)}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;color:#6b7280">${escHtml(lastStr)}</td>
           </tr>`;
         }).join('');
 

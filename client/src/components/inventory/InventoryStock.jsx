@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
+import { useT } from '../../hooks/useT';
 
 function formatBin(area_name, rack_name, bay_name, compartment_name) {
   return [area_name, rack_name, bay_name, compartment_name]
@@ -11,12 +12,16 @@ function formatDate(iso) {
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-const TYPE_LABELS = { receive: 'Receive', issue: 'Issue', transfer: 'Transfer', adjust: 'Adjust', count: 'Count', convert: 'Convert' };
 const TYPE_COLOR  = { receive: '#059669', issue: '#dc2626', transfer: '#2563eb', adjust: '#d97706', count: '#7c3aed', convert: '#0891b2' };
 
 // ── History Panel ─────────────────────────────────────────────────────────────
 
 function HistoryPanel({ item, onClose }) {
+  const t = useT();
+  const TYPE_LABELS = {
+    receive: t.invTxTypeReceive, issue: t.invTxTypeIssue, transfer: t.invTxTypeTransfer,
+    adjust: t.invTxTypeAdjust, count: t.invCycCycleCount, convert: t.invTxTypeConvert,
+  };
   const [rows, setRows]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
@@ -24,8 +29,8 @@ function HistoryPanel({ item, onClose }) {
   useEffect(() => {
     setLoading(true);
     api.get(`/inventory/transactions?item_id=${item.item_id}&limit=30`)
-      .then(r => setRows(r.data))
-      .catch(() => setError('Failed to load history'))
+      .then(r => setRows(r.data.transactions || r.data))
+      .catch(() => setError(t.invStockFailedHistory))
       .finally(() => setLoading(false));
   }, [item.item_id]);
 
@@ -35,26 +40,26 @@ function HistoryPanel({ item, onClose }) {
         <div style={h.header}>
           <div>
             <div style={h.title}>{item.item_name}</div>
-            <div style={h.sub}>Recent stock movements (last 30)</div>
+            <div style={h.sub}>{t.invStockRecentMovements}</div>
           </div>
           <button style={h.close} onClick={onClose}>✕</button>
         </div>
         {error && <div style={h.error}>{error}</div>}
         {loading ? (
-          <div style={h.empty}>Loading…</div>
+          <div style={h.empty}>{t.loading}</div>
         ) : rows.length === 0 ? (
-          <div style={h.empty}>No transactions found.</div>
+          <div style={h.empty}>{t.invStockNoHistory}</div>
         ) : (
           <div style={h.tableWrap}>
             <table style={h.table}>
               <thead>
                 <tr style={h.thead}>
-                  <th style={h.th}>Date</th>
-                  <th style={h.th}>Type</th>
-                  <th style={{ ...h.th, textAlign: 'right' }}>Qty</th>
-                  <th style={h.th}>Location</th>
-                  <th style={h.th}>By</th>
-                  <th style={h.th}>Notes</th>
+                  <th style={h.th}>{t.invTxColDate}</th>
+                  <th style={h.th}>{t.invTxColType}</th>
+                  <th style={{ ...h.th, textAlign: 'right' }}>{t.invTxColQty}</th>
+                  <th style={h.th}>{t.invPOReceivingLocLabel}</th>
+                  <th style={h.th}>{t.invTxColBy}</th>
+                  <th style={h.th}>{t.notes}</th>
                 </tr>
               </thead>
               <tbody>
@@ -112,28 +117,34 @@ const h = {
 // ── Quick Adjust Modal ────────────────────────────────────────────────────────
 
 function AdjustModal({ item, locations, onClose, onDone }) {
+  const t = useT();
   const [qty, setQty]       = useState('');
   const [locId, setLocId]   = useState(item.location_id || '');
   const [notes, setNotes]   = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
+  const [warning, setWarning] = useState('');
 
   const submit = async () => {
     const n = parseFloat(qty);
-    if (isNaN(n) || n === 0) { setError('Enter a non-zero adjustment quantity (+/−)'); return; }
-    if (!locId) { setError('Select a location'); return; }
+    if (isNaN(n) || n === 0) { setError(t.invStockQtyAdjError); return; }
+    if (!locId) { setError(t.invStockSelectLocError); return; }
     setSaving(true); setError('');
     try {
-      await api.post('/inventory/transactions', {
+      const r = await api.post('/inventory/transactions', {
         type: 'adjust',
         item_id: item.item_id,
         quantity: n,
         to_location_id: parseInt(locId),
         notes: notes.trim() || undefined,
       });
-      onDone();
+      if (r.data.warning === 'stock_negative') {
+        setWarning(t.invTxStockNegativeWarn);
+      } else {
+        onDone();
+      }
     } catch (e) {
-      setError(e.response?.data?.error || 'Failed to save adjustment');
+      setError(e.response?.data?.error || t.invStockAdjFailed);
     } finally {
       setSaving(false);
     }
@@ -143,16 +154,17 @@ function AdjustModal({ item, locations, onClose, onDone }) {
     <div style={a.overlay} onClick={onClose}>
       <div style={a.modal} onClick={e => e.stopPropagation()}>
         <div style={a.header}>
-          <div style={a.title}>Quick Adjust — {item.item_name}</div>
+          <div style={a.title}>{t.invStockCurrentStock} — {item.item_name}</div>
           <button style={a.close} onClick={onClose}>✕</button>
         </div>
         <div style={a.body}>
           <div style={a.currentRow}>
-            <span style={a.currentLabel}>Current stock</span>
+            <span style={a.currentLabel}>{t.invStockCurrentStock}</span>
             <span style={a.currentQty}>{parseFloat(item.quantity) % 1 === 0 ? parseFloat(item.quantity).toFixed(0) : parseFloat(item.quantity).toFixed(2)} {item.unit}</span>
           </div>
           {error && <div style={a.error}>{error}</div>}
-          <label style={a.label}>Adjustment quantity (use − for decrease)</label>
+          {warning && <div style={{ ...a.error, background: '#fef3c7', color: '#92400e' }}>{warning}</div>}
+          <label style={a.label}>{t.invStockAdjQtyLabel}</label>
           <input
             type="number"
             step="any"
@@ -162,24 +174,25 @@ function AdjustModal({ item, locations, onClose, onDone }) {
             style={a.input}
             autoFocus
           />
-          <label style={a.label}>Location</label>
+          <label style={a.label}>{t.invStockAdjLocLabel}</label>
           <select value={locId} onChange={e => setLocId(e.target.value)} style={a.input}>
-            <option value="">Select location…</option>
+            <option value="">{t.invStockSelectLocOption}</option>
             {locations.filter(l => l.active).map(l => (
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
           </select>
-          <label style={a.label}>Notes (optional)</label>
+          <label style={a.label}>{t.invStockAdjNotesLabel}</label>
           <input
             type="text"
-            placeholder="Reason for adjustment"
+            placeholder={t.invStockAdjReasonPlaceholder}
             value={notes}
             onChange={e => setNotes(e.target.value)}
             style={a.input}
+            maxLength={1000}
           />
           <div style={a.actions}>
-            <button style={a.cancel} onClick={onClose} disabled={saving}>Cancel</button>
-            <button style={a.save} onClick={submit} disabled={saving}>{saving ? 'Saving…' : 'Save Adjustment'}</button>
+            <button style={a.cancel} onClick={warning ? onDone : onClose} disabled={saving}>{warning ? t.back : t.cancel}</button>
+            {!warning && <button style={a.save} onClick={submit} disabled={saving}>{saving ? t.saving : t.invStockSaveAdj}</button>}
           </div>
         </div>
       </div>
@@ -209,6 +222,7 @@ const a = {
 // ── Quick Issue Modal (workers) ───────────────────────────────────────────────
 
 function IssueModal({ item, projects, onClose, onDone }) {
+  const t = useT();
   const [qty, setQty]             = useState('');
   const [uomId, setUomId]         = useState(item.uom_id ? String(item.uom_id) : '');
   const [itemUoms, setItemUoms]   = useState([]);
@@ -216,6 +230,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
   const [notes, setNotes]         = useState('');
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState('');
+  const [warning, setWarning]     = useState('');
 
   const available = parseFloat(item.quantity);
   const stockUnit = item.unit_spec ? `${item.unit} (${item.unit_spec})` : item.unit;
@@ -241,15 +256,15 @@ function IssueModal({ item, projects, onClose, onDone }) {
 
   const submit = async () => {
     const n = parseFloat(qty);
-    if (isNaN(n) || n <= 0) { setError('Enter a positive quantity to issue'); return; }
+    if (isNaN(n) || n <= 0) { setError(t.invStockIssueQtyError); return; }
     // Only enforce client-side limit when issuing in the same UOM as stock
     if ((!uomId || uomId === String(item.uom_id)) && n > available) {
-      setError(`Cannot issue more than available (${available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} ${stockUnit})`);
+      setError(`${t.invStockCannotExceed} (${available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} ${stockUnit})`);
       return;
     }
     setSaving(true); setError('');
     try {
-      await api.post('/inventory/transactions', {
+      const r = await api.post('/inventory/transactions', {
         type: 'issue',
         item_id: item.item_id,
         quantity: n,
@@ -258,9 +273,13 @@ function IssueModal({ item, projects, onClose, onDone }) {
         project_id: projectId ? parseInt(projectId) : undefined,
         notes: notes.trim() || undefined,
       });
-      onDone();
+      if (r.data.warning === 'stock_negative') {
+        setWarning(t.invTxStockNegativeWarn);
+      } else {
+        onDone();
+      }
     } catch (e) {
-      setError(e.response?.data?.error || 'Failed to issue material');
+      setError(e.response?.data?.error || t.invStockIssueFailed);
     } finally {
       setSaving(false);
     }
@@ -270,21 +289,22 @@ function IssueModal({ item, projects, onClose, onDone }) {
     <div style={a.overlay} onClick={onClose}>
       <div style={a.modal} onClick={e => e.stopPropagation()}>
         <div style={a.header}>
-          <div style={a.title}>Issue — {item.item_name}</div>
+          <div style={a.title}>{t.invTxTypeIssue} — {item.item_name}</div>
           <button style={a.close} onClick={onClose}>✕</button>
         </div>
         <div style={a.body}>
           <div style={a.currentRow}>
-            <span style={a.currentLabel}>Available at {item.location_name}</span>
+            <span style={a.currentLabel}>{t.invStockAvailableAt} {item.location_name}</span>
             <span style={a.currentQty}>{available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} {stockUnit}</span>
           </div>
           {error && <div style={a.error}>{error}</div>}
-          <label style={a.label}>Quantity to issue *</label>
+          {warning && <div style={{ ...a.error, background: '#fef3c7', color: '#92400e' }}>{warning}</div>}
+          <label style={a.label}>{t.invStockQtyToIssue}</label>
           <input
             type="number"
             step="any"
             min="0.001"
-            placeholder="e.g. 5"
+            placeholder={t.invStockQtyPlaceholder}
             value={qty}
             onChange={e => setQty(e.target.value)}
             style={a.input}
@@ -292,42 +312,43 @@ function IssueModal({ item, projects, onClose, onDone }) {
           />
           {itemUoms.length > 1 && (
             <>
-              <label style={a.label}>Unit</label>
+              <label style={a.label}>{t.invStockUnitLabel}</label>
               <select value={uomId} onChange={e => setUomId(e.target.value)} style={a.input}>
-                <option value="">Default ({item.unit})</option>
+                <option value="">{t.invStockDefaultUnit} ({item.unit})</option>
                 {itemUoms.map(u => (
                   <option key={u.id} value={u.id}>
-                    {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ' — base' : ''}
+                    {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ` — ${t.invTxBaseUnit}` : ''}
                   </option>
                 ))}
               </select>
               {availableInSelected && (
-                <div style={a.hint}>≈ {availableInSelected} available in this unit</div>
+                <div style={a.hint}>≈ {availableInSelected} {t.invStockAvailableInUnit}</div>
               )}
             </>
           )}
           {projects && projects.length > 0 && (
             <>
-              <label style={a.label}>Project (optional)</label>
+              <label style={a.label}>{t.invStockProjectLabel}</label>
               <select value={projectId} onChange={e => setProjectId(e.target.value)} style={a.input}>
-                <option value="">No project</option>
+                <option value="">{t.invStockNoProject}</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </>
           )}
-          <label style={a.label}>Notes (optional)</label>
+          <label style={a.label}>{t.invStockAdjNotesLabel}</label>
           <input
             type="text"
-            placeholder="e.g. Job site use"
+            placeholder={t.invStockIssuePlaceholder}
             value={notes}
             onChange={e => setNotes(e.target.value)}
             style={a.input}
+            maxLength={1000}
           />
           <div style={a.actions}>
-            <button style={a.cancel} onClick={onClose} disabled={saving}>Cancel</button>
-            <button style={{ ...a.save, background: '#d97706' }} onClick={submit} disabled={saving}>
-              {saving ? 'Issuing…' : 'Issue Materials'}
-            </button>
+            <button style={a.cancel} onClick={warning ? onDone : onClose} disabled={saving}>{warning ? t.back : t.cancel}</button>
+            {!warning && <button style={{ ...a.save, background: '#d97706' }} onClick={submit} disabled={saving}>
+              {saving ? t.invStockIssuing : t.invStockIssueMaterials}
+            </button>}
           </div>
         </div>
       </div>
@@ -337,8 +358,14 @@ function IssueModal({ item, projects, onClose, onDone }) {
 
 // ── Main Stock Component ──────────────────────────────────────────────────────
 
+const STOCK_PAGE = 500;
+
 export default function InventoryStock({ isAdmin, locations, projects, onStockChange, onReorderClick }) {
+  const t = useT();
   const [stock, setStock]           = useState([]);
+  const [stockTotal, setStockTotal] = useState(0);
+  const [stockOffset, setStockOffset] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [lowItems, setLowItems]     = useState([]);
   const [locationFilter, setLocationFilter] = useState('');
   const [loading, setLoading]       = useState(true);
@@ -348,29 +375,76 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
   const [issueItem, setIssueItem]     = useState(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setStockOffset(0);
     try {
-      const params = locationFilter ? `?location_id=${locationFilter}` : '';
+      const params = new URLSearchParams({ limit: STOCK_PAGE, offset: 0 });
+      if (locationFilter) params.set('location_id', locationFilter);
       const [s, l] = await Promise.all([
-        api.get(`/inventory/stock${params}`),
+        api.get(`/inventory/stock?${params}`),
         isAdmin ? api.get('/inventory/stock/low') : Promise.resolve({ data: [] }),
       ]);
-      setStock(s.data);
+      setStock(s.data.stock);
+      setStockTotal(s.data.total);
       setLowItems(l.data);
     } catch (e) {
-      setError('Failed to load stock');
+      setError(t.invStockFailedLoad);
     } finally {
       setLoading(false);
     }
   }, [locationFilter, isAdmin]);
 
+  const loadMore = async () => {
+    const nextOffset = stockOffset + STOCK_PAGE;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams({ limit: STOCK_PAGE, offset: nextOffset });
+      if (locationFilter) params.set('location_id', locationFilter);
+      const r = await api.get(`/inventory/stock?${params}`);
+      setStock(prev => [...prev, ...r.data.stock]);
+      setStockOffset(nextOffset);
+    } catch { /* non-fatal */ }
+    finally { setLoadingMore(false); }
+  };
+
   useEffect(() => { load(); }, [load]);
 
   const stockStatus = (qty, reorderPoint) => {
     const q = parseFloat(qty);
-    if (q <= 0) return { label: 'Out', color: '#dc2626', bg: '#fee2e2' };
-    if (reorderPoint > 0 && q <= reorderPoint) return { label: 'Low', color: '#d97706', bg: '#fef3c7' };
-    return { label: 'In Stock', color: '#059669', bg: '#d1fae5' };
+    if (q <= 0) return { label: t.invStockStatusOut, color: '#dc2626', bg: '#fee2e2' };
+    if (reorderPoint > 0 && q <= reorderPoint) return { label: t.invStockStatusLow, color: '#d97706', bg: '#fef3c7' };
+    return { label: t.invStockStatusInStock, color: '#059669', bg: '#d1fae5' };
+  };
+
+  const downloadCSV = () => {
+    if (!stock.length) return;
+    const header = [t.invTxColItem, t.colSku, t.colCategory, t.invValColLocation, t.invStockColBin,
+      t.invTxColQty, t.colUnit, t.colUnitCost, t.invValColTotalValue, t.invStockColStatus].join(',');
+    const rows = stock.map(row => {
+      const qty = parseFloat(row.quantity);
+      const cost = parseFloat(row.unit_cost);
+      const status = stockStatus(qty, row.reorder_point);
+      const bin = [row.area_name, row.rack_name, row.bay_name, row.compartment_name].filter(Boolean).join(' > ') || '';
+      return [
+        `"${(row.item_name || '').replace(/"/g, '""')}"`,
+        row.sku || '',
+        `"${(row.category || '').replace(/"/g, '""')}"`,
+        `"${(row.location_name || '').replace(/"/g, '""')}"`,
+        `"${bin}"`,
+        qty % 1 === 0 ? qty.toFixed(0) : qty.toFixed(2),
+        row.unit,
+        cost ? cost.toFixed(2) : '',
+        cost && qty > 0 ? (cost * qty).toFixed(2) : '',
+        status.label,
+      ].join(',');
+    });
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inventory-stock-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleAdjustDone = () => {
@@ -390,10 +464,10 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
       {/* Low stock alert banner */}
       {isAdmin && lowItems.length > 0 && (
         <div style={s.alertBanner}>
-          <span>⚠️ {lowItems.length} item{lowItems.length !== 1 ? 's' : ''} at or below reorder point</span>
+          <span>⚠️ {lowItems.length} {t.invStockLowAlert}</span>
           {onReorderClick && (
             <button style={s.reorderBtn} onClick={onReorderClick}>
-              Create Reorder PO
+              {t.invStockCreateReorderPO}
             </button>
           )}
         </div>
@@ -402,39 +476,43 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
       {/* Filter bar */}
       <div style={s.filterBar}>
         <select style={s.select} value={locationFilter} onChange={e => setLocationFilter(e.target.value)}>
-          <option value="">All Locations</option>
+          <option value="">{t.invCycAllLocations}</option>
           {locations.filter(l => l.active).map(l => (
             <option key={l.id} value={l.id}>{l.name}</option>
           ))}
         </select>
-        <button style={s.refreshBtn} onClick={load}>Refresh</button>
+        <button style={s.refreshBtn} onClick={load}>{t.invStockRefresh}</button>
+        {stock.length > 0 && (
+          <button style={s.refreshBtn} onClick={downloadCSV}>{t.invValDownloadCSV}</button>
+        )}
       </div>
 
       {error && <div style={s.error}>{error}</div>}
 
       {loading ? (
-        <div style={s.empty}>Loading…</div>
+        <div style={s.empty}>{t.loading}</div>
       ) : stock.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>📦</div>
-          <p>No stock on hand{locationFilter ? ' at this location' : ''}.</p>
-          <p style={s.emptyHint}>Receive items through the Transactions tab to add stock.</p>
+          <p>{locationFilter ? t.invStockNoStockAtLoc : t.invStockNoStock}</p>
+          <p style={s.emptyHint}>{t.invStockReceiveHint}</p>
         </div>
       ) : (
+        <>
         <div style={s.tableWrap}>
           <table style={s.table}>
             <thead>
               <tr style={s.thead}>
-                <th style={s.th}>Item</th>
-                <th style={s.th}>SKU</th>
-                <th style={s.th}>Category</th>
-                <th style={s.th}>Location</th>
-                <th style={s.th}>Bin</th>
-                <th style={{ ...s.th, textAlign: 'right' }}>Qty</th>
-                <th style={s.th}>Unit</th>
-                {isAdmin && <th style={{ ...s.th, textAlign: 'right' }}>Unit Cost</th>}
-                {isAdmin && <th style={{ ...s.th, textAlign: 'right' }}>Total Value</th>}
-                <th style={s.th}>Status</th>
+                <th style={s.th}>{t.invTxColItem}</th>
+                <th style={s.th}>{t.colSku}</th>
+                <th style={s.th}>{t.colCategory}</th>
+                <th style={s.th}>{t.invValColLocation}</th>
+                <th style={s.th}>{t.invStockColBin}</th>
+                <th style={{ ...s.th, textAlign: 'right' }}>{t.invTxColQty}</th>
+                <th style={s.th}>{t.colUnit}</th>
+                {isAdmin && <th style={{ ...s.th, textAlign: 'right' }}>{t.colUnitCost}</th>}
+                {isAdmin && <th style={{ ...s.th, textAlign: 'right' }}>{t.invValColTotalValue}</th>}
+                <th style={s.th}>{t.invStockColStatus}</th>
                 <th style={s.th}></th>
               </tr>
             </thead>
@@ -479,22 +557,22 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
                     <td style={{ ...s.td, whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
                       <button
                         style={s.histBtn}
-                        title="View history"
+                        title={t.invStockViewHistory}
                         onClick={() => setHistoryItem(row)}
                       >📋</button>
                       {isAdmin && (
                         <button
                           style={s.adjBtn}
-                          title="Quick adjust"
+                          title={t.invStockQuickAdjust}
                           onClick={() => setAdjustItem(row)}
                         >±</button>
                       )}
                       {!isAdmin && qty > 0 && (
                         <button
                           style={s.issueBtn}
-                          title="Issue material"
+                          title={t.invStockIssueMaterials}
                           onClick={() => setIssueItem(row)}
-                        >Issue</button>
+                        >{t.invStockIssueBtn}</button>
                       )}
                     </td>
                   </tr>
@@ -503,6 +581,17 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
             </tbody>
           </table>
         </div>
+        {stock.length < stockTotal && (
+          <div style={{ textAlign: 'center', padding: '16px 0' }}>
+            <button style={s.refreshBtn} onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? t.loading : t.loadMore}
+            </button>
+            <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>
+              {stock.length} / {stockTotal}
+            </span>
+          </div>
+        )}
+        </>
       )}
 
       {historyItem && (

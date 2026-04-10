@@ -40,12 +40,16 @@ describe('getT', () => {
     expect(orphaned).toEqual([]);
   });
 
-  test('all translation values are non-empty strings', () => {
+  test('all translation values are non-empty strings or non-empty arrays', () => {
     for (const lang of ['English', 'Spanish']) {
       const t = getT(lang);
       for (const [key, val] of Object.entries(t)) {
-        expect(typeof val, `${lang}.${key} should be a string`).toBe('string');
-        expect(val.length, `${lang}.${key} should not be empty`).toBeGreaterThan(0);
+        if (Array.isArray(val)) {
+          expect(val.length, `${lang}.${key} should not be empty`).toBeGreaterThan(0);
+        } else {
+          expect(typeof val, `${lang}.${key} should be a string`).toBe('string');
+          expect(val.length, `${lang}.${key} should not be empty`).toBeGreaterThan(0);
+        }
       }
     }
   });

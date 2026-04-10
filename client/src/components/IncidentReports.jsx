@@ -103,11 +103,11 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
           <div style={styles.row}>
             <div style={styles.fieldGroup}>
               <label style={styles.label}>{t.injuredName}</label>
-              <input style={styles.input} type="text" placeholder={t.fullNamePlaceholder} value={form.injured_name} onChange={e => set('injured_name', e.target.value)} />
+              <input style={styles.input} type="text" placeholder={t.fullNamePlaceholder} maxLength={255} value={form.injured_name} onChange={e => set('injured_name', e.target.value)} />
             </div>
             <div style={styles.fieldGroup}>
               <label style={styles.label}>{t.bodyPartAffected}</label>
-              <input style={styles.input} type="text" placeholder={t.bodyPartPlaceholder} value={form.body_part} onChange={e => set('body_part', e.target.value)} />
+              <input style={styles.input} type="text" maxLength={255} placeholder={t.bodyPartPlaceholder} value={form.body_part} onChange={e => set('body_part', e.target.value)} />
             </div>
           </div>
           <div style={styles.fieldGroup}>
@@ -121,17 +121,17 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.descriptionField} *</label>
-        <textarea style={styles.textarea} rows={4} placeholder={t.describeWhatHappened} value={form.description} onChange={e => set('description', e.target.value)} required />
+        <textarea style={styles.textarea} rows={4} placeholder={t.describeWhatHappened} maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} required />
       </div>
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.witnessesLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
-        <input style={styles.input} type="text" placeholder={t.witnessesPlaceholder} value={form.witnesses} onChange={e => set('witnesses', e.target.value)} />
+        <input style={styles.input} type="text" placeholder={t.witnessesPlaceholder} maxLength={500} value={form.witnesses} onChange={e => set('witnesses', e.target.value)} />
       </div>
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.correctiveActionLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
-        <textarea style={styles.textarea} rows={3} placeholder={t.correctiveActionPlaceholder} value={form.corrective_action} onChange={e => set('corrective_action', e.target.value)} />
+        <textarea style={styles.textarea} rows={3} placeholder={t.correctiveActionPlaceholder} maxLength={2000} value={form.corrective_action} onChange={e => set('corrective_action', e.target.value)} />
       </div>
 
       <label style={styles.checkRow}>
@@ -171,6 +171,7 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
   const [expanded, setExpanded] = useState(false);
   const [closing, setClosing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const handleClose = async () => {
     setClosing(true);
@@ -181,7 +182,6 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
   };
 
   const handleDelete = async () => {
-    if (!confirm(t.deleteIncidentConfirm)) return;
     setDeleting(true);
     try {
       await api.delete(`/incidents/${incident.id}`);
@@ -248,9 +248,14 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
               </button>
             )}
             {(!isAdmin || incident.status !== 'closed') && (
-              <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>
-                {deleting ? '…' : t.delete}
-              </button>
+              confirmingDelete ? (
+                <>
+                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                  <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+                </>
+              ) : (
+                <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.delete}</button>
+              )
             )}
           </div>
         </div>
@@ -275,6 +280,7 @@ export default function IncidentReports({ projects }) {
   };
 
   const [incidents, setIncidents] = useState([]);
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState({});
@@ -284,6 +290,7 @@ export default function IncidentReports({ projects }) {
       const params = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
       const r = await api.get('/incidents', { params });
       setIncidents(r.data);
+      setTruncated(r.data.length === 500);
     } catch {}
   };
 
@@ -331,8 +338,8 @@ export default function IncidentReports({ projects }) {
             <option value="open">{t.incidentOpen}</option>
             <option value="closed">{t.incidentClosed}</option>
           </select>
-          <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title="From date" />
-          <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title="To date" />
+          <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title={t.fromDate} />
+          <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title={t.toDate} />
         </div>
       )}
 
@@ -345,6 +352,7 @@ export default function IncidentReports({ projects }) {
         </div>
       ) : (
         <div style={styles.list}>
+          {truncated && <div style={styles.truncatedBanner}>{t.resultsTruncated || 'Showing the 500 most recent incidents. Use filters to narrow results.'}</div>}
           {incidents.map(i => (
             <IncidentCard
               key={i.id}
@@ -373,6 +381,7 @@ const styles = {
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151', flex: 1, minWidth: 120 },
   filterInput: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151' },
   list: { display: 'flex', flexDirection: 'column', gap: 10 },
+  truncatedBanner: { background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 7, padding: '8px 12px', fontSize: 13, color: '#92400e', marginBottom: 4 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { color: '#9ca3af', fontSize: 15 },
@@ -398,6 +407,8 @@ const styles = {
   cardActions: { display: 'flex', gap: 8, marginTop: 14 },
   closeBtn: { background: '#059669', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  cancelDeleteBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   pendingBadge: { fontSize: 10, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 6, marginLeft: 6, verticalAlign: 'middle' },
   // Form
   form: { display: 'flex', flexDirection: 'column', gap: 16 },

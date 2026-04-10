@@ -90,8 +90,8 @@ export default function AuditLog({ timezone = '' }) {
             <option key={val} value={val}>{label}</option>
           ))}
         </select>
-        <input style={styles.filterDate} type="date" value={from} onChange={e => setFrom(e.target.value)} placeholder="From" title="From date" />
-        <input style={styles.filterDate} type="date" value={to} onChange={e => setTo(e.target.value)} placeholder="To" title="To date" />
+        <input style={styles.filterDate} type="date" value={from} onChange={e => setFrom(e.target.value)} placeholder="From" title={t.fromDate} />
+        <input style={styles.filterDate} type="date" value={to} onChange={e => setTo(e.target.value)} placeholder="To" title={t.toDate} />
         {(group || from || to) && (
           <button style={styles.clearBtn} onClick={() => { setGroup(''); setFrom(''); setTo(''); }}>{t.auditClear}</button>
         )}

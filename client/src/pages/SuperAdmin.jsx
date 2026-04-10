@@ -56,6 +56,10 @@ export default function SuperAdmin() {
 
   // impersonate
   const [impersonating, setImpersonating] = useState(null); // companyId
+  const [impersonateError, setImpersonateError] = useState(null); // { id, msg }
+
+  // affiliate delete confirm
+  const [confirmingAfId, setConfirmingAfId] = useState(null);
 
   // ── Affiliates state ──
   const [afLoading, setAfLoading] = useState(false);
@@ -144,7 +148,7 @@ export default function SuperAdmin() {
       sessionStorage.setItem('impersonate_token', r.data.token);
       window.open('/?impersonate=1', '_blank');
     } catch (err) {
-      alert(err.response?.data?.error || 'Could not impersonate');
+      setImpersonateError({ id: company.id, msg: err.response?.data?.error || 'Could not impersonate' });
     } finally { setImpersonating(null); }
   };
 
@@ -178,10 +182,10 @@ export default function SuperAdmin() {
   };
 
   const deleteAffiliate = async (id) => {
-    if (!confirm('Delete this affiliate? Their companies will become unassigned.')) return;
     try {
       await api.delete(`/superadmin/affiliates/${id}`);
       setAfList(prev => prev.filter(a => a.id !== id));
+      setConfirmingAfId(null);
     } catch {}
   };
 
@@ -359,11 +363,14 @@ export default function SuperAdmin() {
                         </button>
                         <button
                           style={styles.actionBtn}
-                          onClick={() => handleImpersonate(c)}
+                          onClick={() => { setImpersonateError(null); handleImpersonate(c); }}
                           disabled={impersonating === c.id}
                         >
                           {impersonating === c.id ? '...' : 'Login as'}
                         </button>
+                        {impersonateError?.id === c.id && (
+                          <span style={{ fontSize: 12, color: '#ef4444' }}>{impersonateError.msg}</span>
+                        )}
                         <button
                           style={c.active ? styles.deactivateBtn : styles.activateBtn}
                           onClick={() => toggleActive(c)}
@@ -504,7 +511,15 @@ export default function SuperAdmin() {
                             {afExpanded === a.id ? 'Hide' : 'Companies'}
                           </button>
                           <button style={styles.actionBtn} onClick={() => { setAfForm({ ...a }); setAfError(''); }}>Edit</button>
-                          <button style={styles.deleteBtn} onClick={() => deleteAffiliate(a.id)}>Delete</button>
+                          {confirmingAfId === a.id ? (
+                            <>
+                              <span style={{ fontSize: 12, color: '#6b7280' }}>Their companies will become unassigned.</span>
+                              <button style={styles.deleteBtn} onClick={() => deleteAffiliate(a.id)}>Confirm</button>
+                              <button style={styles.actionBtn} onClick={() => setConfirmingAfId(null)}>Cancel</button>
+                            </>
+                          ) : (
+                            <button style={styles.deleteBtn} onClick={() => setConfirmingAfId(a.id)}>Delete</button>
+                          )}
                         </div>
                       </div>
 

@@ -29,7 +29,8 @@ router.get('/', requireAuth, async (req, res) => {
        LEFT JOIN safety_talk_questions q ON q.talk_id = st.id
        WHERE ${conditions.join(' AND ')}
        GROUP BY st.id, p.name, u.full_name
-       ORDER BY st.talk_date DESC, st.created_at DESC`,
+       ORDER BY st.talk_date DESC, st.created_at DESC
+       LIMIT 500`,
       params
     );
     res.json(result.rows);
@@ -81,8 +82,14 @@ router.get('/:id', requireAuth, async (req, res) => {
 
 // POST /safety-talks
 router.post('/', requireAuth, async (req, res) => {
-  const { project_id, title, content, given_by, talk_date, questions, pass_threshold } = req.body;
+  const { project_id, talk_date, questions, pass_threshold } = req.body;
+  const title = req.body.title?.trim();
+  const content = req.body.content?.trim() || null;
+  const given_by = req.body.given_by?.trim() || null;
   if (!title) return res.status(400).json({ error: 'title required' });
+  if (title.length > 200) return res.status(400).json({ error: 'title too long (max 200 characters)' });
+  if (content && content.length > 5000) return res.status(400).json({ error: 'content too long (max 5000 characters)' });
+  if (given_by && given_by.length > 255) return res.status(400).json({ error: 'given_by too long (max 255 characters)' });
   if (!talk_date) return res.status(400).json({ error: 'talk_date required' });
   const companyId = req.user.company_id;
 
@@ -141,7 +148,13 @@ router.patch('/:id', requireAuth, async (req, res) => {
   const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
   if (!isAdmin) return res.status(403).json({ error: 'Admins only' });
 
-  const { title, content, given_by, talk_date, project_id, questions, pass_threshold } = req.body;
+  const { talk_date, project_id, questions, pass_threshold } = req.body;
+  const title = req.body.title !== undefined ? (req.body.title?.trim() || null) : undefined;
+  const content = req.body.content !== undefined ? (req.body.content?.trim() || null) : undefined;
+  const given_by = req.body.given_by !== undefined ? (req.body.given_by?.trim() || null) : undefined;
+  if (title !== undefined && title && title.length > 200) return res.status(400).json({ error: 'title too long (max 200 characters)' });
+  if (content !== undefined && content && content.length > 5000) return res.status(400).json({ error: 'content too long (max 5000 characters)' });
+  if (given_by !== undefined && given_by && given_by.length > 255) return res.status(400).json({ error: 'given_by too long (max 255 characters)' });
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

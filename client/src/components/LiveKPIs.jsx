@@ -5,15 +5,26 @@ import { useT } from '../hooks/useT';
 export default function LiveKPIs() {
   const t = useT();
   const [kpis, setKpis] = useState(null);
+  const [error, setError] = useState('');
 
   const load = () =>
-    api.get('/admin/kpis').then(r => setKpis(r.data)).catch(() => {});
+    api.get('/admin/kpis')
+      .then(r => { setKpis(r.data); setError(''); })
+      .catch(() => setError(t.failedToLoad));
 
   useEffect(() => {
     load();
     const timer = setInterval(load, 60000);
     return () => clearInterval(timer);
   }, []);
+
+  if (error) return (
+    <div style={styles.grid} className="kpi-grid">
+      <div style={{ ...styles.card, gridColumn: '1 / -1', color: '#b91c1c', fontSize: 14 }}>
+        {error}
+      </div>
+    </div>
+  );
 
   if (!kpis) return (
     <div style={styles.grid} className="kpi-grid">

@@ -22,9 +22,15 @@ function fmtTime(t) { const [h, m] = t.split(':'); const hr = parseInt(h); retur
 function PillContent({ s }) {
   return (
     <>
-      <div style={styles.pillWorker}>{s.worker_name}</div>
+      <div style={styles.pillWorker}>
+        {s.worker_name}
+        {s.cant_make_it && <span style={styles.pillCantBadge}>✗ Can't make it</span>}
+      </div>
+      {s.cant_make_it && s.cant_make_it_note && (
+        <div style={styles.pillCantNote}>{s.cant_make_it_note}</div>
+      )}
       {s.project_name && <div style={styles.pillProject}>{s.project_name}</div>}
-      <div style={styles.pillTime}>{fmtTime(s.start_time)}–{fmtTime(s.end_time)}</div>
+      <div style={styles.pillTime}>{fmtTime(s.start_time)}–{fmtTime(s.end_time)}{s.recurrence_group_id ? ' ↻' : ''}</div>
       {s.notes && <div style={styles.pillNotes}>{s.notes}</div>}
     </>
   );
@@ -37,7 +43,7 @@ function DraggableShift({ s, editingId, startEdit, setEditingId, dragMode }) {
 
   return (
     <div ref={setNodeRef}>
-      <div style={{ ...styles.shiftPill, ...(isEditing ? styles.shiftPillActive : {}), opacity: isDragging ? 0.35 : 1, cursor: dragMode ? 'grab' : 'default' }} {...(dragMode ? { ...listeners, ...attributes } : {})}>
+      <div style={{ ...styles.shiftPill, ...(isEditing ? styles.shiftPillActive : {}), ...(s.cant_make_it ? styles.shiftPillCant : {}), opacity: isDragging ? 0.35 : 1, cursor: dragMode ? 'grab' : 'default' }} {...(dragMode ? { ...listeners, ...attributes } : {})}>
         <PillContent s={s} />
         <div style={styles.pillActions} onPointerDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
           <button style={isEditing ? styles.editPillBtnActive : styles.editPillBtn} onClick={() => isEditing ? setEditingId(null) : startEdit(s)}>
@@ -66,13 +72,122 @@ function DroppableDay({ date, isToday, children }) {
   );
 }
 
+function exportCSV(shifts, days) {
+  const header = ['Date', 'Worker', 'Project', 'Start', 'End', 'Notes', "Can't Make It", 'Reason', 'Series ID'];
+  const rows = shifts.map(s => [
+    s.shift_date.substring(0, 10),
+    s.worker_name,
+    s.project_name || '',
+    s.start_time.substring(0, 5),
+    s.end_time.substring(0, 5),
+    s.notes || '',
+    s.cant_make_it ? 'Yes' : 'No',
+    s.cant_make_it_note || '',
+    s.recurrence_group_id || '',
+  ]);
+  const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = `schedule-${days[0].toLocaleDateString('en-CA')}.csv`;
+  a.click();
+}
+
+function SummaryView({ shifts, days }) {
+  const t = useT();
+  const [cantOnly, setCantOnly] = useState(false);
+
+  // Build worker → day → shifts map
+  const workerMap = {};
+  shifts.forEach(s => {
+    const name = s.worker_name;
+    if (!workerMap[name]) workerMap[name] = { name, byDay: {} };
+    const key = s.shift_date.substring(0, 10);
+    if (!workerMap[name].byDay[key]) workerMap[name].byDay[key] = [];
+    workerMap[name].byDay[key].push(s);
+  });
+  let rows = Object.values(workerMap).sort((a, b) => a.name.localeCompare(b.name));
+  if (cantOnly) rows = rows.filter(row => Object.values(row.byDay).some(arr => arr.some(s => s.cant_make_it)));
+
+  const hasCantFlags = shifts.some(s => s.cant_make_it);
+
+  if (Object.values(workerMap).length === 0) return <p style={{ color: '#9ca3af', fontSize: 13, padding: '16px 0' }}>{t.msNoShiftsWeek}</p>;
+
+  return (
+    <div style={styles.summaryWrap}>
+      {hasCantFlags && (
+        <label style={styles.cantOnlyToggle}>
+          <input type="checkbox" checked={cantOnly} onChange={e => setCantOnly(e.target.checked)} />
+          {' '}{t.msCantOnly}
+        </label>
+      )}
+      {cantOnly && rows.length === 0 && (
+        <p style={{ color: '#9ca3af', fontSize: 13, padding: '8px 0' }}>{t.msCantOnlyNoFlags}</p>
+      )}
+      <table style={styles.summaryTable}>
+        <thead>
+          <tr>
+            <th style={styles.summaryThWorker}>Worker</th>
+            {days.map(day => {
+              const isToday = toISO(day) === toISO(new Date());
+              return (
+                <th key={toISO(day)} style={{ ...styles.summaryTh, color: isToday ? '#1a56db' : '#374151' }}>
+                  <div>{day.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                  <div style={{ fontWeight: 400, fontSize: 10 }}>{day.getDate()}</div>
+                </th>
+              );
+            })}
+            <th style={styles.summaryThTotal}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(row => {
+            const total = Object.values(row.byDay).reduce((n, arr) => n + arr.length, 0);
+            const hasCant = Object.values(row.byDay).some(arr => arr.some(s => s.cant_make_it));
+            return (
+              <tr key={row.name} style={hasCant ? styles.summaryRowCant : {}}>
+                <td style={styles.summaryTdWorker}>
+                  {row.name}
+                  {hasCant && <span style={styles.summaryCantDot} title="Can't make it">✗</span>}
+                </td>
+                {days.map(day => {
+                  const key = toISO(day);
+                  const dayShifts = row.byDay[key] || [];
+                  return (
+                    <td key={key} style={styles.summaryTd}>
+                      {dayShifts.length === 0 ? (
+                        <span style={styles.summaryEmpty}>–</span>
+                      ) : dayShifts.map((s, i) => (
+                        <div key={i} style={{ ...styles.summaryShift, ...(s.cant_make_it ? styles.summaryShiftCant : {}) }}>
+                          {fmtTime(s.start_time)}–{fmtTime(s.end_time)}
+                          {s.project_name && <div style={styles.summaryProject}>{s.project_name}</div>}
+                          {s.cant_make_it && s.cant_make_it_note && (
+                            <div style={styles.summaryCantNote}>{s.cant_make_it_note}</div>
+                          )}
+                        </div>
+                      ))}
+                    </td>
+                  );
+                })}
+                <td style={styles.summaryTdTotal}>{total}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function ManageSchedule({ workers, projects }) {
   const toast = useToast();
   const t = useT();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ user_id: '', project_id: '', shift_date: toISO(new Date()), start_time: '08:00', end_time: '17:00', notes: '' });
+  const [viewMode, setViewMode] = useState('grid');
+  const [form, setForm] = useState({ user_id: '', project_id: '', shift_date: toISO(new Date()), start_time: '08:00', end_time: '17:00', notes: '', repeat: 'none' });
+  const [availability, setAvailability] = useState([]); // [{ user_id, day_of_week, start_time, end_time }]
+  const [availabilityWarning, setAvailabilityWarning] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(null);
@@ -84,6 +199,8 @@ export default function ManageSchedule({ workers, projects }) {
   const [preDragShifts, setPreDragShifts] = useState(null);
   const [pendingMoves, setPendingMoves] = useState({});
   const [savingMoves, setSavingMoves] = useState(false);
+  const [overlapWarning, setOverlapWarning] = useState('');
+  const [copyingWeek, setCopyingWeek] = useState(false);
 
   const activeSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -144,6 +261,10 @@ export default function ManageSchedule({ workers, projects }) {
   }, [from, to]);
 
   useEffect(() => {
+    api.get('/availability/admin').then(r => setAvailability(r.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     const today = toISO(new Date());
     const dateInView = today >= from && today <= to ? today : from;
     setForm(f => ({ ...f, shift_date: dateInView }));
@@ -154,15 +275,97 @@ export default function ManageSchedule({ workers, projects }) {
   const addShift = async e => {
     e.preventDefault();
     if (!form.user_id) { setError(t.selectAWorker); return; }
+
+    // Check worker availability
+    const shiftDay = new Date(form.shift_date + 'T00:00:00').getDay();
+    const workerAvail = availability.find(a => String(a.user_id) === String(form.user_id) && a.day_of_week === shiftDay);
+    if (workerAvail) {
+      const availStart = workerAvail.start_time.substring(0, 5);
+      const availEnd = workerAvail.end_time.substring(0, 5);
+      if (form.start_time < availStart || form.end_time > availEnd) {
+        setAvailabilityWarning(t.msAvailabilityWarning);
+      } else {
+        setAvailabilityWarning('');
+      }
+    } else {
+      setAvailabilityWarning('');
+    }
+
+    // Check for overlapping shift for the same worker on the same day
+    const existing = shifts.filter(s =>
+      String(s.user_id) === String(form.user_id) &&
+      s.shift_date.substring(0, 10) === form.shift_date
+    );
+    const newStart = form.start_time;
+    const newEnd = form.end_time;
+    const hasOverlap = existing.some(s => {
+      const eStart = s.start_time.substring(0, 5);
+      const eEnd = s.end_time.substring(0, 5);
+      return newStart < eEnd && newEnd > eStart;
+    });
+    if (hasOverlap) {
+      setOverlapWarning(t.msOverlapWarning);
+    } else {
+      setOverlapWarning('');
+    }
+
+    // Generate dates for recurring
+    const baseDates = [form.shift_date];
+    if (form.repeat === 'weekly-4') {
+      for (let i = 1; i < 4; i++) baseDates.push(toISO(addDays(new Date(form.shift_date + 'T00:00:00'), i * 7)));
+    } else if (form.repeat === 'biweekly-4') {
+      for (let i = 1; i < 4; i++) baseDates.push(toISO(addDays(new Date(form.shift_date + 'T00:00:00'), i * 14)));
+    } else if (form.repeat === 'monthly-3') {
+      for (let i = 1; i < 3; i++) {
+        const d = new Date(form.shift_date + 'T00:00:00');
+        d.setMonth(d.getMonth() + i);
+        baseDates.push(toISO(d));
+      }
+    }
+
     setSaving(true); setError('');
     try {
-      const r = await api.post('/shifts/admin', form);
-      setShifts(prev => [...prev, r.data].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
-      setForm(f => ({ ...f, notes: '' }));
-      toast(t.shiftAdded, 'success');
+      const newShifts = [];
+      const groupId = baseDates.length > 1 ? crypto.randomUUID() : undefined;
+      for (const date of baseDates) {
+        const r = await api.post('/shifts/admin', { ...form, shift_date: date, recurrence_group_id: groupId });
+        newShifts.push(r.data);
+      }
+      setShifts(prev => [...prev, ...newShifts].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
+      setForm(f => ({ ...f, notes: '', repeat: 'none' }));
+      setOverlapWarning(''); setAvailabilityWarning('');
+      toast(baseDates.length > 1 ? `${baseDates.length} shifts added` : t.shiftAdded, 'success');
     } catch (err) {
       setError(err.response?.data?.error || t.failedSaveShift);
     } finally { setSaving(false); }
+  };
+
+  const copyWeek = async () => {
+    if (shifts.length === 0) return;
+    setCopyingWeek(true);
+    let failed = 0;
+    const results = [];
+    for (const s of shifts) {
+      const nextDate = toISO(addDays(new Date(s.shift_date.substring(0, 10) + 'T00:00:00'), 7));
+      try {
+        const r = await api.post('/shifts/admin', {
+          user_id: s.user_id,
+          project_id: s.project_id || '',
+          shift_date: nextDate,
+          start_time: s.start_time.substring(0, 5),
+          end_time: s.end_time.substring(0, 5),
+          notes: s.notes || '',
+        });
+        results.push(r.data);
+      } catch { failed++; }
+    }
+    setCopyingWeek(false);
+    if (failed === shifts.length) { toast(t.msCopyFailed, 'error'); return; }
+    if (failed > 0) toast(t.msCopyFailed, 'error');
+    else toast(t.msCopyDone, 'success');
+    // Navigate to next week to show the copies
+    setShifts(prev => [...prev, ...results].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
+    setWeekStart(d => addDays(d, 7));
   };
 
   const deleteShift = async id => {
@@ -172,6 +375,18 @@ export default function ManageSchedule({ workers, projects }) {
       setShifts(prev => prev.filter(s => s.id !== id));
       if (editingId === id) setEditingId(null);
     } finally { setDeleting(null); }
+  };
+
+  const cancelSeries = async groupId => {
+    setDeleting(groupId);
+    try {
+      const r = await api.delete(`/shifts/admin/series/${groupId}`);
+      const today = toISO(new Date());
+      setShifts(prev => prev.filter(s => !(s.recurrence_group_id === groupId && s.shift_date >= today)));
+      setEditingId(null);
+      toast(`${r.data.deleted} shift${r.data.deleted !== 1 ? 's' : ''} cancelled`, 'success');
+    } catch { toast(t.failedSaveShift, 'error'); }
+    finally { setDeleting(null); }
   };
 
   const duplicateShift = async s => {
@@ -277,13 +492,24 @@ export default function ManageSchedule({ workers, projects }) {
           </div>
           <div style={{ ...styles.field, flex: 2 }}>
             <label style={styles.label}>{t.notes}</label>
-            <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.optional} />
+            <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.optional} maxLength={500} />
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>{t.msRepeat}</label>
+            <select style={styles.input} value={form.repeat} onChange={e => set('repeat', e.target.value)}>
+              <option value="none">{t.msRepeatNone}</option>
+              <option value="weekly-4">{t.msRepeatWeekly4}</option>
+              <option value="biweekly-4">{t.msRepeatBiweekly4}</option>
+              <option value="monthly-3">{t.msRepeatMonthly3}</option>
+            </select>
           </div>
           <div style={styles.field}>
             <label style={styles.label}>&nbsp;</label>
             <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? '...' : t.addShift}</button>
           </div>
         </div>
+        {availabilityWarning && <p style={styles.overlapWarning}>📅 {availabilityWarning}</p>}
+        {overlapWarning && <p style={styles.overlapWarning}>⚠ {overlapWarning}</p>}
         {error && <p style={styles.error}>{error}</p>}
       </form>
 
@@ -292,6 +518,16 @@ export default function ManageSchedule({ workers, projects }) {
         <span style={styles.weekLabel}>{fmtDay(days[0])} – {fmtDay(days[6])}</span>
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>{t.nextWeek}</button>
         <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>{t.today}</button>
+        <button style={styles.exportBtn} onClick={() => exportCSV(shifts, days)} title="Export week as CSV">⬇ CSV</button>
+        {shifts.length > 0 && (
+          <button style={styles.copyWeekBtn} onClick={copyWeek} disabled={copyingWeek} title={t.msCopyWeek}>
+            {copyingWeek ? t.msCopying : '⧉ ' + t.msCopyWeek}
+          </button>
+        )}
+        <div style={styles.viewToggle}>
+          <button style={{ ...styles.viewBtn, ...(viewMode === 'grid' ? styles.viewBtnActive : {}) }} onClick={() => setViewMode('grid')}>{t.msViewGrid}</button>
+          <button style={{ ...styles.viewBtn, ...(viewMode === 'summary' ? styles.viewBtnActive : {}) }} onClick={() => setViewMode('summary')}>{t.msViewSummary}</button>
+        </div>
         {!dragMode
           ? <button style={styles.dragModeBtn} onClick={enterDragMode}>{t.rearrange}</button>
           : (
@@ -308,7 +544,9 @@ export default function ManageSchedule({ workers, projects }) {
         }
       </div>
 
-      {loading ? <p style={{ color: '#888', fontSize: 13 }}>{t.loading}</p> : (
+      {loading ? <p style={{ color: '#888', fontSize: 13 }}>{t.loading}</p> : viewMode === 'summary' ? (
+        <SummaryView shifts={shifts} days={days} />
+      ) : (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={styles.grid}>
             {days.map(day => {
@@ -366,7 +604,7 @@ export default function ManageSchedule({ workers, projects }) {
             </div>
             <div style={{ ...styles.editField, flex: 2 }}>
               <label style={styles.editLabel}>{t.notes}</label>
-              <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} />
+              <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} maxLength={500} />
             </div>
           </div>
           <div style={styles.editActions}>
@@ -376,6 +614,11 @@ export default function ManageSchedule({ workers, projects }) {
             </div>
             <div style={styles.editActionsRight}>
               <button style={styles.dupBtn} onClick={() => duplicateShift(editingShift)}>{t.copy}</button>
+              {editingShift.recurrence_group_id && (
+                <button style={styles.seriesBtn} onClick={() => cancelSeries(editingShift.recurrence_group_id)} disabled={deleting === editingShift.recurrence_group_id}>
+                  {deleting === editingShift.recurrence_group_id ? '…' : t.msCancelSeries}
+                </button>
+              )}
               <button style={styles.deleteBtn} onClick={() => deleteShift(editingShift.id)} disabled={deleting === editingShift.id}>
                 {deleting === editingShift.id ? '…' : t.del}
               </button>
@@ -397,6 +640,8 @@ const styles = {
   input: { padding: '7px 9px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13 },
   addBtn: { padding: '7px 14px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' },
   error: { color: '#e53e3e', fontSize: 13, marginTop: 4 },
+  overlapWarning: { color: '#d97706', fontSize: 13, marginTop: 4, background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '5px 10px' },
+  copyWeekBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: '#6b7280', whiteSpace: 'nowrap' },
   weekNav: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' },
   navBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 10px', fontSize: 13, cursor: 'pointer', color: '#374151' },
   weekLabel: { fontWeight: 600, fontSize: 14, color: '#111827', flex: 1 },
@@ -411,11 +656,14 @@ const styles = {
   dayHead: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 },
   emptyDay: { flex: 1, background: '#f9fafb', borderRadius: 4, minHeight: 40 },
   shiftPill: { background: '#eff6ff', borderLeft: '3px solid #1a56db', borderRadius: 5, padding: '5px 7px', fontSize: 11 },
-  pillWorker: { fontWeight: 700, color: '#1e3a5f', marginBottom: 1 },
+  pillWorker: { fontWeight: 700, color: '#1e3a5f', marginBottom: 1, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
+  pillCantBadge: { fontSize: 9, fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '1px 5px', borderRadius: 4, whiteSpace: 'nowrap' },
+  pillCantNote: { fontSize: 9, color: '#dc2626', fontStyle: 'italic', marginTop: 1 },
   pillProject: { color: '#6b7280', fontSize: 10 },
   pillTime: { fontWeight: 600, color: '#1a56db', marginTop: 2 },
   pillNotes: { color: '#9ca3af', fontSize: 10, fontStyle: 'italic' },
   shiftPillActive: { background: '#dbeafe', borderLeftColor: '#1d4ed8' },
+  shiftPillCant: { background: '#fff5f5', borderLeftColor: '#ef4444' },
   pillActions: { display: 'flex', gap: 4, marginTop: 6 },
   editPillBtn: { flex: 1, background: '#dbeafe', border: 'none', color: '#1d4ed8', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 9px', borderRadius: 5, lineHeight: 1 },
   editPillBtnActive: { flex: 1, background: '#bfdbfe', border: 'none', color: '#1e40af', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 9px', borderRadius: 5, lineHeight: 1 },
@@ -432,5 +680,26 @@ const styles = {
   saveBtn: { background: '#059669', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   cancelBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '7px 18px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   dupBtn: { background: '#d1fae5', border: 'none', color: '#065f46', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 16px', borderRadius: 6 },
+  seriesBtn: { background: '#fef3c7', border: 'none', color: '#92400e', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 16px', borderRadius: 6 },
   deleteBtn: { background: '#fee2e2', border: 'none', color: '#b91c1c', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '7px 16px', borderRadius: 6 },
+  viewToggle: { display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid #d1d5db' },
+  viewBtn: { background: '#fff', border: 'none', padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#374151' },
+  viewBtnActive: { background: '#1a56db', color: '#fff' },
+  summaryWrap: { overflowX: 'auto', WebkitOverflowScrolling: 'touch' },
+  summaryTable: { borderCollapse: 'collapse', fontSize: 12, minWidth: 520 },
+  summaryThWorker: { textAlign: 'left', padding: '6px 10px', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', minWidth: 100, maxWidth: 140 },
+  summaryTh: { textAlign: 'center', padding: '6px 4px', fontWeight: 700, borderBottom: '2px solid #e5e7eb', minWidth: 60 },
+  summaryThTotal: { textAlign: 'center', padding: '6px 8px', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', width: 40 },
+  summaryTdWorker: { padding: '8px 10px', fontWeight: 700, color: '#111827', borderBottom: '1px solid #f3f4f6', verticalAlign: 'top', whiteSpace: 'nowrap', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' },
+  summaryTd: { padding: '4px', borderBottom: '1px solid #f3f4f6', verticalAlign: 'top', textAlign: 'center' },
+  summaryTdTotal: { padding: '8px', borderBottom: '1px solid #f3f4f6', textAlign: 'center', fontWeight: 700, color: '#374151' },
+  summaryEmpty: { color: '#d1d5db' },
+  summaryShift: { background: '#eff6ff', color: '#1e3a5f', borderRadius: 4, padding: '3px 4px', marginBottom: 2, fontWeight: 600, lineHeight: 1.3, whiteSpace: 'nowrap' },
+  summaryShiftCant: { background: '#fff5f5', color: '#b91c1c' },
+  summaryProject: { fontSize: 10, fontWeight: 400, color: '#6b7280', marginTop: 1 },
+  summaryRowCant: { background: '#fff9f9' },
+  summaryCantDot: { marginLeft: 5, fontSize: 10, color: '#dc2626', fontWeight: 700 },
+  cantOnlyToggle: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#dc2626', marginBottom: 10, cursor: 'pointer' },
+  exportBtn: { background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: '#6b7280' },
+  summaryCantNote: { fontSize: 9, color: '#b91c1c', fontStyle: 'italic', marginTop: 2 },
 };

@@ -24,15 +24,23 @@ router.get('/', requireAuth, async (req, res) => {
 
 // POST /equipment — create equipment item (admin)
 router.post('/', requireAdmin, async (req, res) => {
-  const { name, type, unit_number, maintenance_interval_hours, notes } = req.body;
-  if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+  const { maintenance_interval_hours } = req.body;
+  const name = req.body.name?.trim();
+  const type = req.body.type?.trim() || null;
+  const unit_number = req.body.unit_number?.trim() || null;
+  const notes = req.body.notes?.trim() || null;
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  if (name.length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+  if (type && type.length > 100) return res.status(400).json({ error: 'type too long (max 100 characters)' });
+  if (unit_number && unit_number.length > 100) return res.status(400).json({ error: 'unit_number too long (max 100 characters)' });
+  if (notes && notes.length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
       `INSERT INTO equipment_items (company_id, name, type, unit_number, maintenance_interval_hours, notes)
        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [companyId, name.trim(), type || null, unit_number || null,
-       maintenance_interval_hours ? parseInt(maintenance_interval_hours) : null, notes || null]
+      [companyId, name, type, unit_number,
+       maintenance_interval_hours ? parseInt(maintenance_interval_hours) : null, notes]
     );
     res.status(201).json({ ...result.rows[0], total_hours: 0, log_count: 0, last_logged: null });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
@@ -40,16 +48,24 @@ router.post('/', requireAdmin, async (req, res) => {
 
 // PATCH /equipment/:id — update item (admin)
 router.patch('/:id', requireAdmin, async (req, res) => {
-  const { name, type, unit_number, maintenance_interval_hours, notes } = req.body;
-  if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+  const { maintenance_interval_hours } = req.body;
+  const name = req.body.name?.trim();
+  const type = req.body.type?.trim() || null;
+  const unit_number = req.body.unit_number?.trim() || null;
+  const notes = req.body.notes?.trim() || null;
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  if (name.length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+  if (type && type.length > 100) return res.status(400).json({ error: 'type too long (max 100 characters)' });
+  if (unit_number && unit_number.length > 100) return res.status(400).json({ error: 'unit_number too long (max 100 characters)' });
+  if (notes && notes.length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
       `UPDATE equipment_items SET name=$1, type=$2, unit_number=$3, maintenance_interval_hours=$4, notes=$5
        WHERE id=$6 AND company_id=$7 RETURNING *`,
-      [name.trim(), type || null, unit_number || null,
-       maintenance_interval_hours ? parseInt(maintenance_interval_hours) : null,
-       notes || null, req.params.id, companyId]
+      [name, type,
+       unit_number, maintenance_interval_hours ? parseInt(maintenance_interval_hours) : null,
+       notes, req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Equipment not found' });
     res.json(result.rows[0]);
@@ -93,8 +109,12 @@ router.get('/:id/hours', requireAuth, async (req, res) => {
 
 // POST /equipment/:id/hours — log hours for an item
 router.post('/:id/hours', requireAuth, async (req, res) => {
-  const { log_date, hours, project_id, operator_name, notes } = req.body;
+  const { log_date, hours, project_id } = req.body;
+  const operator_name = req.body.operator_name?.trim() || null;
+  const notes = req.body.notes?.trim() || null;
   if (!log_date || !hours) return res.status(400).json({ error: 'log_date and hours are required' });
+  if (operator_name && operator_name.length > 255) return res.status(400).json({ error: 'operator_name too long (max 255 characters)' });
+  if (notes && notes.length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
   const companyId = req.user.company_id;
   // Verify item belongs to this company
   try {
@@ -104,19 +124,17 @@ router.post('/:id/hours', requireAuth, async (req, res) => {
     );
     if (item.rowCount === 0) return res.status(404).json({ error: 'Equipment not found' });
 
-    const result = await pool.query(
-      `INSERT INTO equipment_hours (equipment_id, company_id, project_id, log_date, hours, operator_name, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [req.params.id, companyId, project_id || null, log_date, parseFloat(hours),
-       operator_name || null, notes || null, req.user.id]
-    );
     const full = await pool.query(
-      `SELECT h.*, p.name AS project_name, u.full_name AS logged_by_name
-       FROM equipment_hours h
+      `WITH inserted AS (
+         INSERT INTO equipment_hours (equipment_id, company_id, project_id, log_date, hours, operator_name, notes, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
+       )
+       SELECT h.*, p.name AS project_name, u.full_name AS logged_by_name
+       FROM inserted h
        LEFT JOIN projects p ON h.project_id = p.id
-       LEFT JOIN users u ON h.created_by = u.id
-       WHERE h.id = $1`,
-      [result.rows[0].id]
+       LEFT JOIN users u ON h.created_by = u.id`,
+      [req.params.id, companyId, project_id || null, log_date, parseFloat(hours),
+       operator_name, notes, req.user.id]
     );
     res.status(201).json(full.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }

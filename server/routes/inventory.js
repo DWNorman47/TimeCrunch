@@ -5,6 +5,25 @@ const { uploadBase64 } = require('../r2');
 const { checkStorageLimit, incrementStorage } = require('../storage');
 const { sendPushToCompanyAdmins } = require('../push');
 const { createInboxItemBatch } = require('./inbox');
+const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
+const { applySettingsRows, ADMIN_SETTINGS_DEFAULTS } = require('../settingsDefaults');
+
+// GET /api/inventory/units — active units for this company
+router.get('/units', requireAuth, async (req, res) => {
+  try {
+    const all = await getAdvancedSettings(req.user.company_id);
+    const cfg = all.item_units;
+    const active = [
+      ...cfg.defaults.filter(u => !cfg.suppressed.includes(u)),
+      ...cfg.custom,
+    ];
+    const known = [...cfg.defaults, ...cfg.custom];
+    res.json({ active, known });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -143,8 +162,13 @@ async function processPhotos(photos, companyId) {
 // ── Items ─────────────────────────────────────────────────────────────────────
 
 // GET /api/inventory/items
+// Paginated when ?limit=N&offset=M → returns { items, total }
+// Without limit → returns array (capped at 500, for dropdowns)
 router.get('/items', requireAuth, async (req, res) => {
-  const { search, category, active = 'true' } = req.query;
+  const { search, category, active = 'true', limit, offset } = req.query;
+  const paginate = limit !== undefined;
+  const pageLimit = Math.min(Math.max(parseInt(limit) || 100, 1), 500);
+  const pageOffset = Math.max(parseInt(offset) || 0, 0);
   const companyId = req.user.company_id;
   const admin = isAdmin(req);
   try {
@@ -160,13 +184,16 @@ router.get('/items', requireAuth, async (req, res) => {
       conditions.push(`(name ILIKE $${idx} OR sku ILIKE $${idx} OR category ILIKE $${idx})`);
       values.push(`%${search}%`); idx++;
     }
-    const result = await pool.query(
-      `SELECT id, name, sku, description, category, unit,
-              ${admin ? 'unit_cost,' : ''}
-              reorder_point, reorder_qty, active, created_at
-       FROM inventory_items WHERE ${conditions.join(' AND ')} ORDER BY name`,
-      values
-    );
+    const cols = `id, name, sku, description, category, unit, ${admin ? 'unit_cost,' : ''} reorder_point, reorder_qty, active, created_at`;
+    const where = `FROM inventory_items WHERE ${conditions.join(' AND ')}`;
+    if (paginate) {
+      const [countRes, result] = await Promise.all([
+        pool.query(`SELECT COUNT(*) ${where}`, values),
+        pool.query(`SELECT ${cols} ${where} ORDER BY name LIMIT $${idx} OFFSET $${idx + 1}`, [...values, pageLimit, pageOffset]),
+      ]);
+      return res.json({ items: result.rows, total: parseInt(countRes.rows[0].count) });
+    }
+    const result = await pool.query(`SELECT ${cols} ${where} ORDER BY name LIMIT 500`, values);
     res.json(result.rows);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -175,6 +202,13 @@ router.get('/items', requireAuth, async (req, res) => {
 router.post('/items', requireAdmin, async (req, res) => {
   const { name, sku, description, category, unit = 'each', unit_cost, reorder_point = 0, reorder_qty = 0 } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  if (name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+  if (sku && sku.trim().length > 100) return res.status(400).json({ error: 'sku too long (max 100 characters)' });
+  if (description && description.trim().length > 1000) return res.status(400).json({ error: 'description too long (max 1000 characters)' });
+  if (category && category.trim().length > 100) return res.status(400).json({ error: 'category too long (max 100 characters)' });
+  if (unit_cost !== undefined && unit_cost !== null && isNaN(parseFloat(unit_cost))) {
+    return res.status(400).json({ error: 'unit_cost must be a number' });
+  }
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -195,6 +229,13 @@ router.post('/items', requireAdmin, async (req, res) => {
 router.patch('/items/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const { name, sku, description, category, unit, unit_cost, reorder_point, reorder_qty, active } = req.body;
+  if (name !== undefined && name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+  if (sku !== undefined && sku && sku.trim().length > 100) return res.status(400).json({ error: 'sku too long (max 100 characters)' });
+  if (description !== undefined && description && description.trim().length > 1000) return res.status(400).json({ error: 'description too long (max 1000 characters)' });
+  if (category !== undefined && category && category.trim().length > 100) return res.status(400).json({ error: 'category too long (max 100 characters)' });
+  if (unit_cost !== undefined && unit_cost !== null && isNaN(parseFloat(unit_cost))) {
+    return res.status(400).json({ error: 'unit_cost must be a number' });
+  }
   try {
     const existing = await pool.query('SELECT id FROM inventory_items WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Item not found' });
@@ -341,7 +382,7 @@ router.patch('/items/:id/uoms/:uomId', requireAdmin, async (req, res) => {
       const sets = [], vals = [req.params.uomId]; let idx = 2;
       if (unit     !== undefined) { sets.push(`unit=$${idx++}`);      vals.push(unit.trim()); }
       if ('unit_spec' in req.body) { sets.push(`unit_spec=$${idx++}`); vals.push(unit_spec?.trim() || null); }
-      if (factor   !== undefined) { sets.push(`factor=$${idx++}`);    vals.push(parseFloat(factor)); }
+      if (factor   !== undefined) { const f = parseFloat(factor); if (isNaN(f) || f <= 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'factor must be a positive number' }); } sets.push(`factor=$${idx++}`); vals.push(f); }
       if (is_base  !== undefined) { sets.push(`is_base=$${idx++}`);   vals.push(!!is_base); }
       if (active   !== undefined) { sets.push(`active=$${idx++}`);    vals.push(!!active); }
       if (sets.length === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'No fields to update' }); }
@@ -402,10 +443,16 @@ router.get('/locations', requireAuth, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+const VALID_LOCATION_TYPES = ['warehouse', 'job_site', 'truck', 'other'];
+
 // POST /api/inventory/locations
 router.post('/locations', requireAdmin, async (req, res) => {
   const { name, type = 'warehouse', project_id, notes, address } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  if (name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+  if (!VALID_LOCATION_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid location type' });
+  if (notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+  if (address && address.trim().length > 500) return res.status(400).json({ error: 'address too long (max 500 characters)' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -424,9 +471,12 @@ router.patch('/locations/:id', requireAdmin, async (req, res) => {
   try {
     const existing = await pool.query('SELECT id FROM inventory_locations WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Location not found' });
+    if (name !== undefined && name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+    if (notes !== undefined && notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+    if (address !== undefined && address && address.trim().length > 500) return res.status(400).json({ error: 'address too long (max 500 characters)' });
     const sets = [], vals = [req.params.id, companyId]; let idx = 3;
     if (name !== undefined) { sets.push(`name=$${idx++}`); vals.push(name.trim()); }
-    if (type !== undefined) { sets.push(`type=$${idx++}`); vals.push(type); }
+    if (type !== undefined) { if (!VALID_LOCATION_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid location type' }); sets.push(`type=$${idx++}`); vals.push(type); }
     if (project_id !== undefined) { sets.push(`project_id=$${idx++}`); vals.push(project_id || null); }
     if (notes !== undefined) { sets.push(`notes=$${idx++}`); vals.push(notes?.trim() || null); }
     if (address !== undefined) { sets.push(`address=$${idx++}`); vals.push(address?.trim() || null); }
@@ -471,7 +521,7 @@ router.delete('/locations/:id', requireAdmin, async (req, res) => {
 
 // GET /api/inventory/stock
 router.get('/stock', requireAuth, async (req, res) => {
-  const { location_id, item_id } = req.query;
+  const { location_id, item_id, limit = 500, offset = 0 } = req.query;
   const companyId = req.user.company_id;
   const admin = isAdmin(req);
   try {
@@ -479,6 +529,7 @@ router.get('/stock', requireAuth, async (req, res) => {
     const values = [companyId]; let idx = 2;
     if (location_id) { conditions.push(`s.location_id = $${idx++}`); values.push(location_id); }
     if (item_id) { conditions.push(`s.item_id = $${idx++}`); values.push(item_id); }
+    const whereClause = `${conditions.join(' AND ')} AND i.active = true AND l.active = true`;
     const result = await pool.query(
       `SELECT s.id, s.item_id, i.name as item_name, i.sku, i.category,
               COALESCE(u.unit, i.unit)           as unit,
@@ -499,11 +550,19 @@ router.get('/stock', requireAuth, async (req, res) => {
        LEFT JOIN inventory_racks        ir ON s.rack_id        = ir.id
        LEFT JOIN inventory_bays         ib ON s.bay_id         = ib.id
        LEFT JOIN inventory_compartments ic ON s.compartment_id = ic.id
-       WHERE ${conditions.join(' AND ')} AND i.active = true AND l.active = true
-       ORDER BY l.name, ia.name, ir.name, ib.name, i.name`,
+       WHERE ${whereClause}
+       ORDER BY l.name, ia.name, ir.name, ib.name, i.name
+       LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...values, parseInt(limit), parseInt(offset)]
+    );
+    const totalResult = await pool.query(
+      `SELECT COUNT(*) FROM inventory_stock s
+       JOIN inventory_items i ON s.item_id = i.id
+       JOIN inventory_locations l ON s.location_id = l.id
+       WHERE ${whereClause}`,
       values
     );
-    res.json(result.rows);
+    res.json({ stock: result.rows, total: parseInt(totalResult.rows[0].count) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -555,6 +614,8 @@ router.post('/transactions', requireAuth, async (req, res) => {
   if (type === 'transfer' && (!from_location_id || !to_location_id)) return res.status(400).json({ error: 'from_location_id and to_location_id required for transfer' });
   if (type === 'transfer' && from_location_id === to_location_id) return res.status(400).json({ error: 'from and to locations must differ' });
   if (type === 'adjust' && !to_location_id) return res.status(400).json({ error: 'to_location_id required for adjust' });
+  if (notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+  if (reference_no && reference_no.trim().length > 100) return res.status(400).json({ error: 'reference_no too long (max 100 characters)' });
   if (type === 'convert') {
     if (!from_location_id) return res.status(400).json({ error: 'from_location_id required for convert' });
     if (!to_uom_id)        return res.status(400).json({ error: 'to_uom_id required for convert' });
@@ -714,7 +775,7 @@ router.get('/transactions', requireAuth, async (req, res) => {
 
 // GET /api/inventory/cycle-counts
 router.get('/cycle-counts', requireAdmin, async (req, res) => {
-  const { location_id, status, count_type } = req.query;
+  const { location_id, status, count_type, limit = 100, offset = 0 } = req.query;
   const companyId = req.user.company_id;
   try {
     const conditions = ['cc.company_id = $1'];
@@ -726,17 +787,29 @@ router.get('/cycle-counts', requireAdmin, async (req, res) => {
       `SELECT cc.*, COALESCE(l.name, 'All Locations') as location_name,
               u.full_name as started_by_name,
               cu.full_name as completed_by_name,
-              (SELECT COUNT(*) FROM inventory_cycle_count_lines WHERE cycle_count_id = cc.id) as line_count,
-              (SELECT COUNT(*) FROM inventory_cycle_count_lines WHERE cycle_count_id = cc.id AND counted_qty IS NOT NULL) as counted_count
+              COALESCE(agg.line_count,    0) AS line_count,
+              COALESCE(agg.counted_count, 0) AS counted_count
        FROM inventory_cycle_counts cc
        LEFT JOIN inventory_locations l ON cc.location_id = l.id
        JOIN users u ON cc.started_by = u.id
        LEFT JOIN users cu ON cc.completed_by = cu.id
+       LEFT JOIN (
+         SELECT cycle_count_id,
+                COUNT(*) AS line_count,
+                COUNT(*) FILTER (WHERE line_status IN ('accepted','reconciled','overridden','audited')) AS counted_count
+         FROM inventory_cycle_count_lines
+         GROUP BY cycle_count_id
+       ) agg ON agg.cycle_count_id = cc.id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY cc.started_at DESC`,
+       ORDER BY cc.started_at DESC
+       LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...values, parseInt(limit), parseInt(offset)]
+    );
+    const totalResult = await pool.query(
+      `SELECT COUNT(*) FROM inventory_cycle_counts cc WHERE ${conditions.join(' AND ')}`,
       values
     );
-    res.json(result.rows);
+    res.json({ counts: result.rows, total: parseInt(totalResult.rows[0].count) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -800,13 +873,19 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
       }
 
       if (stock.rows.length > 0) {
-        const lineValues = stock.rows.map((r, i) => `($1, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4}, $${i * 4 + 5})`).join(', ');
-        const lineParams = [countId];
-        stock.rows.forEach(r => { lineParams.push(r.item_id); lineParams.push(r.location_id); lineParams.push(r.quantity); lineParams.push(r.uom_id || null); });
-        await client.query(
-          `INSERT INTO inventory_cycle_count_lines (cycle_count_id, item_id, location_id, expected_qty, stock_uom_id) VALUES ${lineValues}`,
-          lineParams
-        );
+        // Batch inserts in chunks of 500 to avoid oversized parameter lists and
+        // transaction log bloat when snapshotting large inventories (e.g. full counts).
+        const CHUNK = 500;
+        for (let start = 0; start < stock.rows.length; start += CHUNK) {
+          const chunk = stock.rows.slice(start, start + CHUNK);
+          const lineValues = chunk.map((r, i) => `($1, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4}, $${i * 4 + 5})`).join(', ');
+          const lineParams = [countId];
+          chunk.forEach(r => { lineParams.push(r.item_id); lineParams.push(r.location_id); lineParams.push(r.quantity); lineParams.push(r.uom_id || null); });
+          await client.query(
+            `INSERT INTO inventory_cycle_count_lines (cycle_count_id, item_id, location_id, expected_qty, stock_uom_id) VALUES ${lineValues}`,
+            lineParams
+          );
+        }
       }
 
       await client.query('COMMIT');
@@ -834,6 +913,38 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// GET /api/inventory/cycle-counts/my-assignments — worker's pending assignments across all active counts
+router.get('/cycle-counts/my-assignments', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `SELECT a.id as assignment_id, a.line_id, a.role, a.status as assignment_status,
+              a.counted_qty, a.counted_uom_id, a.notes as assignment_notes, a.submitted_at,
+              l.item_id, l.expected_qty, l.line_status, l.stock_uom_id,
+              l.location_id as line_location_id,
+              l.reconcile_threshold, l.reconcile_threshold_type,
+              i.name as item_name, i.sku, i.unit,
+              su.unit as stock_uom_unit, su.factor as stock_uom_factor,
+              loc.name as location_name,
+              cc.id as count_id, cc.count_type, cc.status as count_status, cc.location_id,
+              ccl.name as count_location_name
+       FROM inventory_count_assignments a
+       JOIN inventory_cycle_count_lines l ON a.line_id = l.id
+       JOIN inventory_cycle_counts cc ON a.cycle_count_id = cc.id
+       JOIN inventory_items i ON l.item_id = i.id
+       LEFT JOIN inventory_locations loc ON l.location_id = loc.id
+       LEFT JOIN inventory_locations ccl ON cc.location_id = ccl.id
+       LEFT JOIN inventory_item_uoms su ON l.stock_uom_id = su.id
+       WHERE a.user_id = $1 AND cc.company_id = $2
+         AND cc.status = 'in_progress'
+         AND a.status = 'pending'
+       ORDER BY cc.id, loc.name NULLS LAST, i.name`,
+      [req.user.id, companyId]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // GET /api/inventory/cycle-counts/:id
 router.get('/cycle-counts/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
@@ -850,17 +961,34 @@ router.get('/cycle-counts/:id', requireAdmin, async (req, res) => {
       [req.params.id, companyId]
     );
     if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
-    const lines = await pool.query(
-      `SELECT l.*, i.name as item_name, i.unit, i.sku, u.full_name as counted_by_name,
-              loc.name as location_name
-       FROM inventory_cycle_count_lines l
-       JOIN inventory_items i ON l.item_id = i.id
-       LEFT JOIN users u ON l.counted_by = u.id
-       LEFT JOIN inventory_locations loc ON l.location_id = loc.id
-       WHERE l.cycle_count_id = $1 ORDER BY loc.name NULLS FIRST, i.name`,
-      [req.params.id]
-    );
-    res.json({ ...cc.rows[0], lines: lines.rows });
+    const [lines, workers, assignments] = await Promise.all([
+      pool.query(
+        `SELECT l.*, i.name as item_name, i.unit, i.sku, u.full_name as counted_by_name,
+                loc.name as location_name,
+                su.unit as stock_uom_unit, su.factor as stock_uom_factor,
+                cu.unit as counted_uom_unit
+         FROM inventory_cycle_count_lines l
+         JOIN inventory_items i ON l.item_id = i.id
+         LEFT JOIN users u ON l.counted_by = u.id
+         LEFT JOIN inventory_locations loc ON l.location_id = loc.id
+         LEFT JOIN inventory_item_uoms su ON l.stock_uom_id = su.id
+         LEFT JOIN inventory_item_uoms cu ON l.counted_uom_id = cu.id
+         WHERE l.cycle_count_id = $1 ORDER BY loc.name NULLS FIRST, i.name`,
+        [req.params.id]
+      ),
+      pool.query(
+        `SELECT cw.user_id, cw.roles, u.full_name FROM inventory_count_workers cw
+         JOIN users u ON cw.user_id = u.id WHERE cw.cycle_count_id=$1 ORDER BY u.full_name`,
+        [req.params.id]
+      ),
+      pool.query(
+        `SELECT a.line_id, a.role, a.user_id, a.status as assignment_status, u.full_name as worker_name
+         FROM inventory_count_assignments a JOIN users u ON a.user_id = u.id
+         WHERE a.cycle_count_id=$1`,
+        [req.params.id]
+      ),
+    ]);
+    res.json({ ...cc.rows[0], lines: lines.rows, workers: workers.rows, assignments: assignments.rows });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -873,8 +1001,9 @@ router.patch('/cycle-counts/:id', requireAdmin, async (req, res) => {
     if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
     if (cc.rows[0].status === 'completed') return res.status(409).json({ error: 'Cannot modify a completed count' });
     if (status && status !== 'in_progress') return res.status(400).json({ error: 'Can only advance status to in_progress' });
+    if (notes !== undefined && notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
     const sets = [], vals = [req.params.id, companyId]; let idx = 3;
-    if (notes !== undefined) { sets.push(`notes=$${idx++}`); vals.push(notes); }
+    if (notes !== undefined) { sets.push(`notes=$${idx++}`); vals.push(notes?.trim() || null); }
     if (status === 'in_progress') { sets.push(`status='in_progress'`); }
     if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
     const result = await pool.query(
@@ -886,7 +1015,7 @@ router.patch('/cycle-counts/:id', requireAdmin, async (req, res) => {
 });
 
 // PATCH /api/inventory/cycle-counts/:id/lines/:lineId
-router.patch('/cycle-counts/:id/lines/:lineId', requireAuth, async (req, res) => {
+router.patch('/cycle-counts/:id/lines/:lineId', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const { counted_qty, counted_uom_id, notes } = req.body;
   try {
@@ -922,14 +1051,21 @@ router.patch('/cycle-counts/:id/lines/:lineId', requireAuth, async (req, res) =>
         [resolvedCountedUomId, req.params.lineId]
       );
       if (lineRow.rowCount > 0) {
-        const { expected_qty, stock_factor, counted_factor } = lineRow.rows[0];
-        const stockF   = parseFloat(stock_factor   || 1);
-        const countedF = parseFloat(counted_factor || 1);
-        // Convert counted qty to stock UOM: qty_in_stock_uom = qty * (counted_factor / stock_factor)
-        const qtyInStockUom = qty * (countedF / stockF);
-        const variance = qtyInStockUom - parseFloat(expected_qty);
+        const { expected_qty, stock_uom_id, stock_factor, counted_factor } = lineRow.rows[0];
+        let variance;
+        // Only apply UOM conversion when a different UOM is specified; otherwise variance is
+        // a direct comparison in stock UOM (matches the pattern in submit and override routes).
+        if (resolvedCountedUomId && resolvedCountedUomId !== stock_uom_id) {
+          const stockF   = parseFloat(stock_factor   || 1);
+          const countedF = parseFloat(counted_factor || 1);
+          variance = qty * (countedF / stockF) - parseFloat(expected_qty);
+        } else {
+          variance = qty - parseFloat(expected_qty);
+        }
         sets.push(`variance=$${idx++}`); vals.push(variance);
       }
+      // Admin direct-entry marks the line accepted so the complete flow and progress bar work correctly
+      sets.push(`line_status='accepted'`);
     }
     if (notes !== undefined) { sets.push(`notes=$${idx++}`); vals.push(notes); }
     if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
@@ -939,7 +1075,12 @@ router.patch('/cycle-counts/:id/lines/:lineId', requireAuth, async (req, res) =>
       vals
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Line not found' });
-    res.json(result.rows[0]);
+    // Trigger auto-complete so admin direct-entry counts complete without a manual step
+    let autoCompleted = false;
+    if (counted_qty !== undefined) {
+      autoCompleted = await checkAutoComplete(companyId, parseInt(req.params.id), req.user.id);
+    }
+    res.json({ line: result.rows[0], auto_completed: autoCompleted });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -959,13 +1100,14 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
       [req.params.id]
     );
 
-    // Block if any line uncounted
-    const uncounted = lines.rows.filter(l => l.counted_qty === null);
-    if (uncounted.length > 0) {
-      const itemIds = uncounted.map(l => l.item_id);
+    // Block if any line is not in a final state
+    const FINAL_STATUSES = ['accepted', 'reconciled', 'overridden', 'audited'];
+    const notFinal = lines.rows.filter(l => !FINAL_STATUSES.includes(l.line_status));
+    if (notFinal.length > 0) {
+      const itemIds = notFinal.map(l => l.item_id);
       const items = await pool.query('SELECT id, name FROM inventory_items WHERE id = ANY($1)', [itemIds]);
       const names = items.rows.map(i => i.name);
-      return res.status(422).json({ error: `${uncounted.length} item(s) not yet counted: ${names.join(', ')}` });
+      return res.status(422).json({ error: `${notFinal.length} item(s) not yet in a final state: ${names.join(', ')}` });
     }
 
     const client = await pool.connect();
@@ -973,7 +1115,7 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
       await client.query('BEGIN');
 
       // Post adjust transactions for lines with non-zero variance
-      const linesWithVariance = lines.rows.filter(l => parseFloat(l.variance) !== 0);
+      const linesWithVariance = lines.rows.filter(l => l.variance != null && parseFloat(l.variance) !== 0);
       const isFullCount = cc.rows[0].count_type === 'full';
       for (const line of linesWithVariance) {
         const delta = parseFloat(line.variance); // in stock UOM units
@@ -992,12 +1134,17 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
         await applyStockDelta(client, companyId, line.item_id, locationId, delta, {}, stockUomId);
       }
 
-      // Mark count complete
-      await client.query(
+      // Atomically claim completion — prevent double-posting if auto-complete fired concurrently
+      const claim = await client.query(
         `UPDATE inventory_cycle_counts SET status='completed', completed_by=$1, completed_at=NOW()
-         WHERE id=$2`,
+         WHERE id=$2 AND status='in_progress'
+         RETURNING id`,
         [req.user.id, req.params.id]
       );
+      if (claim.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'Count was already completed' });
+      }
 
       await client.query('COMMIT');
       res.json({ success: true, adjustments_posted: linesWithVariance.length });
@@ -1007,6 +1154,537 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
     } finally {
       client.release();
     }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Cycle Count Worker Assignments ────────────────────────────────────────────
+
+// Helper: check if all lines are in a final state and auto-complete the count
+async function checkAutoComplete(companyId, countId, completedById) {
+  // 'audited' is also final (auditor submitted, no reconciler was available)
+  const FINAL_STATUSES = `'accepted','reconciled','overridden','audited'`;
+  const pending = await pool.query(
+    `SELECT COUNT(*) FROM inventory_cycle_count_lines
+     WHERE cycle_count_id = $1
+       AND line_status NOT IN (${FINAL_STATUSES})`,
+    [countId]
+  );
+  if (parseInt(pending.rows[0].count) > 0) return false;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Atomically claim the count — prevents double-completion from concurrent submits
+    const claim = await client.query(
+      `UPDATE inventory_cycle_counts SET status='completed', completed_by=$1, completed_at=NOW()
+       WHERE id=$2 AND company_id=$3 AND status='in_progress'
+       RETURNING *`,
+      [completedById, countId, companyId]
+    );
+    if (claim.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return false; // Already completed or not found
+    }
+
+    // Fetch lines inside the transaction so we see the latest committed variance values
+    // (a reconciler could have updated variance between the pending-count check and here)
+    const linesResult = await client.query(
+      'SELECT * FROM inventory_cycle_count_lines WHERE cycle_count_id = $1',
+      [countId]
+    );
+
+    const cc = claim.rows[0];
+    const isFullCount = cc.count_type === 'full';
+    const typeLabel = { reconcile: 'Reconcile count adjustment', audit: 'Audit count adjustment',
+      full: 'Full count adjustment' }[cc.count_type] || 'Cycle count adjustment';
+
+    const linesWithVariance = linesResult.rows.filter(l => l.variance != null && parseFloat(l.variance) !== 0);
+    for (const line of linesWithVariance) {
+      const delta = parseFloat(line.variance);
+      const locationId = isFullCount ? line.location_id : cc.location_id;
+      await client.query(
+        `INSERT INTO inventory_transactions
+         (company_id, type, item_id, quantity, to_location_id, performed_by, notes, uom_id)
+         VALUES ($1,'adjust',$2,$3,$4,$5,$6,$7)`,
+        [companyId, line.item_id, Math.abs(delta), locationId, completedById, typeLabel, line.stock_uom_id || null]
+      );
+      await applyStockDelta(client, companyId, line.item_id, locationId, delta, {}, line.stock_uom_id || null);
+    }
+    await client.query('COMMIT');
+    return true;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// GET /api/inventory/cycle-counts/:id/workers
+router.get('/cycle-counts/:id/workers', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const cc = await pool.query(
+      'SELECT id FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    const result = await pool.query(
+      `SELECT cw.id, cw.user_id, cw.roles, cw.assigned_at,
+              u.full_name, u.role as user_role
+       FROM inventory_count_workers cw
+       JOIN users u ON cw.user_id = u.id
+       WHERE cw.cycle_count_id = $1 ORDER BY u.full_name`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/cycle-counts/:id/workers — upsert worker roles
+// Body: { users: [{ user_id, roles: ['counter','auditor','reconciler'] }] }
+router.post('/cycle-counts/:id/workers', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { users } = req.body;
+  const VALID_ROLES = ['counter', 'auditor', 'reconciler'];
+  if (!Array.isArray(users) || users.length === 0) return res.status(400).json({ error: 'users array required' });
+  try {
+    const cc = await pool.query(
+      'SELECT id, status FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    if (cc.rows[0].status === 'completed') return res.status(409).json({ error: 'Cannot modify a completed count' });
+
+    for (const w of users) {
+      const userId = parseInt(w.user_id);
+      if (!userId) continue;
+      const roles = Array.isArray(w.roles) ? w.roles.filter(r => VALID_ROLES.includes(r)) : [];
+      if (roles.length === 0) continue; // skip workers with no valid roles — they can't be assigned
+      // Verify worker belongs to company
+      const workerCheck = await pool.query('SELECT id FROM users WHERE id=$1 AND company_id=$2', [userId, companyId]);
+      if (workerCheck.rowCount === 0) continue;
+      await pool.query(
+        `INSERT INTO inventory_count_workers (cycle_count_id, user_id, roles)
+         VALUES ($1,$2,$3)
+         ON CONFLICT (cycle_count_id, user_id) DO UPDATE SET roles = $3`,
+        [req.params.id, userId, roles]
+      );
+    }
+    // Return updated worker list
+    const result = await pool.query(
+      `SELECT cw.id, cw.user_id, cw.roles, cw.assigned_at, u.full_name, u.role as user_role
+       FROM inventory_count_workers cw JOIN users u ON cw.user_id = u.id
+       WHERE cw.cycle_count_id = $1 ORDER BY u.full_name`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// DELETE /api/inventory/cycle-counts/:id/workers/:userId
+router.delete('/cycle-counts/:id/workers/:userId', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const cc = await pool.query(
+      'SELECT id, status FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    if (cc.rows[0].status === 'completed') return res.status(409).json({ error: 'Cannot modify a completed count' });
+    await pool.query(
+      'DELETE FROM inventory_count_workers WHERE cycle_count_id=$1 AND user_id=$2',
+      [req.params.id, req.params.userId]
+    );
+    // Also remove their pending assignments so they can no longer submit
+    await pool.query(
+      `DELETE FROM inventory_count_assignments
+       WHERE cycle_count_id=$1 AND user_id=$2 AND status='pending'`,
+      [req.params.id, req.params.userId]
+    );
+    res.json({ removed: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/cycle-counts/:id/distribute — round-robin assign lines to counters by location group
+router.post('/cycle-counts/:id/distribute', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const cc = await pool.query(
+      'SELECT * FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    if (cc.rows[0].status === 'completed') return res.status(409).json({ error: 'Count is already completed' });
+
+    // Get counters for this count
+    const countersResult = await pool.query(
+      `SELECT user_id FROM inventory_count_workers
+       WHERE cycle_count_id=$1 AND 'counter' = ANY(roles)
+       ORDER BY user_id`,
+      [req.params.id]
+    );
+    if (countersResult.rowCount === 0) return res.status(400).json({ error: 'No counters assigned to this count' });
+    const counters = countersResult.rows.map(r => r.user_id);
+
+    // Get unassigned (no counter assignment) lines, grouped by location
+    const lines = await pool.query(
+      `SELECT l.id, l.location_id, loc.name as location_name
+       FROM inventory_cycle_count_lines l
+       LEFT JOIN inventory_locations loc ON l.location_id = loc.id
+       LEFT JOIN inventory_count_assignments a ON a.line_id = l.id AND a.role = 'counter'
+       WHERE l.cycle_count_id = $1 AND a.id IS NULL
+       ORDER BY loc.name NULLS FIRST, l.id`,
+      [req.params.id]
+    );
+
+    if (lines.rowCount === 0) return res.json({ assigned: 0 });
+
+    // Group lines by location name (or null for locationless)
+    const groups = {};
+    for (const line of lines.rows) {
+      const key = line.location_name || '__none__';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(line.id);
+    }
+
+    // Round-robin: assign each location group to next counter
+    let counterIdx = 0;
+    let assigned = 0;
+    for (const locationGroup of Object.values(groups)) {
+      const userId = counters[counterIdx % counters.length];
+      counterIdx++;
+      for (const lineId of locationGroup) {
+        await pool.query(
+          `INSERT INTO inventory_count_assignments (line_id, cycle_count_id, user_id, role)
+           VALUES ($1,$2,$3,'counter')
+           ON CONFLICT (line_id, role) DO UPDATE SET user_id = $3`,
+          [lineId, req.params.id, userId]
+        );
+        assigned++;
+      }
+    }
+
+    // Auto-advance to in_progress if still draft
+    if (cc.rows[0].status === 'draft') {
+      await pool.query(
+        `UPDATE inventory_cycle_counts SET status='in_progress' WHERE id=$1`,
+        [req.params.id]
+      );
+    }
+
+    res.json({ assigned });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// PATCH /api/inventory/cycle-counts/:id/workers/:userId/lines — reassign specific lines to a different counter
+// Body: { line_ids: [id, ...], user_id: newUserId }
+router.patch('/cycle-counts/:id/workers/:userId/lines', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { line_ids, user_id: newUserId } = req.body;
+  if (!Array.isArray(line_ids) || line_ids.length === 0) return res.status(400).json({ error: 'line_ids array required' });
+  if (!newUserId) return res.status(400).json({ error: 'user_id required' });
+  const validLineIds = line_ids.map(id => parseInt(id)).filter(id => !isNaN(id));
+  if (validLineIds.length === 0) return res.status(400).json({ error: 'line_ids must be integers' });
+  try {
+    const cc = await pool.query(
+      'SELECT id FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    // Verify new user is a counter for this count
+    const counterCheck = await pool.query(
+      `SELECT id FROM inventory_count_workers WHERE cycle_count_id=$1 AND user_id=$2 AND 'counter' = ANY(roles)`,
+      [req.params.id, newUserId]
+    );
+    if (counterCheck.rowCount === 0) return res.status(400).json({ error: 'Target worker is not a counter for this count' });
+
+    let reassigned = 0;
+    for (const lineId of validLineIds) {
+      const r = await pool.query(
+        `UPDATE inventory_count_assignments SET user_id=$1
+         WHERE line_id=$2 AND cycle_count_id=$3 AND user_id=$4 AND role='counter' AND status='pending'`,
+        [newUserId, lineId, req.params.id, req.params.userId]
+      );
+      reassigned += r.rowCount;
+    }
+    res.json({ reassigned });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/cycle-counts/:id/submit — worker submits a count, audit, or reconcile
+// Body: { line_id, role, counted_qty, counted_uom_id, notes }
+router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { line_id, role, counted_qty, counted_uom_id, notes } = req.body;
+  const VALID_ROLES = ['counter', 'auditor', 'reconciler'];
+  const lineId = parseInt(line_id);
+  if (!line_id || isNaN(lineId)) return res.status(400).json({ error: 'line_id must be a valid integer' });
+  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'role must be counter, auditor, or reconciler' });
+  const qty = parseFloat(counted_qty);
+  if (isNaN(qty) || qty < 0) return res.status(400).json({ error: 'counted_qty must be a non-negative number' });
+  const notesTrimmed = notes?.trim()?.slice(0, 500) || null;
+  const resolvedCountedUomId = counted_uom_id != null ? parseInt(counted_uom_id) : null;
+
+  try {
+    // Verify count belongs to company and is active
+    const cc = await pool.query(
+      'SELECT * FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    if (cc.rows[0].status !== 'in_progress') return res.status(409).json({ error: 'Count is not in progress' });
+
+    // Atomically claim the assignment — prevents duplicate submissions from concurrent requests
+    const assignment = await pool.query(
+      `UPDATE inventory_count_assignments
+       SET status='submitted', counted_qty=$1, counted_uom_id=$2, notes=$3, submitted_at=NOW()
+       WHERE line_id=$4 AND cycle_count_id=$5 AND user_id=$6 AND role=$7 AND status='pending'
+       RETURNING *`,
+      [qty, resolvedCountedUomId, notesTrimmed, lineId, req.params.id, req.user.id, role]
+    );
+    if (assignment.rowCount === 0) {
+      // Distinguish "no assignment" from "already submitted"
+      const exists = await pool.query(
+        `SELECT status FROM inventory_count_assignments
+         WHERE line_id=$1 AND cycle_count_id=$2 AND user_id=$3 AND role=$4`,
+        [lineId, req.params.id, req.user.id, role]
+      );
+      if (exists.rowCount === 0) return res.status(403).json({ error: 'No assignment found for this line/role' });
+      return res.status(409).json({ error: 'Already submitted' });
+    }
+
+    // Fetch line for UOM variance computation
+    const lineRow = await pool.query(
+      `SELECT l.*, i.name as item_name
+       FROM inventory_cycle_count_lines l
+       JOIN inventory_items i ON l.item_id = i.id
+       WHERE l.id=$1 AND l.cycle_count_id=$2`,
+      [lineId, req.params.id]
+    );
+    if (lineRow.rowCount === 0) return res.status(404).json({ error: 'Line not found' });
+    const line = lineRow.rows[0];
+
+    // Reject if line is already in a final state (e.g. admin override) to prevent overwriting it
+    const SUBMIT_FINAL = ['accepted', 'reconciled', 'overridden', 'audited'];
+    if (SUBMIT_FINAL.includes(line.line_status)) {
+      return res.status(409).json({ error: 'Line is already in a final state and cannot be re-submitted' });
+    }
+
+    // Compute variance in stock UOM units
+    let variance = qty - parseFloat(line.expected_qty);
+    if (resolvedCountedUomId && resolvedCountedUomId !== line.stock_uom_id) {
+      const uomRow = await pool.query(
+        `SELECT cu.factor as counted_factor, su.factor as stock_factor
+         FROM inventory_item_uoms cu, inventory_item_uoms su
+         WHERE cu.id=$1 AND su.id=$2`,
+        [resolvedCountedUomId, line.stock_uom_id]
+      );
+      if (uomRow.rowCount > 0) {
+        const { counted_factor, stock_factor } = uomRow.rows[0];
+        const qtyInStockUom = qty * (parseFloat(counted_factor) / parseFloat(stock_factor));
+        variance = qtyInStockUom - parseFloat(line.expected_qty);
+      }
+    }
+
+    // Update line counted values and status
+    let newLineStatus = line.line_status;
+    const settingsRows = await pool.query('SELECT key, value FROM settings WHERE company_id=$1', [companyId]);
+    const settings = applySettingsRows(settingsRows.rows, ADMIN_SETTINGS_DEFAULTS);
+
+    if (role === 'counter') {
+      // Update the line's counted values
+      await pool.query(
+        `UPDATE inventory_cycle_count_lines
+         SET counted_qty=$1, counted_uom_id=$2, counted_by=$3, counted_at=NOW(), variance=$4
+         WHERE id=$5`,
+        [qty, resolvedCountedUomId, req.user.id, variance, lineId]
+      );
+
+      // Decide: sample for audit?
+      const auditPct = settings.cycle_count_audit_pct ?? 15;
+      const shouldAudit = Math.random() * 100 < auditPct;
+
+      if (shouldAudit) {
+        // Find an auditor for this count who is not the counter (prefer different location)
+        const auditors = await pool.query(
+          `SELECT user_id FROM inventory_count_workers
+           WHERE cycle_count_id=$1 AND 'auditor' = ANY(roles) AND user_id != $2
+           ORDER BY RANDOM() LIMIT 1`,
+          [req.params.id, req.user.id]
+        );
+        if (auditors.rowCount > 0) {
+          const auditorId = auditors.rows[0].user_id;
+          await pool.query(
+            `INSERT INTO inventory_count_assignments (line_id, cycle_count_id, user_id, role)
+             VALUES ($1,$2,$3,'auditor')
+             ON CONFLICT (line_id, role) DO UPDATE SET user_id=$3, status='pending', submitted_at=NULL`,
+            [lineId, req.params.id, auditorId]
+          );
+          newLineStatus = 'needs_audit';
+        } else {
+          newLineStatus = 'accepted'; // No auditor available — accept directly
+        }
+      } else {
+        newLineStatus = 'accepted';
+      }
+
+    } else if (role === 'auditor') {
+      // Check if variance exceeds reconcile threshold
+      const threshold = parseFloat(line.reconcile_threshold ?? settings.cycle_count_reconcile_threshold) || 0;
+      const thresholdType = line.reconcile_threshold_type || settings.cycle_count_reconcile_threshold_type || 'units';
+      let exceeds = false;
+      if (threshold > 0) {
+        const absVariance = Math.abs(variance);
+        if (thresholdType === 'pct') {
+          const pct = parseFloat(line.expected_qty) !== 0
+            ? (absVariance / Math.abs(parseFloat(line.expected_qty))) * 100 : 0;
+          exceeds = pct > threshold;
+        } else {
+          exceeds = absVariance > threshold;
+        }
+      }
+
+      if (exceeds) {
+        // Find a reconciler who is not the counter or auditor of this line
+        const counterAssignment = await pool.query(
+          `SELECT user_id FROM inventory_count_assignments WHERE line_id=$1 AND role='counter'`,
+          [lineId]
+        );
+        const counterUserId = counterAssignment.rows[0]?.user_id;
+        const reconcilers = await pool.query(
+          `SELECT user_id FROM inventory_count_workers
+           WHERE cycle_count_id=$1 AND 'reconciler' = ANY(roles)
+             AND user_id != $2 AND user_id != $3
+           ORDER BY RANDOM() LIMIT 1`,
+          [req.params.id, req.user.id, counterUserId || 0]
+        );
+        if (reconcilers.rowCount > 0) {
+          await pool.query(
+            `INSERT INTO inventory_count_assignments (line_id, cycle_count_id, user_id, role)
+             VALUES ($1,$2,$3,'reconciler')
+             ON CONFLICT (line_id, role) DO UPDATE SET user_id=$3, status='pending', submitted_at=NULL`,
+            [lineId, req.params.id, reconcilers.rows[0].user_id]
+          );
+          newLineStatus = 'needs_reconcile';
+        } else {
+          newLineStatus = 'audited'; // No reconciler available — accept as audited
+        }
+      } else {
+        newLineStatus = 'accepted';
+      }
+
+    } else if (role === 'reconciler') {
+      // Update variance with reconciler's count
+      await pool.query(
+        `UPDATE inventory_cycle_count_lines
+         SET counted_qty=$1, counted_uom_id=$2, variance=$3
+         WHERE id=$4`,
+        [qty, resolvedCountedUomId, variance, lineId]
+      );
+      newLineStatus = 'reconciled';
+    }
+
+    await pool.query(
+      `UPDATE inventory_cycle_count_lines SET line_status=$1 WHERE id=$2`,
+      [newLineStatus, lineId]
+    );
+
+    // Check for auto-complete
+    let autoCompleted = false;
+    if (['accepted', 'reconciled', 'overridden', 'audited'].includes(newLineStatus)) {
+      autoCompleted = await checkAutoComplete(companyId, parseInt(req.params.id), req.user.id);
+    }
+
+    const updatedLine = await pool.query(
+      `SELECT l.*, i.name as item_name FROM inventory_cycle_count_lines l
+       JOIN inventory_items i ON l.item_id = i.id WHERE l.id=$1`,
+      [lineId]
+    );
+    res.json({ line: updatedLine.rows[0], auto_completed: autoCompleted });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/cycle-counts/:id/lines/:lineId/override — admin override a line's final value
+router.post('/cycle-counts/:id/lines/:lineId/override', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  const { counted_qty, counted_uom_id, notes } = req.body;
+  const qty = parseFloat(counted_qty);
+  if (isNaN(qty) || qty < 0) return res.status(400).json({ error: 'counted_qty must be a non-negative number' });
+  const notesTrimmed = notes?.trim()?.slice(0, 500) || null;
+  try {
+    const cc = await pool.query(
+      'SELECT * FROM inventory_cycle_counts WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (cc.rowCount === 0) return res.status(404).json({ error: 'Cycle count not found' });
+    if (cc.rows[0].status === 'completed') return res.status(409).json({ error: 'Count is completed. Use reopen first.' });
+
+    const lineRow = await pool.query(
+      'SELECT * FROM inventory_cycle_count_lines WHERE id=$1 AND cycle_count_id=$2',
+      [req.params.lineId, req.params.id]
+    );
+    if (lineRow.rowCount === 0) return res.status(404).json({ error: 'Line not found' });
+    const line = lineRow.rows[0];
+
+    const resolvedUomId = counted_uom_id != null ? parseInt(counted_uom_id) : line.stock_uom_id;
+    let variance = qty - parseFloat(line.expected_qty);
+    if (resolvedUomId && resolvedUomId !== line.stock_uom_id) {
+      const uomRow = await pool.query(
+        `SELECT cu.factor as cf, su.factor as sf FROM inventory_item_uoms cu, inventory_item_uoms su
+         WHERE cu.id=$1 AND su.id=$2`,
+        [resolvedUomId, line.stock_uom_id]
+      );
+      if (uomRow.rowCount > 0) {
+        variance = qty * (parseFloat(uomRow.rows[0].cf) / parseFloat(uomRow.rows[0].sf)) - parseFloat(line.expected_qty);
+      }
+    }
+
+    await pool.query(
+      `UPDATE inventory_cycle_count_lines
+       SET counted_qty=$1, counted_uom_id=$2, variance=$3, notes=$4,
+           counted_by=$5, counted_at=NOW(), line_status='overridden'
+       WHERE id=$6`,
+      [qty, resolvedUomId, variance, notesTrimmed, req.user.id, req.params.lineId]
+    );
+
+    const autoCompleted = await checkAutoComplete(companyId, parseInt(req.params.id), req.user.id);
+    const updatedLine = await pool.query(
+      'SELECT * FROM inventory_cycle_count_lines WHERE id=$1', [req.params.lineId]
+    );
+    res.json({ line: updatedLine.rows[0], auto_completed: autoCompleted });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/inventory/cycle-counts/:id/reopen — admin reopens a completed count
+router.post('/cycle-counts/:id/reopen', requireAdmin, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const result = await pool.query(
+      `UPDATE inventory_cycle_counts
+       SET status='in_progress', completed_by=NULL, completed_at=NULL
+       WHERE id=$1 AND company_id=$2 AND status='completed'
+       RETURNING *`,
+      [req.params.id, companyId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Completed count not found' });
+    // Reset all line statuses to pending so re-completion requires intentional re-evaluation
+    // of every line and cannot immediately re-trigger auto-complete (which would double-post
+    // stock adjustment transactions for lines that haven't been changed).
+    await pool.query(
+      `UPDATE inventory_cycle_count_lines SET line_status='pending' WHERE cycle_count_id=$1`,
+      [req.params.id]
+    );
+    // Delete all assignments so the count can be redistributed fresh.
+    // Leaving submitted assignments in place blocks distribution (UNIQUE on line_id+role
+    // prevents new assignments) and hides lines from My Count (my-assignments filters
+    // out submitted). Admin must redistribute after reopen.
+    await pool.query(
+      `DELETE FROM inventory_count_assignments WHERE cycle_count_id=$1`,
+      [req.params.id]
+    );
+    res.json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -1136,9 +1814,27 @@ router.get('/suppliers', requireAdmin, async (req, res) => {
 });
 
 // POST /api/inventory/suppliers
+function validateSupplierWebsite(website) {
+  if (!website?.trim()) return null; // optional field
+  try {
+    const parsed = new URL(website.trim());
+    if (!['http:', 'https:'].includes(parsed.protocol)) return 'website must use http or https';
+  } catch {
+    return 'website must be a valid URL';
+  }
+  return null;
+}
+
 router.post('/suppliers', requireAdmin, async (req, res) => {
   const { name, contact_name, phone, email, website, notes } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  if (name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+  if (contact_name && contact_name.trim().length > 255) return res.status(400).json({ error: 'contact_name too long (max 255 characters)' });
+  if (phone && phone.trim().length > 50) return res.status(400).json({ error: 'phone too long (max 50 characters)' });
+  if (email && email.trim().length > 255) return res.status(400).json({ error: 'email too long (max 255 characters)' });
+  if (notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+  const websiteErr = validateSupplierWebsite(website);
+  if (websiteErr) return res.status(400).json({ error: websiteErr });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -1158,12 +1854,21 @@ router.patch('/suppliers/:id', requireAdmin, async (req, res) => {
   try {
     const existing = await pool.query('SELECT id FROM inventory_suppliers WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Supplier not found' });
+    if (name !== undefined && name.trim().length > 255) return res.status(400).json({ error: 'name too long (max 255 characters)' });
+    if (contact_name !== undefined && contact_name && contact_name.trim().length > 255) return res.status(400).json({ error: 'contact_name too long (max 255 characters)' });
+    if (phone !== undefined && phone && phone.trim().length > 50) return res.status(400).json({ error: 'phone too long (max 50 characters)' });
+    if (email !== undefined && email && email.trim().length > 255) return res.status(400).json({ error: 'email too long (max 255 characters)' });
+    if (notes !== undefined && notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
     const sets = [], vals = [req.params.id, companyId]; let idx = 3;
     if (name !== undefined)         { sets.push(`name=$${idx++}`);         vals.push(name.trim()); }
     if (contact_name !== undefined) { sets.push(`contact_name=$${idx++}`); vals.push(contact_name?.trim() || null); }
     if (phone !== undefined)        { sets.push(`phone=$${idx++}`);        vals.push(phone?.trim() || null); }
     if (email !== undefined)        { sets.push(`email=$${idx++}`);        vals.push(email?.trim() || null); }
-    if (website !== undefined)      { sets.push(`website=$${idx++}`);      vals.push(website?.trim() || null); }
+    if (website !== undefined) {
+      const websiteErr = validateSupplierWebsite(website);
+      if (websiteErr) return res.status(400).json({ error: websiteErr });
+      sets.push(`website=$${idx++}`); vals.push(website?.trim() || null);
+    }
     if (notes !== undefined)        { sets.push(`notes=$${idx++}`);        vals.push(notes?.trim() || null); }
     if (active !== undefined)       { sets.push(`active=$${idx++}`);       vals.push(!!active); }
     if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
@@ -1203,36 +1908,52 @@ async function nextPONumber(client, companyId) {
 
 // GET /api/inventory/purchase-orders
 router.get('/purchase-orders', requireAdmin, async (req, res) => {
-  const { status, supplier_id } = req.query;
+  const { status, supplier_id, limit = 100, offset = 0 } = req.query;
   const companyId = req.user.company_id;
   try {
     const conditions = ['po.company_id = $1'];
     const values = [companyId]; let idx = 2;
     if (status) { conditions.push(`po.status = $${idx++}`); values.push(status); }
     if (supplier_id) { conditions.push(`po.supplier_id = $${idx++}`); values.push(supplier_id); }
+    // Aggregate line stats in a single pre-joined subquery instead of 3 correlated subqueries per PO row
     const result = await pool.query(
       `SELECT po.*,
               sup.name AS supplier_name,
               loc.name AS to_location_name,
               u.full_name AS created_by_name,
-              (SELECT COUNT(*)        FROM purchase_order_lines WHERE po_id = po.id) AS line_count,
-              (SELECT COALESCE(SUM(qty_ordered),  0) FROM purchase_order_lines WHERE po_id = po.id) AS total_ordered,
-              (SELECT COALESCE(SUM(qty_received), 0) FROM purchase_order_lines WHERE po_id = po.id) AS total_received
+              COALESCE(agg.line_count,     0) AS line_count,
+              COALESCE(agg.total_ordered,  0) AS total_ordered,
+              COALESCE(agg.total_received, 0) AS total_received
        FROM purchase_orders po
-       LEFT JOIN inventory_suppliers  sup ON po.supplier_id    = sup.id
-       LEFT JOIN inventory_locations  loc ON po.to_location_id = loc.id
+       LEFT JOIN inventory_suppliers sup ON po.supplier_id    = sup.id
+       LEFT JOIN inventory_locations loc ON po.to_location_id = loc.id
        JOIN  users u ON po.created_by = u.id
+       LEFT JOIN (
+         SELECT po_id,
+                COUNT(*)            AS line_count,
+                SUM(qty_ordered)    AS total_ordered,
+                SUM(qty_received)   AS total_received
+         FROM purchase_order_lines
+         GROUP BY po_id
+       ) agg ON agg.po_id = po.id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY po.created_at DESC`,
+       ORDER BY po.created_at DESC
+       LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...values, parseInt(limit), parseInt(offset)]
+    );
+    const totalResult = await pool.query(
+      `SELECT COUNT(*) FROM purchase_orders po WHERE ${conditions.join(' AND ')}`,
       values
     );
-    res.json(result.rows);
+    res.json({ orders: result.rows, total: parseInt(totalResult.rows[0].count) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/purchase-orders
 router.post('/purchase-orders', requireAdmin, async (req, res) => {
   const { supplier_id, order_date, expected_date, to_location_id, notes, reference_no, lines = [] } = req.body;
+  if (notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+  if (reference_no && reference_no.trim().length > 100) return res.status(400).json({ error: 'reference_no too long (max 100 characters)' });
   const companyId = req.user.company_id;
   const client = await pool.connect();
   try {
@@ -1249,12 +1970,21 @@ router.post('/purchase-orders', requireAdmin, async (req, res) => {
     );
     const po = poResult.rows[0];
     for (const line of lines) {
-      if (!line.item_id || !line.qty_ordered || parseFloat(line.qty_ordered) <= 0) continue;
+      const qtyOrdered = parseFloat(line.qty_ordered);
+      if (!line.item_id || isNaN(qtyOrdered) || qtyOrdered <= 0) continue;
+      const parsedUnitCost = line.unit_cost != null ? parseFloat(line.unit_cost) : null;
+      if (parsedUnitCost !== null && isNaN(parsedUnitCost)) continue; // skip lines with invalid cost
+      // Verify item belongs to this company
+      const itemCheck = await client.query(
+        'SELECT id FROM inventory_items WHERE id=$1 AND company_id=$2',
+        [parseInt(line.item_id), companyId]
+      );
+      if (itemCheck.rowCount === 0) continue;
       await client.query(
         `INSERT INTO purchase_order_lines (po_id, item_id, qty_ordered, unit_cost, uom_id, notes)
          VALUES ($1,$2,$3,$4,$5,$6)`,
-        [po.id, parseInt(line.item_id), parseFloat(line.qty_ordered),
-         line.unit_cost != null ? parseFloat(line.unit_cost) : null,
+        [po.id, parseInt(line.item_id), qtyOrdered,
+         parsedUnitCost,
          line.uom_id ? parseInt(line.uom_id) : null, line.notes?.trim() || null]
       );
     }
@@ -1300,6 +2030,8 @@ router.get('/purchase-orders/:id', requireAdmin, async (req, res) => {
 router.patch('/purchase-orders/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const { supplier_id, order_date, expected_date, to_location_id, notes, reference_no, status } = req.body;
+  if (notes !== undefined && notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+  if (reference_no !== undefined && reference_no && reference_no.trim().length > 100) return res.status(400).json({ error: 'reference_no too long (max 100 characters)' });
   try {
     const existing = await pool.query(
       'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
@@ -1360,9 +2092,13 @@ router.delete('/purchase-orders/:id', requireAdmin, async (req, res) => {
 router.post('/purchase-orders/:id/lines', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const { item_id, qty_ordered, unit_cost, uom_id, notes } = req.body;
-  if (!item_id || !qty_ordered || parseFloat(qty_ordered) <= 0) {
+  const qtyOrdered = parseFloat(qty_ordered);
+  if (!item_id || !qty_ordered || isNaN(qtyOrdered) || qtyOrdered <= 0) {
     return res.status(400).json({ error: 'item_id and positive qty_ordered required' });
   }
+  const unitCostVal = unit_cost != null && unit_cost !== '' ? parseFloat(unit_cost) : null;
+  if (unitCostVal !== null && isNaN(unitCostVal)) return res.status(400).json({ error: 'unit_cost must be a number' });
+  if (notes && notes.trim().length > 500) return res.status(400).json({ error: 'notes too long (max 500 characters)' });
   try {
     const po = await pool.query(
       'SELECT id, status FROM purchase_orders WHERE id=$1 AND company_id=$2',
@@ -1375,8 +2111,8 @@ router.post('/purchase-orders/:id/lines', requireAdmin, async (req, res) => {
     await pool.query(
       `INSERT INTO purchase_order_lines (po_id, item_id, qty_ordered, unit_cost, uom_id, notes)
        VALUES ($1,$2,$3,$4,$5,$6)`,
-      [req.params.id, parseInt(item_id), parseFloat(qty_ordered),
-       unit_cost != null ? parseFloat(unit_cost) : null,
+      [req.params.id, parseInt(item_id), qtyOrdered,
+       unitCostVal,
        uom_id ? parseInt(uom_id) : null, notes?.trim() || null]
     );
     const lines = await pool.query(
@@ -1400,6 +2136,13 @@ router.patch('/purchase-orders/:id/lines/:lineId', requireAdmin, async (req, res
     );
     if (po.rowCount === 0) return res.status(404).json({ error: 'PO not found' });
     if (po.rows[0].status !== 'draft') return res.status(409).json({ error: 'Can only edit lines on a draft PO' });
+    if (qty_ordered !== undefined) {
+      const q = parseFloat(qty_ordered);
+      if (isNaN(q) || q <= 0) return res.status(400).json({ error: 'qty_ordered must be a positive number' });
+    }
+    if (unit_cost !== undefined && unit_cost !== null) {
+      if (isNaN(parseFloat(unit_cost))) return res.status(400).json({ error: 'unit_cost must be a number' });
+    }
     const sets = [], vals = [req.params.lineId]; let idx = 2;
     if (qty_ordered !== undefined) { sets.push(`qty_ordered=$${idx++}`); vals.push(parseFloat(qty_ordered)); }
     if (unit_cost   !== undefined) { sets.push(`unit_cost=$${idx++}`);   vals.push(unit_cost != null ? parseFloat(unit_cost) : null); }
@@ -1634,8 +2377,9 @@ router.post('/purchase-orders/:id/email', requireAdmin, async (req, res) => {
           </thead>
           <tbody>${tableRows}</tbody>
           ${hasAnyPricing ? `<tfoot><tr style="background:#f0fdf4;border-top:2px solid #d1fae5">
-            <td colspan="${3 + (lines[0]?.notes ? 1 : 0)}" style="padding:10px;font-weight:700">Order Total</td>
+            <td colspan="3" style="padding:10px;font-weight:700">Order Total</td>
             <td colspan="2" style="padding:10px;text-align:right;font-weight:800;font-size:16px">${fmt(lineTotal)}</td>
+            <td></td>
           </tr></tfoot>` : ''}
         </table>
 
@@ -1660,11 +2404,25 @@ router.post('/purchase-orders/:id/email', requireAdmin, async (req, res) => {
 // GET /api/inventory/valuation
 router.get('/valuation', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
-  const { location_id } = req.query;
+  const { location_id, limit = 200, offset = 0 } = req.query;
   try {
     const conditions = ['i.company_id = $1', 'i.active = true'];
     const values = [companyId]; let idx = 2;
     if (location_id) { conditions.push(`s.location_id = $${idx++}`); values.push(location_id); }
+
+    const whereClause = conditions.join(' AND ');
+
+    // Grand total via dedicated aggregation — avoids shipping all rows to Node just to sum
+    const totalResult = await pool.query(
+      `SELECT COALESCE(SUM(s.quantity * COALESCE(i.unit_cost, 0)), 0) AS grand_total,
+              COUNT(DISTINCT i.id) AS total_items
+       FROM inventory_items i
+       LEFT JOIN inventory_stock s ON i.id = s.item_id AND s.company_id = i.company_id
+       LEFT JOIN inventory_locations l ON s.location_id = l.id AND l.active = true
+       WHERE ${whereClause}`,
+      values
+    );
+
     const result = await pool.query(
       `SELECT i.id, i.name, i.sku, i.category, i.unit, i.unit_cost,
               COALESCE(SUM(s.quantity), 0) AS total_qty,
@@ -1679,13 +2437,18 @@ router.get('/valuation', requireAdmin, async (req, res) => {
        FROM inventory_items i
        LEFT JOIN inventory_stock s ON i.id = s.item_id AND s.company_id = i.company_id
        LEFT JOIN inventory_locations l ON s.location_id = l.id AND l.active = true
-       WHERE ${conditions.join(' AND ')}
+       WHERE ${whereClause}
        GROUP BY i.id
-       ORDER BY i.name`,
-      values
+       ORDER BY i.name
+       LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...values, parseInt(limit), parseInt(offset)]
     );
-    const grandTotal = result.rows.reduce((sum, r) => sum + parseFloat(r.total_value || 0), 0);
-    res.json({ items: result.rows, grand_total: grandTotal });
+
+    res.json({
+      items: result.rows,
+      grand_total: parseFloat(totalResult.rows[0].grand_total),
+      total: parseInt(totalResult.rows[0].total_items),
+    });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

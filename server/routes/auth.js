@@ -9,6 +9,12 @@ const rateLimit = require('express-rate-limit');
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
+// Hash a token for safe storage — raw token goes in the email, hash goes in the DB
+const sha256 = str => crypto.createHash('sha256').update(str).digest('hex');
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const isValidEmail = email => EMAIL_RE.test(String(email).trim());
+
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 15,
@@ -54,7 +60,7 @@ router.post('/login', loginLimiter, async (req, res) => {
   const logFailure = (reason) => pool.query(
     'INSERT INTO login_failures (attempted_company, attempted_username, failure_reason, ip) VALUES ($1, $2, $3, $4)',
     [company_name, username, reason, ip]
-  ).catch(() => {});
+  ).catch(err => console.error('Failed to log login failure:', err));
   try {
     // Step 1: check company name
     const companyRes = await pool.query(
@@ -254,13 +260,14 @@ router.post('/register', authLimiter, async (req, res) => {
     }
     const hash = await bcrypt.hash(password, 10);
     const confirmToken = crypto.randomBytes(32).toString('hex');
+    const confirmTokenHash = sha256(confirmToken);
     const confirmExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await client.query(
       `INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, email,
         email_confirmed, email_confirm_token, email_confirm_token_expires)
        VALUES ($1,$2,$3,$4,$5,$6,$7,'admin',$8,false,$9,$10)
        RETURNING id, username, full_name, role, company_id, email`,
-      [companyId, username, hash, full_name, first_name||null, middle_name||null, last_name||null, email, confirmToken, confirmExpires]
+      [companyId, username, hash, full_name, first_name||null, middle_name||null, last_name||null, email, confirmTokenHash, confirmExpires]
     );
 
     // Send confirmation email — COMMIT only after success so email failure rolls back the account
@@ -301,8 +308,8 @@ router.post('/confirm-email', async (req, res) => {
   if (!token) return res.status(400).json({ error: 'Token required' });
   try {
     const result = await pool.query(
-      'SELECT * FROM users WHERE email_confirm_token = $1 AND email_confirm_token_expires > NOW()',
-      [token]
+      'SELECT id FROM users WHERE email_confirm_token = $1 AND email_confirm_token_expires > NOW()',
+      [sha256(token)]
     );
     if (result.rowCount === 0) return res.status(400).json({ error: 'Confirmation link is invalid or has expired' });
     const user = result.rows[0];
@@ -367,7 +374,7 @@ router.post('/resend-confirmation', async (req, res) => {
     const confirmExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await pool.query(
       'UPDATE users SET email_confirm_token = $1, email_confirm_token_expires = $2 WHERE id = $3',
-      [confirmToken, confirmExpires, user.id]
+      [sha256(confirmToken), confirmExpires, user.id]
     );
     const confirmUrl = `${process.env.APP_URL}/confirm-email?token=${confirmToken}`;
     try {
@@ -398,6 +405,7 @@ router.post('/resend-confirmation', async (req, res) => {
 router.post('/forgot-password', authLimiter, async (req, res) => {
   const { email, company } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
+  if (!isValidEmail(email)) return res.json({ success: true }); // silently drop — don't leak validation info
   try {
     let result;
     if (company && company.trim()) {
@@ -423,7 +431,7 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
 
     await pool.query(
       'UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3',
-      [token, expires, user.id]
+      [sha256(token), expires, user.id]
     );
 
     const resetUrl = `${process.env.APP_URL}/reset-password?token=${token}`;
@@ -458,8 +466,8 @@ router.post('/reset-password', authLimiter, async (req, res) => {
   if (pwErr) return res.status(400).json({ error: pwErr });
   try {
     const result = await pool.query(
-      'SELECT * FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()',
-      [token]
+      'SELECT id FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()',
+      [sha256(token)]
     );
     if (result.rowCount === 0) return res.status(400).json({ error: 'Reset link is invalid or has expired' });
 
@@ -483,10 +491,10 @@ router.post('/accept-invite', authLimiter, async (req, res) => {
   if (pwErr) return res.status(400).json({ error: pwErr });
   try {
     const result = await pool.query(
-      `SELECT u.*, c.name as company_name FROM users u
+      `SELECT u.id, u.username, u.company_id, c.name as company_name FROM users u
        JOIN companies c ON c.id = u.company_id
        WHERE u.invite_token = $1 AND u.invite_token_expires > NOW() AND u.invite_pending = true`,
-      [token]
+      [sha256(token)]
     );
     if (result.rowCount === 0) return res.status(400).json({ error: 'Invite link is invalid or has expired' });
     const user = result.rows[0];
@@ -503,7 +511,7 @@ router.post('/accept-invite', authLimiter, async (req, res) => {
 });
 
 // Change password
-router.post('/change-password', requireAuth, async (req, res) => {
+router.post('/change-password', requireAuth, authLimiter, async (req, res) => {
   const { current_password, new_password } = req.body;
   if (!current_password || !new_password) {
     return res.status(400).json({ error: 'current_password and new_password required' });
@@ -616,7 +624,7 @@ router.post('/mfa/disable', requireAuth, async (req, res) => {
 
 // Update language
 router.post('/update-language', requireAuth, async (req, res) => {
-  const { language } = req.body;
+  const language = req.body.language?.trim();
   if (!language) return res.status(400).json({ error: 'language required' });
   try {
     await pool.query('UPDATE users SET language = $1 WHERE id = $2', [language, req.user.id]);

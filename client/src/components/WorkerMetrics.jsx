@@ -15,10 +15,16 @@ function downloadCSV(rows, filename) {
 
 function defaultDates() {
   const today = new Date();
-  const from = new Date(today);
-  from.setDate(today.getDate() - 10);
   const fmt = d => d.toLocaleDateString('en-CA');
-  return { from: fmt(from), to: fmt(today) };
+  // Last full week: Sunday through Saturday
+  // daysToLastSat: how many days back to reach the most recent Saturday
+  const day = today.getDay(); // 0=Sun, 1=Mon, … 6=Sat
+  const daysToLastSat = day === 6 ? 7 : day + 1; // if today is Sat, go back a full week
+  const sat = new Date(today);
+  sat.setDate(today.getDate() - daysToLastSat);
+  const sun = new Date(sat);
+  sun.setDate(sat.getDate() - 6);
+  return { from: fmt(sun), to: fmt(sat) };
 }
 
 export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = {}, overtimeEnabled = true, projectsEnabled = true, projects = [] }) {
@@ -148,7 +154,10 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
             </button>
           </div>
 
-          {billData && (
+          {billData && billData.entries.length === 0 && (billData.reimbursements || []).length === 0 && (
+            <div style={{ marginTop: 12, color: '#9ca3af', fontSize: 14 }}>{t.noEntriesPeriod}</div>
+          )}
+          {billData && (billData.entries.length > 0 || (billData.reimbursements || []).length > 0) && (
             <div style={{ marginTop: 16 }}>
               <div style={styles.billSummary}>
                 <span>{t.entriesLabel} <b>{billData.entries.length}</b></span>

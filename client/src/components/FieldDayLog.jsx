@@ -76,9 +76,9 @@ function Lightbox({ photos, startIndex, onClose }) {
       )}
       {item.caption && <div style={s.lbCaption}>{item.caption}</div>}
       <div style={s.lbNav} onClick={e => e.stopPropagation()}>
-        <button style={s.lbBtn} onClick={() => setIdx(i => i - 1)} disabled={idx === 0}>‹</button>
+        <button style={s.lbBtn} aria-label="Previous photo" onClick={() => setIdx(i => i - 1)} disabled={idx === 0}>‹</button>
         <span style={s.lbCount}>{idx + 1} / {photos.length}</span>
-        <button style={s.lbBtn} onClick={() => setIdx(i => i + 1)} disabled={idx === photos.length - 1}>›</button>
+        <button style={s.lbBtn} aria-label="Next photo" onClick={() => setIdx(i => i + 1)} disabled={idx === photos.length - 1}>›</button>
       </div>
     </div>
   );
@@ -129,7 +129,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
       if (proj) params.project_id = proj;
       const r = await api.get('/field-reports', { params });
       setDayReports(r.data);
-    } catch {} finally { setLoading(false); }
+    } catch { setError(t.failedLoadFieldReports); } finally { setLoading(false); }
   };
 
   useEffect(() => { if (project !== '' || projects.length === 0) load(); }, [project, date]);
@@ -233,7 +233,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
     try {
       await api.patch(`/field-reports/${id}/review`);
       setDayReports(prev => prev.map(r => r.id === id ? { ...r, status: 'reviewed' } : r));
-    } catch {}
+    } catch { setError(t.failedMarkReviewed); }
   };
 
   // Flatten all photos across the day's reports
@@ -316,6 +316,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
           <textarea
             style={s.noteTextarea}
             rows={5}
+            maxLength={2000}
             placeholder={t.noteFieldPlaceholder}
             value={captureNote}
             onChange={e => setCaptureNote(e.target.value)}
@@ -441,7 +442,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
                       </span>
                       {r.pending && <span style={s.pendingBadge}>⏳ {t.pendingSync}</span>}
                       {r.lat && (
-                        <a href={`https://www.google.com/maps?q=${r.lat},${r.lng}`} target="_blank" rel="noreferrer" style={s.mapLink}>📍</a>
+                        <a href={`https://www.google.com/maps?q=${r.lat},${r.lng}`} target="_blank" rel="noopener noreferrer" style={s.mapLink}>📍</a>
                       )}
                       {isAdmin && !r.pending && r.status !== 'reviewed' && (
                         <button style={s.reviewBtn} onClick={() => handleReview(r.id)}>✓ {t.reviewBtn}</button>

@@ -219,6 +219,13 @@ self.addEventListener('message', event => {
   if (event.data?.type === 'GET_QUEUE_COUNT') {
     event.waitUntil(broadcastQueueCount());
   }
+  if (event.data?.type === 'CLEAR_QUEUE') {
+    event.waitUntil((async () => {
+      const items = await getAllQueued();
+      for (const item of items) await dequeue(item.id);
+      await broadcastQueueCount();
+    })());
+  }
 });
 
 // ── Background Sync (Chrome/Edge) ──────────────────────────────────────────────

@@ -7,7 +7,6 @@ import WorkerMetrics from '../components/WorkerMetrics';
 import ProjectReports from '../components/ProjectReports';
 import LiveWorkers from '../components/LiveWorkers';
 import ApprovalQueue from '../components/ApprovalQueue';
-import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import ManagePayPeriods from '../components/ManagePayPeriods';
 import ManageSchedule from '../components/ManageSchedule';
 import ExportPanel from '../components/ExportPanel';
@@ -55,9 +54,16 @@ export default function AdminDashboard() {
   const [billing, setBilling] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [pendingReimbursements, setPendingReimbursements] = useState(0);
+  const [chatUnread, setChatUnread] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState(() => {
     try { return JSON.parse(localStorage.getItem('opsfloa_report_sections') || '{}'); } catch { return {}; }
   });
+
+  // tab must be declared before any useEffect that references it (avoids TDZ in minified output)
+  const ALL_TABS = ['live', 'approvals', 'reports', 'timeoff', 'expenses', 'manage'];
+  const hashTab = window.location.hash.replace('#', '');
+  const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
+
   const toggleSection = key => setCollapsedSections(s => {
     const next = { ...s, [key]: !s[key] };
     localStorage.setItem('opsfloa_report_sections', JSON.stringify(next));
@@ -77,16 +83,31 @@ export default function AdminDashboard() {
     const interval = setInterval(fetchPending, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  // Background chat unread check — show dot on Live tab when workers have messaged
+  useEffect(() => {
+    if (tab === 'live') return; // CompanyChat handles read state when visible
+    const check = () => {
+      api.get('/chat').then(r => {
+        const hasUnread = r.data.some(thread => {
+          const key = `chatLastRead_admin_${thread.worker_id}`;
+          const lastRead = localStorage.getItem(key);
+          return !lastRead || new Date(thread.last_at) > new Date(lastRead);
+        });
+        setChatUnread(hasUnread);
+      }).catch(() => {});
+    };
+    check();
+    const iv = setInterval(check, 60000);
+    return () => clearInterval(iv);
+  }, [tab]);
+
   // Permission helper — null admin_permissions means full access
   const canDo = key => !user?.admin_permissions || user.admin_permissions[key] === true;
 
-  const ALL_TABS = ['live', 'analytics', 'approvals', 'reports', 'timeoff', 'expenses', 'manage'];
-  const hashTab = window.location.hash.replace('#', '');
-  const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
-
   const switchTab = t => {
     setTab(t);
-    window.location.hash = t;
+    history.replaceState(null, '', '#' + t);
   };
 
   useEffect(() => {
@@ -112,6 +133,7 @@ export default function AdminDashboard() {
         <div style={styles.headerTopRow}>
           <div style={styles.logoGroup}>
             <AppSwitcher currentApp="timeclock" userRole={user?.role} features={settings} />
+            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
           </div>
           <div style={styles.headerRight}>
             <NotificationBell />
@@ -145,8 +167,7 @@ export default function AdminDashboard() {
           active={tab}
           onChange={switchTab}
           tabs={[
-            { id: 'live', label: t.tabLive },
-            ...(settings?.feature_analytics !== false && canDo('view_reports') ? [{ id: 'analytics', label: t.tabAnalytics }] : []),
+            { id: 'live', label: t.tabLive, dot: chatUnread && settings?.feature_chat !== false ? '#3b82f6' : null },
             ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
             { id: 'timeoff', label: '🏖 Time Off' },
@@ -175,14 +196,6 @@ export default function AdminDashboard() {
             ) : (
               <LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} />
             )}
-          </>
-        ) : tab === 'analytics' ? (
-          <>
-            <h2 style={styles.heading}>{t.tabAnalytics}</h2>
-            {plan.isBusiness
-              ? <AnalyticsDashboard />
-              : <UpgradePrompt requiredPlan="business" feature={t.fullAnalytics} />
-            }
           </>
         ) : tab === 'approvals' ? (
           <>
@@ -227,7 +240,7 @@ export default function AdminDashboard() {
             {!collapsedSections.export && (plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />)}
           </>
         ) : tab === 'timeoff' ? (
-          <AdminTimeOff />
+          <AdminTimeOff settings={settings} />
         ) : tab === 'expenses' ? (
           <ReimbursementsAdmin />
         ) : tab === 'manage' ? (
@@ -242,13 +255,12 @@ export default function AdminDashboard() {
 
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9' },
-  header: { background: '#1a56db', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', height: 'calc(56px + env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
-  headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
+  header: { background: '#1a56db', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, minHeight: 'calc(56px + env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', top: 0, zIndex: 100 },
+  headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
-  logo: { fontWeight: 700, fontSize: 20 },
-  companyName: { fontSize: 14, fontWeight: 400, opacity: 0.75 },
+  companyName: { fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' },
   headerRight: { display: 'flex', gap: 10 },
-  headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' },
+  headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   main: { maxWidth: 900, margin: '32px auto', padding: '0 16px' },
   tabs: { display: 'flex', gap: 4, marginBottom: 24, background: '#e8edf5', borderRadius: 10, padding: 4, width: '100%', overflowX: 'auto', flexWrap: 'nowrap', scrollbarWidth: 'none' },
   tab: { flex: 1, padding: '9px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#666', cursor: 'pointer', whiteSpace: 'nowrap', textAlign: 'center' },
