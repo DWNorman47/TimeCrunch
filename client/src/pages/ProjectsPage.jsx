@@ -124,6 +124,12 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const [billData, setBillData] = useState(null);
   const [billLoading, setBillLoading] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [qboStatus, setQboStatus] = useState(null);
+  const [qboItems, setQboItems] = useState(null);
+  const [qboItemId, setQboItemId] = useState('');
+  const [qboPushing, setQboPushing] = useState(false);
+  const [qboPushResult, setQboPushResult] = useState(null);
+  const [showQboPicker, setShowQboPicker] = useState(false);
   const [billFrom, setBillFrom] = useState('');
   const [billTo, setBillTo] = useState('');
   const [workers, setWorkers] = useState([]);
@@ -298,6 +304,47 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
       a.href = url; a.download = `invoice-${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`; a.click();
       URL.revokeObjectURL(url);
     } finally { setPdfGenerating(false); }
+  };
+
+  const openQBOPicker = async () => {
+    setQboPushResult(null);
+    if (!qboStatus) {
+      try {
+        const r = await api.get('/qbo/status');
+        setQboStatus(r.data);
+        if (!r.data.connected) return;
+      } catch { return; }
+    }
+    if (qboItems === null) {
+      try {
+        const r = await api.get('/qbo/items');
+        setQboItems(r.data);
+        if (r.data.length === 1) setQboItemId(r.data[0].Id);
+      } catch { return; }
+    }
+    setShowQboPicker(true);
+  };
+
+  const pushInvoiceToQBO = async () => {
+    if (!qboItemId) return;
+    setQboPushing(true);
+    setQboPushResult(null);
+    try {
+      const total = parseFloat(billData.summary.total_cost);
+      const periodStr = [billFrom, billTo].filter(Boolean).join(' – ') || 'all dates';
+      const description = `Labor — ${project.name} (${periodStr})`;
+      const r = await api.post('/qbo/invoices', {
+        customer_id: project.qbo_customer_id,
+        item_id: qboItemId,
+        amount: total,
+        description,
+        txn_date: billTo || new Date().toLocaleDateString('en-CA'),
+      });
+      setQboPushResult({ success: true, invoiceId: r.data.Id, docNumber: r.data.DocNumber });
+      setShowQboPicker(false);
+    } catch (err) {
+      setQboPushResult({ success: false, error: err.response?.data?.error || 'Push failed' });
+    } finally { setQboPushing(false); }
   };
 
   const handleEditSave = async () => {
@@ -920,9 +967,46 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                     </div>
                   </div>
 
-                  <button style={styles.pdfLink} onClick={downloadPDF} disabled={pdfGenerating}>
-                    {pdfGenerating ? 'Preparing PDF…' : '⬇ Download Invoice'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    <button style={styles.pdfLink} onClick={downloadPDF} disabled={pdfGenerating}>
+                      {pdfGenerating ? 'Preparing PDF…' : '⬇ Download Invoice'}
+                    </button>
+                    {project.qbo_customer_id && (
+                      <button style={styles.qboBtn} onClick={openQBOPicker} disabled={qboPushing}>
+                        Push to QuickBooks
+                      </button>
+                    )}
+                  </div>
+
+                  {showQboPicker && qboItems !== null && (
+                    <div style={styles.qboPicker}>
+                      <div style={styles.qboPickerLabel}>Select QuickBooks service item:</div>
+                      {qboItems.length === 0 ? (
+                        <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>No service items found in QuickBooks.</p>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <select style={styles.qboSelect} value={qboItemId} onChange={e => setQboItemId(e.target.value)}>
+                            <option value="">Select item…</option>
+                            {qboItems.map(item => (
+                              <option key={item.Id} value={item.Id}>{item.Name}</option>
+                            ))}
+                          </select>
+                          <button style={styles.qboConfirmBtn} onClick={pushInvoiceToQBO} disabled={!qboItemId || qboPushing}>
+                            {qboPushing ? 'Pushing…' : 'Create Invoice'}
+                          </button>
+                          <button style={styles.qboCancelBtn} onClick={() => setShowQboPicker(false)}>Cancel</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {qboPushResult && (
+                    <div style={{ ...styles.qboResult, background: qboPushResult.success ? '#f0fdf4' : '#fef2f2', borderColor: qboPushResult.success ? '#bbf7d0' : '#fecaca' }}>
+                      {qboPushResult.success
+                        ? `Invoice #${qboPushResult.docNumber || qboPushResult.invoiceId} created in QuickBooks.`
+                        : `Error: ${qboPushResult.error}`}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1435,7 +1519,14 @@ const styles = {
   filterLabel: { fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' },
   filterInput: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff' },
   generateBtn: { background: '#8b5cf6', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-end' },
-  pdfLink: { display: 'inline-block', marginTop: 16, background: '#eff6ff', color: '#1a56db', border: '1px solid #bfdbfe', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none' },
+  pdfLink: { display: 'inline-block', marginTop: 16, background: '#eff6ff', color: '#1a56db', border: '1px solid #bfdbfe', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none', cursor: 'pointer' },
+  qboBtn: { display: 'inline-block', marginTop: 16, background: '#2CA01C', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  qboPicker: { marginTop: 12, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 14px' },
+  qboPickerLabel: { fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 },
+  qboSelect: { padding: '7px 10px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13, minWidth: 200 },
+  qboConfirmBtn: { background: '#2CA01C', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  qboCancelBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer', color: '#6b7280' },
+  qboResult: { marginTop: 10, fontSize: 13, padding: '10px 14px', borderRadius: 8, border: '1px solid', color: '#374151' },
   // Entries table
   entriesTable: { display: 'flex', flexDirection: 'column', gap: 2 },
   tableHeader: { display: 'flex', gap: 8, padding: '6px 10px', background: '#f9fafb', borderRadius: 6, marginBottom: 4 },

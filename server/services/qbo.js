@@ -164,6 +164,33 @@ async function listVendors(companyId) {
   return data.QueryResponse?.Vendor || [];
 }
 
+async function listItems(companyId) {
+  const data = await qboGet(companyId, "/query?query=SELECT * FROM Item WHERE Active = true AND Type IN ('Service', 'NonInventory') MAXRESULTS 1000&minorversion=65");
+  return data.QueryResponse?.Item || [];
+}
+
+async function createInvoice(companyId, { customerId, itemId, amount, description, docNumber, txnDate }) {
+  const body = {
+    CustomerRef: { value: String(customerId) },
+    TxnDate: txnDate || new Date().toLocaleDateString('en-CA'),
+    ...(docNumber ? { DocNumber: String(docNumber) } : {}),
+    Line: [
+      {
+        Amount: parseFloat(amount.toFixed(2)),
+        DetailType: 'SalesItemLineDetail',
+        Description: description || '',
+        SalesItemLineDetail: {
+          ItemRef: { value: String(itemId) },
+          Qty: 1,
+          UnitPrice: parseFloat(amount.toFixed(2)),
+        },
+      },
+    ],
+  };
+  const data = await qboPost(companyId, '/invoice?minorversion=65', body);
+  return data.Invoice;
+}
+
 async function pushTimeActivity(companyId, { employeeId, vendorId, customerId, workDate, hours, description }) {
   const useVendor = !!vendorId;
   const body = {
@@ -181,4 +208,4 @@ async function pushTimeActivity(companyId, { employeeId, vendorId, customerId, w
   return data.TimeActivity;
 }
 
-module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getCompanyInfo, listEmployees, listCustomers, listVendors, pushTimeActivity };
+module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getCompanyInfo, listEmployees, listCustomers, listVendors, listItems, createInvoice, pushTimeActivity };

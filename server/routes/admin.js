@@ -12,6 +12,7 @@ const { sendPushToUser, sendPushToAllWorkers } = require('../push');
 const { sendEmail } = require('../email');
 const { hoursWorked, computeOT, computeDailyPayCosts } = require('../utils/payCalculations');
 const { createInboxItem, createInboxItemBatch } = require('./inbox');
+const qbo = require('../services/qbo');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -2135,6 +2136,41 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
     createInboxItem(entry.user_id, companyId, 'approval', 'Time entry approved ✓',
       `Your entry for ${entry.work_date?.toString().substring(0,10)} (${entry.start_time}–${entry.end_time}) was approved.`, '/dashboard');
     res.json(entry);
+
+    // QBO auto-sync — fire-and-forget, never blocks the response
+    setImmediate(async () => {
+      try {
+        const company = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
+        if (!company.rows[0]?.qbo_realm_id) return;
+        const worker = await pool.query('SELECT qbo_employee_id, qbo_vendor_id, worker_type FROM users WHERE id = $1', [entry.user_id]);
+        const w = worker.rows[0];
+        if (!w) return;
+        const usesVendor = w.worker_type === 'contractor' || w.worker_type === 'subcontractor';
+        const mappedId = usesVendor ? w.qbo_vendor_id : w.qbo_employee_id;
+        if (!mappedId) return;
+        if (!entry.project_id) return;
+        const proj = await pool.query('SELECT qbo_customer_id FROM projects WHERE id = $1', [entry.project_id]);
+        const customerId = proj.rows[0]?.qbo_customer_id;
+        if (!customerId) return;
+        let ms = new Date(`1970-01-01T${entry.end_time}`) - new Date(`1970-01-01T${entry.start_time}`);
+        if (ms < 0) ms += 86400000;
+        const hours = Math.max(0, ms / 3600000 - (entry.break_minutes || 0) / 60);
+        const workDate = entry.work_date.toISOString().substring(0, 10);
+        const activity = await qbo.pushTimeActivity(companyId, {
+          ...(usesVendor ? { vendorId: w.qbo_vendor_id } : { employeeId: w.qbo_employee_id }),
+          customerId,
+          workDate,
+          hours,
+          description: entry.notes || '',
+        });
+        await pool.query(
+          'UPDATE time_entries SET qbo_activity_id = $1, qbo_synced_at = NOW() WHERE id = $2',
+          [activity?.Id || 'synced', entry.id]
+        );
+      } catch (err) {
+        console.error('[QBO auto-sync]', err.message);
+      }
+    });
 
     // Budget alert — fire-and-forget after response is sent
     if (entry.project_id) {

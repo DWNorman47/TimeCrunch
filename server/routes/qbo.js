@@ -177,6 +177,44 @@ router.patch('/projects/:id/mapping', requireAdmin, async (req, res) => {
   }
 });
 
+// GET /api/qbo/items — list QBO service/non-inventory items for invoice line selection
+router.get('/items', requireAdmin, async (req, res) => {
+  try {
+    const items = await qbo.listItems(req.user.company_id);
+    res.json(items);
+  } catch (err) {
+    console.error(err);
+    const status = err.code === 'qbo_auth_expired' ? 401 : 500;
+    res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
+  }
+});
+
+// POST /api/qbo/invoices — push a billing invoice to QBO
+// Body: { customer_id, item_id, amount, description, doc_number, txn_date }
+router.post('/invoices', requireAdmin, async (req, res) => {
+  const { customer_id, item_id, amount, description, doc_number, txn_date } = req.body;
+  if (!customer_id || !item_id || amount == null) {
+    return res.status(400).json({ error: 'customer_id, item_id, and amount are required' });
+  }
+  const parsed = parseFloat(amount);
+  if (isNaN(parsed) || parsed <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
+  try {
+    const invoice = await qbo.createInvoice(req.user.company_id, {
+      customerId: customer_id,
+      itemId: item_id,
+      amount: parsed,
+      description: description || '',
+      docNumber: doc_number || null,
+      txnDate: txn_date || null,
+    });
+    res.json(invoice);
+  } catch (err) {
+    console.error(err);
+    const status = err.code === 'qbo_auth_expired' ? 401 : 500;
+    res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
+  }
+});
+
 // POST /api/qbo/push — push time entries to QBO for a date range
 // Body: { from, to, force } — force=true re-pushes already-synced entries
 router.post('/push', requireAdmin, async (req, res) => {

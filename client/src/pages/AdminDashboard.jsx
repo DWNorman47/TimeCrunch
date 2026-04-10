@@ -1,26 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePlan } from '../hooks/usePlan';
 import { useT } from '../hooks/useT';
 import NotificationBell from '../components/NotificationBell';
-import WorkerMetrics from '../components/WorkerMetrics';
-import ProjectReports from '../components/ProjectReports';
 import LiveWorkers from '../components/LiveWorkers';
-import ApprovalQueue from '../components/ApprovalQueue';
-import ManagePayPeriods from '../components/ManagePayPeriods';
-import ManageSchedule from '../components/ManageSchedule';
-import ExportPanel from '../components/ExportPanel';
-import OvertimeReport from '../components/OvertimeReport';
-import CertifiedPayroll from '../components/CertifiedPayroll';
 import CompanyChat from '../components/CompanyChat';
 import LiveKPIs from '../components/LiveKPIs';
 import BroadcastMessage from '../components/BroadcastMessage';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
-import AdminTimeOff from '../components/AdminTimeOff';
 import OnboardingChecklist from '../components/OnboardingChecklist';
-import ReimbursementsAdmin from '../components/ReimbursementsAdmin';
 import api from '../api';
+
+// Non-default tabs — lazy-loaded on first visit to reduce initial bundle size
+const WorkerMetrics = lazy(() => import('../components/WorkerMetrics'));
+const ProjectReports = lazy(() => import('../components/ProjectReports'));
+const ApprovalQueue = lazy(() => import('../components/ApprovalQueue'));
+const ManagePayPeriods = lazy(() => import('../components/ManagePayPeriods'));
+const ManageSchedule = lazy(() => import('../components/ManageSchedule'));
+const ExportPanel = lazy(() => import('../components/ExportPanel'));
+const OvertimeReport = lazy(() => import('../components/OvertimeReport'));
+const CertifiedPayroll = lazy(() => import('../components/CertifiedPayroll'));
+const AdminTimeOff = lazy(() => import('../components/AdminTimeOff'));
+const ReimbursementsAdmin = lazy(() => import('../components/ReimbursementsAdmin'));
+
+function TabLoader() {
+  return <div style={{ padding: '40px 0', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>Loading…</div>;
+}
 
 
 function UpgradePrompt({ requiredPlan, feature }) {
@@ -198,13 +204,13 @@ export default function AdminDashboard() {
             )}
           </>
         ) : tab === 'approvals' ? (
-          <>
+          <Suspense fallback={<TabLoader />}>
             <h2 style={styles.heading}>{t.tabApprovals}</h2>
             <ApprovalQueue onCountChange={setPendingCount} />
             {canDo('approve_entries') && <ManagePayPeriods />}
-          </>
+          </Suspense>
         ) : tab === 'reports' ? (
-          <>
+          <Suspense fallback={<TabLoader />}>
             <h2 style={styles.heading}>{t.tabReports}</h2>
             <button style={styles.sectionToggle} onClick={() => toggleSection('workers')}>
               <span>{t.workerReports}</span>
@@ -238,15 +244,19 @@ export default function AdminDashboard() {
               <span style={styles.chevron}>{collapsedSections.export ? '▶' : '▼'}</span>
             </button>
             {!collapsedSections.export && (plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />)}
-          </>
+          </Suspense>
         ) : tab === 'timeoff' ? (
-          <AdminTimeOff settings={settings} />
+          <Suspense fallback={<TabLoader />}>
+            <AdminTimeOff settings={settings} />
+          </Suspense>
         ) : tab === 'expenses' ? (
-          <ReimbursementsAdmin />
+          <Suspense fallback={<TabLoader />}>
+            <ReimbursementsAdmin />
+          </Suspense>
         ) : tab === 'manage' ? (
-          <>
+          <Suspense fallback={<TabLoader />}>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
-          </>
+          </Suspense>
         ) : null}
       </main>
     </div>
