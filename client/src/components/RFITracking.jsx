@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { RFIDownloadLink } from './RFIPdf';
 import { useT } from '../hooks/useT';
+import Pagination from './Pagination';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
@@ -231,6 +232,8 @@ export default function RFITracking({ projects }) {
   const { onSync } = useOffline() || {};
 
   const [rfis, setRfis] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -239,20 +242,22 @@ export default function RFITracking({ projects }) {
 
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
-  const loadRFIs = async (f = filters) => {
+  const loadRFIs = async (f = filters, p = 1) => {
+    setPage(p);
     try {
-      const params = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
+      const params = { ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), page: p, limit: 50 };
       const r = await api.get('/rfis', { params });
-      setRfis(r.data);
+      setRfis(r.data.items);
+      setTotalPages(r.data.pages);
     } catch {}
   };
 
   useEffect(() => {
-    loadRFIs().finally(() => setLoading(false));
+    loadRFIs(filters, 1).finally(() => setLoading(false));
     api.get('/company-info').then(r => setCompanyName(r.data.name || '')).catch(() => {});
   }, []);
-  useEffect(() => { if (!loading) loadRFIs(filters); }, [filters]);
-  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadRFIs(); }); }, [onSync]);
+  useEffect(() => { if (!loading) loadRFIs(filters, 1); }, [filters]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadRFIs(filters, page); }); }, [onSync]);
 
   const handleSaved = (rfi, isEdit) => {
     if (isEdit) {
@@ -318,18 +323,21 @@ export default function RFITracking({ projects }) {
           <p style={styles.emptyText}>{isAdmin ? t.noRFIsAdmin : t.noRFIsWorker}</p>
         </div>
       ) : (
-        <div style={styles.list}>
-          {rfis.map(r => (
-            <RFICard
-              key={r.id}
-              rfi={r}
-              isAdmin={isAdmin}
-              companyName={companyName}
-              onEdit={r => { setEditing(r); setShowForm(false); }}
-              onDeleted={id => setRfis(prev => prev.filter(r => r.id !== id))}
-            />
-          ))}
-        </div>
+        <>
+          <div style={styles.list}>
+            {rfis.map(r => (
+              <RFICard
+                key={r.id}
+                rfi={r}
+                isAdmin={isAdmin}
+                companyName={companyName}
+                onEdit={r => { setEditing(r); setShowForm(false); }}
+                onDeleted={id => setRfis(prev => prev.filter(r => r.id !== id))}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pages={totalPages} onChange={p => loadRFIs(filters, p)} />
+        </>
       )}
     </div>
   );

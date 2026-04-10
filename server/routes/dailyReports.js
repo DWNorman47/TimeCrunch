@@ -26,6 +26,9 @@ router.get('/', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
   const { project_id, from, to, status } = req.query;
+  const page  = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
 
   try {
     const conditions = ['r.company_id = $1'];
@@ -39,19 +42,28 @@ router.get('/', requireAuth, async (req, res) => {
       params.push(status); conditions.push(`r.status = $${params.length}`);
     }
 
-    const result = await pool.query(
-      `SELECT r.*, p.name as project_name, u.full_name as created_by_name,
-              COUNT(m.id) as manpower_count
-       FROM daily_reports r
-       LEFT JOIN projects p ON r.project_id = p.id
-       LEFT JOIN users u ON r.created_by = u.id
-       LEFT JOIN daily_report_manpower m ON m.report_id = r.id
-       WHERE ${conditions.join(' AND ')}
-       GROUP BY r.id, p.name, u.full_name
-       ORDER BY r.report_date DESC, r.created_at DESC LIMIT 500`,
-      params
-    );
-    res.json(result.rows);
+    const where = conditions.join(' AND ');
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(DISTINCT r.id) FROM daily_reports r WHERE ${where}`,
+        params
+      ),
+      pool.query(
+        `SELECT r.*, p.name as project_name, u.full_name as created_by_name,
+                COUNT(m.id) as manpower_count
+         FROM daily_reports r
+         LEFT JOIN projects p ON r.project_id = p.id
+         LEFT JOIN users u ON r.created_by = u.id
+         LEFT JOIN daily_report_manpower m ON m.report_id = r.id
+         WHERE ${where}
+         GROUP BY r.id, p.name, u.full_name
+         ORDER BY r.report_date DESC, r.created_at DESC
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+    ]);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

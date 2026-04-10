@@ -12,18 +12,27 @@ const FULL_SELECT = `
 router.get('/', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   const { project_id, status, from, to } = req.query;
+  const page  = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
   const conditions = ['r.company_id = $1'];
   const params = [companyId];
   if (project_id) { params.push(project_id); conditions.push(`r.project_id = $${params.length}`); }
   if (status) { params.push(status); conditions.push(`r.status = $${params.length}`); }
   if (from) { params.push(from); conditions.push(`r.date_submitted >= $${params.length}`); }
   if (to) { params.push(to); conditions.push(`r.date_submitted <= $${params.length}`); }
+  const where = conditions.join(' AND ');
   try {
-    const result = await pool.query(
-      `${FULL_SELECT} WHERE ${conditions.join(' AND ')} ORDER BY r.rfi_number DESC LIMIT 500`,
-      params
-    );
-    res.json(result.rows);
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(`SELECT COUNT(*) FROM rfis r WHERE ${where}`, params),
+      pool.query(
+        `${FULL_SELECT} WHERE ${where} ORDER BY r.rfi_number DESC
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+    ]);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

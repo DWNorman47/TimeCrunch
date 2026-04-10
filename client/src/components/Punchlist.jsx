@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { PunchlistPDFButton } from './PunchlistPDF';
 import { useT } from '../hooks/useT';
+import Pagination from './Pagination';
 
 const STATUS_COLORS = {
   open: { color: '#92400e', bg: '#fef3c7' },
@@ -320,6 +321,8 @@ export default function Punchlist({ projects }) {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
   const [items, setItems] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -327,14 +330,16 @@ export default function Punchlist({ projects }) {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPhase, setFilterPhase] = useState('');
 
-  const load = async (proj = filterProject, stat = filterStatus, ph = filterPhase) => {
+  const load = async (proj = filterProject, stat = filterStatus, ph = filterPhase, p = 1) => {
+    setPage(p);
     try {
-      const params = {};
+      const params = { page: p, limit: 50 };
       if (proj) params.project_id = proj;
       if (stat) params.status = stat;
       if (ph) params.phase = ph;
       const r = await api.get('/punchlist', { params });
-      setItems(r.data);
+      setItems(r.data.items);
+      setTotalPages(r.data.pages);
     } finally { setLoading(false); }
   };
 
@@ -349,8 +354,8 @@ export default function Punchlist({ projects }) {
     init();
   }, []);
 
-  useEffect(() => { if (!loading) load(filterProject, filterStatus, filterPhase); }, [filterProject, filterStatus, filterPhase]);
-  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(); }); }, [onSync]);
+  useEffect(() => { if (!loading) load(filterProject, filterStatus, filterPhase, 1); }, [filterProject, filterStatus, filterPhase]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(filterProject, filterStatus, filterPhase, page); }); }, [onSync]);
 
   const openCount = items.filter(i => i.status === 'open').length;
   const doneCount = items.filter(i => i.status === 'done').length;
@@ -449,6 +454,7 @@ export default function Punchlist({ projects }) {
               </div>
             </div>
           ))}
+          <Pagination page={page} pages={totalPages} onChange={p => load(filterProject, filterStatus, filterPhase, p)} />
         </div>
       )}
     </div>

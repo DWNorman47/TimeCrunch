@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { IncidentReportPDFButton } from './IncidentReportPDF';
 import { useT } from '../hooks/useT';
+import Pagination from './Pagination';
 
 function today() {
   return new Date().toLocaleDateString('en-CA');
@@ -280,23 +281,25 @@ export default function IncidentReports({ projects }) {
   };
 
   const [incidents, setIncidents] = useState([]);
-  const [truncated, setTruncated] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState({});
 
-  const loadIncidents = async (f = filters) => {
+  const loadIncidents = async (f = filters, p = 1) => {
+    setPage(p);
     try {
-      const params = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
+      const params = { ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), page: p, limit: 50 };
       const r = await api.get('/incidents', { params });
-      setIncidents(r.data);
-      setTruncated(r.data.length === 500);
+      setIncidents(r.data.items);
+      setTotalPages(r.data.pages);
     } catch {}
   };
 
-  useEffect(() => { loadIncidents().finally(() => setLoading(false)); }, []);
-  useEffect(() => { if (!loading) loadIncidents(filters); }, [filters]);
-  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadIncidents(); }); }, [onSync]);
+  useEffect(() => { loadIncidents(filters, 1).finally(() => setLoading(false)); }, []);
+  useEffect(() => { if (!loading) loadIncidents(filters, 1); }, [filters]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadIncidents(filters, page); }); }, [onSync]);
 
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
@@ -351,18 +354,20 @@ export default function IncidentReports({ projects }) {
           <p style={styles.emptyText}>{isAdmin ? t.noIncidents : t.noIncidentsWorker}</p>
         </div>
       ) : (
-        <div style={styles.list}>
-          {truncated && <div style={styles.truncatedBanner}>{t.resultsTruncated || 'Showing the 500 most recent incidents. Use filters to narrow results.'}</div>}
-          {incidents.map(i => (
-            <IncidentCard
-              key={i.id}
-              incident={i}
-              isAdmin={isAdmin}
-              onClosed={id => setIncidents(prev => prev.map(r => r.id === id ? { ...r, status: 'closed' } : r))}
-              onDeleted={id => setIncidents(prev => prev.filter(r => r.id !== id))}
-            />
-          ))}
-        </div>
+        <>
+          <div style={styles.list}>
+            {incidents.map(i => (
+              <IncidentCard
+                key={i.id}
+                incident={i}
+                isAdmin={isAdmin}
+                onClosed={id => setIncidents(prev => prev.map(r => r.id === id ? { ...r, status: 'closed' } : r))}
+                onDeleted={id => setIncidents(prev => prev.filter(r => r.id !== id))}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pages={totalPages} onChange={p => loadIncidents(filters, p)} />
+        </>
       )}
     </div>
   );
@@ -381,7 +386,6 @@ const styles = {
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151', flex: 1, minWidth: 120 },
   filterInput: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151' },
   list: { display: 'flex', flexDirection: 'column', gap: 10 },
-  truncatedBanner: { background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 7, padding: '8px 12px', fontSize: 13, color: '#92400e', marginBottom: 4 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { color: '#9ca3af', fontSize: 15 },

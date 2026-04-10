@@ -6,6 +6,9 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 router.get('/', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const { project_id, from, to, sub_company } = req.query;
+  const page  = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
 
   const conditions = ['s.company_id = $1'];
   const params = [companyId];
@@ -15,18 +18,23 @@ router.get('/', requireAdmin, async (req, res) => {
   if (to) { params.push(to); conditions.push(`s.report_date <= $${params.length}`); }
   if (sub_company) { params.push(`%${sub_company}%`); conditions.push(`s.sub_company ILIKE $${params.length}`); }
 
+  const where = conditions.join(' AND ');
   try {
-    const result = await pool.query(
-      `SELECT s.*, p.name as project_name, u.full_name as created_by_name
-       FROM sub_reports s
-       LEFT JOIN projects p ON s.project_id = p.id
-       LEFT JOIN users u ON s.created_by = u.id
-       WHERE ${conditions.join(' AND ')}
-       ORDER BY s.report_date DESC, s.created_at DESC
-       LIMIT 500`,
-      params
-    );
-    res.json(result.rows);
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(`SELECT COUNT(*) FROM sub_reports s WHERE ${where}`, params),
+      pool.query(
+        `SELECT s.*, p.name as project_name, u.full_name as created_by_name
+         FROM sub_reports s
+         LEFT JOIN projects p ON s.project_id = p.id
+         LEFT JOIN users u ON s.created_by = u.id
+         WHERE ${where}
+         ORDER BY s.report_date DESC, s.created_at DESC
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+    ]);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

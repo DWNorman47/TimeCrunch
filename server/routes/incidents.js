@@ -20,6 +20,9 @@ router.get('/', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
   const { project_id, worker_id, type, status, from, to } = req.query;
+  const page  = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
 
   const conditions = ['i.company_id = $1'];
   const params = [companyId];
@@ -43,12 +46,18 @@ router.get('/', requireAuth, async (req, res) => {
   if (from) { params.push(from); conditions.push(`i.incident_date >= $${params.length}`); }
   if (to) { params.push(to); conditions.push(`i.incident_date <= $${params.length}`); }
 
+  const where = conditions.join(' AND ');
   try {
-    const result = await pool.query(
-      `${BASE_QUERY} WHERE ${conditions.join(' AND ')} ORDER BY i.incident_date DESC, i.created_at DESC LIMIT 500`,
-      params
-    );
-    res.json(result.rows);
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(`SELECT COUNT(*) FROM incident_reports i WHERE ${where}`, params),
+      pool.query(
+        `${BASE_QUERY} WHERE ${where} ORDER BY i.incident_date DESC, i.created_at DESC
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+    ]);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

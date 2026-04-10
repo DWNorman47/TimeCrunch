@@ -6,8 +6,10 @@ const { sendPushToUser } = require('../push');
 // GET /punchlist
 router.get('/', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
-  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
   const { project_id, status, priority, phase } = req.query;
+  const page  = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
 
   try {
     const conditions = ['pi.company_id = $1'];
@@ -18,25 +20,31 @@ router.get('/', requireAuth, async (req, res) => {
     if (priority) { params.push(priority); conditions.push(`pi.priority = $${params.length}`); }
     if (phase) { params.push(phase); conditions.push(`pi.phase = $${params.length}`); }
 
-    const result = await pool.query(
-      `SELECT pi.*, p.name as project_name,
-              creator.full_name as created_by_name,
-              assignee.full_name as assigned_to_name,
-              COUNT(ci.id) AS checklist_total,
-              COUNT(ci.id) FILTER (WHERE ci.checked = true) AS checked_count
-       FROM punchlist_items pi
-       LEFT JOIN projects p ON pi.project_id = p.id
-       LEFT JOIN users creator ON pi.created_by = creator.id
-       LEFT JOIN users assignee ON pi.assigned_to = assignee.id
-       LEFT JOIN punchlist_checklist_items ci ON ci.punchlist_id = pi.id
-       WHERE ${conditions.join(' AND ')}
-       GROUP BY pi.id, p.name, creator.full_name, assignee.full_name
-       ORDER BY
-         CASE pi.priority WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END,
-         pi.created_at DESC LIMIT 500`,
-      params
-    );
-    res.json(result.rows);
+    const where = conditions.join(' AND ');
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(`SELECT COUNT(DISTINCT pi.id) FROM punchlist_items pi WHERE ${where}`, params),
+      pool.query(
+        `SELECT pi.*, p.name as project_name,
+                creator.full_name as created_by_name,
+                assignee.full_name as assigned_to_name,
+                COUNT(ci.id) AS checklist_total,
+                COUNT(ci.id) FILTER (WHERE ci.checked = true) AS checked_count
+         FROM punchlist_items pi
+         LEFT JOIN projects p ON pi.project_id = p.id
+         LEFT JOIN users creator ON pi.created_by = creator.id
+         LEFT JOIN users assignee ON pi.assigned_to = assignee.id
+         LEFT JOIN punchlist_checklist_items ci ON ci.punchlist_id = pi.id
+         WHERE ${where}
+         GROUP BY pi.id, p.name, creator.full_name, assignee.full_name
+         ORDER BY
+           CASE pi.priority WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END,
+           pi.created_at DESC
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+    ]);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

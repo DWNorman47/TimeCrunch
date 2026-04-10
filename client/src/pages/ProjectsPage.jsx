@@ -224,8 +224,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const loadPunch = () => {
     if (punchLoaded) return;
     setPunchLoaded(true);
-    api.get('/punchlist', { params: { project_id: project.id } })
-      .then(r => setPunch(r.data))
+    api.get('/punchlist', { params: { project_id: project.id, limit: 100 } })
+      .then(r => setPunch(r.data.items))
       .catch(() => {});
   };
 

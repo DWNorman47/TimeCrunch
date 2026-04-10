@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
+import Pagination from './Pagination';
 
 const today = () => new Date().toLocaleDateString('en-CA');
 
@@ -371,6 +372,8 @@ export default function SafetyChecklists({ projects }) {
   const [view, setView] = useState('list'); // 'list' | 'fill' | 'templates'
   const [templates, setTemplates] = useState([]);
   const [submissions, setSubmissions] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [filterProject, setFilterProject] = useState('');
   const [editingTemplate, setEditingTemplate] = useState(null);
@@ -384,21 +387,23 @@ export default function SafetyChecklists({ projects }) {
     template_items: templatesById[s.template_id]?.items ?? [],
   }));
 
-  const load = async (proj = filterProject) => {
+  const load = async (proj = filterProject, p = 1) => {
+    setPage(p);
     try {
-      const params = {};
+      const params = { page: p, limit: 50 };
       if (proj) params.project_id = proj;
       const [t, s] = await Promise.all([
         api.get('/safety-checklists/templates'),
         api.get('/safety-checklists', { params }),
       ]);
       setTemplates(t.data);
-      setSubmissions(s.data);
+      setSubmissions(s.data.items);
+      setTotalPages(s.data.pages);
     } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
-  useEffect(() => { if (!loading) load(filterProject); }, [filterProject]);
+  useEffect(() => { if (!loading) load(filterProject, 1); }, [filterProject]);
 
   if (view === 'fill') {
     return (
@@ -513,16 +518,19 @@ export default function SafetyChecklists({ projects }) {
           </p>
         </div>
       ) : (
-        <div style={styles.list}>
-          {enriched.map(s => (
-            <SubmissionCard
-              key={s.id}
-              sub={s}
-              isAdmin={isAdmin}
-              onDeleted={id => setSubmissions(prev => prev.filter(x => x.id !== id))}
-            />
-          ))}
-        </div>
+        <>
+          <div style={styles.list}>
+            {enriched.map(s => (
+              <SubmissionCard
+                key={s.id}
+                sub={s}
+                isAdmin={isAdmin}
+                onDeleted={id => setSubmissions(prev => prev.filter(x => x.id !== id))}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pages={totalPages} onChange={p => load(filterProject, p)} />
+        </>
       )}
     </div>
   );

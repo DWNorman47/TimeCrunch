@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { SafetyTalkPDFButton } from './SafetyTalkPDF';
 import { useT } from '../hooks/useT';
+import Pagination from './Pagination';
 
 const TALK_LIBRARY = [
   { title: 'Fall Protection', content: 'Key Points:\n• Workers at 6 ft or more must be protected from falls\n• Fall protection methods: guardrails, safety nets, personal fall arrest systems (PFAS)\n• Inspect all harnesses and lanyards before each use — retire any that has been in a fall\n• Keep work areas clear of tripping hazards\n\nHazards to watch for:\n• Unprotected floor openings and roof edges without guardrails\n• Scaffolding without toe boards\n\nAction: Report missing or damaged fall protection immediately. Do not work at heights without protection in place.' },
@@ -495,22 +496,26 @@ export default function SafetyTalks({ projects }) {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
   const [talks, setTalks] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filterProject, setFilterProject] = useState('');
 
-  const load = async (proj = filterProject) => {
+  const load = async (proj = filterProject, p = 1) => {
+    setPage(p);
     try {
-      const params = {};
+      const params = { page: p, limit: 50 };
       if (proj) params.project_id = proj;
       const r = await api.get('/safety-talks', { params });
-      setTalks(r.data);
+      setTalks(r.data.items);
+      setTotalPages(r.data.pages);
     } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
-  useEffect(() => { if (!loading) load(filterProject); }, [filterProject]);
-  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(); }); }, [onSync]);
+  useEffect(() => { if (!loading) load(filterProject, 1); }, [filterProject]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(filterProject, page); }); }, [onSync]);
 
   const totalSignoffs = talks.reduce((s, t) => s + parseInt(t.signoff_count || 0), 0);
 
@@ -558,16 +563,19 @@ export default function SafetyTalks({ projects }) {
           </p>
         </div>
       ) : (
-        <div style={styles.list}>
-          {talks.map(t => (
-            <TalkCard
-              key={t.id}
-              talk={t}
-              isAdmin={isAdmin}
-              onDeleted={id => setTalks(prev => prev.filter(t => t.id !== id))}
-            />
-          ))}
-        </div>
+        <>
+          <div style={styles.list}>
+            {talks.map(t => (
+              <TalkCard
+                key={t.id}
+                talk={t}
+                isAdmin={isAdmin}
+                onDeleted={id => setTalks(prev => prev.filter(t => t.id !== id))}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pages={totalPages} onChange={p => load(filterProject, p)} />
+        </>
       )}
     </div>
   );

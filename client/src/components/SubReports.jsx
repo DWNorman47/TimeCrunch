@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import Pagination from './Pagination';
 
 function today() {
   return new Date().toLocaleDateString('en-CA');
@@ -170,6 +171,8 @@ export default function SubReports({ projects }) {
   const t = useT();
   const { onSync } = useOffline() || {};
   const [reports, setReports] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -177,17 +180,19 @@ export default function SubReports({ projects }) {
 
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
-  const loadReports = async (f = filters) => {
+  const loadReports = async (f = filters, p = 1) => {
+    setPage(p);
     try {
-      const params = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
+      const params = { ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), page: p, limit: 50 };
       const r = await api.get('/sub-reports', { params });
-      setReports(r.data);
+      setReports(r.data.items);
+      setTotalPages(r.data.pages);
     } catch {}
   };
 
-  useEffect(() => { loadReports().finally(() => setLoading(false)); }, []);
-  useEffect(() => { if (!loading) loadReports(filters); }, [filters]);
-  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadReports(); }); }, [onSync]);
+  useEffect(() => { loadReports(filters, 1).finally(() => setLoading(false)); }, []);
+  useEffect(() => { if (!loading) loadReports(filters, 1); }, [filters]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadReports(filters, page); }); }, [onSync]);
 
   const handleSaved = (report, isEdit) => {
     if (isEdit) {
@@ -247,16 +252,19 @@ export default function SubReports({ projects }) {
           <p style={styles.emptyText}>{t.noSubReports}</p>
         </div>
       ) : (
-        <div style={styles.list}>
-          {reports.map(r => (
-            <SubCard
-              key={r.id}
-              report={r}
-              onEdit={r => { setEditing({ ...r, project_id: r.project_id || '', headcount: r.headcount ?? '' }); setShowForm(false); }}
-              onDeleted={id => setReports(prev => prev.filter(r => r.id !== id))}
-            />
-          ))}
-        </div>
+        <>
+          <div style={styles.list}>
+            {reports.map(r => (
+              <SubCard
+                key={r.id}
+                report={r}
+                onEdit={r => { setEditing({ ...r, project_id: r.project_id || '', headcount: r.headcount ?? '' }); setShowForm(false); }}
+                onDeleted={id => setReports(prev => prev.filter(r => r.id !== id))}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pages={totalPages} onChange={p => loadReports(filters, p)} />
+        </>
       )}
     </div>
   );

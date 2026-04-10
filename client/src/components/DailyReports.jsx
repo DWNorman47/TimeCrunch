@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { PDFButton } from './DailyReportPDF';
 import { useT } from '../hooks/useT';
+import Pagination from './Pagination';
 
 const WEATHER_KEYS = [
   { value: 'sunny', key: 'weatherSunny', emoji: '☀️' },
@@ -435,19 +436,21 @@ export default function DailyReports({ projects }) {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
   const [reports, setReports] = useState([]);
-  const [truncated, setTruncated] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // null=list, 'new'=new form, report=edit form
   const [filterProject, setFilterProject] = useState('');
   const [fieldPhotos, setFieldPhotos] = useState({});
 
-  const loadReports = async () => {
+  const loadReports = async (p = 1) => {
+    setPage(p);
     try {
-      const params = {};
+      const params = { page: p, limit: 50 };
       if (filterProject) params.project_id = filterProject;
       const r = await api.get('/daily-reports', { params });
-      setReports(r.data);
-      setTruncated(r.data.length === 500);
+      setReports(r.data.items);
+      setTotalPages(r.data.pages);
     } finally { setLoading(false); }
   };
 
@@ -459,14 +462,14 @@ export default function DailyReports({ projects }) {
       const params = { from: date, to: date };
       if (projectId) params.project_id = projectId;
       const r = await api.get('/field-reports', { params });
-      const photos = r.data.flatMap(fr => fr.photos || []);
+      const photos = r.data.items.flatMap(fr => fr.photos || []);
       setFieldPhotos(prev => ({ ...prev, [key]: photos }));
       return photos;
     } catch { return []; }
   };
 
-  useEffect(() => { loadReports(); }, [filterProject]);
-  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadReports(); }); }, [onSync]);
+  useEffect(() => { loadReports(1); }, [filterProject]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadReports(page); }); }, [onSync]);
 
   const handleSaved = report => {
     setReports(prev => {
@@ -524,20 +527,22 @@ export default function DailyReports({ projects }) {
             <p style={styles.emptyText}>{t.noDailyReports}</p>
           </div>
         ) : (
-          <div style={styles.reportList}>
-            {truncated && <div style={styles.truncatedBanner}>{t.resultsTruncated || 'Showing the 500 most recent reports. Use filters to narrow results.'}</div>}
-            {reports.map(r => (
-              <ReportRow
-                key={r.id}
-                report={r}
-                onEdit={handleEdit}
-                onDelete={id => setReports(prev => prev.filter(r => r.id !== id))}
-                isAdmin={isAdmin}
-                companyName={user?.company_name}
-                fieldPhotos={getPhotos(r)}
-              />
-            ))}
-          </div>
+          <>
+            <div style={styles.reportList}>
+              {reports.map(r => (
+                <ReportRow
+                  key={r.id}
+                  report={r}
+                  onEdit={handleEdit}
+                  onDelete={id => setReports(prev => prev.filter(r => r.id !== id))}
+                  isAdmin={isAdmin}
+                  companyName={user?.company_name}
+                  fieldPhotos={getPhotos(r)}
+                />
+              ))}
+            </div>
+            <Pagination page={page} pages={totalPages} onChange={p => loadReports(p)} />
+          </>
         )
       }
     </div>
@@ -552,7 +557,6 @@ const styles = {
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', flex: 1, maxWidth: 220 },
   newBtn: { background: '#059669', color: '#fff', border: 'none', padding: '9px 16px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0 },
   reportList: { display: 'flex', flexDirection: 'column', gap: 8 },
-  truncatedBanner: { background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 7, padding: '8px 12px', fontSize: 13, color: '#92400e', marginBottom: 8 },
   reportRow: { background: '#fff', borderRadius: 10, padding: '12px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   rowLeft: { flex: 1, cursor: 'pointer', minWidth: 0 },
   rowDate: { fontWeight: 700, fontSize: 14, color: '#111827', marginBottom: 2 },

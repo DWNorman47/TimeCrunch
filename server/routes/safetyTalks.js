@@ -9,6 +9,9 @@ const { checkStorageLimit, incrementStorage, decrementStorage } = require('../st
 router.get('/', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   const { project_id, from, to } = req.query;
+  const page  = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
 
   try {
     const conditions = ['st.company_id = $1'];
@@ -18,22 +21,27 @@ router.get('/', requireAuth, async (req, res) => {
     if (from) { params.push(from); conditions.push(`st.talk_date >= $${params.length}`); }
     if (to) { params.push(to); conditions.push(`st.talk_date <= $${params.length}`); }
 
-    const result = await pool.query(
-      `SELECT st.*, p.name as project_name, u.full_name as created_by_name,
-              COUNT(DISTINCT s.id) as signoff_count,
-              COUNT(DISTINCT q.id) as question_count
-       FROM safety_talks st
-       LEFT JOIN projects p ON st.project_id = p.id
-       LEFT JOIN users u ON st.created_by = u.id
-       LEFT JOIN safety_talk_signoffs s ON s.talk_id = st.id
-       LEFT JOIN safety_talk_questions q ON q.talk_id = st.id
-       WHERE ${conditions.join(' AND ')}
-       GROUP BY st.id, p.name, u.full_name
-       ORDER BY st.talk_date DESC, st.created_at DESC
-       LIMIT 500`,
-      params
-    );
-    res.json(result.rows);
+    const where = conditions.join(' AND ');
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(`SELECT COUNT(DISTINCT st.id) FROM safety_talks st WHERE ${where}`, params),
+      pool.query(
+        `SELECT st.*, p.name as project_name, u.full_name as created_by_name,
+                COUNT(DISTINCT s.id) as signoff_count,
+                COUNT(DISTINCT q.id) as question_count
+         FROM safety_talks st
+         LEFT JOIN projects p ON st.project_id = p.id
+         LEFT JOIN users u ON st.created_by = u.id
+         LEFT JOIN safety_talk_signoffs s ON s.talk_id = st.id
+         LEFT JOIN safety_talk_questions q ON q.talk_id = st.id
+         WHERE ${where}
+         GROUP BY st.id, p.name, u.full_name
+         ORDER BY st.talk_date DESC, st.created_at DESC
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+    ]);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
