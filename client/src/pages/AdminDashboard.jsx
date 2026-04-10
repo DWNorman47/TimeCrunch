@@ -58,6 +58,12 @@ export default function AdminDashboard() {
   const [collapsedSections, setCollapsedSections] = useState(() => {
     try { return JSON.parse(localStorage.getItem('opsfloa_report_sections') || '{}'); } catch { return {}; }
   });
+
+  // tab must be declared before any useEffect that references it (avoids TDZ in minified output)
+  const ALL_TABS = ['live', 'approvals', 'reports', 'timeoff', 'expenses', 'manage'];
+  const hashTab = window.location.hash.replace('#', '');
+  const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
+
   const toggleSection = key => setCollapsedSections(s => {
     const next = { ...s, [key]: !s[key] };
     localStorage.setItem('opsfloa_report_sections', JSON.stringify(next));
@@ -95,12 +101,9 @@ export default function AdminDashboard() {
     const iv = setInterval(check, 60000);
     return () => clearInterval(iv);
   }, [tab]);
+
   // Permission helper — null admin_permissions means full access
   const canDo = key => !user?.admin_permissions || user.admin_permissions[key] === true;
-
-  const ALL_TABS = ['live', 'approvals', 'reports', 'timeoff', 'expenses', 'manage'];
-  const hashTab = window.location.hash.replace('#', '');
-  const [tab, setTab] = useState(ALL_TABS.includes(hashTab) ? hashTab : 'live');
 
   const switchTab = t => {
     setTab(t);
