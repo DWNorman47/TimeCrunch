@@ -42,7 +42,7 @@ export default function FieldPage() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
+      <header style={styles.header} className="app-header">
         <div style={styles.headerTopRow}>
           <div style={styles.logoGroup}>
             <AppSwitcher currentApp="field" userRole={user?.role} features={features} />

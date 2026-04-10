@@ -70,7 +70,7 @@ export default function InventoryPage() {
   if (!features.module_inventory) {
     return (
       <div style={styles.page}>
-        <header style={styles.header}>
+        <header style={styles.header} className="app-header">
           <div style={styles.headerTopRow}>
             <div style={styles.logoGroup}>
               <AppSwitcher currentApp="inventory" userRole={user?.role} features={features} />

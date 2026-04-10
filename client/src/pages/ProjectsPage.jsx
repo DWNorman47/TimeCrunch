@@ -1220,7 +1220,7 @@ export default function ProjectsPage() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
+      <header style={styles.header} className="app-header">
         <div style={styles.headerTopRow}>
           <div style={styles.logoGroup}>
             <AppSwitcher currentApp="projects" userRole={user?.role} features={features} />

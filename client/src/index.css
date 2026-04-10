@@ -115,10 +115,9 @@ input, select, textarea {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 
-  /* App header — two explicit rows on small screens */
+  /* App header — safe-area on iOS, nothing extra on non-notch devices */
   .app-header {
-    height: auto !important;
-    padding-top: max(env(safe-area-inset-top), 10px) !important;
+    padding-top: env(safe-area-inset-top) !important;
     padding-bottom: 0 !important;
   }
   .header-right {
@@ -136,7 +135,7 @@ input, select, textarea {
   .company-name-row {
     display: flex !important;
     align-items: center !important;
-    margin: 6px -24px 0 -24px !important;
+    margin: 0 -24px 0 -24px !important;
     padding: 4px 24px !important;
     background: rgba(0, 0, 0, 0.18) !important;
   }
