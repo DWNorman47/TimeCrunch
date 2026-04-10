@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
-import { RFIDownloadLink } from './RFIPdf';
 import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
 
@@ -134,6 +133,24 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const [{ pdf }, { RFIDocument }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./RFIPdf'),
+      ]);
+      const blob = await pdf(React.createElement(RFIDocument, { rfi, companyName })).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `RFI-${rfi.rfi_number}-${(rfi.subject || 'rfi').replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -198,7 +215,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
 
           {!rfi.pending && (
             <div style={styles.cardActions}>
-              <RFIDownloadLink rfi={rfi} companyName={companyName} />
+              <button style={styles.pdfBtn} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? 'Preparing…' : 'Export PDF'}</button>
               {isAdmin && (
                 <>
                   <button style={styles.editBtn} onClick={() => onEdit(rfi)}>
@@ -385,6 +402,7 @@ const styles = {
   responseText: { fontSize: 13, color: '#374151', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' },
   noResponse: { fontSize: 13, color: '#9ca3af', fontStyle: 'italic', marginTop: 10 },
   cardActions: { display: 'flex', gap: 8, marginTop: 14 },
+  pdfBtn: { display: 'inline-block', background: '#eff6ff', color: '#1a56db', border: '1px solid #bfdbfe', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   editBtn: { background: '#f3f4f6', border: 'none', color: '#374151', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },

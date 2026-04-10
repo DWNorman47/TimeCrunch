@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
-import ProjectBillPDF from './ProjectBillPDF';
 import { fmtHours, formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
 
@@ -55,6 +53,8 @@ function ProjectCard({ project: p, currency = 'USD' }) {
   const [billData, setBillData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
 
   const fetchBill = async () => {
     setLoading(true);
@@ -67,6 +67,42 @@ function ProjectCard({ project: p, currency = 'USD' }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const makeBillElement = async () => {
+    const [{ pdf }, { default: ProjectBillPDF }] = await Promise.all([
+      import('@react-pdf/renderer'),
+      import('./ProjectBillPDF'),
+    ]);
+    const el = React.createElement(ProjectBillPDF, { data: billData, currency });
+    return { pdf, el };
+  };
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const { pdf, el } = await makeBillElement();
+      const blob = await pdf(el).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `bill-${p.name.replace(/\s+/g, '-')}-${from || 'all'}-to-${to || 'all'}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
+
+  const togglePreview = async () => {
+    if (showPreview) {
+      setShowPreview(false);
+      return;
+    }
+    setPdfGenerating(true);
+    try {
+      const { pdf, el } = await makeBillElement();
+      const blob = await pdf(el).toBlob();
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+      setShowPreview(true);
+    } finally { setPdfGenerating(false); }
   };
 
   return (
@@ -125,8 +161,8 @@ function ProjectCard({ project: p, currency = 'USD' }) {
                 <span style={{ fontWeight: 700 }}>{t.totalCostLabel}: <b>{formatCurrency(billData.summary.total_cost, currency)}</b></span>
               </div>
               <div style={styles.btnRow}>
-                <button style={styles.previewBtn} onClick={() => setShowPreview(s => !s)}>
-                  {showPreview ? t.hidePreview : t.previewBill}
+                <button style={styles.previewBtn} onClick={togglePreview} disabled={pdfGenerating}>
+                  {pdfGenerating ? 'Preparing…' : showPreview ? t.hidePreview : t.previewBill}
                 </button>
                 <button style={styles.csvBtn} onClick={() => {
                   const headers = ['Date', 'Worker', 'Wage Type', 'Start', 'End', 'Hours'];
@@ -136,18 +172,12 @@ function ProjectCard({ project: p, currency = 'USD' }) {
                   });
                   downloadCSV([headers, ...rows], `${p.name.replace(/\s+/g,'-')}-${from||'all'}-to-${to||'all'}.csv`);
                 }}>{t.exportCSV}</button>
-                <PDFDownloadLink
-                  document={<ProjectBillPDF data={billData} currency={currency} />}
-                  fileName={`bill-${p.name.replace(/\s+/g, '-')}-${from || 'all'}-to-${to || 'all'}.pdf`}
-                  style={styles.pdfBtn}
-                >
-                  {({ loading: l }) => l ? t.preparingPDF : t.downloadPDF}
-                </PDFDownloadLink>
+                <button style={styles.pdfBtn} onClick={downloadPDF} disabled={pdfGenerating}>
+                  {pdfGenerating ? t.preparingPDF : t.downloadPDF}
+                </button>
               </div>
-              {showPreview && (
-                <PDFViewer style={styles.pdfViewer}>
-                  <ProjectBillPDF data={billData} currency={currency} />
-                </PDFViewer>
+              {showPreview && previewUrl && (
+                <iframe src={previewUrl} style={styles.pdfViewer} title="Bill Preview" />
               )}
             </div>
           )}

@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import api from '../api';
-import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
-import BillPDF from './BillPDF';
 import { fmtHours, formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
 
@@ -35,6 +33,8 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
   const [billData, setBillData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
   const [showAddEntry, setShowAddEntry] = useState(false);
   const [addForm, setAddForm] = useState({ work_date: defaultDates().to, start_time: '08:00', end_time: '17:00', project_id: '', notes: '', break_minutes: '0' });
   const [addSaving, setAddSaving] = useState(false);
@@ -75,6 +75,42 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
     } finally {
       setLoading(false);
     }
+  };
+
+  const makeBillElement = async () => {
+    const [{ pdf }, { default: BillPDF }] = await Promise.all([
+      import('@react-pdf/renderer'),
+      import('./BillPDF'),
+    ]);
+    const el = React.createElement(BillPDF, { data: billData, currency, companyInfo, overtimeEnabled, showProject: projectsEnabled, showRateType: (companyInfo?.prevailing_wage_rate ?? 0) > 0 });
+    return { pdf, el };
+  };
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const { pdf, el } = await makeBillElement();
+      const blob = await pdf(el).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `bill-${worker.username}-${from || 'all'}-to-${to || 'all'}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
+
+  const togglePreview = async () => {
+    if (showPreview) {
+      setShowPreview(false);
+      return;
+    }
+    setPdfGenerating(true);
+    try {
+      const { pdf, el } = await makeBillElement();
+      const blob = await pdf(el).toBlob();
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+      setShowPreview(true);
+    } finally { setPdfGenerating(false); }
   };
 
   return (
@@ -174,8 +210,8 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
                 <span style={{ fontWeight: 700 }}>{t.totalCostLabel} <b>{formatCurrency(billData.summary.total_cost, currency)}</b></span>
               </div>
               <div style={styles.btnRow}>
-                <button style={styles.previewBtn} onClick={() => setShowPreview(p => !p)}>
-                  {showPreview ? t.hideBill : t.previewBill}
+                <button style={styles.previewBtn} onClick={togglePreview} disabled={pdfGenerating}>
+                  {pdfGenerating ? 'Preparing…' : showPreview ? t.hideBill : t.previewBill}
                 </button>
                 <button style={styles.csvBtn} onClick={() => {
                   const headers = ['Date', 'Type', 'Project', 'Category / Wage Type', 'Start', 'End', 'Hours', 'Amount'];
@@ -188,18 +224,12 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
                   ]);
                   downloadCSV([headers, ...timeRows, ...reimbRows], `${worker.username}-${from||'all'}-to-${to||'all'}.csv`);
                 }}>{t.exportCSV}</button>
-                <PDFDownloadLink
-                  document={<BillPDF data={billData} currency={currency} companyInfo={companyInfo} overtimeEnabled={overtimeEnabled} showProject={projectsEnabled} showRateType={(companyInfo?.prevailing_wage_rate ?? 0) > 0} />}
-                  fileName={`bill-${worker.username}-${from || 'all'}-to-${to || 'all'}.pdf`}
-                  style={styles.pdfBtn}
-                >
-                  {({ loading: l }) => l ? t.preparingPDF : t.downloadPDF}
-                </PDFDownloadLink>
+                <button style={styles.pdfBtn} onClick={downloadPDF} disabled={pdfGenerating}>
+                  {pdfGenerating ? t.preparingPDF : t.downloadPDF}
+                </button>
               </div>
-              {showPreview && (
-                <PDFViewer style={styles.pdfViewer}>
-                  <BillPDF data={billData} currency={currency} companyInfo={companyInfo} overtimeEnabled={overtimeEnabled} showProject={projectsEnabled} showRateType={(companyInfo?.prevailing_wage_rate ?? 0) > 0} />
-                </PDFViewer>
+              {showPreview && previewUrl && (
+                <iframe src={previewUrl} style={styles.pdfViewer} title="Bill Preview" />
               )}
             </div>
           )}

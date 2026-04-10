@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import AppSwitcher from '../components/AppSwitcher';
-import { PDFDownloadLink } from '@react-pdf/renderer';
-import ProjectBillPDF from '../components/ProjectBillPDF';
 import ManageClients from '../components/ManageClients';
 import { useT } from '../hooks/useT';
 
@@ -125,6 +123,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [billData, setBillData] = useState(null);
   const [billLoading, setBillLoading] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
   const [billFrom, setBillFrom] = useState('');
   const [billTo, setBillTo] = useState('');
   const [workers, setWorkers] = useState([]);
@@ -284,6 +283,22 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   useEffect(() => {
     if (tab === 'billing' && !billData) loadBilling();
   }, [tab]);
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const [{ pdf }, { default: ProjectBillPDF }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('../components/ProjectBillPDF'),
+      ]);
+      const el = React.createElement(ProjectBillPDF, { data: billData, currency: settings?.currency || 'USD', companyInfo, project });
+      const blob = await pdf(el).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `invoice-${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
 
   const handleEditSave = async () => {
     if (!editForm.name.trim()) return;
@@ -905,13 +920,9 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                     </div>
                   </div>
 
-                  <PDFDownloadLink
-                    document={<ProjectBillPDF data={billData} currency={settings?.currency || 'USD'} companyInfo={companyInfo} project={project} />}
-                    fileName={`invoice-${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`}
-                    style={styles.pdfLink}
-                  >
-                    {({ loading }) => (loading ? 'Preparing PDF…' : '⬇ Download Invoice')}
-                  </PDFDownloadLink>
+                  <button style={styles.pdfLink} onClick={downloadPDF} disabled={pdfGenerating}>
+                    {pdfGenerating ? 'Preparing PDF…' : '⬇ Download Invoice'}
+                  </button>
                 </div>
               )}
 

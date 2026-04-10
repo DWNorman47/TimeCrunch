@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
-import { PDFButton } from './DailyReportPDF';
 import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
 
@@ -68,6 +67,22 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
   const [suggesting, setSuggesting] = useState(false);
   const [gettingWeather, setGettingWeather] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+
+  const downloadPDF = async (reportData) => {
+    setPdfGenerating(true);
+    try {
+      const [{ pdf }, { DailyReportDocument }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./DailyReportPDF'),
+      ]);
+      const blob = await pdf(React.createElement(DailyReportDocument, { report: reportData, companyName, fieldPhotos: fieldPhotos || [] })).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `daily-report-${reportData.report_date || 'report'}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
 
   useEffect(() => {
     if (!dirty) return;
@@ -165,12 +180,9 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       <div style={styles.editorHeader}>
         <h3 style={styles.editorTitle}>{isNew ? t.newDailyReport : t.editDailyReport}</h3>
         {!isNew && initial.status === 'submitted' && (
-          <PDFButton
-            report={{ ...initial, ...form, manpower, equipment, materials }}
-            companyName={companyName}
-            fieldPhotos={fieldPhotos}
-            style={styles.pdfBtn}
-          />
+          <button style={styles.pdfBtn} onClick={() => downloadPDF({ ...initial, ...form, manpower, equipment, materials })} disabled={pdfGenerating}>
+            {pdfGenerating ? 'Preparing…' : 'Export PDF'}
+          </button>
         )}
       </div>
 
@@ -354,6 +366,22 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
   const [deleteError, setDeleteError] = useState('');
   const [approving, setApproving] = useState(false);
   const [approveError, setApproveError] = useState('');
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const [{ pdf }, { DailyReportDocument }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./DailyReportPDF'),
+      ]);
+      const blob = await pdf(React.createElement(DailyReportDocument, { report, companyName, fieldPhotos: fieldPhotos || [] })).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `daily-report-${report.report_date || 'report'}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
   const WEATHER_OPTIONS = WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` }));
   const WEATHER_LABELS = Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label]));
   const weather = report.weather_condition ? WEATHER_LABELS[report.weather_condition] : null;
@@ -398,12 +426,9 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
           {isReviewed ? t.statusReviewed : isSubmitted ? t.statusSubmitted : t.statusDraft}
         </span>
         {(isSubmitted || isReviewed) && (
-          <PDFButton
-            report={report}
-            companyName={companyName}
-            fieldPhotos={fieldPhotos}
-            style={styles.pdfBtnSmall}
-          />
+          <button style={styles.pdfBtnSmall} onClick={downloadPDF} disabled={pdfGenerating}>
+            {pdfGenerating ? 'Preparing…' : 'PDF'}
+          </button>
         )}
         {isAdmin && isSubmitted && (
           <>

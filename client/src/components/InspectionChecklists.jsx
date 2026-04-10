@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import Pagination from './Pagination';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
@@ -482,20 +483,23 @@ export default function InspectionChecklists({ projects }) {
   const [editing, setEditing] = useState(null);
   const [filters, setFilters] = useState({});
   const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
 
-  const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
+  const setFilter = (k, v) => { setPage(1); setFilters(f => ({ ...f, [k]: v })); };
 
-  const loadAll = async () => {
+  const loadAll = async (p = page) => {
     const [insRes, tplRes] = await Promise.all([
-      api.get('/inspections', { params: Object.fromEntries(Object.entries(filters).filter(([,v]) => v)) }),
+      api.get('/inspections', { params: { ...Object.fromEntries(Object.entries(filters).filter(([,v]) => v)), page: p, limit: 50 } }),
       api.get('/inspections/templates'),
     ]);
-    setInspections(insRes.data);
+    setInspections(insRes.data.items);
+    setPages(insRes.data.pages || 1);
     setTemplates(tplRes.data);
   };
 
-  useEffect(() => { loadAll().finally(() => setLoading(false)); }, []);
-  useEffect(() => { if (!loading) loadAll(); }, [filters]);
+  useEffect(() => { loadAll(1).finally(() => setLoading(false)); }, []);
+  useEffect(() => { if (!loading) loadAll(page); }, [filters, page]);
 
   const handleSaved = (item, isEdit) => {
     if (view === 'templates') {
@@ -632,18 +636,21 @@ export default function InspectionChecklists({ projects }) {
           <p style={styles.emptyText}>{isAdmin ? t.inspNoInspectionsAdmin : t.inspNoInspectionsWorker}</p>
         </div>
       ) : (
-        <div style={styles.list}>
-          {inspections.map(ins => (
-            <InspectionCard
-              key={ins.id}
-              ins={ins}
-              isAdmin={isAdmin}
-              templates={templates}
-              onEdit={ins => { setEditing(ins); setShowForm(false); }}
-              onDeleted={id => setInspections(prev => prev.filter(i => i.id !== id))}
-            />
-          ))}
-        </div>
+        <>
+          <div style={styles.list}>
+            {inspections.map(ins => (
+              <InspectionCard
+                key={ins.id}
+                ins={ins}
+                isAdmin={isAdmin}
+                templates={templates}
+                onEdit={ins => { setEditing(ins); setShowForm(false); }}
+                onDeleted={id => setInspections(prev => prev.filter(i => i.id !== id))}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pages={pages} onChange={setPage} />
+        </>
       )}
     </div>
   );

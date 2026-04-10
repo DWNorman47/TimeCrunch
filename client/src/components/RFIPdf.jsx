@@ -44,7 +44,7 @@ function SectionHeader({ title }) {
   );
 }
 
-function RFIDocument({ rfi, companyName }) {
+export function RFIDocument({ rfi, companyName }) {
   const statusColors = STATUS_COLORS[rfi.status] || STATUS_COLORS.open;
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 

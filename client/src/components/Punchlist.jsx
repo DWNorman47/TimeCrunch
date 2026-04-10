@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
-import { PunchlistPDFButton } from './PunchlistPDF';
 import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
 
@@ -326,6 +325,22 @@ export default function Punchlist({ projects }) {
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const [{ pdf }, { PunchlistDocument }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./PunchlistPDF'),
+      ]);
+      const blob = await pdf(React.createElement(PunchlistDocument, { items, companyName: user?.company_name })).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'punchlist.pdf'; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
   const [filterProject, setFilterProject] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPhase, setFilterPhase] = useState('');
@@ -362,16 +377,17 @@ export default function Punchlist({ projects }) {
   const verifiedCount = items.filter(i => i.status === 'verified').length;
 
   // All unique phases across current items (for datalist + filter dropdown)
-  const allPhases = [...new Set(items.map(i => i.phase).filter(Boolean))].sort();
+  const allPhases = useMemo(() => [...new Set(items.map(i => i.phase).filter(Boolean))].sort(), [items]);
 
   // Group items by phase when any have a phase set
-  const hasPhases = items.some(i => i.phase);
-  const grouped = hasPhases
-    ? [
-        ...allPhases.map(ph => ({ phase: ph, items: items.filter(i => i.phase === ph) })),
-        ...(items.some(i => !i.phase) ? [{ phase: null, items: items.filter(i => !i.phase) }] : []),
-      ]
-    : [{ phase: null, items }];
+  const grouped = useMemo(() => {
+    const hasPhases = items.some(i => i.phase);
+    if (!hasPhases) return [{ phase: null, items }];
+    return [
+      ...allPhases.map(ph => ({ phase: ph, items: items.filter(i => i.phase === ph) })),
+      ...(items.some(i => !i.phase) ? [{ phase: null, items: items.filter(i => !i.phase) }] : []),
+    ];
+  }, [items, allPhases]);
 
   return (
     <div>
@@ -385,7 +401,7 @@ export default function Punchlist({ projects }) {
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {items.length > 0 && <PunchlistPDFButton items={items} companyName={user?.company_name} style={styles.pdfBtn} />}
+          {items.length > 0 && <button style={styles.pdfBtn} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? 'Preparing…' : 'Export PDF'}</button>}
           <button style={styles.newBtn} onClick={() => setShowForm(true)}>{t.newPunchlistItem}</button>
         </div>
       </div>

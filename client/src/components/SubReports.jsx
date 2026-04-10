@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
@@ -205,7 +205,7 @@ export default function SubReports({ projects }) {
   };
 
   // Unique sub company names for filter
-  const subNames = [...new Set(reports.map(r => r.sub_company))].sort();
+  const subNames = useMemo(() => [...new Set(reports.map(r => r.sub_company))].sort(), [reports]);
 
   return (
     <div>

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
-import { SafetyTalkPDFButton } from './SafetyTalkPDF';
 import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
 
@@ -501,6 +500,22 @@ export default function SafetyTalks({ projects }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filterProject, setFilterProject] = useState('');
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const [{ pdf }, { SafetyTalkDocument }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./SafetyTalkPDF'),
+      ]);
+      const blob = await pdf(React.createElement(SafetyTalkDocument, { talks, companyName: user?.company_name })).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'safety-talks.pdf'; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
 
   const load = async (proj = filterProject, p = 1) => {
     setPage(p);
@@ -529,7 +544,7 @@ export default function SafetyTalks({ projects }) {
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {talks.length > 0 && <SafetyTalkPDFButton talks={talks} companyName={user?.company_name} style={styles.pdfBtn} />}
+          {talks.length > 0 && <button style={styles.pdfBtn} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? 'Preparing…' : 'Export PDF'}</button>}
           {isAdmin && <button style={styles.newBtn} onClick={() => setShowForm(true)}>{t.newTalk}</button>}
         </div>
       </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import Pagination from './Pagination';
 
 function fmtDate(str) {
   return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -80,19 +81,22 @@ export default function PhotoGallery({ projects }) {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({});
   const [lightbox, setLightbox] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
 
-  const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
+  const setFilter = (k, v) => { setPage(1); setFilters(f => ({ ...f, [k]: v })); };
 
-  const loadMedia = async (f = filters) => {
+  const loadMedia = async (f = filters, p = page) => {
     try {
-      const params = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
+      const params = { ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), page: p, limit: 100 };
       const r = await api.get('/field-reports/photos', { params });
-      setMedia(r.data);
+      setMedia(r.data.items);
+      setPages(r.data.pages || 1);
     } catch {}
   };
 
-  useEffect(() => { loadMedia().finally(() => setLoading(false)); }, []);
-  useEffect(() => { if (!loading) loadMedia(filters); }, [filters]);
+  useEffect(() => { loadMedia(filters, page).finally(() => setLoading(false)); }, []);
+  useEffect(() => { if (!loading) loadMedia(filters, page); }, [filters, page]);
 
   const grouped = media.reduce((acc, item) => {
     const day = item.reported_at?.substring(0, 10) ?? 'Unknown';
@@ -140,20 +144,23 @@ export default function PhotoGallery({ projects }) {
           <p style={styles.emptyText}>No media yet. Photos and videos from field notes appear here.</p>
         </div>
       ) : (
-        days.map(day => (
-          <div key={day} style={styles.dayGroup}>
-            <div style={styles.dayHeader}>
-              <span style={styles.dayLabel}>{fmtDate(day + 'T12:00:00')}</span>
-              <span style={styles.dayCount}>{grouped[day].length} item{grouped[day].length !== 1 ? 's' : ''}</span>
+        <>
+          {days.map(day => (
+            <div key={day} style={styles.dayGroup}>
+              <div style={styles.dayHeader}>
+                <span style={styles.dayLabel}>{fmtDate(day + 'T12:00:00')}</span>
+                <span style={styles.dayCount}>{grouped[day].length} item{grouped[day].length !== 1 ? 's' : ''}</span>
+              </div>
+              <div style={styles.grid}>
+                {grouped[day].map(item => {
+                  const idx = media.indexOf(item);
+                  return <MediaTile key={item.id} item={item} onClick={() => setLightbox(idx)} />;
+                })}
+              </div>
             </div>
-            <div style={styles.grid}>
-              {grouped[day].map(item => {
-                const idx = media.indexOf(item);
-                return <MediaTile key={item.id} item={item} onClick={() => setLightbox(idx)} />;
-              })}
-            </div>
-          </div>
-        ))
+          ))}
+          <Pagination page={page} pages={pages} onChange={setPage} />
+        </>
       )}
     </div>
   );

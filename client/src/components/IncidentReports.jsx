@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
-import { IncidentReportPDFButton } from './IncidentReportPDF';
 import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
 
@@ -286,6 +285,22 @@ export default function IncidentReports({ projects }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState({});
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const [{ pdf }, { IncidentReportDocument }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./IncidentReportPDF'),
+      ]);
+      const blob = await pdf(React.createElement(IncidentReportDocument, { incidents, companyName: user?.company_name })).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'incident-reports.pdf'; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
 
   const loadIncidents = async (f = filters, p = 1) => {
     setPage(p);
@@ -315,7 +330,7 @@ export default function IncidentReports({ projects }) {
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {incidents.length > 0 && <IncidentReportPDFButton incidents={incidents} companyName={user?.company_name} style={styles.pdfBtn} />}
+          {incidents.length > 0 && <button style={styles.pdfBtn} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? 'Preparing…' : 'Export PDF'}</button>}
           {!showForm && <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ {t.newIncident}</button>}
         </div>
       </div>
