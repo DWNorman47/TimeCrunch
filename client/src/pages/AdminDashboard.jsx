@@ -254,7 +254,8 @@ export default function AdminDashboard() {
 
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9' },
-  header: { background: '#1a56db', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', height: 'calc(56px + env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
+  header: { background: '#1a56db', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, minHeight: 'calc(56px + env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
+  headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
   headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
   logo: { fontWeight: 700, fontSize: 20 },

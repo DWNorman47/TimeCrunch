@@ -1221,13 +1221,15 @@ export default function ProjectsPage() {
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <div style={styles.logoGroup}>
-          <AppSwitcher currentApp="projects" userRole={user?.role} features={features} />
-          {user?.company_name && <span style={styles.companyName}>{user.company_name}</span>}
+        <div style={styles.headerTopRow}>
+          <div style={styles.logoGroup}>
+            <AppSwitcher currentApp="projects" userRole={user?.role} features={features} />
+          </div>
+          <div style={styles.headerRight}>
+            <button style={styles.headerBtn} onClick={logout}>Logout</button>
+          </div>
         </div>
-        <div style={styles.headerRight}>
-          <button style={styles.headerBtn} onClick={logout}>Logout</button>
-        </div>
+        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
       <main style={styles.main}>
@@ -1364,9 +1366,9 @@ export default function ProjectsPage() {
 
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9', display: 'flex', flexDirection: 'column' },
-  header: { background: '#8b5cf6', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 },
+  header: { background: '#8b5cf6', padding: '0 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', top: 0, zIndex: 100, minHeight: 56 },
+  headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
-  companyName: { fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)' },
   headerRight: { display: 'flex', gap: 12, alignItems: 'center' },
   headerBtn: { background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', padding: '7px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   main: { flex: 1, padding: '24px 20px', maxWidth: 1100, margin: '0 auto', width: '100%' },

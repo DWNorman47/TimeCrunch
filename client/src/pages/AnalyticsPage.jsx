@@ -40,7 +40,6 @@ export default function AnalyticsPage() {
         <div style={styles.headerTopRow}>
           <div style={styles.logoGroup}>
             <AppSwitcher currentApp="analytics" userRole={user?.role} features={features} />
-            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
           </div>
           <button style={styles.headerBtn} className="header-btn" onClick={logout}>Logout</button>
         </div>
@@ -70,9 +69,9 @@ const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9' },
   header: {
     background: HEADER_BG, color: '#fff', padding: '0 24px',
-    paddingTop: 'env(safe-area-inset-top)',
-    height: 'calc(56px + env(safe-area-inset-top))',
+    paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0,
     display: 'flex', flexDirection: 'column', justifyContent: 'center',
+    minHeight: 'calc(56px + env(safe-area-inset-top))',
   },
   headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
