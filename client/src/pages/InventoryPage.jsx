@@ -70,13 +70,16 @@ export default function InventoryPage() {
   if (!features.module_inventory) {
     return (
       <div style={styles.page}>
-        <header style={styles.header}>
-          <div style={styles.logoGroup}>
-            <AppSwitcher currentApp="inventory" userRole={user?.role} features={features} />
+        <header style={styles.header} className="app-header">
+          <div style={styles.headerTopRow}>
+            <div style={styles.logoGroup}>
+              <AppSwitcher currentApp="inventory" userRole={user?.role} features={features} />
+            </div>
+            <div style={styles.headerRight}>
+              <button style={styles.headerBtn} onClick={logout}>Logout</button>
+            </div>
           </div>
-          <div style={styles.headerRight}>
-            <button style={styles.headerBtn} onClick={logout}>Logout</button>
-          </div>
+          {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
         </header>
         <div style={styles.disabled}>
           <div style={styles.disabledIcon}>📦</div>
@@ -90,21 +93,18 @@ export default function InventoryPage() {
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <div style={styles.logoGroup}>
-          <AppSwitcher currentApp="inventory" userRole={user?.role} features={features} />
-          {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
+        <div style={styles.headerTopRow}>
+          <div style={styles.logoGroup}>
+            <AppSwitcher currentApp="inventory" userRole={user?.role} features={features} />
+            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
+          </div>
+          <div style={styles.headerRight}>
+            {!isAdmin && <span style={styles.userName}>{user?.full_name}</span>}
+            <button style={styles.headerBtn} onClick={logout}>Logout</button>
+          </div>
         </div>
-        <div style={styles.headerRight}>
-          {!isAdmin && <span style={styles.userName}>{user?.full_name}</span>}
-          <button style={styles.headerBtn} onClick={logout}>Logout</button>
-        </div>
+        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
-
-      {user?.company_name && (
-        <div style={styles.companyBand} className="company-name-row">
-          {user.company_name}
-        </div>
-      )}
 
       <main style={styles.main}>
         <TabBar
@@ -183,13 +183,13 @@ const HEADER_BG = '#92400e';
 const styles = {
   page:          { minHeight: '100vh', background: '#f9fafb', fontFamily: 'system-ui, sans-serif' },
   loading:       { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#6b7280' },
-  header:        { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', paddingTop: 'env(safe-area-inset-top)', height: 'calc(52px + env(safe-area-inset-top))', background: HEADER_BG, color: '#fff', position: 'sticky', top: 0, zIndex: 50 },
+  header:        { display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, minHeight: 'calc(56px + env(safe-area-inset-top))', background: HEADER_BG, color: '#fff', position: 'sticky', top: 0, zIndex: 100 },
+  headerTopRow:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
   logoGroup:     { display: 'flex', alignItems: 'center', gap: 10 },
-  companyName:   { fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginLeft: 4 },
-  companyBand:   { background: HEADER_BG, color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 600, textAlign: 'center', padding: '4px 16px' },
+  companyName:   { fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' },
   headerRight:   { display: 'flex', alignItems: 'center', gap: 10 },
   userName:      { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
-  headerBtn:     { background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  headerBtn:     { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   main:          { maxWidth: 960, margin: '24px auto 0', padding: '0 16px 80px' },
   disabled:      { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 12, padding: 24 },
   disabledIcon:  { fontSize: 48 },
