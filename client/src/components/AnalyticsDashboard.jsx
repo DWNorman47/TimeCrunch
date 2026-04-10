@@ -9,6 +9,22 @@ const BLUE = '#1a56db';
 const GREEN = '#059669';
 const ORANGE = '#d97706';
 
+const PRESET_DAYS = [14, 30, 90];
+
+function toLocalDate(d) {
+  return d.toLocaleDateString('en-CA'); // YYYY-MM-DD
+}
+
+function daysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n + 1);
+  return toLocalDate(d);
+}
+
+function today() {
+  return toLocalDate(new Date());
+}
+
 function StatCard({ label, value, sub, color }) {
   return (
     <div style={styles.statCard}>
@@ -51,45 +67,117 @@ function formatWeek(dateStr) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function presetLabel(days, t) {
+  if (days === 14) return t.ad14Days;
+  if (days === 30) return t.ad30Days;
+  if (days === 90) return t.ad90Days;
+  return `${days}d`;
+}
+
 export default function AnalyticsDashboard() {
   const t = useT();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [preset, setPreset] = useState(14); // days; null = custom
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [showCustom, setShowCustom] = useState(false);
+
+  const from = showCustom ? customFrom : daysAgo(preset);
+  const to = showCustom ? customTo : today();
 
   useEffect(() => {
-    api.get('/admin/analytics')
+    setLoading(true);
+    setData(null);
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    api.get(`/admin/analytics?${params}`)
       .then(r => setData(r.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [from, to]);
 
   if (loading) return <p style={{ color: '#888' }}>{t.loadingAnalytics}</p>;
   if (!data) return <p style={{ color: '#e53e3e' }}>{t.failedLoadAnalytics}</p>;
 
   const { summary, daily_hours, weekly_hours, project_hours, worker_hours } = data;
 
-  // Fill in any missing weeks in the last 12
-  const weeklyMap = Object.fromEntries((weekly_hours || []).map(d => [d.week_start, parseFloat(d.hours)]));
-  const weeklyFilled = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - d.getDay() - i * 7); // Monday of each week
-    const key = d.toLocaleDateString('en-CA');
-    weeklyFilled.push({ week_start: key, hours: weeklyMap[key] || 0 });
-  }
-
-  // Fill in any missing days in the last 14
+  // Fill daily chart — build a date range and zero-fill missing days
   const dailyMap = Object.fromEntries(daily_hours.map(d => [d.date, parseFloat(d.hours)]));
   const dailyFilled = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toLocaleDateString('en-CA');
-    dailyFilled.push({ date: key, hours: dailyMap[key] || 0 });
+  if (showCustom && customFrom && customTo) {
+    const start = new Date(customFrom + 'T00:00:00');
+    const end = new Date(customTo + 'T00:00:00');
+    const rangeDays = Math.min(90, Math.round((end - start) / 86400000) + 1);
+    for (let i = 0; i < rangeDays; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const key = toLocalDate(d);
+      dailyFilled.push({ date: key, hours: dailyMap[key] || 0 });
+    }
+  } else if (!showCustom) {
+    for (let i = preset - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = toLocalDate(d);
+      dailyFilled.push({ date: key, hours: dailyMap[key] || 0 });
+    }
+  } else {
+    // Custom mode but dates not fully set — show whatever server returned
+    daily_hours.forEach(d => dailyFilled.push({ date: d.date, hours: parseFloat(d.hours) }));
   }
+
+  // Fill weekly chart
+  const weeklyMap = Object.fromEntries((weekly_hours || []).map(d => [d.week_start, parseFloat(d.hours)]));
+  const weeklyFilled = [];
+  if (showCustom) {
+    // Use server data as-is for custom range
+    (weekly_hours || []).forEach(w => weeklyFilled.push({ week_start: w.week_start, hours: parseFloat(w.hours) }));
+  } else {
+    const weekCount = Math.ceil(preset / 7);
+    for (let i = weekCount - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - d.getDay() - i * 7);
+      const key = toLocalDate(d);
+      weeklyFilled.push({ week_start: key, hours: weeklyMap[key] || 0 });
+    }
+  }
+
+  const rangeLabel = showCustom
+    ? (customFrom && customTo ? `${customFrom} – ${customTo}` : t.adCustom)
+    : presetLabel(preset, t);
 
   return (
     <div style={styles.wrap}>
+      {/* Date range controls */}
+      <div style={styles.rangeRow}>
+        <div style={styles.presetGroup}>
+          {PRESET_DAYS.map(days => (
+            <button
+              key={days}
+              style={{ ...styles.presetBtn, ...((!showCustom && preset === days) ? styles.presetBtnActive : {}) }}
+              onClick={() => { setPreset(days); setShowCustom(false); }}
+            >
+              {presetLabel(days, t)}
+            </button>
+          ))}
+          <button
+            style={{ ...styles.presetBtn, ...(showCustom ? styles.presetBtnActive : {}) }}
+            onClick={() => { setShowCustom(true); if (!customFrom) setCustomFrom(daysAgo(30)); if (!customTo) setCustomTo(today()); }}
+          >
+            {t.adCustom}
+          </button>
+        </div>
+        {showCustom && (
+          <div style={styles.customRange}>
+            <input type="date" style={styles.dateInput} value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+            <span style={{ fontSize: 12, color: '#9ca3af' }}>–</span>
+            <input type="date" style={styles.dateInput} value={customTo} onChange={e => setCustomTo(e.target.value)} />
+          </div>
+        )}
+      </div>
+
       {/* Summary cards */}
       <div style={styles.statRow}>
         <StatCard
@@ -112,9 +200,9 @@ export default function AnalyticsDashboard() {
         />
         {(parseFloat(summary.mileage_this_month) > 0 || parseFloat(summary.mileage_this_week) > 0) && (
           <StatCard
-            label="Mileage This Month"
+            label={t.mileageThisMonth}
             value={`${summary.mileage_this_month} mi`}
-            sub={`${summary.mileage_this_week} mi this week`}
+            sub={t.mileageThisWeek.replace('{n}', summary.mileage_this_week)}
             color="#8b5cf6"
           />
         )}
@@ -122,7 +210,7 @@ export default function AnalyticsDashboard() {
 
       {/* Daily hours bar chart */}
       <div style={styles.card}>
-        <SectionTitle>{t.dailyHoursChart}</SectionTitle>
+        <SectionTitle>{t.dailyHoursChart} <span style={styles.rangeTag}>{rangeLabel}</span></SectionTitle>
         {dailyFilled.every(d => d.hours === 0) ? (
           <p style={styles.empty}>{t.noEntries14Days}</p>
         ) : (
@@ -134,7 +222,7 @@ export default function AnalyticsDashboard() {
                 tick={{ fontSize: 11, fill: '#9ca3af' }}
                 axisLine={false}
                 tickLine={false}
-                interval={1}
+                interval={Math.max(0, Math.floor(dailyFilled.length / 10) - 1)}
               />
               <YAxis
                 tick={{ fontSize: 11, fill: '#9ca3af' }}
@@ -159,7 +247,7 @@ export default function AnalyticsDashboard() {
 
       {/* Weekly hours trend */}
       <div style={styles.card}>
-        <SectionTitle>{t.weeklyHoursChart}</SectionTitle>
+        <SectionTitle>{t.weeklyHoursChart} <span style={styles.rangeTag}>{rangeLabel}</span></SectionTitle>
         {weeklyFilled.every(d => d.hours === 0) ? (
           <p style={styles.empty}>{t.noEntries12Weeks}</p>
         ) : (
@@ -171,7 +259,7 @@ export default function AnalyticsDashboard() {
                 tick={{ fontSize: 11, fill: '#9ca3af' }}
                 axisLine={false}
                 tickLine={false}
-                interval={1}
+                interval={Math.max(0, Math.floor(weeklyFilled.length / 8) - 1)}
               />
               <YAxis
                 tick={{ fontSize: 11, fill: '#9ca3af' }}
@@ -200,11 +288,11 @@ export default function AnalyticsDashboard() {
       {/* Project and worker breakdown */}
       <div style={styles.twoCol}>
         <div style={styles.card}>
-          <SectionTitle>{t.hoursByProject}</SectionTitle>
+          <SectionTitle>{t.hoursByProject} <span style={styles.rangeTag}>{rangeLabel}</span></SectionTitle>
           <HorizontalBars data={project_hours} color={BLUE} noDataLabel={t.noDataYet} />
         </div>
         <div style={styles.card}>
-          <SectionTitle>{t.hoursByWorker}</SectionTitle>
+          <SectionTitle>{t.hoursByWorker} <span style={styles.rangeTag}>{rangeLabel}</span></SectionTitle>
           <HorizontalBars data={worker_hours} color={GREEN} noDataLabel={t.noDataYet} />
         </div>
       </div>
@@ -214,6 +302,13 @@ export default function AnalyticsDashboard() {
 
 const styles = {
   wrap: { display: 'flex', flexDirection: 'column', gap: 20 },
+  rangeRow: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+  presetGroup: { display: 'flex', gap: 6 },
+  presetBtn: { fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 20, border: '1px solid #d1d5db', background: '#fff', color: '#374151', cursor: 'pointer' },
+  presetBtnActive: { background: '#1a56db', color: '#fff', borderColor: '#1a56db' },
+  customRange: { display: 'flex', alignItems: 'center', gap: 6 },
+  dateInput: { fontSize: 12, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, color: '#374151' },
+  rangeTag: { fontSize: 11, fontWeight: 400, color: '#9ca3af', marginLeft: 6 },
   statRow: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 },
   statCard: { background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
   statValue: { fontSize: 32, fontWeight: 800, lineHeight: 1, marginBottom: 6 },
@@ -221,7 +316,7 @@ const styles = {
   statSub: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
   card: { background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 },
-  sectionTitle: { fontSize: 14, fontWeight: 700, color: '#374151', marginBottom: 16, margin: '0 0 16px' },
+  sectionTitle: { fontSize: 14, fontWeight: 700, color: '#374151', marginBottom: 16, margin: '0 0 16px', display: 'flex', alignItems: 'baseline' },
   empty: { color: '#9ca3af', fontSize: 13 },
   hBarList: { display: 'flex', flexDirection: 'column', gap: 10 },
   hBarRow: { display: 'flex', alignItems: 'center', gap: 10 },

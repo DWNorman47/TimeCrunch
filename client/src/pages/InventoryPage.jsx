@@ -11,6 +11,7 @@ import InventorySetup from '../components/inventory/InventorySetup';
 import InventoryValuation from '../components/inventory/InventoryValuation';
 import InventoryPurchaseOrders from '../components/inventory/InventoryPurchaseOrders';
 import InventoryConversions from '../components/inventory/InventoryConversions';
+import MyCount from '../components/MyCount';
 
 export default function InventoryPage() {
   const { user, logout } = useAuth();
@@ -25,7 +26,7 @@ export default function InventoryPage() {
 
   const INV_TABS = isAdmin
     ? ['stock', 'items', 'transactions', 'orders', 'cycle', 'valuation', 'conversions', 'setup']
-    : ['stock', 'transactions'];
+    : ['stock', 'transactions', 'mycount'];
   const [poLowStockTrigger, setPoLowStockTrigger] = useState(false);
 
   const handleReorderClick = () => {
@@ -34,7 +35,7 @@ export default function InventoryPage() {
   };
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(INV_TABS.includes(hashTab) ? hashTab : 'stock');
-  const switchTab = t => { setTab(t); window.location.hash = t; };
+  const switchTab = t => { setTab(t); history.replaceState(null, '', '#' + t); };
 
   useEffect(() => {
     const init = async () => {
@@ -112,6 +113,9 @@ export default function InventoryPage() {
           tabs={[
             { id: 'stock',        label: '📦 Stock', dot: lowStockCount > 0 ? '#f59e0b' : null },
             { id: 'transactions', label: '↔️ Transactions' },
+            ...(!isAdmin ? [
+              { id: 'mycount',    label: '📋 My Count' },
+            ] : []),
             ...(isAdmin ? [
               { id: 'items',      label: '🗂 Items' },
               { id: 'orders',     label: '🛒 Orders' },
@@ -165,6 +169,9 @@ export default function InventoryPage() {
         )}
         {tab === 'setup' && isAdmin && (
           <InventorySetup projects={projects} />
+        )}
+        {tab === 'mycount' && !isAdmin && (
+          <MyCount />
         )}
       </main>
     </div>

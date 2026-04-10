@@ -27,12 +27,12 @@ function emptyRow(type) {
 
 // ── Editable table row ─────────────────────────────────────────────────────────
 
-function RowInput({ value, onChange, type = 'text', placeholder, style, min }) {
+function RowInput({ value, onChange, type = 'text', placeholder, style, min, maxLength }) {
   return (
     <input
       style={{ ...styles.cellInput, ...style }}
       type={type} value={value} placeholder={placeholder}
-      min={min}
+      min={min} maxLength={maxLength}
       onChange={e => onChange(e.target.value)}
     />
   );
@@ -66,8 +66,16 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
   const [error, setError] = useState('');
   const [suggesting, setSuggesting] = useState(false);
   const [gettingWeather, setGettingWeather] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = e => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
+  const set = (k, v) => { setDirty(true); setForm(f => ({ ...f, [k]: v })); };
 
   const weatherCodeToCondition = code => {
     if (code === 0) return 'sunny';
@@ -120,11 +128,12 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
   };
 
   const updateRow = (list, setList, i, key, value) => {
+    setDirty(true);
     const next = list.map((r, idx) => idx === i ? { ...r, [key]: value } : r);
     setList(next);
   };
-  const addRow = (list, setList, type) => setList([...list, emptyRow(type)]);
-  const removeRow = (list, setList, i) => setList(list.filter((_, idx) => idx !== i));
+  const addRow = (list, setList, type) => { setDirty(true); setList([...list, emptyRow(type)]); };
+  const removeRow = (list, setList, i) => { setDirty(true); setList(list.filter((_, idx) => idx !== i)); };
 
   const save = async (status) => {
     const isSub = status === 'submitted';
@@ -143,6 +152,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       } else {
         r = await api.patch(`/daily-reports/${initial.id}`, payload);
       }
+      setDirty(false);
       onSaved(r.data);
     } catch (err) {
       setError(err.response?.data?.error || t.failedToSave);
@@ -178,7 +188,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.superintendent}</label>
-          <input style={styles.input} type="text" placeholder={t.superintendent} value={form.superintendent} onChange={e => set('superintendent', e.target.value)} />
+          <input style={styles.input} type="text" placeholder={t.superintendent} value={form.superintendent} onChange={e => set('superintendent', e.target.value)} maxLength={255} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>
@@ -192,7 +202,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
               <option value="">{t.select}</option>
               {WEATHER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <input style={{ ...styles.input, width: 70 }} type="number" placeholder="°F" value={form.weather_temp} onChange={e => set('weather_temp', e.target.value)} />
+            <input style={{ ...styles.input, width: 70 }} type="number" placeholder="°F" min="-50" max="130" value={form.weather_temp} onChange={e => set('weather_temp', e.target.value)} />
           </div>
         </div>
       </div>
@@ -218,11 +228,11 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
           <tbody>
             {manpower.map((m, i) => (
               <tr key={i}>
-                <td style={styles.td}><RowInput value={m.trade} onChange={v => updateRow(manpower, setManpower, i, 'trade', v)} placeholder="e.g. Carpenters" /></td>
+                <td style={styles.td}><RowInput value={m.trade} onChange={v => updateRow(manpower, setManpower, i, 'trade', v)} placeholder="e.g. Carpenters" maxLength={255} /></td>
                 <td style={styles.td}><RowInput value={m.worker_count} onChange={v => updateRow(manpower, setManpower, i, 'worker_count', v)} type="number" min="1" style={{ width: 55 }} /></td>
                 <td style={styles.td}><RowInput value={m.hours} onChange={v => updateRow(manpower, setManpower, i, 'hours', v)} type="number" min="0" placeholder="0" style={{ width: 55 }} /></td>
-                <td style={styles.td}><RowInput value={m.notes} onChange={v => updateRow(manpower, setManpower, i, 'notes', v)} placeholder={t.optional} /></td>
-                <td style={styles.td}><button style={styles.removeRowBtn} onClick={() => removeRow(manpower, setManpower, i)}>✕</button></td>
+                <td style={styles.td}><RowInput value={m.notes} onChange={v => updateRow(manpower, setManpower, i, 'notes', v)} placeholder={t.optional} maxLength={500} /></td>
+                <td style={styles.td}><button style={styles.removeRowBtn} aria-label="Remove row" onClick={() => removeRow(manpower, setManpower, i)}>✕</button></td>
               </tr>
             ))}
           </tbody>
@@ -233,7 +243,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       {/* Work Performed */}
       <div style={styles.section}>
         <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.workPerformed}</span></div>
-        <textarea style={styles.textarea} rows={4} placeholder={t.workPerformedPlaceholder} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
+        <textarea style={styles.textarea} rows={4} placeholder={t.workPerformedPlaceholder} maxLength={2000} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
       </div>
 
       {/* Equipment */}
@@ -255,10 +265,10 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
             <tbody>
               {equipment.map((e, i) => (
                 <tr key={i}>
-                  <td style={styles.td}><RowInput value={e.name} onChange={v => updateRow(equipment, setEquipment, i, 'name', v)} placeholder="e.g. Excavator" /></td>
+                  <td style={styles.td}><RowInput value={e.name} onChange={v => updateRow(equipment, setEquipment, i, 'name', v)} placeholder={t.equipmentNamePlaceholder} maxLength={255} /></td>
                   <td style={styles.td}><RowInput value={e.quantity} onChange={v => updateRow(equipment, setEquipment, i, 'quantity', v)} type="number" min="1" style={{ width: 55 }} /></td>
                   <td style={styles.td}><RowInput value={e.hours} onChange={v => updateRow(equipment, setEquipment, i, 'hours', v)} type="number" min="0" placeholder="0" style={{ width: 55 }} /></td>
-                  <td style={styles.td}><button style={styles.removeRowBtn} onClick={() => removeRow(equipment, setEquipment, i)}>✕</button></td>
+                  <td style={styles.td}><button style={styles.removeRowBtn} aria-label="Remove row" onClick={() => removeRow(equipment, setEquipment, i)}>✕</button></td>
                 </tr>
               ))}
             </tbody>
@@ -284,9 +294,9 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
             <tbody>
               {materials.map((m, i) => (
                 <tr key={i}>
-                  <td style={styles.td}><RowInput value={m.description} onChange={v => updateRow(materials, setMaterials, i, 'description', v)} placeholder="e.g. Lumber 2x4" /></td>
+                  <td style={styles.td}><RowInput value={m.description} onChange={v => updateRow(materials, setMaterials, i, 'description', v)} placeholder="e.g. Lumber 2x4" maxLength={500} /></td>
                   <td style={styles.td}><RowInput value={m.quantity} onChange={v => updateRow(materials, setMaterials, i, 'quantity', v)} placeholder="e.g. 200 boards" /></td>
-                  <td style={styles.td}><button style={styles.removeRowBtn} onClick={() => removeRow(materials, setMaterials, i)}>✕</button></td>
+                  <td style={styles.td}><button style={styles.removeRowBtn} aria-label="Remove row" onClick={() => removeRow(materials, setMaterials, i)}>✕</button></td>
                 </tr>
               ))}
             </tbody>
@@ -297,13 +307,13 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       {/* Delays */}
       <div style={styles.section}>
         <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.delaysIssues}</span></div>
-        <textarea style={styles.textarea} rows={3} placeholder={t.delaysIssuesPlaceholder} value={form.delays_issues} onChange={e => set('delays_issues', e.target.value)} />
+        <textarea style={styles.textarea} rows={3} placeholder={t.delaysIssuesPlaceholder} maxLength={2000} value={form.delays_issues} onChange={e => set('delays_issues', e.target.value)} />
       </div>
 
       {/* Visitor log */}
       <div style={styles.section}>
         <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.visitorLog}</span></div>
-        <textarea style={styles.textarea} rows={2} placeholder={t.visitorLogPlaceholder} value={form.visitor_log} onChange={e => set('visitor_log', e.target.value)} />
+        <textarea style={styles.textarea} rows={2} placeholder={t.visitorLogPlaceholder} maxLength={2000} value={form.visitor_log} onChange={e => set('visitor_log', e.target.value)} />
       </div>
 
       {fieldPhotos.length > 0 && (
@@ -339,25 +349,29 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
   const t = useT();
   const [report, setReport] = useState(initialReport);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [approving, setApproving] = useState(false);
+  const [approveError, setApproveError] = useState('');
   const WEATHER_OPTIONS = WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` }));
   const WEATHER_LABELS = Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label]));
   const weather = report.weather_condition ? WEATHER_LABELS[report.weather_condition] : null;
 
   const handleDelete = async () => {
-    if (!confirm(t.deleteDailyReportConfirm)) return;
     setDeleting(true);
+    setDeleteError('');
     try { await api.delete(`/daily-reports/${report.id}`); onDelete(report.id); }
-    catch { alert(t.failedToDelete); }
+    catch { setDeleteError(t.failedToDelete); setConfirmingDelete(false); }
     finally { setDeleting(false); }
   };
 
   const handleApprove = async () => {
     setApproving(true);
+    setApproveError('');
     try {
       const r = await api.patch(`/daily-reports/${report.id}/review`);
       setReport(r.data);
-    } catch { alert(t.failedToApprove); }
+    } catch { setApproveError(t.failedToApprove); }
     finally { setApproving(false); }
   };
 
@@ -391,12 +405,23 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
           />
         )}
         {isAdmin && isSubmitted && (
-          <button style={styles.approveBtn} onClick={handleApprove} disabled={approving}>
-            {approving ? '...' : t.approve}
-          </button>
+          <>
+            <button style={styles.approveBtn} onClick={handleApprove} disabled={approving}>
+              {approving ? '...' : t.approve}
+            </button>
+            {approveError && <span style={styles.inlineError}>{approveError}</span>}
+          </>
         )}
         {!report.pending && <button style={styles.editRowBtn} onClick={() => onEdit(report)}>{t.edit}</button>}
-        {!report.pending && <button style={styles.deleteRowBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : '✕'}</button>}
+        {!report.pending && (confirmingDelete ? (
+          <>
+            <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
+            <button style={styles.cancelRowBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+            {deleteError && <span style={styles.inlineError}>{deleteError}</span>}
+          </>
+        ) : (
+          <button style={styles.deleteRowBtn} onClick={() => setConfirmingDelete(true)}>✕</button>
+        ))}
       </div>
     </div>
   );
@@ -410,6 +435,7 @@ export default function DailyReports({ projects }) {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
   const [reports, setReports] = useState([]);
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // null=list, 'new'=new form, report=edit form
   const [filterProject, setFilterProject] = useState('');
@@ -421,6 +447,7 @@ export default function DailyReports({ projects }) {
       if (filterProject) params.project_id = filterProject;
       const r = await api.get('/daily-reports', { params });
       setReports(r.data);
+      setTruncated(r.data.length === 500);
     } finally { setLoading(false); }
   };
 
@@ -498,6 +525,7 @@ export default function DailyReports({ projects }) {
           </div>
         ) : (
           <div style={styles.reportList}>
+            {truncated && <div style={styles.truncatedBanner}>{t.resultsTruncated || 'Showing the 500 most recent reports. Use filters to narrow results.'}</div>}
             {reports.map(r => (
               <ReportRow
                 key={r.id}
@@ -524,6 +552,7 @@ const styles = {
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', flex: 1, maxWidth: 220 },
   newBtn: { background: '#059669', color: '#fff', border: 'none', padding: '9px 16px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0 },
   reportList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  truncatedBanner: { background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 7, padding: '8px 12px', fontSize: 13, color: '#92400e', marginBottom: 8 },
   reportRow: { background: '#fff', borderRadius: 10, padding: '12px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   rowLeft: { flex: 1, cursor: 'pointer', minWidth: 0 },
   rowDate: { fontWeight: 700, fontSize: 14, color: '#111827', marginBottom: 2 },
@@ -538,6 +567,9 @@ const styles = {
   approveBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   editRowBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#374151', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   deleteRowBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  cancelRowBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' },
+  inlineError: { fontSize: 11, color: '#ef4444' },
   pdfBtnSmall: { fontSize: 11, fontWeight: 600, color: '#1a56db', background: '#eff6ff', border: 'none', padding: '4px 10px', borderRadius: 6, textDecoration: 'none', cursor: 'pointer' },
   hint: { color: '#9ca3af', fontSize: 14 },
   empty: { textAlign: 'center', padding: '40px 20px' },

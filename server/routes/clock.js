@@ -3,9 +3,20 @@ const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { haversineDistanceFt } = require('../utils/geoUtils');
 const { sendPushToCompanyAdmins } = require('../push');
-const { createInboxItem } = require('./inbox');
+const { createInboxItem, createInboxItemBatch } = require('./inbox');
 const { applySettingsRows, SETTINGS_DEFAULTS } = require('../settingsDefaults');
 const { sendEmail } = require('../email');
+const rateLimit = require('express-rate-limit');
+
+// Per-user limiter for clock actions (keyed by user ID once authenticated)
+const clockLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 60, // 60 clock-in/out actions per hour is far beyond any real usage
+  keyGenerator: req => String(req.user?.id || req.ip),
+  message: { error: 'Too many clock requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // GET /api/clock/status — returns active clock-in for this user, if any
 router.get('/status', requireAuth, async (req, res) => {
@@ -27,8 +38,10 @@ router.get('/status', requireAuth, async (req, res) => {
 const { validCoords } = require('../utils/geoUtils');
 
 // POST /api/clock/in
-router.post('/in', requireAuth, async (req, res) => {
-  const { project_id, notes, lat, lng, local_work_date, timezone, location_denied, clock_in_time } = req.body;
+router.post('/in', requireAuth, clockLimiter, async (req, res) => {
+  const { project_id, lat, lng, local_work_date, timezone, location_denied, clock_in_time } = req.body;
+  const notes = req.body.notes?.trim() || null;
+  if (notes && notes.length > 500) return res.status(400).json({ error: 'notes too long (max 500 characters)' });
   if ((lat != null || lng != null) && !validCoords(lat, lng)) {
     return res.status(400).json({ error: 'Invalid coordinates' });
   }
@@ -144,9 +157,7 @@ router.post('/in', requireAuth, async (req, res) => {
             `SELECT id FROM users WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true`,
             [companyId]
           );
-          for (const a of adminRows.rows) {
-            createInboxItem(a.id, companyId, 'location_denied', title, body, '/admin#live');
-          }
+          createInboxItemBatch(adminRows.rows.map(a => a.id), companyId, 'location_denied', title, body, '/admin#live');
         }
 
         // Outside-hours notification
@@ -189,7 +200,7 @@ router.post('/in', requireAuth, async (req, res) => {
 });
 
 // POST /api/clock/out
-router.post('/out', requireAuth, async (req, res) => {
+router.post('/out', requireAuth, clockLimiter, async (req, res) => {
   const { lat, lng, break_minutes, mileage, local_clock_in, local_clock_out } = req.body;
   if ((lat != null || lng != null) && !validCoords(lat, lng)) {
     return res.status(400).json({ error: 'Invalid coordinates' });
@@ -218,26 +229,33 @@ router.post('/out', requireAuth, async (req, res) => {
     const start_time = local_clock_in || `${pad(clockInTime.getUTCHours())}:${pad(clockInTime.getUTCMinutes())}:${pad(clockInTime.getUTCSeconds())}`;
     const end_time = local_clock_out || `${pad(clockOutTime.getUTCHours())}:${pad(clockOutTime.getUTCMinutes())}:${pad(clockOutTime.getUTCSeconds())}`;
 
-    // Create the time entry
-    const entryResult = await pool.query(
-      `INSERT INTO time_entries
-         (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
-          clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, break_minutes, mileage, timezone,
-          clock_source, clocked_in_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-       RETURNING *`,
-      [
-        companyId, req.user.id, clock.project_id, clock.work_date,
-        start_time, end_time, wage_type, clock.notes || null,
-        clock.clock_in_lat, clock.clock_in_lng, lat || null, lng || null,
-        parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
-        clock.timezone || null,
-        clock.clock_source, clock.clocked_in_by,
-      ]
-    );
-
-    // Remove the active clock row
-    await pool.query('DELETE FROM active_clock WHERE user_id = $1', [req.user.id]);
+    // Create the time entry and remove active clock atomically
+    const txClient = await pool.connect();
+    let entryResult;
+    try {
+      await txClient.query('BEGIN');
+      entryResult = await txClient.query(
+        `INSERT INTO time_entries
+           (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
+            clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, break_minutes, mileage, timezone,
+            clock_source, clocked_in_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         RETURNING *`,
+        [
+          companyId, req.user.id, clock.project_id, clock.work_date,
+          start_time, end_time, wage_type, clock.notes || null,
+          clock.clock_in_lat, clock.clock_in_lng, lat || null, lng || null,
+          parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
+          clock.timezone || null,
+          clock.clock_source, clock.clocked_in_by,
+        ]
+      );
+      await txClient.query('DELETE FROM active_clock WHERE user_id = $1', [req.user.id]);
+      await txClient.query('COMMIT');
+    } catch (err) {
+      await txClient.query('ROLLBACK');
+      throw err;
+    } finally { txClient.release(); }
 
     // Overtime alert — fire-and-forget, never block the response
     try {
@@ -327,9 +345,7 @@ async function _sendOvertimeAlert(worker, companyId, projectName, totalHours, th
     `SELECT id FROM users WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true`,
     [companyId]
   );
-  for (const a of adminRows.rows) {
-    createInboxItem(a.id, companyId, 'overtime_alert', title, body, '/admin#reports');
-  }
+  createInboxItemBatch(adminRows.rows.map(a => a.id), companyId, 'overtime_alert', title, body, '/admin#reports');
 }
 
 // DELETE /api/clock/cancel — discard an active clock-in without creating a time entry

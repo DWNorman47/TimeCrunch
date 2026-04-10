@@ -112,7 +112,7 @@ router.get('/employees', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
-    res.status(status).json({ error: err.message || 'Server error', code: err.code });
+    res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
 });
 
@@ -124,7 +124,7 @@ router.get('/customers', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
-    res.status(status).json({ error: err.message || 'Server error', code: err.code });
+    res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
 });
 
@@ -136,7 +136,7 @@ router.get('/vendors', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
-    res.status(status).json({ error: err.message || 'Server error', code: err.code });
+    res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
 });
 
@@ -266,11 +266,11 @@ router.post('/import/workers', requireAdmin, async (req, res) => {
   const skipped = [];
 
   for (const w of workers) {
-    const displayName = (w.display_name || '').trim();
+    const displayName = (w.display_name || '').trim().slice(0, 255);
     if (!displayName) { skipped.push({ display_name: displayName, reason: 'Missing name' }); continue; }
 
     const workerType = VALID_WORKER_TYPES.includes(w.worker_type) ? w.worker_type : 'employee';
-    const email = w.email?.trim() || null;
+    const email = w.email?.trim()?.slice(0, 255) || null;
 
     // Generate username from display name
     const parts = displayName.split(/\s+/);
@@ -293,7 +293,8 @@ router.post('/import/workers', requireAdmin, async (req, res) => {
       );
       imported.push({ ...result.rows[0], temp_password: tempPassword });
     } catch (err) {
-      skipped.push({ display_name: displayName, reason: err.message });
+      console.error('QBO worker import error:', err);
+      skipped.push({ display_name: displayName, reason: 'Failed to import worker' });
     }
   }
 
@@ -310,7 +311,7 @@ router.post('/import/projects', requireAdmin, async (req, res) => {
   const skipped = [];
 
   for (const p of projects) {
-    const name = (p.name || '').trim();
+    const name = (p.name || '').trim().slice(0, 255);
     if (!name) { skipped.push({ name, reason: 'Missing name' }); continue; }
     try {
       const result = await pool.query(
@@ -321,8 +322,9 @@ router.post('/import/projects', requireAdmin, async (req, res) => {
       );
       imported.push(result.rows[0]);
     } catch (err) {
+      console.error('QBO project import error:', err);
       if (err.code === '23505') skipped.push({ name, reason: 'Project with this name already exists' });
-      else skipped.push({ name, reason: err.message });
+      else skipped.push({ name, reason: 'Failed to import project' });
     }
   }
 

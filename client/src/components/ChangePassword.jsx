@@ -38,7 +38,7 @@ export default function ChangePassword({ onClose, t }) {
         <h3 style={styles.title}>{t.changePasswordTitle}</h3>
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>{t.currentPassword}</label>
-          <PasswordInput style={styles.input} value={form.current_password} onChange={e => set('current_password', e.target.value)} required autoFocus />
+          <PasswordInput style={styles.input} value={form.current_password} onChange={e => set('current_password', e.target.value)} required minLength={6} autoFocus />
           <label style={styles.label}>{t.newPassword}</label>
           <PasswordInput style={styles.input} value={form.new_password} onChange={e => set('new_password', e.target.value)} required minLength={6} />
           <label style={styles.label}>{t.confirmNewPassword}</label>

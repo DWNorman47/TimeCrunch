@@ -96,6 +96,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     company_timezone: settings?.company_timezone ?? '',
     invoice_signature: settings?.invoice_signature ?? 'optional',
     default_temp_password: settings?.default_temp_password ?? '',
+    cycle_count_audit_pct: String(settings?.cycle_count_audit_pct ?? 15),
+    cycle_count_reconcile_threshold: String(settings?.cycle_count_reconcile_threshold ?? 0),
+    cycle_count_reconcile_threshold_type: settings?.cycle_count_reconcile_threshold_type ?? 'units',
     media_retention_days: String(settings?.media_retention_days ?? 0),
     media_delete_on_project_archive: settings?.media_delete_on_project_archive ?? false,
     notify_timeoff_requests: settings?.notify_timeoff_requests ?? true,
@@ -161,6 +164,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       company_timezone: settings.company_timezone ?? '',
       invoice_signature: settings.invoice_signature ?? 'optional',
       default_temp_password: settings.default_temp_password ?? '',
+      cycle_count_audit_pct: String(settings.cycle_count_audit_pct ?? 15),
+      cycle_count_reconcile_threshold: String(settings.cycle_count_reconcile_threshold ?? 0),
+      cycle_count_reconcile_threshold_type: settings.cycle_count_reconcile_threshold_type ?? 'units',
       media_retention_days: String(settings.media_retention_days ?? 0),
       media_delete_on_project_archive: settings.media_delete_on_project_archive ?? false,
       notify_timeoff_requests: settings.notify_timeoff_requests ?? true,
@@ -209,6 +215,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         company_timezone: form.company_timezone,
         invoice_signature: form.invoice_signature,
         default_temp_password: form.default_temp_password,
+        cycle_count_audit_pct: isNaN(parseFloat(form.cycle_count_audit_pct)) ? 15 : parseFloat(form.cycle_count_audit_pct),
+        cycle_count_reconcile_threshold: parseFloat(form.cycle_count_reconcile_threshold) || 0,
+        cycle_count_reconcile_threshold_type: form.cycle_count_reconcile_threshold_type,
         media_retention_days: parseFloat(form.media_retention_days) || 0,
         media_delete_on_project_archive: form.media_delete_on_project_archive,
         notify_timeoff_requests: form.notify_timeoff_requests,
@@ -442,6 +451,27 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </label>
           </div>
           <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.ratesShiftReminderHour}</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Hour to send tomorrow's shift push notifications</div>
+            </div>
+            <select style={styles.input} value={form.shift_reminder_hour} onChange={e => set('shift_reminder_hour', e.target.value)}>
+              {Array.from({ length: 24 }, (_, h) => (
+                <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
+              ))}
+            </select>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.ratesPtoAnnualDays}</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.ratesPtoAnnualDaysDesc}</div>
+            </div>
+            <div style={styles.inputGroup}>
+              <input style={styles.input} type="number" min="0" max="365" step="1" value={form.pto_annual_days} onChange={e => set('pto_annual_days', e.target.value)} />
+              <span style={styles.suffix}>{t.ratesDays}</span>
+            </div>
+          </div>
+          <div style={styles.row}>
             <label style={styles.label}>{t.ratesClearChat}</label>
             <div style={styles.inputGroup}>
               <input style={styles.input} type="number" min="1" max="90" step="1" value={form.chat_retention_days} onChange={e => set('chat_retention_days', e.target.value)} required />
@@ -604,6 +634,36 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={{ ...styles.toggleKnob, transform: form.module_inventory ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
+          {form.module_inventory && (
+            <>
+              <div style={styles.row}>
+                <div>
+                  <div style={styles.label}>Cycle Count — Audit %</div>
+                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Percentage of counted items randomly selected for audit (0–100)</div>
+                </div>
+                <input style={{ ...styles.input, width: 70 }} type="number" min="0" max="100" step="1"
+                  value={form.cycle_count_audit_pct}
+                  onChange={e => set('cycle_count_audit_pct', e.target.value)} />
+              </div>
+              <div style={styles.row}>
+                <div>
+                  <div style={styles.label}>Cycle Count — Reconcile Threshold</div>
+                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Variance that triggers reconciliation (0 = never)</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input style={{ ...styles.input, width: 80 }} type="number" min="0" step="any"
+                    value={form.cycle_count_reconcile_threshold}
+                    onChange={e => set('cycle_count_reconcile_threshold', e.target.value)} />
+                  <select style={{ ...styles.input, width: 90 }}
+                    value={form.cycle_count_reconcile_threshold_type}
+                    onChange={e => set('cycle_count_reconcile_threshold_type', e.target.value)}>
+                    <option value="units">units</option>
+                    <option value="pct">%</option>
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Analytics</div>
@@ -769,19 +829,29 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
                 <div style={styles.row}>
                   <div>
                     <div style={styles.label}>Auto-delete media after</div>
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Automatically delete photos and attachments older than this many days (0 = disabled)</div>
+                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Automatically delete photos and attachments older than this many days</div>
                   </div>
-                  <div style={styles.inputGroup}>
-                    <input
-                      style={styles.input}
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={form.media_retention_days}
-                      onChange={e => set('media_retention_days', e.target.value)}
-                    />
-                    <span style={styles.suffix}>days</span>
-                  </div>
+                  {parseFloat(form.media_retention_days) === 0 ? (
+                    <button
+                      type="button"
+                      style={{ padding: '7px 16px', background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+                      onClick={() => set('media_retention_days', '30')}
+                    >
+                      Turn on
+                    </button>
+                  ) : (
+                    <div style={styles.inputGroup}>
+                      <input
+                        style={styles.input}
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={form.media_retention_days}
+                        onChange={e => set('media_retention_days', e.target.value)}
+                      />
+                      <span style={styles.suffix}>days</span>
+                    </div>
+                  )}
                 </div>
                 <div style={styles.row}>
                   <div>

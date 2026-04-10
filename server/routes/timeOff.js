@@ -2,6 +2,8 @@ const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendEmail } = require('../email');
+const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
+const { createInboxItem, createInboxItemBatch } = require('./inbox');
 
 const VALID_TYPES = ['vacation', 'sick', 'personal', 'other'];
 
@@ -11,12 +13,14 @@ router.post('/', requireAuth, async (req, res) => {
   if (!start_date || !end_date) return res.status(400).json({ error: 'start_date and end_date are required' });
   if (end_date < start_date) return res.status(400).json({ error: 'end_date must be on or after start_date' });
   if (type && !VALID_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid type' });
+  const noteTrimmed = note?.trim() || null;
+  if (noteTrimmed && noteTrimmed.length > 500) return res.status(400).json({ error: 'Note must be 500 characters or fewer' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
       `INSERT INTO time_off_requests (company_id, user_id, type, start_date, end_date, note)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [companyId, req.user.id, type || 'vacation', start_date, end_date, note || null]
+      [companyId, req.user.id, type || 'vacation', start_date, end_date, noteTrimmed]
     );
     // Notify admins
     setImmediate(async () => {
@@ -26,18 +30,22 @@ router.post('/', requireAuth, async (req, res) => {
           [companyId]
         );
         if (setting.rows[0]?.value === '0') return;
+        const typeLabel = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' }[type || 'vacation'];
         const admins = await pool.query(
-          `SELECT email FROM users WHERE company_id = $1 AND role = 'admin' AND email IS NOT NULL`,
+          `SELECT id, email FROM users WHERE company_id = $1 AND role = 'admin' AND active = true`,
           [companyId]
         );
-        const typeLabel = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' }[type || 'vacation'];
         const subject = `Time off request: ${req.user.full_name}`;
-        const body = `<p><b>${req.user.full_name}</b> submitted a time off request.</p>
+        const emailBody = `<p><b>${req.user.full_name}</b> submitted a time off request.</p>
           <p><b>Type:</b> ${typeLabel}<br/>
           <b>Dates:</b> ${start_date} – ${end_date}${note ? `<br/><b>Note:</b> ${note}` : ''}</p>
           <p>Log in to OpsFloa to approve or deny.</p>`;
-        for (const admin of admins.rows) sendEmail(admin.email, subject, body);
-      } catch {}
+        for (const admin of admins.rows) if (admin.email) sendEmail(admin.email, subject, emailBody);
+        createInboxItemBatch(admins.rows.map(a => a.id), companyId, 'timeoff_request',
+          `Time off request: ${req.user.full_name}`,
+          `${typeLabel} · ${start_date} – ${end_date}`,
+          '/timeclock#timeoff');
+      } catch (err) { console.error('Time off request notification error:', err); }
     });
     res.status(201).json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
@@ -81,7 +89,8 @@ router.get('/', requireAdmin, async (req, res) => {
 
 // PATCH /time-off/:id/approve
 router.patch('/:id/approve', requireAdmin, async (req, res) => {
-  const { review_note } = req.body;
+  const review_note = req.body.review_note?.trim() || null;
+  if (review_note && review_note.length > 500) return res.status(400).json({ error: 'Review note must be 500 characters or fewer' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -91,14 +100,44 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Request not found or already reviewed' });
     const row = result.rows[0];
+    const startStr = row.start_date?.toString().substring(0, 10);
+    const endStr = row.end_date?.toString().substring(0, 10);
+
     setImmediate(async () => {
       try {
         const worker = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [row.user_id]);
         if (worker.rows[0]?.email) {
           sendEmail(worker.rows[0].email, 'Time off approved ✓',
-            `<p>Hi ${worker.rows[0].full_name},</p><p>Your time off request (<b>${row.start_date?.toString().substring(0,10)}</b> – <b>${row.end_date?.toString().substring(0,10)}</b>) has been <b style="color:#059669">approved</b>.</p>${review_note ? `<p>Note: ${review_note}</p>` : ''}<p>— OpsFloa</p>`);
+            `<p>Hi ${worker.rows[0].full_name},</p><p>Your time off request (<b>${startStr}</b> – <b>${endStr}</b>) has been <b style="color:#059669">approved</b>.</p>${review_note ? `<p>Note: ${review_note}</p>` : ''}<p>— OpsFloa</p>`);
         }
-      } catch {}
+        sendPushToUser(row.user_id, {
+          title: 'Time off approved ✓',
+          body: `${startStr} – ${endStr}${review_note ? ': ' + review_note : ''}`,
+          url: '/dashboard#time-off',
+        });
+        createInboxItem(row.user_id, companyId, 'timeoff_approved', 'Time off approved ✓',
+          `${startStr} – ${endStr}${review_note ? ' · ' + review_note : ''}`, '/dashboard#timeoff');
+
+        // Flag any scheduled shifts during the approved time-off period
+        const conflictResult = await pool.query(
+          `UPDATE shifts SET cant_make_it = true, cant_make_it_note = 'Time off approved'
+           WHERE user_id = $1 AND company_id = $2
+             AND shift_date >= $3::date AND shift_date <= $4::date
+             AND cant_make_it = false
+           RETURNING id, shift_date, start_time, end_time`,
+          [row.user_id, companyId, startStr, endStr]
+        );
+
+        if (conflictResult.rowCount > 0) {
+          // Notify admins of the conflicts
+          const workerName = worker.rows[0]?.full_name || 'Worker';
+          sendPushToCompanyAdmins(companyId, {
+            title: `${workerName} has ${conflictResult.rowCount} shift${conflictResult.rowCount !== 1 ? 's' : ''} during approved time off`,
+            body: `${startStr} – ${endStr} · Review schedule`,
+            url: '/timeclock#manage',
+          });
+        }
+      } catch (err) { console.error('Time off approval notification error:', err); }
     });
     res.json(row);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
@@ -106,7 +145,8 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
 
 // PATCH /time-off/:id/deny
 router.patch('/:id/deny', requireAdmin, async (req, res) => {
-  const { review_note } = req.body;
+  const review_note = req.body.review_note?.trim() || null;
+  if (review_note && review_note.length > 500) return res.status(400).json({ error: 'Review note must be 500 characters or fewer' });
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -118,14 +158,44 @@ router.patch('/:id/deny', requireAdmin, async (req, res) => {
     const row = result.rows[0];
     setImmediate(async () => {
       try {
+        const denyStartStr = row.start_date?.toString().substring(0, 10);
+        const denyEndStr = row.end_date?.toString().substring(0, 10);
         const worker = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [row.user_id]);
         if (worker.rows[0]?.email) {
           sendEmail(worker.rows[0].email, 'Time off request denied',
-            `<p>Hi ${worker.rows[0].full_name},</p><p>Your time off request (<b>${row.start_date?.toString().substring(0,10)}</b> – <b>${row.end_date?.toString().substring(0,10)}</b>) was <b style="color:#ef4444">denied</b>.${review_note ? ` Reason: ${review_note}` : ''}</p><p>— OpsFloa</p>`);
+            `<p>Hi ${worker.rows[0].full_name},</p><p>Your time off request (<b>${denyStartStr}</b> – <b>${denyEndStr}</b>) was <b style="color:#ef4444">denied</b>.${review_note ? ` Reason: ${review_note}` : ''}</p><p>— OpsFloa</p>`);
         }
-      } catch {}
+        sendPushToUser(row.user_id, {
+          title: 'Time off request denied',
+          body: `${denyStartStr} – ${denyEndStr}${review_note ? ': ' + review_note : ''}`,
+          url: '/dashboard#time-off',
+        });
+        createInboxItem(row.user_id, companyId, 'timeoff_denied', 'Time off request denied',
+          `${denyStartStr} – ${denyEndStr}${review_note ? ' · ' + review_note : ''}`, '/dashboard#timeoff');
+      } catch (err) { console.error('Time off denial notification error:', err); }
     });
     res.json(row);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /time-off/balance — worker's PTO balance for the current year
+router.get('/balance', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  try {
+    const [settingResult, usedResult] = await Promise.all([
+      pool.query(`SELECT value FROM settings WHERE company_id = $1 AND key = 'pto_annual_days'`, [companyId]),
+      pool.query(
+        `SELECT COALESCE(SUM(end_date - start_date + 1), 0) AS used_days
+         FROM time_off_requests
+         WHERE user_id = $1 AND company_id = $2
+           AND status = 'approved'
+           AND EXTRACT(YEAR FROM start_date) = EXTRACT(YEAR FROM CURRENT_DATE)`,
+        [req.user.id, companyId]
+      ),
+    ]);
+    const annualDays = parseFloat(settingResult.rows[0]?.value ?? 0);
+    const usedDays = parseInt(usedResult.rows[0]?.used_days ?? 0);
+    res.json({ annual_days: annualDays, used_days: usedDays, remaining_days: Math.max(0, annualDays - usedDays) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

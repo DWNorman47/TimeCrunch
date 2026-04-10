@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ClockInOut from '../components/ClockInOut';
 import TimeEntryForm from '../components/TimeEntryForm';
@@ -6,10 +6,6 @@ import EntryList from '../components/EntryList';
 import TimesheetView from '../components/TimesheetView';
 import UpcomingShifts from '../components/UpcomingShifts';
 import WorkerSummary from '../components/WorkerSummary';
-import ChangePassword from '../components/ChangePassword';
-import MFASetup from '../components/MFASetup';
-import PayStubView from '../components/PayStubView';
-import NotificationSetup from '../components/NotificationSetup';
 import TimesheetSignOff from '../components/TimesheetSignOff';
 import CompanyChat from '../components/CompanyChat';
 import AppSwitcher from '../components/AppSwitcher';
@@ -21,6 +17,7 @@ import { useOffline } from '../contexts/OfflineContext';
 import OfflineBanner from '../components/OfflineBanner';
 import SignatureModal from '../components/SignatureModal';
 import TimeOffTab from '../components/TimeOffTab';
+import AvailabilityTab from '../components/AvailabilityTab';
 import WorkerSchedule from '../components/WorkerSchedule';
 import ReimbursementsView from '../components/ReimbursementsView';
 
@@ -36,13 +33,16 @@ export default function Dashboard() {
   const [companyInfo, setCompanyInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
-  const TABS = ['clock', 'messages', 'timesheet', 'timeoff', 'schedule', 'reimbursements', 'account'];
+  const [headerClock, setHeaderClock] = useState(null); // null=loading, false=not clocked in, {clock_in_time}=clocked in
+  const [headerElapsed, setHeaderElapsed] = useState(0);
+  const headerTimerRef = useRef(null);
+  const TABS = ['clock', 'messages', 'timesheet', 'timeoff', 'schedule', 'reimbursements'];
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'clock');
   const [entryView, setEntryView] = useState('list');
   const [shiftPrefill, setShiftPrefill] = useState(null);
+  const [chatUnread, setChatUnread] = useState(false);
 
   const handleFillFromShift = shift => {
     setShiftPrefill(shift);
@@ -80,11 +80,29 @@ export default function Dashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Fetch clock status for header timer (independent of ClockInOut component)
+  useEffect(() => {
+    api.get('/clock/status').then(r => setHeaderClock(r.data || false)).catch(() => setHeaderClock(false));
+  }, []);
+
+  // Tick header elapsed timer while clocked in
+  useEffect(() => {
+    clearInterval(headerTimerRef.current);
+    if (headerClock && headerClock.clock_in_time) {
+      const tick = () => setHeaderElapsed(Math.floor((Date.now() - new Date(headerClock.clock_in_time)) / 1000));
+      tick();
+      headerTimerRef.current = setInterval(tick, 1000);
+    } else {
+      setHeaderElapsed(0);
+    }
+    return () => clearInterval(headerTimerRef.current);
+  }, [headerClock]);
+
   // When timeclock feature is off, redirect away from clock-only tabs
   useEffect(() => {
-    if (settings && settings.module_timeclock === false && tab !== 'account') {
-      setTab('account');
-      window.location.hash = 'account';
+    if (settings && settings.module_timeclock === false && ['clock', 'messages', 'timesheet'].includes(tab)) {
+      setTab('timeoff');
+      history.replaceState(null, '', '#timeoff');
     }
   }, [settings]);
 
@@ -94,8 +112,30 @@ export default function Dashboard() {
     return onSync(count => { if (count > 0) refreshEntries(); });
   }, [onSync]);
 
+  // Background chat unread check (only when not on messages tab)
+  useEffect(() => {
+    if (tab === 'messages') return;
+    const check = () => {
+      api.get('/chat').then(r => {
+        const lastRead = localStorage.getItem('chatLastRead');
+        const hasUnread = r.data.some(
+          m => m.sender_id !== user?.id && (!lastRead || new Date(m.created_at) > new Date(lastRead))
+        );
+        setChatUnread(hasUnread);
+      }).catch(() => {});
+    };
+    check();
+    const iv = setInterval(check, 60000);
+    return () => clearInterval(iv);
+  }, [tab, user?.id]);
+
   const handleEntryAdded = entry => {
     setEntries(prev => [entry, ...prev]);
+    setHeaderClock(false); // worker clocked out
+  };
+
+  const handleClockedIn = clockStatus => {
+    setHeaderClock(clockStatus); // worker clocked in
   };
   const handleEntryDeleted = id => setEntries(prev => prev.filter(e => e.id !== id));
   const handleEntryUpdated = entry => setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, ...entry } : e));
@@ -200,8 +240,8 @@ export default function Dashboard() {
       }
 
       const badge = isPrev
-        ? `<span style="background:#d97706;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">Prevailing</span>`
-        : `<span style="background:#2563eb;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">Regular</span>`;
+        ? `<span style="background:#d97706;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">${t.prevailing}</span>`
+        : `<span style="background:#2563eb;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700">${t.regular}</span>`;
       return `<tr>
         <td>${fmtDate(e.work_date)}</td>
         ${showProject ? `<td>${e.project_name || '—'}</td>` : ''}
@@ -218,13 +258,13 @@ export default function Dashboard() {
 
     // Summary rows
     const sumRows = [
-      regularHours > 0 ? `<tr><td>Regular Hours</td><td style="text-align:right">${fmtH(regularHours)}</td></tr>` : '',
-      overtimeEnabled && overtimeHours > 0 ? `<tr><td>Overtime Hours</td><td style="text-align:right">${fmtH(overtimeHours)}</td></tr>` : '',
-      prevailingHours > 0 ? `<tr><td>Prevailing Hours</td><td style="text-align:right">${fmtH(prevailingHours)}</td></tr>` : '',
-      `<tr style="border-top:1px solid #e5e7eb;font-weight:600"><td>Total Hours</td><td style="text-align:right">${fmtH(totalHours)}</td></tr>`,
-      workerRate > 0 && regularHours > 0 ? `<tr><td>Regular Pay (${fmtMoney(workerRate)}/hr)</td><td style="text-align:right">${fmtMoney(regularPay)}</td></tr>` : '',
-      overtimeEnabled && overtimeHours > 0 && workerRate > 0 ? `<tr><td>Overtime Pay (${otMultiplier}×)</td><td style="text-align:right">${fmtMoney(overtimePay)}</td></tr>` : '',
-      prevRate > 0 && prevailingHours > 0 ? `<tr><td>Prevailing Pay (${fmtMoney(prevRate)}/hr)</td><td style="text-align:right">${fmtMoney(prevailingPay)}</td></tr>` : '',
+      regularHours > 0 ? `<tr><td>${t.regularHours}</td><td style="text-align:right">${fmtH(regularHours)}</td></tr>` : '',
+      overtimeEnabled && overtimeHours > 0 ? `<tr><td>${t.overtimeHours}</td><td style="text-align:right">${fmtH(overtimeHours)}</td></tr>` : '',
+      prevailingHours > 0 ? `<tr><td>${t.prevailingHours}</td><td style="text-align:right">${fmtH(prevailingHours)}</td></tr>` : '',
+      `<tr style="border-top:1px solid #e5e7eb;font-weight:600"><td>${t.totalHours}</td><td style="text-align:right">${fmtH(totalHours)}</td></tr>`,
+      workerRate > 0 && regularHours > 0 ? `<tr><td>${t.regularPay} (${fmtMoney(workerRate)}/hr)</td><td style="text-align:right">${fmtMoney(regularPay)}</td></tr>` : '',
+      overtimeEnabled && overtimeHours > 0 && workerRate > 0 ? `<tr><td>${t.overtimePay} (${otMultiplier}×)</td><td style="text-align:right">${fmtMoney(overtimePay)}</td></tr>` : '',
+      prevRate > 0 && prevailingHours > 0 ? `<tr><td>${t.prevailingPay} (${fmtMoney(prevRate)}/hr)</td><td style="text-align:right">${fmtMoney(prevailingPay)}</td></tr>` : '',
     ].filter(Boolean).join('');
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice — ${workerName}</title><style>
@@ -261,51 +301,49 @@ tr:last-child td{border-bottom:none}
 <div class="header">
   <div>
     <div class="brand">Ops Flow Assist</div>
-    <div class="brand-sub">Employee Time Invoice</div>
+    <div class="brand-sub">${t.employeeTimeInvoice}</div>
   </div>
   <div>
-    <div class="inv-title">INVOICE</div>
+    <div class="inv-title">${t.invoiceLabel}</div>
     <div class="inv-meta">
-      Invoice #:<strong>${invoiceNo}</strong><br>
-      Invoice Date:<strong>${invoiceDate}</strong>
+      ${t.pdfInvoiceNo}<strong>${invoiceNo}</strong><br>
+      ${t.pdfInvoiceDate}<strong>${invoiceDate}</strong>
     </div>
   </div>
 </div>
 
 <div class="parties">
   <div>
-    <div class="party-label">From</div>
+    <div class="party-label">${t.from}</div>
     <div class="party-name">${workerName}</div>
     <div class="party-detail">${workerEmail}</div>
   </div>
   <div>
-    <div class="party-label">Bill To</div>
+    <div class="party-label">${t.billTo}</div>
     <div class="party-detail">${billToLines.map((l, i) => i === 0 ? `<span class="party-name">${l}</span>` : l).join('<br>')}</div>
   </div>
 </div>
 
 <div class="period-bar">
-  <span class="period-label">Pay Period</span>
+  <span class="period-label">${t.payPeriod}</span>
   <span class="period-val">${periodStart} – ${periodEnd}</span>
 </div>
 
 <table>
   <thead><tr>
-    <th>Date</th>${showProject ? '<th>Project</th>' : ''}<th>Description</th><th>Clock In</th><th>Clock Out</th>${showRateType ? '<th>Rate Type</th>' : ''}<th style="text-align:right">Hours</th>
+    <th>${t.date}</th>${showProject ? `<th>${t.project}</th>` : ''}<th>${t.descriptionLabel}</th><th>${t.clockIn}</th><th>${t.clockOut}</th>${showRateType ? `<th>${t.rateTypeLabel}</th>` : ''}<th style="text-align:right">${t.hours}</th>
   </tr></thead>
   <tbody>${rows}</tbody>
 </table>
 
 <div class="summary-wrap">
   <div class="thank-you">
-    Thank you for reviewing this invoice.<br>
-    Please approve all time entries in OpsFloa<br>
-    and process payment at your earliest convenience.
+    ${t.thankYouInvoice}
   </div>
   <div class="sum-table">
     <table style="width:100%;border-collapse:collapse">
       ${sumRows}
-      <tr class="total-row"><td>Total Due</td><td style="text-align:right">${totalPay > 0 ? fmtMoney(totalPay) : '—'}</td></tr>
+      <tr class="total-row"><td>${t.totalDue}</td><td style="text-align:right">${totalPay > 0 ? fmtMoney(totalPay) : '—'}</td></tr>
     </table>
   </div>
 </div>
@@ -314,12 +352,12 @@ ${signatureDataUrl ? `
 <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end">
   <div style="text-align:center">
     <img src="${signatureDataUrl}" style="height:60px;display:block;margin-bottom:4px" />
-    <div style="font-size:11px;color:#9ca3af;border-top:1px solid #d1d5db;padding-top:4px;min-width:200px">${workerName} — Digital Signature</div>
+    <div style="font-size:11px;color:#9ca3af;border-top:1px solid #d1d5db;padding-top:4px;min-width:200px">${workerName} — ${t.pdfDigitalSignature}</div>
   </div>
 </div>` : ''}
 
 <div class="footer">
-  <span>Generated by Ops Flow Assist</span>
+  <span>${t.pdfGeneratedBy}</span>
   <span>${invoiceDate}</span>
 </div>
 
@@ -328,6 +366,12 @@ ${signatureDataUrl ? `
     win.document.write(html);
     win.document.close();
     win.print();
+  };
+
+  const fmtHeaderElapsed = secs => {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
 
   const handleLanguageChange = async lang => {
@@ -354,13 +398,18 @@ ${signatureDataUrl ? `
               <option value="English" style={{ color: '#111827', background: '#fff' }}>EN</option>
               <option value="Spanish" style={{ color: '#111827', background: '#fff' }}>ES</option>
             </select>
+            {headerClock && <span style={styles.headerTimer} className="header-clock-timer-desktop">⏱ {fmtHeaderElapsed(headerElapsed)}</span>}
             <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
           </div>
         </div>
-        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
+        {user?.company_name && (
+          <div className="company-name-row">
+            <span className="company-name">{user.company_name}</span>
+            {headerClock && <span className="header-clock-timer-mobile" style={styles.headerTimerMobile}>⏱ {fmtHeaderElapsed(headerElapsed)}</span>}
+          </div>
+        )}
       </header>
 
-      {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
       {showSignatureModal && (
         <SignatureModal
           onConfirm={sig => { setShowSignatureModal(false); handleExportPDF(sig); }}
@@ -371,20 +420,32 @@ ${signatureDataUrl ? `
 
       <main style={styles.main} className="mobile-main">
         <div style={styles.tabs} className="tab-bar">
-          {settings?.module_timeclock !== false && <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); window.location.hash = 'clock'; }}>🕐 Clock</button>}
-          {settings?.module_timeclock !== false && <button style={tab === 'messages' ? styles.tabActive : styles.tab} onClick={() => { setTab('messages'); window.location.hash = 'messages'; }}>💬 Messages</button>}
-          {settings?.module_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); window.location.hash = 'timesheet'; }}>📋 Timesheet</button>}
-          <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); window.location.hash = 'timeoff'; }}>🏖 Time Off</button>
-          {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); window.location.hash = 'schedule'; }}>📅 Schedule</button>}
-          <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); window.location.hash = 'reimbursements'; }}>💳 Expenses</button>
-          <button style={tab === 'account' ? styles.tabActive : styles.tab} onClick={() => { setTab('account'); window.location.hash = 'account'; }}>👤 Account</button>
+          {settings?.module_timeclock !== false && <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); history.replaceState(null, '', '#clock'); }}>🕐 Clock</button>}
+          {settings?.module_timeclock !== false && (
+            <button
+              style={tab === 'messages' ? styles.tabActive : styles.tab}
+              onClick={() => {
+                setTab('messages');
+                history.replaceState(null, '', '#messages');
+                setChatUnread(false);
+                localStorage.setItem('chatLastRead', new Date().toISOString());
+              }}
+            >
+              💬 Messages{chatUnread && <span style={styles.unreadDot} />}
+            </button>
+          )}
+          {settings?.module_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); history.replaceState(null, '', '#timesheet'); }}>📋 Timesheet</button>}
+          <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); history.replaceState(null, '', '#timeoff'); }}>🏖 Time Off</button>
+          {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); history.replaceState(null, '', '#schedule'); }}>📅 Schedule</button>}
+          {settings?.feature_scheduling !== false && <button style={tab === 'availability' ? styles.tabActive : styles.tab} onClick={() => { setTab('availability'); history.replaceState(null, '', '#availability'); }}>📆 Availability</button>}
+          <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>💳 Expenses</button>
         </div>
 
-        {tab === 'messages' && <CompanyChat />}
+        {tab === 'messages' && <CompanyChat onRead={() => { setChatUnread(false); localStorage.setItem('chatLastRead', new Date().toISOString()); }} />}
 
         {tab === 'clock' && (
           <>
-            <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} t={t} geolocationEnabled={settings?.feature_geolocation ?? false} projectsEnabled={settings?.feature_project_integration !== false} />
+            <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} onClockedIn={handleClockedIn} t={t} geolocationEnabled={settings?.feature_geolocation ?? false} projectsEnabled={settings?.feature_project_integration !== false} />
             <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} prefill={shiftPrefill} projectsEnabled={settings?.feature_project_integration !== false} />
           </>
         )}
@@ -416,29 +477,12 @@ ${signatureDataUrl ? `
 
         {tab === 'timeoff' && <TimeOffTab />}
 
+        {tab === 'availability' && <AvailabilityTab />}
+
         {tab === 'schedule' && <WorkerSchedule />}
 
         {tab === 'reimbursements' && <ReimbursementsView />}
 
-        {tab === 'account' && (
-          <>
-            <NotificationSetup />
-            <div style={styles.accountCard} className="mobile-card">
-              <div style={styles.accountRow}>
-                <div>
-                  <div style={styles.accountLabel}>Password</div>
-                  <div style={styles.accountSub}>Change your login password</div>
-                </div>
-                <button style={styles.accountBtn} onClick={() => setShowChangePassword(true)}>Change Password</button>
-              </div>
-            </div>
-            <MFASetup />
-            <div style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '8px 0 4px' }}>
-              Need help? Email us at <a href="mailto:info@opsfloa.com" style={{ color: '#1a56db' }}>info@opsfloa.com</a>
-            </div>
-            {!loading && (settings?.show_worker_wages ?? false) && <PayStubView user={user} settings={settings} companyInfo={companyInfo} />}
-          </>
-        )}
       </main>
     </div>
   );
@@ -455,18 +499,16 @@ const styles = {
   userName: { fontSize: 14 },
   langSelect: { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', padding: '5px 8px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600 },
+  headerTimer: { fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)', background: 'rgba(255,255,255,0.15)', padding: '4px 10px', borderRadius: 6, fontVariantNumeric: 'tabular-nums' },
+  headerTimerMobile: { fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.9)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 },
   main: { maxWidth: 700, margin: '24px auto', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 20 },
   tabs: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 10, padding: 4, width: '100%' },
   tab: { flex: 1, padding: '14px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#666', cursor: 'pointer', textAlign: 'center' },
-  tabActive: { flex: 1, padding: '14px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', textAlign: 'center' },
+  tabActive: { flex: 1, padding: '14px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', textAlign: 'center', position: 'relative' },
+  unreadDot: { display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#ef4444', marginLeft: 4, verticalAlign: 'middle', flexShrink: 0 },
   timesheetToolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
   viewToggle: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 8, padding: 3, width: 'fit-content' },
   exportBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '6px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   toggleBtn: { padding: '6px 14px', background: 'none', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#666', cursor: 'pointer' },
   toggleActive: { padding: '6px 14px', background: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
-  accountCard: { background: '#fff', borderRadius: 12, padding: '14px 18px', boxShadow: '0 1px 6px rgba(0,0,0,0.06)' },
-  accountRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
-  accountLabel: { fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 2 },
-  accountSub: { fontSize: 12, color: '#6b7280' },
-  accountBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '7px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
 };

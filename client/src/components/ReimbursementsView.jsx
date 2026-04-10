@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
-
-const CATEGORIES = ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'];
+import { useT } from '../hooks/useT';
 
 function fmtDate(str) {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
@@ -26,9 +25,11 @@ function StatusBadge({ status }) {
 }
 
 export default function ReimbursementsView() {
+  const t = useT();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
+  const [categories, setCategories] = useState({ active: [], known: [] });
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), project_id: '' });
   const [receiptFile, setReceiptFile] = useState(null);
@@ -37,21 +38,28 @@ export default function ReimbursementsView() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
   const fileRef = useRef();
 
+  const resolveCategory = cat => cat && categories.known.includes(cat) ? cat : cat ? 'Other' : null;
+
   const load = () => {
-    api.get('/reimbursements').then(r => setItems(r.data)).catch(() => {}).finally(() => setLoading(false));
+    setLoadError('');
+    api.get('/reimbursements').then(r => setItems(r.data)).catch(() => setLoadError(t.failedLoad)).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
   useEffect(() => { api.get('/projects').then(r => setProjects(r.data)).catch(() => {}); }, []);
+  useEffect(() => { api.get('/reimbursements/categories').then(r => setCategories(r.data)).catch(() => {}); }, []);
 
   const handleFileChange = e => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
-      setReceiptFile(ev.target.result); // base64 data URL
+      setReceiptFile(ev.target.result);
       setReceiptPreview(ev.target.result);
     };
     reader.readAsDataURL(file);
@@ -59,7 +67,7 @@ export default function ReimbursementsView() {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!noReceipt && !receiptFile) { setError('Please attach a receipt or check "No Receipt Available".'); return; }
+    if (!noReceipt && !receiptFile) { setError(t.receiptRequired); return; }
     setSaving(true); setError(''); setSuccess('');
     try {
       await api.post('/reimbursements', {
@@ -70,101 +78,104 @@ export default function ReimbursementsView() {
         project_id: form.project_id || null,
         receipt: receiptFile || null,
       });
-      setSuccess('Reimbursement submitted successfully.');
+      setSuccess(t.submitSuccess);
       setShowForm(false);
       setForm({ amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), project_id: '' });
       setReceiptFile(null); setReceiptPreview(null); setNoReceipt(false);
       load();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to submit reimbursement');
+      setError(err.response?.data?.error || t.failedSave);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async id => {
-    if (!confirm('Delete this reimbursement?')) return;
+    setPendingDeleteId(null);
+    setDeleteError('');
     try {
       await api.delete(`/reimbursements/${id}`);
       setItems(prev => prev.filter(i => i.id !== id));
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to delete');
+      setDeleteError(err.response?.data?.error || t.failedSave);
     }
   };
 
   if (loading) return null;
+  if (loadError) return <p style={{ color: '#dc2626', fontSize: 13, padding: 16 }}>{loadError}</p>;
 
   return (
     <div style={s.wrap}>
       <div style={s.header}>
-        <div style={s.title}>Reimbursements</div>
+        <div style={s.title}>{t.reimbursementsTitle}</div>
         <button style={s.addBtn} onClick={() => { setShowForm(v => !v); setError(''); setSuccess(''); }}>
-          {showForm ? '✕ Cancel' : '+ New Request'}
+          {showForm ? `✕ ${t.cancel}` : t.newRequest}
         </button>
       </div>
 
       {success && <div style={s.successMsg}>{success}</div>}
+      {deleteError && <div style={s.errorMsg}>{deleteError}</div>}
 
       {showForm && (
         <form onSubmit={handleSubmit} style={s.form}>
           <div style={s.formRow}>
             <div style={s.field}>
-              <label style={s.label}>Date *</label>
+              <label style={s.label}>{t.date} *</label>
               <input style={s.input} type="date" value={form.expense_date} onChange={e => setForm(f => ({ ...f, expense_date: e.target.value }))} required />
             </div>
             <div style={s.field}>
-              <label style={s.label}>Amount *</label>
+              <label style={s.label}>{t.amountLabel}</label>
               <input style={{ ...s.input, width: 110 }} type="number" min="0.01" step="0.01" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required />
             </div>
             <div style={s.field}>
-              <label style={s.label}>Category</label>
+              <label style={s.label}>{t.categoryLabel}</label>
               <select style={s.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                <option value="">Select…</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="">{t.selectPlaceholder}</option>
+                {categories.active.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             {projects.length > 0 && (
               <div style={s.field}>
-                <label style={s.label}>Project</label>
+                <label style={s.label}>{t.project}</label>
                 <select style={s.input} value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}>
-                  <option value="">No project</option>
+                  <option value="">{t.noProject}</option>
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
             )}
           </div>
           <div style={s.field}>
-            <label style={s.label}>Description</label>
-            <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder="What was this expense for? (optional)" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+            <label style={s.label}>{t.descriptionLabel}</label>
+            <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder={t.descriptionPlaceholder} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
           <div style={s.field}>
-            <label style={s.label}>Receipt (photo or PDF)</label>
+            <label style={s.label}>{t.receiptLabel}</label>
             <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => { handleFileChange(e); setNoReceipt(false); }} />
             {!noReceipt && (
               <button type="button" style={s.uploadBtn} onClick={() => fileRef.current.click()}>
-                {receiptFile ? '✓ Receipt attached — change' : '📎 Attach Receipt'}
+                {receiptFile ? t.receiptAttached : t.attachReceipt}
               </button>
             )}
             {receiptPreview && !noReceipt && receiptPreview.startsWith('data:image') && (
               <img src={receiptPreview} alt="Receipt preview" style={s.preview} />
             )}
             {receiptPreview && !noReceipt && receiptPreview.startsWith('data:application/pdf') && (
-              <div style={s.pdfHint}>PDF attached</div>
+              <div style={s.pdfHint}>{t.pdfAttached}</div>
             )}
             <label style={s.checkLabel}>
               <input type="checkbox" checked={noReceipt} onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setReceiptFile(null); setReceiptPreview(null); } }} />
-              {' '}No receipt available
+              {' '}{t.noReceiptAvailable}
             </label>
           </div>
           {error && <div style={s.errorMsg}>{error}</div>}
           <button style={s.submitBtn} type="submit" disabled={saving}>
-            {saving ? 'Submitting…' : 'Submit Request'}
+            {saving ? t.submitting : t.submitRequest}
           </button>
         </form>
       )}
 
       {items.length === 0 && !showForm ? (
-        <div style={s.empty}>No reimbursements submitted yet.</div>
+        <div style={s.empty}>{t.noReimbursementsYet}</div>
       ) : (
         <div style={s.list}>
           {items.map(item => (
@@ -172,13 +183,20 @@ export default function ReimbursementsView() {
               <div style={s.cardTop}>
                 <div style={s.cardLeft}>
                   <span style={s.amount}>{fmtMoney(item.amount)}</span>
-                  {item.category && <span style={s.category}>{item.category}</span>}
+                  {item.category && <span style={s.category}>{resolveCategory(item.category)}</span>}
                   {item.project_name && <span style={s.projectTag}>{item.project_name}</span>}
                 </div>
                 <div style={s.cardRight}>
                   <StatusBadge status={item.status} />
                   {item.status === 'pending' && (
-                    <button style={s.deleteBtn} onClick={() => handleDelete(item.id)}>✕</button>
+                    pendingDeleteId === item.id ? (
+                      <>
+                        <button style={s.deleteConfirmBtn} onClick={() => handleDelete(item.id)}>{t.confirm}</button>
+                        <button style={s.deleteCancelBtn} onClick={() => setPendingDeleteId(null)}>{t.cancel}</button>
+                      </>
+                    ) : (
+                      <button style={s.deleteBtn} aria-label="Delete reimbursement" onClick={() => setPendingDeleteId(item.id)}>✕</button>
+                    )
                   )}
                 </div>
               </div>
@@ -186,11 +204,11 @@ export default function ReimbursementsView() {
               <div style={s.meta}>
                 <span>{fmtDate(item.expense_date)}</span>
                 {item.receipt_url && (
-                  <a href={item.receipt_url} target="_blank" rel="noopener noreferrer" style={s.receiptLink}>View Receipt</a>
+                  <a href={item.receipt_url} target="_blank" rel="noopener noreferrer" style={s.receiptLink}>{t.viewReceipt}</a>
                 )}
               </div>
               {item.admin_notes && (
-                <div style={s.adminNote}>Admin note: {item.admin_notes}</div>
+                <div style={s.adminNote}>{t.adminNotePrefix}{item.admin_notes}</div>
               )}
             </div>
           ))}
@@ -228,6 +246,8 @@ const s = {
   projectTag: { fontSize: 11, fontWeight: 600, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: 8 },
   badge: { fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8 },
   deleteBtn: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '2px 4px' },
+  deleteConfirmBtn: { background: '#dc2626', color: '#fff', border: 'none', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
+  deleteCancelBtn: { background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
   desc: { fontSize: 14, color: '#374151' },
   meta: { display: 'flex', gap: 14, fontSize: 12, color: '#6b7280', alignItems: 'center' },
   receiptLink: { color: '#1a56db', textDecoration: 'none', fontWeight: 600 },

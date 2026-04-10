@@ -55,6 +55,7 @@ export default function PhotoCapture({ photos, onChange, maxPhotos = 10 }) {
               placeholder="Caption (optional)"
               value={p.caption}
               onChange={e => updateCaption(i, e.target.value)}
+              maxLength={500}
             />
           </div>
         ))}

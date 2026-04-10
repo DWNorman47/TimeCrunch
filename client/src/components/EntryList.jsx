@@ -32,6 +32,8 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
   const [openMessageId, setOpenMessageId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
+  const [bulkDeleteError, setBulkDeleteError] = useState('');
 
   const toggleSelect = id => {
     setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
@@ -39,13 +41,14 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
 
   const handleBulkDelete = async () => {
     const ids = [...selectedIds];
-    if (!confirm(`Delete ${ids.length} entr${ids.length === 1 ? 'y' : 'ies'}? This cannot be undone.`)) return;
+    setConfirmingBulkDelete(false);
     setBulkDeleting(true);
+    setBulkDeleteError('');
     try {
       await Promise.all(ids.map(id => api.delete(`/time-entries/${id}`)));
       ids.forEach(id => onDeleted(id));
       setSelectedIds(new Set());
-    } catch { alert(t.failedDeleteEntry); }
+    } catch { setBulkDeleteError(t.failedDeleteEntry); }
     finally { setBulkDeleting(false); }
   };
 
@@ -77,10 +80,20 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
       <div style={styles.headingRow}>
         <h2 style={styles.heading}>{t.yourEntries}</h2>
         {selectedIds.size > 0 && (
-          <button style={styles.bulkDeleteBtn} onClick={handleBulkDelete} disabled={bulkDeleting}>
-            {bulkDeleting ? 'Deleting\u2026' : `Delete ${selectedIds.size} selected`}
-          </button>
+          confirmingBulkDelete ? (
+            <>
+              <button style={styles.confirmBulkDeleteBtn} onClick={handleBulkDelete} disabled={bulkDeleting}>
+                {bulkDeleting ? t.elDeleting : `${t.elConfirmDelete} ${selectedIds.size}`}
+              </button>
+              <button style={styles.cancelBulkDeleteBtn} onClick={() => setConfirmingBulkDelete(false)}>{t.cancel}</button>
+            </>
+          ) : (
+            <button style={styles.bulkDeleteBtn} onClick={() => { setBulkDeleteError(''); setConfirmingBulkDelete(true); }} disabled={bulkDeleting}>
+              {`${t.elDeleteSelected} ${selectedIds.size}`}
+            </button>
+          )
         )}
+        {bulkDeleteError && <span style={styles.bulkDeleteError}>{bulkDeleteError}</span>}
       </div>
 
       {grouped.map(group => (
@@ -118,11 +131,11 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                       </span>
                     </div>
                     <div style={styles.entryRight}>
-                      {e.status === 'approved' && <span style={styles.badgeGreen}>Approved</span>}
-                      {e.status === 'rejected' && <span style={styles.badgeRed}>Rejected</span>}
+                      {e.status === 'approved' && <span style={styles.badgeGreen}>{t.approved}</span>}
+                      {e.status === 'rejected' && <span style={styles.badgeRed}>{t.rejected}</span>}
                       {e.locked && <span style={styles.badgeLock}>🔒</span>}
                       {e.pending && <span style={styles.badgePending}>⏳</span>}
-                      {!e.pending && (!e.status || e.status === 'pending') && <span style={styles.badgePending}>Pending</span>}
+                      {!e.pending && (!e.status || e.status === 'pending') && <span style={styles.badgePending}>{t.pending}</span>}
                       <span style={{ ...styles.wageChip, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                         {e.wage_type === 'prevailing' ? t.prevailing : t.regular}
                       </span>
@@ -134,8 +147,8 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                     <>
                       {(e.break_minutes > 0 || e.mileage > 0 || e.notes) && (
                         <div style={styles.entryMeta}>
-                          {e.break_minutes > 0 && <span style={styles.metaTag}>☕ {e.break_minutes}m break</span>}
-                          {e.mileage > 0 && <span style={styles.metaTag}>🚗 {parseFloat(e.mileage).toFixed(1)} mi</span>}
+                          {e.break_minutes > 0 && <span style={styles.metaTag}>☕ {e.break_minutes}m {t.elBreak}</span>}
+                          {e.mileage > 0 && <span style={styles.metaTag}>🚗 {parseFloat(e.mileage).toFixed(1)} {t.miChip}</span>}
                           {e.notes && <span style={styles.notes}>{e.notes}</span>}
                         </div>
                       )}
@@ -170,6 +183,9 @@ const styles = {
   headingRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 },
   heading: { fontSize: 18, fontWeight: 700, margin: 0 },
   bulkDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  confirmBulkDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  cancelBulkDeleteBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '6px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
+  bulkDeleteError: { fontSize: 13, color: '#ef4444' },
   dateHeader: { fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '12px 0 4px', borderBottom: '1px solid #f3f4f6', marginBottom: 6 },
   list: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 4 },
   entry: { border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 12px', cursor: 'default' },

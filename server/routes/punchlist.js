@@ -22,16 +22,18 @@ router.get('/', requireAuth, async (req, res) => {
       `SELECT pi.*, p.name as project_name,
               creator.full_name as created_by_name,
               assignee.full_name as assigned_to_name,
-              (SELECT COUNT(*) FROM punchlist_checklist_items WHERE punchlist_id = pi.id) as checklist_total,
-              (SELECT COUNT(*) FROM punchlist_checklist_items WHERE punchlist_id = pi.id AND checked = true) as checked_count
+              COUNT(ci.id) AS checklist_total,
+              COUNT(ci.id) FILTER (WHERE ci.checked = true) AS checked_count
        FROM punchlist_items pi
        LEFT JOIN projects p ON pi.project_id = p.id
        LEFT JOIN users creator ON pi.created_by = creator.id
        LEFT JOIN users assignee ON pi.assigned_to = assignee.id
+       LEFT JOIN punchlist_checklist_items ci ON ci.punchlist_id = pi.id
        WHERE ${conditions.join(' AND ')}
+       GROUP BY pi.id, p.name, creator.full_name, assignee.full_name
        ORDER BY
          CASE pi.priority WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END,
-         pi.created_at DESC`,
+         pi.created_at DESC LIMIT 500`,
       params
     );
     res.json(result.rows);
@@ -40,8 +42,14 @@ router.get('/', requireAuth, async (req, res) => {
 
 // POST /punchlist
 router.post('/', requireAuth, async (req, res) => {
-  const { project_id, title, description, location, priority, assigned_to, phase } = req.body;
+  const { project_id, priority, assigned_to, phase } = req.body;
+  const title = req.body.title?.trim();
+  const description = req.body.description?.trim() || null;
+  const location = req.body.location?.trim() || null;
   if (!title) return res.status(400).json({ error: 'title required' });
+  if (title.length > 255) return res.status(400).json({ error: 'title too long (max 255 characters)' });
+  if (description && description.length > 1000) return res.status(400).json({ error: 'description too long (max 1000 characters)' });
+  if (location && location.length > 255) return res.status(400).json({ error: 'location too long (max 255 characters)' });
   const companyId = req.user.company_id;
 
   try {
@@ -50,7 +58,7 @@ router.post('/', requireAuth, async (req, res) => {
          (company_id, project_id, title, description, location, priority, assigned_to, created_by, phase)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING id`,
-      [companyId, project_id || null, title, description || null, location || null,
+      [companyId, project_id || null, title, description, location,
        priority || 'normal', assigned_to || null, req.user.id, phase || null]
     );
     const id = result.rows[0].id;
@@ -79,7 +87,15 @@ router.post('/', requireAuth, async (req, res) => {
 // PATCH /punchlist/:id
 router.patch('/:id', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
-  const { title, description, location, priority, status, assigned_to, phase } = req.body;
+  const { priority, status, assigned_to, phase } = req.body;
+  const title = req.body.title !== undefined ? (req.body.title?.trim() || null) : undefined;
+  const description = req.body.description !== undefined ? (req.body.description?.trim() || null) : undefined;
+  const location = req.body.location !== undefined ? (req.body.location?.trim() || null) : undefined;
+
+  const VALID_STATUSES  = ['open', 'in_progress', 'resolved', 'verified'];
+  const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+  if (status   !== undefined && !VALID_STATUSES.includes(status))   return res.status(400).json({ error: 'Invalid status value' });
+  if (priority !== undefined && !VALID_PRIORITIES.includes(priority)) return res.status(400).json({ error: 'Invalid priority value' });
 
   try {
     const existing = await pool.query(
@@ -172,7 +188,7 @@ router.patch('/:id/checklist/:checkId', requireAuth, async (req, res) => {
          checked = CASE WHEN $1::boolean IS NOT NULL THEN $1 ELSE checked END,
          text = COALESCE($2, text)
        WHERE id=$3 AND punchlist_id=$4 RETURNING *`,
-      [checked !== undefined ? checked : null, text || null, req.params.checkId, req.params.id]
+      [checked !== undefined ? checked : null, text?.trim() || null, req.params.checkId, req.params.id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json(result.rows[0]);

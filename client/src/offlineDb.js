@@ -1,14 +1,16 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'opsfloa-cache';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'api-cache';
+const SYNC_STORE = 'pending-syncs';
 
 const TTL = {
   projects: 24 * 60 * 60 * 1000,
   settings: 24 * 60 * 60 * 1000,
   shifts: 60 * 60 * 1000,
   entries: 15 * 60 * 1000,
+  'my-count-assignments': 15 * 60 * 1000,
 };
 
 let _db;
@@ -19,10 +21,35 @@ async function getDb() {
         if (!db.objectStoreNames.contains(STORE)) {
           db.createObjectStore(STORE);
         }
+        if (!db.objectStoreNames.contains(SYNC_STORE)) {
+          db.createObjectStore(SYNC_STORE, { keyPath: 'id', autoIncrement: true });
+        }
       },
     });
   }
   return _db;
+}
+
+// Pending sync queue — for offline submissions
+export async function enqueuePendingSync(item) {
+  try {
+    const db = await getDb();
+    await db.add(SYNC_STORE, { ...item, queued_at: Date.now() });
+  } catch { /* ignore */ }
+}
+
+export async function getPendingSyncs() {
+  try {
+    const db = await getDb();
+    return await db.getAll(SYNC_STORE);
+  } catch { return []; }
+}
+
+export async function removePendingSync(id) {
+  try {
+    const db = await getDb();
+    await db.delete(SYNC_STORE, id);
+  } catch { /* ignore */ }
 }
 
 export async function getCached(key) {

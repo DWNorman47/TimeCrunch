@@ -75,8 +75,9 @@ router.get('/', requireAuth, async (req, res) => {
 // Workers: send to their own thread (worker_id = self)
 // Admin: must provide worker_id in body
 router.post('/', requireAuth, async (req, res) => {
-  const { body, worker_id } = req.body;
-  if (!body?.trim()) return res.status(400).json({ error: 'Message body required' });
+  const { worker_id } = req.body;
+  const body = req.body.body?.trim() || '';
+  if (!body) return res.status(400).json({ error: 'Message body required' });
   if (body.length > 1000) return res.status(400).json({ error: 'Message must be 1000 characters or fewer' });
 
   const isAdmin = req.user.role === 'admin';
@@ -97,7 +98,7 @@ router.post('/', requireAuth, async (req, res) => {
       `INSERT INTO company_chat (company_id, sender_id, worker_id, body)
        VALUES ($1, $2, $3, $4)
        RETURNING id, sender_id, worker_id, body, created_at`,
-      [req.user.company_id, req.user.id, targetWorkerId, body.trim()]
+      [req.user.company_id, req.user.id, targetWorkerId, body]
     );
 
     // Prune old messages based on chat_retention_days setting
@@ -114,7 +115,7 @@ router.post('/', requireAuth, async (req, res) => {
     const msg = { ...result.rows[0], sender_name: req.user.full_name, sender_role: req.user.role };
 
     // Push notification to recipient(s)
-    const snippet = body.trim().substring(0, 100);
+    const snippet = body.substring(0, 100);
     if (req.user.role === 'admin') {
       // Admin messaging a worker — notify that worker
       sendPushToUser(targetWorkerId, {

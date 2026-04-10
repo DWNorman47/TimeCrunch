@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api';
 import BinLabelModal from './BinLabelModal';
+import { useT } from '../../hooks/useT';
+
+function isHttpUrl(url) {
+  try { return ['http:', 'https:'].includes(new URL(url).protocol); } catch { return false; }
+}
 
 // ── Level config ──────────────────────────────────────────────────────────────
 // Each level knows its API path, its parent's key name, and which parent level feeds it.
@@ -110,7 +115,17 @@ const pg = {
 // ── Entity Edit Form ──────────────────────────────────────────────────────────
 
 function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) {
+  const t = useT();
   const isLocation = level.key === 'locations';
+
+  const LEVEL_SGl = {
+    locations:    t.invSetupLocationSgl,
+    areas:        t.invSetupAreaSgl,
+    racks:        t.invSetupRackSgl,
+    bays:         t.invSetupBaySgl,
+    compartments: t.invSetupCompartmentSgl,
+  };
+  const levelSingular = LEVEL_SGl[level.key] || level.label;
 
   const [form, setForm] = useState({
     name:       item?.name       || '',
@@ -129,8 +144,8 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
   const submit = async e => {
     e.preventDefault();
     setError('');
-    if (!form.name.trim()) return setError('Name is required.');
-    if (level.parentKey && !form[level.parentKey]) return setError(`${level.parentLabel} is required.`);
+    if (!form.name.trim()) return setError(t.invSetupNameRequired);
+    if (level.parentKey && !form[level.parentKey]) return setError(`${levelSingular} ${t.invSetupIsRequired}`);
     setSaving(true);
     try {
       const payload = {
@@ -147,7 +162,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       }
       onSave();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save.');
+      setError(err.response?.data?.error || t.invSetupFailedSave);
     } finally {
       setSaving(false);
     }
@@ -158,20 +173,20 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
 
   return (
     <form onSubmit={submit} style={ef.form}>
-      <h3 style={ef.title}>{item ? `Edit ${level.label.slice(0,-1)||level.label}` : `Add ${level.label.slice(0,-1)||level.label}`}</h3>
+      <h3 style={ef.title}>{item ? `${t.edit} ${levelSingular}` : `${t.addOption} ${levelSingular}`}</h3>
       {error && <div style={ef.error}>{error}</div>}
 
       {/* Parent selector (only for new items on non-location levels) */}
       {!isLocation && !item && (
         <div style={ef.field}>
-          <label style={ef.label}>{level.parentLabel} *</label>
+          <label style={ef.label}>{LEVEL_SGl[level.parentLevel] || level.parentLabel} *</label>
           <select
             style={ef.input}
             value={form[level.parentKey]}
             onChange={e => set(level.parentKey, e.target.value)}
             required
           >
-            <option value="">Select {level.parentLabel}…</option>
+            <option value="">{t.selectPlaceholder} {levelSingular}…</option>
             {parentOptions.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
@@ -180,7 +195,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       )}
 
       <div style={ef.field}>
-        <label style={ef.label}>Name *</label>
+        <label style={ef.label}>{t.invSetupNameField}</label>
         <input
           style={ef.input}
           value={form.name}
@@ -193,42 +208,44 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       {isLocation && (
         <>
           <div style={ef.field}>
-            <label style={ef.label}>Type</label>
+            <label style={ef.label}>{t.invSetupTypeField}</label>
             <select style={ef.input} value={form.type} onChange={e => set('type', e.target.value)}>
               {level.typeOptions.map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
             </select>
           </div>
           <div style={ef.field}>
-            <label style={ef.label}>Address <span style={ef.labelHint}>(optional)</span></label>
+            <label style={ef.label}>{t.invSetupAddressField} <span style={ef.labelHint}>({t.optional})</span></label>
             <textarea
               style={{ ...ef.input, minHeight: 56, resize: 'vertical' }}
               value={form.address}
               onChange={e => set('address', e.target.value)}
               placeholder="123 Main St, City, State 12345"
+              maxLength={500}
             />
           </div>
         </>
       )}
 
       <div style={ef.field}>
-        <label style={ef.label}>Notes</label>
+        <label style={ef.label}>{t.notes}</label>
         <textarea
           style={{ ...ef.input, minHeight: 56, resize: 'vertical' }}
           value={form.notes}
           onChange={e => set('notes', e.target.value)}
           placeholder="Optional description or map reference…"
+          maxLength={1000}
         />
       </div>
 
       <div style={ef.field}>
-        <label style={ef.label}>Photos <span style={ef.labelHint}>(maps, photos of the spot)</span></label>
+        <label style={ef.label}>{t.invSetupPhotosField}</label>
         <PhotoGrid photos={photos} onAdd={addPhoto} onRemove={removePhoto} />
       </div>
 
       <div style={ef.actions}>
-        <button type="button" style={ef.cancelBtn} onClick={onCancel}>Cancel</button>
+        <button type="button" style={ef.cancelBtn} onClick={onCancel}>{t.cancel}</button>
         <button type="submit" style={ef.saveBtn} disabled={saving}>
-          {saving ? 'Saving…' : item ? 'Save Changes' : `Add ${level.label.slice(0,-1)||level.label}`}
+          {saving ? t.saving : item ? t.saveChanges : `${t.addOption} ${levelSingular}`}
         </button>
       </div>
     </form>
@@ -251,6 +268,7 @@ const ef = {
 // ── Supplier Panel ────────────────────────────────────────────────────────────
 
 function SupplierPanel() {
+  const t = useT();
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState('');
@@ -259,13 +277,16 @@ function SupplierPanel() {
   const [form, setForm]           = useState({ name: '', contact_name: '', phone: '', email: '', website: '', notes: '' });
   const [saving, setSaving]       = useState(false);
   const [formErr, setFormErr]     = useState('');
+  const [pendingArchiveSupId, setPendingArchiveSupId] = useState(null);
+  const [archiveError, setArchiveError] = useState('');
+  const [restoreError, setRestoreError] = useState('');
 
   const load = async () => {
     setLoading(true);
     try {
       const r = await api.get(`/inventory/suppliers?active=${showAll ? 'all' : 'true'}`);
       setSuppliers(r.data);
-    } catch { setError('Failed to load suppliers.'); }
+    } catch { setError(t.invSetupFailedLoad); }
     finally { setLoading(false); }
   };
 
@@ -288,7 +309,7 @@ function SupplierPanel() {
 
   const save = async () => {
     setFormErr('');
-    if (!form.name.trim()) return setFormErr('Name is required.');
+    if (!form.name.trim()) return setFormErr(t.invSetupNameRequired);
     setSaving(true);
     try {
       const payload = {
@@ -304,61 +325,63 @@ function SupplierPanel() {
       setEditing(null);
       load();
     } catch (err) {
-      setFormErr(err.response?.data?.error || 'Failed to save.');
+      setFormErr(err.response?.data?.error || t.invSetupFailedSave);
     } finally { setSaving(false); }
   };
 
   const archive = async (sup) => {
-    if (!confirm(`Archive "${sup.name}"?`)) return;
+    setPendingArchiveSupId(null);
+    setArchiveError('');
     try {
       await api.delete(`/inventory/suppliers/${sup.id}`);
       load();
-    } catch (err) { alert(err.response?.data?.error || 'Failed to archive.'); }
+    } catch (err) { setArchiveError(err.response?.data?.error || t.invSetupFailedArchive); }
   };
 
   const restore = async (sup) => {
+    setRestoreError('');
     try {
       await api.patch(`/inventory/suppliers/${sup.id}`, { active: true });
       load();
-    } catch { alert('Failed to restore.'); }
+    } catch { setRestoreError(t.invSetupFailedRestore); }
   };
 
   if (editing !== null) {
     return (
       <div style={sp.formWrap}>
-        <h3 style={sp.formTitle}>{editing ? 'Edit Supplier' : 'Add Supplier'}</h3>
+        <h3 style={sp.formTitle}>{editing ? t.invSetupEditSupplierTitle : t.invSetupAddSupplierTitle}</h3>
         {formErr && <div style={sp.error}>{formErr}</div>}
         <div style={sp.row}>
           <div style={sp.field}>
-            <label style={sp.label}>Name *</label>
-            <input style={sp.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Supply Co." />
+            <label style={sp.label}>{t.invSetupNameField}</label>
+            <input style={sp.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Supply Co." />
           </div>
           <div style={sp.field}>
-            <label style={sp.label}>Contact Name</label>
-            <input style={sp.input} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" />
+            <label style={sp.label}>{t.invSetupContactName}</label>
+            <input style={sp.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" />
           </div>
         </div>
         <div style={sp.row}>
           <div style={sp.field}>
-            <label style={sp.label}>Phone</label>
-            <input style={sp.input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 555-5555" />
+            <label style={sp.label}>{t.invSetupPhone}</label>
+            <input style={sp.input} maxLength={50} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 555-5555" />
           </div>
           <div style={sp.field}>
-            <label style={sp.label}>Email</label>
-            <input style={sp.input} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="orders@supplier.com" />
+            <label style={sp.label}>{t.invSetupEmail}</label>
+            <input style={sp.input} type="email" maxLength={255} value={form.email} onChange={e => set('email', e.target.value)} placeholder="orders@supplier.com" />
           </div>
           <div style={sp.field}>
-            <label style={sp.label}>Website</label>
+            <label style={sp.label}>{t.invSetupWebsite}</label>
             <input style={sp.input} value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://supplier.com" />
           </div>
         </div>
         <div style={sp.field}>
-          <label style={sp.label}>Notes</label>
-          <textarea style={{ ...sp.input, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} />
+          <label style={sp.label}>{t.notes}</label>
+          <textarea style={{ ...sp.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
         </div>
         <div style={sp.actions}>
-          <button style={sp.cancelBtn} onClick={() => setEditing(null)}>Cancel</button>
-          <button style={sp.saveBtn} onClick={save} disabled={saving}>{saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Supplier'}</button>
+          <button style={sp.cancelBtn} onClick={() => setEditing(null)}>{t.cancel}</button>
+          <button style={sp.saveBtn} onClick={save} disabled={saving}>{saving ? t.saving : editing ? t.saveChanges : t.invSetupAddSupplierTitle}</button>
         </div>
       </div>
     );
@@ -369,17 +392,17 @@ function SupplierPanel() {
       <div style={sp.toolbar}>
         <label style={sp.toggle}>
           <input type="checkbox" checked={showAll} onChange={e => setShowAll(e.target.checked)} />
-          Show archived
+          {t.invSetupShowArchived}
         </label>
-        <button style={sp.addBtn} onClick={openNew}>+ Add Supplier</button>
+        <button style={sp.addBtn} onClick={openNew}>{t.invSetupAddSupplierBtn}</button>
       </div>
       {error && <div style={sp.error}>{error}</div>}
       {loading ? (
-        <div style={sp.empty}>Loading…</div>
+        <div style={sp.empty}>{t.loading}</div>
       ) : suppliers.length === 0 ? (
         <div style={sp.empty}>
           <div style={sp.emptyIcon}>🏭</div>
-          <p>No suppliers yet. Add your first supplier to get started.</p>
+          <p>{t.invSetupNoSuppliers}</p>
         </div>
       ) : (
         <div style={sp.list}>
@@ -392,24 +415,33 @@ function SupplierPanel() {
                   <div style={sp.cardContacts}>
                     {sup.phone && <span style={sp.contact}>{sup.phone}</span>}
                     {sup.email && <a href={`mailto:${sup.email}`} style={sp.contactLink}>{sup.email}</a>}
-                    {sup.website && <a href={sup.website} target="_blank" rel="noopener noreferrer" style={sp.contactLink}>{sup.website.replace(/^https?:\/\//, '')}</a>}
+                    {sup.website && isHttpUrl(sup.website) && <a href={sup.website} target="_blank" rel="noopener noreferrer" style={sp.contactLink}>{sup.website.replace(/^https?:\/\//, '')}</a>}
                   </div>
                   {sup.notes && <div style={sp.cardNotes}>{sup.notes}</div>}
                 </div>
                 <div style={sp.cardActions}>
                   {sup.active ? (
                     <>
-                      <span style={{ ...sp.badge, color: '#059669', background: '#d1fae5' }}>Active</span>
+                      <span style={{ ...sp.badge, color: '#059669', background: '#d1fae5' }}>{t.invSetupActiveStatus}</span>
                       <button style={sp.iconBtn} onClick={() => openEdit(sup)} title="Edit">✏️</button>
-                      <button style={sp.iconBtn} onClick={() => archive(sup)} title="Archive">🗄️</button>
+                      {pendingArchiveSupId === sup.id ? (
+                        <>
+                          <button style={sp.confirmArchiveBtn} onClick={() => archive(sup)}>{t.confirm}</button>
+                          <button style={sp.iconBtn} onClick={() => setPendingArchiveSupId(null)}>✕</button>
+                        </>
+                      ) : (
+                        <button style={sp.iconBtn} onClick={() => setPendingArchiveSupId(sup.id)} title="Archive">🗄️</button>
+                      )}
                     </>
                   ) : (
                     <>
-                      <span style={{ ...sp.badge, color: '#9ca3af', background: '#f3f4f6' }}>Archived</span>
+                      <span style={{ ...sp.badge, color: '#9ca3af', background: '#f3f4f6' }}>{t.invSetupArchivedStatus}</span>
                       <button style={sp.iconBtn} onClick={() => restore(sup)} title="Restore">↩️</button>
                     </>
                   )}
                 </div>
+                {archiveError && <p style={sp.inlineError}>{archiveError}</p>}
+                {restoreError && <p style={sp.inlineError}>{restoreError}</p>}
               </div>
             </div>
           ))}
@@ -439,6 +471,8 @@ const sp = {
   cardActions: { display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 },
   badge:       { display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, marginRight: 4 },
   iconBtn:     { background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 3px' },
+  confirmArchiveBtn: { background: '#f59e0b', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  inlineError: { fontSize: 12, color: '#ef4444', margin: '4px 0 0' },
   formWrap:    { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20 },
   formTitle:   { fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 16 },
   row:         { display: 'flex', gap: 12, flexWrap: 'wrap' },
@@ -453,12 +487,33 @@ const sp = {
 // ── Main Setup Component ───────────────────────────────────────────────────────
 
 export default function InventorySetup({ projects }) {
+  const t = useT();
+
+  const LEVEL_LABELS = {
+    locations:    t.invSetupLocations,
+    areas:        t.invSetupAreas,
+    racks:        t.invSetupRacks,
+    bays:         t.invSetupBays,
+    compartments: t.invSetupCompartments,
+  };
+
+  const LEVEL_LABELS_SGl = {
+    locations:    t.invSetupLocationSgl,
+    areas:        t.invSetupAreaSgl,
+    racks:        t.invSetupRackSgl,
+    bays:         t.invSetupBaySgl,
+    compartments: t.invSetupCompartmentSgl,
+  };
+
   const [levelKey,  setLevelKey]  = useState('locations');
   const [items,     setItems]     = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState('');
   const [editing,   setEditing]   = useState(null); // null=list, false=new, obj=edit
   const [printItem, setPrintItem] = useState(null); // item to print label for
+  const [pendingArchiveItemId, setPendingArchiveItemId] = useState(null);
+  const [itemArchiveError, setItemArchiveError] = useState('');
+  const [itemRestoreError, setItemRestoreError] = useState('');
 
   // Parent cascade: store selected IDs for each level so child levels can filter
   const [parentSels, setParentSels] = useState({
@@ -537,7 +592,7 @@ export default function InventorySetup({ projects }) {
       const r = await api.get(url);
       setItems(r.data);
     } catch {
-      setError('Failed to load.');
+      setError(t.invSetupFailedLoad);
     } finally {
       setLoading(false);
     }
@@ -555,20 +610,22 @@ export default function InventorySetup({ projects }) {
   };
 
   const archive = async item => {
-    if (!confirm(`Archive "${item.name}"?`)) return;
+    setPendingArchiveItemId(null);
+    setItemArchiveError('');
     try {
       await api.delete(`${level.apiPath}/${item.id}`);
       load();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to archive.');
+      setItemArchiveError(err.response?.data?.error || t.invSetupFailedArchive);
     }
   };
 
   const restore = async item => {
+    setItemRestoreError('');
     try {
       await api.patch(`${level.apiPath}/${item.id}`, { active: true });
       load();
-    } catch { alert('Failed to restore.'); }
+    } catch { setItemRestoreError(t.invSetupFailedRestore); }
   };
 
   // Which parent option list feeds the "Add new" form's parent selector
@@ -584,16 +641,16 @@ export default function InventorySetup({ projects }) {
   const parentFilters = () => {
     const filters = [];
     if (['areas','racks','bays','compartments'].includes(levelKey)) {
-      filters.push({ label: 'Location', key: 'location_id', options: parentOpts.locations });
+      filters.push({ label: t.invSetupLocationSgl, key: 'location_id', options: parentOpts.locations });
     }
     if (['racks','bays','compartments'].includes(levelKey)) {
-      filters.push({ label: 'Area', key: 'area_id', options: parentOpts.areas });
+      filters.push({ label: t.invSetupAreaSgl, key: 'area_id', options: parentOpts.areas });
     }
     if (['bays','compartments'].includes(levelKey)) {
-      filters.push({ label: 'Rack', key: 'rack_id', options: parentOpts.racks });
+      filters.push({ label: t.invSetupRackSgl, key: 'rack_id', options: parentOpts.racks });
     }
     if (levelKey === 'compartments') {
-      filters.push({ label: 'Bay', key: 'bay_id', options: parentOpts.bays });
+      filters.push({ label: t.invSetupBaySgl, key: 'bay_id', options: parentOpts.bays });
     }
     return filters;
   };
@@ -608,14 +665,14 @@ export default function InventorySetup({ projects }) {
             style={{ ...s.levelTab, ...(l.key === levelKey ? s.levelTabActive : {}) }}
             onClick={() => setLevelKey(l.key)}
           >
-            {l.label}
+            {LEVEL_LABELS[l.key] || l.label}
           </button>
         ))}
         <button
           style={{ ...s.levelTab, ...(levelKey === 'suppliers' ? s.levelTabActive : {}) }}
           onClick={() => setLevelKey('suppliers')}
         >
-          Suppliers
+          {t.invSetupSuppliers}
         </button>
       </div>
 
@@ -634,8 +691,8 @@ export default function InventorySetup({ projects }) {
                 value={parentSels[f.key]}
                 onChange={e => setParentSels(p => ({ ...p, [f.key]: e.target.value }))}
               >
-                <option value="">All {f.label}s</option>
-                {f.options.map(o => <option key={o.id} value={o.id}>{o.name}{!o.active ? ' (archived)' : ''}</option>)}
+                <option value="">{t.invCycAllLocations}</option>
+                {f.options.map(o => <option key={o.id} value={o.id}>{o.name}{!o.active ? ` ${t.invSetupArchivedSuffix}` : ''}</option>)}
               </select>
             </div>
           ))}
@@ -659,20 +716,20 @@ export default function InventorySetup({ projects }) {
       {editing === null && (
         <>
           <div style={s.toolbar}>
-            <span style={s.count}>{items.length} {level.label.toLowerCase()}</span>
+            <span style={s.count}>{items.length} {(LEVEL_LABELS[level.key] || level.label).toLowerCase()}</span>
             <button style={s.addBtn} onClick={() => setEditing(false)}>
-              + Add {level.label.slice(0, -1) || level.label}
+              + {t.addOption} {LEVEL_LABELS_SGl[level.key] || level.label}
             </button>
           </div>
 
           {error && <div style={s.error}>{error}</div>}
 
           {loading ? (
-            <div style={s.empty}>Loading…</div>
+            <div style={s.empty}>{t.loading}</div>
           ) : items.length === 0 ? (
             <div style={s.empty}>
               <div style={s.emptyIcon}>📍</div>
-              <p>No {level.label.toLowerCase()} yet.</p>
+              <p>{t.invSetupNoPrefix} {(LEVEL_LABELS[level.key] || level.label).toLowerCase()} {t.invSetupNoSuffix}</p>
             </div>
           ) : (
             <div style={s.list}>
@@ -682,7 +739,7 @@ export default function InventorySetup({ projects }) {
                     <div style={s.cardInfo}>
                       <div style={s.cardName}>{item.name}</div>
                       {item.parent_name && (
-                        <div style={s.cardParent}>in {item.parent_name}</div>
+                        <div style={s.cardParent}>{t.invSetupIn} {item.parent_name}</div>
                       )}
                       {item.address && <div style={s.cardAddress}>{item.address}</div>}
                       {item.notes && <div style={s.cardNotes}>{item.notes}</div>}
@@ -706,8 +763,8 @@ export default function InventorySetup({ projects }) {
                       )}
                       <div style={s.cardActions}>
                         {!item.active
-                          ? <span style={{ ...s.badge, color: '#9ca3af', background: '#f3f4f6' }}>Archived</span>
-                          : <span style={{ ...s.badge, color: '#059669', background: '#d1fae5' }}>Active</span>
+                          ? <span style={{ ...s.badge, color: '#9ca3af', background: '#f3f4f6' }}>{t.invSetupArchivedStatus}</span>
+                          : <span style={{ ...s.badge, color: '#059669', background: '#d1fae5' }}>{t.invSetupActiveStatus}</span>
                         }
                         {item.active ? (
                           <>
@@ -715,7 +772,14 @@ export default function InventorySetup({ projects }) {
                               <button style={s.iconBtn} onClick={() => setPrintItem(item)} title="Print QR Label">🏷</button>
                             )}
                             <button style={s.iconBtn} onClick={() => setEditing(item)} title="Edit">✏️</button>
-                            <button style={s.iconBtn} onClick={() => archive(item)} title="Archive">🗄️</button>
+                            {pendingArchiveItemId === item.id ? (
+                              <>
+                                <button style={s.confirmArchiveBtn} onClick={() => archive(item)}>{t.confirm}</button>
+                                <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(null)}>✕</button>
+                              </>
+                            ) : (
+                              <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(item.id)} title="Archive">🗄️</button>
+                            )}
                           </>
                         ) : (
                           <button style={s.iconBtn} onClick={() => restore(item)} title="Restore">↩️</button>
@@ -729,6 +793,8 @@ export default function InventorySetup({ projects }) {
           )}
         </>
       )}
+      {itemArchiveError && <p style={s.inlineError}>{itemArchiveError}</p>}
+      {itemRestoreError && <p style={s.inlineError}>{itemRestoreError}</p>}
       {printItem && (
         <BinLabelModal
           item={printItem}
@@ -772,4 +838,6 @@ const s = {
   cardActions:   { display: 'flex', alignItems: 'center', gap: 4 },
   badge:         { display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700 },
   iconBtn:       { background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 3px' },
+  confirmArchiveBtn: { background: '#f59e0b', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  inlineError:   { fontSize: 12, color: '#ef4444', margin: '4px 0 0' },
 };

@@ -8,6 +8,7 @@ import TabBar from '../components/TabBar';
 import BillingPanel from '../components/BillingPanel';
 import ManageWorkers from '../components/ManageWorkers';
 import ManageRates from '../components/ManageRates';
+import AdvancedSettings from '../components/AdvancedSettings';
 import AuditLog from '../components/AuditLog';
 import QuickBooks from '../components/QuickBooks';
 import MFASetup from '../components/MFASetup';
@@ -311,7 +312,7 @@ export default function AdministrationPage() {
 
   const hashTab = window.location.hash.replace('#', '');
   const [tab, setTab] = useState(ADMIN_TABS.includes(hashTab) ? hashTab : 'company');
-  const switchTab = t => { setTab(t); window.location.hash = t; };
+  const switchTab = t => { setTab(t); history.replaceState(null, '', '#' + t); };
 
   // Shared state for ManageWorkers and QuickBooks
   const [workers, setWorkers] = useState([]);
@@ -365,6 +366,7 @@ export default function AdministrationPage() {
             <CompanyTab />
             <h3 style={{ ...styles.sectionTitle, marginTop: 8 }}>{t.settings}</h3>
             <ManageRates settings={settings} onSettingsUpdated={setSettings} />
+            <AdvancedSettings />
           </div>
         )}
         {tab === 'team'     && (

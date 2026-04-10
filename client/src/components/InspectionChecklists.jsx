@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
+import { useT } from '../hooks/useT';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
@@ -11,11 +12,7 @@ const STATUS_STYLES = {
   pending: { color: '#92400e', background: '#fef3c7' },
 };
 
-const ITEM_TYPES = [
-  { value: 'pass_fail', label: 'Pass / Fail' },
-  { value: 'text', label: 'Text note' },
-  { value: 'number', label: 'Number' },
-];
+// ITEM_TYPES is built inside TemplateBuilder using t keys
 
 // ── Preset Templates ───────────────────────────────────────────────────────────
 
@@ -62,6 +59,12 @@ const PRESET_TEMPLATES = [
 // ── Template Builder ───────────────────────────────────────────────────────────
 
 function TemplateBuilder({ initial, onSaved, onCancel }) {
+  const t = useT();
+  const ITEM_TYPES = [
+    { value: 'pass_fail', label: t.inspPassFail },
+    { value: 'text', label: t.inspTextNote },
+    { value: 'number', label: t.inspNumber },
+  ];
   const isEdit = !!initial?.id;
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -84,8 +87,8 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!name.trim()) { setError('Template name is required.'); return; }
-    if (items.length === 0) { setError('Add at least one checklist item.'); return; }
+    if (!name.trim()) { setError(t.inspTemplateNameRequired); return; }
+    if (items.length === 0) { setError(t.inspAddAtLeastOne); return; }
     setSaving(true); setError('');
     const cleanItems = items.map(({ _id, ...rest }) => ({ ...rest, id: _id.toString(36).slice(2) }));
     try {
@@ -94,17 +97,17 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
         : await api.post('/inspections/templates', { name, description, items: cleanItems });
       onSaved(r.data, isEdit);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save');
+      setError(err.response?.data?.error || t.inspFailedSave);
     } finally { setSaving(false); }
   };
 
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={styles.formTitle}>{isEdit ? 'Edit Template' : 'New Checklist Template'}</h3>
+        <h3 style={styles.formTitle}>{isEdit ? t.inspEditTemplate : t.inspNewTemplateTitle}</h3>
         {!isEdit && (
           <button type="button" style={styles.presetBtn} onClick={() => setShowPresets(s => !s)}>
-            📋 From Preset
+            {t.inspFromPreset}
           </button>
         )}
       </div>
@@ -114,28 +117,28 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
           {PRESET_TEMPLATES.map(p => (
             <button key={p.name} type="button" style={styles.presetCard} onClick={() => pickPreset(p)}>
               <div style={styles.presetName}>{p.name}</div>
-              <div style={styles.presetCount}>{p.items.length} items</div>
+              <div style={styles.presetCount}>{p.items.length} {t.inspItemsCount}</div>
             </button>
           ))}
         </div>
       )}
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>Template Name</label>
+        <label style={styles.label}>{t.inspTemplateName}</label>
         <input style={styles.input} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daily Site Safety" />
       </div>
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>Description <span style={styles.optional}>(optional)</span></label>
-        <input style={styles.input} value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of when to use this checklist" />
+        <label style={styles.label}>{t.inspDescriptionField} <span style={styles.optional}>{t.inspOptional}</span></label>
+        <input style={styles.input} maxLength={255} value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of when to use this checklist" />
       </div>
 
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <label style={styles.label}>Checklist Items</label>
-          <button type="button" style={styles.addItemBtn} onClick={addItem}>+ Add Item</button>
+          <label style={styles.label}>{t.inspChecklistItems}</label>
+          <button type="button" style={styles.addItemBtn} onClick={addItem}>{t.inspAddItem}</button>
         </div>
         {items.length === 0 && (
-          <p style={styles.hint}>No items yet. Add items or pick a preset.</p>
+          <p style={styles.hint}>{t.inspNoItemsYet}</p>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {items.map((item, idx) => (
@@ -145,10 +148,10 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
                 style={{ ...styles.input, flex: 1 }}
                 value={item.label}
                 onChange={e => updateItem(item._id, 'label', e.target.value)}
-                placeholder="Item label"
+                placeholder={t.inspItemLabel}
               />
               <select style={styles.typeSelect} value={item.type} onChange={e => updateItem(item._id, 'type', e.target.value)}>
-                {ITEM_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {ITEM_TYPES.map(it => <option key={it.value} value={it.value}>{it.label}</option>)}
               </select>
               <button type="button" style={styles.removeItemBtn} onClick={() => removeItem(item._id)}>✕</button>
             </div>
@@ -158,8 +161,8 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Template'}</button>
-        <button style={styles.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.inspSaveChanges : t.inspCreateTemplate}</button>
+        <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
   );
@@ -168,6 +171,7 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
 // ── Inspection Form (fill out an inspection) ──────────────────────────────────
 
 function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
+  const t = useT();
   const isEdit = !!initial?.id;
   const [form, setForm] = useState({
     template_id: initial?.template_id ?? '',
@@ -184,10 +188,10 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
   const [error, setError] = useState('');
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const selectedTemplate = templates.find(t => t.id === form.template_id);
+  const selectedTemplate = templates.find(tpl => tpl.id === form.template_id);
 
   const handleTemplateChange = (tid) => {
-    const tpl = templates.find(t => t.id === tid);
+    const tpl = templates.find(tpl2 => tpl2.id === tid);
     set('template_id', tid);
     if (tpl && !isEdit) set('name', tpl.name);
   };
@@ -213,7 +217,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!form.name.trim() || !form.inspected_at) { setError('Name and date are required.'); return; }
+    if (!form.name.trim() || !form.inspected_at) { setError(t.inspNameDateRequired); return; }
     setSaving(true); setError('');
     try {
       const r = isEdit
@@ -225,51 +229,51 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
       }
       onSaved(r.data, isEdit);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save');
+      setError(err.response?.data?.error || t.inspFailedSave);
     } finally { setSaving(false); }
   };
 
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
-      <h3 style={styles.formTitle}>{isEdit ? 'Edit Inspection' : 'New Inspection'}</h3>
+      <h3 style={styles.formTitle}>{isEdit ? t.inspEditInspection : t.inspNewInspectionTitle}</h3>
 
       {!isEdit && templates.length > 0 && (
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Checklist Template <span style={styles.optional}>(optional)</span></label>
+          <label style={styles.label}>{t.inspChecklistTemplate} <span style={styles.optional}>{t.inspOptional}</span></label>
           <select style={styles.input} value={form.template_id} onChange={e => handleTemplateChange(e.target.value)}>
-            <option value="">— blank inspection —</option>
-            {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            <option value="">{t.inspBlankInspection}</option>
+            {templates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
           </select>
         </div>
       )}
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Inspection Name</label>
-          <input style={styles.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Daily Site Safety - Mar 25" />
+          <label style={styles.label}>{t.inspInspectionName}</label>
+          <input style={styles.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Daily Site Safety - Mar 25" />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Date</label>
+          <label style={styles.label}>{t.date}</label>
           <input style={styles.input} type="date" value={form.inspected_at} onChange={e => set('inspected_at', e.target.value)} />
         </div>
       </div>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Inspector <span style={styles.optional}>(optional)</span></label>
-          <input style={styles.input} value={form.inspector} onChange={e => set('inspector', e.target.value)} placeholder="Name of inspector" />
+          <label style={styles.label}>{t.inspInspector} <span style={styles.optional}>{t.inspOptional}</span></label>
+          <input style={styles.input} maxLength={255} value={form.inspector} onChange={e => set('inspector', e.target.value)} placeholder="Name of inspector" />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Location <span style={styles.optional}>(optional)</span></label>
-          <input style={styles.input} value={form.location} onChange={e => set('location', e.target.value)} placeholder="Area or location inspected" />
+          <label style={styles.label}>{t.inspInspectionLocation} <span style={styles.optional}>{t.inspOptional}</span></label>
+          <input style={styles.input} maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} placeholder="Area or location inspected" />
         </div>
       </div>
 
       {projects.length > 0 && (
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Project <span style={styles.optional}>(optional)</span></label>
+          <label style={styles.label}>{t.project} <span style={styles.optional}>{t.inspOptional}</span></label>
           <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-            <option value="">No project</option>
+            <option value="">{t.inspNoProject}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
@@ -277,7 +281,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
 
       {selectedTemplate && selectedTemplate.items.length > 0 && (
         <div>
-          <label style={{ ...styles.label, marginBottom: 8, display: 'block' }}>Checklist Items</label>
+          <label style={{ ...styles.label, marginBottom: 8, display: 'block' }}>{t.inspChecklistItems}</label>
           <div style={styles.checklistGrid}>
             {selectedTemplate.items.map(item => {
               const res = form.results[item.id] || {};
@@ -293,7 +297,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
                           style={{ ...styles.pfBtn, ...(res.value === v ? styles[`pfBtn_${v}`] : {}) }}
                           onClick={() => setResult(item.id, 'value', res.value === v ? null : v)}
                         >
-                          {v === 'pass' ? '✓ Pass' : '✗ Fail'}
+                          {v === 'pass' ? t.inspPassBtn : t.inspFailBtn}
                         </button>
                       ))}
                       {res.value === 'fail' && (
@@ -301,7 +305,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
                           style={{ ...styles.input, flex: 1, fontSize: 12 }}
                           value={res.note || ''}
                           onChange={e => setResult(item.id, 'note', e.target.value)}
-                          placeholder="Describe the issue…"
+                          placeholder={t.inspDescribeIssue}
                         />
                       )}
                     </div>
@@ -311,7 +315,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
                       style={styles.input}
                       value={res.value || ''}
                       onChange={e => setResult(item.id, 'value', e.target.value)}
-                      placeholder="Enter note…"
+                      placeholder={t.inspEnterNote}
                     />
                   )}
                   {item.type === 'number' && (
@@ -331,24 +335,24 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Overall Status</label>
+          <label style={styles.label}>{t.inspOverallStatus}</label>
           <select style={styles.input} value={form.status} onChange={e => set('status', e.target.value)}>
-            <option value="pass">Pass</option>
-            <option value="fail">Fail</option>
-            <option value="pending">Pending</option>
+            <option value="pass">{t.inspStatusPass}</option>
+            <option value="fail">{t.inspStatusFail}</option>
+            <option value="pending">{t.inspStatusPending}</option>
           </select>
         </div>
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>Notes <span style={styles.optional}>(optional)</span></label>
-        <textarea style={styles.textarea} rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="General notes about this inspection…" />
+        <label style={styles.label}>{t.notes} <span style={styles.optional}>{t.inspOptional}</span></label>
+        <textarea style={styles.textarea} rows={3} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="General notes about this inspection…" />
       </div>
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Save Inspection'}</button>
-        <button style={styles.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.inspSaveChanges : t.inspSaveInspection}</button>
+        <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
   );
@@ -357,14 +361,17 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
 // ── Inspection Card ────────────────────────────────────────────────────────────
 
 function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const handleDelete = async () => {
-    if (!confirm('Delete this inspection?')) return;
     setDeleting(true);
+    setDeleteError('');
     try { await api.delete(`/inspections/${ins.id}`); onDeleted(ins.id); }
-    catch { alert('Failed to delete'); }
+    catch { setDeleteError(t.inspFailedDelete); setConfirmingDelete(false); }
     finally { setDeleting(false); }
   };
 
@@ -372,7 +379,7 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
   const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
 
   // Build a label lookup map from the template this inspection was based on
-  const template = templates?.find(t => t.id === ins.template_id);
+  const template = templates?.find(tpl => tpl.id === ins.template_id);
   const itemLabels = {};
   if (template?.items) {
     template.items.forEach(i => { itemLabels[i.id] = i.label; });
@@ -391,7 +398,7 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
         <div style={styles.cardMiddle}>
           <div style={styles.cardName}>
             {ins.name}
-            {ins.pending && <span style={styles.pendingBadge}>⏳ Pending sync</span>}
+            {ins.pending && <span style={styles.pendingBadge}>{t.inspPendingSync}</span>}
           </div>
           <div style={styles.cardMeta}>
             <span>{fmtDate(ins.inspected_at)}</span>
@@ -419,7 +426,7 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
 
           {Object.entries(results).length > 0 && (
             <div style={{ marginTop: 12 }}>
-              <div style={styles.sectionLabel}>Checklist Results</div>
+              <div style={styles.sectionLabel}>{t.inspChecklistResults}</div>
               <div style={styles.resultsGrid}>
                 {Object.entries(results).map(([itemId, res]) => {
                   const isPass = res.value === 'pass';
@@ -441,8 +448,16 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
 
           {isAdmin && !ins.pending && (
             <div style={styles.cardActions}>
-              <button style={styles.editBtn} onClick={() => onEdit(ins)}>Edit</button>
-              <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : 'Delete'}</button>
+              <button style={styles.editBtn} onClick={() => onEdit(ins)}>{t.edit}</button>
+              {confirmingDelete ? (
+                <>
+                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                  <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+                </>
+              ) : (
+                <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.delete}</button>
+              )}
+              {deleteError && <span style={styles.inlineError}>{deleteError}</span>}
             </div>
           )}
         </div>
@@ -454,6 +469,7 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function InspectionChecklists({ projects }) {
+  const t = useT();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
@@ -465,6 +481,7 @@ export default function InspectionChecklists({ projects }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [filters, setFilters] = useState({});
+  const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
 
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
@@ -482,7 +499,7 @@ export default function InspectionChecklists({ projects }) {
 
   const handleSaved = (item, isEdit) => {
     if (view === 'templates') {
-      if (isEdit) setTemplates(prev => prev.map(t => t.id === item.id ? item : t));
+      if (isEdit) setTemplates(prev => prev.map(tpl => tpl.id === item.id ? item : tpl));
       else setTemplates(prev => [item, ...prev]);
     } else {
       if (isEdit) setInspections(prev => prev.map(i => i.id === item.id ? item : i));
@@ -499,10 +516,10 @@ export default function InspectionChecklists({ projects }) {
     <div>
       <div style={styles.topRow}>
         <div>
-          <h1 style={styles.heading}>Inspections</h1>
+          <h1 style={styles.heading}>{t.inspHeading}</h1>
           <p style={styles.summary}>
-            {inspections.length} inspection{inspections.length !== 1 ? 's' : ''} · {passCount} pass
-            {failCount > 0 && <span style={styles.failNote}> · {failCount} fail</span>}
+            {inspections.length} {inspections.length !== 1 ? t.inspInspectionsCount : t.inspInspectionCount} · {passCount} {t.inspSummaryPass}
+            {failCount > 0 && <span style={styles.failNote}> · {failCount} {t.inspSummaryFail}</span>}
           </p>
         </div>
         <div style={styles.topActions}>
@@ -511,16 +528,16 @@ export default function InspectionChecklists({ projects }) {
               <button
                 style={{ ...styles.toggleBtn, ...(view === 'inspections' ? styles.toggleBtnActive : {}) }}
                 onClick={() => { setView('inspections'); setShowForm(false); setEditing(null); }}
-              >Inspections</button>
+              >{t.inspInspectionsTab}</button>
               <button
                 style={{ ...styles.toggleBtn, ...(view === 'templates' ? styles.toggleBtnActive : {}) }}
                 onClick={() => { setView('templates'); setShowForm(false); setEditing(null); }}
-              >Templates</button>
+              >{t.inspTemplatesTab}</button>
             </div>
           )}
           {!showForm && !editing && (
             <button style={styles.newBtn} onClick={() => setShowForm(true)}>
-              {view === 'templates' ? '+ New Template' : '+ New Inspection'}
+              {view === 'templates' ? t.inspNewTemplate : t.inspNewInspection}
             </button>
           )}
         </div>
@@ -549,53 +566,60 @@ export default function InspectionChecklists({ projects }) {
       {view === 'inspections' && (
         <div style={styles.filterBar}>
           <select style={styles.filterSelect} value={filters.status || ''} onChange={e => setFilter('status', e.target.value)}>
-            <option value="">All statuses</option>
-            <option value="pass">Pass</option>
-            <option value="fail">Fail</option>
-            <option value="pending">Pending</option>
+            <option value="">{t.inspAllStatuses}</option>
+            <option value="pass">{t.inspStatusPass}</option>
+            <option value="fail">{t.inspStatusFail}</option>
+            <option value="pending">{t.inspStatusPending}</option>
           </select>
           {projects.length > 0 && (
             <select style={styles.filterSelect} value={filters.project_id || ''} onChange={e => setFilter('project_id', e.target.value)}>
-              <option value="">All projects</option>
+              <option value="">{t.inspAllProjects}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           )}
           {templates.length > 0 && (
             <select style={styles.filterSelect} value={filters.template_id || ''} onChange={e => setFilter('template_id', e.target.value)}>
-              <option value="">All templates</option>
-              {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              <option value="">{t.inspAllTemplates}</option>
+              {templates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
             </select>
           )}
-          <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title="From date" />
-          <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title="To date" />
+          <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title={t.fromDate} />
+          <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title={t.toDate} />
         </div>
       )}
 
       {loading ? (
-        <p style={styles.hint}>Loading…</p>
+        <p style={styles.hint}>{t.loading}</p>
       ) : view === 'templates' ? (
         templates.length === 0 ? (
           <div style={styles.empty}>
             <div style={styles.emptyIcon}>📋</div>
-            <p style={styles.emptyText}>No templates yet. Create one or pick from a preset.</p>
+            <p style={styles.emptyText}>{t.inspNoTemplates}</p>
           </div>
         ) : (
           <div style={styles.list}>
-            {templates.map(t => (
-              <div key={t.id} style={styles.templateCard}>
+            {templates.map(tpl => (
+              <div key={tpl.id} style={styles.templateCard}>
                 <div style={styles.templateInfo}>
-                  <div style={styles.templateName}>{t.name}</div>
-                  {t.description && <div style={styles.templateDesc}>{t.description}</div>}
-                  <div style={styles.templateCount}>{t.items?.length || 0} items</div>
+                  <div style={styles.templateName}>{tpl.name}</div>
+                  {tpl.description && <div style={styles.templateDesc}>{tpl.description}</div>}
+                  <div style={styles.templateCount}>{tpl.items?.length || 0} {t.inspItemsCount}</div>
                 </div>
                 {isAdmin && (
                   <div style={styles.cardActions}>
-                    <button style={styles.editBtn} onClick={() => { setEditing(t); setShowForm(false); }}>Edit</button>
-                    <button style={styles.deleteBtn} onClick={async () => {
-                      if (!confirm('Delete this template?')) return;
-                      await api.delete(`/inspections/templates/${t.id}`);
-                      setTemplates(prev => prev.filter(x => x.id !== t.id));
-                    }}>Delete</button>
+                    <button style={styles.editBtn} onClick={() => { setEditing(tpl); setShowForm(false); }}>{t.edit}</button>
+                    {pendingDeleteTemplateId === tpl.id ? (
+                      <>
+                        <button style={styles.confirmDeleteBtn} onClick={async () => {
+                          await api.delete(`/inspections/templates/${tpl.id}`);
+                          setTemplates(prev => prev.filter(x => x.id !== tpl.id));
+                          setPendingDeleteTemplateId(null);
+                        }}>{t.confirm}</button>
+                        <button style={styles.cancelDeleteBtn} onClick={() => setPendingDeleteTemplateId(null)}>{t.cancel}</button>
+                      </>
+                    ) : (
+                      <button style={styles.deleteBtn} onClick={() => setPendingDeleteTemplateId(tpl.id)}>{t.delete}</button>
+                    )}
                   </div>
                 )}
               </div>
@@ -605,7 +629,7 @@ export default function InspectionChecklists({ projects }) {
       ) : inspections.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>✅</div>
-          <p style={styles.emptyText}>{isAdmin ? 'No inspections yet. Create one to start tracking.' : 'No inspections on file.'}</p>
+          <p style={styles.emptyText}>{isAdmin ? t.inspNoInspectionsAdmin : t.inspNoInspectionsWorker}</p>
         </div>
       ) : (
         <div style={styles.list}>
@@ -671,6 +695,9 @@ const styles = {
   cardActions: { display: 'flex', gap: 8, marginTop: 14 },
   editBtn: { background: '#f3f4f6', border: 'none', color: '#374151', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  cancelDeleteBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  inlineError: { fontSize: 12, color: '#ef4444' },
   // Template card
   templateCard: { background: '#fff', borderRadius: 10, padding: '14px 16px', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
   templateInfo: { flex: 1 },

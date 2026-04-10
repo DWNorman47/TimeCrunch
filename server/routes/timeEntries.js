@@ -4,6 +4,16 @@ const { requireAuth } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem } = require('./inbox');
 const { sendEmail } = require('../email');
+const rateLimit = require('express-rate-limit');
+
+const entryWriteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 120, // generous — manual entry is rare, but admins can bulk-add
+  keyGenerator: req => String(req.user?.id || req.ip),
+  message: { error: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Get current user's entries
 router.get('/', requireAuth, async (req, res) => {
@@ -33,12 +43,13 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // Submit a time entry (wage_type inherited from project)
-router.post('/', requireAuth, async (req, res) => {
-  const { project_id, work_date, start_time, end_time, notes, break_minutes, mileage, timezone, client_id } = req.body;
+router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
+  const { project_id, work_date, start_time, end_time, break_minutes, mileage, timezone, client_id } = req.body;
+  const notesTrimmed = req.body.notes?.trim() || null;
   if (!project_id || !work_date || !start_time || !end_time) {
     return res.status(400).json({ error: 'project_id, work_date, start_time, and end_time are required' });
   }
-  if (notes && notes.length > 500) return res.status(400).json({ error: 'Notes must be 500 characters or fewer' });
+  if (notesTrimmed && notesTrimmed.length > 500) return res.status(400).json({ error: 'Notes must be 500 characters or fewer' });
   const companyId = req.user.company_id;
   try {
     const projectResult = await pool.query(
@@ -50,14 +61,16 @@ router.post('/', requireAuth, async (req, res) => {
 
     const bm = parseInt(break_minutes) || 0;
     if (bm < 0) return res.status(400).json({ error: 'break_minutes must be non-negative' });
+    const mileageParsed = mileage != null ? parseFloat(mileage) : null;
+    const mileageVal = (mileageParsed != null && !isNaN(mileageParsed) && mileageParsed >= 0) ? mileageParsed : null;
     const cid = (typeof client_id === 'string' && client_id.length <= 36) ? client_id : null;
     const result = await pool.query(
       `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes, break_minutes, mileage, timezone, client_id, clock_source)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        ON CONFLICT (user_id, client_id) WHERE client_id IS NOT NULL DO NOTHING
        RETURNING *`,
-      [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notes || null,
-       bm, mileage != null ? parseFloat(mileage) : null, timezone || null, cid, 'log_entry']
+      [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notesTrimmed,
+       bm, mileageVal, timezone || null, cid, 'log_entry']
     );
     if (result.rowCount === 0) return res.status(409).json({ error: 'Duplicate entry' });
     const entry = result.rows[0];
@@ -77,7 +90,7 @@ router.post('/', requireAuth, async (req, res) => {
         const subject = `Time entry submitted: ${req.user.full_name}`;
         const body = `<p><b>${req.user.full_name}</b> submitted a time entry for <b>${work_date}</b> (${start_time}–${end_time}).</p><p>— OpsFloa</p>`;
         for (const admin of admins.rows) sendEmail(admin.email, subject, body);
-      } catch {}
+      } catch (err) { console.error('Entry notification error:', err); }
     });
   } catch (err) {
     console.error(err);
@@ -109,11 +122,12 @@ router.patch('/:id', requireAuth, async (req, res) => {
     if (locked.rowCount > 0) return res.status(403).json({ error: 'This entry is in a locked pay period' });
     const bm = parseInt(break_minutes) || 0;
     if (bm < 0) return res.status(400).json({ error: 'break_minutes must be non-negative' });
+    const mileageParsed = mileage != null ? parseFloat(mileage) : null;
+    const mileageVal = (mileageParsed != null && !isNaN(mileageParsed) && mileageParsed >= 0) ? mileageParsed : null;
     const result = await pool.query(
       `UPDATE time_entries SET start_time = $1, end_time = $2, notes = $3, break_minutes = $4, mileage = $5,
        status = 'pending', approval_note = NULL WHERE id = $6 RETURNING *`,
-      [start_time, end_time, notes || null, bm,
-       mileage != null ? parseFloat(mileage) : null, req.params.id]
+      [start_time, end_time, notes?.trim() || null, bm, mileageVal, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) {

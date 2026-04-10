@@ -68,23 +68,23 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
         )}
         <div style={{ ...styles.fieldGroup, flex: 3 }}>
           <label style={styles.label}>{t.subjectField} *</label>
-          <input style={styles.input} type="text" placeholder="Brief description of the question or request" value={form.subject} onChange={e => set('subject', e.target.value)} required />
+          <input style={styles.input} type="text" placeholder="Brief description of the question or request" maxLength={255} value={form.subject} onChange={e => set('subject', e.target.value)} required />
         </div>
       </div>
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.descriptionField} <span style={styles.optional}>({t.optional})</span></label>
-        <textarea style={styles.textarea} rows={3} placeholder="Detailed description, background, or relevant context…" value={form.description} onChange={e => set('description', e.target.value)} />
+        <textarea style={styles.textarea} rows={3} placeholder="Detailed description, background, or relevant context…" maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} />
       </div>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.directedTo}</label>
-          <input style={styles.input} type="text" placeholder="e.g. Architect, Structural Engineer, Owner" value={form.directed_to} onChange={e => set('directed_to', e.target.value)} />
+          <input style={styles.input} type="text" placeholder="e.g. Architect, Structural Engineer, Owner" maxLength={255} value={form.directed_to} onChange={e => set('directed_to', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.submittedBy}</label>
-          <input style={styles.input} type="text" placeholder="Name or company" value={form.submitted_by} onChange={e => set('submitted_by', e.target.value)} />
+          <input style={styles.input} type="text" placeholder="Name or company" maxLength={255} value={form.submitted_by} onChange={e => set('submitted_by', e.target.value)} />
         </div>
       </div>
 
@@ -110,7 +110,7 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       {isEdit && (
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.rfiResponse}</label>
-          <textarea style={styles.textarea} rows={3} placeholder="Enter the response or answer received…" value={form.response} onChange={e => set('response', e.target.value)} />
+          <textarea style={styles.textarea} rows={3} placeholder="Enter the response or answer received…" maxLength={2000} value={form.response} onChange={e => set('response', e.target.value)} />
         </div>
       )}
 
@@ -131,12 +131,14 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
   const STATUS_LABELS = { open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed };
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const handleDelete = async () => {
-    if (!confirm(`${t.deleteRFIPrefix} #${rfi.rfi_number}?`)) return;
     setDeleting(true);
+    setDeleteError('');
     try { await api.delete(`/rfis/${rfi.id}`); onDeleted(rfi.id); }
-    catch { alert(t.failedToDelete); }
+    catch { setDeleteError(t.failedToDelete); setConfirmingDelete(false); }
     finally { setDeleting(false); }
   };
 
@@ -201,7 +203,15 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
                   <button style={styles.editBtn} onClick={() => onEdit(rfi)}>
                     {rfi.status === 'open' && !rfi.response ? t.addResponse : t.edit}
                   </button>
-                  <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.delete}</button>
+                  {confirmingDelete ? (
+                    <>
+                      <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                      <button style={styles.smallCancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+                    </>
+                  ) : (
+                    <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.delete}</button>
+                  )}
+                  {deleteError && <span style={styles.inlineError}>{deleteError}</span>}
                 </>
               )}
             </div>
@@ -296,8 +306,8 @@ export default function RFITracking({ projects }) {
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
-        <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title="From date" />
-        <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title="To date" />
+        <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title={t.fromDate} />
+        <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title={t.toDate} />
       </div>
 
       {loading ? (
@@ -369,6 +379,9 @@ const styles = {
   cardActions: { display: 'flex', gap: 8, marginTop: 14 },
   editBtn: { background: '#f3f4f6', border: 'none', color: '#374151', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  smallCancelBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  inlineError: { fontSize: 12, color: '#ef4444' },
   // Form
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   formTitle: { fontSize: 17, fontWeight: 700, margin: 0 },

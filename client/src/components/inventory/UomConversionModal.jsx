@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import api from '../../api';
+import { useT } from '../../hooks/useT';
 
 /**
  * Shown when a non-base UOM with factor=1 is selected, prompting the admin
@@ -13,6 +14,7 @@ import api from '../../api';
  *   onDismiss — () => void                 called when user skips
  */
 export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onDismiss }) {
+  const t = useT();
   const [factor, setFactor] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
@@ -21,13 +23,13 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
 
   const save = async () => {
     const n = parseFloat(factor);
-    if (!factor || isNaN(n) || n <= 0) { setError('Enter a positive number.'); return; }
+    if (!factor || isNaN(n) || n <= 0) { setError(t.uomConvEnterPositive); return; }
     setSaving(true); setError('');
     try {
       const r = await api.patch(`/inventory/items/${itemId}/uoms/${uom.id}`, { factor: n });
       onSaved(r.data); // server returns updated full UOM list
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save conversion.');
+      setError(err.response?.data?.error || t.uomConvFailed);
       setSaving(false);
     }
   };
@@ -36,15 +38,15 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
     <div style={m.overlay} onClick={onDismiss}>
       <div style={m.modal} onClick={e => e.stopPropagation()}>
         <div style={m.header}>
-          <div style={m.title}>Set Conversion Rate</div>
+          <div style={m.title}>{t.uomConvTitle}</div>
           <button style={m.close} onClick={onDismiss}>✕</button>
         </div>
         <div style={m.body}>
           <p style={m.desc}>
-            No conversion is defined yet for <strong>{uomLabel}</strong>.
-            How many <strong>{baseUnit}</strong> are in 1 <strong>{uomLabel}</strong>?
+            {t.uomConvDescPre} <strong>{uomLabel}</strong>.{' '}
+            {t.uomConvDescHow} <strong>{baseUnit}</strong> {t.uomConvDescAreIn} <strong>{uomLabel}</strong>?
           </p>
-          <p style={m.sub}>e.g. if 1 box holds 30 each, enter 30</p>
+          <p style={m.sub}>{t.uomConvExample}</p>
           {error && <div style={m.error}>{error}</div>}
           <div style={m.inputRow}>
             <span style={m.eq}>1&nbsp;{uomLabel}&nbsp;=</span>
@@ -52,7 +54,7 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
               type="number"
               min="0.0001"
               step="any"
-              placeholder="e.g. 30"
+              placeholder={t.uomConvFactorPlaceholder}
               value={factor}
               onChange={e => setFactor(e.target.value)}
               style={m.input}
@@ -62,9 +64,9 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
             <span style={m.eq}>&nbsp;{baseUnit}</span>
           </div>
           <div style={m.actions}>
-            <button style={m.skipBtn} onClick={onDismiss}>Skip for now</button>
+            <button style={m.skipBtn} onClick={onDismiss}>{t.uomConvSkip}</button>
             <button style={m.saveBtn} onClick={save} disabled={saving}>
-              {saving ? 'Saving…' : 'Save Conversion'}
+              {saving ? t.saving : t.uomConvSave}
             </button>
           </div>
         </div>

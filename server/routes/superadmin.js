@@ -206,12 +206,15 @@ router.get('/affiliates', requireSuperAdmin, async (req, res) => {
 
 // POST /superadmin/affiliates
 router.post('/affiliates', requireSuperAdmin, async (req, res) => {
-  const { name, email, phone, notes } = req.body;
-  if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  const name  = req.body.name?.trim();
+  const email = req.body.email?.trim() || null;
+  const phone = req.body.phone?.trim() || null;
+  const notes = req.body.notes?.trim() || null;
+  if (!name) return res.status(400).json({ error: 'name required' });
   try {
     const result = await pool.query(
       `INSERT INTO affiliates (name, email, phone, notes) VALUES ($1,$2,$3,$4) RETURNING *`,
-      [name.trim(), email || null, phone || null, notes || null]
+      [name, email, phone, notes]
     );
     res.status(201).json({ ...result.rows[0], company_count: 0, active_mrr_cents: 0, companies: [] });
   } catch (err) {
@@ -222,15 +225,19 @@ router.post('/affiliates', requireSuperAdmin, async (req, res) => {
 
 // PATCH /superadmin/affiliates/:id
 router.patch('/affiliates/:id', requireSuperAdmin, async (req, res) => {
-  const { name, email, phone, notes } = req.body;
   try {
     const existing = await pool.query('SELECT * FROM affiliates WHERE id = $1', [req.params.id]);
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     const a = existing.rows[0];
     const result = await pool.query(
       `UPDATE affiliates SET name=$1, email=$2, phone=$3, notes=$4 WHERE id=$5 RETURNING *`,
-      [name?.trim() ?? a.name, email !== undefined ? email : a.email,
-       phone !== undefined ? phone : a.phone, notes !== undefined ? notes : a.notes, req.params.id]
+      [
+        req.body.name !== undefined ? (req.body.name?.trim() || a.name) : a.name,
+        req.body.email !== undefined ? (req.body.email?.trim() || null) : a.email,
+        req.body.phone !== undefined ? (req.body.phone?.trim() || null) : a.phone,
+        req.body.notes !== undefined ? (req.body.notes?.trim() || null) : a.notes,
+        req.params.id,
+      ]
     );
     res.json(result.rows[0]);
   } catch (err) {

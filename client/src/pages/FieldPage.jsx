@@ -28,7 +28,7 @@ export default function FieldPage() {
   const FIELD_TABS = ['notes', 'daily', 'punchlist', 'safety', 'checklists', 'incident', 'gallery', 'subs', 'equip', 'rfi', 'inspect'];
   const hashTab = window.location.hash.replace('#', '');
   const [fieldTab, setFieldTab] = useState(FIELD_TABS.includes(hashTab) ? hashTab : 'notes');
-  const switchTab = t => { setFieldTab(t); window.location.hash = t; };
+  const switchTab = t => { setFieldTab(t); history.replaceState(null, '', '#' + t); };
 
   useEffect(() => {
     const init = async () => {

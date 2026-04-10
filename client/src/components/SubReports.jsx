@@ -64,11 +64,11 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.subCompany} *</label>
-          <input style={styles.input} type="text" placeholder={t.companyNamePlaceholder} value={form.sub_company} onChange={e => set('sub_company', e.target.value)} required />
+          <input style={styles.input} type="text" placeholder={t.companyNamePlaceholder} maxLength={255} value={form.sub_company} onChange={e => set('sub_company', e.target.value)} required />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.foremanField}</label>
-          <input style={styles.input} type="text" placeholder={t.nameOnSitePlaceholder} value={form.foreman_name} onChange={e => set('foreman_name', e.target.value)} />
+          <input style={styles.input} type="text" placeholder={t.nameOnSitePlaceholder} maxLength={255} value={form.foreman_name} onChange={e => set('foreman_name', e.target.value)} />
         </div>
       </div>
 
@@ -79,12 +79,12 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.workPerformed}</label>
-        <textarea style={styles.textarea} rows={3} placeholder={t.subWorkPerformedPlaceholder} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
+        <textarea style={styles.textarea} rows={3} placeholder={t.subWorkPerformedPlaceholder} maxLength={2000} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
       </div>
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.notes} <span style={styles.optional}>({t.optional})</span></label>
-        <textarea style={styles.textarea} rows={2} placeholder={t.issuesPlaceholder} value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <textarea style={styles.textarea} rows={2} placeholder={t.issuesPlaceholder} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
       </div>
 
       {error && <p style={styles.error}>{error}</p>}
@@ -103,9 +103,9 @@ function SubCard({ report, onEdit, onDeleted }) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const handleDelete = async () => {
-    if (!confirm(t.deleteSubReportConfirm)) return;
     setDeleting(true);
     try {
       await api.delete(`/sub-reports/${report.id}`);
@@ -148,7 +148,14 @@ function SubCard({ report, onEdit, onDeleted }) {
           {!report.pending && (
             <div style={styles.cardActions}>
               <button style={styles.editBtn} onClick={() => onEdit(report)}>{t.edit}</button>
-              <button style={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.delete}</button>
+              {confirmingDelete ? (
+                <>
+                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                  <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+                </>
+              ) : (
+                <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.delete}</button>
+              )}
             </div>
           )}
         </div>
@@ -228,8 +235,8 @@ export default function SubReports({ projects }) {
             {subNames.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
         )}
-        <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title="From date" />
-        <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title="To date" />
+        <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title={t.fromDate} />
+        <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title={t.toDate} />
       </div>
 
       {loading ? (
@@ -287,6 +294,8 @@ const styles = {
   cardActions: { display: 'flex', gap: 8, marginTop: 14 },
   editBtn: { background: '#f3f4f6', border: 'none', color: '#374151', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  cancelDeleteBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   // Form
   form: { display: 'flex', flexDirection: 'column', gap: 16 },
   formTitle: { fontSize: 17, fontWeight: 700, margin: 0 },

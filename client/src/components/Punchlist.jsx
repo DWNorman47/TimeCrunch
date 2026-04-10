@@ -50,7 +50,7 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.titleField} *</label>
-          <input style={styles.input} type="text" placeholder="e.g. Patch drywall in office 2B" value={form.title} onChange={e => set('title', e.target.value)} />
+          <input style={styles.input} type="text" placeholder="e.g. Patch drywall in office 2B" maxLength={255} value={form.title} onChange={e => set('title', e.target.value)} />
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
@@ -78,18 +78,18 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
         )}
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.phaseField}</label>
-          <input style={styles.input} type="text" list="phase-suggestions" placeholder="e.g. Foundation, Rough-in" value={form.phase} onChange={e => set('phase', e.target.value)} />
+          <input style={styles.input} type="text" list="phase-suggestions" placeholder="e.g. Foundation, Rough-in" maxLength={255} value={form.phase} onChange={e => set('phase', e.target.value)} />
           <datalist id="phase-suggestions">
             {existingPhases.map(p => <option key={p} value={p} />)}
           </datalist>
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.locationField}</label>
-          <input style={styles.input} type="text" placeholder="e.g. 2nd floor, north wing" value={form.location} onChange={e => set('location', e.target.value)} />
+          <input style={styles.input} type="text" placeholder="e.g. 2nd floor, north wing" maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.descriptionField}</label>
-          <textarea style={styles.textarea} rows={3} placeholder="Additional details..." value={form.description} onChange={e => set('description', e.target.value)} />
+          <textarea style={styles.textarea} rows={3} placeholder="Additional details..." maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
         </div>
       </div>
       {error && <p style={styles.error}>{error}</p>}
@@ -115,6 +115,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
   const [newCheckText, setNewCheckText] = useState('');
   const [addingCheck, setAddingCheck] = useState(false);
   const [editPhase, setEditPhase] = useState(initialItem.phase || '');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => { setItem(initialItem); setEditPhase(initialItem.phase || ''); }, [initialItem]);
 
@@ -155,7 +156,6 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
   };
 
   const handleDelete = async () => {
-    if (!confirm(t.deleteItemConfirm)) return;
     try { await api.delete(`/punchlist/${item.id}`); onDeleted(item.id); } catch {}
   };
 
@@ -238,6 +238,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
               type="text"
               list="phase-suggestions"
               placeholder={t.phaseEditPlaceholder}
+              maxLength={255}
               value={editPhase}
               onChange={e => setEditPhase(e.target.value)}
               onBlur={savePhase}
@@ -298,7 +299,14 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
             <button style={styles.advanceBtn} onClick={advance} disabled={updating}>
               {updating ? '...' : nextLabel[item.status] || t.markDone}
             </button>
-            <button style={styles.deleteBtn} onClick={handleDelete}>{t.delete}</button>
+            {confirmingDelete ? (
+              <>
+                <button style={styles.confirmDeleteBtn} onClick={handleDelete}>{t.confirm}</button>
+                <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
+              </>
+            ) : (
+              <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.delete}</button>
+            )}
           </div>
         </div>
       )}
@@ -482,6 +490,8 @@ const styles = {
   itemActions: { display: 'flex', gap: 8 },
   advanceBtn: { background: '#059669', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  cancelDeleteBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   // Form
   formCard: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 20 },
   form: { display: 'flex', flexDirection: 'column', gap: 14 },

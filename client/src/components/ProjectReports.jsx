@@ -15,10 +15,15 @@ function downloadCSV(rows, filename) {
 
 function defaultDates() {
   const today = new Date();
-  const from = new Date(today);
-  from.setDate(today.getDate() - 10);
   const fmt = d => d.toLocaleDateString('en-CA');
-  return { from: fmt(from), to: fmt(today) };
+  // Last full week: Sunday through Saturday
+  const day = today.getDay(); // 0=Sun, 1=Mon, … 6=Sat
+  const daysToLastSat = day === 6 ? 7 : day + 1;
+  const sat = new Date(today);
+  sat.setDate(today.getDate() - daysToLastSat);
+  const sun = new Date(sat);
+  sun.setDate(sat.getDate() - 6);
+  return { from: fmt(sun), to: fmt(sat) };
 }
 
 export default function ProjectReports({ currency = 'USD' }) {
@@ -79,6 +84,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
           {parseFloat(p.regular_hours) > 0 && <Metric label={t.regularLabel} value={fmtHours(parseFloat(p.regular_hours))} color="#2563eb" />}
           {parseFloat(p.overtime_hours) > 0 && <Metric label={t.overtimeLabel} value={fmtHours(parseFloat(p.overtime_hours))} color="#dc2626" />}
           {parseFloat(p.prevailing_hours) > 0 && <Metric label={t.prevailingLabel} value={fmtHours(parseFloat(p.prevailing_hours))} color="#d97706" />}
+          {parseFloat(p.estimated_cost) > 0 && <Metric label={t.projEstCost} value={formatCurrency(parseFloat(p.estimated_cost), currency)} color="#059669" />}
         </div>
         <div style={styles.barContainer}>
           <HoursBar regular={parseFloat(p.regular_hours)} overtime={parseFloat(p.overtime_hours)} prevailing={parseFloat(p.prevailing_hours)} />
@@ -86,8 +92,8 @@ function ProjectCard({ project: p, currency = 'USD' }) {
         {p.budget_hours && (
           <BudgetBar used={parseFloat(p.total_hours)} budget={parseFloat(p.budget_hours)} label="hrs" />
         )}
-        {p.budget_dollars && (
-          <BudgetBar used={parseFloat(p.total_hours) * 30} budget={parseFloat(p.budget_dollars)} label="$" money currency={currency} />
+        {p.budget_dollars && parseFloat(p.estimated_cost) >= 0 && (
+          <BudgetBar used={parseFloat(p.estimated_cost)} budget={parseFloat(p.budget_dollars)} label="$" money currency={currency} />
         )}
       </div>
 

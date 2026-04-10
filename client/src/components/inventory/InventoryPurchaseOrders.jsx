@@ -1,15 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
+import { useT } from '../../hooks/useT';
 
-const STATUS = {
-  draft:      { label: 'Draft',      color: '#6b7280', bg: '#f3f4f6' },
-  submitted:  { label: 'Submitted',  color: '#2563eb', bg: '#dbeafe' },
-  partial:    { label: 'Partial',    color: '#d97706', bg: '#fef3c7' },
-  received:   { label: 'Received',   color: '#059669', bg: '#d1fae5' },
-  cancelled:  { label: 'Cancelled',  color: '#9ca3af', bg: '#f3f4f6' },
-};
+function useStatus(t) {
+  return {
+    draft:      { label: t.invPODraft,      color: '#6b7280', bg: '#f3f4f6' },
+    submitted:  { label: t.invPOSubmitted,  color: '#2563eb', bg: '#dbeafe' },
+    partial:    { label: t.invPOPartial,    color: '#d97706', bg: '#fef3c7' },
+    received:   { label: t.invPOReceived,   color: '#059669', bg: '#d1fae5' },
+    cancelled:  { label: t.invPOCancelled,  color: '#9ca3af', bg: '#f3f4f6' },
+  };
+}
 
 function StatusBadge({ status }) {
+  const t = useT();
+  const STATUS = useStatus(t);
   const st = STATUS[status] || STATUS.draft;
   return (
     <span style={{ padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700,
@@ -22,6 +27,7 @@ function StatusBadge({ status }) {
 // ── Receive Modal ──────────────────────────────────────────────────────────────
 
 function ReceiveModal({ po, locations, onDone, onClose }) {
+  const t = useT();
   const defaultLoc = po.to_location_id ? String(po.to_location_id) : '';
   const [locationId, setLocationId] = useState(defaultLoc);
   const [qtys, setQtys] = useState(() => {
@@ -41,11 +47,11 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
 
   const submit = async () => {
     setError('');
-    if (!locationId) return setError('Select a receiving location.');
+    if (!locationId) return setError(t.invPOSelectReceiveLoc);
     const lines = openLines
       .map(l => ({ line_id: l.id, qty_to_receive: parseFloat(qtys[l.id] || 0) }))
       .filter(l => l.qty_to_receive > 0);
-    if (lines.length === 0) return setError('Enter a quantity for at least one line.');
+    if (lines.length === 0) return setError(t.invPOEnterQty);
     setSaving(true);
     try {
       const r = await api.post(`/inventory/purchase-orders/${po.id}/receive`, {
@@ -54,7 +60,7 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
       });
       onDone(r.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to receive items.');
+      setError(err.response?.data?.error || t.invPOFailedReceive);
     } finally { setSaving(false); }
   };
 
@@ -62,16 +68,16 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
     <div style={m.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={m.modal}>
         <div style={m.header}>
-          <h3 style={m.title}>Receive Items — {po.po_number}</h3>
+          <h3 style={m.title}>{t.invPOReceiveTitle} — {po.po_number}</h3>
           <button style={m.closeBtn} onClick={onClose}>✕</button>
         </div>
 
         {error && <div style={m.error}>{error}</div>}
 
         <div style={m.field}>
-          <label style={m.label}>Receiving Location *</label>
+          <label style={m.label}>{t.invPOReceivingLoc}</label>
           <select style={m.input} value={locationId} onChange={e => setLocationId(e.target.value)}>
-            <option value="">Select location…</option>
+            <option value="">{t.invCycSelectLocation}</option>
             {locations.filter(l => l.active).map(l => (
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
@@ -82,11 +88,11 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#f9fafb' }}>
-                <th style={m.th}>Item</th>
-                <th style={{ ...m.th, textAlign: 'right' }}>Ordered</th>
-                <th style={{ ...m.th, textAlign: 'right' }}>Received</th>
-                <th style={{ ...m.th, textAlign: 'right' }}>Remaining</th>
-                <th style={{ ...m.th, textAlign: 'right' }}>Receive Now</th>
+                <th style={m.th}>{t.invTxColItem}</th>
+                <th style={{ ...m.th, textAlign: 'right' }}>{t.invPOColOrdered}</th>
+                <th style={{ ...m.th, textAlign: 'right' }}>{t.invPOColReceived}</th>
+                <th style={{ ...m.th, textAlign: 'right' }}>{t.invPOColRemaining}</th>
+                <th style={{ ...m.th, textAlign: 'right' }}>{t.invPOColReceiveNow}</th>
               </tr>
             </thead>
             <tbody>
@@ -120,9 +126,9 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
         </div>
 
         <div style={m.actions}>
-          <button style={m.cancelBtn} onClick={onClose}>Cancel</button>
+          <button style={m.cancelBtn} onClick={onClose}>{t.cancel}</button>
           <button style={m.confirmBtn} onClick={submit} disabled={saving}>
-            {saving ? 'Receiving…' : 'Confirm Receipt'}
+            {saving ? t.invPOReceiving : t.invPOConfirmReceipt}
           </button>
         </div>
       </div>
@@ -133,6 +139,8 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
 // ── PO Detail ──────────────────────────────────────────────────────────────────
 
 function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
+  const t = useT();
+  const STATUS = useStatus(t);
   const [po, setPo]           = useState(initialPo);
   const [lines, setLines]     = useState(initialPo.lines || []);
   const [receiveOpen, setReceiveOpen] = useState(false);
@@ -151,6 +159,9 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
   });
   const [editSaving, setEditSaving] = useState(false);
   const [actionErr, setActionErr]   = useState('');
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [pendingRemoveLineId, setPendingRemoveLineId] = useState(null);
+  const [removeLineErr, setRemoveLineErr] = useState('');
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent]       = useState(false);
 
@@ -164,27 +175,35 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
   const canReceive  = ['submitted', 'partial'].includes(po.status);
   const isFinished  = ['received', 'cancelled'].includes(po.status);
 
+  const nextActionText = {
+    draft:     t.invPONextActionDraft,
+    submitted: t.invPONextActionSubmitted,
+    partial:   t.invPONextActionPartial,
+    received:  t.invPONextActionReceived,
+    cancelled: t.invPONextActionCancelled,
+  }[po.status];
+
   const totalOrdered  = lines.reduce((s, l) => s + parseFloat(l.qty_ordered), 0);
   const totalReceived = lines.reduce((s, l) => s + parseFloat(l.qty_received), 0);
 
   const submitPO = async () => {
-    if (lines.length === 0) return setActionErr('Add at least one line item before submitting.');
+    if (lines.length === 0) return setActionErr(t.invPOSubmitAtLeastOne);
     setActionErr(''); setSaving(true);
     try {
       const r = await api.patch(`/inventory/purchase-orders/${po.id}`, { status: 'submitted' });
       setPo(r.data);
       onUpdate();
-    } catch (err) { setActionErr(err.response?.data?.error || 'Failed to submit.'); }
+    } catch (err) { setActionErr(err.response?.data?.error || t.invPOFailedSubmit); }
     finally { setSaving(false); }
   };
 
   const cancelPO = async () => {
-    if (!confirm('Cancel this purchase order?')) return;
+    setConfirmingCancel(false);
     setActionErr(''); setSaving(true);
     try {
       await api.delete(`/inventory/purchase-orders/${po.id}`);
       onBack(true); // true = reload list
-    } catch (err) { setActionErr(err.response?.data?.error || 'Failed to cancel.'); }
+    } catch (err) { setActionErr(err.response?.data?.error || t.invPOFailedCancel); }
     finally { setSaving(false); }
   };
 
@@ -201,14 +220,14 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
       setPo(r.data);
       setEditing(false);
       onUpdate();
-    } catch (err) { setActionErr(err.response?.data?.error || 'Failed to save.'); }
+    } catch (err) { setActionErr(err.response?.data?.error || t.invPOFailedSave); }
     finally { setEditSaving(false); }
   };
 
   const addLine = async () => {
     setLineErr('');
-    if (!newLine.item_id) return setLineErr('Select an item.');
-    if (!newLine.qty_ordered || parseFloat(newLine.qty_ordered) <= 0) return setLineErr('Enter a positive quantity.');
+    if (!newLine.item_id) return setLineErr(t.invPOSelectItem);
+    if (!newLine.qty_ordered || parseFloat(newLine.qty_ordered) <= 0) return setLineErr(t.invPOPositiveQty);
     setSaving(true);
     try {
       const r = await api.post(`/inventory/purchase-orders/${po.id}/lines`, {
@@ -221,17 +240,18 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
       setNewLine({ item_id: '', qty_ordered: '', unit_cost: '', notes: '' });
       setAddingLine(false);
       onUpdate();
-    } catch (err) { setLineErr(err.response?.data?.error || 'Failed to add line.'); }
+    } catch (err) { setLineErr(err.response?.data?.error || t.invPOFailedAddLine); }
     finally { setSaving(false); }
   };
 
   const removeLine = async (lineId) => {
-    if (!confirm('Remove this line?')) return;
+    setPendingRemoveLineId(null);
+    setRemoveLineErr('');
     try {
       const r = await api.delete(`/inventory/purchase-orders/${po.id}/lines/${lineId}`);
       setLines(r.data);
       onUpdate();
-    } catch (err) { alert(err.response?.data?.error || 'Failed to remove line.'); }
+    } catch (err) { setRemoveLineErr(err.response?.data?.error || t.invPOFailedRemoveLine); }
   };
 
   const emailPO = async () => {
@@ -241,7 +261,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
       setEmailSent(true);
       setTimeout(() => setEmailSent(false), 4000);
     } catch (err) {
-      setActionErr(err.response?.data?.error || 'Failed to send email.');
+      setActionErr(err.response?.data?.error || t.invPOFailedEmail);
     } finally {
       setEmailSending(false);
     }
@@ -256,7 +276,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
 
   return (
     <div style={d.wrap}>
-      <button style={d.backBtn} onClick={() => onBack(false)}>← Back to Orders</button>
+      <button style={d.backBtn} onClick={() => onBack(false)}>{t.invPOBackToOrders}</button>
 
       {/* Header card */}
       <div style={d.headerCard}>
@@ -264,22 +284,27 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
           <div>
             <div style={d.poNumber}>{po.po_number}</div>
             <div style={d.poMeta}>
-              Created by {po.created_by_name} · {new Date(po.created_at).toLocaleDateString()}
-              {po.order_date && ` · Ordered ${new Date(po.order_date + 'T00:00:00').toLocaleDateString()}`}
+              {t.invPOCreatedBy} {po.created_by_name} · {new Date(po.created_at).toLocaleDateString()}
+              {po.order_date && ` · ${t.invPOOrderedOn} ${new Date(po.order_date + 'T00:00:00').toLocaleDateString()}`}
             </div>
           </div>
           <div style={d.headerActions}>
-            <StatusBadge status={po.status} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+              <StatusBadge status={po.status} />
+              {nextActionText && (
+                <span style={d.nextActionHint}>{nextActionText}</span>
+              )}
+            </div>
             {isDraft && !editing && (
               <>
-                <button style={d.editBtn} onClick={() => setEditing(true)}>Edit</button>
-                <button style={d.submitBtn} onClick={submitPO} disabled={saving}>Submit</button>
+                <button style={d.editBtn} onClick={() => setEditing(true)}>{t.invPOEditBtn}</button>
+                <button style={d.submitBtn} onClick={submitPO} disabled={saving}>{t.invPOSubmitBtn}</button>
               </>
             )}
             {editing && (
               <>
-                <button style={d.cancelEditBtn} onClick={() => setEditing(false)}>Cancel</button>
-                <button style={d.submitBtn} onClick={saveEdit} disabled={editSaving}>{editSaving ? 'Saving…' : 'Save'}</button>
+                <button style={d.cancelEditBtn} onClick={() => setEditing(false)}>{t.cancel}</button>
+                <button style={d.submitBtn} onClick={saveEdit} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
               </>
             )}
             {po.supplier_name && !isDraft && (
@@ -289,17 +314,22 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
                 disabled={emailSending}
                 title={`Email PO to ${po.supplier_name}`}
               >
-                {emailSending ? 'Sending…' : emailSent ? '✓ Sent' : '📧 Email PO'}
+                {emailSending ? t.invPOEmailSending : emailSent ? t.invPOEmailSent : t.invPOEmailBtn}
               </button>
             )}
             {canReceive && (
-              <button style={d.receiveBtn} onClick={() => setReceiveOpen(true)}>Receive Items</button>
+              <button style={d.receiveBtn} onClick={() => setReceiveOpen(true)}>{t.invPOReceiveBtn}</button>
             )}
-            {!isFinished && (
-              <button style={d.cancelBtn} onClick={cancelPO} disabled={saving}>
-                {isDraft ? 'Delete' : 'Cancel PO'}
+            {!isFinished && (confirmingCancel ? (
+              <>
+                <button style={d.confirmCancelBtn} onClick={cancelPO} disabled={saving}>{saving ? '…' : t.confirm}</button>
+                <button style={d.smallCancelBtn} onClick={() => setConfirmingCancel(false)}>{t.cancel}</button>
+              </>
+            ) : (
+              <button style={d.cancelBtn} onClick={() => setConfirmingCancel(true)}>
+                {isDraft ? t.invPODeleteBtn : t.invPOCancelBtn}
               </button>
-            )}
+            ))}
           </div>
         </div>
 
@@ -308,55 +338,55 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
         {editing ? (
           <div style={d.editGrid}>
             <div style={d.editField}>
-              <label style={d.editLabel}>Supplier</label>
+              <label style={d.editLabel}>{t.invPOSupplier}</label>
               <select style={d.editInput} value={editForm.supplier_id} onChange={e => setEditForm(f => ({ ...f, supplier_id: e.target.value }))}>
-                <option value="">None</option>
+                <option value="">{t.none}</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
             <div style={d.editField}>
-              <label style={d.editLabel}>Default Receive Location</label>
+              <label style={d.editLabel}>{t.invPODefaultReceiveLoc}</label>
               <select style={d.editInput} value={editForm.to_location_id} onChange={e => setEditForm(f => ({ ...f, to_location_id: e.target.value }))}>
-                <option value="">None</option>
+                <option value="">{t.none}</option>
                 {locations.filter(l => l.active).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
             </div>
             <div style={d.editField}>
-              <label style={d.editLabel}>Expected Date</label>
+              <label style={d.editLabel}>{t.invPOExpectedDate}</label>
               <input style={d.editInput} type="date" value={editForm.expected_date} onChange={e => setEditForm(f => ({ ...f, expected_date: e.target.value }))} />
             </div>
             <div style={d.editField}>
-              <label style={d.editLabel}>Reference / PO #</label>
-              <input style={d.editInput} value={editForm.reference_no} onChange={e => setEditForm(f => ({ ...f, reference_no: e.target.value }))} placeholder="Supplier's order #" />
+              <label style={d.editLabel}>{t.invPOSupplierRef}</label>
+              <input style={d.editInput} value={editForm.reference_no} onChange={e => setEditForm(f => ({ ...f, reference_no: e.target.value }))} placeholder={t.invPOSupplierRef} />
             </div>
             <div style={{ ...d.editField, flexBasis: '100%' }}>
-              <label style={d.editLabel}>Notes</label>
-              <textarea style={{ ...d.editInput, minHeight: 52, resize: 'vertical' }} value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} />
+              <label style={d.editLabel}>{t.notes}</label>
+              <textarea style={{ ...d.editInput, minHeight: 52, resize: 'vertical' }} value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} maxLength={1000} />
             </div>
           </div>
         ) : (
           <div style={d.infoGrid}>
             <div style={d.infoItem}>
-              <span style={d.infoLabel}>Supplier</span>
-              <span style={d.infoValue}>{po.supplier_name || <em style={{ color: '#9ca3af' }}>None</em>}</span>
+              <span style={d.infoLabel}>{t.invPOSupplier}</span>
+              <span style={d.infoValue}>{po.supplier_name || <em style={{ color: '#9ca3af' }}>{t.none}</em>}</span>
             </div>
             <div style={d.infoItem}>
-              <span style={d.infoLabel}>Receive To</span>
-              <span style={d.infoValue}>{po.to_location_name || <em style={{ color: '#9ca3af' }}>Not set</em>}</span>
+              <span style={d.infoLabel}>{t.invPOReceiveTo}</span>
+              <span style={d.infoValue}>{po.to_location_name || <em style={{ color: '#9ca3af' }}>{t.invPONotSet}</em>}</span>
             </div>
             <div style={d.infoItem}>
-              <span style={d.infoLabel}>Expected</span>
-              <span style={d.infoValue}>{po.expected_date ? new Date(po.expected_date + 'T00:00:00').toLocaleDateString() : <em style={{ color: '#9ca3af' }}>Not set</em>}</span>
+              <span style={d.infoLabel}>{t.invPOExpected}</span>
+              <span style={d.infoValue}>{po.expected_date ? new Date(po.expected_date + 'T00:00:00').toLocaleDateString() : <em style={{ color: '#9ca3af' }}>{t.invPONotSet}</em>}</span>
             </div>
             {po.reference_no && (
               <div style={d.infoItem}>
-                <span style={d.infoLabel}>Supplier Ref</span>
+                <span style={d.infoLabel}>{t.invPOSupplierRefLabel}</span>
                 <span style={d.infoValue}>{po.reference_no}</span>
               </div>
             )}
             {po.notes && (
               <div style={{ ...d.infoItem, flexBasis: '100%' }}>
-                <span style={d.infoLabel}>Notes</span>
+                <span style={d.infoLabel}>{t.notes}</span>
                 <span style={d.infoValue}>{po.notes}</span>
               </div>
             )}
@@ -369,33 +399,33 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             <div style={d.progressBar}>
               <div style={{ ...d.progressFill, width: `${Math.min(100, (totalReceived / totalOrdered) * 100)}%` }} />
             </div>
-            <span style={d.progressText}>{totalReceived}/{totalOrdered} items received</span>
+            <span style={d.progressText}>{totalReceived}/{totalOrdered} {t.invPOItemsReceived}</span>
           </div>
         )}
       </div>
 
       {/* Lines table */}
       <div style={d.linesHeader}>
-        <div style={d.linesTitle}>Line Items</div>
+        <div style={d.linesTitle}>{t.invPOLineItems}</div>
         {isDraft && !addingLine && (
-          <button style={d.addLineBtn} onClick={() => setAddingLine(true)}>+ Add Item</button>
+          <button style={d.addLineBtn} onClick={() => setAddingLine(true)}>{t.invPOAddItem}</button>
         )}
       </div>
 
       {lines.length === 0 ? (
-        <div style={d.emptyLines}>No items on this order yet.{isDraft ? ' Add items using the button above.' : ''}</div>
+        <div style={d.emptyLines}>{t.invPONoLines}</div>
       ) : (
         <div style={d.tableWrap}>
           <table style={d.table}>
             <thead>
               <tr style={d.thead}>
-                <th style={d.th}>Item</th>
-                <th style={d.th}>SKU</th>
-                <th style={d.th}>Unit</th>
-                <th style={{ ...d.th, textAlign: 'right' }}>Qty Ordered</th>
-                <th style={{ ...d.th, textAlign: 'right' }}>Qty Received</th>
-                <th style={{ ...d.th, textAlign: 'right' }}>Remaining</th>
-                <th style={{ ...d.th, textAlign: 'right' }}>Unit Cost</th>
+                <th style={d.th}>{t.invTxColItem}</th>
+                <th style={d.th}>{t.colSku}</th>
+                <th style={d.th}>{t.colUnit}</th>
+                <th style={{ ...d.th, textAlign: 'right' }}>{t.invPOColQtyOrdered}</th>
+                <th style={{ ...d.th, textAlign: 'right' }}>{t.invPOColQtyReceived}</th>
+                <th style={{ ...d.th, textAlign: 'right' }}>{t.invPOColRemaining}</th>
+                <th style={{ ...d.th, textAlign: 'right' }}>{t.invPOColUnitCost}</th>
                 {isDraft && <th style={d.th}></th>}
               </tr>
             </thead>
@@ -420,7 +450,14 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
                     </td>
                     {isDraft && (
                       <td style={d.td}>
-                        <button style={d.removeBtn} onClick={() => removeLine(line.id)} title="Remove line">🗑️</button>
+                        {pendingRemoveLineId === line.id ? (
+                          <>
+                            <button style={d.confirmLineRemoveBtn} onClick={() => removeLine(line.id)}>{t.confirm}</button>
+                            <button style={d.removeBtn} onClick={() => setPendingRemoveLineId(null)}>✕</button>
+                          </>
+                        ) : (
+                          <button style={d.removeBtn} onClick={() => setPendingRemoveLineId(line.id)} title="Remove line">🗑️</button>
+                        )}
                       </td>
                     )}
                   </tr>
@@ -430,7 +467,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             {lines.length > 0 && (
               <tfoot>
                 <tr style={d.totalRow}>
-                  <td colSpan={3} style={{ ...d.td, fontWeight: 700 }}>Total</td>
+                  <td colSpan={3} style={{ ...d.td, fontWeight: 700 }}>{t.invPOTotal}</td>
                   <td style={{ ...d.td, textAlign: 'right', fontWeight: 700 }}>{totalOrdered}</td>
                   <td style={{ ...d.td, textAlign: 'right', fontWeight: 700, color: '#059669' }}>{totalReceived}</td>
                   <td style={{ ...d.td, textAlign: 'right', fontWeight: 700, color: totalOrdered - totalReceived > 0 ? '#d97706' : '#059669' }}>
@@ -449,43 +486,45 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
         </div>
       )}
 
+      {removeLineErr && <div style={d.lineErr}>{removeLineErr}</div>}
+
       {/* Add line form */}
       {addingLine && (
         <div style={d.addLineForm}>
           {lineErr && <div style={d.lineErr}>{lineErr}</div>}
           <div style={d.addLineRow}>
             <div style={d.addLineField}>
-              <label style={d.editLabel}>Item *</label>
+              <label style={d.editLabel}>{t.invTxColItem} *</label>
               <select style={d.editInput} value={newLine.item_id}
                 onChange={e => {
                   const item = items.find(i => String(i.id) === e.target.value);
                   setNewLine(f => ({ ...f, item_id: e.target.value,
                     unit_cost: item?.unit_cost != null ? String(item.unit_cost) : f.unit_cost }));
                 }}>
-                <option value="">Select item…</option>
+                <option value="">{t.selectPlaceholder} {t.invTxColItem}…</option>
                 {items.map(i => <option key={i.id} value={i.id}>{i.name}{i.sku ? ` (${i.sku})` : ''}</option>)}
               </select>
             </div>
             <div style={{ ...d.addLineField, maxWidth: 100 }}>
-              <label style={d.editLabel}>Qty *</label>
+              <label style={d.editLabel}>{t.invPOQtyLabel}</label>
               <input style={d.editInput} type="number" min="0.001" step="any"
                 value={newLine.qty_ordered} onChange={e => setNewLine(f => ({ ...f, qty_ordered: e.target.value }))} />
             </div>
             <div style={{ ...d.addLineField, maxWidth: 110 }}>
-              <label style={d.editLabel}>Unit Cost</label>
+              <label style={d.editLabel}>{t.invPOColUnitCost}</label>
               <input style={d.editInput} type="number" min="0" step="0.01"
                 value={newLine.unit_cost} onChange={e => setNewLine(f => ({ ...f, unit_cost: e.target.value }))}
-                placeholder="Optional" />
+                placeholder={t.optional} />
             </div>
             <div style={d.addLineField}>
-              <label style={d.editLabel}>Notes</label>
+              <label style={d.editLabel}>{t.notes}</label>
               <input style={d.editInput} value={newLine.notes}
-                onChange={e => setNewLine(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
+                onChange={e => setNewLine(f => ({ ...f, notes: e.target.value }))} placeholder={t.optional} maxLength={500} />
             </div>
             <div style={d.addLineBtns}>
-              <button style={d.cancelEditBtn} onClick={() => { setAddingLine(false); setLineErr(''); }}>Cancel</button>
+              <button style={d.cancelEditBtn} onClick={() => { setAddingLine(false); setLineErr(''); }}>{t.cancel}</button>
               <button style={d.submitBtn} onClick={addLine} disabled={saving}>
-                {saving ? '…' : 'Add'}
+                {saving ? '…' : t.invPOAddLineBtn}
               </button>
             </div>
           </div>
@@ -507,6 +546,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
 // ── Create PO Form ─────────────────────────────────────────────────────────────
 
 function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel }) {
+  const t = useT();
   const [form, setForm] = useState({
     supplier_id: '',
     to_location_id: '',
@@ -562,7 +602,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
   const submit = async () => {
     setError('');
     const validLines = lines.filter(l => l.item_id && parseFloat(l.qty_ordered) > 0);
-    if (validLines.length === 0) return setError('Add at least one line item.');
+    if (validLines.length === 0) return setError(t.invPOAddAtLeastOne);
     setSaving(true);
     try {
       const payload = {
@@ -582,65 +622,65 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
       const r = await api.post('/inventory/purchase-orders', payload);
       onSaved(r.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create PO.');
+      setError(err.response?.data?.error || t.invPOFailedCreate);
     } finally { setSaving(false); }
   };
 
   return (
     <div style={c.wrap}>
-      <h3 style={c.title}>New Purchase Order</h3>
+      <h3 style={c.title}>{t.invPONewPO}</h3>
       {error && <div style={c.error}>{error}</div>}
 
       <div style={c.row}>
         <div style={c.field}>
-          <label style={c.label}>Supplier</label>
+          <label style={c.label}>{t.invPOSupplier}</label>
           <select style={c.input} value={form.supplier_id} onChange={e => set('supplier_id', e.target.value)}>
-            <option value="">None</option>
+            <option value="">{t.none}</option>
             {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
         <div style={c.field}>
-          <label style={c.label}>Default Receive Location</label>
+          <label style={c.label}>{t.invPODefaultReceiveLoc}</label>
           <select style={c.input} value={form.to_location_id} onChange={e => set('to_location_id', e.target.value)}>
-            <option value="">None</option>
+            <option value="">{t.none}</option>
             {locations.filter(l => l.active).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
         </div>
         <div style={c.field}>
-          <label style={c.label}>Order Date</label>
+          <label style={c.label}>{t.invPOOrderDate}</label>
           <input style={c.input} type="date" value={form.order_date} onChange={e => set('order_date', e.target.value)} />
         </div>
         <div style={c.field}>
-          <label style={c.label}>Expected Date</label>
+          <label style={c.label}>{t.invPOExpectedDate}</label>
           <input style={c.input} type="date" value={form.expected_date} onChange={e => set('expected_date', e.target.value)} />
         </div>
         <div style={c.field}>
-          <label style={c.label}>Supplier Ref #</label>
-          <input style={c.input} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder="Optional" />
+          <label style={c.label}>{t.invPOSupplierRef}</label>
+          <input style={c.input} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder={t.optional} />
         </div>
       </div>
 
       <div style={c.field}>
-        <label style={c.label}>Notes</label>
-        <textarea style={{ ...c.input, minHeight: 52, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <label style={c.label}>{t.notes}</label>
+        <textarea style={{ ...c.input, minHeight: 52, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} maxLength={1000} />
       </div>
 
       <div style={c.linesHeader}>
-        <div style={c.linesTitle}>Line Items</div>
-        <button style={c.addLineBtn} onClick={addLine}>+ Add Item</button>
+        <div style={c.linesTitle}>{t.invPOLineItems}</div>
+        <button style={c.addLineBtn} onClick={addLine}>{t.invPOAddItem}</button>
       </div>
 
       {lines.length === 0 ? (
-        <div style={c.emptyLines}>No items yet. Click "+ Add Item" to begin.</div>
+        <div style={c.emptyLines}>{t.invPONoItems}</div>
       ) : (
         <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb', marginBottom: 16 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
             <thead>
               <tr style={{ background: '#f9fafb' }}>
-                <th style={c.th}>Item</th>
-                <th style={{ ...c.th, width: 90 }}>Qty</th>
-                <th style={{ ...c.th, width: 110 }}>Unit Cost</th>
-                <th style={c.th}>Notes</th>
+                <th style={c.th}>{t.invTxColItem}</th>
+                <th style={{ ...c.th, width: 90 }}>{t.invPOQtyLabel}</th>
+                <th style={{ ...c.th, width: 110 }}>{t.invPOColUnitCost}</th>
+                <th style={c.th}>{t.notes}</th>
                 <th style={{ ...c.th, width: 36 }}></th>
               </tr>
             </thead>
@@ -650,7 +690,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
                   <td style={c.td}>
                     <select style={c.cellInput} value={line.item_id}
                       onChange={e => updateLine(line.key, 'item_id', e.target.value)}>
-                      <option value="">Select item…</option>
+                      <option value="">{t.selectPlaceholder} {t.invTxColItem}…</option>
                       {items.map(i => <option key={i.id} value={i.id}>{i.name}{i.sku ? ` (${i.sku})` : ''}</option>)}
                     </select>
                   </td>
@@ -665,7 +705,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
                   </td>
                   <td style={c.td}>
                     <input style={c.cellInput} value={line.notes}
-                      onChange={e => updateLine(line.key, 'notes', e.target.value)} placeholder="Optional" />
+                      onChange={e => updateLine(line.key, 'notes', e.target.value)} placeholder={t.optional} maxLength={500} />
                   </td>
                   <td style={c.td}>
                     <button style={c.removeBtn} onClick={() => removeLine(line.key)}>✕</button>
@@ -678,9 +718,9 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
       )}
 
       <div style={c.actions}>
-        <button style={c.cancelBtn} onClick={onCancel}>Cancel</button>
+        <button style={c.cancelBtn} onClick={onCancel}>{t.cancel}</button>
         <button style={c.saveBtn} onClick={submit} disabled={saving}>
-          {saving ? 'Creating…' : 'Create Draft PO'}
+          {saving ? t.invPOCreating : t.invPOCreateDraft}
         </button>
       </div>
     </div>
@@ -690,13 +730,20 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function InventoryPurchaseOrders({ locations, suppliers: suppliersProp, prefillLowStock, onPrefillHandled }) {
+  const t = useT();
+  const STATUS = useStatus(t);
   const [view, setView]         = useState('list'); // 'list' | 'create' | 'detail'
   const [pos, setPos]           = useState([]);
+  const [posTotal, setPosTotal] = useState(0);
+  const [posOffset, setPosOffset] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState('');
+  const [loadDetailError, setLoadDetailError] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
+  const PO_PAGE = 100;
   const [suppliers, setSuppliers] = useState(suppliersProp || []);
   const [prefillItems, setPrefillItems] = useState(null); // null = no prefill
 
@@ -722,25 +769,41 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
   }, [prefillLowStock]);
 
   const load = useCallback(async () => {
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setPosOffset(0);
     try {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ limit: PO_PAGE, offset: 0 });
       if (filterStatus) params.set('status', filterStatus);
       if (filterSupplier) params.set('supplier_id', filterSupplier);
       const r = await api.get(`/inventory/purchase-orders?${params}`);
-      setPos(r.data);
-    } catch { setError('Failed to load purchase orders.'); }
+      setPos(r.data.orders);
+      setPosTotal(r.data.total);
+    } catch { setError(t.invPOFailedLoad); }
     finally { setLoading(false); }
   }, [filterStatus, filterSupplier]);
+
+  const loadMorePos = async () => {
+    const nextOffset = posOffset + PO_PAGE;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams({ limit: PO_PAGE, offset: nextOffset });
+      if (filterStatus) params.set('status', filterStatus);
+      if (filterSupplier) params.set('supplier_id', filterSupplier);
+      const r = await api.get(`/inventory/purchase-orders?${params}`);
+      setPos(prev => [...prev, ...r.data.orders]);
+      setPosOffset(nextOffset);
+    } catch { /* non-fatal */ }
+    finally { setLoadingMore(false); }
+  };
 
   useEffect(() => { if (view === 'list') load(); }, [load, view]);
 
   const openDetail = async (po) => {
+    setLoadDetailError('');
     try {
       const r = await api.get(`/inventory/purchase-orders/${po.id}`);
       setSelected(r.data);
       setView('detail');
-    } catch { alert('Failed to load PO details.'); }
+    } catch { setLoadDetailError(t.invPOFailedLoadDetails); }
   };
 
   const handleSaved = (newPo) => {
@@ -784,28 +847,30 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
     <div style={l.wrap}>
       <div style={l.toolbar}>
         <select style={l.select} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-          <option value="">All Statuses</option>
+          <option value="">{t.invPOAllStatuses}</option>
           {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
         {suppliers.length > 0 && (
           <select style={l.select} value={filterSupplier} onChange={e => setFilterSupplier(e.target.value)}>
-            <option value="">All Suppliers</option>
+            <option value="">{t.invPOAllSuppliers}</option>
             {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         )}
-        <button style={l.createBtn} onClick={() => { setPrefillItems([]); setView('create'); }}>+ New PO</button>
+        <button style={l.createBtn} onClick={() => { setPrefillItems([]); setView('create'); }}>{t.invPONewPOBtn}</button>
       </div>
 
       {error && <div style={l.error}>{error}</div>}
+      {loadDetailError && <div style={l.error}>{loadDetailError}</div>}
 
       {loading ? (
-        <div style={l.empty}>Loading…</div>
+        <div style={l.empty}>{t.loading}</div>
       ) : pos.length === 0 ? (
         <div style={l.empty}>
           <div style={l.emptyIcon}>📋</div>
-          <p>No purchase orders yet. Create one above.</p>
+          <p>{t.invPONoPOs}</p>
         </div>
       ) : (
+        <>
         <div style={l.list}>
           {pos.map(po => {
             const ordered  = parseFloat(po.total_ordered  || 0);
@@ -817,15 +882,15 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
                   <div style={l.cardLeft}>
                     <div style={l.cardPo}>{po.po_number}</div>
                     <div style={l.cardMeta}>
-                      {po.supplier_name || <em style={{ color: '#9ca3af' }}>No supplier</em>}
+                      {po.supplier_name || <em style={{ color: '#9ca3af' }}>{t.invPONoSupplier}</em>}
                       {' · '}
                       {new Date(po.created_at).toLocaleDateString()}
-                      {po.expected_date && ` · Expected ${new Date(po.expected_date + 'T00:00:00').toLocaleDateString()}`}
+                      {po.expected_date && ` · ${t.invPOExpected} ${new Date(po.expected_date + 'T00:00:00').toLocaleDateString()}`}
                     </div>
                   </div>
                   <div style={l.cardRight}>
                     <StatusBadge status={po.status} />
-                    <span style={l.lineCount}>{po.line_count} item{po.line_count !== '1' ? 's' : ''}</span>
+                    <span style={l.lineCount}>{po.line_count} {t.invPOItems}</span>
                   </div>
                 </div>
                 {po.status !== 'draft' && po.status !== 'cancelled' && ordered > 0 && (
@@ -834,13 +899,22 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
                       <div style={{ ...l.progressFill, width: `${pct}%`,
                         background: pct >= 100 ? '#059669' : '#2563eb' }} />
                     </div>
-                    <span style={l.progressText}>{received}/{ordered} received</span>
+                    <span style={l.progressText}>{received}/{ordered} {t.invPOColReceived}</span>
                   </div>
                 )}
               </div>
             );
           })}
         </div>
+        {pos.length < posTotal && (
+          <div style={{ textAlign: 'center', padding: '16px 0' }}>
+            <button style={l.loadMoreBtn} onClick={loadMorePos} disabled={loadingMore}>
+              {loadingMore ? t.loading : t.loadMore}
+            </button>
+            <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>{pos.length} / {posTotal}</span>
+          </div>
+        )}
+        </>
       )}
     </div>
   );
@@ -875,12 +949,16 @@ const d = {
   headerTop:    { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 12 },
   poNumber:     { fontSize: 20, fontWeight: 800, color: '#111827' },
   poMeta:       { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-  headerActions:{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  headerActions:{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' },
+  nextActionHint: { fontSize: 12, color: '#6b7280', fontStyle: 'italic', textAlign: 'right', maxWidth: 260 },
   editBtn:      { padding: '7px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' },
   cancelEditBtn:{ padding: '7px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' },
   submitBtn:    { padding: '7px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   receiveBtn:   { padding: '7px 16px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   cancelBtn:    { padding: '7px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fee2e2', color: '#dc2626', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  confirmCancelBtn: { padding: '7px 14px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  smallCancelBtn: { padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: 13, cursor: 'pointer' },
+  confirmLineRemoveBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '2px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
   error:        { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '8px 12px', marginTop: 8, fontSize: 13 },
   infoGrid:     { display: 'flex', flexWrap: 'wrap', gap: '8px 24px', marginTop: 4 },
   infoItem:     { display: 'flex', flexDirection: 'column', gap: 2 },
@@ -941,6 +1019,7 @@ const l = {
   wrap:         { padding: 16 },
   toolbar:      { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 },
   select:       { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151' },
+  loadMoreBtn:  { padding: '8px 20px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, color: '#374151', cursor: 'pointer' },
   createBtn:    { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginLeft: 'auto', whiteSpace: 'nowrap' },
   error:        { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },
   empty:        { textAlign: 'center', padding: '60px 24px', color: '#6b7280', fontSize: 15 },

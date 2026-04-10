@@ -34,7 +34,10 @@ router.get('/', requireAuth, async (req, res) => {
     if (project_id) { params.push(project_id); conditions.push(`r.project_id = $${params.length}`); }
     if (from) { params.push(from); conditions.push(`r.report_date >= $${params.length}`); }
     if (to) { params.push(to); conditions.push(`r.report_date <= $${params.length}`); }
-    if (status) { params.push(status); conditions.push(`r.status = $${params.length}`); }
+    if (status) {
+      if (!['draft', 'submitted', 'reviewed'].includes(status)) return res.status(400).json({ error: 'Invalid status' });
+      params.push(status); conditions.push(`r.status = $${params.length}`);
+    }
 
     const result = await pool.query(
       `SELECT r.*, p.name as project_name, u.full_name as created_by_name,
@@ -45,7 +48,7 @@ router.get('/', requireAuth, async (req, res) => {
        LEFT JOIN daily_report_manpower m ON m.report_id = r.id
        WHERE ${conditions.join(' AND ')}
        GROUP BY r.id, p.name, u.full_name
-       ORDER BY r.report_date DESC, r.created_at DESC`,
+       ORDER BY r.report_date DESC, r.created_at DESC LIMIT 500`,
       params
     );
     res.json(result.rows);
@@ -97,6 +100,11 @@ router.post('/', requireAuth, async (req, res) => {
   const { project_id, report_date, superintendent, weather_condition, weather_temp,
           work_performed, delays_issues, visitor_log, manpower = [], equipment = [], materials = [] } = req.body;
   if (!report_date) return res.status(400).json({ error: 'report_date required' });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(report_date) || isNaN(Date.parse(report_date))) {
+    return res.status(400).json({ error: 'report_date must be a valid date (YYYY-MM-DD)' });
+  }
+  const tempVal = weather_temp != null && weather_temp !== '' ? parseFloat(weather_temp) : null;
+  if (tempVal !== null && isNaN(tempVal)) return res.status(400).json({ error: 'weather_temp must be a number' });
   const companyId = req.user.company_id;
 
   const client = await pool.connect();
@@ -112,11 +120,25 @@ router.post('/', requireAuth, async (req, res) => {
        DO UPDATE SET superintendent=$4, weather_condition=$5, weather_temp=$6,
          work_performed=$7, delays_issues=$8, visitor_log=$9, updated_at=NOW()
        RETURNING id`,
-      [companyId, project_id || null, report_date, superintendent || null,
-       weather_condition || null, weather_temp || null, work_performed || null,
-       delays_issues || null, visitor_log || null, req.user.id]
+      [companyId, project_id || null, report_date, superintendent?.trim() || null,
+       weather_condition?.trim() || null, tempVal, work_performed?.trim() || null,
+       delays_issues?.trim() || null, visitor_log?.trim() || null, req.user.id]
     );
     const reportId = result.rows[0].id;
+
+    // Validate sub-table row fields (trim + numeric checks)
+    for (const m of manpower) {
+      if (m.hours !== undefined && m.hours !== null && m.hours !== '') { m.hours = parseFloat(m.hours); if (isNaN(m.hours)) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Manpower hours must be a number' }); } } else { m.hours = null; }
+      if (m.trade && m.trade.length > 255) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Manpower trade too long (max 255 characters)' }); }
+      if (m.notes && m.notes.length > 500) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Manpower notes too long (max 500 characters)' }); }
+    }
+    for (const e of equipment) {
+      if (e.hours !== undefined && e.hours !== null && e.hours !== '') { e.hours = parseFloat(e.hours); if (isNaN(e.hours)) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Equipment hours must be a number' }); } } else { e.hours = null; }
+      if (e.name && e.name.length > 255) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Equipment name too long (max 255 characters)' }); }
+    }
+    for (const m of materials) {
+      if (m.description && m.description.length > 500) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Material description too long (max 500 characters)' }); }
+    }
 
     // Replace sub-tables
     await client.query('DELETE FROM daily_report_manpower WHERE report_id=$1', [reportId]);
@@ -124,7 +146,7 @@ router.post('/', requireAuth, async (req, res) => {
       if (!m.trade && !m.worker_count) continue;
       await client.query(
         'INSERT INTO daily_report_manpower (report_id, trade, worker_count, hours, notes) VALUES ($1,$2,$3,$4,$5)',
-        [reportId, m.trade || null, parseInt(m.worker_count) || 1, m.hours ? parseFloat(m.hours) : null, m.notes || null]
+        [reportId, m.trade || null, parseInt(m.worker_count) || 1, m.hours, m.notes || null]
       );
     }
     await client.query('DELETE FROM daily_report_equipment WHERE report_id=$1', [reportId]);
@@ -132,7 +154,7 @@ router.post('/', requireAuth, async (req, res) => {
       if (!e.name) continue;
       await client.query(
         'INSERT INTO daily_report_equipment (report_id, name, quantity, hours) VALUES ($1,$2,$3,$4)',
-        [reportId, e.name, parseInt(e.quantity) || 1, e.hours ? parseFloat(e.hours) : null]
+        [reportId, e.name, parseInt(e.quantity) || 1, e.hours]
       );
     }
     await client.query('DELETE FROM daily_report_materials WHERE report_id=$1', [reportId]);
@@ -157,8 +179,20 @@ router.post('/', requireAuth, async (req, res) => {
 // PATCH /daily-reports/:id — update (same payload as POST)
 router.patch('/:id', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
   const { superintendent, weather_condition, weather_temp, work_performed, delays_issues,
           visitor_log, status, manpower = [], equipment = [], materials = [] } = req.body;
+
+  // Validate status value and enforce transition rules
+  const VALID_STATUSES = ['draft', 'submitted', 'reviewed'];
+  if (status !== undefined && !VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status value' });
+  }
+  const patchTempVal = weather_temp != null && weather_temp !== '' ? parseFloat(weather_temp) : undefined;
+  if (patchTempVal !== undefined && isNaN(patchTempVal)) return res.status(400).json({ error: 'weather_temp must be a number' });
+  if (status === 'reviewed' && !isAdmin) {
+    return res.status(403).json({ error: 'Only admins can mark a report as reviewed' });
+  }
 
   const client = await pool.connect();
   try {
@@ -168,25 +202,49 @@ router.patch('/:id', requireAuth, async (req, res) => {
     );
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Report not found' });
 
+    // Ownership check: workers may only edit their own reports
+    if (!isAdmin && existing.rows[0].created_by !== req.user.id) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'You can only edit your own reports' });
+    }
+
     await client.query(
       `UPDATE daily_reports SET superintendent=$1, weather_condition=$2, weather_temp=$3,
          work_performed=$4, delays_issues=$5, visitor_log=$6, status=COALESCE($7, status), updated_at=NOW()
        WHERE id=$8`,
-      [superintendent ?? existing.rows[0].superintendent,
-       weather_condition ?? existing.rows[0].weather_condition,
-       weather_temp ?? existing.rows[0].weather_temp,
-       work_performed ?? existing.rows[0].work_performed,
-       delays_issues ?? existing.rows[0].delays_issues,
-       visitor_log ?? existing.rows[0].visitor_log,
+      [superintendent?.trim() ?? existing.rows[0].superintendent,
+       weather_condition?.trim() ?? existing.rows[0].weather_condition,
+       patchTempVal !== undefined ? patchTempVal : existing.rows[0].weather_temp,
+       work_performed?.trim() ?? existing.rows[0].work_performed,
+       delays_issues?.trim() ?? existing.rows[0].delays_issues,
+       visitor_log?.trim() ?? existing.rows[0].visitor_log,
        status || null, req.params.id]
     );
+
+    // Validate sub-table row fields (trim + numeric checks)
+    for (const m of manpower) {
+      m.trade = m.trade?.trim() || null;
+      m.notes = m.notes?.trim() || null;
+      if (m.hours !== undefined && m.hours !== null && m.hours !== '') { m.hours = parseFloat(m.hours); if (isNaN(m.hours)) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Manpower hours must be a number' }); } } else { m.hours = null; }
+      if (m.trade && m.trade.length > 255) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Manpower trade too long (max 255 characters)' }); }
+      if (m.notes && m.notes.length > 500) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Manpower notes too long (max 500 characters)' }); }
+    }
+    for (const e of equipment) {
+      e.name = e.name?.trim() || null;
+      if (e.hours !== undefined && e.hours !== null && e.hours !== '') { e.hours = parseFloat(e.hours); if (isNaN(e.hours)) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Equipment hours must be a number' }); } } else { e.hours = null; }
+      if (e.name && e.name.length > 255) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Equipment name too long (max 255 characters)' }); }
+    }
+    for (const m of materials) {
+      m.description = m.description?.trim() || null;
+      if (m.description && m.description.length > 500) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Material description too long (max 500 characters)' }); }
+    }
 
     await client.query('DELETE FROM daily_report_manpower WHERE report_id=$1', [req.params.id]);
     for (const m of manpower) {
       if (!m.trade && !m.worker_count) continue;
       await client.query(
         'INSERT INTO daily_report_manpower (report_id, trade, worker_count, hours, notes) VALUES ($1,$2,$3,$4,$5)',
-        [req.params.id, m.trade || null, parseInt(m.worker_count) || 1, m.hours ? parseFloat(m.hours) : null, m.notes || null]
+        [req.params.id, m.trade, parseInt(m.worker_count) || 1, m.hours, m.notes]
       );
     }
     await client.query('DELETE FROM daily_report_equipment WHERE report_id=$1', [req.params.id]);
@@ -194,7 +252,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       if (!e.name) continue;
       await client.query(
         'INSERT INTO daily_report_equipment (report_id, name, quantity, hours) VALUES ($1,$2,$3,$4)',
-        [req.params.id, e.name, parseInt(e.quantity) || 1, e.hours ? parseFloat(e.hours) : null]
+        [req.params.id, e.name, parseInt(e.quantity) || 1, e.hours]
       );
     }
     await client.query('DELETE FROM daily_report_materials WHERE report_id=$1', [req.params.id]);

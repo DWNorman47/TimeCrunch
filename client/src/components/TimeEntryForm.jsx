@@ -120,11 +120,11 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
         )}
         <div style={styles.row} className="form-row">
           <div style={styles.field}>
-            <label style={styles.label}>Break (minutes)</label>
+            <label style={styles.label}>{t.entryPanelBreakMin}</label>
             <input style={styles.input} type="number" min="0" max="480" step="1" value={form.break_minutes} onChange={e => set('break_minutes', e.target.value)} placeholder="0" />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>Mileage (mi)</label>
+            <label style={styles.label}>{t.entryPanelMileage}</label>
             <input style={styles.input} type="number" min="0" step="0.1" value={form.mileage} onChange={e => set('mileage', e.target.value)} placeholder="Optional" />
           </div>
         </div>
