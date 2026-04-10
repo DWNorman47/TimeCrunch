@@ -217,12 +217,12 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
 
 // ── Advanced Settings ──────────────────────────────────────────────────────────
 
-const ADVANCED_SETTING_KEYS = ['reimbursement_categories', 'item_units'];
+const ADVANCED_SETTING_KEYS = ['reimbursement_categories', 'item_units', 'mileage_rate'];
 
 // Hardcoded defaults — never stored in DB unless overridden
 const ADVANCED_DEFAULTS = {
   reimbursement_categories: {
-    defaults: ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'],
+    defaults: ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Mileage', 'Other'],
     suppressed: [],
     custom: [],
   },
@@ -231,6 +231,7 @@ const ADVANCED_DEFAULTS = {
     suppressed: [],
     custom: [],
   },
+  mileage_rate: { rate: 0.67 },
 };
 
 async function getAdvancedSettings(companyId) {
@@ -273,6 +274,10 @@ router.patch('/advanced-settings/:key', requireAdmin, requirePermission('manage_
         ? req.body.custom.map(s => String(s).trim()).filter(Boolean)
         : [];
       value = { suppressed, custom };
+    } else if (key === 'mileage_rate') {
+      const rate = parseFloat(req.body.rate);
+      if (isNaN(rate) || rate < 0 || rate > 10) return res.status(400).json({ error: 'rate must be between 0 and 10' });
+      value = { rate };
     }
 
     await pool.query(

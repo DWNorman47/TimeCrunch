@@ -112,6 +112,35 @@ function CollapsibleCategory({ title, children }) {
   );
 }
 
+function MileageRateSection({ cfg, onSave, saving }) {
+  const [rate, setRate] = useState(String(cfg?.rate ?? 0.67));
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => { setRate(String(cfg?.rate ?? 0.67)); setDirty(false); }, [cfg]);
+  return (
+    <div style={s.catSection}>
+      <div style={s.catLabel}>Per-mile reimbursement rate (USD)</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+        <span style={{ fontSize: 14, color: '#374151' }}>$</span>
+        <input
+          style={{ ...s.addInput, width: 90, flex: 'none' }}
+          type="number"
+          min="0"
+          max="10"
+          step="0.001"
+          value={rate}
+          onChange={e => { setRate(e.target.value); setDirty(true); }}
+        />
+        <span style={{ fontSize: 13, color: '#6b7280' }}>per mile · IRS standard rate for 2025 is $0.670</span>
+      </div>
+      {dirty && (
+        <button style={{ ...s.saveBtn, marginTop: 8 }} onClick={() => onSave({ rate })} disabled={saving}>
+          {saving ? 'Saving…' : 'Save Rate'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function AdvancedSettings() {
   const t = useT();
   const [open, setOpen]           = useState(false);
@@ -128,10 +157,10 @@ export default function AdvancedSettings() {
     }
   }, [open, config]);
 
-  const makeSaver = key => async ({ suppressed, custom }) => {
+  const makeSaver = key => async (body) => {
     setSaving(true); setError(''); setSuccess('');
     try {
-      const r = await api.patch(`/admin/advanced-settings/${key}`, { suppressed, custom });
+      const r = await api.patch(`/admin/advanced-settings/${key}`, body);
       setConfig(r.data);
       setSuccess(t.advSettingsSaved);
       setTimeout(() => setSuccess(''), 2000);
@@ -171,6 +200,15 @@ export default function AdvancedSettings() {
                   <CategorySection
                     cfg={config.item_units}
                     onSave={makeSaver('item_units')}
+                    saving={saving}
+                  />
+                </CollapsibleCategory>
+              )}
+              {config.mileage_rate && (
+                <CollapsibleCategory title="Mileage Rate">
+                  <MileageRateSection
+                    cfg={config.mileage_rate}
+                    onSave={makeSaver('mileage_rate')}
                     saving={saving}
                   />
                 </CollapsibleCategory>

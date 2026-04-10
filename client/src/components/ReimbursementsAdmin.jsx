@@ -67,6 +67,11 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
       {expanded && (
         <div style={s.detail}>
           <div style={s.desc}>{item.description}</div>
+          {item.miles && (
+            <div style={s.milesMeta}>
+              🚗 {parseFloat(item.miles).toFixed(1)} miles × ${parseFloat(item.mileage_rate).toFixed(4)}/mi = {fmtMoney(item.amount)}
+            </div>
+          )}
           {item.receipt_url && (
             <div style={{ marginBottom: 10 }}>
               <a href={item.receipt_url} target="_blank" rel="noopener noreferrer" style={s.receiptLink}>
@@ -113,13 +118,14 @@ export default function ReimbursementsAdmin() {
   const t = useT();
   const { user } = useAuth();
   const [items, setItems] = useState([]);
+  const [mileageRate, setMileageRate] = useState(0.67);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('pending');
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [categories, setCategories] = useState({ active: [], known: [] });
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ user_id: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved', project_id: '' });
+  const [form, setForm] = useState({ user_id: '', miles: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved', project_id: '' });
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptPreview, setReceiptPreview] = useState(null);
   const [noReceipt, setNoReceipt] = useState(false);
@@ -127,6 +133,7 @@ export default function ReimbursementsAdmin() {
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const fileRef = useRef();
+  const isMileage = form.category === 'Mileage';
 
   const filterLabels = {
     pending:  t.filterPending || t.statusPendingLabel,
@@ -138,7 +145,7 @@ export default function ReimbursementsAdmin() {
   const load = useCallback(() => {
     const params = filter !== 'all' ? `?status=${filter}` : '';
     api.get(`/reimbursements/admin${params}`)
-      .then(r => setItems(r.data))
+      .then(r => { setItems(r.data.items); setMileageRate(r.data.mileage_rate); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [filter]);
@@ -161,22 +168,27 @@ export default function ReimbursementsAdmin() {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!noReceipt && !receiptFile) { setFormError(t.receiptRequired); return; }
+    if (!isMileage && !noReceipt && !receiptFile) { setFormError(t.receiptRequired); return; }
     setSaving(true); setFormError(''); setFormSuccess('');
     try {
-      await api.post('/reimbursements/admin', {
+      const payload = {
         user_id: form.user_id,
-        amount: form.amount,
         description: form.description || null,
         category: form.category || null,
         expense_date: form.expense_date,
         project_id: form.project_id || null,
         status: form.status,
         receipt: receiptFile || null,
-      });
+      };
+      if (isMileage) {
+        payload.miles = form.miles;
+      } else {
+        payload.amount = form.amount;
+      }
+      await api.post('/reimbursements/admin', payload);
       setFormSuccess(t.expenseAdded);
       setShowForm(false);
-      setForm({ user_id: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved', project_id: '' });
+      setForm({ user_id: '', miles: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved', project_id: '' });
       setReceiptFile(null); setReceiptPreview(null); setNoReceipt(false);
       load();
     } catch (err) {
@@ -232,16 +244,28 @@ export default function ReimbursementsAdmin() {
               <input style={s.input} type="date" value={form.expense_date} onChange={e => setForm(f => ({ ...f, expense_date: e.target.value }))} required />
             </div>
             <div style={s.field}>
-              <label style={s.fieldLabel}>{t.amountLabel}</label>
-              <input style={{ ...s.input, width: 100 }} type="number" min="0.01" step="0.01" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required />
-            </div>
-            <div style={s.field}>
               <label style={s.fieldLabel}>{t.categoryLabel}</label>
-              <select style={s.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+              <select style={s.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value, miles: '', amount: '' }))}>
                 <option value="">{t.selectPlaceholder}</option>
                 {categories.active.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
+            {isMileage ? (
+              <div style={s.field}>
+                <label style={s.fieldLabel}>Miles *</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input style={{ ...s.input, width: 90 }} type="number" min="0.1" step="0.1" placeholder="0.0" value={form.miles} onChange={e => setForm(f => ({ ...f, miles: e.target.value }))} required />
+                  {form.miles > 0 && (
+                    <span style={s.mileageCalc}>= ${(parseFloat(form.miles) * mileageRate).toFixed(2)}</span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={s.field}>
+                <label style={s.fieldLabel}>{t.amountLabel}</label>
+                <input style={{ ...s.input, width: 100 }} type="number" min="0.01" step="0.01" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required={!isMileage} />
+              </div>
+            )}
             <div style={s.field}>
               <label style={s.fieldLabel}>{t.statusLabel}</label>
               <select style={s.input} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
@@ -263,22 +287,24 @@ export default function ReimbursementsAdmin() {
             <label style={s.fieldLabel}>{t.descriptionLabel}</label>
             <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder={t.descriptionPlaceholder} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
-          <div style={s.field}>
-            <label style={s.fieldLabel}>{t.receiptLabel}</label>
-            <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => { handleFileChange(e); setNoReceipt(false); }} />
-            {!noReceipt && (
-              <button type="button" style={s.uploadBtn} onClick={() => fileRef.current.click()}>
-                {receiptFile ? t.receiptAttached : t.attachReceipt}
-              </button>
-            )}
-            {receiptPreview && !noReceipt && receiptPreview.startsWith('data:image') && (
-              <img src={receiptPreview} alt="Receipt" style={s.preview} />
-            )}
-            <label style={s.checkLabel}>
-              <input type="checkbox" checked={noReceipt} onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setReceiptFile(null); setReceiptPreview(null); } }} />
-              {' '}{t.noReceiptAvailable}
-            </label>
-          </div>
+          {!isMileage && (
+            <div style={s.field}>
+              <label style={s.fieldLabel}>{t.receiptLabel}</label>
+              <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => { handleFileChange(e); setNoReceipt(false); }} />
+              {!noReceipt && (
+                <button type="button" style={s.uploadBtn} onClick={() => fileRef.current.click()}>
+                  {receiptFile ? t.receiptAttached : t.attachReceipt}
+                </button>
+              )}
+              {receiptPreview && !noReceipt && receiptPreview.startsWith('data:image') && (
+                <img src={receiptPreview} alt="Receipt" style={s.preview} />
+              )}
+              <label style={s.checkLabel}>
+                <input type="checkbox" checked={noReceipt} onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setReceiptFile(null); setReceiptPreview(null); } }} />
+                {' '}{t.noReceiptAvailable}
+              </label>
+            </div>
+          )}
           {formError && <div style={s.errorMsg}>{formError}</div>}
           <button style={s.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : t.addExpenseBtn}</button>
         </form>
@@ -350,4 +376,6 @@ const s = {
   approveBtn: { padding: '8px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
   rejectBtn: { padding: '8px 18px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
   resetBtn: { padding: '8px 18px', background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  milesMeta: { fontSize: 13, color: '#059669', fontWeight: 600, background: '#f0fdf4', borderRadius: 6, padding: '5px 10px' },
+  mileageCalc: { fontSize: 12, color: '#059669', fontWeight: 600, whiteSpace: 'nowrap' },
 };

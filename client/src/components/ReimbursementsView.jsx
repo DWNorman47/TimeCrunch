@@ -27,11 +27,12 @@ function StatusBadge({ status }) {
 export default function ReimbursementsView() {
   const t = useT();
   const [items, setItems] = useState([]);
+  const [mileageRate, setMileageRate] = useState(0.67);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
   const [categories, setCategories] = useState({ active: [], known: [] });
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), project_id: '' });
+  const [form, setForm] = useState({ miles: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), project_id: '' });
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptPreview, setReceiptPreview] = useState(null);
   const [noReceipt, setNoReceipt] = useState(false);
@@ -43,11 +44,15 @@ export default function ReimbursementsView() {
   const [deleteError, setDeleteError] = useState('');
   const fileRef = useRef();
 
+  const isMileage = form.category === 'Mileage';
   const resolveCategory = cat => cat && categories.known.includes(cat) ? cat : cat ? 'Other' : null;
 
   const load = () => {
     setLoadError('');
-    api.get('/reimbursements').then(r => setItems(r.data)).catch(() => setLoadError(t.failedLoad)).finally(() => setLoading(false));
+    api.get('/reimbursements')
+      .then(r => { setItems(r.data.items); setMileageRate(r.data.mileage_rate); })
+      .catch(() => setLoadError(t.failedLoad))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
@@ -67,20 +72,25 @@ export default function ReimbursementsView() {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!noReceipt && !receiptFile) { setError(t.receiptRequired); return; }
+    if (!isMileage && !noReceipt && !receiptFile) { setError(t.receiptRequired); return; }
     setSaving(true); setError(''); setSuccess('');
     try {
-      await api.post('/reimbursements', {
-        amount: form.amount,
+      const payload = {
         description: form.description || null,
         category: form.category || null,
         expense_date: form.expense_date,
         project_id: form.project_id || null,
         receipt: receiptFile || null,
-      });
+      };
+      if (isMileage) {
+        payload.miles = form.miles;
+      } else {
+        payload.amount = form.amount;
+      }
+      await api.post('/reimbursements', payload);
       setSuccess(t.submitSuccess);
       setShowForm(false);
-      setForm({ amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), project_id: '' });
+      setForm({ miles: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), project_id: '' });
       setReceiptFile(null); setReceiptPreview(null); setNoReceipt(false);
       load();
     } catch (err) {
@@ -124,16 +134,28 @@ export default function ReimbursementsView() {
               <input style={s.input} type="date" value={form.expense_date} onChange={e => setForm(f => ({ ...f, expense_date: e.target.value }))} required />
             </div>
             <div style={s.field}>
-              <label style={s.label}>{t.amountLabel}</label>
-              <input style={{ ...s.input, width: 110 }} type="number" min="0.01" step="0.01" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required />
-            </div>
-            <div style={s.field}>
               <label style={s.label}>{t.categoryLabel}</label>
-              <select style={s.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+              <select style={s.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value, miles: '', amount: '' }))}>
                 <option value="">{t.selectPlaceholder}</option>
                 {categories.active.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
+            {isMileage ? (
+              <div style={s.field}>
+                <label style={s.label}>Miles *</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input style={{ ...s.input, width: 100 }} type="number" min="0.1" step="0.1" placeholder="0.0" value={form.miles} onChange={e => setForm(f => ({ ...f, miles: e.target.value }))} required />
+                  {form.miles > 0 && (
+                    <span style={s.mileageCalc}>= ${(parseFloat(form.miles) * mileageRate).toFixed(2)} @ ${mileageRate}/mi</span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={s.field}>
+                <label style={s.label}>{t.amountLabel}</label>
+                <input style={{ ...s.input, width: 110 }} type="number" min="0.01" step="0.01" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required={!isMileage} />
+              </div>
+            )}
             {projects.length > 0 && (
               <div style={s.field}>
                 <label style={s.label}>{t.project}</label>
@@ -146,27 +168,29 @@ export default function ReimbursementsView() {
           </div>
           <div style={s.field}>
             <label style={s.label}>{t.descriptionLabel}</label>
-            <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder={t.descriptionPlaceholder} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+            <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder={isMileage ? 'e.g. Site visit to 123 Main St' : t.descriptionPlaceholder} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
-          <div style={s.field}>
-            <label style={s.label}>{t.receiptLabel}</label>
-            <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => { handleFileChange(e); setNoReceipt(false); }} />
-            {!noReceipt && (
-              <button type="button" style={s.uploadBtn} onClick={() => fileRef.current.click()}>
-                {receiptFile ? t.receiptAttached : t.attachReceipt}
-              </button>
-            )}
-            {receiptPreview && !noReceipt && receiptPreview.startsWith('data:image') && (
-              <img src={receiptPreview} alt="Receipt preview" style={s.preview} />
-            )}
-            {receiptPreview && !noReceipt && receiptPreview.startsWith('data:application/pdf') && (
-              <div style={s.pdfHint}>{t.pdfAttached}</div>
-            )}
-            <label style={s.checkLabel}>
-              <input type="checkbox" checked={noReceipt} onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setReceiptFile(null); setReceiptPreview(null); } }} />
-              {' '}{t.noReceiptAvailable}
-            </label>
-          </div>
+          {!isMileage && (
+            <div style={s.field}>
+              <label style={s.label}>{t.receiptLabel}</label>
+              <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => { handleFileChange(e); setNoReceipt(false); }} />
+              {!noReceipt && (
+                <button type="button" style={s.uploadBtn} onClick={() => fileRef.current.click()}>
+                  {receiptFile ? t.receiptAttached : t.attachReceipt}
+                </button>
+              )}
+              {receiptPreview && !noReceipt && receiptPreview.startsWith('data:image') && (
+                <img src={receiptPreview} alt="Receipt preview" style={s.preview} />
+              )}
+              {receiptPreview && !noReceipt && receiptPreview.startsWith('data:application/pdf') && (
+                <div style={s.pdfHint}>{t.pdfAttached}</div>
+              )}
+              <label style={s.checkLabel}>
+                <input type="checkbox" checked={noReceipt} onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setReceiptFile(null); setReceiptPreview(null); } }} />
+                {' '}{t.noReceiptAvailable}
+              </label>
+            </div>
+          )}
           {error && <div style={s.errorMsg}>{error}</div>}
           <button style={s.submitBtn} type="submit" disabled={saving}>
             {saving ? t.submitting : t.submitRequest}
@@ -201,6 +225,11 @@ export default function ReimbursementsView() {
                 </div>
               </div>
               <div style={s.desc}>{item.description}</div>
+              {item.miles && (
+                <div style={s.milesMeta}>
+                  {parseFloat(item.miles).toFixed(1)} mi × ${parseFloat(item.mileage_rate).toFixed(4)}/mi
+                </div>
+              )}
               <div style={s.meta}>
                 <span>{fmtDate(item.expense_date)}</span>
                 {item.receipt_url && (
@@ -252,4 +281,6 @@ const s = {
   meta: { display: 'flex', gap: 14, fontSize: 12, color: '#6b7280', alignItems: 'center' },
   receiptLink: { color: '#1a56db', textDecoration: 'none', fontWeight: 600 },
   adminNote: { fontSize: 12, color: '#6b7280', fontStyle: 'italic', background: '#f9fafb', borderRadius: 6, padding: '5px 10px', marginTop: 2 },
+  milesMeta: { fontSize: 12, color: '#6b7280' },
+  mileageCalc: { fontSize: 12, color: '#059669', fontWeight: 600, whiteSpace: 'nowrap' },
 };
