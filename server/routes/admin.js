@@ -1478,7 +1478,22 @@ router.post('/projects', requireAdmin, requirePermission('manage_projects'), asy
        address?.trim() || null, start_date || null, end_date || null, st, description?.trim() || null]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.created', 'project', result.rows[0].id, name, { wage_type: wt });
-    res.status(201).json(result.rows[0]);
+    const newProject = result.rows[0];
+    res.status(201).json(newProject);
+
+    // QBO auto-create customer — fire-and-forget
+    setImmediate(async () => {
+      try {
+        const setting = await pool.query("SELECT value FROM settings WHERE company_id = $1 AND key = 'qbo_auto_create_customers'", [companyId]);
+        if (setting.rows[0]?.value !== '1') return;
+        const company = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
+        if (!company.rows[0]?.qbo_realm_id) return;
+        const customer = await qbo.createCustomer(companyId, { displayName: name });
+        if (customer?.Id) {
+          await pool.query('UPDATE projects SET qbo_customer_id = $1 WHERE id = $2', [customer.Id, newProject.id]);
+        }
+      } catch (err) { console.error('[QBO auto-create customer]', err.message); }
+    });
   } catch (err) {
     if (err.code === '23505') {
       const existing = await pool.query('SELECT id, name, active FROM projects WHERE name = $1 AND company_id = $2', [name, companyId]);
@@ -2032,6 +2047,7 @@ router.get('/entries/recently-approved', requireAdmin, requirePermission('approv
     const params = accessIds && accessIds.length ? [companyId, accessIds] : [companyId];
     const { rows } = await pool.query(
       `SELECT te.id, te.work_date, te.start_time, te.end_time, te.project_id, te.user_id, te.approved_at,
+              te.qbo_activity_id, te.qbo_synced_at,
               COALESCE(u.invoice_name, u.full_name) AS worker_name, p.name AS project_name
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
@@ -2151,7 +2167,7 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
         const mappedId = usesVendor ? w.qbo_vendor_id : w.qbo_employee_id;
         if (!mappedId) return;
         if (!entry.project_id) return;
-        const proj = await pool.query('SELECT qbo_customer_id FROM projects WHERE id = $1', [entry.project_id]);
+        const proj = await pool.query('SELECT qbo_customer_id, qbo_class_id FROM projects WHERE id = $1', [entry.project_id]);
         const customerId = proj.rows[0]?.qbo_customer_id;
         if (!customerId) return;
         let ms = new Date(`1970-01-01T${entry.end_time}`) - new Date(`1970-01-01T${entry.start_time}`);
@@ -2161,6 +2177,7 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
         const activity = await qbo.pushTimeActivity(companyId, {
           ...(usesVendor ? { vendorId: w.qbo_vendor_id } : { employeeId: w.qbo_employee_id }),
           customerId,
+          classId: proj.rows[0]?.qbo_class_id || null,
           workDate,
           hours,
           description: entry.notes || '',
@@ -2171,6 +2188,10 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
         );
       } catch (err) {
         console.error('[QBO auto-sync]', err.message);
+        pool.query(
+          'INSERT INTO qbo_sync_errors (company_id, entity_type, entity_id, error_message) VALUES ($1, $2, $3, $4)',
+          [companyId, 'time_entry', entry.id, err.message]
+        ).catch(() => {});
       }
     });
 
@@ -2268,6 +2289,16 @@ router.patch('/entries/:id/reject', requireAdmin, requirePermission('approve_ent
     createInboxItem(rejEntry.user_id, companyId, 'rejection', 'Time entry rejected',
       `Your entry for ${rejEntry.work_date?.toString().substring(0,10)} was rejected.${note ? ` Reason: ${note}` : ''}`, '/dashboard');
     res.json(rejEntry);
+
+    // QBO cleanup — void the time activity if already synced
+    if (rejEntry.qbo_activity_id && rejEntry.qbo_activity_id !== 'synced') {
+      setImmediate(async () => {
+        try {
+          await qbo.deleteTimeActivity(companyId, rejEntry.qbo_activity_id);
+          await pool.query('UPDATE time_entries SET qbo_activity_id = NULL, qbo_synced_at = NULL WHERE id = $1', [rejEntry.id]);
+        } catch (err) { console.error('[QBO delete on reject]', err.message); }
+      });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -2279,11 +2310,16 @@ router.patch('/entries/:id/unapprove', requireAdmin, requirePermission('approve_
   const companyId = req.user.company_id;
   const accessIds = req.user.worker_access_ids;
   try {
+    // Fetch existing qbo_activity_id before clearing it
+    const existing = await pool.query('SELECT qbo_activity_id FROM time_entries WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
+    const existingActivityId = existing.rows[0]?.qbo_activity_id;
+
     const workerFilter = accessIds && accessIds.length ? `AND user_id = ANY($3)` : '';
     const params = accessIds && accessIds.length ? [req.params.id, companyId, accessIds] : [req.params.id, companyId];
     const result = await pool.query(
       `UPDATE time_entries
-       SET status = 'pending', locked = false, approved_by = NULL, approved_at = NULL, approval_note = NULL
+       SET status = 'pending', locked = false, approved_by = NULL, approved_at = NULL, approval_note = NULL,
+           qbo_activity_id = NULL, qbo_synced_at = NULL
        WHERE id = $1 AND company_id = $2 AND status = 'approved' ${workerFilter}
        RETURNING *`,
       params
@@ -2291,6 +2327,14 @@ router.patch('/entries/:id/unapprove', requireAdmin, requirePermission('approve_
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found or not in approved state' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.unapproved', 'time_entry', parseInt(req.params.id), null);
     res.json(result.rows[0]);
+
+    // QBO cleanup — delete the time activity that was previously pushed
+    if (existingActivityId && existingActivityId !== 'synced') {
+      setImmediate(async () => {
+        try { await qbo.deleteTimeActivity(companyId, existingActivityId); }
+        catch (err) { console.error('[QBO delete on unapprove]', err.message); }
+      });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

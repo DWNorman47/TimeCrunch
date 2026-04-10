@@ -543,6 +543,11 @@ export default function ApprovalQueue({ onCountChange }) {
                     <span style={styles.recentDate}>{formatDate(e.work_date)}</span>
                     <span style={styles.recentTime}>{formatTime(e.start_time)} – {formatTime(e.end_time)}</span>
                     {e.project_name && <span style={styles.recentProject}>{e.project_name}</span>}
+                    {e.qbo_activity_id && (
+                      <span style={styles.qboSyncBadge} title={`Synced to QuickBooks${e.qbo_synced_at ? ' · ' + new Date(e.qbo_synced_at).toLocaleTimeString() : ''}`}>
+                        QB ✓
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
                     <button
@@ -628,6 +633,7 @@ const styles = {
   recentTime: { color: '#6b7280' },
   recentProject: { background: '#e0e7ff', color: '#3730a3', borderRadius: 6, padding: '1px 7px', fontSize: 11, fontWeight: 600 },
   unapproveBtn: { padding: '5px 12px', background: '#fff', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  qboSyncBadge: { background: '#d1fae5', color: '#065f46', border: '1px solid #6ee7b7', borderRadius: 6, padding: '1px 6px', fontSize: 11, fontWeight: 700 },
   cancelApproveAllBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '5px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   inlineError: { fontSize: 12, color: '#ef4444' },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 6 },

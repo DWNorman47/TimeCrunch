@@ -266,16 +266,24 @@ router.patch('/admin/:id', requireAdmin, async (req, res) => {
             }
           }
 
-          await qbo.createPurchase(req.user.company_id, {
+          const txnDate = reimb.expense_date ? reimb.expense_date.toISOString?.().substring(0, 10) || String(reimb.expense_date).substring(0, 10) : null;
+          const purchase = await qbo.createPurchase(req.user.company_id, {
             bankAccountId,
             expenseAccountId,
             vendorId,
             amount: parseFloat(reimb.amount),
             description: reimb.description || reimb.category || 'Expense reimbursement',
-            txnDate: reimb.expense_date ? reimb.expense_date.toISOString?.().substring(0, 10) || String(reimb.expense_date).substring(0, 10) : null,
+            txnDate,
           });
+          if (purchase?.Id) {
+            await pool.query('UPDATE reimbursements SET qbo_purchase_id = $1, qbo_synced_at = NOW() WHERE id = $2', [purchase.Id, reimb.id]);
+          }
         } catch (err) {
           console.error('[QBO expense auto-sync]', err.message);
+          pool.query(
+            'INSERT INTO qbo_sync_errors (company_id, entity_type, entity_id, error_message) VALUES ($1, $2, $3, $4)',
+            [req.user.company_id, 'reimbursement', reimb.id, err.message]
+          ).catch(() => {});
         }
       });
     }

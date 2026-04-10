@@ -28,11 +28,28 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [qboVendors, setQboVendors] = useState([]);
   const [qboCustomers, setQboCustomers] = useState([]);
   const [qboAccounts, setQboAccounts] = useState([]);
+  const [qboClasses, setQboClasses] = useState([]);
+  const [syncErrors, setSyncErrors] = useState([]);
   const [loadingMappings, setLoadingMappings] = useState(false);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [clearingErrors, setClearingErrors] = useState(false);
+  // Bulk expense push
+  const [expFrom, setExpFrom] = useState('');
+  const [expTo, setExpTo] = useState('');
+  const [expForce, setExpForce] = useState(false);
+  const [expPushing, setExpPushing] = useState(false);
+  const [expResult, setExpResult] = useState(null);
+  // Payroll journal entry
+  const [payFrom, setPayFrom] = useState('');
+  const [payTo, setPayTo] = useState('');
+  const [payDebitId, setPayDebitId] = useState('');
+  const [payCreditId, setPayCreditId] = useState('');
+  const [payPushing, setPayPushing] = useState(false);
+  const [payResult, setPayResult] = useState(null);
   const [employeeMappings, setEmployeeMappings] = useState({});
   const [vendorMappings, setVendorMappings] = useState({});
   const [projectMappings, setProjectMappings] = useState({});
+  const [classMappings, setClassMappings] = useState({});
   const [pushFrom, setPushFrom] = useState('');
   const [pushTo, setPushTo] = useState('');
   const [pushResult, setPushResult] = useState(null);
@@ -74,8 +91,12 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   useEffect(() => {
     if (!status?.connected) return;
     setLoadingAccounts(true);
-    api.get('/qbo/accounts')
-      .then(r => setQboAccounts(r.data))
+    Promise.all([api.get('/qbo/accounts'), api.get('/qbo/classes'), api.get('/qbo/errors')])
+      .then(([acct, cls, errs]) => {
+        setQboAccounts(acct.data);
+        setQboClasses(cls.data);
+        setSyncErrors(errs.data);
+      })
       .catch(() => {})
       .finally(() => setLoadingAccounts(false));
   }, [status?.connected]);
@@ -109,8 +130,13 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
     setVendorMappings(vm);
 
     const pm = {};
-    projects.forEach(p => { if (p.qbo_customer_id) pm[p.id] = p.qbo_customer_id; });
+    const cm = {};
+    projects.forEach(p => {
+      if (p.qbo_customer_id) pm[p.id] = p.qbo_customer_id;
+      if (p.qbo_class_id) cm[p.id] = p.qbo_class_id;
+    });
     setProjectMappings(pm);
+    setClassMappings(cm);
   }, [status?.connected]);
 
   const handleConnect = async () => {
@@ -205,6 +231,41 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
     } finally {
       setImporting(false);
     }
+  };
+
+  const saveProjectClassMapping = async (projectId, qboClassId) => {
+    setClassMappings(m => ({ ...m, [projectId]: qboClassId }));
+    await api.patch(`/qbo/projects/${projectId}/mapping`, { qbo_class_id: qboClassId || null });
+  };
+
+  const dismissAllErrors = async () => {
+    setClearingErrors(true);
+    try { await api.delete('/qbo/errors'); setSyncErrors([]); }
+    catch (err) { setError(err.response?.data?.error || 'Failed to clear errors'); }
+    finally { setClearingErrors(false); }
+  };
+
+  const dismissError = async (id) => {
+    try { await api.delete(`/qbo/errors/${id}`); setSyncErrors(prev => prev.filter(e => e.id !== id)); }
+    catch { /* non-fatal */ }
+  };
+
+  const pushExpenses = async () => {
+    setExpPushing(true); setExpResult(null); setError('');
+    try {
+      const r = await api.post('/qbo/push-expenses', { from: expFrom || undefined, to: expTo || undefined, force: expForce || undefined });
+      setExpResult(r.data);
+    } catch (err) { setError(err.response?.data?.error || 'Push failed'); }
+    finally { setExpPushing(false); }
+  };
+
+  const pushPayroll = async () => {
+    setPayPushing(true); setPayResult(null); setError('');
+    try {
+      const r = await api.post('/qbo/push-payroll', { from: payFrom, to: payTo, debit_account_id: payDebitId, credit_account_id: payCreditId });
+      setPayResult(r.data);
+    } catch (err) { setError(err.response?.data?.error || 'Push failed'); }
+    finally { setPayPushing(false); }
   };
 
   const saveAutoSyncSetting = async (key, value) => {
@@ -305,6 +366,29 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
 
       {status.connected && (
         <>
+          {/* ── Sync error panel ── */}
+          {syncErrors.length > 0 && (
+            <div style={styles.errorPanel}>
+              <div style={styles.errorPanelHeader}>
+                <span style={{ fontWeight: 700, color: '#92400e' }}>⚠ {syncErrors.length} QBO sync error{syncErrors.length !== 1 ? 's' : ''}</span>
+                <button style={styles.clearAllBtn} onClick={dismissAllErrors} disabled={clearingErrors}>
+                  {clearingErrors ? '…' : 'Dismiss all'}
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+                {syncErrors.map(e => (
+                  <div key={e.id} style={styles.errorRow}>
+                    <span style={styles.errorType}>{e.entity_type}</span>
+                    {e.entity_id && <span style={styles.errorEntityId}>#{e.entity_id}</span>}
+                    <span style={styles.errorMsg}>{e.error_message}</span>
+                    <span style={styles.errorTime}>{new Date(e.created_at).toLocaleString()}</span>
+                    <button style={styles.errorDismiss} onClick={() => dismissError(e.id)}>✕</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ── Worker mapping tables ── */}
           {presentTypes.map(type => {
             const isVendorType = VENDOR_TYPES.includes(type);
@@ -376,6 +460,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                     <tr>
                       <th style={styles.th}>{t.qboOpsFloaProject}</th>
                       <th style={styles.th}>{t.qboQBCustomer}</th>
+                      {qboClasses.length > 0 && <th style={styles.th}>QB Class</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -394,6 +479,20 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                             ))}
                           </select>
                         </td>
+                        {qboClasses.length > 0 && (
+                          <td style={styles.td}>
+                            <select
+                              style={styles.select}
+                              value={classMappings[p.id] || ''}
+                              onChange={e => saveProjectClassMapping(p.id, e.target.value)}
+                            >
+                              <option value="">None</option>
+                              {qboClasses.map(c => (
+                                <option key={c.Id} value={c.Id}>{c.Name}</option>
+                              ))}
+                            </select>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -618,6 +717,20 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
               </span>
             </label>
 
+            <label style={{ ...styles.syncToggle, marginTop: 12 }}>
+              <input
+                type="checkbox"
+                checked={!!settings?.qbo_auto_create_customers}
+                onChange={e => saveAutoSyncSetting('qbo_auto_create_customers', e.target.checked)}
+                disabled={savingAutoSync}
+                style={{ marginRight: 8 }}
+              />
+              <span>
+                <span style={{ fontWeight: 600, color: '#1a202c', fontSize: 14 }}>Auto-create QB Customer when project is created</span>
+                <span style={{ display: 'block', fontSize: 12, color: '#6b7280', marginTop: 1 }}>Automatically creates a matching Customer in QuickBooks when you add a new project.</span>
+              </span>
+            </label>
+
             {settings?.qbo_auto_push_expenses && (
               <div style={{ marginTop: 20, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 220 }}>
@@ -650,6 +763,98 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                     ))}
                   </select>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Push expense reimbursements ── */}
+          <div style={styles.section}>
+            <h3 style={styles.sectionTitle}>Push Expense Reimbursements</h3>
+            <p style={styles.hint}>Manually push approved reimbursements to QuickBooks as Purchase records for a date range.</p>
+            <div style={styles.pushRow}>
+              <div>
+                <label style={styles.label}>From</label>
+                <input style={styles.dateInput} type="date" value={expFrom} onChange={e => setExpFrom(e.target.value)} />
+              </div>
+              <div>
+                <label style={styles.label}>To</label>
+                <input style={styles.dateInput} type="date" value={expTo} onChange={e => setExpTo(e.target.value)} />
+              </div>
+              <button style={styles.pushBtn} onClick={pushExpenses} disabled={expPushing}>
+                {expPushing ? 'Pushing…' : 'Push Expenses'}
+              </button>
+            </div>
+            <label style={styles.forceLabel}>
+              <input type="checkbox" checked={expForce} onChange={e => setExpForce(e.target.checked)} style={{ marginRight: 6 }} />
+              Re-push already-synced expenses
+            </label>
+            {expResult && (
+              <div style={styles.resultBox}>
+                <p style={{ margin: 0, fontWeight: 600, color: '#166534' }}>
+                  {expResult.pushed} expense{expResult.pushed !== 1 ? 's' : ''} pushed successfully.
+                </p>
+                {expResult.already_synced > 0 && (
+                  <p style={{ margin: '6px 0 0', fontSize: 13, color: '#6b7280' }}>{expResult.already_synced} already synced (skipped).</p>
+                )}
+                {expResult.skipped?.length > 0 && (
+                  <details style={{ marginTop: 8 }}>
+                    <summary style={{ cursor: 'pointer', color: '#92400e', fontWeight: 600 }}>{expResult.skipped.length} skipped</summary>
+                    <ul style={{ marginTop: 6, paddingLeft: 20 }}>
+                      {expResult.skipped.map((s, i) => <li key={i} style={{ fontSize: 13, color: '#666' }}>{s.reason}</li>)}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Payroll journal entry ── */}
+          <div style={styles.section}>
+            <h3 style={styles.sectionTitle}>Push Payroll Journal Entry</h3>
+            <p style={styles.hint}>Creates a journal entry in QuickBooks for the total labor cost of approved time entries in a date range. Select the wage expense account to debit and the liability or bank account to credit.</p>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
+              <div>
+                <label style={styles.label}>From</label>
+                <input style={styles.dateInput} type="date" value={payFrom} onChange={e => setPayFrom(e.target.value)} />
+              </div>
+              <div>
+                <label style={styles.label}>To</label>
+                <input style={styles.dateInput} type="date" value={payTo} onChange={e => setPayTo(e.target.value)} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <label style={styles.label}>Debit — Wages Expense Account</label>
+                <select style={styles.select} value={payDebitId} onChange={e => setPayDebitId(e.target.value)} disabled={loadingAccounts}>
+                  <option value="">— Select account —</option>
+                  {qboAccounts.filter(a => ['Expense', 'OtherExpense', 'CostOfGoodsSold'].includes(a.AccountType)).map(a => (
+                    <option key={a.Id} value={a.Id}>{a.Name}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <label style={styles.label}>Credit — Payroll Liability / Bank Account</label>
+                <select style={styles.select} value={payCreditId} onChange={e => setPayCreditId(e.target.value)} disabled={loadingAccounts}>
+                  <option value="">— Select account —</option>
+                  {qboAccounts.filter(a => ['Bank', 'CreditCard', 'OtherCurrentLiability', 'LongTermLiability'].includes(a.AccountType)).map(a => (
+                    <option key={a.Id} value={a.Id}>{a.Name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <button
+              style={{ ...styles.pushBtn, opacity: (!payFrom || !payTo || !payDebitId || !payCreditId) ? 0.5 : 1 }}
+              onClick={pushPayroll}
+              disabled={payPushing || !payFrom || !payTo || !payDebitId || !payCreditId}
+            >
+              {payPushing ? 'Pushing…' : 'Push Journal Entry'}
+            </button>
+            {payResult && (
+              <div style={styles.resultBox}>
+                <p style={{ margin: 0, fontWeight: 600, color: '#166534' }}>
+                  Journal entry created — ${payResult.amount?.toFixed(2)} across {payResult.entries} entries.
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#6b7280' }}>{payResult.description}</p>
               </div>
             )}
           </div>
@@ -745,4 +950,13 @@ const styles = {
   pageBtn: { background: '#f3f4f6', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 16, cursor: 'pointer', color: '#374151', minHeight: 'unset', lineHeight: 1 },
   pageInfo: { fontSize: 13, color: '#6b7280', fontVariantNumeric: 'tabular-nums' },
   syncToggle: { display: 'flex', alignItems: 'flex-start', cursor: 'pointer', fontSize: 14, color: '#374151' },
+  errorPanel: { background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 12, padding: '16px 20px' },
+  errorPanelHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  clearAllBtn: { background: 'none', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 6, padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  errorRow: { display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #fde68a', borderRadius: 7, padding: '7px 12px', fontSize: 13, flexWrap: 'wrap' },
+  errorType: { background: '#fef3c7', color: '#92400e', borderRadius: 4, padding: '1px 7px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', flexShrink: 0 },
+  errorEntityId: { color: '#6b7280', fontSize: 12, flexShrink: 0 },
+  errorMsg: { flex: 1, color: '#374151', minWidth: 120 },
+  errorTime: { color: '#9ca3af', fontSize: 11, flexShrink: 0 },
+  errorDismiss: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px', flexShrink: 0 },
 };
