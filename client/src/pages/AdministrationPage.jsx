@@ -351,6 +351,7 @@ export default function AdministrationPage() {
         <div style={styles.headerTopRow}>
           <div style={styles.logoGroup}>
             <AppSwitcher currentApp="administration" userRole={user?.role} features={settings} />
+            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
           </div>
           <div style={styles.headerRight}>
             <button style={styles.headerBtn} onClick={logout}>{t.logout}</button>
@@ -425,6 +426,7 @@ const styles = {
   },
   headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
+  companyName: { fontSize: 14, fontWeight: 400, opacity: 0.6 },
   headerRight: { display: 'flex', alignItems: 'center', gap: 10 },
   headerBtn: { background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' },
   main: { maxWidth: 900, margin: '0 auto', padding: '24px 16px' },

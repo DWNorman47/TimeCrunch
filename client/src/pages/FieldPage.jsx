@@ -46,6 +46,7 @@ export default function FieldPage() {
         <div style={styles.headerTopRow}>
           <div style={styles.logoGroup}>
             <AppSwitcher currentApp="field" userRole={user?.role} features={features} />
+            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
           </div>
           <div style={styles.headerRight}>
             {!isAdmin && <span style={styles.userName}>{user?.full_name}</span>}
@@ -112,6 +113,7 @@ const styles = {
   header: { background: '#059669', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 'calc(56px + env(safe-area-inset-top))' },
   headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
+  companyName: { fontSize: 14, fontWeight: 400, opacity: 0.75 },
   headerRight: { display: 'flex', alignItems: 'center', gap: 10 },
   userName: { fontSize: 14, opacity: 0.85 },
   headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' },

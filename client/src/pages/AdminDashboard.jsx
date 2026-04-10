@@ -133,6 +133,7 @@ export default function AdminDashboard() {
         <div style={styles.headerTopRow}>
           <div style={styles.logoGroup}>
             <AppSwitcher currentApp="timeclock" userRole={user?.role} features={settings} />
+            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
           </div>
           <div style={styles.headerRight}>
             <NotificationBell />

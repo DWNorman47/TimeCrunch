@@ -96,6 +96,7 @@ export default function InventoryPage() {
         <div style={styles.headerTopRow}>
           <div style={styles.logoGroup}>
             <AppSwitcher currentApp="inventory" userRole={user?.role} features={features} />
+            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
           </div>
           <div style={styles.headerRight}>
             {!isAdmin && <span style={styles.userName}>{user?.full_name}</span>}
@@ -185,6 +186,7 @@ const styles = {
   header:        { display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 16px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, minHeight: 'calc(52px + env(safe-area-inset-top))', background: HEADER_BG, color: '#fff', position: 'sticky', top: 0, zIndex: 50 },
   headerTopRow:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 52 },
   logoGroup:     { display: 'flex', alignItems: 'center', gap: 10 },
+  companyName:   { fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginLeft: 4 },
   headerRight:   { display: 'flex', alignItems: 'center', gap: 10 },
   userName:      { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
   headerBtn:     { background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },

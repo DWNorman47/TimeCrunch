@@ -24,19 +24,9 @@ button {
   font-family: inherit;
 }
 
-/* Company name: always shown as a band below the header row */
-.company-name-row {
-  display: flex;
-  align-items: center;
-  margin: 0 -24px;
-  padding: 4px 24px;
-  background: rgba(0, 0, 0, 0.14);
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0.9;
-  letter-spacing: 0.01em;
-}
-.company-name-desktop { display: none; }
+/* Company name: inline on desktop, band below header on mobile */
+.company-name-row { display: none; }
+.company-name-desktop { display: inline; }
 .header-clock-timer-mobile { display: none; }
 .header-clock-timer-desktop { display: inline-flex; align-items: center; }
 
@@ -141,15 +131,22 @@ input, select, textarea {
     padding: 5px 10px !important;
     font-size: 12px !important;
   }
-  /* Company name band — slightly darker on mobile */
+  /* Company name — second row, darker band edge-to-edge */
   .company-name-desktop { display: none !important; }
   .company-name-row {
-    margin: 6px -16px 0 -16px !important;
-    padding: 4px 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    margin: 6px -24px 0 -24px !important;
+    padding: 4px 24px !important;
     background: rgba(0, 0, 0, 0.18) !important;
-    white-space: nowrap !important;
+  }
+  .company-name {
+    display: block !important;
+    font-size: 12px !important;
+    opacity: 0.9 !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
   .header-clock-timer-desktop { display: none !important; }
   .header-clock-timer-mobile { display: block !important; }

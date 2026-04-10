@@ -40,6 +40,7 @@ export default function AnalyticsPage() {
         <div style={styles.headerTopRow}>
           <div style={styles.logoGroup}>
             <AppSwitcher currentApp="analytics" userRole={user?.role} features={features} />
+            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
           </div>
           <button style={styles.headerBtn} className="header-btn" onClick={logout}>Logout</button>
         </div>
