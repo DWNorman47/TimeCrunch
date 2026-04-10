@@ -124,8 +124,8 @@ export default function PhotoGallery({ projects }) {
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
-        <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title={t.fromDate} />
-        <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title={t.toDate} />
+        <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title="From date" />
+        <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title="To date" />
       </div>
 
       {lightbox !== null && (
