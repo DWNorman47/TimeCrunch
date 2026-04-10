@@ -110,12 +110,12 @@ export default function FieldPage() {
 
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9' },
-  header: { background: '#059669', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 'calc(56px + env(safe-area-inset-top))' },
+  header: { background: '#059669', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 'calc(56px + env(safe-area-inset-top))', position: 'sticky', top: 0, zIndex: 100 },
   headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
-  companyName: { fontSize: 14, fontWeight: 400, opacity: 0.75 },
+  companyName: { fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' },
   headerRight: { display: 'flex', alignItems: 'center', gap: 10 },
   userName: { fontSize: 14, opacity: 0.85 },
-  headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' },
+  headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   main: { maxWidth: 860, margin: '0 auto', padding: '24px 16px' },
 };
