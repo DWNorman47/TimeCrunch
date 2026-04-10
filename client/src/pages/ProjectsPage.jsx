@@ -1367,7 +1367,7 @@ export default function ProjectsPage() {
 
 const styles = {
   page: { minHeight: '100vh', background: '#f4f6f9', display: 'flex', flexDirection: 'column' },
-  header: { background: '#8b5cf6', padding: '0 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', top: 0, zIndex: 100, minHeight: 56 },
+  header: { background: '#8b5cf6', color: '#fff', padding: '0 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', top: 0, zIndex: 100, minHeight: 56 },
   headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
   companyName: { fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)' },
