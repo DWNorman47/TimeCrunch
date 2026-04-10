@@ -77,7 +77,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchPending = () => {
       api.get('/admin/kpis').then(r => setPendingCount(r.data.pending_approvals ?? 0)).catch(() => {});
-      api.get('/reimbursements/admin?status=pending').then(r => setPendingReimbursements(r.data.length)).catch(() => {});
+      api.get('/reimbursements/admin?status=pending').then(r => setPendingReimbursements((r.data.items ?? r.data).length)).catch(() => {});
     };
     fetchPending();
     const interval = setInterval(fetchPending, 60000);
