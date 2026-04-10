@@ -28,6 +28,11 @@ function basicAuthHeader() {
 
 async function notifyDisconnect(companyId) {
   try {
+    const setting = await pool.query(
+      `SELECT value FROM settings WHERE company_id = $1 AND key = 'notify_qbo_disconnect'`,
+      [companyId]
+    );
+    if (setting.rows[0]?.value !== '1') return;
     const admins = await pool.query(
       `SELECT email, full_name FROM users WHERE company_id = $1 AND role IN ('admin','superadmin') AND active = true AND email IS NOT NULL`,
       [companyId]

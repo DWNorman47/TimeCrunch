@@ -720,6 +720,20 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             <label style={{ ...styles.syncToggle, marginTop: 12 }}>
               <input
                 type="checkbox"
+                checked={!!settings?.notify_qbo_disconnect}
+                onChange={e => saveAutoSyncSetting('notify_qbo_disconnect', e.target.checked)}
+                disabled={savingAutoSync}
+                style={{ marginRight: 8 }}
+              />
+              <span>
+                <span style={{ fontWeight: 600, color: '#1a202c', fontSize: 14 }}>Email admins when QuickBooks disconnects</span>
+                <span style={{ display: 'block', fontSize: 12, color: '#6b7280', marginTop: 1 }}>Send an email to all admins if the QuickBooks token expires or is revoked.</span>
+              </span>
+            </label>
+
+            <label style={{ ...styles.syncToggle, marginTop: 12 }}>
+              <input
+                type="checkbox"
                 checked={!!settings?.qbo_auto_create_customers}
                 onChange={e => saveAutoSyncSetting('qbo_auto_create_customers', e.target.checked)}
                 disabled={savingAutoSync}
