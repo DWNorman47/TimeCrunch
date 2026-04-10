@@ -155,7 +155,7 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
   const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
   const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour', 'chat_retention_days'];
   const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold', 'media_retention_days'];
-  const stringKeys = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id'];
+  const stringKeys = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id', 'qbo_expense_account_id', 'qbo_bank_account_id'];
   const allowed = [...numericKeys, ...stringKeys, ...FEATURE_KEYS];
   const companyId = req.user.company_id;
   try {
@@ -2140,6 +2140,8 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
     // QBO auto-sync — fire-and-forget, never blocks the response
     setImmediate(async () => {
       try {
+        const autopush = await pool.query("SELECT value FROM settings WHERE company_id = $1 AND key = 'qbo_auto_push'", [companyId]);
+        if (autopush.rows[0]?.value !== '1') return;
         const company = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
         if (!company.rows[0]?.qbo_realm_id) return;
         const worker = await pool.query('SELECT qbo_employee_id, qbo_vendor_id, worker_type FROM users WHERE id = $1', [entry.user_id]);

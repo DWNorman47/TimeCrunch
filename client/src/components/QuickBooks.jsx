@@ -21,13 +21,15 @@ function Paginator({ page, total, pageSize, onChange }) {
   );
 }
 
-export default function QuickBooks({ workers, projects, onWorkersImported, onProjectsImported }) {
+export default function QuickBooks({ workers, projects, onWorkersImported, onProjectsImported, settings, onSettingsChange }) {
   const t = useT();
   const [status, setStatus] = useState(null);
   const [qboEmployees, setQboEmployees] = useState([]);
   const [qboVendors, setQboVendors] = useState([]);
   const [qboCustomers, setQboCustomers] = useState([]);
+  const [qboAccounts, setQboAccounts] = useState([]);
   const [loadingMappings, setLoadingMappings] = useState(false);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [employeeMappings, setEmployeeMappings] = useState({});
   const [vendorMappings, setVendorMappings] = useState({});
   const [projectMappings, setProjectMappings] = useState({});
@@ -38,6 +40,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [forcePush, setForcePush] = useState(false);
   const [error, setError] = useState('');
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
+  const [savingAutoSync, setSavingAutoSync] = useState(false);
 
   // Import state
   const [selectedWorkers, setSelectedWorkers] = useState(new Set());
@@ -67,6 +70,15 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   useEffect(() => {
     api.get('/qbo/status').then(r => setStatus(r.data)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!status?.connected) return;
+    setLoadingAccounts(true);
+    api.get('/qbo/accounts')
+      .then(r => setQboAccounts(r.data))
+      .catch(() => {})
+      .finally(() => setLoadingAccounts(false));
+  }, [status?.connected]);
 
   useEffect(() => {
     if (!status?.connected) return;
@@ -192,6 +204,18 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
       setError(err.response?.data?.error || 'Import failed');
     } finally {
       setImporting(false);
+    }
+  };
+
+  const saveAutoSyncSetting = async (key, value) => {
+    setSavingAutoSync(true);
+    try {
+      const r = await api.patch('/admin/settings', { [key]: value });
+      if (onSettingsChange) onSettingsChange(r.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save setting');
+    } finally {
+      setSavingAutoSync(false);
     }
   };
 
@@ -561,6 +585,75 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             </div>
           )}
 
+          {/* ── Auto-sync settings ── */}
+          <div style={styles.section}>
+            <h3 style={styles.sectionTitle}>Auto-sync Settings</h3>
+            <p style={styles.hint}>Automatically push records to QuickBooks when approved. Workers and projects must be mapped above for auto-sync to work.</p>
+
+            <label style={styles.syncToggle}>
+              <input
+                type="checkbox"
+                checked={!!settings?.qbo_auto_push}
+                onChange={e => saveAutoSyncSetting('qbo_auto_push', e.target.checked)}
+                disabled={savingAutoSync}
+                style={{ marginRight: 8 }}
+              />
+              <span>
+                <span style={{ fontWeight: 600, color: '#1a202c', fontSize: 14 }}>Auto-push time entries</span>
+                <span style={{ display: 'block', fontSize: 12, color: '#6b7280', marginTop: 1 }}>When a time entry is approved, push it to QuickBooks as a Time Activity.</span>
+              </span>
+            </label>
+
+            <label style={{ ...styles.syncToggle, marginTop: 12 }}>
+              <input
+                type="checkbox"
+                checked={!!settings?.qbo_auto_push_expenses}
+                onChange={e => saveAutoSyncSetting('qbo_auto_push_expenses', e.target.checked)}
+                disabled={savingAutoSync}
+                style={{ marginRight: 8 }}
+              />
+              <span>
+                <span style={{ fontWeight: 600, color: '#1a202c', fontSize: 14 }}>Auto-push expense reimbursements</span>
+                <span style={{ display: 'block', fontSize: 12, color: '#6b7280', marginTop: 1 }}>When a reimbursement is approved, create a Purchase record in QuickBooks.</span>
+              </span>
+            </label>
+
+            {settings?.qbo_auto_push_expenses && (
+              <div style={{ marginTop: 20, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <label style={styles.label}>Payment / Bank Account</label>
+                  <p style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 6px' }}>The account used to pay expenses (e.g. Checking, Petty Cash)</p>
+                  <select
+                    style={styles.select}
+                    value={settings?.qbo_bank_account_id || ''}
+                    onChange={e => saveAutoSyncSetting('qbo_bank_account_id', e.target.value)}
+                    disabled={savingAutoSync || loadingAccounts}
+                  >
+                    <option value="">— Select account —</option>
+                    {qboAccounts.filter(a => ['Bank', 'CreditCard', 'OtherCurrentAsset'].includes(a.AccountType)).map(a => (
+                      <option key={a.Id} value={a.Id}>{a.Name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <label style={styles.label}>Expense Category Account</label>
+                  <p style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 6px' }}>The expense account for the line item (e.g. Job Materials, Travel)</p>
+                  <select
+                    style={styles.select}
+                    value={settings?.qbo_expense_account_id || ''}
+                    onChange={e => saveAutoSyncSetting('qbo_expense_account_id', e.target.value)}
+                    disabled={savingAutoSync || loadingAccounts}
+                  >
+                    <option value="">— Select account —</option>
+                    {qboAccounts.filter(a => ['Expense', 'OtherExpense', 'CostOfGoodsSold'].includes(a.AccountType)).map(a => (
+                      <option key={a.Id} value={a.Id}>{a.Name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* ── Push time entries ── */}
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>{t.qboPushEntries}</h3>
@@ -651,4 +744,5 @@ const styles = {
   paginator: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, justifyContent: 'flex-end' },
   pageBtn: { background: '#f3f4f6', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 16, cursor: 'pointer', color: '#374151', minHeight: 'unset', lineHeight: 1 },
   pageInfo: { fontSize: 13, color: '#6b7280', fontVariantNumeric: 'tabular-nums' },
+  syncToggle: { display: 'flex', alignItems: 'flex-start', cursor: 'pointer', fontSize: 14, color: '#374151' },
 };

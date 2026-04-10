@@ -215,6 +215,44 @@ router.post('/invoices', requireAdmin, async (req, res) => {
   }
 });
 
+// GET /api/qbo/accounts — list all active QBO accounts
+router.get('/accounts', requireAdmin, async (req, res) => {
+  try {
+    const accounts = await qbo.listAccounts(req.user.company_id);
+    res.json(accounts);
+  } catch (err) {
+    console.error(err);
+    const status = err.code === 'qbo_auth_expired' ? 401 : 500;
+    res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
+  }
+});
+
+// POST /api/qbo/expenses — push a reimbursement expense to QBO
+// Body: { bank_account_id, expense_account_id, vendor_id, amount, description, txn_date }
+router.post('/expenses', requireAdmin, async (req, res) => {
+  const { bank_account_id, expense_account_id, vendor_id, amount, description, txn_date } = req.body;
+  if (!bank_account_id || !expense_account_id || amount == null) {
+    return res.status(400).json({ error: 'bank_account_id, expense_account_id, and amount are required' });
+  }
+  const parsed = parseFloat(amount);
+  if (isNaN(parsed) || parsed <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
+  try {
+    const purchase = await qbo.createPurchase(req.user.company_id, {
+      bankAccountId: bank_account_id,
+      expenseAccountId: expense_account_id,
+      vendorId: vendor_id || null,
+      amount: parsed,
+      description: description || '',
+      txnDate: txn_date || null,
+    });
+    res.json(purchase);
+  } catch (err) {
+    console.error(err);
+    const status = err.code === 'qbo_auth_expired' ? 401 : 500;
+    res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
+  }
+});
+
 // POST /api/qbo/push — push time entries to QBO for a date range
 // Body: { from, to, force } — force=true re-pushes already-synced entries
 router.post('/push', requireAdmin, async (req, res) => {

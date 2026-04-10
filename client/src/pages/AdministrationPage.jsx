@@ -402,6 +402,8 @@ export default function AdministrationPage() {
             <QuickBooks
               workers={workers}
               projects={projects}
+              settings={settings}
+              onSettingsChange={setSettings}
               onWorkersImported={imported => setWorkers(prev => [...prev, ...imported.map(w => ({ ...w, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 }))])}
               onProjectsImported={imported => setProjects(prev => [...prev, ...imported])}
             />

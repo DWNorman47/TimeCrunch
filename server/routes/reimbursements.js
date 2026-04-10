@@ -6,6 +6,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadBase64 } = require('../r2');
 const { incrementStorage, decrementStorage, checkStorageLimit } = require('../storage');
 const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
+const qbo = require('../services/qbo');
 
 // GET /api/reimbursements/categories
 // Returns:
@@ -232,11 +233,52 @@ router.patch('/admin/:id', requireAdmin, async (req, res) => {
        SET status = $1, admin_notes = $2, updated_at = NOW()
        WHERE id = $3 AND company_id = $4
        RETURNING id, amount, description, category, expense_date, receipt_url,
-                 status, admin_notes, created_at, project_id`,
+                 status, admin_notes, created_at, project_id, user_id`,
       [status, admin_notes, req.params.id, req.user.company_id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
-    res.json(rows[0]);
+    const reimb = rows[0];
+    res.json(reimb);
+
+    // QBO expense auto-sync — fire-and-forget, only on approval
+    if (status === 'approved') {
+      setImmediate(async () => {
+        try {
+          const [autopush, accounts] = await Promise.all([
+            pool.query("SELECT value FROM settings WHERE company_id = $1 AND key = 'qbo_auto_push_expenses'", [req.user.company_id]),
+            pool.query("SELECT key, value FROM settings WHERE company_id = $1 AND key IN ('qbo_expense_account_id', 'qbo_bank_account_id')", [req.user.company_id]),
+          ]);
+          if (autopush.rows[0]?.value !== '1') return;
+          const expenseAccountId = accounts.rows.find(r => r.key === 'qbo_expense_account_id')?.value;
+          const bankAccountId = accounts.rows.find(r => r.key === 'qbo_bank_account_id')?.value;
+          if (!expenseAccountId || !bankAccountId) return;
+
+          const company = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [req.user.company_id]);
+          if (!company.rows[0]?.qbo_realm_id) return;
+
+          // Optional: get vendor ID if worker is a contractor/subcontractor
+          let vendorId = null;
+          if (reimb.user_id) {
+            const worker = await pool.query('SELECT qbo_vendor_id, worker_type FROM users WHERE id = $1', [reimb.user_id]);
+            const w = worker.rows[0];
+            if (w && (w.worker_type === 'contractor' || w.worker_type === 'subcontractor') && w.qbo_vendor_id) {
+              vendorId = w.qbo_vendor_id;
+            }
+          }
+
+          await qbo.createPurchase(req.user.company_id, {
+            bankAccountId,
+            expenseAccountId,
+            vendorId,
+            amount: parseFloat(reimb.amount),
+            description: reimb.description || reimb.category || 'Expense reimbursement',
+            txnDate: reimb.expense_date ? reimb.expense_date.toISOString?.().substring(0, 10) || String(reimb.expense_date).substring(0, 10) : null,
+          });
+        } catch (err) {
+          console.error('[QBO expense auto-sync]', err.message);
+        }
+      });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update reimbursement' });

@@ -191,6 +191,32 @@ async function createInvoice(companyId, { customerId, itemId, amount, descriptio
   return data.Invoice;
 }
 
+async function listAccounts(companyId) {
+  const data = await qboGet(companyId, '/query?query=SELECT * FROM Account WHERE Active = true MAXRESULTS 1000&minorversion=65');
+  return data.QueryResponse?.Account || [];
+}
+
+async function createPurchase(companyId, { bankAccountId, expenseAccountId, vendorId, amount, description, txnDate }) {
+  const body = {
+    PaymentType: 'Cash',
+    AccountRef: { value: String(bankAccountId) },
+    TxnDate: txnDate || new Date().toLocaleDateString('en-CA'),
+    Line: [
+      {
+        Amount: parseFloat(amount.toFixed(2)),
+        DetailType: 'AccountBasedExpenseLineDetail',
+        Description: description || '',
+        AccountBasedExpenseLineDetail: {
+          AccountRef: { value: String(expenseAccountId) },
+        },
+      },
+    ],
+  };
+  if (vendorId) body.EntityRef = { value: String(vendorId), type: 'Vendor' };
+  const data = await qboPost(companyId, '/purchase?minorversion=65', body);
+  return data.Purchase;
+}
+
 async function pushTimeActivity(companyId, { employeeId, vendorId, customerId, workDate, hours, description }) {
   const useVendor = !!vendorId;
   const body = {
@@ -208,4 +234,4 @@ async function pushTimeActivity(companyId, { employeeId, vendorId, customerId, w
   return data.TimeActivity;
 }
 
-module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getCompanyInfo, listEmployees, listCustomers, listVendors, listItems, createInvoice, pushTimeActivity };
+module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getCompanyInfo, listEmployees, listCustomers, listVendors, listItems, listAccounts, createInvoice, createPurchase, pushTimeActivity };
