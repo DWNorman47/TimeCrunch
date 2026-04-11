@@ -146,7 +146,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
               <label style={styles.label}>{t.qboTo}</label>
               <input style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
             </div>
-            <button style={styles.fetchBtn} onClick={fetchBill} disabled={loading}>
+            <button style={{ ...styles.fetchBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={fetchBill} disabled={loading}>
               {loading ? t.loading : t.loadEntries}
             </button>
           </div>
@@ -162,7 +162,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
                 <span style={{ fontWeight: 700 }}>{t.totalCostLabel}: <b>{formatCurrency(billData.summary.total_cost, currency)}</b></span>
               </div>
               <div style={styles.btnRow}>
-                <button style={styles.previewBtn} onClick={togglePreview} disabled={pdfGenerating}>
+                <button style={{ ...styles.previewBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={togglePreview} disabled={pdfGenerating}>
                   {pdfGenerating ? 'Preparing…' : showPreview ? t.hidePreview : t.previewBill}
                 </button>
                 <button style={styles.csvBtn} onClick={() => {
@@ -173,7 +173,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
                   });
                   downloadCSV([headers, ...rows], `${p.name.replace(/\s+/g,'-')}-${from||'all'}-to-${to||'all'}.csv`);
                 }}>{t.exportCSV}</button>
-                <button style={styles.pdfBtn} onClick={downloadPDF} disabled={pdfGenerating}>
+                <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>
                   {pdfGenerating ? t.preparingPDF : t.downloadPDF}
                 </button>
               </div>

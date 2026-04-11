@@ -63,7 +63,7 @@ export default function AvailabilityTab() {
           <h2 style={s.title}>{t.availTitle}</h2>
           <p style={s.subtitle}>{t.availSubtitle}</p>
         </div>
-        <button style={s.saveBtn} onClick={save} disabled={saving}>
+        <button style={{ ...s.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={save} disabled={saving}>
           {saving ? t.saving : saved ? `✓ ${t.availSaved}` : t.availSave}
         </button>
       </div>

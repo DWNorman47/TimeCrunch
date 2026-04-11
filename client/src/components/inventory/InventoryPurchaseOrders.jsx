@@ -128,7 +128,7 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
 
         <div style={m.actions}>
           <button style={m.cancelBtn} onClick={onClose}>{t.cancel}</button>
-          <button style={m.confirmBtn} onClick={submit} disabled={saving}>
+          <button style={{ ...m.confirmBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submit} disabled={saving}>
             {saving ? t.invPOReceiving : t.invPOConfirmReceipt}
           </button>
         </div>
@@ -299,13 +299,13 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             {isDraft && !editing && (
               <>
                 <button style={d.editBtn} onClick={() => setEditing(true)}>{t.invPOEditBtn}</button>
-                <button style={d.submitBtn} onClick={submitPO} disabled={saving}>{t.invPOSubmitBtn}</button>
+                <button style={{ ...d.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitPO} disabled={saving}>{t.invPOSubmitBtn}</button>
               </>
             )}
             {editing && (
               <>
                 <button style={d.cancelEditBtn} onClick={() => setEditing(false)}>{t.cancel}</button>
-                <button style={d.submitBtn} onClick={saveEdit} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
+                <button style={{ ...d.submitBtn, ...(editSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={saveEdit} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
               </>
             )}
             {po.supplier_name && !isDraft && (
@@ -323,7 +323,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             )}
             {!isFinished && (confirmingCancel ? (
               <>
-                <button style={d.confirmCancelBtn} onClick={cancelPO} disabled={saving}>{saving ? '…' : t.confirm}</button>
+                <button style={{ ...d.confirmCancelBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={cancelPO} disabled={saving}>{saving ? '…' : t.confirm}</button>
                 <button style={d.smallCancelBtn} onClick={() => setConfirmingCancel(false)}>{t.cancel}</button>
               </>
             ) : (
@@ -524,7 +524,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             </div>
             <div style={d.addLineBtns}>
               <button style={d.cancelEditBtn} onClick={() => { setAddingLine(false); setLineErr(''); }}>{t.cancel}</button>
-              <button style={d.submitBtn} onClick={addLine} disabled={saving}>
+              <button style={{ ...d.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={addLine} disabled={saving}>
                 {saving ? '…' : t.invPOAddLineBtn}
               </button>
             </div>
@@ -720,7 +720,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
 
       <div style={c.actions}>
         <button style={c.cancelBtn} onClick={onCancel}>{t.cancel}</button>
-        <button style={c.saveBtn} onClick={submit} disabled={saving}>
+        <button style={{ ...c.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submit} disabled={saving}>
           {saving ? t.invPOCreating : t.invPOCreateDraft}
         </button>
       </div>

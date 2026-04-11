@@ -145,7 +145,7 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
       </div>
       <div style={f.actions}>
         <button type="button" style={f.cancelBtn} onClick={onCancel}>{t.cancel}</button>
-        <button type="submit" style={f.saveBtn} disabled={saving}>{saving ? t.saving : item ? t.saveChanges : t.addItem}</button>
+        <button type="submit" style={{ ...f.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={saving}>{saving ? t.saving : item ? t.saveChanges : t.addItem}</button>
       </div>
     </form>
   );
@@ -245,7 +245,7 @@ function ItemUOMPanel({ item }) {
               <label style={u.label}>{t.uomBase}</label>
               <input type="checkbox" checked={newForm.is_base} onChange={e => setN('is_base', e.target.checked)} style={{ marginTop: 10 }} />
             </div>
-            <button style={u.saveBtn} onClick={add} disabled={saving}>{t.save}</button>
+            <button style={{ ...u.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={add} disabled={saving}>{t.save}</button>
           </div>
           <p style={u.factorNote}>{t.uomFactorNote}</p>
         </div>
@@ -276,7 +276,7 @@ function ItemUOMPanel({ item }) {
                     <td style={u.td}><input style={{ ...u.input, width: 70, textAlign: 'right' }} type="number" min="0.0001" step="any" value={editForm.factor} onChange={e => setE('factor', e.target.value)} /></td>
                     <td style={u.td}><input type="checkbox" checked={!!editForm.is_base} onChange={e => setE('is_base', e.target.checked)} /></td>
                     <td style={{ ...u.td, whiteSpace: 'nowrap' }}>
-                      <button style={u.saveBtn} onClick={() => save(row.id)} disabled={saving}>{t.save}</button>
+                      <button style={{ ...u.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => save(row.id)} disabled={saving}>{t.save}</button>
                       <button style={u.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
                     </td>
                   </>

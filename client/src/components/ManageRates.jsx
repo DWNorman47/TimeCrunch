@@ -241,7 +241,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       {saved === section && <span style={styles.savedMsg}>{t.ratesSettingsSaved}</span>}
       {error && saving === null && <span style={styles.errorMsg}>{error}</span>}
       <button
-        style={styles.saveBtn}
+        style={{ ...styles.saveBtn, ...(saving === section ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
         type="button"
         disabled={saving === section}
         onClick={() => saveSection(section)}

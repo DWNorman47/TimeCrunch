@@ -405,7 +405,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
 
       <div style={f.actions}>
         <button type="button" style={f.cancelBtn} onClick={onCancel}>{t.cancel}</button>
-        <button type="submit" style={f.saveBtn} disabled={saving}>{saving ? t.saving : t.invTxLogTx}</button>
+        <button type="submit" style={{ ...f.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={saving}>{saving ? t.saving : t.invTxLogTx}</button>
       </div>
 
       {conversionPrompt && (

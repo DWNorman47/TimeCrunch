@@ -83,12 +83,12 @@ function CategorySection({ cfg, onSave, saving }) {
           onKeyDown={e => e.key === 'Enter' && addCustom()}
           maxLength={60}
         />
-        <button style={s.addBtn} onClick={addCustom} disabled={!newCat.trim()}>{t.addOption}</button>
+        <button style={{ ...s.addBtn, ...(!newCat.trim() ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={addCustom} disabled={!newCat.trim()}>{t.addOption}</button>
       </div>
 
       {dirty && (
         <button
-          style={s.saveBtn}
+          style={{ ...s.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
           onClick={() => onSave({ suppressed, custom })}
           disabled={saving}
         >
@@ -133,7 +133,7 @@ function MileageRateSection({ cfg, onSave, saving }) {
         <span style={{ fontSize: 13, color: '#6b7280' }}>per mile · IRS standard rate for 2025 is $0.670</span>
       </div>
       {dirty && (
-        <button style={{ ...s.saveBtn, marginTop: 8 }} onClick={() => onSave({ rate })} disabled={saving}>
+        <button style={{ ...s.saveBtn, marginTop: 8, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => onSave({ rate })} disabled={saving}>
           {saving ? 'Saving…' : 'Save Rate'}
         </button>
       )}

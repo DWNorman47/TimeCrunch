@@ -82,7 +82,7 @@ export default function ManagePayPeriods() {
           </div>
           <div style={styles.field}>
             <label style={styles.label}>&nbsp;</label>
-            <button style={styles.lockBtn} type="submit" disabled={saving}>
+            <button style={{ ...styles.lockBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>
               {saving ? t.locking : t.lockPeriod}
             </button>
           </div>
@@ -103,7 +103,7 @@ export default function ManagePayPeriods() {
                 <div style={styles.periodMeta}>Locked by {p.locked_by_name} · {new Date(p.created_at).toLocaleDateString()}</div>
               </div>
               <button
-                style={styles.unlockBtn}
+                style={{ ...styles.unlockBtn, ...(unlocking === p.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                 onClick={() => unlock(p.id)}
                 disabled={unlocking === p.id}
               >

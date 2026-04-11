@@ -193,7 +193,7 @@ export default function BillingPanel() {
             Your <strong>{currentPlan === 'business' ? t.planBusiness : t.planStarter}</strong> plan is active
             {hasQbo ? ` with ${t.addonQBO}` : ''}.
           </p>
-          <button style={s.portalBtn} onClick={portal} disabled={redirecting === 'portal'}>
+          <button style={{ ...s.portalBtn, ...(redirecting === 'portal' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={portal} disabled={redirecting === 'portal'}>
             {redirecting === 'portal' ? 'Redirecting...' : t.manageSub}
           </button>
         </div>
