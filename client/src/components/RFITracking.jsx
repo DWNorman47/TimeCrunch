@@ -79,6 +79,7 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.descriptionField} <span style={styles.optional}>({t.optional})</span></label>
         <textarea style={styles.textarea} rows={3} placeholder="Detailed description, background, or relevant context…" maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} />
+        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{form.description.length}/2000</div>
       </div>
 
       <div style={styles.row}>
@@ -115,6 +116,7 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.rfiResponse}</label>
           <textarea style={styles.textarea} rows={3} placeholder="Enter the response or answer received…" maxLength={2000} value={form.response} onChange={e => set('response', e.target.value)} />
+          <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{form.response.length}/2000</div>
         </div>
       )}
 

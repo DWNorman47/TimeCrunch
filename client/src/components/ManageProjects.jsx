@@ -429,6 +429,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
                         <label style={s.fieldLabel}>Description</label>
                         <textarea style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Brief project description..." />
+                        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(editDescription || '').length}/1000</div>
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
                         <label style={s.fieldLabel}>Progress % (0–100)</label>

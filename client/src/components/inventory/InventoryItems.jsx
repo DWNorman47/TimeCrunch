@@ -142,6 +142,7 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
       <div style={f.field}>
         <label style={f.label}>{t.itemDescriptionLabel}</label>
         <textarea style={{ ...f.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
+        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.description || '').length}/1000</div>
       </div>
       <div style={f.actions}>
         <button type="button" style={f.cancelBtn} onClick={onCancel}>{t.cancel}</button>

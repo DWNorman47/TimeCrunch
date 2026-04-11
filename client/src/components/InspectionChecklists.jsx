@@ -348,6 +348,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.notes} <span style={styles.optional}>{t.inspOptional}</span></label>
         <textarea style={styles.textarea} rows={3} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="General notes about this inspection…" />
+        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 
       {error && <p style={styles.error}>{error}</p>}

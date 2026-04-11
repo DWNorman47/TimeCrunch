@@ -262,6 +262,7 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.additionalNotes}</label>
           <textarea style={styles.textarea} rows={2} placeholder={t.anyObservations} maxLength={1000} value={notes} onChange={e => setNotes(e.target.value)} />
+          <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{notes.length}/1000</div>
         </div>
       )}
 

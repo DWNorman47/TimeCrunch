@@ -92,6 +92,7 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.descriptionField}</label>
           <textarea style={styles.textarea} rows={3} placeholder="Additional details..." maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
+          <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.description || '').length}/1000</div>
         </div>
       </div>
       {error && <p style={styles.error}>{error}</p>}

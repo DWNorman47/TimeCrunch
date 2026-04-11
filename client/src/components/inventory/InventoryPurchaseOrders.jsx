@@ -363,6 +363,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             <div style={{ ...d.editField, flexBasis: '100%' }}>
               <label style={d.editLabel}>{t.notes}</label>
               <textarea style={{ ...d.editInput, minHeight: 52, resize: 'vertical' }} value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} maxLength={1000} />
+              <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(editForm.notes || '').length}/1000</div>
             </div>
           </div>
         ) : (
@@ -664,6 +665,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
       <div style={c.field}>
         <label style={c.label}>{t.notes}</label>
         <textarea style={{ ...c.input, minHeight: 52, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} maxLength={1000} />
+        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 
       <div style={c.linesHeader}>

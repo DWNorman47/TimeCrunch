@@ -401,6 +401,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
       <div style={f.field}>
         <label style={f.label}>{t.notes}</label>
         <textarea style={{ ...f.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 
       <div style={f.actions}>

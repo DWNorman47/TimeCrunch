@@ -379,6 +379,7 @@ function SupplierPanel() {
         <div style={sp.field}>
           <label style={sp.label}>{t.notes}</label>
           <textarea style={{ ...sp.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
+          <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
         </div>
         <div style={sp.actions}>
           <button style={sp.cancelBtn} onClick={() => setEditing(null)}>{t.cancel}</button>

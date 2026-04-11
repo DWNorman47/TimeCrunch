@@ -82,11 +82,13 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.workPerformed}</label>
         <textarea style={styles.textarea} rows={3} placeholder={t.subWorkPerformedPlaceholder} maxLength={2000} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
+        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{form.work_performed.length}/2000</div>
       </div>
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.notes} <span style={styles.optional}>({t.optional})</span></label>
         <textarea style={styles.textarea} rows={2} placeholder={t.issuesPlaceholder} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 
       {error && <p style={styles.error}>{error}</p>}
