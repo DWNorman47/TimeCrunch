@@ -828,7 +828,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             </div>
             <div style={d.modalActions}>
               <button style={d.cancelBtn} onClick={() => setOverrideModal(null)}>{t.cancel}</button>
-              <button style={{ ...d.confirmBtn, background: '#7c3aed' }}
+              <button style={{ ...d.confirmBtn, background: '#7c3aed', ...(overriding || overrideQty === '' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                 onClick={submitOverride} disabled={overriding || overrideQty === ''}>
                 {overriding ? t.invCycOverrideSaving : t.invCycOverride}
               </button>

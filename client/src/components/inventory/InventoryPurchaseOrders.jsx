@@ -310,7 +310,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             )}
             {po.supplier_name && !isDraft && (
               <button
-                style={{ ...d.editBtn, color: emailSent ? '#059669' : '#2563eb', borderColor: emailSent ? '#059669' : '#bfdbfe', background: emailSent ? '#d1fae5' : '#eff6ff' }}
+                style={{ ...d.editBtn, color: emailSent ? '#059669' : '#2563eb', borderColor: emailSent ? '#059669' : '#bfdbfe', background: emailSent ? '#d1fae5' : '#eff6ff', ...(emailSending ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                 onClick={emailPO}
                 disabled={emailSending}
                 title={`Email PO to ${po.supplier_name}`}
