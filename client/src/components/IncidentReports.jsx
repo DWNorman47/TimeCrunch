@@ -347,7 +347,7 @@ export default function IncidentReports({ projects }) {
       )}
 
       {isAdmin && (
-        <div style={styles.filterBar}>
+        <div className="filter-row" style={styles.filterBar}>
           <select style={styles.filterSelect} value={filters.type || ''} onChange={e => setFilter('type', e.target.value)}>
             <option value="">{t.allTypes}</option>
             {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}

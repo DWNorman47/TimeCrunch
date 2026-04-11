@@ -212,6 +212,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       onProjectDeleted(archiveTarget.id);
       if (expandedId === archiveTarget.id) setExpandedId(null);
       loadArchived();
+      toast(`"${archiveTarget.name}" archived`, 'success');
       setArchiveTarget(null);
     } catch {
       toast('Failed to remove project', 'error');

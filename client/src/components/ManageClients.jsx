@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
-import { SkeletonList } from './Skeleton';
+import { useToast } from '../contexts/ToastContext';
+import { SkeletonList, SkeletonBlock } from './Skeleton';
 
 // Document type metadata
 const DOC_TYPES = [
@@ -111,6 +112,7 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
 
 function DocUploadForm({ clientId, onUploaded }) {
   const t = useT();
+  const toast = useToast();
   const [docType, setDocType] = useState('coi');
   const [direction, setDirection] = useState('from_client');
   const [expiresAt, setExpiresAt] = useState('');
@@ -138,6 +140,7 @@ function DocUploadForm({ clientId, onUploaded }) {
         direction,
       });
       onUploaded(doc);
+      toast('Document uploaded', 'success');
       setExpiresAt('');
       fileRef.current.value = '';
     } catch (err) {
@@ -307,7 +310,7 @@ function ClientCard({ client, onEdit, onDeleted }) {
             onUploaded={doc => setDocs(prev => prev ? [doc, ...prev] : [doc])}
           />
           {loadingDocs ? (
-            <p style={s.hint}>Loading…</p>
+            <SkeletonBlock width="100%" height={60} style={{ marginTop: 8 }} />
           ) : (
             <DocList
               clientId={client.id}

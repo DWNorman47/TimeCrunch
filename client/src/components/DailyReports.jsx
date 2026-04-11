@@ -541,7 +541,7 @@ export default function DailyReports({ projects }) {
 
   return (
     <div>
-      <div style={styles.listHeader}>
+      <div className="filter-row" style={styles.listHeader}>
         <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
           <option value="">{t.allProjects}</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}

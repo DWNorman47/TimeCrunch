@@ -1333,6 +1333,7 @@ export default function ProjectsPage() {
   const [metrics, setMetrics] = useState({});
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selected, setSelected] = useState(null);
   const [features, setFeatures] = useState({});
   const [showArchived, setShowArchived] = useState(false);
@@ -1356,7 +1357,7 @@ export default function ProjectsPage() {
       setSettings(sRes.data);
       setFeatures(sRes.data);
       setCompanyInfo(ciRes.data || {});
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(() => setLoadError(true)).finally(() => setLoading(false));
   };
 
   useEffect(() => { loadProjects(showArchived); }, [showArchived]);
@@ -1458,6 +1459,11 @@ export default function ProjectsPage() {
             )}
             {loading ? (
               <SkeletonList count={5} rows={3} />
+            ) : loadError ? (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '16px 20px', color: '#991b1b', fontSize: 14 }}>
+                Failed to load projects.{' '}
+                <button style={{ background: 'none', border: 'none', color: '#1a56db', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: 0 }} onClick={() => { setLoadError(false); loadProjects(showArchived); }}>Try again</button>
+              </div>
             ) : projects.length === 0 ? (
               <div style={styles.empty}>
                 <div style={styles.emptyIcon}>📁</div>

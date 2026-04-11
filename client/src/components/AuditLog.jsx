@@ -85,7 +85,7 @@ export default function AuditLog({ timezone = '' }) {
         <span style={styles.totalBadge}>{total} {t.auditEvents}</span>
       </div>
 
-      <div style={styles.filters}>
+      <div className="filter-row" style={styles.filters}>
         <select style={styles.filterSelect} value={group} onChange={e => setGroup(e.target.value)}>
           {Object.entries(ACTION_GROUPS).map(([val, label]) => (
             <option key={val} value={val}>{label}</option>

@@ -228,7 +228,7 @@ export default function SubReports({ projects }) {
         </div>
       )}
 
-      <div style={styles.filterBar}>
+      <div className="filter-row" style={styles.filterBar}>
         {projects.length > 0 && (
           <select style={styles.filterSelect} value={filters.project_id || ''} onChange={e => setFilter('project_id', e.target.value)}>
             <option value="">{t.allProjects}</option>

@@ -450,6 +450,9 @@ export default function SafetyChecklists({ projects }) {
           <div style={styles.empty}>
             <div style={styles.emptyIcon}>📋</div>
             <p style={styles.emptyText}>{t.noTemplatesAdmin}</p>
+            <button style={styles.emptyCtaBtn} onClick={() => setShowTemplateForm(true)}>
+              + Create Template
+            </button>
           </div>
         ) : (
           <div style={styles.list}>
@@ -501,7 +504,7 @@ export default function SafetyChecklists({ projects }) {
       </div>
 
       {projects.length > 0 && (
-        <div style={styles.filters}>
+        <div className="filter-row" style={styles.filters}>
           <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
             <option value="">{t.allProjectsOpt}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -616,5 +619,6 @@ const styles = {
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { color: '#9ca3af', fontSize: 15 },
+  emptyCtaBtn: { marginTop: 14, background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   hint: { color: '#9ca3af', fontSize: 14 },
 };

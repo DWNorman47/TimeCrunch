@@ -349,7 +349,7 @@ export default function ApprovalQueue({ onCountChange }) {
       </div>
 
       {entries.length > 0 && (
-        <div style={styles.dateFilterRow}>
+        <div className="filter-row" style={styles.dateFilterRow}>
           <input
             type="date"
             style={styles.dateInput}
@@ -367,7 +367,7 @@ export default function ApprovalQueue({ onCountChange }) {
           />
           <button style={styles.applyDateBtn} onClick={() => { setSelectedIds(new Set()); fetch(); }}>{t.apply}</button>
           {(dateFrom || dateTo) && (
-            <button style={styles.clearDateBtn} onClick={() => { setDateFrom(''); setDateTo(''); setSelectedIds(new Set()); fetch(); }}>✕</button>
+            <button style={styles.clearDateBtn} aria-label="Clear date filters" onClick={() => { setDateFrom(''); setDateTo(''); setSelectedIds(new Set()); fetch(); }}>✕</button>
           )}
         </div>
       )}
@@ -375,7 +375,11 @@ export default function ApprovalQueue({ onCountChange }) {
       {fetchError ? (
         <p style={styles.fetchError}>{t.failedLoadPending} <button style={styles.retryBtn} onClick={fetch}>{t.retry}</button></p>
       ) : entries.length === 0 ? (
-        <p style={styles.empty}>{t.allCaughtUp}</p>
+        <div style={styles.emptyState}>
+          <div style={styles.emptyIcon}>✓</div>
+          <p style={styles.emptyTitle}>{t.allCaughtUp}</p>
+          <p style={styles.emptySubtitle}>No pending time entries to review.</p>
+        </div>
       ) : (
         <div style={styles.list}>
           {hasMore && (
@@ -606,6 +610,10 @@ const styles = {
   badge: { background: '#fef3c7', color: '#b45309', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 700 },
   filterSelect: { padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, color: '#374151', background: '#fff' },
   empty: { color: '#059669', fontSize: 14, fontWeight: 500 },
+  emptyState: { textAlign: 'center', padding: '36px 0 28px' },
+  emptyIcon: { fontSize: 36, color: '#059669', marginBottom: 8 },
+  emptyTitle: { fontSize: 16, fontWeight: 700, color: '#059669', margin: '0 0 4px' },
+  emptySubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
   fetchError: { color: '#991b1b', fontSize: 14 },
   retryBtn: { background: 'none', border: 'none', color: '#1a56db', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: 14 },
   list:      { display: 'flex', flexDirection: 'column', gap: 16 },

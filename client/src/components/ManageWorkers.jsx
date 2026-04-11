@@ -3,6 +3,7 @@ import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 function WorkerDocuments({ workerId }) {
   const t = useT();
@@ -60,7 +61,7 @@ function WorkerDocuments({ workerId }) {
             <div key={d.id} style={ds.docRow}>
               <a href={d.url} target="_blank" rel="noopener noreferrer" style={ds.docName}>{d.name}</a>
               <span style={ds.docMeta}>{fmtSize(d.size_bytes)}{d.uploaded_by_name ? ` · ${d.uploaded_by_name}` : ''}</span>
-              <button style={ds.deleteBtn} onClick={() => handleDelete(d.id)}>✕</button>
+              <button style={ds.deleteBtn} aria-label={`Delete ${d.name}`} onClick={() => handleDelete(d.id)}>✕</button>
             </div>
           ))}
         </div>
@@ -220,6 +221,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const full_name = [form.first_name, form.last_name].filter(Boolean).join(' ');
       const r = await api.post('/admin/workers', { ...form, full_name });
       onWorkerAdded(r.data);
+      toast(t.workerCreated || 'Worker created successfully', 'success');
       const workerType = form.worker_type;
       setForm({ first_name: '', last_name: '', username: '', password: defaultTempPassword, email: '', role: 'worker', worker_type: 'employee', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
       setUsernameEdited(false); setUsernameTaken(false); setShowForm(false);
@@ -538,7 +540,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   {archivedConflict && <button type="button" style={s.restoreInlineBtn} onClick={handleRestoreConflict}>Restore {archivedConflict.name}</button>}
                 </div>
               )}
-              <button style={s.saveBtn} type="submit" disabled={saving || usernameTaken}>{saving ? t.creating : t.createUser}</button>
+              <button style={{ ...s.saveBtn, ...((saving || usernameTaken) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving || usernameTaken}>{saving ? t.creating : t.createUser}</button>
             </form>
           ) : (
             <form onSubmit={handleInvite} style={s.addForm}>
@@ -592,7 +594,11 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       )}
 
       {workers.length === 0 ? (
-        <p style={s.empty}>{t.noUsers}</p>
+        <div style={s.emptyState}>
+          <div style={s.emptyStateIcon}>👷</div>
+          <p style={s.emptyStateTitle}>{t.noUsers}</p>
+          <p style={s.emptyStateSubtitle}>Add your first worker using the form above.</p>
+        </div>
       ) : (
         <div style={s.list}>
           {workers.map(w => {
@@ -955,7 +961,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
         </button>
         {showHistory && (
           <div style={s.historyList}>
-            {loadingArchived ? <p style={s.empty}>{t.loading}</p>
+            {loadingArchived ? <SkeletonList count={3} rows={1} />
               : archived.length === 0 ? <p style={s.empty}>{t.noRemovedUsers}</p>
               : archived.map(w => (
                 <div key={w.id} style={s.historyItem}>
@@ -1026,6 +1032,10 @@ const s = {
   saveBtn: { padding: '8px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer', width: 'fit-content' },
   cancelBtn: { padding: '8px 14px', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
   empty: { color: '#9ca3af', fontSize: 14, margin: 0 },
+  emptyState: { textAlign: 'center', padding: '40px 0 24px' },
+  emptyStateIcon: { fontSize: 40, marginBottom: 10 },
+  emptyStateTitle: { fontSize: 16, fontWeight: 700, color: '#374151', margin: '0 0 4px' },
+  emptyStateSubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
   list: { display: 'flex', flexDirection: 'column', gap: 2 },
   item: { border: '1px solid #f3f4f6', borderRadius: 8, overflow: 'hidden' },
   itemBar: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 10 },

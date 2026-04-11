@@ -266,7 +266,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
                         <span style={{ ...styles.checkText, textDecoration: c.checked ? 'line-through' : 'none', color: c.checked ? '#9ca3af' : '#374151' }}>
                           {c.text}
                         </span>
-                        <button style={styles.checkDeleteBtn} onClick={() => deleteCheck(c.id)}>✕</button>
+                        <button style={styles.checkDeleteBtn} aria-label="Delete checklist item" onClick={() => deleteCheck(c.id)}>✕</button>
                       </div>
                     ))}
                   </div>

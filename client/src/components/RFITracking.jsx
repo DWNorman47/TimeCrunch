@@ -319,7 +319,7 @@ export default function RFITracking({ projects }) {
         </div>
       )}
 
-      <div style={styles.filterBar}>
+      <div className="filter-row" style={styles.filterBar}>
         <select style={styles.filterSelect} value={filters.status || ''} onChange={e => setFilter('status', e.target.value)}>
           <option value="">{t.allStatuses}</option>
           <option value="open">{t.statusOpen}</option>

@@ -145,14 +145,14 @@ export default function AdminTimeOff({ settings }) {
                     onChange={e => setReviewNote(prev => ({ ...prev, [r.id]: e.target.value }))}
                   />
                   <button
-                    style={s.approveBtn}
+                    style={{ ...s.approveBtn, ...(acting === r.id + 'approve' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                     disabled={acting === r.id + 'approve'}
                     onClick={() => { setActError(''); act(r.id, 'approve'); }}
                   >
                     {acting === r.id + 'approve' ? '…' : `✓ ${t.filterApproved}`}
                   </button>
                   <button
-                    style={s.denyBtn}
+                    style={{ ...s.denyBtn, ...(acting === r.id + 'deny' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                     disabled={acting === r.id + 'deny'}
                     onClick={() => { setActError(''); act(r.id, 'deny'); }}
                   >

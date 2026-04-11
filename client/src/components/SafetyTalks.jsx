@@ -561,7 +561,7 @@ export default function SafetyTalks({ projects }) {
       )}
 
       {projects.length > 0 && (
-        <div style={styles.filters}>
+        <div className="filter-row" style={styles.filters}>
           <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
             <option value="">{t.allProjectsOpt}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
