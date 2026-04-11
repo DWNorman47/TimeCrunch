@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
@@ -381,11 +381,13 @@ export default function SafetyChecklists({ projects }) {
   const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
 
   // Attach template items to submissions for rendering
-  const templatesById = Object.fromEntries(templates.map(t => [t.id, t]));
-  const enriched = submissions.map(s => ({
-    ...s,
-    template_items: templatesById[s.template_id]?.items ?? [],
-  }));
+  const { templatesById, enriched } = useMemo(() => {
+    const byId = Object.fromEntries(templates.map(t => [t.id, t]));
+    return {
+      templatesById: byId,
+      enriched: submissions.map(s => ({ ...s, template_items: byId[s.template_id]?.items ?? [] })),
+    };
+  }, [templates, submissions]);
 
   const load = async (proj = filterProject, p = 1) => {
     setPage(p);

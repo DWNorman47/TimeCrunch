@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
@@ -17,7 +17,7 @@ const STATUS_STYLES = {
 
 function RFIForm({ initial, projects, onSaved, onCancel }) {
   const t = useT();
-  const STATUS_LABELS = { open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed };
+  const STATUS_LABELS = useMemo(() => ({ open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed }), [t]);
   const isEdit = !!initial?.id;
   const [form, setForm] = useState({
     project_id: initial?.project_id ?? '',
@@ -128,7 +128,7 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
 
 function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
   const t = useT();
-  const STATUS_LABELS = { open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed };
+  const STATUS_LABELS = useMemo(() => ({ open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed }), [t]);
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);

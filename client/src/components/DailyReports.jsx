@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
@@ -44,8 +44,8 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
   const t = useT();
   const isNew = !initial?.id;
   const today = new Date().toLocaleDateString('en-CA');
-  const WEATHER_OPTIONS = WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` }));
-  const WEATHER_LABELS = Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label]));
+  const WEATHER_OPTIONS = useMemo(() => WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` })), [t]);
+  const WEATHER_LABELS = useMemo(() => Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label])), [WEATHER_OPTIONS]);
 
   const [form, setForm] = useState({
     project_id: initial?.project_id || '',
@@ -382,8 +382,8 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
       URL.revokeObjectURL(url);
     } finally { setPdfGenerating(false); }
   };
-  const WEATHER_OPTIONS = WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` }));
-  const WEATHER_LABELS = Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label]));
+  const WEATHER_OPTIONS = useMemo(() => WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` })), [t]);
+  const WEATHER_LABELS = useMemo(() => Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label])), [WEATHER_OPTIONS]);
   const weather = report.weather_condition ? WEATHER_LABELS[report.weather_condition] : null;
 
   const handleDelete = async () => {

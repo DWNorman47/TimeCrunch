@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
@@ -61,11 +61,11 @@ const PRESET_TEMPLATES = [
 
 function TemplateBuilder({ initial, onSaved, onCancel }) {
   const t = useT();
-  const ITEM_TYPES = [
+  const ITEM_TYPES = useMemo(() => [
     { value: 'pass_fail', label: t.inspPassFail },
     { value: 'text', label: t.inspTextNote },
     { value: 'number', label: t.inspNumber },
-  ];
+  ], [t]);
   const isEdit = !!initial?.id;
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');

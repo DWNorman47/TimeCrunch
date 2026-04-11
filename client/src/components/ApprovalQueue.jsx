@@ -121,7 +121,23 @@ export default function ApprovalQueue({ onCountChange }) {
       .catch(() => {});
   };
 
-  useEffect(() => { fetch(); fetchRecentApproved(); }, []);
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setFetchError(false);
+    const params = {};
+    if (dateFrom) params.from = dateFrom;
+    if (dateTo) params.to = dateTo;
+    Promise.all([
+      api.get('/admin/entries/pending', { params }),
+      getOrFetch('projects', () => api.get('/projects').then(r => r.data)),
+    ])
+      .then(([r, p]) => { if (!mounted) return; setEntries(r.data.entries); setHasMore(r.data.has_more); setProjects(p); })
+      .catch(() => { if (mounted) setFetchError(true); })
+      .finally(() => { if (mounted) setLoading(false); });
+    fetchRecentApproved();
+    return () => { mounted = false; };
+  }, []);
   useEffect(() => { if (onCountChange) onCountChange(entries.length); }, [entries]);
 
   const startEdit = (e) => {

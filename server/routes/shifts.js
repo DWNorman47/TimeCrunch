@@ -18,7 +18,7 @@ router.get('/admin', requireAdmin, async (req, res) => {
          AND ($2::date IS NULL OR s.shift_date >= $2::date)
          AND ($3::date IS NULL OR s.shift_date <= $3::date)
        ORDER BY s.shift_date ASC, s.start_time ASC
-       LIMIT 500`,
+       LIMIT 200`,
       [companyId, from || null, to || null]
     );
     res.json(result.rows);

@@ -372,9 +372,11 @@ export default function Punchlist({ projects }) {
   useEffect(() => { if (!loading) load(filterProject, filterStatus, filterPhase, 1); }, [filterProject, filterStatus, filterPhase]);
   useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(filterProject, filterStatus, filterPhase, page); }); }, [onSync]);
 
-  const openCount = items.filter(i => i.status === 'open').length;
-  const doneCount = items.filter(i => i.status === 'done').length;
-  const verifiedCount = items.filter(i => i.status === 'verified').length;
+  const { openCount, doneCount, verifiedCount } = useMemo(() => ({
+    openCount: items.filter(i => i.status === 'open').length,
+    doneCount: items.filter(i => i.status === 'done').length,
+    verifiedCount: items.filter(i => i.status === 'verified').length,
+  }), [items]);
 
   // All unique phases across current items (for datalist + filter dropdown)
   const allPhases = useMemo(() => [...new Set(items.map(i => i.phase).filter(Boolean))].sort(), [items]);
