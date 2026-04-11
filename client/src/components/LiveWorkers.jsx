@@ -234,7 +234,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
             <span style={styles.updated}>Updated {formatInTz(lastUpdated.toISOString(), timezone)}</span>
           )}
           <button style={styles.refreshBtn} onClick={fetchActive}>{t.refresh}</button>
-          <button style={styles.clockInWorkerBtn} onClick={() => setShowClockInModal(true)}>+ Clock In Worker</button>
+          <button style={styles.clockInWorkerBtn} onClick={() => setShowClockInModal(true)}>{t.lwClockInWorkerBtn}</button>
         </div>
       </div>
 
@@ -304,7 +304,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                       : <span style={styles.noLocation}>{t.noLocation}</span>
                   }
                   {w.clock_source === 'admin' && w.clocked_in_by_name && (
-                    <span style={styles.adminBadge}>Clocked in by {w.clocked_in_by_name}</span>
+                    <span style={styles.adminBadge}>{t.lwClockedInBy} {w.clocked_in_by_name}</span>
                   )}
                 </div>
                 <div style={styles.cardActions}>
@@ -317,19 +317,19 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                         onChange={e => setEditClockInValue(e.target.value)}
                       />
                       <button style={{ ...styles.saveTimeBtn, ...(editClockInSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => handleSaveClockIn(w.user_id)} disabled={editClockInSaving}>
-                        {editClockInSaving ? 'Saving…' : 'Save'}
+                        {editClockInSaving ? t.saving : t.save}
                       </button>
-                      <button style={styles.cancelTimeBtn} onClick={() => setEditingClockInId(null)}>Cancel</button>
+                      <button style={styles.cancelTimeBtn} onClick={() => setEditingClockInId(null)}>{t.cancel}</button>
                     </>
                   ) : (
-                    <button style={styles.editTimeBtn} onClick={() => startEditClockIn(w)}>Edit Clock-In Time</button>
+                    <button style={styles.editTimeBtn} onClick={() => startEditClockIn(w)}>{t.lwEditClockInTime}</button>
                   )}
                   <button
                     style={{ ...styles.clockOutBtn, ...(clockingOutId === w.user_id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                     onClick={() => handleAdminClockOut(w.user_id)}
                     disabled={clockingOutId === w.user_id}
                   >
-                    {clockingOutId === w.user_id ? 'Clocking out…' : 'Clock Out'}
+                    {clockingOutId === w.user_id ? t.lwClockingOut : t.lwClockOut}
                   </button>
                 </div>
               </div>
@@ -338,7 +338,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
 
           {mapped.length > 0 && (
             <div style={styles.mapWrap}>
-              <h3 style={styles.mapTitle}>Worker Locations</h3>
+              <h3 style={styles.mapTitle}>{t.lwWorkerLocations}</h3>
               <MapContainer center={center} zoom={mapped.length === 1 ? 13 : 5} style={styles.map}>
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -365,15 +365,15 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
       {showClockInModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
-            <h3 style={styles.modalTitle}>Clock In Worker</h3>
+            <h3 style={styles.modalTitle}>{t.lwClockInWorkerTitle}</h3>
             <div style={styles.modalField}>
-              <label style={styles.modalLabel}>Worker</label>
+              <label style={styles.modalLabel}>{t.worker}</label>
               <select
                 style={styles.modalSelect}
                 value={clockInUserId}
                 onChange={e => setClockInUserId(e.target.value)}
               >
-                <option value="">Select a worker...</option>
+                <option value="">{t.lwSelectWorkerOpt}</option>
                 {allWorkers
                   .filter(w => !workers.some(aw => String(aw.user_id) === String(w.id)))
                   .map(w => (
@@ -382,26 +382,26 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
               </select>
             </div>
             <div style={styles.modalField}>
-              <label style={styles.modalLabel}>Project (optional)</label>
+              <label style={styles.modalLabel}>{t.projectOptionalLabel}</label>
               <select
                 style={styles.modalSelect}
                 value={clockInProjectId}
                 onChange={e => setClockInProjectId(e.target.value)}
               >
-                <option value="">No project</option>
+                <option value="">{t.noProject}</option>
                 {projects.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
             </div>
             <div style={styles.modalField}>
-              <label style={styles.modalLabel}>Notes (optional)</label>
+              <label style={styles.modalLabel}>{t.notesOptional}</label>
               <textarea
                 style={styles.modalTextarea}
                 value={clockInNotes}
                 onChange={e => setClockInNotes(e.target.value)}
                 rows={3}
-                placeholder="Add a note..."
+                placeholder={t.lwAddNotePlaceholder}
                 maxLength={500}
               />
               <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{clockInNotes.length}/500</div>
@@ -412,13 +412,13 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                 onClick={handleAdminClockIn}
                 disabled={!clockInUserId || clockInSaving}
               >
-                {clockInSaving ? 'Clocking in...' : 'Clock In'}
+                {clockInSaving ? t.clockingIn : t.clockIn}
               </button>
               <button
                 style={styles.modalCancelBtn}
                 onClick={() => { setShowClockInModal(false); setClockInUserId(''); setClockInProjectId(''); setClockInNotes(''); }}
               >
-                Cancel
+                {t.cancel}
               </button>
             </div>
           </div>

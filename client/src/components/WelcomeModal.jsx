@@ -28,7 +28,7 @@ export default function WelcomeModal() {
       <div style={styles.modal}>
         <div style={styles.brand}>{t.welcomeBrand}</div>
         <div style={styles.emoji}>{isAdmin ? '🏗️' : '👷'}</div>
-        <h2 style={styles.title}>Welcome, {firstName}!</h2>
+        <h2 style={styles.title}>{t.welcome}, {firstName}!</h2>
         {isAdmin ? (
           <>
             <p style={styles.body}><strong>Ops Flow Assist</strong> {t.welcomeAdminBody1}</p>

@@ -1,6 +1,8 @@
 import { useOffline } from '../contexts/OfflineContext';
+import { useT } from '../hooks/useT';
 
 export default function OfflineBanner() {
+  const t = useT();
   const { isOffline, queueCount, sendToSW } = useOffline() || {};
 
   if (!isOffline && !queueCount) return null;
@@ -24,9 +26,9 @@ export default function OfflineBanner() {
       <span>
         {isOffline
           ? queueCount > 0
-            ? `Offline — ${queueCount} entr${queueCount === 1 ? 'y' : 'ies'} pending sync`
-            : "You're offline — entries will be saved when you reconnect"
-          : `${queueCount} entr${queueCount === 1 ? 'y' : 'ies'} pending sync…`}
+            ? `Offline — ${queueCount} ${queueCount === 1 ? t.offlineEntry : t.offlineEntries} ${t.offlinePendingSync}`
+            : t.offlineNoQueue
+          : `${queueCount} ${queueCount === 1 ? t.offlineEntry : t.offlineEntries} ${t.offlinePendingSync}…`}
       </span>
       {!isOffline && queueCount > 0 && (
         <>
@@ -34,13 +36,13 @@ export default function OfflineBanner() {
             onClick={retry}
             style={{ background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.5)', color: '#fff', borderRadius: 5, padding: '2px 10px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
           >
-            Retry
+            {t.retry}
           </button>
           <button
             onClick={clear}
             style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
           >
-            Clear
+            {t.clear}
           </button>
         </>
       )}

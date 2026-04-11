@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { useT } from '../hooks/useT';
 
 export default function SignatureModal({ onConfirm, onCancel, required = false }) {
+  const t = useT();
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [isEmpty, setIsEmpty] = useState(true);
@@ -66,8 +68,8 @@ export default function SignatureModal({ onConfirm, onCancel, required = false }
   return (
     <div style={styles.overlay}>
       <div style={styles.modal}>
-        <h3 style={styles.title}>Sign Invoice</h3>
-        <p style={styles.hint}>Draw your signature below. This will appear at the bottom of the invoice.</p>
+        <h3 style={styles.title}>{t.signInvoice}</h3>
+        <p style={styles.hint}>{t.signatureHint}</p>
         <div style={styles.canvasWrap}>
           <canvas
             ref={canvasRef}
@@ -82,19 +84,19 @@ export default function SignatureModal({ onConfirm, onCancel, required = false }
             onTouchMove={draw}
             onTouchEnd={stopDraw}
           />
-          <button style={styles.clearBtn} onClick={clear}>Clear</button>
+          <button style={styles.clearBtn} onClick={clear}>{t.clear}</button>
         </div>
         <div style={styles.actions}>
           <button style={{ ...styles.confirmBtn, ...(isEmpty ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={confirm} disabled={isEmpty}>
-            Sign & Export
+            {t.signAndExport}
           </button>
           {!required && (
             <button style={styles.skipBtn} onClick={() => onConfirm(null)}>
-              Export without signature
+              {t.exportWithoutSignature}
             </button>
           )}
           <button style={styles.cancelBtn} onClick={onCancel}>
-            Cancel
+            {t.cancel}
           </button>
         </div>
       </div>

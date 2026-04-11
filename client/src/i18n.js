@@ -231,6 +231,16 @@ const translations = {
     locationCaptured: '📍 Location captured',
     noLocation: 'No location',
     clockInLocations: 'Clock-in Locations',
+    lwClockInWorkerBtn: '+ Clock In Worker',
+    lwClockedInBy: 'Clocked in by',
+    lwEditClockInTime: 'Edit Clock-In Time',
+    lwClockOut: 'Clock Out',
+    lwClockingOut: 'Clocking out…',
+    lwWorkerLocations: 'Worker Locations',
+    lwClockInWorkerTitle: 'Clock In Worker',
+    lwSelectWorkerOpt: 'Select a worker...',
+    lwAddNotePlaceholder: 'Add a note...',
+    projectOptionalLabel: 'Project (optional)',
 
     // ── Live KPIs ────────────────────────────────────────────────────────────
     pendingApprovals: 'Pending Approvals',
@@ -1096,6 +1106,43 @@ const translations = {
     billingPastDue: '⚠ Payment past due',
     billingCanceled: 'Canceled',
     billingTrialEnded: 'Trial ended',
+    requestApproved: 'Request approved',
+    requestDenied: 'Request denied',
+
+    // ── MFA Setup ────────────────────────────────────────────────────────────
+    mfaTitle: 'Two-Factor Authentication',
+    mfaEnabledDesc: '🔒 Enabled — your account requires a code from your authenticator app at login',
+    mfaDisabledDesc: 'Add a second layer of security using an authenticator app (Google Authenticator, Authy, etc.)',
+    mfaDisableBtn: 'Disable',
+    mfaEnableBtn: 'Enable',
+    mfaScanHint: 'Scan this QR code with your authenticator app, then enter the 6-digit code to confirm.',
+    mfaManualCode: "Can't scan? Enter this code manually:",
+    mfaCodePlaceholder: '6-digit code',
+    mfaVerifying: 'Verifying...',
+    mfaConfirmEnable: 'Confirm & Enable',
+    mfaDisableHint: 'Enter your password to disable two-factor authentication.',
+    mfaPasswordPlaceholder: 'Your password',
+    mfaDisabling: 'Disabling...',
+    mfaDisableMFA: 'Disable MFA',
+    mfaFailedSetup: 'Failed to start setup',
+    mfaFailedEnable: 'Failed to enable MFA',
+    mfaFailedDisable: 'Failed to disable MFA',
+
+    // ── Signature Modal ───────────────────────────────────────────────────────
+    signInvoice: 'Sign Invoice',
+    signatureHint: 'Draw your signature below. This will appear at the bottom of the invoice.',
+    clear: 'Clear',
+    signAndExport: 'Sign & Export',
+    exportWithoutSignature: 'Export without signature',
+
+    // ── Offline Banner ────────────────────────────────────────────────────────
+    offlineEntry: 'entry',
+    offlineEntries: 'entries',
+    offlinePendingSync: 'pending sync',
+    offlineNoQueue: "You're offline — entries will be saved when you reconnect",
+
+    // ── Welcome Modal ─────────────────────────────────────────────────────────
+    welcome: 'Welcome',
 
     // ── Admin: Reports ────────────────────────────────────────────────────────
     runReport: 'Run Report',
@@ -2057,6 +2104,16 @@ const translations = {
     locationCaptured: '📍 Ubicación capturada',
     noLocation: 'Sin ubicación',
     clockInLocations: 'Ubicaciones de Entrada',
+    lwClockInWorkerBtn: '+ Registrar Entrada de Trabajador',
+    lwClockedInBy: 'Registrado por',
+    lwEditClockInTime: 'Editar Hora de Entrada',
+    lwClockOut: 'Registrar Salida',
+    lwClockingOut: 'Registrando salida…',
+    lwWorkerLocations: 'Ubicaciones de Trabajadores',
+    lwClockInWorkerTitle: 'Registrar Entrada de Trabajador',
+    lwSelectWorkerOpt: 'Seleccionar trabajador...',
+    lwAddNotePlaceholder: 'Agregar nota...',
+    projectOptionalLabel: 'Proyecto (opcional)',
 
     // ── Live KPIs ────────────────────────────────────────────────────────────
     pendingApprovals: 'Aprobaciones Pendientes',
@@ -2911,6 +2968,43 @@ const translations = {
     billingPastDue: '⚠ Pago vencido',
     billingCanceled: 'Cancelado',
     billingTrialEnded: 'Prueba terminada',
+    requestApproved: 'Solicitud aprobada',
+    requestDenied: 'Solicitud denegada',
+
+    // ── MFA Setup ────────────────────────────────────────────────────────────
+    mfaTitle: 'Autenticación de Dos Factores',
+    mfaEnabledDesc: '🔒 Activada — tu cuenta requiere un código de tu app autenticadora al iniciar sesión',
+    mfaDisabledDesc: 'Agrega una segunda capa de seguridad usando una app autenticadora (Google Authenticator, Authy, etc.)',
+    mfaDisableBtn: 'Desactivar',
+    mfaEnableBtn: 'Activar',
+    mfaScanHint: 'Escanea este código QR con tu app autenticadora, luego ingresa el código de 6 dígitos para confirmar.',
+    mfaManualCode: '¿No puedes escanear? Ingresa este código manualmente:',
+    mfaCodePlaceholder: 'Código de 6 dígitos',
+    mfaVerifying: 'Verificando...',
+    mfaConfirmEnable: 'Confirmar y Activar',
+    mfaDisableHint: 'Ingresa tu contraseña para desactivar la autenticación de dos factores.',
+    mfaPasswordPlaceholder: 'Tu contraseña',
+    mfaDisabling: 'Desactivando...',
+    mfaDisableMFA: 'Desactivar MFA',
+    mfaFailedSetup: 'Error al iniciar configuración',
+    mfaFailedEnable: 'Error al activar MFA',
+    mfaFailedDisable: 'Error al desactivar MFA',
+
+    // ── Signature Modal ───────────────────────────────────────────────────────
+    signInvoice: 'Firmar Factura',
+    signatureHint: 'Dibuja tu firma abajo. Aparecerá al pie de la factura.',
+    clear: 'Limpiar',
+    signAndExport: 'Firmar y Exportar',
+    exportWithoutSignature: 'Exportar sin firma',
+
+    // ── Offline Banner ────────────────────────────────────────────────────────
+    offlineEntry: 'entrada',
+    offlineEntries: 'entradas',
+    offlinePendingSync: 'pendiente de sincronización',
+    offlineNoQueue: 'Sin conexión — las entradas se guardarán cuando te reconectes',
+
+    // ── Welcome Modal ─────────────────────────────────────────────────────────
+    welcome: 'Bienvenido',
 
     // ── Admin: Reports ────────────────────────────────────────────────────────
     runReport: 'Generar Reporte',

@@ -60,7 +60,7 @@ export default function AdminTimeOff({ settings }) {
       const r = await api.patch(`/time-off/${id}/${action}`, { review_note: reviewNote[id] || null });
       setRequests(prev => prev.map(x => x.id === id ? r.data : x));
       setReviewNote(prev => { const n = { ...prev }; delete n[id]; return n; });
-      toast(action === 'approve' ? 'Request approved' : 'Request denied', 'success');
+      toast(action === 'approve' ? t.requestApproved : t.requestDenied, 'success');
     } catch (err) {
       setActError(err.response?.data?.error || t.actionFailed);
     } finally { setActing(null); }
