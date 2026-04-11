@@ -103,17 +103,17 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
           {error && <div style={s.error}>{error}</div>}
           <div style={s.actions}>
             {item.status !== 'approved' && (
-              <button style={s.approveBtn} onClick={() => act('approved')} disabled={saving}>
+              <button style={{ ...s.approveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => act('approved')} disabled={saving}>
                 {saving ? '…' : t.approveBtn}
               </button>
             )}
             {item.status !== 'rejected' && (
-              <button style={s.rejectBtn} onClick={() => act('rejected')} disabled={saving}>
+              <button style={{ ...s.rejectBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => act('rejected')} disabled={saving}>
                 {saving ? '…' : t.rejectBtn}
               </button>
             )}
             {item.status !== 'pending' && (
-              <button style={s.resetBtn} onClick={() => act('pending')} disabled={saving}>
+              <button style={{ ...s.resetBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => act('pending')} disabled={saving}>
                 {t.resetPending}
               </button>
             )}
@@ -316,7 +316,7 @@ export default function ReimbursementsAdmin() {
             </div>
           )}
           {formError && <div style={s.errorMsg}>{formError}</div>}
-          <button style={s.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : t.addExpenseBtn}</button>
+          <button style={{ ...s.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.addExpenseBtn}</button>
         </form>
       )}
 

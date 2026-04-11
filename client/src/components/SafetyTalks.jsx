@@ -120,7 +120,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
 
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>{t.topicTitle}</label>
+          <label style={styles.label}>{t.topicTitle}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
           <input style={styles.input} type="text" maxLength={200} placeholder="e.g. Ladder Safety, PPE Requirements, Fall Protection" value={form.title} onChange={e => set('title', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>

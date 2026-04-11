@@ -182,7 +182,7 @@ const styles = {
   dayHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   dayLabel: { fontSize: 14, fontWeight: 700, color: '#374151' },
   dayCount: { fontSize: 12, color: '#9ca3af' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 },
   tile: { position: 'relative', borderRadius: 10, overflow: 'hidden', cursor: 'pointer', aspectRatio: '1', background: '#111827' },
   videoThumb: { width: '100%', height: '100%', position: 'relative' },
   tileImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },

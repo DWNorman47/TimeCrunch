@@ -69,7 +69,7 @@ function ItemForm({ initial, onSaved, onCancel }) {
       </div>
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.addEquipmentTitle}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.addEquipmentTitle}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -254,7 +254,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
                   <button style={styles.editBtn} onClick={() => onEdit(item)}>{t.edit}</button>
                   {confirmingDelete ? (
                     <>
-                      <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                      <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
                       <button style={styles.cancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
                       {deleteError && <span style={styles.inlineError}>{deleteError}</span>}
                     </>

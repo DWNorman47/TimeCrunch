@@ -517,7 +517,7 @@ export default function ManageSchedule({ workers, projects }) {
           </div>
           <div style={styles.field}>
             <label style={styles.label}>&nbsp;</label>
-            <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? '...' : t.addShift}</button>
+            <button style={{ ...styles.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? '...' : t.addShift}</button>
           </div>
         </div>
         {availabilityWarning && <p style={styles.overlapWarning}>📅 {availabilityWarning}</p>}
@@ -547,10 +547,10 @@ export default function ManageSchedule({ workers, projects }) {
               <span style={styles.dragModeLabel}>
                 {t.dragMode}{Object.keys(pendingMoves).length > 0 ? ` · ${Object.keys(pendingMoves).length} unsaved` : ''}
               </span>
-              <button style={styles.saveDragBtn} onClick={saveDragMoves} disabled={savingMoves || Object.keys(pendingMoves).length === 0}>
+              <button style={{ ...styles.saveDragBtn, ...((savingMoves || Object.keys(pendingMoves).length === 0) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={saveDragMoves} disabled={savingMoves || Object.keys(pendingMoves).length === 0}>
                 {savingMoves ? t.saving : t.saveAndNotify}
               </button>
-              <button style={styles.discardDragBtn} onClick={discardDrag} disabled={savingMoves}>{t.discard}</button>
+              <button style={{ ...styles.discardDragBtn, ...(savingMoves ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={discardDrag} disabled={savingMoves}>{t.discard}</button>
             </div>
           )
         }
