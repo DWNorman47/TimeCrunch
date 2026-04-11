@@ -47,7 +47,7 @@ export default function ChangePassword({ onClose, t }) {
           {success && <p style={styles.success}>{t.passwordChanged}</p>}
           <div style={styles.buttons}>
             <button type="button" style={styles.cancelBtn} onClick={onClose}>{t.cancel}</button>
-            <button type="submit" style={styles.saveBtn} disabled={saving}>{saving ? t.saving : t.save}</button>
+            <button type="submit" style={{ ...styles.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={saving}>{saving ? t.saving : t.save}</button>
           </div>
         </form>
       </div>

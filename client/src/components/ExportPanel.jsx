@@ -85,7 +85,7 @@ export default function ExportPanel({ workers, projects }) {
       {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.actions}>
-        <button style={styles.downloadBtn} onClick={download} disabled={loading || !from || !to}>
+        <button style={{ ...styles.downloadBtn, ...((loading || !from || !to) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={download} disabled={loading || !from || !to}>
           {loading ? t.preparing : t.downloadCSV}
         </button>
         <span style={styles.hint}>{t.exportColumns}</span>

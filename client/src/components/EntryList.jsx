@@ -88,7 +88,7 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
         {selectedIds.size > 0 && (
           confirmingBulkDelete ? (
             <>
-              <button style={styles.confirmBulkDeleteBtn} onClick={handleBulkDelete} disabled={bulkDeleting}>
+              <button style={{ ...styles.confirmBulkDeleteBtn, ...(bulkDeleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleBulkDelete} disabled={bulkDeleting}>
                 {bulkDeleting ? t.elDeleting : `${t.elConfirmDelete} ${selectedIds.size}`}
               </button>
               <button style={styles.cancelBulkDeleteBtn} onClick={() => setConfirmingBulkDelete(false)}>{t.cancel}</button>

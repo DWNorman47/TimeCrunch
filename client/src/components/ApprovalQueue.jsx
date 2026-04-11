@@ -322,14 +322,14 @@ export default function ApprovalQueue({ onCountChange }) {
             )}
             {selectedIds.size > 0 ? (
               <>
-                <button style={styles.approveSelectedBtn} onClick={approveSelected} disabled={approvingSelected}>
+                <button style={{ ...styles.approveSelectedBtn, ...(approvingSelected ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={approveSelected} disabled={approvingSelected}>
                   {approvingSelected ? t.aqApprovingSelected : `${t.aqApproveSelected} (${selectedIds.size})`}
                 </button>
                 <button style={styles.cancelApproveAllBtn} onClick={deselectAll}>{t.cancel}</button>
               </>
             ) : confirmingApproveAll ? (
               <>
-                <button style={styles.approveAllBtn} onClick={approveAll} disabled={approvingAll}>
+                <button style={{ ...styles.approveAllBtn, ...(approvingAll ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={approveAll} disabled={approvingAll}>
                   {approvingAll ? t.aqApprovingAll : t.confirm}
                 </button>
                 <button style={styles.cancelApproveAllBtn} onClick={() => setConfirmingApproveAll(false)}>{t.cancel}</button>
@@ -339,7 +339,7 @@ export default function ApprovalQueue({ onCountChange }) {
                 <button style={styles.selectAllBtn} onClick={selectedIds.size > 0 ? deselectAll : selectAll}>
                   {selectedIds.size > 0 ? t.aqDeselectAll : t.aqSelectAll}
                 </button>
-                <button style={styles.approveAllBtn} onClick={() => setConfirmingApproveAll(true)} disabled={approvingAll || visibleEntries.length === 0}>
+                <button style={{ ...styles.approveAllBtn, ...((approvingAll || visibleEntries.length === 0) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setConfirmingApproveAll(true)} disabled={approvingAll || visibleEntries.length === 0}>
                   {workerFilter ? `${t.approve} ${workerFilter.split(' ')[0]}'s` : t.aqApproveAll}
                 </button>
               </>
@@ -489,7 +489,7 @@ export default function ApprovalQueue({ onCountChange }) {
                         </select>
                       </div>
                       <div style={styles.editTimesActions}>
-                        <button style={styles.saveTimesBtn} onClick={() => { setEditSaveError(''); saveEdit(e.id); }} disabled={editSaving}>{editSaving ? '...' : t.save}</button>
+                        <button style={{ ...styles.saveTimesBtn, ...(editSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => { setEditSaveError(''); saveEdit(e.id); }} disabled={editSaving}>{editSaving ? '...' : t.save}</button>
                         <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
                         {editSaveError && <span style={styles.inlineError}>{editSaveError}</span>}
                       </div>
@@ -533,21 +533,21 @@ export default function ApprovalQueue({ onCountChange }) {
                         setSplitSegments(prev => [...prev, { _key: Date.now(), start_time: last.end_time, end_time: last.end_time, project_id: '' }]);
                       }}>{t.aqAddSegment}</button>
                       <div style={styles.editTimesActions}>
-                        <button style={styles.saveTimesBtn} onClick={() => saveSplit(e.id)} disabled={splitSaving}>{splitSaving ? '...' : t.aqSplitSave}</button>
+                        <button style={{ ...styles.saveTimesBtn, ...(splitSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveSplit(e.id)} disabled={splitSaving}>{splitSaving ? '...' : t.aqSplitSave}</button>
                         <button style={styles.cancelBtn} onClick={() => setSplittingId(null)}>{t.cancel}</button>
                       </div>
                     </div>
                   ) : rejectingId === e.id ? (
                     <div style={styles.rejectForm}>
                       <input style={styles.rejectInput} placeholder={t.reasonOptional} maxLength={500} value={rejectNote} onChange={ev => setRejectNote(ev.target.value)} autoFocus />
-                      <button style={styles.confirmRejectBtn} onClick={() => submitReject(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.confirmReject}</button>
+                      <button style={{ ...styles.confirmRejectBtn, ...(working === e.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => submitReject(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.confirmReject}</button>
                       <button style={styles.cancelBtn} onClick={() => { setRejectingId(null); setRejectNote(''); }}>{t.cancel}</button>
                     </div>
                   ) : (
                     <div style={styles.actions}>
                       <button style={styles.editTimesBtn} onClick={() => startEdit(e)}>✏️ Edit</button>
                       <button style={styles.splitBtn} onClick={() => startSplit(e)}>⇌ Split</button>
-                      <button style={styles.approveBtn} onClick={() => approve(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.approve}</button>
+                      <button style={{ ...styles.approveBtn, ...(working === e.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => approve(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.approve}</button>
                       <button style={styles.rejectBtn} onClick={() => { setRejectingId(e.id); setRejectNote(''); }}>{t.reject}</button>
                     </div>
                   )}
@@ -581,7 +581,7 @@ export default function ApprovalQueue({ onCountChange }) {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
                     <button
-                      style={styles.unapproveBtn}
+                      style={{ ...styles.unapproveBtn, ...(unapproving === e.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                       onClick={() => { setUnapproveError(''); unapprove(e.id); }}
                       disabled={unapproving === e.id}
                     >

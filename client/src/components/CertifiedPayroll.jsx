@@ -129,7 +129,7 @@ export default function CertifiedPayroll({ projects }) {
             {(projects || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
-        <button style={styles.generateBtn} onClick={generate} disabled={loading || !weekEnd}>
+        <button style={{ ...styles.generateBtn, ...((loading || !weekEnd) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={generate} disabled={loading || !weekEnd}>
           {loading ? t.loading : t.generate}
         </button>
       </div>

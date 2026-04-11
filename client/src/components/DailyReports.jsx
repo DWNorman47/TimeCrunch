@@ -210,7 +210,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
         <div style={styles.fieldGroup}>
           <label style={styles.label}>
             {t.weather}
-            <button type="button" style={styles.weatherBtn} onClick={autoFillWeather} disabled={gettingWeather} title="Auto-fill from current location">
+            <button type="button" style={{ ...styles.weatherBtn, ...(gettingWeather ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={autoFillWeather} disabled={gettingWeather} title="Auto-fill from current location">
               {gettingWeather ? '...' : '🌤 Auto'}
             </button>
           </label>
@@ -228,7 +228,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       <div style={styles.section}>
         <div style={styles.sectionHead}>
           <span style={styles.sectionTitle}>{t.manpowerSection}</span>
-          <button style={styles.autofillBtn} onClick={autoFillManpower} disabled={suggesting}>
+          <button style={{ ...styles.autofillBtn, ...(suggesting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={autoFillManpower} disabled={suggesting}>
             {suggesting ? '...' : `⚡ ${t.autoFillEntries}`}
           </button>
         </div>
@@ -357,10 +357,10 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.editorActions}>
-        <button style={styles.saveDraftBtn} onClick={() => save('draft')} disabled={saving || submitting}>
+        <button style={{ ...styles.saveDraftBtn, ...((saving || submitting) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => save('draft')} disabled={saving || submitting}>
           {saving ? t.saving : t.saveDraft}
         </button>
-        <button style={styles.submitBtn} onClick={() => save('submitted')} disabled={saving || submitting}>
+        <button style={{ ...styles.submitBtn, ...((saving || submitting) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => save('submitted')} disabled={saving || submitting}>
           {submitting ? t.submitting : t.submitReport}
         </button>
         <button style={styles.cancelBtn} onClick={onCancel}>{t.cancel}</button>

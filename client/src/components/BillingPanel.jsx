@@ -163,7 +163,7 @@ export default function BillingPanel() {
       {sub === 'past_due' && (
         <div style={s.alert}>
           ⚠ Your last payment failed. Update your payment method to avoid losing access.
-          <button style={s.alertBtn} onClick={portal} disabled={redirecting === 'portal'}>
+          <button style={{ ...s.alertBtn, ...(redirecting === 'portal' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={portal} disabled={redirecting === 'portal'}>
             {redirecting === 'portal' ? 'Redirecting...' : 'Update payment'}
           </button>
         </div>
@@ -418,7 +418,7 @@ export default function BillingPanel() {
                   </span>
                 )}
               </div>
-              <button style={s.ctaBtn} onClick={subscribeSelectedPlan} disabled={!!redirecting}>
+              <button style={{ ...s.ctaBtn, ...(redirecting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={subscribeSelectedPlan} disabled={!!redirecting}>
                 {redirecting ? 'Redirecting...' : `Subscribe to ${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} — ${annual ? 'Annual' : 'Monthly'}`}
               </button>
               <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'center' }}>

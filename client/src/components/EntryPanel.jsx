@@ -141,7 +141,7 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
           </div>
           {splitError && <p style={s.error}>{splitError}</p>}
           <div style={s.actions}>
-            <button style={s.saveBtn} onClick={doSplitBreak} disabled={splitSaving}>{splitSaving ? t.saving : t.entryPanelInsertBreakBtn}</button>
+            <button style={{ ...s.saveBtn, ...(splitSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={doSplitBreak} disabled={splitSaving}>{splitSaving ? t.saving : t.entryPanelInsertBreakBtn}</button>
             <button style={s.cancelBtn} onClick={onClose}>{t.cancel}</button>
           </div>
         </div>
@@ -162,7 +162,7 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
           </div>
           {splitError && <p style={s.error}>{splitError}</p>}
           <div style={s.actions}>
-            <button style={s.saveBtn} onClick={doSplitSwitch} disabled={splitSaving}>{splitSaving ? t.saving : t.entryPanelInsertSwitchBtn}</button>
+            <button style={{ ...s.saveBtn, ...(splitSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={doSplitSwitch} disabled={splitSaving}>{splitSaving ? t.saving : t.entryPanelInsertSwitchBtn}</button>
             <button style={s.cancelBtn} onClick={onClose}>{t.cancel}</button>
           </div>
         </div>
