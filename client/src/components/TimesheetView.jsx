@@ -158,7 +158,7 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
                       }}
                       onClick={() => setSelectedEntry(selectedEntry?.id === e.id ? null : e)}
                     >
-                      <div style={styles.pillProject}>{e.project_name}</div>
+                      <div style={styles.pillProject} title={e.project_name}>{e.project_name}</div>
                       <div style={styles.pillTimes}>{formatTime(e.start_time)}–{formatTime(e.end_time)}</div>
                       <div style={styles.pillHours}>{fmtHours(netHours(e.start_time, e.end_time, e.break_minutes))}</div>
                       {e.break_minutes > 0 && <div style={styles.pillBreak}>☕ {e.break_minutes}m</div>}

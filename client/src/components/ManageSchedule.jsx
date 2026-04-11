@@ -150,7 +150,7 @@ function SummaryView({ shifts, days }) {
             const hasCant = Object.values(row.byDay).some(arr => arr.some(s => s.cant_make_it));
             return (
               <tr key={row.name} style={hasCant ? styles.summaryRowCant : {}}>
-                <td style={styles.summaryTdWorker}>
+                <td style={styles.summaryTdWorker} title={row.name}>
                   {row.name}
                   {hasCant && <span style={styles.summaryCantDot} title="Can't make it">✗</span>}
                 </td>

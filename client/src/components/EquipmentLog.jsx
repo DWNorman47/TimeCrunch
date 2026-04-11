@@ -114,7 +114,7 @@ function LogHoursForm({ item, projects, onLogged, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.date} *</label>
-          <input style={styles.input} type="date" value={form.log_date} onChange={e => set('log_date', e.target.value)} required />
+          <input style={styles.input} type="date" value={form.log_date} onChange={e => set('log_date', e.target.value)} required max={new Date().toLocaleDateString('en-CA')} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.hours} *</label>

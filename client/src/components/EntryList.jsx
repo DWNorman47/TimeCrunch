@@ -129,7 +129,7 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                       />
                     )}
                     <div style={styles.entryInfo}>
-                      <span style={styles.project}>{e.project_name || '—'}</span>
+                      <span style={styles.project} title={e.project_name || ''}>{e.project_name || '—'}</span>
                       <span style={styles.times}>
                         {formatTime(e.start_time)} – {formatTime(e.end_time)}
                         {crosses && <span style={styles.plus1}>+1</span>}

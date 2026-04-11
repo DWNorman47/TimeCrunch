@@ -66,7 +66,7 @@ function WorkerDocuments({ workerId }) {
         <div style={ds.list}>
           {docs.map(d => (
             <div key={d.id} style={ds.docRow}>
-              <a href={d.url} target="_blank" rel="noopener noreferrer" style={ds.docName}>{d.name}</a>
+              <a href={d.url} target="_blank" rel="noopener noreferrer" style={ds.docName} title={d.name}>{d.name}</a>
               <span style={ds.docMeta}>{fmtSize(d.size_bytes)}{d.uploaded_by_name ? ` · ${d.uploaded_by_name}` : ''}</span>
               {pendingDeleteDocId === d.id ? (
                 <>

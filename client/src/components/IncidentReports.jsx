@@ -43,7 +43,7 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
   const isInjury = form.type === 'injury';
 
   const handleSubmit = async e => {
@@ -73,7 +73,7 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.date} *</label>
-          <input style={styles.input} type="date" value={form.incident_date} onChange={e => set('incident_date', e.target.value)} required />
+          <input style={styles.input} type="date" value={form.incident_date} onChange={e => set('incident_date', e.target.value)} required max={new Date().toLocaleDateString('en-CA')} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.timeLabel} <span style={styles.optional}>{t.quizOptional}</span></label>

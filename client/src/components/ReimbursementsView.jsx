@@ -131,7 +131,7 @@ export default function ReimbursementsView() {
           <div style={s.formRow}>
             <div style={s.field}>
               <label style={s.label}>{t.date} *</label>
-              <input style={s.input} type="date" value={form.expense_date} onChange={e => setForm(f => ({ ...f, expense_date: e.target.value }))} required />
+              <input style={s.input} type="date" value={form.expense_date} onChange={e => setForm(f => ({ ...f, expense_date: e.target.value }))} required max={new Date().toLocaleDateString('en-CA')} />
             </div>
             <div style={s.field}>
               <label style={s.label}>{t.categoryLabel}</label>

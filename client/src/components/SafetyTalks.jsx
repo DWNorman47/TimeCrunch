@@ -425,7 +425,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                   {attachments.map(a => (
                     <div key={a.id} style={styles.attachmentRow}>
                       <span style={styles.attachIcon}>{fileIcon(a.content_type)}</span>
-                      <a href={a.url} target="_blank" rel="noopener noreferrer" style={styles.attachName}>{a.name}</a>
+                      <a href={a.url} target="_blank" rel="noopener noreferrer" style={styles.attachName} title={a.name}>{a.name}</a>
                       {a.size_bytes && <span style={styles.attachSize}>{formatBytes(a.size_bytes)}</span>}
                       {isAdmin && (pendingDeleteAttachId === a.id ? (
                         <>

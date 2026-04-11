@@ -31,7 +31,7 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
 
   const { clearPersisted } = useFormPersist('time-entry', form, setForm);
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
 
   const selectedProject = projects.find(p => p.id === parseInt(form.project_id));
 

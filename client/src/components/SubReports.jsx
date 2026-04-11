@@ -22,7 +22,7 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
   const isEdit = !!initial.id;
 
   const handleSubmit = async e => {
@@ -50,7 +50,7 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.date} *</label>
-          <input style={styles.input} type="date" value={form.report_date} onChange={e => set('report_date', e.target.value)} required />
+          <input style={styles.input} type="date" value={form.report_date} onChange={e => set('report_date', e.target.value)} required max={today()} />
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
@@ -76,7 +76,7 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.headcount} <span style={styles.optional}>({t.workersOnSite})</span></label>
-        <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" placeholder="0" value={form.headcount} onChange={e => set('headcount', e.target.value)} />
+        <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="1" placeholder="0" value={form.headcount} onChange={e => set('headcount', e.target.value)} />
       </div>
 
       <div style={styles.fieldGroup}>

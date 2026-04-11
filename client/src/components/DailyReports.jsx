@@ -194,7 +194,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       <div style={styles.fieldGrid}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.date}</label>
-          <input style={styles.input} type="date" value={form.report_date} onChange={e => set('report_date', e.target.value)} />
+          <input style={styles.input} type="date" value={form.report_date} onChange={e => set('report_date', e.target.value)} max={new Date().toLocaleDateString('en-CA')} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.project}</label>
