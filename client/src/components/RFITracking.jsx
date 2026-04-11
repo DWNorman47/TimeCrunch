@@ -221,7 +221,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
 
           {!rfi.pending && (
             <div style={styles.cardActions}>
-              <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? 'Preparing…' : 'Export PDF'}</button>
+              <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? t.preparing : 'Export PDF'}</button>
               {isAdmin && (
                 <>
                   <button style={styles.editBtn} onClick={() => onEdit(rfi)}>

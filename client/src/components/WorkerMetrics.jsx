@@ -211,7 +211,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
               </div>
               <div style={styles.btnRow}>
                 <button style={{ ...styles.previewBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={togglePreview} disabled={pdfGenerating}>
-                  {pdfGenerating ? 'Preparing…' : showPreview ? t.hideBill : t.previewBill}
+                  {pdfGenerating ? t.preparing : showPreview ? t.hideBill : t.previewBill}
                 </button>
                 <button style={styles.csvBtn} onClick={() => {
                   const headers = ['Date', 'Type', 'Project', 'Category / Wage Type', 'Start', 'End', 'Hours', 'Amount'];

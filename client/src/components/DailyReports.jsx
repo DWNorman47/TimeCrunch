@@ -185,7 +185,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
         <h3 style={styles.editorTitle}>{isNew ? t.newDailyReport : t.editDailyReport}</h3>
         {!isNew && initial.status === 'submitted' && (
           <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => downloadPDF({ ...initial, ...form, manpower, equipment, materials })} disabled={pdfGenerating}>
-            {pdfGenerating ? 'Preparing…' : 'Export PDF'}
+            {pdfGenerating ? t.preparing : 'Export PDF'}
           </button>
         )}
       </div>
@@ -440,13 +440,13 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
         </span>
         {(isSubmitted || isReviewed) && (
           <button style={{ ...styles.pdfBtnSmall, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>
-            {pdfGenerating ? 'Preparing…' : 'PDF'}
+            {pdfGenerating ? t.preparing : 'PDF'}
           </button>
         )}
         {isAdmin && isSubmitted && (
           <>
             <button style={{ ...styles.approveBtn, ...(approving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleApprove} disabled={approving}>
-              {approving ? '...' : t.approve}
+              {approving ? t.saving : t.approve}
             </button>
             {approveError && <span style={styles.inlineError}>{approveError}</span>}
           </>
@@ -454,7 +454,7 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
         {!report.pending && <button style={styles.editRowBtn} onClick={() => onEdit(report)}>{t.edit}</button>}
         {!report.pending && (confirmingDelete ? (
           <>
-            <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
+            <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? t.saving : t.confirm}</button>
             <button style={styles.cancelRowBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
             {deleteError && <span style={styles.inlineError}>{deleteError}</span>}
           </>

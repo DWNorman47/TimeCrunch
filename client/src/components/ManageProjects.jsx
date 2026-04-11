@@ -566,7 +566,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
             )}
             <div style={s.modalDownload}>
               <button style={{ ...s.downloadBtn, ...(archiveDownloading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDownloadZip} disabled={archiveDownloading}>
-                {archiveDownloading ? 'Preparing ZIP...' : 'Download media as ZIP'}
+                {archiveDownloading ? t.preparing : 'Download media as ZIP'}
               </button>
               {!settings?.media_delete_on_project_archive && (
                 <button style={{ ...s.downloadBtn, background: '#6b7280', marginTop: 4, ...(archiveDownloading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDownloadMediaUrls} disabled={archiveDownloading}>

@@ -163,7 +163,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
               </div>
               <div style={styles.btnRow}>
                 <button style={{ ...styles.previewBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={togglePreview} disabled={pdfGenerating}>
-                  {pdfGenerating ? 'Preparing…' : showPreview ? t.hidePreview : t.previewBill}
+                  {pdfGenerating ? t.preparing : showPreview ? t.hidePreview : t.previewBill}
                 </button>
                 <button style={styles.csvBtn} onClick={() => {
                   const headers = ['Date', 'Worker', 'Wage Type', 'Start', 'End', 'Hours'];
