@@ -82,6 +82,7 @@ export default function ApprovalQueue({ onCountChange }) {
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
   const [editProject, setEditProject] = useState('');
+  const [editUpdatedAt, setEditUpdatedAt] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
   // Split state
   const [splittingId, setSplittingId] = useState(null);
@@ -145,6 +146,7 @@ export default function ApprovalQueue({ onCountChange }) {
     setEditStart(e.start_time.substring(0, 5));
     setEditEnd(e.end_time.substring(0, 5));
     setEditProject(e.project_id ? String(e.project_id) : '');
+    setEditUpdatedAt(e.updated_at || null);
     setSplittingId(null);
   };
 
@@ -155,11 +157,15 @@ export default function ApprovalQueue({ onCountChange }) {
         start_time: editStart,
         end_time: editEnd,
         project_id: editProject ? parseInt(editProject) : null,
+        updated_at: editUpdatedAt,
       });
       setEntries(prev => prev.map(e => e.id === id ? { ...e, ...updated.data } : e));
       setEditingId(null);
     } catch (err) {
-      setEditSaveError(err.response?.data?.error || t.failedToSave);
+      const msg = err.response?.status === 409
+        ? 'This entry was modified by someone else. Refresh to see the latest.'
+        : err.response?.data?.error || t.failedToSave;
+      setEditSaveError(msg);
     } finally {
       setEditSaving(false);
     }

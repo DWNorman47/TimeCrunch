@@ -67,10 +67,18 @@ router.patch('/admin/:id', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'shift_date, start_time, end_time required' });
   }
   if (notes && notes.length > 500) return res.status(400).json({ error: 'notes too long (max 500 characters)' });
+  const clientUpdatedAt = req.body.updated_at || null;
   const companyId = req.user.company_id;
   try {
+    if (clientUpdatedAt) {
+      const cur = await pool.query('SELECT updated_at FROM shifts WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+      if (!cur.rows.length) return res.status(404).json({ error: 'Shift not found' });
+      if (new Date(cur.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+        return res.status(409).json({ error: 'conflict' });
+      }
+    }
     const result = await pool.query(
-      `UPDATE shifts SET project_id = $1, shift_date = $2, start_time = $3, end_time = $4, notes = $5
+      `UPDATE shifts SET project_id = $1, shift_date = $2, start_time = $3, end_time = $4, notes = $5, updated_at = NOW()
        WHERE id = $6 AND company_id = $7 RETURNING *`,
       [project_id || null, shift_date, start_time, end_time, notes, req.params.id, companyId]
     );

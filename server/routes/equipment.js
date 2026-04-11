@@ -59,10 +59,18 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   if (type && type.length > 100) return res.status(400).json({ error: 'type too long (max 100 characters)' });
   if (unit_number && unit_number.length > 100) return res.status(400).json({ error: 'unit_number too long (max 100 characters)' });
   if (notes && notes.length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
+  const clientUpdatedAt = req.body.updated_at || null;
   const companyId = req.user.company_id;
   try {
+    if (clientUpdatedAt) {
+      const cur = await pool.query('SELECT updated_at FROM equipment_items WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+      if (!cur.rows.length) return res.status(404).json({ error: 'Equipment not found' });
+      if (new Date(cur.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+        return res.status(409).json({ error: 'conflict' });
+      }
+    }
     const result = await pool.query(
-      `UPDATE equipment_items SET name=$1, type=$2, unit_number=$3, maintenance_interval_hours=$4, notes=$5
+      `UPDATE equipment_items SET name=$1, type=$2, unit_number=$3, maintenance_interval_hours=$4, notes=$5, updated_at=NOW()
        WHERE id=$6 AND company_id=$7 RETURNING *`,
       [name, type,
        unit_number, maintenance_interval_hours ? parseInt(maintenance_interval_hours) : null,

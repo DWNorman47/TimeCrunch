@@ -166,12 +166,15 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
           return;
         }
       } else {
-        r = await api.patch(`/daily-reports/${initial.id}`, payload);
+        r = await api.patch(`/daily-reports/${initial.id}`, { ...payload, updated_at: initial.updated_at });
       }
       setDirty(false);
       onSaved(r.data);
     } catch (err) {
-      setError(err.response?.data?.error || t.failedToSave);
+      const msg = err.response?.status === 409
+        ? 'This report was modified by someone else. Refresh to see the latest version.'
+        : err.response?.data?.error || t.failedToSave;
+      setError(msg);
     } finally { setSaving(false); setSubmitting(false); }
   };
 

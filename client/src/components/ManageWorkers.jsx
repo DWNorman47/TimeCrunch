@@ -167,6 +167,8 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const [editPermForm, setEditPermForm] = useState({ full_access: true, keys: {} });
   const [editPermSaving, setEditPermSaving] = useState(false);
 
+  const [editWorkerUpdatedAt, setEditWorkerUpdatedAt] = useState(null);
+
   const [editWorkerAccessForm, setEditWorkerAccessForm] = useState({ all_workers: true, ids: new Set() });
   const [editWorkerAccessSaving, setEditWorkerAccessSaving] = useState(false);
 
@@ -282,16 +284,19 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
   const startEditInfo = w => {
     setEditingId(w.id); setEditSection('info');
+    setEditWorkerUpdatedAt(w.updated_at || null);
     setEditInfoForm({ full_name: w.full_name, invoice_name: w.invoice_name || '', email: w.email || '', role: w.role, language: w.language || 'English', worker_type: w.worker_type || 'employee' });
   };
 
   const startEditUsername = w => {
     setEditingId(w.id); setEditSection('username');
+    setEditWorkerUpdatedAt(w.updated_at || null);
     setEditUsernameVal(w.username); setEditUsernameTaken(false);
   };
 
   const startEditRate = w => {
     setEditingId(w.id); setEditSection('rate');
+    setEditWorkerUpdatedAt(w.updated_at || null);
     const gwh = w.guaranteed_weekly_hours != null ? parseFloat(w.guaranteed_weekly_hours) : null;
     setEditRateForm({
       rate: String(w.hourly_rate ?? 0),
@@ -315,21 +320,25 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const saveInfo = async id => {
     setEditInfoSaving(true);
     try {
-      const r = await api.patch(`/admin/workers/${id}`, editInfoForm);
+      const r = await api.patch(`/admin/workers/${id}`, { ...editInfoForm, updated_at: editWorkerUpdatedAt });
       onWorkerUpdated(r.data);
       cancelEdit();
-    } catch (err) { toast(err.response?.data?.error || 'Failed to update', 'error'); }
-    finally { setEditInfoSaving(false); }
+    } catch (err) {
+      const msg = err.response?.status === 409 ? 'This worker was modified by someone else. Refresh to see the latest.' : err.response?.data?.error || 'Failed to update';
+      toast(msg, 'error');
+    } finally { setEditInfoSaving(false); }
   };
 
   const saveUsername = async id => {
     setEditUsernameSaving(true);
     try {
-      const r = await api.patch(`/admin/workers/${id}`, { username: editUsernameVal });
+      const r = await api.patch(`/admin/workers/${id}`, { username: editUsernameVal, updated_at: editWorkerUpdatedAt });
       onWorkerUpdated(r.data);
       cancelEdit();
-    } catch (err) { toast(err.response?.data?.error || 'Username already taken', 'error'); }
-    finally { setEditUsernameSaving(false); }
+    } catch (err) {
+      const msg = err.response?.status === 409 ? 'This worker was modified by someone else. Refresh to see the latest.' : err.response?.data?.error || 'Username already taken';
+      toast(msg, 'error');
+    } finally { setEditUsernameSaving(false); }
   };
 
   const saveRate = async id => {
@@ -342,11 +351,14 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
         guaranteed_weekly_hours: editRateForm.guarantee_enabled
           ? (parseFloat(editRateForm.guaranteed_weekly_hours) || 40)
           : null,
+        updated_at: editWorkerUpdatedAt,
       });
       onWorkerUpdated(r.data);
       cancelEdit();
-    } catch (err) { toast(err.response?.data?.error || 'Failed to update', 'error'); }
-    finally { setEditRateSaving(false); }
+    } catch (err) {
+      const msg = err.response?.status === 409 ? 'This worker was modified by someone else. Refresh to see the latest.' : err.response?.data?.error || 'Failed to update';
+      toast(msg, 'error');
+    } finally { setEditRateSaving(false); }
   };
 
   const startEditPermissions = w => {

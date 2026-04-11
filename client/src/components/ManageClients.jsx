@@ -49,11 +49,14 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
     setSaving(true); setError('');
     try {
       const r = isEdit
-        ? await api.patch(`/admin/clients/${initial.id}`, form)
+        ? await api.patch(`/admin/clients/${initial.id}`, { ...form, updated_at: initial.updated_at })
         : await api.post('/admin/clients', form);
       onSaved(r.data, isEdit);
     } catch (err) {
-      setError(err.response?.data?.error || t.failedSaveClient);
+      const msg = err.response?.status === 409
+        ? 'This client was modified by someone else. Refresh to see the latest version.'
+        : err.response?.data?.error || t.failedSaveClient;
+      setError(msg);
     } finally { setSaving(false); }
   };
 

@@ -418,6 +418,7 @@ export default function ManageSchedule({ workers, projects }) {
       start_time: s.start_time.substring(0, 5),
       end_time: s.end_time.substring(0, 5),
       notes: s.notes || '',
+      updated_at: s.updated_at,
     });
   };
 
@@ -428,7 +429,10 @@ export default function ManageSchedule({ workers, projects }) {
       setShifts(prev => prev.map(s => s.id === id ? r.data : s));
       setEditingId(null);
     } catch (err) {
-      toast(err.response?.data?.error || 'Failed to update shift', 'error');
+      const msg = err.response?.status === 409
+        ? 'This shift was modified by someone else. Refresh to see the latest.'
+        : err.response?.data?.error || 'Failed to update shift';
+      toast(msg, 'error');
     } finally { setEditSaving(false); }
   };
 

@@ -206,6 +206,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'Only admins can mark a report as reviewed' });
   }
 
+  const clientUpdatedAt = req.body.updated_at || null;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -218,6 +219,11 @@ router.patch('/:id', requireAuth, async (req, res) => {
     if (!isAdmin && existing.rows[0].created_by !== req.user.id) {
       await client.query('ROLLBACK');
       return res.status(403).json({ error: 'You can only edit your own reports' });
+    }
+
+    if (clientUpdatedAt && new Date(existing.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'conflict' });
     }
 
     await client.query(

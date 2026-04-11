@@ -461,8 +461,16 @@ router.patch('/entries/:id/times', requireAdmin, requirePermission('manage_worke
 router.patch('/entries/:id/edit', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const { start_time, end_time, project_id } = req.body;
+  const clientUpdatedAt = req.body.updated_at || null;
   if (!start_time || !end_time) return res.status(400).json({ error: 'start_time and end_time required' });
   try {
+    if (clientUpdatedAt) {
+      const cur = await pool.query('SELECT updated_at FROM time_entries WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+      if (!cur.rows.length) return res.status(404).json({ error: 'Entry not found' });
+      if (new Date(cur.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+        return res.status(409).json({ error: 'conflict' });
+      }
+    }
     // Derive wage_type from new project if provided
     let wage_type = 'regular';
     if (project_id) {
@@ -471,7 +479,7 @@ router.patch('/entries/:id/edit', requireAdmin, requirePermission('approve_entri
       wage_type = proj.rows[0].wage_type;
     }
     const result = await pool.query(
-      `UPDATE time_entries SET start_time=$1, end_time=$2, project_id=$3, wage_type=$4
+      `UPDATE time_entries SET start_time=$1, end_time=$2, project_id=$3, wage_type=$4, updated_at=NOW()
        WHERE id=$5 AND company_id=$6 RETURNING *`,
       [start_time, end_time, project_id || null, wage_type, req.params.id, companyId]
     );
@@ -1113,10 +1121,19 @@ router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), 
         fields.push(`guaranteed_weekly_hours = $${idx++}`); values.push(gn);
       }
     }
+    const workerClientUpdatedAt = req.body.updated_at || null;
+    if (workerClientUpdatedAt) {
+      const cur = await pool.query('SELECT updated_at FROM users WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+      if (!cur.rows.length) return res.status(404).json({ error: 'Worker not found' });
+      if (new Date(cur.rows[0].updated_at).getTime() !== new Date(workerClientUpdatedAt).getTime()) {
+        return res.status(409).json({ error: 'conflict' });
+      }
+    }
+    fields.push(`updated_at = NOW()`);
     values.push(req.params.id);
     values.push(companyId);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, invoice_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type, guaranteed_weekly_hours`,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, invoice_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type, guaranteed_weekly_hours, updated_at`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
@@ -1438,6 +1455,15 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
     }
     if (active !== undefined) { fields.push(`active = $${idx++}`); values.push(!!active); }
     if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+    const clientUpdatedAt = req.body.updated_at || null;
+    if (clientUpdatedAt) {
+      const cur = await pool.query('SELECT updated_at FROM projects WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+      if (!cur.rows.length) return res.status(404).json({ error: 'Project not found' });
+      if (new Date(cur.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+        return res.status(409).json({ error: 'conflict' });
+      }
+    }
+    fields.push(`updated_at = NOW()`);
     values.push(req.params.id);
     values.push(companyId);
     const result = await pool.query(
@@ -2967,12 +2993,20 @@ router.post('/clients', requireAdmin, async (req, res) => {
 
 router.patch('/clients/:id', requireAdmin, async (req, res) => {
   const { name, contact_name, contact_email, contact_phone, address, notes } = req.body;
+  const clientUpdatedAt = req.body.updated_at || null;
   if (!name?.trim()) return res.status(400).json({ error: 'Client name is required' });
   const companyId = req.user.company_id;
   try {
+    if (clientUpdatedAt) {
+      const cur = await pool.query('SELECT updated_at FROM clients WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+      if (!cur.rows.length) return res.status(404).json({ error: 'Not found' });
+      if (new Date(cur.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+        return res.status(409).json({ error: 'conflict' });
+      }
+    }
     const result = await pool.query(
       `UPDATE clients SET name=$1, contact_name=$2, contact_email=$3, contact_phone=$4,
-       address=$5, notes=$6 WHERE id=$7 AND company_id=$8 RETURNING *`,
+       address=$5, notes=$6, updated_at=NOW() WHERE id=$7 AND company_id=$8 RETURNING *`,
       [name.trim(), contact_name || null, contact_email || null, contact_phone || null,
        address || null, notes || null, req.params.id, companyId]
     );

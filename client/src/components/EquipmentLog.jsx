@@ -28,11 +28,14 @@ function ItemForm({ initial, onSaved, onCancel }) {
     setSaving(true); setError('');
     try {
       const r = isEdit
-        ? await api.patch(`/equipment/${initial.id}`, form)
+        ? await api.patch(`/equipment/${initial.id}`, { ...form, updated_at: initial.updated_at })
         : await api.post('/equipment', form);
       onSaved(r.data, isEdit);
     } catch (err) {
-      setError(err.response?.data?.error || t.failedToSave);
+      const msg = err.response?.status === 409
+        ? 'This equipment was modified by someone else. Refresh to see the latest version.'
+        : err.response?.data?.error || t.failedToSave;
+      setError(msg);
     } finally { setSaving(false); }
   };
 

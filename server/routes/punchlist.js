@@ -107,11 +107,16 @@ router.patch('/:id', requireAuth, async (req, res) => {
   if (status   !== undefined && !VALID_STATUSES.includes(status))   return res.status(400).json({ error: 'Invalid status value' });
   if (priority !== undefined && !VALID_PRIORITIES.includes(priority)) return res.status(400).json({ error: 'Invalid priority value' });
 
+  const clientUpdatedAt = req.body.updated_at || null;
   try {
     const existing = await pool.query(
       'SELECT * FROM punchlist_items WHERE id=$1 AND company_id=$2', [req.params.id, companyId]
     );
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+
+    if (clientUpdatedAt && new Date(existing.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+      return res.status(409).json({ error: 'conflict' });
+    }
 
     const resolvedAt = status === 'verified' && existing.rows[0].status !== 'verified'
       ? new Date() : existing.rows[0].resolved_at;

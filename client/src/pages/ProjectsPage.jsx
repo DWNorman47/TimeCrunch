@@ -389,12 +389,13 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
         description: editForm.description || null,
         progress_pct: editForm.progress_pct !== '' ? parseInt(editForm.progress_pct, 10) : null,
         wage_type: editForm.wage_type,
+        updated_at: project.updated_at,
       });
       onProjectUpdated?.(r.data);
       setEditMsg('Saved');
       setTimeout(() => setEditMsg(''), 2000);
-    } catch {
-      setEditMsg('Failed to save');
+    } catch (err) {
+      setEditMsg(err.response?.status === 409 ? 'Modified by someone else — refresh first' : 'Failed to save');
     } finally { setEditSaving(false); }
   };
 
