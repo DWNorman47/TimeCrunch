@@ -287,14 +287,14 @@ function ItemUOMPanel({ item }) {
                     <td style={{ ...u.td, textAlign: 'right' }}>{parseFloat(row.factor)}</td>
                     <td style={u.td}>{row.is_base ? <span style={u.baseBadge}>{t.uomBaseBadge}</span> : ''}</td>
                     <td style={{ ...u.td, whiteSpace: 'nowrap' }}>
-                      <button style={u.iconBtn} onClick={() => { setEditingId(row.id); setEditForm({ unit: row.unit, unit_spec: row.unit_spec || '', factor: String(row.factor), is_base: row.is_base }); }}>✏️</button>
+                      <button style={u.iconBtn} aria-label="Edit unit" onClick={() => { setEditingId(row.id); setEditForm({ unit: row.unit, unit_spec: row.unit_spec || '', factor: String(row.factor), is_base: row.is_base }); }}>✏️</button>
                       {!row.is_base && (pendingRemoveUomId === row.id ? (
                         <>
                           <button style={u.confirmRemoveBtn} onClick={() => remove(row.id)}>{t.confirm}</button>
-                          <button style={u.iconBtn} onClick={() => setPendingRemoveUomId(null)}>✕</button>
+                          <button style={u.iconBtn} aria-label="Cancel remove" onClick={() => setPendingRemoveUomId(null)}>✕</button>
                         </>
                       ) : (
-                        <button style={u.iconBtn} onClick={() => setPendingRemoveUomId(row.id)}>🗑️</button>
+                        <button style={u.iconBtn} aria-label="Remove unit" onClick={() => setPendingRemoveUomId(row.id)}>🗑️</button>
                       ))}
                     </td>
                   </>
@@ -492,12 +492,12 @@ export default function InventoryItems({ onItemChange }) {
                       <td style={{ ...s.td, whiteSpace: 'nowrap' }}>
                         {item.active ? (
                           <>
-                            <button style={s.iconBtn} onClick={() => setLabelItem(item)} title="Print label">🏷️</button>
-                            <button style={s.iconBtn} onClick={() => setEditingItem(item)} title="Edit">✏️</button>
+                            <button style={s.iconBtn} onClick={() => setLabelItem(item)} aria-label="Print label">🏷️</button>
+                            <button style={s.iconBtn} onClick={() => setEditingItem(item)} aria-label="Edit item">✏️</button>
                             {pendingArchiveItemId === item.id ? (
                               <>
                                 <button style={s.confirmArchiveBtn} onClick={() => archive(item)} disabled={archiving === item.id}>{t.confirm}</button>
-                                <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(null)}>✕</button>
+                                <button style={s.iconBtn} aria-label="Cancel archive" onClick={() => setPendingArchiveItemId(null)}>✕</button>
                               </>
                             ) : (
                               <button style={{ ...s.iconBtn, opacity: archiving === item.id ? 0.5 : 1 }} onClick={() => setPendingArchiveItemId(item.id)} title="Archive">🗄️</button>

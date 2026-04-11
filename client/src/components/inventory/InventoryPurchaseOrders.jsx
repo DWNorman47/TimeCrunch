@@ -454,10 +454,10 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
                         {pendingRemoveLineId === line.id ? (
                           <>
                             <button style={d.confirmLineRemoveBtn} onClick={() => removeLine(line.id)}>{t.confirm}</button>
-                            <button style={d.removeBtn} onClick={() => setPendingRemoveLineId(null)}>✕</button>
+                            <button style={d.removeBtn} aria-label="Cancel remove line" onClick={() => setPendingRemoveLineId(null)}>✕</button>
                           </>
                         ) : (
-                          <button style={d.removeBtn} onClick={() => setPendingRemoveLineId(line.id)} title="Remove line">🗑️</button>
+                          <button style={d.removeBtn} aria-label="Remove line" onClick={() => setPendingRemoveLineId(line.id)}>🗑️</button>
                         )}
                       </td>
                     )}

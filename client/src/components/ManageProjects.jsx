@@ -312,7 +312,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
         {showWageType && wageType === 'prevailing' && (
           <input style={{ ...s.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder={`Rate (${defaultPrevailingRate || '45.00'})`} value={prevailingRate} onChange={e => setPrevailingRate(e.target.value)} />
         )}
-        <button style={s.addBtn} type="submit" disabled={saving}>{saving ? t.adding : t.add}</button>
+        <button style={{ ...s.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.adding : t.add}</button>
       </form>
       {error && (
         <div style={s.errorBox}>

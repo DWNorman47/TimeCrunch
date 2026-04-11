@@ -104,7 +104,7 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
       {error && <p style={s.error}>{error}</p>}
 
       <div style={s.formActions}>
-        <button style={s.saveBtn} type="submit" disabled={saving}>{saving ? '…' : isEdit ? t.saveChanges : t.addClient}</button>
+        <button style={{ ...s.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? '…' : isEdit ? t.saveChanges : t.addClient}</button>
         <button style={s.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>

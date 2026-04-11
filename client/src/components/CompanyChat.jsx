@@ -206,7 +206,7 @@ function ChatForm({ body, setBody, sending, onSubmit, t }) {
         maxLength={1000}
         disabled={sending}
       />
-      <button style={styles.sendBtn} type="submit" disabled={sending || !body.trim()}>
+      <button style={{ ...styles.sendBtn, ...((sending || !body.trim()) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={sending || !body.trim()}>
         {sending ? '...' : t.chatSend}
       </button>
     </form>

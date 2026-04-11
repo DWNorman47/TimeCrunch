@@ -142,7 +142,7 @@ function LogHoursForm({ item, projects, onLogged, onCancel }) {
       </div>
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : t.logHoursBtn}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.logHoursBtn}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
