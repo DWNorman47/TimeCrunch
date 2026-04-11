@@ -68,7 +68,7 @@ export default function ItemLabelModal({ item, onClose }) {
       <div style={s.modal}>
         <div style={s.header}>
           <h3 style={s.title}>{t.itemLabelTitle}</h3>
-          <button style={s.closeBtn} onClick={onClose}>✕</button>
+          <button style={s.closeBtn} aria-label="Close" onClick={onClose}>✕</button>
         </div>
 
         <div style={s.preview}>

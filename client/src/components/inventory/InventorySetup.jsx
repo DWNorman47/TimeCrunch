@@ -81,7 +81,7 @@ function PhotoGrid({ photos, onRemove, onAdd, readOnly }) {
             onClick={() => window.open(url, '_blank')}
           />
           {!readOnly && (
-            <button style={pg.removeBtn} onClick={() => onRemove(i)} title="Remove photo">×</button>
+            <button style={pg.removeBtn} aria-label="Remove photo" onClick={() => onRemove(i)} title="Remove photo">×</button>
           )}
         </div>
       ))}
@@ -428,7 +428,7 @@ function SupplierPanel() {
                       {pendingArchiveSupId === sup.id ? (
                         <>
                           <button style={sp.confirmArchiveBtn} onClick={() => archive(sup)}>{t.confirm}</button>
-                          <button style={sp.iconBtn} onClick={() => setPendingArchiveSupId(null)}>✕</button>
+                          <button style={sp.iconBtn} aria-label="Cancel archive" onClick={() => setPendingArchiveSupId(null)}>✕</button>
                         </>
                       ) : (
                         <button style={sp.iconBtn} onClick={() => setPendingArchiveSupId(sup.id)} title="Archive">🗄️</button>
@@ -776,7 +776,7 @@ export default function InventorySetup({ projects }) {
                             {pendingArchiveItemId === item.id ? (
                               <>
                                 <button style={s.confirmArchiveBtn} onClick={() => archive(item)}>{t.confirm}</button>
-                                <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(null)}>✕</button>
+                                <button style={s.iconBtn} aria-label="Cancel archive" onClick={() => setPendingArchiveItemId(null)}>✕</button>
                               </>
                             ) : (
                               <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(item.id)} title="Archive">🗄️</button>

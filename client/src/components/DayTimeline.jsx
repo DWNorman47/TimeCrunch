@@ -284,11 +284,11 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                             </button>
                             {pendingDeleteEntry?.id === seg.entry.id ? (
                               <>
-                                <button style={{ ...s.confirmEntryDeleteBtn, ...(deletingId === seg.entry.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => doDelete(seg.entry)} disabled={deletingId === seg.entry.id}>✓</button>
-                                <button style={s.cancelEntryDeleteBtn} onClick={() => setPendingDeleteEntry(null)}>✕</button>
+                                <button style={{ ...s.confirmEntryDeleteBtn, ...(deletingId === seg.entry.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Confirm delete" onClick={() => doDelete(seg.entry)} disabled={deletingId === seg.entry.id}>✓</button>
+                                <button style={s.cancelEntryDeleteBtn} aria-label="Cancel delete" onClick={() => setPendingDeleteEntry(null)}>✕</button>
                               </>
                             ) : (
-                              <button style={{ ...s.deleteBtn, ...(deletingId === seg.entry.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setPendingDeleteEntry(seg.entry)} disabled={deletingId === seg.entry.id}>✕</button>
+                              <button style={{ ...s.deleteBtn, ...(deletingId === seg.entry.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Delete entry" onClick={() => setPendingDeleteEntry(seg.entry)} disabled={deletingId === seg.entry.id}>✕</button>
                             )}
                           </div>
                         )}
@@ -365,7 +365,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                       <div style={s.gapExpanded}>
                         <div style={s.gapExpandedHeader}>
                           <span style={s.gapLabel}>Gap: {minToDisplay(seg.start)} – {minToDisplay(seg.end)} ({dur(seg.start, seg.end)})</span>
-                          <button style={s.closeBtn} onClick={closeGap}>✕</button>
+                          <button style={s.closeBtn} aria-label="Close" onClick={closeGap}>✕</button>
                         </div>
 
                         <div style={s.modeBtns}>

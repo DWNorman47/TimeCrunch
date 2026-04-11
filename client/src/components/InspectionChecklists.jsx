@@ -154,7 +154,7 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
               <select style={styles.typeSelect} value={item.type} onChange={e => updateItem(item._id, 'type', e.target.value)}>
                 {ITEM_TYPES.map(it => <option key={it.value} value={it.value}>{it.label}</option>)}
               </select>
-              <button type="button" style={styles.removeItemBtn} onClick={() => removeItem(item._id)}>✕</button>
+              <button type="button" style={styles.removeItemBtn} aria-label="Remove item" onClick={() => removeItem(item._id)}>✕</button>
             </div>
           ))}
         </div>

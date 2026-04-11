@@ -274,9 +274,9 @@ export default function FieldDayLog({ projects, isAdmin }) {
         </select>
 
         <div style={s.dateNav}>
-          <button style={s.dateArrow} onClick={prevDay}>‹</button>
+          <button style={s.dateArrow} aria-label="Previous day" onClick={prevDay}>‹</button>
           <span style={s.dateLabel}>{dayLabel(date, t)}</span>
-          <button style={{ ...s.dateArrow, opacity: isToday ? 0.3 : 1, ...(isToday ? { cursor: 'not-allowed' } : {}) }} onClick={nextDay} disabled={isToday}>›</button>
+          <button style={{ ...s.dateArrow, opacity: isToday ? 0.3 : 1, ...(isToday ? { cursor: 'not-allowed' } : {}) }} aria-label="Next day" onClick={nextDay} disabled={isToday}>›</button>
         </div>
       </div>
 

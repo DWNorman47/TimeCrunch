@@ -16,9 +16,9 @@ function Paginator({ page, total, pageSize, onChange }) {
   const end = Math.min((page + 1) * pageSize, total);
   return (
     <div style={styles.paginator}>
-      <button style={{ ...styles.pageBtn, ...(page === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => onChange(page - 1)} disabled={page === 0}>‹</button>
+      <button style={{ ...styles.pageBtn, ...(page === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Previous page" onClick={() => onChange(page - 1)} disabled={page === 0}>‹</button>
       <span style={styles.pageInfo}>{start}–{end} of {total}</span>
-      <button style={{ ...styles.pageBtn, ...(page >= totalPages - 1 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => onChange(page + 1)} disabled={page >= totalPages - 1}>›</button>
+      <button style={{ ...styles.pageBtn, ...(page >= totalPages - 1 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Next page" onClick={() => onChange(page + 1)} disabled={page >= totalPages - 1}>›</button>
     </div>
   );
 }
@@ -410,7 +410,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                         {retryingErrors.has(e.id) ? '…' : 'Retry'}
                       </button>
                     )}
-                    <button style={styles.errorDismiss} onClick={() => dismissError(e.id)}>✕</button>
+                    <button style={styles.errorDismiss} aria-label="Dismiss error" onClick={() => dismissError(e.id)}>✕</button>
                   </div>
                 ))}
               </div>

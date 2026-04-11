@@ -441,7 +441,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
             <div style={styles.clockOutSummaryProject}>{clockOutSummary.projectName}</div>
             <div style={styles.clockOutSummaryDuration}>{t.clockOutSummaryDuration}: <strong>{formatElapsed(clockOutSummary.seconds)}</strong></div>
           </div>
-          <button style={styles.clockOutSummaryDismiss} onClick={() => setClockOutSummary(null)}>✕</button>
+          <button style={styles.clockOutSummaryDismiss} aria-label="Dismiss" onClick={() => setClockOutSummary(null)}>✕</button>
         </div>
       )}
       <h2 style={styles.heading}>{t.clockIn}</h2>

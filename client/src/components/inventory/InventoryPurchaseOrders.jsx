@@ -70,7 +70,7 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
       <div style={m.modal}>
         <div style={m.header}>
           <h3 style={m.title}>{t.invPOReceiveTitle} — {po.po_number}</h3>
-          <button style={m.closeBtn} onClick={onClose}>✕</button>
+          <button style={m.closeBtn} aria-label="Close" onClick={onClose}>✕</button>
         </div>
 
         {error && <div style={m.error}>{error}</div>}
@@ -709,7 +709,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
                       onChange={e => updateLine(line.key, 'notes', e.target.value)} placeholder={t.optional} maxLength={500} />
                   </td>
                   <td style={c.td}>
-                    <button style={c.removeBtn} onClick={() => removeLine(line.key)}>✕</button>
+                    <button style={c.removeBtn} aria-label="Remove line" onClick={() => removeLine(line.key)}>✕</button>
                   </td>
                 </tr>
               ))}
