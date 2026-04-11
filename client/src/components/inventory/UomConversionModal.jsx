@@ -65,7 +65,7 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
           </div>
           <div style={m.actions}>
             <button style={m.skipBtn} onClick={onDismiss}>{t.uomConvSkip}</button>
-            <button style={m.saveBtn} onClick={save} disabled={saving}>
+            <button style={{ ...m.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={save} disabled={saving}>
               {saving ? t.saving : t.uomConvSave}
             </button>
           </div>

@@ -119,7 +119,7 @@ export default function WorkerSchedule() {
                   )}
                   {s.cant_make_it ? (
                     <button
-                      style={styles.undoBtn}
+                      style={{ ...styles.undoBtn, ...(flagging === s.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                       onClick={() => undoCantMakeIt(s)}
                       disabled={flagging === s.id}
                     >
@@ -127,7 +127,7 @@ export default function WorkerSchedule() {
                     </button>
                   ) : pendingFlag?.id === s.id ? null : (
                     <button
-                      style={styles.cantBtn}
+                      style={{ ...styles.cantBtn, ...(flagging === s.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                       onClick={() => setPendingFlag({ id: s.id, note: '' })}
                       disabled={flagging === s.id}
                     >

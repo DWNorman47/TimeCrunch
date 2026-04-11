@@ -65,9 +65,9 @@ function Lightbox({ items, index, onClose }) {
         </div>
       </div>
       <div style={styles.navRow} onClick={e => e.stopPropagation()}>
-        <button style={styles.navBtn} aria-label="Previous photo" onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0}>‹</button>
+        <button style={{ ...styles.navBtn, ...(idx === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Previous photo" onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0}>‹</button>
         <span style={styles.navCount}>{idx + 1} / {items.length}</span>
-        <button style={styles.navBtn} aria-label="Next photo" onClick={() => setIdx(i => Math.min(items.length - 1, i + 1))} disabled={idx === items.length - 1}>›</button>
+        <button style={{ ...styles.navBtn, ...(idx === items.length - 1 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Next photo" onClick={() => setIdx(i => Math.min(items.length - 1, i + 1))} disabled={idx === items.length - 1}>›</button>
       </div>
       <button style={styles.closeBtn} aria-label="Close lightbox" onClick={onClose}>✕</button>
     </div>

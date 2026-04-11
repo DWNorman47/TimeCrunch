@@ -116,7 +116,7 @@ export default function InstallPrompt() {
           {deferredPrompt ? (
             <>
               <div style={styles.body}>Add OpsFloa to your home screen for quick clock-in access.</div>
-              <button style={styles.installBtn} onClick={androidInstall} disabled={installing}>
+              <button style={{ ...styles.installBtn, ...(installing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={androidInstall} disabled={installing}>
                 {installing ? 'Installing...' : 'Add to Home Screen'}
               </button>
             </>

@@ -78,7 +78,7 @@ export default function MFASetup() {
         {step === 'idle' && (
           user?.mfa_enabled
             ? <button style={s.disableBtn} onClick={() => { setStep('disable'); setError(''); }}>Disable</button>
-            : <button style={s.enableBtn} onClick={startSetup} disabled={loading}>
+            : <button style={{ ...s.enableBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={startSetup} disabled={loading}>
                 {loading ? 'Loading...' : 'Enable'}
               </button>
         )}
@@ -107,7 +107,7 @@ export default function MFASetup() {
             {error && <p style={s.error}>{error}</p>}
             <div style={s.btnRow}>
               <button type="button" style={s.cancelBtn} onClick={cancel}>Cancel</button>
-              <button style={s.confirmBtn} type="submit" disabled={loading || code.length !== 6}>
+              <button style={{ ...s.confirmBtn, ...(loading || code.length !== 6 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={loading || code.length !== 6}>
                 {loading ? 'Verifying...' : 'Confirm & Enable'}
               </button>
             </div>
@@ -131,7 +131,7 @@ export default function MFASetup() {
             {error && <p style={s.error}>{error}</p>}
             <div style={s.btnRow}>
               <button type="button" style={s.cancelBtn} onClick={cancel}>Cancel</button>
-              <button style={{ ...s.confirmBtn, background: '#dc2626' }} type="submit" disabled={loading || !password}>
+              <button style={{ ...s.confirmBtn, background: '#dc2626', ...(loading || !password ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={loading || !password}>
                 {loading ? 'Disabling...' : 'Disable MFA'}
               </button>
             </div>

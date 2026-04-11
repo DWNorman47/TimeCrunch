@@ -173,7 +173,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
                 <input style={{ ...styles.input, width: '100%' }} type="text" maxLength={500} value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
               </div>
               {addError && <div style={styles.addError}>{addError}</div>}
-              <button style={styles.fetchBtn} type="submit" disabled={addSaving}>{addSaving ? 'Saving…' : 'Add Entry'}</button>
+              <button style={{ ...styles.fetchBtn, ...(addSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={addSaving}>{addSaving ? 'Saving…' : 'Add Entry'}</button>
             </form>
           )}
           <div style={styles.dateRow}>
@@ -185,7 +185,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
               <label style={styles.label}>{t.to}</label>
               <input style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
             </div>
-            <button style={styles.fetchBtn} onClick={fetchBill} disabled={loading}>
+            <button style={{ ...styles.fetchBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={fetchBill} disabled={loading}>
               {loading ? t.loading : t.loadEntries}
             </button>
           </div>
@@ -210,7 +210,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
                 <span style={{ fontWeight: 700 }}>{t.totalCostLabel} <b>{formatCurrency(billData.summary.total_cost, currency)}</b></span>
               </div>
               <div style={styles.btnRow}>
-                <button style={styles.previewBtn} onClick={togglePreview} disabled={pdfGenerating}>
+                <button style={{ ...styles.previewBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={togglePreview} disabled={pdfGenerating}>
                   {pdfGenerating ? 'Preparing…' : showPreview ? t.hideBill : t.previewBill}
                 </button>
                 <button style={styles.csvBtn} onClick={() => {
@@ -224,7 +224,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
                   ]);
                   downloadCSV([headers, ...timeRows, ...reimbRows], `${worker.username}-${from||'all'}-to-${to||'all'}.csv`);
                 }}>{t.exportCSV}</button>
-                <button style={styles.pdfBtn} onClick={downloadPDF} disabled={pdfGenerating}>
+                <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>
                   {pdfGenerating ? t.preparingPDF : t.downloadPDF}
                 </button>
               </div>

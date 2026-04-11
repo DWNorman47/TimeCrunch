@@ -79,7 +79,7 @@ export default function SignatureModal({ onConfirm, onCancel, required = false }
           <button style={styles.clearBtn} onClick={clear}>Clear</button>
         </div>
         <div style={styles.actions}>
-          <button style={styles.confirmBtn} onClick={confirm} disabled={isEmpty}>
+          <button style={{ ...styles.confirmBtn, ...(isEmpty ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={confirm} disabled={isEmpty}>
             Sign & Export
           </button>
           {!required && (

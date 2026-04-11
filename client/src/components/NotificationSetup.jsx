@@ -89,7 +89,7 @@ export default function NotificationSetup() {
       ) : state === 'denied' ? (
         <span style={styles.denied}>{t.blockedInBrowser}</span>
       ) : (
-        <button style={styles.onBtn} onClick={subscribe} disabled={state === 'loading'}>
+        <button style={{ ...styles.onBtn, ...(state === 'loading' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={subscribe} disabled={state === 'loading'}>
           {state === 'loading' ? t.enabling : t.enable}
         </button>
       )}

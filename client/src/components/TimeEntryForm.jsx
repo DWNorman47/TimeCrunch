@@ -137,7 +137,7 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
         </div>
         {error && <p style={styles.error}>{error}</p>}
         {success && <p style={styles.success}>{t.entrySaved}</p>}
-        <button style={styles.button} type="submit" disabled={saving}>{saving ? t.saving : t.logEntry}</button>
+        <button style={{ ...styles.button, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.logEntry}</button>
       </form>}
     </div>
   );

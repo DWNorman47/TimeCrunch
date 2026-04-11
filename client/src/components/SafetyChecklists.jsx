@@ -149,7 +149,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.createTemplate}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.createTemplate}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -267,7 +267,7 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving || !templateId}>
+        <button style={{ ...styles.submitBtn, ...((saving || !templateId) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving || !templateId}>
           {saving ? t.submitting : t.submitChecklist}
         </button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
@@ -349,7 +349,7 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
             <div style={styles.cardActions}>
               {confirmingDelete ? (
                 <>
-                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
+                  <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
                   <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
                 </>
               ) : (
@@ -497,7 +497,7 @@ export default function SafetyChecklists({ projects }) {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {isAdmin && <button style={styles.templatesBtn} onClick={() => setView('templates')}>{t.manageTemplates}</button>}
-          <button style={styles.newBtn} onClick={() => setView('fill')} disabled={templates.length === 0}>
+          <button style={{ ...styles.newBtn, ...(templates.length === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setView('fill')} disabled={templates.length === 0}>
             {templates.length === 0 ? t.noTemplates : `+ ${t.fillOut}`}
           </button>
         </div>

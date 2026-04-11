@@ -138,11 +138,11 @@ export default function AuditLog({ timezone = '' }) {
 
           {totalPages > 1 && (
             <div style={styles.pagination}>
-              <button style={styles.pageBtn} aria-label="First page" onClick={() => goTo(0)} disabled={page === 0 || loading}>«</button>
-              <button style={styles.pageBtn} onClick={() => goTo(page - 1)} disabled={page === 0 || loading}>‹ {t.paginationPrev}</button>
+              <button style={{ ...styles.pageBtn, ...(page === 0 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="First page" onClick={() => goTo(0)} disabled={page === 0 || loading}>«</button>
+              <button style={{ ...styles.pageBtn, ...(page === 0 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => goTo(page - 1)} disabled={page === 0 || loading}>‹ {t.paginationPrev}</button>
               <span style={styles.pageInfo}>{t.paginationPage} {page + 1} {t.ofLabel} {totalPages}</span>
-              <button style={styles.pageBtn} onClick={() => goTo(page + 1)} disabled={page >= totalPages - 1 || loading}>{t.paginationNext} ›</button>
-              <button style={styles.pageBtn} aria-label="Last page" onClick={() => goTo(totalPages - 1)} disabled={page >= totalPages - 1 || loading}>»</button>
+              <button style={{ ...styles.pageBtn, ...(page >= totalPages - 1 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => goTo(page + 1)} disabled={page >= totalPages - 1 || loading}>{t.paginationNext} ›</button>
+              <button style={{ ...styles.pageBtn, ...(page >= totalPages - 1 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Last page" onClick={() => goTo(totalPages - 1)} disabled={page >= totalPages - 1 || loading}>»</button>
             </div>
           )}
         </>

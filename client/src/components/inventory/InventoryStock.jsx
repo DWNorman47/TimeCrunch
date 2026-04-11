@@ -195,8 +195,8 @@ function AdjustModal({ item, locations, onClose, onDone }) {
             maxLength={1000}
           />
           <div style={a.actions}>
-            <button style={a.cancel} onClick={warning ? onDone : onClose} disabled={saving}>{warning ? t.back : t.cancel}</button>
-            {!warning && <button style={a.save} onClick={submit} disabled={saving}>{saving ? t.saving : t.invStockSaveAdj}</button>}
+            <button style={{ ...a.cancel, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={warning ? onDone : onClose} disabled={saving}>{warning ? t.back : t.cancel}</button>
+            {!warning && <button style={{ ...a.save, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submit} disabled={saving}>{saving ? t.saving : t.invStockSaveAdj}</button>}
           </div>
         </div>
       </div>
@@ -349,8 +349,8 @@ function IssueModal({ item, projects, onClose, onDone }) {
             maxLength={1000}
           />
           <div style={a.actions}>
-            <button style={a.cancel} onClick={warning ? onDone : onClose} disabled={saving}>{warning ? t.back : t.cancel}</button>
-            {!warning && <button style={{ ...a.save, background: '#d97706' }} onClick={submit} disabled={saving}>
+            <button style={{ ...a.cancel, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={warning ? onDone : onClose} disabled={saving}>{warning ? t.back : t.cancel}</button>
+            {!warning && <button style={{ ...a.save, background: '#d97706', ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submit} disabled={saving}>
               {saving ? t.invStockIssuing : t.invStockIssueMaterials}
             </button>}
           </div>
@@ -587,7 +587,7 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
         </div>
         {stock.length < stockTotal && (
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
-            <button style={s.refreshBtn} onClick={loadMore} disabled={loadingMore}>
+            <button style={{ ...s.refreshBtn, ...(loadingMore ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={loadMore} disabled={loadingMore}>
               {loadingMore ? t.loading : t.loadMore}
             </button>
             <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>

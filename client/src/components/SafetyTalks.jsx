@@ -220,7 +220,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : t.createTalk}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.createTalk}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -407,7 +407,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                 <span style={styles.attachmentsTitle}>{t.attachmentsSection}</span>
                 {isAdmin && (
                   <>
-                    <button style={styles.attachBtn} onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                    <button style={{ ...styles.attachBtn, ...(uploading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => fileInputRef.current?.click()} disabled={uploading}>
                       {uploading ? t.uploading : `+ ${t.attachFile}`}
                     </button>
                     <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleAttachmentUpload} />
@@ -447,7 +447,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
               <span style={styles.signoffTitle}>{t.signoffsLabel} ({signoffs?.length ?? talk.signoff_count})</span>
               {!isAdmin && !alreadySigned && (
                 <button
-                  style={styles.signBtn}
+                  style={{ ...styles.signBtn, ...((signing || (questions?.length > 0 && !allAnswered)) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                   onClick={handleSignoff}
                   disabled={signing || (questions?.length > 0 && !allAnswered)}
                   title={questions?.length > 0 && !allAnswered ? t.answerQuestionsFirst : ''}
@@ -482,7 +482,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
             <div style={styles.cardActions}>
               {confirmingDelete ? (
                 <>
-                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
+                  <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
                   <button style={styles.cancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
                 </>
               ) : (
@@ -552,7 +552,7 @@ export default function SafetyTalks({ projects }) {
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {talks.length > 0 && <button style={styles.pdfBtn} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? 'Preparing…' : 'Export PDF'}</button>}
+          {talks.length > 0 && <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? 'Preparing…' : 'Export PDF'}</button>}
           {isAdmin && <button style={styles.newBtn} onClick={() => setShowForm(true)}>{t.newTalk}</button>}
         </div>
       </div>

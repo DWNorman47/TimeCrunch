@@ -77,9 +77,9 @@ function Lightbox({ photos, startIndex, onClose }) {
       )}
       {item.caption && <div style={s.lbCaption}>{item.caption}</div>}
       <div style={s.lbNav} onClick={e => e.stopPropagation()}>
-        <button style={s.lbBtn} aria-label="Previous photo" onClick={() => setIdx(i => i - 1)} disabled={idx === 0}>‹</button>
+        <button style={{ ...s.lbBtn, ...(idx === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Previous photo" onClick={() => setIdx(i => i - 1)} disabled={idx === 0}>‹</button>
         <span style={s.lbCount}>{idx + 1} / {photos.length}</span>
-        <button style={s.lbBtn} aria-label="Next photo" onClick={() => setIdx(i => i + 1)} disabled={idx === photos.length - 1}>›</button>
+        <button style={{ ...s.lbBtn, ...(idx === photos.length - 1 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Next photo" onClick={() => setIdx(i => i + 1)} disabled={idx === photos.length - 1}>›</button>
       </div>
     </div>
   );
@@ -276,7 +276,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
         <div style={s.dateNav}>
           <button style={s.dateArrow} onClick={prevDay}>‹</button>
           <span style={s.dateLabel}>{dayLabel(date, t)}</span>
-          <button style={{ ...s.dateArrow, opacity: isToday ? 0.3 : 1 }} onClick={nextDay} disabled={isToday}>›</button>
+          <button style={{ ...s.dateArrow, opacity: isToday ? 0.3 : 1, ...(isToday ? { cursor: 'not-allowed' } : {}) }} onClick={nextDay} disabled={isToday}>›</button>
         </div>
       </div>
 
@@ -301,7 +301,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
           <PhotoCapture photos={capturePhotos} onChange={setCapturePhotos} />
           {error && <p style={s.error}>{error}</p>}
           <div style={s.captureActions}>
-            <button style={s.submitBtn} onClick={submitPhotos} disabled={saving || capturePhotos.length === 0}>
+            <button style={{ ...s.submitBtn, ...(saving || capturePhotos.length === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitPhotos} disabled={saving || capturePhotos.length === 0}>
               {saving ? t.submitting : capturePhotos.length > 0
                 ? `${t.submitPhotos} (${capturePhotos.length})`
                 : t.submitPhotos}
@@ -326,7 +326,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
           <div style={s.charCount}>{captureNote.length}/2000</div>
           {error && <p style={s.error}>{error}</p>}
           <div style={s.captureActions}>
-            <button style={s.submitBtn} onClick={submitNote} disabled={saving || !captureNote.trim()}>
+            <button style={{ ...s.submitBtn, ...(saving || !captureNote.trim() ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitNote} disabled={saving || !captureNote.trim()}>
               {saving ? t.submitting : t.submitNote}
             </button>
             <button style={s.cancelBtn} onClick={() => { setNoteOpen(false); setCaptureNote(''); setError(''); }}>{t.cancel}</button>
@@ -372,7 +372,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
           )}
           {error && <p style={s.error}>{error}</p>}
           <div style={s.captureActions}>
-            <button style={s.submitBtn} onClick={submitVideo} disabled={saving || !captureVideo}>
+            <button style={{ ...s.submitBtn, ...(saving || !captureVideo ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitVideo} disabled={saving || !captureVideo}>
               {saving ? (uploadProgress > 0 ? `${t.uploading} ${uploadProgress}%` : t.submitting) : t.submitVideo}
             </button>
             <button style={s.cancelBtn} onClick={() => { if (captureVideo) URL.revokeObjectURL(captureVideo.previewUrl); setCaptureVideo(null); setVideoCaption(''); setVideoOpen(false); setError(''); }}>{t.cancel}</button>

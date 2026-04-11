@@ -193,7 +193,7 @@ export default function ReimbursementsView() {
             </div>
           )}
           {error && <div style={s.errorMsg}>{error}</div>}
-          <button style={s.submitBtn} type="submit" disabled={saving}>
+          <button style={{ ...s.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>
             {saving ? t.submitting : t.submitRequest}
           </button>
         </form>
