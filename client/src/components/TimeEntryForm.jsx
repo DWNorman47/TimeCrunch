@@ -129,7 +129,10 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
           </div>
         </div>
         <div style={styles.field}>
-          <label style={styles.label}>{t.notesOptional}</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <label style={styles.label}>{t.notesOptional}</label>
+            <span style={styles.charCount}>{form.notes.length}/500</span>
+          </div>
           <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.notesPlaceholder} maxLength={500} />
         </div>
         {error && <p style={styles.error}>{error}</p>}
@@ -154,4 +157,5 @@ const styles = {
   error: { color: '#e53e3e', fontSize: 13 },
   success: { color: '#38a169', fontSize: 13 },
   button: { padding: '11px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600 },
+  charCount: { fontSize: 11, color: '#9ca3af' },
 };

@@ -585,7 +585,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                     )}
                   </div>
                   {inviteError && <p style={s.errorText}>{inviteError}</p>}
-                  <button style={s.saveBtn} type="submit" disabled={inviteSaving}>{inviteSaving ? t.sendingInvite : t.sendInvite}</button>
+                  <button style={{ ...s.saveBtn, ...(inviteSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={inviteSaving}>{inviteSaving ? t.sendingInvite : t.sendInvite}</button>
                 </>
               )}
             </form>
@@ -666,7 +666,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               </div>
                             </div>
                             <div style={s.editActions}>
-                              <button style={s.saveBtn} onClick={() => saveInfo(w.id)} disabled={editInfoSaving}>{editInfoSaving ? t.loading : t.save}</button>
+                              <button style={{ ...s.saveBtn, ...(editInfoSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveInfo(w.id)} disabled={editInfoSaving}>{editInfoSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
                           </div>
@@ -694,7 +694,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 {invitedIds.has(w.id) ? (
                                   <span style={s.inviteSentLabel}>Invite sent ✓</span>
                                 ) : (
-                                  <button style={s.inviteBtn} onClick={() => sendInvite(w.id)} disabled={inviteSending.has(w.id)}>
+                                  <button style={{ ...s.inviteBtn, ...(inviteSending.has(w.id) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => sendInvite(w.id)} disabled={inviteSending.has(w.id)}>
                                     {inviteSending.has(w.id) ? 'Sending...' : 'Send invite email'}
                                   </button>
                                 )}
@@ -726,7 +726,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               />
                             </div>
                             <div style={s.editActions}>
-                              <button style={s.saveBtn} onClick={() => saveUsername(w.id)} disabled={editUsernameSaving || editUsernameTaken}>{editUsernameSaving ? t.loading : t.save}</button>
+                              <button style={{ ...s.saveBtn, ...((editUsernameSaving || editUsernameTaken) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveUsername(w.id)} disabled={editUsernameSaving || editUsernameTaken}>{editUsernameSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
                           </div>
@@ -789,7 +789,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               )}
                             </div>
                             <div style={s.editActions}>
-                              <button style={s.saveBtn} onClick={() => saveRate(w.id)} disabled={editRateSaving}>{editRateSaving ? t.loading : t.save}</button>
+                              <button style={{ ...s.saveBtn, ...(editRateSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveRate(w.id)} disabled={editRateSaving}>{editRateSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
                           </div>
@@ -843,7 +843,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               </div>
                             )}
                             <div style={s.editActions}>
-                              <button style={s.saveBtn} onClick={() => savePermissions(w.id)} disabled={editPermSaving}>{editPermSaving ? t.loading : t.save}</button>
+                              <button style={{ ...s.saveBtn, ...(editPermSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => savePermissions(w.id)} disabled={editPermSaving}>{editPermSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
                           </div>
@@ -907,7 +907,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               </div>
                             )}
                             <div style={s.editActions}>
-                              <button style={s.saveBtn} onClick={() => saveWorkerAccess(w.id)} disabled={editWorkerAccessSaving}>{editWorkerAccessSaving ? t.loading : t.save}</button>
+                              <button style={{ ...s.saveBtn, ...(editWorkerAccessSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveWorkerAccess(w.id)} disabled={editWorkerAccessSaving}>{editWorkerAccessSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
                           </div>
@@ -962,7 +962,13 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
         {showHistory && (
           <div style={s.historyList}>
             {loadingArchived ? <SkeletonList count={3} rows={1} />
-              : archived.length === 0 ? <p style={s.empty}>{t.noRemovedUsers}</p>
+              : archived.length === 0 ? (
+                <div style={s.emptyState}>
+                  <div style={s.emptyStateIcon}>🗑️</div>
+                  <p style={s.emptyStateTitle}>{t.noRemovedUsers}</p>
+                  <p style={s.emptyStateSubtitle}>Removed workers will appear here.</p>
+                </div>
+              )
               : archived.map(w => (
                 <div key={w.id} style={s.historyItem}>
                   <div style={s.itemLeft}>
@@ -995,7 +1001,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
             )}
             <div style={s.qboPromptActions}>
               {!qboVendorResult && (
-                <button style={s.saveBtn} onClick={createQboVendor} disabled={qboVendorCreating}>
+                <button style={{ ...s.saveBtn, ...(qboVendorCreating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={createQboVendor} disabled={qboVendorCreating}>
                   {qboVendorCreating ? 'Creating…' : 'Yes, Create Vendor'}
                 </button>
               )}
