@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
+import { useT } from '../hooks/useT';
 
 // ── Time helpers ─────────────────────────────────────────────────────────────
 function strToMin(str) {
@@ -44,6 +45,7 @@ function todayLocal() {
 
 // ── Component ────────────────────────────────────────────────────────────────
 export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUpdated, onRefresh }) {
+  const t = useT();
   const toast = useToast();
   const today = todayLocal();
 
@@ -120,8 +122,8 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
   function closeGap() { setActiveGapKey(null); }
 
   async function addWork() {
-    if (!workForm.project_id) { toast('Select a project', 'error'); return; }
-    if (!workForm.start || !workForm.end) { toast('Set start and end times', 'error'); return; }
+    if (!workForm.project_id) { toast(t.dtSelectProject_err, 'error'); return; }
+    if (!workForm.start || !workForm.end) { toast(t.dtSetStartEnd, 'error'); return; }
     setSaving(true);
     try {
       const r = await api.post('/time-entries', {
@@ -134,15 +136,15 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
       });
       onEntryAdded(r.data);
       closeGap();
-      toast('Entry added', 'success');
+      toast(t.dtEntryAdded, 'success');
     } catch (err) {
       toast(err.response?.data?.error || t.failedSaveEntry, 'error');
     } finally { setSaving(false); }
   }
 
   async function addSwitch(gap) {
-    if (!switchForm.p1 || !switchForm.p2) { toast('Select both projects', 'error'); return; }
-    if (!switchForm.split) { toast('Set a switch time', 'error'); return; }
+    if (!switchForm.p1 || !switchForm.p2) { toast(t.dtSelectBothProjects, 'error'); return; }
+    if (!switchForm.split) { toast(t.dtSetSwitchTime, 'error'); return; }
     setSaving(true);
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     try {
@@ -152,7 +154,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
       ]);
       await onRefresh();
       closeGap();
-      toast('Entries added', 'success');
+      toast(t.dtEntriesAdded, 'success');
     } catch (err) {
       toast(err.response?.data?.error || t.failedToSave, 'error');
     } finally { setSaving(false); }
@@ -164,7 +166,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
     setDeletingId(entry.id);
     try {
       await api.delete(`/time-entries/${entry.id}`);
-      toast('Entry deleted', 'success');
+      toast(t.dtEntryDeleted, 'success');
       onRefresh();
     } catch (err) {
       toast(err.response?.data?.error || t.failedDeleteEntry, 'error');
@@ -185,11 +187,11 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
 
   async function doSplitBreak(entry) {
     const { breakStart, breakEnd } = splitBreakForm;
-    if (!breakStart || !breakEnd) { toast('Set break start and end times', 'error'); return; }
+    if (!breakStart || !breakEnd) { toast(t.dtBreakStartEnd, 'error'); return; }
     if (breakStart >= entry.end_time.substring(0, 5) || breakEnd <= entry.start_time.substring(0, 5)) {
-      toast('Break times must be within the entry', 'error'); return;
+      toast(t.dtBreakWithin, 'error'); return;
     }
-    if (breakEnd <= breakStart) { toast('Break end must be after break start', 'error'); return; }
+    if (breakEnd <= breakStart) { toast(t.dtBreakEndAfterStart, 'error'); return; }
     setSaving(true);
     try {
       const [patchRes, postRes] = await Promise.all([
@@ -205,7 +207,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
         }),
       ]);
       closeSplit();
-      toast('Break inserted', 'success');
+      toast(t.dtBreakInserted, 'success');
       onRefresh();
     } catch (err) {
       toast(err.response?.data?.error || t.entryPanelFailedSplit, 'error');
@@ -214,9 +216,9 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
 
   async function doSplitSwitch(entry) {
     const { at, project_id } = splitSwitchForm;
-    if (!at || !project_id) { toast('Set switch time and project', 'error'); return; }
+    if (!at || !project_id) { toast(t.dtSetSwitchTimeAndProject, 'error'); return; }
     if (at <= entry.start_time.substring(0, 5) || at >= entry.end_time.substring(0, 5)) {
-      toast('Switch time must be within the entry', 'error'); return;
+      toast(t.dtSwitchTimeMustBeWithin, 'error'); return;
     }
     setSaving(true);
     try {
@@ -232,7 +234,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
         }),
       ]);
       closeSplit();
-      toast('Project switch inserted', 'success');
+      toast(t.dtProjectSwitchInserted, 'success');
       onRefresh();
     } catch (err) {
       toast(err.response?.data?.error || t.entryPanelFailedSplit, 'error');
@@ -322,19 +324,19 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
 
                           {splitMode === 'switch' && (
                             <div style={s.form}>
-                              <p style={s.hint}>The existing entry will end at the switch time; a new entry for the selected project starts there.</p>
+                              <p style={s.hint}>{t.dtSwitchHint}</p>
                               <div style={s.timeRow}>
-                                <label style={s.miniLabel}>Switch at</label>
+                                <label style={s.miniLabel}>{t.dtSwitchAt}</label>
                                 <input type="time" style={s.timeInput} value={splitSwitchForm.at}
                                   onChange={e => setSplitSwitchForm(f => ({ ...f, at: e.target.value }))} />
                               </div>
                               <select style={s.select} value={splitSwitchForm.project_id}
                                 onChange={e => setSplitSwitchForm(f => ({ ...f, project_id: e.target.value }))}>
-                                <option value="">Switch to project...</option>
+                                <option value="">{t.dtSwitchToProject}</option>
                                 {activeProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                               </select>
                               <button style={{ ...s.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => doSplitSwitch(seg.entry)} disabled={saving}>
-                                {saving ? 'Saving...' : 'Insert switch'}
+                                {saving ? t.saving : t.dtInsertSwitch}
                               </button>
                             </div>
                           )}
@@ -369,16 +371,16 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                         </div>
 
                         <div style={s.modeBtns}>
-                          <button style={gapMode === 'work' ? s.modeBtnOn : s.modeBtn} onClick={() => setGapMode('work')}>Work period</button>
-                          <button style={gapMode === 'break' ? s.modeBtnOn : s.modeBtn} onClick={() => setGapMode('break')}>Break</button>
-                          <button style={gapMode === 'switch' ? s.modeBtnOn : s.modeBtn} onClick={() => setGapMode('switch')}>Project switch</button>
+                          <button style={gapMode === 'work' ? s.modeBtnOn : s.modeBtn} onClick={() => setGapMode('work')}>{t.dtWorkPeriod}</button>
+                          <button style={gapMode === 'break' ? s.modeBtnOn : s.modeBtn} onClick={() => setGapMode('break')}>{t.dtBreak}</button>
+                          <button style={gapMode === 'switch' ? s.modeBtnOn : s.modeBtn} onClick={() => setGapMode('switch')}>{t.dtProjectSwitch}</button>
                         </div>
 
                         {gapMode === 'work' && (
                           <div style={s.form}>
                             <select style={s.select} value={workForm.project_id}
                               onChange={e => setWorkForm(f => ({ ...f, project_id: e.target.value }))}>
-                              <option value="">Select project...</option>
+                              <option value="">{t.dtSelectProject}</option>
                               {activeProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select>
                             <div style={s.timeRow}>
@@ -389,7 +391,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                                 onChange={e => setWorkForm(f => ({ ...f, end: e.target.value }))} />
                             </div>
                             <button style={{ ...s.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={addWork} disabled={saving}>
-                              {saving ? 'Adding...' : 'Add entry'}
+                              {saving ? t.saving : t.dtAddEntry}
                             </button>
                           </div>
                         )}
@@ -398,7 +400,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                           <div style={s.form}>
                             <p style={s.hint}>No time entry is created. The gap will be labeled as a break on this screen.</p>
                             <button style={s.addBtn} onClick={() => { setBreaks(prev => new Set([...prev, seg.key])); closeGap(); }}>
-                              Mark as break
+                              {t.dtMarkAsBreak}
                             </button>
                           </div>
                         )}
@@ -409,7 +411,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                             <div style={s.switchRow}>
                               <select style={{ ...s.select, flex: 1 }} value={switchForm.p1}
                                 onChange={e => setSwitchForm(f => ({ ...f, p1: e.target.value }))}>
-                                <option value="">First project...</option>
+                                <option value="">{t.dtFirstProject}</option>
                                 {activeProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                               </select>
                               <span style={s.switchArrow}>{minToDisplay(seg.start)} →</span>
@@ -422,13 +424,13 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                             <div style={s.switchRow}>
                               <select style={{ ...s.select, flex: 1 }} value={switchForm.p2}
                                 onChange={e => setSwitchForm(f => ({ ...f, p2: e.target.value }))}>
-                                <option value="">Second project...</option>
+                                <option value="">{t.dtSecondProject}</option>
                                 {activeProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                               </select>
                               <span style={s.switchArrow}>→ {minToDisplay(seg.end)}</span>
                             </div>
                             <button style={{ ...s.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => addSwitch(seg)} disabled={saving}>
-                              {saving ? 'Adding...' : 'Add both entries'}
+                              {saving ? t.saving : t.dtAddBothEntries}
                             </button>
                           </div>
                         )}

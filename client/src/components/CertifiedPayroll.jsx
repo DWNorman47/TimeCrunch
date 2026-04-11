@@ -97,7 +97,7 @@ export default function CertifiedPayroll({ projects }) {
       <div class="meta">
         <div><strong>Contractor:</strong> ${data.contractor}</div>
         <div><strong>Week ending:</strong> ${fmtDate(data.week_end)}</div>
-        <div><strong>Project:</strong> ${data.project || 'All projects'}</div>
+        <div><strong>Project:</strong> ${data.project || t.allProjectsOpt}</div>
         <div><strong>Week starting:</strong> ${fmtDate(data.week_start)}</div>
       </div>
       <table>
