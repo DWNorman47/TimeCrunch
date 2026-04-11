@@ -431,7 +431,7 @@ export default function ManageSchedule({ workers, projects }) {
       setEditingId(null);
     } catch (err) {
       const msg = err.response?.status === 409
-        ? 'This shift was modified by someone else. Refresh to see the latest.'
+        ? t.concurrentModification
         : err.response?.data?.error || 'Failed to update shift';
       toast(msg, 'error');
     } finally { setEditSaving(false); }

@@ -50,7 +50,7 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       onSaved(r.data, isEdit);
     } catch (err) {
       const msg = err.response?.status === 409
-        ? 'This RFI was modified by someone else. Refresh to see the latest version.'
+        ? t.concurrentModification
         : err.response?.data?.error || t.failedToSave;
       setError(msg);
     } finally { setSaving(false); }
@@ -221,7 +221,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
 
           {!rfi.pending && (
             <div style={styles.cardActions}>
-              <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? t.preparing : 'Export PDF'}</button>
+              <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? t.preparing : t.exportPDF}</button>
               {isAdmin && (
                 <>
                   <button style={styles.editBtn} onClick={() => onEdit(rfi)}>

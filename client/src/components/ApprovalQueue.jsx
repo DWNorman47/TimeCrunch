@@ -164,7 +164,7 @@ export default function ApprovalQueue({ onCountChange }) {
       setEditingId(null);
     } catch (err) {
       const msg = err.response?.status === 409
-        ? 'This entry was modified by someone else. Refresh to see the latest.'
+        ? t.concurrentModification
         : err.response?.data?.error || t.failedToSave;
       setEditSaveError(msg);
     } finally {

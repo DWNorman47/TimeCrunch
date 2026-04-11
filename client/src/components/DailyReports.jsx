@@ -173,7 +173,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       onSaved(r.data);
     } catch (err) {
       const msg = err.response?.status === 409
-        ? 'This report was modified by someone else. Refresh to see the latest version.'
+        ? t.concurrentModification
         : err.response?.data?.error || t.failedToSave;
       setError(msg);
     } finally { setSaving(false); setSubmitting(false); }
@@ -185,7 +185,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
         <h3 style={styles.editorTitle}>{isNew ? t.newDailyReport : t.editDailyReport}</h3>
         {!isNew && initial.status === 'submitted' && (
           <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => downloadPDF({ ...initial, ...form, manpower, equipment, materials })} disabled={pdfGenerating}>
-            {pdfGenerating ? t.preparing : 'Export PDF'}
+            {pdfGenerating ? t.preparing : t.exportPDF}
           </button>
         )}
       </div>
@@ -210,7 +210,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
         <div style={styles.fieldGroup}>
           <label style={styles.label}>
             {t.weather}
-            <button type="button" style={{ ...styles.weatherBtn, ...(gettingWeather ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={autoFillWeather} disabled={gettingWeather} title="Auto-fill from current location">
+            <button type="button" style={{ ...styles.weatherBtn, ...(gettingWeather ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={autoFillWeather} disabled={gettingWeather} title={t.autoFillLocation}>
               {gettingWeather ? t.loading : '🌤 Auto'}
             </button>
           </label>

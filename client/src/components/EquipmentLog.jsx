@@ -34,7 +34,7 @@ function ItemForm({ initial, onSaved, onCancel }) {
       onSaved(r.data, isEdit);
     } catch (err) {
       const msg = err.response?.status === 409
-        ? 'This equipment was modified by someone else. Refresh to see the latest version.'
+        ? t.concurrentModification
         : err.response?.data?.error || t.failedToSave;
       setError(msg);
     } finally { setSaving(false); }

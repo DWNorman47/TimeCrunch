@@ -56,7 +56,7 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
       onSaved(r.data, isEdit);
     } catch (err) {
       const msg = err.response?.status === 409
-        ? 'This client was modified by someone else. Refresh to see the latest version.'
+        ? t.concurrentModification
         : err.response?.data?.error || t.failedSaveClient;
       setError(msg);
     } finally { setSaving(false); }
@@ -213,7 +213,7 @@ function DocList({ clientId, docs, onDeleted }) {
           <div key={doc.id} style={s.docRow}>
             <span style={{ ...s.docTypeBadge, color: meta.color, background: meta.bg }}>{meta.label}</span>
             <span style={{ ...s.dirBadge, ...(doc.direction === 'from_company' ? s.dirBadgeOurs : s.dirBadgeTheirs) }}>
-              {doc.direction === 'from_company' ? 'From Us' : 'From Client'}
+              {doc.direction === 'from_company' ? t.docDirectionFromCompany : t.docDirectionFromClient}
             </span>
             <a href={doc.url} target="_blank" rel="noopener noreferrer" style={s.docName}>{doc.name}</a>
             {fmt(doc.size_bytes) && <span style={s.docSize}>{fmt(doc.size_bytes)}</span>}

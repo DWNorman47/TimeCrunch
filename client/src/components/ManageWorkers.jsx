@@ -342,7 +342,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       onWorkerUpdated(r.data);
       cancelEdit();
     } catch (err) {
-      const msg = err.response?.status === 409 ? 'This worker was modified by someone else. Refresh to see the latest.' : err.response?.data?.error || 'Failed to update';
+      const msg = err.response?.status === 409 ? t.concurrentModification : err.response?.data?.error || 'Failed to update';
       toast(msg, 'error');
     } finally { setEditInfoSaving(false); }
   };
@@ -354,7 +354,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       onWorkerUpdated(r.data);
       cancelEdit();
     } catch (err) {
-      const msg = err.response?.status === 409 ? 'This worker was modified by someone else. Refresh to see the latest.' : err.response?.data?.error || 'Username already taken';
+      const msg = err.response?.status === 409 ? t.concurrentModification : err.response?.data?.error || 'Username already taken';
       toast(msg, 'error');
     } finally { setEditUsernameSaving(false); }
   };
@@ -374,7 +374,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       onWorkerUpdated(r.data);
       cancelEdit();
     } catch (err) {
-      const msg = err.response?.status === 409 ? 'This worker was modified by someone else. Refresh to see the latest.' : err.response?.data?.error || 'Failed to update';
+      const msg = err.response?.status === 409 ? t.concurrentModification : err.response?.data?.error || 'Failed to update';
       toast(msg, 'error');
     } finally { setEditRateSaving(false); }
   };

@@ -90,6 +90,7 @@ export default function ReimbursementsView() {
       }
       await api.post('/reimbursements', payload);
       setSuccess(t.submitSuccess);
+      setTimeout(() => setSuccess(''), 4000);
       setShowForm(false);
       setForm({ miles: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), project_id: '' });
       setReceiptFile(null); setReceiptPreview(null); setNoReceipt(false);
@@ -169,7 +170,7 @@ export default function ReimbursementsView() {
           </div>
           <div style={s.field}>
             <label style={s.label}>{t.descriptionLabel}</label>
-            <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder={isMileage ? 'e.g. Site visit to 123 Main St' : t.descriptionPlaceholder} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+            <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder={isMileage ? t.mileageDescPlaceholder : t.descriptionPlaceholder} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{form.description.length}/500</div>
           </div>
           {!isMileage && (

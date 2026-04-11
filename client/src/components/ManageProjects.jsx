@@ -472,7 +472,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                             <input style={s.geoInput} type="number" min="0" step="0.5" placeholder="e.g. 200" value={editBudgetHours} onChange={e => setEditBudgetHours(e.target.value)} />
                           </div>
                           <div style={s.budgetField}>
-                            <label style={s.budgetLabel}>Dollars ($)</label>
+                            <label style={s.budgetLabel}>{t.budgetDollars}</label>
                             <input style={s.geoInput} type="number" min="0" step="100" placeholder="e.g. 15000" value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
                           </div>
                           {hasBudget(p) && (confirmingClearBudgetId === p.id ? (
@@ -490,18 +490,18 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
 
                     {/* Clock-in Checklist */}
                     <div style={s.section}>
-                      <div style={s.sectionTitle}>Clock-in Checklist</div>
+                      <div style={s.sectionTitle}>{t.clockInChecklist}</div>
                       <select
                         style={s.editInput}
                         value={editRequiredChecklist}
                         onChange={e => setEditRequiredChecklist(e.target.value)}
                       >
-                        <option value="">None — no checklist required</option>
+                        <option value="">{t.noChecklistRequired}</option>
                         {checklistTemplates.map(t => (
                           <option key={t.id} value={t.id}>{t.name}</option>
                         ))}
                       </select>
-                      <p style={s.hint}>Workers must complete this checklist before clocking into this project.</p>
+                      <p style={s.hint}>{t.clockInChecklistHint}</p>
                     </div>
 
                     {/* Actions */}
@@ -509,7 +509,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       <button style={s.saveBtn} onClick={() => handleEditSave(p.id)}>{t.save}</button>
                       <button style={s.cancelBtn} onClick={() => setExpandedId(null)}>{t.cancel}</button>
                       {projects.length > 1 && (
-                        <button style={s.mergeBtn} onClick={() => { setMergeSource({ id: p.id, name: p.name }); setMergeTargetId(''); }}>Merge into...</button>
+                        <button style={s.mergeBtn} onClick={() => { setMergeSource({ id: p.id, name: p.name }); setMergeTargetId(''); }}>{t.mergeIntoBtn}</button>
                       )}
                       <button style={s.removeBtn} onClick={() => handleRemove(p.id, p.name)}>{t.remove}</button>
                     </div>
@@ -530,22 +530,22 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
               "{mergeSource.name}" will be permanently deleted. This cannot be undone.
             </p>
             <div style={s.fieldGroup}>
-              <label style={s.fieldLabel}>Merge into</label>
+              <label style={s.fieldLabel}>{t.mergeIntoLabel}</label>
               <select
                 style={s.editInput}
                 value={mergeTargetId}
                 onChange={e => setMergeTargetId(e.target.value)}
               >
-                <option value="">— select project —</option>
+                <option value="">{t.selectProject}</option>
                 {projects.filter(p => p.id !== mergeSource.id).map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
             </div>
             <div style={s.modalActions}>
-              <button style={{ ...s.cancelBtn, ...(mergeSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setMergeSource(null)} disabled={mergeSaving}>Cancel</button>
+              <button style={{ ...s.cancelBtn, ...(mergeSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setMergeSource(null)} disabled={mergeSaving}>{t.cancel}</button>
               <button style={{ ...s.mergeConfirmBtn, ...(!mergeTargetId || mergeSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleConfirmMerge} disabled={!mergeTargetId || mergeSaving}>
-                {mergeSaving ? 'Merging...' : 'Merge & Delete'}
+                {mergeSaving ? t.saving : t.mergeAndDelete}
               </button>
             </div>
           </div>
@@ -566,18 +566,18 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
             )}
             <div style={s.modalDownload}>
               <button style={{ ...s.downloadBtn, ...(archiveDownloading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDownloadZip} disabled={archiveDownloading}>
-                {archiveDownloading ? t.preparing : 'Download media as ZIP'}
+                {archiveDownloading ? t.preparing : t.downloadMediaZip}
               </button>
               {!settings?.media_delete_on_project_archive && (
                 <button style={{ ...s.downloadBtn, background: '#6b7280', marginTop: 4, ...(archiveDownloading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDownloadMediaUrls} disabled={archiveDownloading}>
-                  Download media URL list (.txt)
+                  {t.downloadMediaUrls}
                 </button>
               )}
               <span style={s.downloadHint}>Download all photos and attachments for this project before archiving</span>
             </div>
             <div style={s.modalActions}>
-              <button style={s.cancelBtn} onClick={() => setArchiveTarget(null)}>Cancel</button>
-              <button style={s.archiveBtn} onClick={handleConfirmArchive}>Archive Project</button>
+              <button style={s.cancelBtn} onClick={() => setArchiveTarget(null)}>{t.cancel}</button>
+              <button style={s.archiveBtn} onClick={handleConfirmArchive}>{t.archiveProject}</button>
             </div>
           </div>
         </div>

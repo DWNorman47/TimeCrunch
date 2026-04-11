@@ -47,7 +47,7 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
       setExpanded(false);
     } catch (err) {
       const msg = err.response?.status === 409
-        ? 'This reimbursement was already updated by someone else. Refresh to see the latest.'
+        ? t.concurrentModification
         : err.response?.data?.error || t.failedSave;
       setError(msg);
     } finally {
