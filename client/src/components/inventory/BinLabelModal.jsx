@@ -35,6 +35,12 @@ export default function BinLabelModal({ item, binType, onClose }) {
       .catch(console.error);
   }, [binType, item.id, item.name]);
 
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   const typeName = BIN_LABELS[binType] || binType;
 
   const printLabel = () => {

@@ -68,6 +68,17 @@ function Lightbox({ photos, startIndex, onClose }) {
   const [idx, setIdx] = useState(startIndex);
   const item = photos[idx];
   const isVid = item.media_type === 'video' || /\.(mp4|mov|webm|avi|m4v)$/i.test(item.url || '');
+
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowLeft') setIdx(i => Math.max(0, i - 1));
+      else if (e.key === 'ArrowRight') setIdx(i => Math.min(photos.length - 1, i + 1));
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div style={s.lbBackdrop} onClick={onClose}>
       {isVid ? (

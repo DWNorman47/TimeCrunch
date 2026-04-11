@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
 
@@ -20,6 +20,12 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
   const [error, setError]   = useState('');
 
   const uomLabel = uom.unit + (uom.unit_spec ? ` (${uom.unit_spec})` : '');
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onDismiss(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   const save = async () => {
     const n = parseFloat(factor);

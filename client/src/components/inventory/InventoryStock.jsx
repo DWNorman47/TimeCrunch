@@ -27,13 +27,21 @@ function HistoryPanel({ item, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
 
-  useEffect(() => {
-    setLoading(true);
+  const load = () => {
+    setLoading(true); setError('');
     api.get(`/inventory/transactions?item_id=${item.item_id}&limit=30`)
       .then(r => setRows(r.data.transactions || r.data))
       .catch(() => setError(t.invStockFailedHistory))
       .finally(() => setLoading(false));
-  }, [item.item_id]);
+  };
+
+  useEffect(() => { load(); }, [item.item_id]);
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <div style={h.overlay} onClick={onClose}>
@@ -45,7 +53,7 @@ function HistoryPanel({ item, onClose }) {
           </div>
           <button style={h.close} aria-label="Close" onClick={onClose}>✕</button>
         </div>
-        {error && <div style={h.error}>{error}</div>}
+        {error && <div style={h.error}>{error} <button style={h.retryBtn} onClick={load}>{t.tryAgain || 'Try again'}</button></div>}
         {loading ? (
           <SkeletonList count={3} rows={1} />
         ) : rows.length === 0 ? (
@@ -103,7 +111,8 @@ const h = {
   title:     { fontSize: 16, fontWeight: 700, color: '#111827' },
   sub:       { fontSize: 12, color: '#6b7280', marginTop: 2 },
   close:     { background: 'none', border: 'none', fontSize: 18, color: '#6b7280', cursor: 'pointer', padding: '2px 6px' },
-  error:     { background: '#fee2e2', color: '#dc2626', padding: '10px 20px', fontSize: 14 },
+  error:     { background: '#fee2e2', color: '#dc2626', padding: '10px 20px', fontSize: 14, display: 'flex', alignItems: 'center', gap: 10 },
+  retryBtn:  { background: 'none', border: '1px solid #dc2626', color: '#dc2626', borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
   empty:     { padding: '40px 20px', textAlign: 'center', color: '#6b7280', fontSize: 14 },
   tableWrap: { overflowY: 'auto', flex: 1 },
   table:     { width: '100%', borderCollapse: 'collapse' },
@@ -125,6 +134,12 @@ function AdjustModal({ item, locations, onClose, onDone }) {
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
   const [warning, setWarning] = useState('');
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   const submit = async () => {
     const n = parseFloat(qty);
@@ -244,6 +259,12 @@ function IssueModal({ item, projects, onClose, onDone }) {
       .then(r => setItemUoms(r.data.filter(u => u.active)))
       .catch(() => {});
   }, [item.item_id]);
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   const selectedUom = itemUoms.find(u => String(u.id) === uomId);
   const stockUom    = item.uom_id ? itemUoms.find(u => u.id === item.uom_id) : null;

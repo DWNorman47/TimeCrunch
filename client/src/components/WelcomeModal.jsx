@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
@@ -16,6 +16,12 @@ export default function WelcomeModal() {
     clearFirstLogin();
     if (isAdmin) navigate('/administration');
   };
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') handleStart(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <div style={styles.overlay}>

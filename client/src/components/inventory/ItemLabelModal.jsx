@@ -28,6 +28,12 @@ export default function ItemLabelModal({ item, onClose }) {
       .catch(console.error);
   }, [item.id, item.sku, item.name]);
 
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   const printLabel = () => {
     if (!qrDataUrl) return;
     const win = window.open('', '_blank', 'width=380,height=480');

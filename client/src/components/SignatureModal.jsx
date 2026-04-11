@@ -14,6 +14,12 @@ export default function SignatureModal({ onConfirm, onCancel, required = false }
     ctx.lineJoin = 'round';
   }, []);
 
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onCancel(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   const getPos = (e, canvas) => {
     const rect = canvas.getBoundingClientRect();
     const src = e.touches ? e.touches[0] : e;

@@ -34,6 +34,17 @@ function Lightbox({ items, index, onClose }) {
   const [idx, setIdx] = useState(index);
   const item = items[idx];
   const video = isVideo(item);
+
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowLeft') setIdx(i => Math.max(0, i - 1));
+      else if (e.key === 'ArrowRight') setIdx(i => Math.min(items.length - 1, i + 1));
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div style={styles.backdrop} onClick={onClose}>
       <div style={styles.lbContent} onClick={e => e.stopPropagation()}>
