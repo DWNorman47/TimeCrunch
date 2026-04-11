@@ -224,7 +224,7 @@ function DocList({ clientId, docs, onDeleted }) {
                 <button style={s.cancelDocDeleteBtn} onClick={() => setPendingDeleteDocId(null)}>{t.cancel}</button>
               </>
             ) : (
-              <button style={s.docDeleteBtn} onClick={() => setPendingDeleteDocId(doc.id)} disabled={deleting === doc.id}>
+              <button style={s.docDeleteBtn} aria-label="Delete document" onClick={() => setPendingDeleteDocId(doc.id)} disabled={deleting === doc.id}>
                 {deleting === doc.id ? '…' : '✕'}
               </button>
             )}

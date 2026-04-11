@@ -184,7 +184,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       <div style={styles.editorHeader}>
         <h3 style={styles.editorTitle}>{isNew ? t.newDailyReport : t.editDailyReport}</h3>
         {!isNew && initial.status === 'submitted' && (
-          <button style={styles.pdfBtn} onClick={() => downloadPDF({ ...initial, ...form, manpower, equipment, materials })} disabled={pdfGenerating}>
+          <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => downloadPDF({ ...initial, ...form, manpower, equipment, materials })} disabled={pdfGenerating}>
             {pdfGenerating ? 'Preparing…' : 'Export PDF'}
           </button>
         )}
@@ -439,13 +439,13 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
           {isReviewed ? t.statusReviewed : isSubmitted ? t.statusSubmitted : t.statusDraft}
         </span>
         {(isSubmitted || isReviewed) && (
-          <button style={styles.pdfBtnSmall} onClick={downloadPDF} disabled={pdfGenerating}>
+          <button style={{ ...styles.pdfBtnSmall, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>
             {pdfGenerating ? 'Preparing…' : 'PDF'}
           </button>
         )}
         {isAdmin && isSubmitted && (
           <>
-            <button style={styles.approveBtn} onClick={handleApprove} disabled={approving}>
+            <button style={{ ...styles.approveBtn, ...(approving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleApprove} disabled={approving}>
               {approving ? '...' : t.approve}
             </button>
             {approveError && <span style={styles.inlineError}>{approveError}</span>}
@@ -454,12 +454,12 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
         {!report.pending && <button style={styles.editRowBtn} onClick={() => onEdit(report)}>{t.edit}</button>}
         {!report.pending && (confirmingDelete ? (
           <>
-            <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
+            <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
             <button style={styles.cancelRowBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
             {deleteError && <span style={styles.inlineError}>{deleteError}</span>}
           </>
         ) : (
-          <button style={styles.deleteRowBtn} onClick={() => setConfirmingDelete(true)}>✕</button>
+          <button style={styles.deleteRowBtn} aria-label="Delete report" onClick={() => setConfirmingDelete(true)}>✕</button>
         ))}
       </div>
     </div>

@@ -217,7 +217,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
               </div>
             </div>
           </div>
-          <button style={styles.dismissBtn} onClick={() => setDismissedInactive(true)}>✕</button>
+          <button style={styles.dismissBtn} aria-label="Dismiss alert" onClick={() => setDismissedInactive(true)}>✕</button>
         </div>
       )}
       {actionError && (
@@ -316,7 +316,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                         value={editClockInValue}
                         onChange={e => setEditClockInValue(e.target.value)}
                       />
-                      <button style={styles.saveTimeBtn} onClick={() => handleSaveClockIn(w.user_id)} disabled={editClockInSaving}>
+                      <button style={{ ...styles.saveTimeBtn, ...(editClockInSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => handleSaveClockIn(w.user_id)} disabled={editClockInSaving}>
                         {editClockInSaving ? 'Saving…' : 'Save'}
                       </button>
                       <button style={styles.cancelTimeBtn} onClick={() => setEditingClockInId(null)}>Cancel</button>
@@ -325,7 +325,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                     <button style={styles.editTimeBtn} onClick={() => startEditClockIn(w)}>Edit Clock-In Time</button>
                   )}
                   <button
-                    style={styles.clockOutBtn}
+                    style={{ ...styles.clockOutBtn, ...(clockingOutId === w.user_id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                     onClick={() => handleAdminClockOut(w.user_id)}
                     disabled={clockingOutId === w.user_id}
                   >
@@ -408,7 +408,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
             </div>
             <div style={styles.modalActions}>
               <button
-                style={styles.modalClockInBtn}
+                style={{ ...styles.modalClockInBtn, ...((!clockInUserId || clockInSaving) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                 onClick={handleAdminClockIn}
                 disabled={!clockInUserId || clockInSaving}
               >

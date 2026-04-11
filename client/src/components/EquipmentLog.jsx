@@ -303,7 +303,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
                               <button style={styles.cancelEntryBtn} onClick={() => setPendingDeleteEntryId(null)}>{t.cancel}</button>
                             </>
                           ) : (
-                            <button style={styles.delEntryBtn} onClick={() => setPendingDeleteEntryId(h.id)}>✕</button>
+                            <button style={styles.delEntryBtn} aria-label="Delete entry" onClick={() => setPendingDeleteEntryId(h.id)}>✕</button>
                           ))}
                         </td>
                       </tr>
