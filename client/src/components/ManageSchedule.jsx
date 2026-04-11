@@ -621,18 +621,18 @@ export default function ManageSchedule({ workers, projects }) {
           </div>
           <div style={styles.editActions}>
             <div style={styles.editActionsLeft}>
-              <button style={{ ...styles.saveBtn, ...(editSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveEdit(editingShift.id)} disabled={editSaving}>{editSaving ? '…' : t.save}</button>
+              <button style={{ ...styles.saveBtn, ...(editSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveEdit(editingShift.id)} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
               <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
             </div>
             <div style={styles.editActionsRight}>
               <button style={styles.dupBtn} onClick={() => duplicateShift(editingShift)}>{t.copy}</button>
               {editingShift.recurrence_group_id && (
                 <button style={{ ...styles.seriesBtn, ...(deleting === editingShift.recurrence_group_id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => cancelSeries(editingShift.recurrence_group_id)} disabled={deleting === editingShift.recurrence_group_id}>
-                  {deleting === editingShift.recurrence_group_id ? '…' : t.msCancelSeries}
+                  {deleting === editingShift.recurrence_group_id ? t.saving : t.msCancelSeries}
                 </button>
               )}
               <button style={{ ...styles.deleteBtn, ...(deleting === editingShift.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => deleteShift(editingShift.id)} disabled={deleting === editingShift.id}>
-                {deleting === editingShift.id ? '…' : t.del}
+                {deleting === editingShift.id ? t.saving : t.del}
               </button>
             </div>
           </div>

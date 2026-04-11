@@ -110,7 +110,7 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
           {weekTotalMiles > 0 && <span style={styles.weekMiles}>🚗 {weekTotalMiles.toFixed(1)} mi</span>}
           <button style={styles.todayBtn} onClick={goToday}>{t.todayBtn}</button>
           <button style={{ ...styles.todayBtn, borderColor: '#1a56db', color: '#1a56db', ...(copying ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={copyLastWeek} disabled={copying}>
-            {copying ? '…' : t.copyLastWeekBtn}
+            {copying ? t.saving : t.copyLastWeekBtn}
           </button>
           {copyMsg && <span style={{ fontSize: 12, color: '#6b7280' }}>{copyMsg}</span>}
         </div>

@@ -104,7 +104,7 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
       {error && <p style={s.error}>{error}</p>}
 
       <div style={s.formActions}>
-        <button style={{ ...s.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? '…' : isEdit ? t.saveChanges : t.addClient}</button>
+        <button style={{ ...s.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.addClient}</button>
         <button style={s.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -176,7 +176,7 @@ function DocUploadForm({ clientId, onUploaded }) {
           </div>
         )}
         <label style={{ ...s.uploadFileBtn, opacity: uploading ? 0.6 : 1 }}>
-          {uploading ? '…' : t.uploadDocument}
+          {uploading ? t.uploading : t.uploadDocument}
           <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={handleFile} disabled={uploading}
             accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.txt,.csv" />
         </label>

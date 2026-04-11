@@ -395,7 +395,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
               <div style={styles.errorPanelHeader}>
                 <span style={{ fontWeight: 700, color: '#92400e' }}>⚠ {syncErrors.length} QBO sync error{syncErrors.length !== 1 ? 's' : ''}</span>
                 <button style={{ ...styles.clearAllBtn, ...(clearingErrors ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={dismissAllErrors} disabled={clearingErrors}>
-                  {clearingErrors ? '…' : 'Dismiss all'}
+                  {clearingErrors ? t.saving : 'Dismiss all'}
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
@@ -407,7 +407,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                     <span style={styles.errorTime}>{new Date(e.created_at).toLocaleString()}</span>
                     {(e.entity_type === 'time_entry' || e.entity_type === 'reimbursement') && (
                       <button style={{ ...styles.errorRetry, ...(retryingErrors.has(e.id) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => retryError(e.id)} disabled={retryingErrors.has(e.id)}>
-                        {retryingErrors.has(e.id) ? '…' : 'Retry'}
+                        {retryingErrors.has(e.id) ? t.saving : 'Retry'}
                       </button>
                     )}
                     <button style={styles.errorDismiss} aria-label="Dismiss error" onClick={() => dismissError(e.id)}>✕</button>

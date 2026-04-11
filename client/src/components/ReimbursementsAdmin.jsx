@@ -105,12 +105,12 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
           <div style={s.actions}>
             {item.status !== 'approved' && (
               <button style={{ ...s.approveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => act('approved')} disabled={saving}>
-                {saving ? '…' : t.approveBtn}
+                {saving ? t.saving : t.approveBtn}
               </button>
             )}
             {item.status !== 'rejected' && (
               <button style={{ ...s.rejectBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => act('rejected')} disabled={saving}>
-                {saving ? '…' : t.rejectBtn}
+                {saving ? t.saving : t.rejectBtn}
               </button>
             )}
             {item.status !== 'pending' && (
@@ -172,6 +172,7 @@ export default function ReimbursementsAdmin() {
   const handleFileChange = e => {
     const file = e.target.files[0];
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { setFormError(t.fileTooLarge || 'File must be under 10 MB'); return; }
     const reader = new FileReader();
     reader.onload = ev => { setReceiptFile(ev.target.result); setReceiptPreview(ev.target.result); };
     reader.readAsDataURL(file);

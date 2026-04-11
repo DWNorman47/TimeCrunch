@@ -62,6 +62,7 @@ export default function ReimbursementsView() {
   const handleFileChange = e => {
     const file = e.target.files[0];
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { setError(t.fileTooLarge || 'File must be under 10 MB'); return; }
     const reader = new FileReader();
     reader.onload = ev => {
       setReceiptFile(ev.target.result);

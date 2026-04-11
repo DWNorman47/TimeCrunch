@@ -588,7 +588,7 @@ export default function ApprovalQueue({ onCountChange }) {
                       onClick={() => { setUnapproveError(''); unapprove(e.id); }}
                       disabled={unapproving === e.id}
                     >
-                      {unapproving === e.id ? '…' : t.aqUnapprove}
+                      {unapproving === e.id ? t.saving : t.aqUnapprove}
                     </button>
                     {unapproveError && unapproving === null && <span style={styles.inlineError}>{unapproveError}</span>}
                   </div>

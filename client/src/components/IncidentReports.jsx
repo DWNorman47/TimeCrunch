@@ -254,7 +254,7 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
           <div style={styles.cardActions}>
             {isAdmin && incident.status !== 'closed' && (
               <button style={{ ...styles.closeBtn, ...(closing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleClose} disabled={closing}>
-                {closing ? '…' : t.closeIncident}
+                {closing ? t.saving : t.closeIncident}
               </button>
             )}
             {(!isAdmin || incident.status !== 'closed') && (

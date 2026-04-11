@@ -526,7 +526,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             <div style={d.addLineBtns}>
               <button style={d.cancelEditBtn} onClick={() => { setAddingLine(false); setLineErr(''); }}>{t.cancel}</button>
               <button style={{ ...d.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={addLine} disabled={saving}>
-                {saving ? '…' : t.invPOAddLineBtn}
+                {saving ? t.saving : t.invPOAddLineBtn}
               </button>
             </div>
           </div>

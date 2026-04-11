@@ -153,7 +153,7 @@ export default function InventoryConversions({ onConversionChange }) {
           {isEditing ? (
             <>
               {saveErr && <span style={s.inlineErr}>{saveErr} </span>}
-              <button style={{ ...s.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveEdit(row)} disabled={saving}>{saving ? '…' : t.save}</button>
+              <button style={{ ...s.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveEdit(row)} disabled={saving}>{saving ? t.saving : t.save}</button>
               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
             </>
           ) : (

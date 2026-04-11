@@ -166,14 +166,14 @@ export default function AdminTimeOff({ settings }) {
                     disabled={acting === r.id + 'approve'}
                     onClick={() => { setActError(''); act(r.id, 'approve'); }}
                   >
-                    {acting === r.id + 'approve' ? '…' : `✓ ${t.filterApproved}`}
+                    {acting === r.id + 'approve' ? t.saving : `✓ ${t.filterApproved}`}
                   </button>
                   <button
                     style={{ ...s.denyBtn, ...(acting === r.id + 'deny' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                     disabled={acting === r.id + 'deny'}
                     onClick={() => { setActError(''); act(r.id, 'deny'); }}
                   >
-                    {acting === r.id + 'deny' ? '…' : t.denyAction}
+                    {acting === r.id + 'deny' ? t.saving : t.denyAction}
                   </button>
                   {actError && <span style={s.actError}>{actError}</span>}
                 </div>
