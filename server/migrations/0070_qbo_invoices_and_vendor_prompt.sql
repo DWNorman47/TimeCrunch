@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS project_invoices (
   id            SERIAL PRIMARY KEY,
   company_id    UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-  project_id    UUID REFERENCES projects(id) ON DELETE SET NULL,
+  project_id    INTEGER REFERENCES projects(id) ON DELETE SET NULL,
   qbo_invoice_id VARCHAR(50) NOT NULL,
   doc_number    VARCHAR(100),
   amount        NUMERIC(12,2),
