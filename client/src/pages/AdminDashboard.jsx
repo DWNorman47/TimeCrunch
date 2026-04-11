@@ -5,6 +5,7 @@ import { useT } from '../hooks/useT';
 import NotificationBell from '../components/NotificationBell';
 import CompanyChat from '../components/CompanyChat';
 import LiveKPIs from '../components/LiveKPIs';
+import { SkeletonStatRow, SkeletonList } from '../components/Skeleton';
 import BroadcastMessage from '../components/BroadcastMessage';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
@@ -183,7 +184,12 @@ export default function AdminDashboard() {
           ]}
         />
 
-        {loading ? <p>{t.loading}</p> : loadError ? (
+        {loading ? (
+          <>
+            <SkeletonStatRow count={4} style={{ marginBottom: 20 }} />
+            <SkeletonList count={4} />
+          </>
+        ) : loadError ? (
           <div style={styles.errorBanner}>
             <strong>{t.failedLoadDashboard}</strong> Check your connection and{' '}
             <button style={styles.retryBtn} onClick={() => window.location.reload()}>{t.tryAgain}</button>.

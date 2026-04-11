@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
+import { SkeletonList } from './Skeleton';
 import MessageThread from './MessageThread';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
@@ -298,10 +299,10 @@ export default function ApprovalQueue({ onCountChange }) {
     } finally { setApprovingAll(false); }
   };
 
-  if (loading) return <div style={styles.card}><p style={{ color: '#888' }}>{t.loading}</p></div>;
+  if (loading) return <div className="admin-card" style={styles.card}><SkeletonList count={4} rows={2} /></div>;
 
   return (
-    <div style={styles.card}>
+    <div className="admin-card" style={styles.card}>
       <div style={styles.header}>
         <h3 style={styles.title}>{t.approvalQueue}</h3>
         {entries.length > 0 && (
@@ -395,7 +396,7 @@ export default function ApprovalQueue({ onCountChange }) {
                 <span style={styles.dayCount}>{entriesByDay[day].length}</span>
               </div>
               {entriesByDay[day].map(e => (
-                <div key={e.id} style={{ ...styles.row, ...(selectedIds.has(e.id) ? styles.rowSelected : {}) }}>
+                <div key={e.id} className="approval-row" style={{ ...styles.row, ...(selectedIds.has(e.id) ? styles.rowSelected : {}) }}>
                   <input
                     type="checkbox"
                     checked={selectedIds.has(e.id)}

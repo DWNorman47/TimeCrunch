@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 import Pagination from './Pagination';
 
 const STATUS_COLORS = {
@@ -441,7 +442,7 @@ export default function Punchlist({ projects }) {
       </div>
 
       {loading ? (
-        <p style={styles.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : items.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>✅</div>

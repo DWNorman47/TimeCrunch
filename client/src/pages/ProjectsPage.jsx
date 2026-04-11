@@ -4,6 +4,7 @@ import api from '../api';
 import AppSwitcher from '../components/AppSwitcher';
 import ManageClients from '../components/ManageClients';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from '../components/Skeleton';
 
 function punchColor(status) {
   return { open: '#f59e0b', in_progress: '#3b82f6', resolved: '#059669', closed: '#9ca3af' }[status] || '#9ca3af';
@@ -1456,7 +1457,7 @@ export default function ProjectsPage() {
               </div>
             )}
             {loading ? (
-              <p style={styles.loadingText}>Loading…</p>
+              <SkeletonList count={5} rows={3} />
             ) : projects.length === 0 ? (
               <div style={styles.empty}>
                 <div style={styles.emptyIcon}>📁</div>

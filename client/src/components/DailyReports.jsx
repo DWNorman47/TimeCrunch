@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 import Pagination from './Pagination';
 
 const WEATHER_KEYS = [
@@ -548,7 +549,7 @@ export default function DailyReports({ projects }) {
         <button style={styles.newBtn} onClick={() => setEditing('new')}>{t.newReport}</button>
       </div>
 
-      {loading ? <p style={styles.hint}>{t.loading}</p> :
+      {loading ? <SkeletonList count={3} rows={2} /> :
         reports.length === 0 ? (
           <div style={styles.empty}>
             <div style={styles.emptyIcon}>📋</div>
