@@ -334,7 +334,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
           <div style={styles.sectionHead}><span style={styles.sectionTitle}>📷 {fieldPhotos.length} {t.photosFromFieldReports}</span></div>
           <div style={styles.photoStrip}>
             {fieldPhotos.map((p, i) => (
-              <img key={i} src={p.url} style={styles.photoThumb} alt={p.caption || `photo ${i + 1}`} title={p.caption} />
+              <img key={i} src={p.url} style={styles.photoThumb} alt={p.caption || `photo ${i + 1}`} title={p.caption} loading="lazy" />
             ))}
           </div>
           <p style={styles.photoNote}>{t.photosPulledNote}</p>

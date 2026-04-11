@@ -408,7 +408,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
                           <div style={s.playOverlay}>▶</div>
                         </>
                       ) : (
-                        <img src={p.url} style={s.photoThumb} alt={p.caption || `photo ${i + 1}`} />
+                        <img src={p.url} style={s.photoThumb} alt={p.caption || `photo ${i + 1}`} loading="lazy" />
                       )}
                       {p.caption && <div style={s.photoCaption}>{p.caption}</div>}
                       {isAdmin && p.worker_name && <div style={s.photoWorker}>{p.worker_name}</div>}

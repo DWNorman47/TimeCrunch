@@ -8,6 +8,7 @@ import PayStubView from '../components/PayStubView';
 import OfflineBanner from '../components/OfflineBanner';
 import { getT } from '../i18n';
 import api from '../api';
+import { getOrFetch } from '../offlineDb';
 
 export default function AccountPage() {
   const { user, logout, updateUser } = useAuth();
@@ -19,7 +20,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/settings').then(r => r.data),
+      getOrFetch('settings', () => api.get('/settings').then(r => r.data)),
       api.get('/company-info').then(r => r.data).catch(() => ({})),
     ]).then(([s, ci]) => {
       setSettings(s);

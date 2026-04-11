@@ -46,7 +46,7 @@ export default function PhotoCapture({ photos, onChange, maxPhotos = 10 }) {
         {photos.map((p, i) => (
           <div key={i} style={styles.photoCard}>
             <div style={styles.photoImgWrap}>
-              <img src={p.url} alt={`photo ${i + 1}`} style={styles.photoImg} />
+              <img src={p.url} alt={`photo ${i + 1}`} style={styles.photoImg} loading="lazy" />
               <button style={styles.removeBtn} onClick={() => remove(i)} title="Remove">✕</button>
             </div>
             <input

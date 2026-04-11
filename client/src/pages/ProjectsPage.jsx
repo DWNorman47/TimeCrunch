@@ -779,7 +779,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                     <div style={styles.photoGrid}>
                       {photos.map((ph, i) => (
                         <button key={i} style={styles.photoThumb} onClick={() => setLightboxPhoto(ph)}>
-                          <img src={ph.url} alt={ph.caption || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 6 }} />
+                          <img src={ph.url} alt={ph.caption || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 6 }} loading="lazy" />
                         </button>
                       ))}
                     </div>

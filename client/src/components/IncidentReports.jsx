@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
@@ -13,19 +13,19 @@ function today() {
 
 function IncidentForm({ projects, onSubmitted, onCancel }) {
   const t = useT();
-  const TYPE_LABELS = {
+  const TYPE_LABELS = useMemo(() => ({
     'injury': `🤕 ${t.typeInjury}`,
     'near-miss': `⚠️ ${t.typeNearMiss}`,
     'property-damage': `🔧 ${t.typePropertyDamage}`,
     'environmental': `🌿 ${t.typeEnvironmental}`,
     'other': `📝 ${t.typeOther}`,
-  };
-  const TREATMENT_LABELS = {
+  }), [t]);
+  const TREATMENT_LABELS = useMemo(() => ({
     'none': t.treatmentNone,
     'first-aid': t.treatmentFirstAid,
     'medical-attention': t.treatmentMedicalFull,
     'hospitalization': t.treatmentHospitalization,
-  };
+  }), [t]);
   const [form, setForm] = useState({
     incident_date: today(),
     incident_time: '',
@@ -155,19 +155,19 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
 
 function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
   const t = useT();
-  const TYPE_LABELS = {
+  const TYPE_LABELS = useMemo(() => ({
     'injury': `🤕 ${t.typeInjury}`,
     'near-miss': `⚠️ ${t.typeNearMiss}`,
     'property-damage': `🔧 ${t.typePropertyDamage}`,
     'environmental': `🌿 ${t.typeEnvironmental}`,
     'other': `📝 ${t.typeOther}`,
-  };
-  const TREATMENT_LABELS = {
+  }), [t]);
+  const TREATMENT_LABELS = useMemo(() => ({
     'none': t.treatmentNone,
     'first-aid': t.treatmentFirstAid,
     'medical-attention': t.treatmentMedicalFull,
     'hospitalization': t.treatmentHospitalization,
-  };
+  }), [t]);
   const [expanded, setExpanded] = useState(false);
   const [closing, setClosing] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -271,13 +271,13 @@ export default function IncidentReports({ projects }) {
   const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
-  const TYPE_LABELS = {
+  const TYPE_LABELS = useMemo(() => ({
     'injury': `🤕 ${t.typeInjury}`,
     'near-miss': `⚠️ ${t.typeNearMiss}`,
     'property-damage': `🔧 ${t.typePropertyDamage}`,
     'environmental': `🌿 ${t.typeEnvironmental}`,
     'other': `📝 ${t.typeOther}`,
-  };
+  }), [t]);
 
   const [incidents, setIncidents] = useState([]);
   const [page, setPage] = useState(1);

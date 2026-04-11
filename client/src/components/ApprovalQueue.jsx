@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
+import { getOrFetch } from '../offlineDb';
 import MessageThread from './MessageThread';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
@@ -107,9 +108,9 @@ export default function ApprovalQueue({ onCountChange }) {
     if (dateTo) params.to = dateTo;
     Promise.all([
       api.get('/admin/entries/pending', { params }),
-      api.get('/projects'),
+      getOrFetch('projects', () => api.get('/projects').then(r => r.data)),
     ])
-      .then(([r, p]) => { setEntries(r.data.entries); setHasMore(r.data.has_more); setProjects(p.data); })
+      .then(([r, p]) => { setEntries(r.data.entries); setHasMore(r.data.has_more); setProjects(p); })
       .catch(() => setFetchError(true))
       .finally(() => setLoading(false));
   };

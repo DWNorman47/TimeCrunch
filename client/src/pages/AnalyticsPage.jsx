@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePlan } from '../hooks/usePlan';
 import api from '../api';
+import { getOrFetch } from '../offlineDb';
 import AppSwitcher from '../components/AppSwitcher';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 
@@ -28,8 +29,8 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/settings')
-      .then(r => setFeatures(r.data))
+    getOrFetch('settings', () => api.get('/settings').then(r => r.data))
+      .then(s => setFeatures(s))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
