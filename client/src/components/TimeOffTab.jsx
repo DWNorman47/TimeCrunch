@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
 
 const TYPE_LABELS_EN = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' };
@@ -20,6 +21,7 @@ function days(start, end) {
 
 export default function TimeOffTab() {
   const t = useT();
+  const toast = useToast();
   const TYPE_LABELS = { vacation: t.typeVacation, sick: t.typeSick, personal: t.typePersonal, other: t.typeOther };
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +58,7 @@ export default function TimeOffTab() {
       setRequests(prev => [r.data, ...prev]);
       setForm({ type: 'vacation', start_date: '', end_date: '', note: '' });
       setShowForm(false);
+      toast(t.requestSubmitted || 'Request submitted', 'success');
     } catch (err) {
       setError(err.response?.data?.error || t.failedSubmitRequest);
     } finally { setSaving(false); }

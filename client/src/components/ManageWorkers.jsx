@@ -7,10 +7,12 @@ import { SkeletonList } from './Skeleton';
 
 function WorkerDocuments({ workerId }) {
   const t = useT();
+  const toast = useToast();
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [pendingDeleteDocId, setPendingDeleteDocId] = useState(null);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -37,8 +39,13 @@ function WorkerDocuments({ workerId }) {
   };
 
   const handleDelete = async (docId) => {
-    await api.delete(`/admin/workers/${workerId}/documents/${docId}`).catch(() => {});
-    setDocs(prev => prev.filter(d => d.id !== docId));
+    try {
+      await api.delete(`/admin/workers/${workerId}/documents/${docId}`);
+      setDocs(prev => prev.filter(d => d.id !== docId));
+      toast(t.docsDeleted || 'Document deleted', 'success');
+    } catch {
+      toast(t.docsDeleteFailed || 'Failed to delete document', 'error');
+    } finally { setPendingDeleteDocId(null); }
   };
 
   const fmtSize = (b) => b ? (b < 1024 * 1024 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`) : '';
@@ -61,7 +68,14 @@ function WorkerDocuments({ workerId }) {
             <div key={d.id} style={ds.docRow}>
               <a href={d.url} target="_blank" rel="noopener noreferrer" style={ds.docName}>{d.name}</a>
               <span style={ds.docMeta}>{fmtSize(d.size_bytes)}{d.uploaded_by_name ? ` · ${d.uploaded_by_name}` : ''}</span>
-              <button style={ds.deleteBtn} aria-label={`Delete ${d.name}`} onClick={() => handleDelete(d.id)}>✕</button>
+              {pendingDeleteDocId === d.id ? (
+                <>
+                  <button style={ds.confirmDeleteBtn} onClick={() => handleDelete(d.id)}>{t.confirm}</button>
+                  <button style={ds.cancelDeleteBtn} onClick={() => setPendingDeleteDocId(null)}>{t.cancel}</button>
+                </>
+              ) : (
+                <button style={ds.deleteBtn} aria-label={`Delete ${d.name}`} onClick={() => setPendingDeleteDocId(d.id)}>✕</button>
+              )}
             </div>
           ))}
         </div>
@@ -80,6 +94,8 @@ const ds = {
   docName: { flex: 1, fontSize: 13, color: '#1a56db', textDecoration: 'none', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   docMeta: { fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' },
   deleteBtn: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 12, padding: '0 2px', lineHeight: 1 },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  cancelDeleteBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', borderRadius: 5, padding: '3px 8px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   error: { fontSize: 12, color: '#ef4444', margin: '4px 0' },
   empty: { fontSize: 12, color: '#9ca3af', margin: '4px 0' },
 };
