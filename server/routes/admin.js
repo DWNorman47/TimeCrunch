@@ -2321,7 +2321,7 @@ router.patch('/entries/:id/reject', requireAdmin, requirePermission('approve_ent
       setImmediate(async () => {
         try {
           await qbo.deleteTimeActivity(companyId, rejEntry.qbo_activity_id);
-          await pool.query('UPDATE time_entries SET qbo_activity_id = NULL, qbo_synced_at = NULL WHERE id = $1', [rejEntry.id]);
+          await pool.query('UPDATE time_entries SET qbo_activity_id = NULL, qbo_synced_at = NULL WHERE id = $1 AND company_id = $2', [rejEntry.id, companyId]);
         } catch (err) { console.error('[QBO delete on reject]', err.message); }
       });
     }
@@ -3161,7 +3161,7 @@ router.delete('/workers/:id/documents/:docId', requireAdmin, async (req, res) =>
       [req.params.docId, req.params.id, companyId]
     );
     if (doc.rowCount === 0) return res.status(404).json({ error: 'Document not found' });
-    await pool.query('DELETE FROM worker_documents WHERE id = $1', [req.params.docId]);
+    await pool.query('DELETE FROM worker_documents WHERE id = $1 AND company_id = $2', [req.params.docId, companyId]);
     deleteByUrl(doc.rows[0].url).catch(() => {});
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
