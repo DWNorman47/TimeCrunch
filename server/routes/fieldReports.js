@@ -208,7 +208,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     );
     const totalBytes = parseInt(photoSum.rows[0].total);
 
-    await pool.query('DELETE FROM field_reports WHERE id = $1', [req.params.id]);
+    await pool.query('DELETE FROM field_reports WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
 
     if (totalBytes > 0) decrementStorage(companyId, totalBytes).catch(() => {});
 

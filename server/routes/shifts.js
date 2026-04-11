@@ -107,7 +107,7 @@ router.delete('/admin/:id', requireAdmin, async (req, res) => {
     );
     if (full.rowCount === 0) return res.status(404).json({ error: 'Shift not found' });
     const shift = full.rows[0];
-    await pool.query('DELETE FROM shifts WHERE id = $1', [req.params.id]);
+    await pool.query('DELETE FROM shifts WHERE id = $1 AND company_id = $2', [req.params.id, req.user.company_id]);
     const cancelBody = `${shift.shift_date?.toString().substring(0, 10)} · ${shift.start_time.substring(0, 5)}–${shift.end_time.substring(0, 5)}${shift.project_name ? ' · ' + shift.project_name : ''}`;
     sendPushToUser(shift.user_id, { title: 'Shift cancelled', body: cancelBody, url: '/dashboard' });
     createInboxItem(shift.user_id, req.user.company_id, 'shift_cancelled', 'Shift cancelled', cancelBody, '/dashboard#schedule');
