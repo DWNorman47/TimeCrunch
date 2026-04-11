@@ -121,7 +121,7 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.createRFI}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.createRFI}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -219,7 +219,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
 
           {!rfi.pending && (
             <div style={styles.cardActions}>
-              <button style={styles.pdfBtn} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? 'Preparing…' : 'Export PDF'}</button>
+              <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? 'Preparing…' : 'Export PDF'}</button>
               {isAdmin && (
                 <>
                   <button style={styles.editBtn} onClick={() => onEdit(rfi)}>
@@ -227,7 +227,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
                   </button>
                   {confirmingDelete ? (
                     <>
-                      <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                      <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
                       <button style={styles.smallCancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
                     </>
                   ) : (

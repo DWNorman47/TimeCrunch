@@ -381,7 +381,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                   ))}
                 </select>
                 <div style={styles.switchActions}>
-                  <button style={styles.switchConfirmBtn} onClick={handleSwitchProject} disabled={loading || !switchProject}>
+                  <button style={{ ...styles.switchConfirmBtn, ...(loading || !switchProject ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleSwitchProject} disabled={loading || !switchProject}>
                     {loading ? '...' : t.confirmSwitch}
                   </button>
                   <button style={styles.switchCancelBtn} onClick={() => { setSwitchingProject(false); setSwitchProject(''); setError(''); }}>
@@ -391,22 +391,22 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
               </div>
             ) : (
               projectsEnabled && projects?.length > 1 && (
-                <button style={styles.switchProjectBtn} onClick={() => setSwitchingProject(true)} disabled={loading}>
+                <button style={{ ...styles.switchProjectBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setSwitchingProject(true)} disabled={loading}>
                   {t.switchProject}
                 </button>
               )
             )}
 
-            <button style={styles.clockOutBtn} className="clock-btn" onClick={handleClockOut} disabled={loading}>
+            <button style={{ ...styles.clockOutBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} className="clock-btn" onClick={handleClockOut} disabled={loading}>
               {loading ? t.clockingOut : t.clockOut}
             </button>
             {confirmingCancelClock ? (
               <>
-                <button style={styles.confirmCancelBtn} onClick={handleCancelClockIn} disabled={loading}>{t.confirm}</button>
+                <button style={{ ...styles.confirmCancelBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleCancelClockIn} disabled={loading}>{t.confirm}</button>
                 <button style={styles.cancelClockInBtn} onClick={() => setConfirmingCancelClock(false)}>{t.cancel}</button>
               </>
             ) : (
-              <button style={styles.cancelClockInBtn} onClick={() => setConfirmingCancelClock(true)} disabled={loading}>
+              <button style={{ ...styles.cancelClockInBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setConfirmingCancelClock(true)} disabled={loading}>
                 {t.cancelClockIn}
               </button>
             )}
@@ -524,7 +524,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
               </div>
             ))}
             <button
-              style={styles.checklistGateSubmitBtn}
+              style={{ ...styles.checklistGateSubmitBtn, ...(checklistSubmitting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
               onClick={handleChecklistSubmit}
               disabled={checklistSubmitting}
             >
@@ -536,7 +536,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
           </div>
         )}
         {!pendingChecklist && (
-          <button style={styles.clockInBtn} className="clock-btn" onClick={handleClockIn} disabled={loading}>
+          <button style={{ ...styles.clockInBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} className="clock-btn" onClick={handleClockIn} disabled={loading}>
             {loading ? t.clockingIn : t.clockIn}
           </button>
         )}

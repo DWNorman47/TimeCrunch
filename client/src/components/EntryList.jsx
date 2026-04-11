@@ -94,7 +94,7 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
               <button style={styles.cancelBulkDeleteBtn} onClick={() => setConfirmingBulkDelete(false)}>{t.cancel}</button>
             </>
           ) : (
-            <button style={styles.bulkDeleteBtn} onClick={() => { setBulkDeleteError(''); setConfirmingBulkDelete(true); }} disabled={bulkDeleting}>
+            <button style={{ ...styles.bulkDeleteBtn, ...(bulkDeleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => { setBulkDeleteError(''); setConfirmingBulkDelete(true); }} disabled={bulkDeleting}>
               {`${t.elDeleteSelected} ${selectedIds.size}`}
             </button>
           )

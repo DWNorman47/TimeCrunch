@@ -245,7 +245,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
 
       <div style={ef.actions}>
         <button type="button" style={ef.cancelBtn} onClick={onCancel}>{t.cancel}</button>
-        <button type="submit" style={ef.saveBtn} disabled={saving}>
+        <button type="submit" style={{ ...ef.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={saving}>
           {saving ? t.saving : item ? t.saveChanges : `${t.addOption} ${levelSingular}`}
         </button>
       </div>
@@ -382,7 +382,7 @@ function SupplierPanel() {
         </div>
         <div style={sp.actions}>
           <button style={sp.cancelBtn} onClick={() => setEditing(null)}>{t.cancel}</button>
-          <button style={sp.saveBtn} onClick={save} disabled={saving}>{saving ? t.saving : editing ? t.saveChanges : t.invSetupAddSupplierTitle}</button>
+          <button style={{ ...sp.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={save} disabled={saving}>{saving ? t.saving : editing ? t.saveChanges : t.invSetupAddSupplierTitle}</button>
         </div>
       </div>
     );

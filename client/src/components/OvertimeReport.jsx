@@ -80,7 +80,7 @@ export default function OvertimeReport({ currency = 'USD' }) {
             <label style={styles.label}>{t.qboTo}</label>
             <input style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
           </div>
-          <button style={styles.runBtn} onClick={load} disabled={loading || !from || !to}>
+          <button style={{ ...styles.runBtn, ...(loading || !from || !to ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={load} disabled={loading || !from || !to}>
             {loading ? t.loading : t.runReport}
           </button>
           {rows && rows.length > 0 && (

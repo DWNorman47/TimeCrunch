@@ -98,7 +98,7 @@ export default function InventoryValuation({ locations }) {
           <input type="checkbox" checked={showZero} onChange={e => setShowZero(e.target.checked)} />
           {t.invValIncludeZero}
         </label>
-        <button style={s.csvBtn} onClick={downloadCSV} disabled={!data || visibleItems.length === 0}>
+        <button style={{ ...s.csvBtn, ...(!data || visibleItems.length === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadCSV} disabled={!data || visibleItems.length === 0}>
           {t.invValDownloadCSV}
         </button>
       </div>
@@ -162,7 +162,7 @@ export default function InventoryValuation({ locations }) {
           </div>
           {(data?.items?.length || 0) < valTotal && (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
-              <button style={s.csvBtn} onClick={loadMoreVal} disabled={loadingMore}>
+              <button style={{ ...s.csvBtn, ...(loadingMore ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={loadMoreVal} disabled={loadingMore}>
                 {loadingMore ? t.loading : t.loadMore}
               </button>
               <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>

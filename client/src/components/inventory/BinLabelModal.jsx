@@ -99,7 +99,7 @@ export default function BinLabelModal({ item, binType, onClose }) {
 
         <div style={s.actions}>
           <button style={s.cancelBtn} onClick={onClose}>{t.labelModalClose}</button>
-          <button style={s.printBtn} onClick={printLabel} disabled={!qrDataUrl}>
+          <button style={{ ...s.printBtn, ...(!qrDataUrl ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={printLabel} disabled={!qrDataUrl}>
             {t.labelModalPrint}
           </button>
         </div>

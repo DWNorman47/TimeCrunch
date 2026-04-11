@@ -539,7 +539,10 @@ export default function ApprovalQueue({ onCountChange }) {
                     </div>
                   ) : rejectingId === e.id ? (
                     <div style={styles.rejectForm}>
-                      <input style={styles.rejectInput} placeholder={t.reasonOptional} maxLength={500} value={rejectNote} onChange={ev => setRejectNote(ev.target.value)} autoFocus />
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <input style={styles.rejectInput} placeholder={t.reasonOptional} maxLength={500} value={rejectNote} onChange={ev => setRejectNote(ev.target.value)} autoFocus />
+                        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{rejectNote.length}/500</div>
+                      </div>
                       <button style={{ ...styles.confirmRejectBtn, ...(working === e.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => submitReject(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.confirmReject}</button>
                       <button style={styles.cancelBtn} onClick={() => { setRejectingId(null); setRejectNote(''); }}>{t.cancel}</button>
                     </div>

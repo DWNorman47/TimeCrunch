@@ -151,13 +151,16 @@ export default function AdminTimeOff({ settings }) {
 
               {r.status === 'pending' && (
                 <div style={s.actionRow}>
-                  <input
-                    style={s.noteInput}
-                    placeholder={t.reviewNotePlaceholder}
-                    maxLength={500}
-                    value={reviewNote[r.id] || ''}
-                    onChange={e => setReviewNote(prev => ({ ...prev, [r.id]: e.target.value }))}
-                  />
+                  <div style={{ flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column' }}>
+                    <input
+                      style={{ ...s.noteInput, flex: 'unset' }}
+                      placeholder={t.reviewNotePlaceholder}
+                      maxLength={500}
+                      value={reviewNote[r.id] || ''}
+                      onChange={e => setReviewNote(prev => ({ ...prev, [r.id]: e.target.value }))}
+                    />
+                    <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(reviewNote[r.id] || '').length}/500</div>
+                  </div>
                   <button
                     style={{ ...s.approveBtn, ...(acting === r.id + 'approve' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                     disabled={acting === r.id + 'approve'}

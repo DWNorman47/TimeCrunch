@@ -153,7 +153,7 @@ export default function InventoryConversions({ onConversionChange }) {
           {isEditing ? (
             <>
               {saveErr && <span style={s.inlineErr}>{saveErr} </span>}
-              <button style={s.saveBtn} onClick={() => saveEdit(row)} disabled={saving}>{saving ? '…' : t.save}</button>
+              <button style={{ ...s.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveEdit(row)} disabled={saving}>{saving ? '…' : t.save}</button>
               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
             </>
           ) : (
@@ -226,8 +226,8 @@ export default function InventoryConversions({ onConversionChange }) {
               </div>
             </div>
             <div style={s.addActions}>
-              <button style={s.cancelBtn} onClick={resetAdd} disabled={addSaving}>{t.cancel}</button>
-              <button style={s.saveBtn} onClick={submitAdd} disabled={addSaving}>
+              <button style={{ ...s.cancelBtn, ...(addSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={resetAdd} disabled={addSaving}>{t.cancel}</button>
+              <button style={{ ...s.saveBtn, ...(addSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitAdd} disabled={addSaving}>
                 {addSaving ? t.saving : t.invConvSaveConversion}
               </button>
             </div>

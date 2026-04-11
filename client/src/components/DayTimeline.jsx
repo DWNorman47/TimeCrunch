@@ -284,11 +284,11 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                             </button>
                             {pendingDeleteEntry?.id === seg.entry.id ? (
                               <>
-                                <button style={s.confirmEntryDeleteBtn} onClick={() => doDelete(seg.entry)} disabled={deletingId === seg.entry.id}>✓</button>
+                                <button style={{ ...s.confirmEntryDeleteBtn, ...(deletingId === seg.entry.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => doDelete(seg.entry)} disabled={deletingId === seg.entry.id}>✓</button>
                                 <button style={s.cancelEntryDeleteBtn} onClick={() => setPendingDeleteEntry(null)}>✕</button>
                               </>
                             ) : (
-                              <button style={s.deleteBtn} onClick={() => setPendingDeleteEntry(seg.entry)} disabled={deletingId === seg.entry.id}>✕</button>
+                              <button style={{ ...s.deleteBtn, ...(deletingId === seg.entry.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setPendingDeleteEntry(seg.entry)} disabled={deletingId === seg.entry.id}>✕</button>
                             )}
                           </div>
                         )}
@@ -314,7 +314,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                                 <input type="time" style={s.timeInput} value={splitBreakForm.breakEnd}
                                   onChange={e => setSplitBreakForm(f => ({ ...f, breakEnd: e.target.value }))} />
                               </div>
-                              <button style={s.addBtn} onClick={() => doSplitBreak(seg.entry)} disabled={saving}>
+                              <button style={{ ...s.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => doSplitBreak(seg.entry)} disabled={saving}>
                                 {saving ? 'Saving...' : 'Insert break'}
                               </button>
                             </div>
@@ -333,7 +333,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                                 <option value="">Switch to project...</option>
                                 {activeProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                               </select>
-                              <button style={s.addBtn} onClick={() => doSplitSwitch(seg.entry)} disabled={saving}>
+                              <button style={{ ...s.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => doSplitSwitch(seg.entry)} disabled={saving}>
                                 {saving ? 'Saving...' : 'Insert switch'}
                               </button>
                             </div>
@@ -388,7 +388,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                               <input type="time" style={s.timeInput} value={workForm.end}
                                 onChange={e => setWorkForm(f => ({ ...f, end: e.target.value }))} />
                             </div>
-                            <button style={s.addBtn} onClick={addWork} disabled={saving}>
+                            <button style={{ ...s.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={addWork} disabled={saving}>
                               {saving ? 'Adding...' : 'Add entry'}
                             </button>
                           </div>
@@ -427,7 +427,7 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                               </select>
                               <span style={s.switchArrow}>→ {minToDisplay(seg.end)}</span>
                             </div>
-                            <button style={s.addBtn} onClick={() => addSwitch(seg)} disabled={saving}>
+                            <button style={{ ...s.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => addSwitch(seg)} disabled={saving}>
                               {saving ? 'Adding...' : 'Add both entries'}
                             </button>
                           </div>
