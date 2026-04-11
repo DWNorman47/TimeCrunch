@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api';
 import BinLabelModal from './BinLabelModal';
 import { useT } from '../../hooks/useT';
+import { SkeletonList } from '../Skeleton';
 
 function isHttpUrl(url) {
   try { return ['http:', 'https:'].includes(new URL(url).protocol); } catch { return false; }
@@ -398,7 +399,7 @@ function SupplierPanel() {
       </div>
       {error && <div style={sp.error}>{error}</div>}
       {loading ? (
-        <div style={sp.empty}>{t.loading}</div>
+        <SkeletonList count={3} rows={2} />
       ) : suppliers.length === 0 ? (
         <div style={sp.empty}>
           <div style={sp.emptyIcon}>🏭</div>
@@ -725,7 +726,7 @@ export default function InventorySetup({ projects }) {
           {error && <div style={s.error}>{error}</div>}
 
           {loading ? (
-            <div style={s.empty}>{t.loading}</div>
+            <SkeletonList count={3} rows={1} />
           ) : items.length === 0 ? (
             <div style={s.empty}>
               <div style={s.emptyIcon}>📍</div>

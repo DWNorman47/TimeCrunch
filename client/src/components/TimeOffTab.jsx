@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 const TYPE_LABELS_EN = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' };
 const TYPE_COLORS = { vacation: '#1d4ed8', sick: '#dc2626', personal: '#8b5cf6', other: '#6b7280' };
@@ -125,7 +126,7 @@ export default function TimeOffTab() {
       )}
 
       {loading ? (
-        <p style={s.empty}>{t.loading}</p>
+        <SkeletonList count={3} rows={2} />
       ) : requests.length === 0 ? (
         <p style={s.empty}>{t.noTimeOffYet}</p>
       ) : (

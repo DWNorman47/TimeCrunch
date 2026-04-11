@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 // Document type metadata
 const DOC_TYPES = [
@@ -408,7 +409,7 @@ export default function ManageClients() {
       )}
 
       {loading ? (
-        <p style={s.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : clients.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>🏢</div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
+import { SkeletonList } from '../Skeleton';
 
 const DEFAULT_UNITS = ['each', 'box', 'bag', 'bundle', 'pallet', 'lb', 'kg', 'ft', 'm', 'sq ft', 'gal', 'L', 'roll', 'sheet', 'piece', 'other'];
 
@@ -235,7 +236,7 @@ export default function InventoryConversions({ onConversionChange }) {
       </div>
 
       {error && <div style={s.errorMsg}>{error}</div>}
-      {loading && <div style={s.empty}>{t.loading}</div>}
+      {loading && <SkeletonList count={3} rows={1} />}
 
       {!loading && !error && (
         <>

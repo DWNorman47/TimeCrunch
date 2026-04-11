@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
+import { SkeletonList } from '../Skeleton';
 
 const VAL_PAGE = 200;
 
@@ -105,7 +106,7 @@ export default function InventoryValuation({ locations }) {
       {error && <div style={s.error}>{error}</div>}
 
       {loading ? (
-        <div style={s.empty}>{t.loading}</div>
+        <SkeletonList count={4} rows={2} />
       ) : !data || visibleItems.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>💰</div>

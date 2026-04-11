@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import Pagination from './Pagination';
+import { SkeletonList } from './Skeleton';
 
 function fmtDate(str) {
   return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -137,7 +138,7 @@ export default function PhotoGallery({ projects }) {
       )}
 
       {loading ? (
-        <p style={styles.hint}>Loading…</p>
+        <SkeletonList count={4} rows={2} />
       ) : media.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>🖼️</div>

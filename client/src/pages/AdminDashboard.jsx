@@ -27,7 +27,7 @@ const AdminTimeOff = lazy(() => import('../components/AdminTimeOff'));
 const ReimbursementsAdmin = lazy(() => import('../components/ReimbursementsAdmin'));
 
 function TabLoader() {
-  return <div style={{ padding: '40px 0', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>Loading…</div>;
+  return <SkeletonList count={4} rows={2} />;
 }
 
 

@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
+import { SkeletonList } from './Skeleton';
 
 const today = () => new Date().toLocaleDateString('en-CA');
 
@@ -509,7 +510,7 @@ export default function SafetyChecklists({ projects }) {
       )}
 
       {loading ? (
-        <p style={styles.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : submissions.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>☑️</div>

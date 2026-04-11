@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { formatInTz } from '../utils';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 function formatDt(str, tz) {
   return {
@@ -98,7 +99,7 @@ export default function AuditLog({ timezone = '' }) {
       </div>
 
       {loading && entries.length === 0 ? (
-        <p style={styles.empty}>{t.loading}</p>
+        <SkeletonList count={5} rows={2} />
       ) : entries.length === 0 ? (
         <p style={styles.empty}>{t.auditNoActivity}</p>
       ) : (

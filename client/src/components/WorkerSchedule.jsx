@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 function fmtDate(d, t) {
   const date = new Date(d + 'T00:00:00');
@@ -69,7 +70,7 @@ export default function WorkerSchedule() {
     }
   };
 
-  if (loading) return <p style={styles.empty}>Loading…</p>;
+  if (loading) return <SkeletonList count={4} rows={2} />;
   if (error) return <p style={styles.empty}>{error}</p>;
   if (shifts.length === 0) return (
     <div style={styles.emptyBox}>

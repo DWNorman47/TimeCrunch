@@ -3,6 +3,7 @@ import api from '../api';
 import PhotoCapture from './PhotoCapture';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -380,7 +381,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
 
       {/* Day content */}
       {loading ? (
-        <p style={s.hint}>Loading…</p>
+        <SkeletonList count={3} rows={2} />
       ) : dayReports.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>📋</div>

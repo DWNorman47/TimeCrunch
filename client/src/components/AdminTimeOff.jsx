@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 const TYPE_COLORS = { vacation: '#1d4ed8', sick: '#dc2626', personal: '#8b5cf6', other: '#6b7280' };
 const STATUS_COLORS = { pending: '#d97706', approved: '#059669', denied: '#ef4444' };
@@ -96,7 +97,7 @@ export default function AdminTimeOff({ settings }) {
       </div>
 
       {loading ? (
-        <p style={s.empty}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : visible.length === 0 ? (
         <p style={s.empty}>{t.noTimeOffRequests}</p>
       ) : (

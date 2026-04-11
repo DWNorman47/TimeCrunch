@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import { SkeletonList, SkeletonBlock } from './Skeleton';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
@@ -269,7 +270,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
             <div style={styles.hoursHistory}>
               <div style={styles.historyTitle}>{t.hoursHistory}</div>
               {loadingHours ? (
-                <p style={styles.hint}>{t.loading}</p>
+                <SkeletonBlock width="100%" height={48} style={{ marginTop: 8 }} />
               ) : hours.length === 0 ? (
                 <p style={styles.hint}>{t.noHoursLogged}</p>
               ) : (
@@ -384,7 +385,7 @@ export default function EquipmentLog({ projects }) {
       )}
 
       {loading ? (
-        <p style={styles.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : items.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>🚜</div>

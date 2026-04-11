@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true, showGeofenceBudget = true, defaultPrevailingRate = '', currency = 'USD', settings = null }) {
   const toast = useToast();
@@ -586,7 +587,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
         {showHistory && (
           <div style={s.historyList}>
             {loadingArchived ? (
-              <p style={s.empty}>{t.loading}</p>
+              <SkeletonList count={3} rows={1} />
             ) : archived.length === 0 ? (
               <p style={s.empty}>{t.noRemovedProjects}</p>
             ) : (

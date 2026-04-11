@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import UomConversionModal from './UomConversionModal';
 import { useT } from '../../hooks/useT';
+import { SkeletonList } from '../Skeleton';
 const TYPE_COLORS = {
   receive:  { color: '#059669', bg: '#d1fae5' },
   issue:    { color: '#d97706', bg: '#fef3c7' },
@@ -545,7 +546,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
           {error && <div style={s.error}>{error}</div>}
 
           {loading ? (
-            <div style={s.empty}>{t.loading}</div>
+            <SkeletonList count={4} rows={2} />
           ) : transactions.length === 0 ? (
             <div style={s.empty}>
               <div style={s.emptyIcon}>↔️</div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { fmtHours, formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 function downloadCSV(rows, filename) {
   const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -35,7 +36,7 @@ export default function ProjectReports({ currency = 'USD' }) {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p>{t.loading}</p>;
+  if (loading) return <SkeletonList count={4} rows={3} />;
   if (projects.length === 0) return <p style={{ color: '#666' }}>{t.noProjectsMsg}</p>;
 
   return (

@@ -4,6 +4,7 @@ import { parseBinQR } from './BinLabelModal';
 import { parseItemQR } from './ItemLabelModal';
 import UomConversionModal from './UomConversionModal';
 import { useT } from '../../hooks/useT';
+import { SkeletonList } from '../Skeleton';
 
 function useCountTypes(t) {
   return {
@@ -985,7 +986,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
       {loadDetailError && <p style={s.inlineError}>{loadDetailError}</p>}
 
       {loading ? (
-        <div style={s.empty}>{t.loading}</div>
+        <SkeletonList count={4} rows={2} />
       ) : counts.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>📋</div>

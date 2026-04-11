@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 const VENDOR_TYPES = ['contractor', 'subcontractor'];
 const EMPLOYEE_TYPES = ['employee', 'owner'];
@@ -306,7 +307,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
     q ? qboCustomers.filter(c => c.DisplayName?.toLowerCase().includes(q)) : qboCustomers,
     [qboCustomers, q]);
 
-  if (!status) return <p style={{ color: '#666' }}>{t.loading}</p>;
+  if (!status) return <SkeletonList count={4} rows={2} />;
 
   const TYPE_LABELS = {
     employee: t.qboTypeEmployee,

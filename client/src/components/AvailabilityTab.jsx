@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 export default function AvailabilityTab() {
   const t = useT();
@@ -53,7 +54,7 @@ export default function AvailabilityTab() {
     finally { setSaving(false); }
   };
 
-  if (loading) return <p style={s.empty}>{t.loading}</p>;
+  if (loading) return <SkeletonList count={3} rows={1} />;
 
   return (
     <div style={s.wrap}>

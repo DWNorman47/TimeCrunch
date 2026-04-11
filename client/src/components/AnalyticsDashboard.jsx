@@ -4,6 +4,7 @@ import {
 } from 'recharts';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { SkeletonStatRow, SkeletonList } from './Skeleton';
 
 const BLUE = '#1a56db';
 const GREEN = '#059669';
@@ -98,7 +99,7 @@ export default function AnalyticsDashboard() {
       .finally(() => setLoading(false));
   }, [from, to]);
 
-  if (loading) return <p style={{ color: '#888' }}>{t.loadingAnalytics}</p>;
+  if (loading) return <><SkeletonStatRow count={4} style={{ marginBottom: 16 }} /><SkeletonList count={4} /></>;
   if (!data) return <p style={{ color: '#e53e3e' }}>{t.failedLoadAnalytics}</p>;
 
   const { summary, daily_hours, weekly_hours, project_hours, worker_hours } = data;

@@ -5,6 +5,7 @@ import api from '../api';
 import { getOrFetch } from '../offlineDb';
 import AppSwitcher from '../components/AppSwitcher';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
+import { SkeletonStatRow, SkeletonList } from '../components/Skeleton';
 
 function UpgradePrompt() {
   return (
@@ -54,7 +55,7 @@ export default function AnalyticsPage() {
         </div>
 
         {loading ? (
-          <p style={styles.loadingText}>Loading…</p>
+          <><SkeletonStatRow count={4} style={{ marginBottom: 16 }} /><SkeletonList count={4} /></>
         ) : plan.isBusiness ? (
           <AnalyticsDashboard />
         ) : (

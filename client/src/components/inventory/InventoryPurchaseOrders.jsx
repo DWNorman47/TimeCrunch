@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
+import { SkeletonList } from '../Skeleton';
 
 function useStatus(t) {
   return {
@@ -863,7 +864,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
       {loadDetailError && <div style={l.error}>{loadDetailError}</div>}
 
       {loading ? (
-        <div style={l.empty}>{t.loading}</div>
+        <SkeletonList count={4} rows={2} />
       ) : pos.length === 0 ? (
         <div style={l.empty}>
           <div style={l.emptyIcon}>📋</div>

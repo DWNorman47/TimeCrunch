@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
+import { SkeletonList } from '../Skeleton';
 
 function formatBin(area_name, rack_name, bay_name, compartment_name) {
   return [area_name, rack_name, bay_name, compartment_name]
@@ -46,7 +47,7 @@ function HistoryPanel({ item, onClose }) {
         </div>
         {error && <div style={h.error}>{error}</div>}
         {loading ? (
-          <div style={h.empty}>{t.loading}</div>
+          <SkeletonList count={3} rows={1} />
         ) : rows.length === 0 ? (
           <div style={h.empty}>{t.invStockNoHistory}</div>
         ) : (
@@ -490,7 +491,7 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
       {error && <div style={s.error}>{error}</div>}
 
       {loading ? (
-        <div style={s.empty}>{t.loading}</div>
+        <SkeletonList count={5} rows={2} />
       ) : stock.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>📦</div>

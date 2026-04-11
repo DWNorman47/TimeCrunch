@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
+import { SkeletonList, SkeletonBlock } from './Skeleton';
 
 const TALK_LIBRARY = [
   { title: 'Fall Protection', content: 'Key Points:\n• Workers at 6 ft or more must be protected from falls\n• Fall protection methods: guardrails, safety nets, personal fall arrest systems (PFAS)\n• Inspect all harnesses and lanyards before each use — retire any that has been in a fall\n• Keep work areas clear of tripping hazards\n\nHazards to watch for:\n• Unprotected floor openings and roof edges without guardrails\n• Scaffolding without toe boards\n\nAction: Report missing or damaged fall protection immediately. Do not work at heights without protection in place.' },
@@ -409,7 +410,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
               {uploadError && <p style={styles.error}>{uploadError}</p>}
               {attachDeleteError && <p style={styles.error}>{attachDeleteError}</p>}
               {attachments === null ? (
-                <p style={styles.hint}>Loading...</p>
+                <SkeletonBlock width="100%" height={36} style={{ marginTop: 8 }} />
               ) : attachments.length === 0 ? (
                 <p style={styles.hint}>{t.noAttachments}</p>
               ) : (
@@ -452,7 +453,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
               )}
             </div>
             {signoffs === null ? (
-              <p style={styles.hint}>Loading...</p>
+              <SkeletonBlock width="60%" height={24} style={{ marginTop: 6 }} />
             ) : signoffs.length === 0 ? (
               <p style={styles.hint}>{t.noSignoffs}</p>
             ) : (
@@ -569,7 +570,7 @@ export default function SafetyTalks({ projects }) {
       )}
 
       {loading ? (
-        <p style={styles.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : talks.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>🦺</div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 function fmt(dateStr) {
   return new Date(dateStr.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -85,7 +86,7 @@ export default function ManagePayPeriods() {
         {error && <p style={styles.error}>{error}</p>}
       </form>
 
-      {loading ? <p style={{ color: '#888', fontSize: 13 }}>{t.loading}</p> : periods.length === 0 ? (
+      {loading ? <SkeletonList count={3} rows={1} /> : periods.length === 0 ? (
         <p style={styles.empty}>{t.noLockedPeriods}</p>
       ) : (
         <div style={styles.list}>

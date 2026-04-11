@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
+import { SkeletonList } from './Skeleton';
 
 function today() {
   return new Date().toLocaleDateString('en-CA');
@@ -245,7 +246,7 @@ export default function SubReports({ projects }) {
       </div>
 
       {loading ? (
-        <p style={styles.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : reports.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>🏗️</div>

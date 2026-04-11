@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 function daysLeft(dateStr) {
   if (!dateStr) return 0;
@@ -124,7 +125,7 @@ export default function BillingPanel() {
     }
   };
 
-  if (loading) return <div style={s.card}><p style={{ color: '#888' }}>{t.loading}</p></div>;
+  if (loading) return <div style={s.card}><SkeletonList count={3} rows={2} /></div>;
 
   const sub = status?.subscription_status;
   const currentPlan = status?.plan || 'free';

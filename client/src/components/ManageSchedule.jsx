@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 import {
   DndContext, DragOverlay, PointerSensor, TouchSensor,
   useSensor, useSensors, useDroppable, useDraggable,
@@ -555,7 +556,7 @@ export default function ManageSchedule({ workers, projects }) {
         }
       </div>
 
-      {loading ? <p style={{ color: '#888', fontSize: 13 }}>{t.loading}</p> : viewMode === 'summary' ? (
+      {loading ? <SkeletonList count={4} rows={2} /> : viewMode === 'summary' ? (
         <SummaryView shifts={shifts} days={days} />
       ) : (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
