@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
+import { getOrFetch } from '../offlineDb';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
 import FieldDayLog from '../components/FieldDayLog';
@@ -37,9 +38,12 @@ export default function FieldPage() {
 
   useEffect(() => {
     const init = async () => {
-      const [p, s] = await Promise.all([api.get('/projects'), api.get('/settings')]);
-      setFeatures(s.data);
-      setProjects(p.data);
+      const [p, s] = await Promise.all([
+        getOrFetch('projects', () => api.get('/projects').then(r => r.data)),
+        getOrFetch('settings', () => api.get('/settings').then(r => r.data)),
+      ]);
+      setFeatures(s);
+      setProjects(p);
       setLoading(false);
     };
     init();

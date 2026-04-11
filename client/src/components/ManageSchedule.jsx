@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { useT } from '../hooks/useT';
@@ -97,18 +97,22 @@ function SummaryView({ shifts, days }) {
   const [cantOnly, setCantOnly] = useState(false);
 
   // Build worker → day → shifts map
-  const workerMap = {};
-  shifts.forEach(s => {
-    const name = s.worker_name;
-    if (!workerMap[name]) workerMap[name] = { name, byDay: {} };
-    const key = s.shift_date.substring(0, 10);
-    if (!workerMap[name].byDay[key]) workerMap[name].byDay[key] = [];
-    workerMap[name].byDay[key].push(s);
-  });
-  let rows = Object.values(workerMap).sort((a, b) => a.name.localeCompare(b.name));
-  if (cantOnly) rows = rows.filter(row => Object.values(row.byDay).some(arr => arr.some(s => s.cant_make_it)));
+  const { workerMap, hasCantFlags } = useMemo(() => {
+    const map = {};
+    shifts.forEach(s => {
+      const name = s.worker_name;
+      if (!map[name]) map[name] = { name, byDay: {} };
+      const key = s.shift_date.substring(0, 10);
+      if (!map[name].byDay[key]) map[name].byDay[key] = [];
+      map[name].byDay[key].push(s);
+    });
+    return { workerMap: map, hasCantFlags: shifts.some(s => s.cant_make_it) };
+  }, [shifts]);
 
-  const hasCantFlags = shifts.some(s => s.cant_make_it);
+  let rows = useMemo(() => {
+    const sorted = Object.values(workerMap).sort((a, b) => a.name.localeCompare(b.name));
+    return cantOnly ? sorted.filter(row => Object.values(row.byDay).some(arr => arr.some(s => s.cant_make_it))) : sorted;
+  }, [workerMap, cantOnly]);
 
   if (Object.values(workerMap).length === 0) return <p style={{ color: '#9ca3af', fontSize: 13, padding: '16px 0' }}>{t.msNoShiftsWeek}</p>;
 
@@ -248,7 +252,7 @@ export default function ManageSchedule({ workers, projects }) {
     }
   };
 
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const from = toISO(days[0]);
   const to = toISO(days[6]);
 
@@ -448,15 +452,18 @@ export default function ManageSchedule({ workers, projects }) {
     setPendingMoves(prev => ({ ...prev, [shiftId]: newDate }));
   };
 
-  const shiftsByDay = {};
-  days.forEach(d => { shiftsByDay[toISO(d)] = []; });
-  shifts.forEach(s => {
-    const key = s.shift_date.substring(0, 10);
-    if (shiftsByDay[key]) shiftsByDay[key].push(s);
-  });
+  const shiftsByDay = useMemo(() => {
+    const map = {};
+    days.forEach(d => { map[toISO(d)] = []; });
+    shifts.forEach(s => {
+      const key = s.shift_date.substring(0, 10);
+      if (map[key]) map[key].push(s);
+    });
+    return map;
+  }, [shifts, days]);
 
   const shiftProps = { editingId, startEdit, setEditingId, dragMode };
-  const editingShift = editingId ? shifts.find(s => s.id === editingId) : null;
+  const editingShift = useMemo(() => editingId ? shifts.find(s => s.id === editingId) : null, [editingId, shifts]);
 
   return (
     <div style={styles.card}>
