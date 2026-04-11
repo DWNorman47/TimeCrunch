@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { fmtHours } from '../utils';
 import EntryPanel from './EntryPanel';
 import api from '../api';
@@ -71,28 +71,31 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
     }
   };
 
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const todayKey = toDateKey(new Date());
 
   // Group entries by date
-  const byDate = {};
-  entries.forEach(e => {
-    const key = e.work_date.substring(0, 10);
-    if (!byDate[key]) byDate[key] = [];
-    byDate[key].push(e);
-  });
+  const byDate = useMemo(() => {
+    const map = {};
+    entries.forEach(e => {
+      const key = e.work_date.substring(0, 10);
+      if (!map[key]) map[key] = [];
+      map[key].push(e);
+    });
+    return map;
+  }, [entries]);
 
   const weekLabel = `${formatMonthDay(days[0])} \u2013 ${formatMonthDay(days[6])}, ${days[6].getFullYear()}`;
 
-  const weekTotalHours = days.reduce((sum, d) => {
+  const weekTotalHours = useMemo(() => days.reduce((sum, d) => {
     const key = toDateKey(d);
     return sum + (byDate[key] || []).reduce((s, e) => s + netHours(e.start_time, e.end_time, e.break_minutes), 0);
-  }, 0);
+  }, 0), [days, byDate]);
 
-  const weekTotalMiles = days.reduce((sum, d) => {
+  const weekTotalMiles = useMemo(() => days.reduce((sum, d) => {
     const key = toDateKey(d);
     return sum + (byDate[key] || []).reduce((s, e) => s + (parseFloat(e.mileage) || 0), 0);
-  }, 0);
+  }, 0), [days, byDate]);
 
   return (
     <div style={styles.card} className="mobile-card">

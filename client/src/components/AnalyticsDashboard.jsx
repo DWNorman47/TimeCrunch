@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line,
 } from 'recharts';
@@ -104,45 +104,51 @@ export default function AnalyticsDashboard() {
   const { summary, daily_hours, weekly_hours, project_hours, worker_hours } = data;
 
   // Fill daily chart — build a date range and zero-fill missing days
-  const dailyMap = Object.fromEntries(daily_hours.map(d => [d.date, parseFloat(d.hours)]));
-  const dailyFilled = [];
-  if (showCustom && customFrom && customTo) {
-    const start = new Date(customFrom + 'T00:00:00');
-    const end = new Date(customTo + 'T00:00:00');
-    const rangeDays = Math.min(90, Math.round((end - start) / 86400000) + 1);
-    for (let i = 0; i < rangeDays; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      const key = toLocalDate(d);
-      dailyFilled.push({ date: key, hours: dailyMap[key] || 0 });
+  const dailyFilled = useMemo(() => {
+    const dailyMap = Object.fromEntries(daily_hours.map(d => [d.date, parseFloat(d.hours)]));
+    const result = [];
+    if (showCustom && customFrom && customTo) {
+      const start = new Date(customFrom + 'T00:00:00');
+      const end = new Date(customTo + 'T00:00:00');
+      const rangeDays = Math.min(90, Math.round((end - start) / 86400000) + 1);
+      for (let i = 0; i < rangeDays; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const key = toLocalDate(d);
+        result.push({ date: key, hours: dailyMap[key] || 0 });
+      }
+    } else if (!showCustom) {
+      for (let i = preset - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = toLocalDate(d);
+        result.push({ date: key, hours: dailyMap[key] || 0 });
+      }
+    } else {
+      // Custom mode but dates not fully set — show whatever server returned
+      daily_hours.forEach(d => result.push({ date: d.date, hours: parseFloat(d.hours) }));
     }
-  } else if (!showCustom) {
-    for (let i = preset - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = toLocalDate(d);
-      dailyFilled.push({ date: key, hours: dailyMap[key] || 0 });
-    }
-  } else {
-    // Custom mode but dates not fully set — show whatever server returned
-    daily_hours.forEach(d => dailyFilled.push({ date: d.date, hours: parseFloat(d.hours) }));
-  }
+    return result;
+  }, [daily_hours, showCustom, customFrom, customTo, preset]);
 
   // Fill weekly chart
-  const weeklyMap = Object.fromEntries((weekly_hours || []).map(d => [d.week_start, parseFloat(d.hours)]));
-  const weeklyFilled = [];
-  if (showCustom) {
-    // Use server data as-is for custom range
-    (weekly_hours || []).forEach(w => weeklyFilled.push({ week_start: w.week_start, hours: parseFloat(w.hours) }));
-  } else {
-    const weekCount = Math.ceil(preset / 7);
-    for (let i = weekCount - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - d.getDay() - i * 7);
-      const key = toLocalDate(d);
-      weeklyFilled.push({ week_start: key, hours: weeklyMap[key] || 0 });
+  const weeklyFilled = useMemo(() => {
+    const weeklyMap = Object.fromEntries((weekly_hours || []).map(d => [d.week_start, parseFloat(d.hours)]));
+    const result = [];
+    if (showCustom) {
+      // Use server data as-is for custom range
+      (weekly_hours || []).forEach(w => result.push({ week_start: w.week_start, hours: parseFloat(w.hours) }));
+    } else {
+      const weekCount = Math.ceil(preset / 7);
+      for (let i = weekCount - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - d.getDay() - i * 7);
+        const key = toLocalDate(d);
+        result.push({ week_start: key, hours: weeklyMap[key] || 0 });
+      }
     }
-  }
+    return result;
+  }, [weekly_hours, showCustom, customFrom, customTo, preset]);
 
   const rangeLabel = showCustom
     ? (customFrom && customTo ? `${customFrom} – ${customTo}` : t.adCustom)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import MessageThread from './MessageThread';
 import { useAuth } from '../contexts/AuthContext';
@@ -217,23 +217,25 @@ export default function ApprovalQueue({ onCountChange }) {
     } finally { setWorking(null); }
   };
 
-  const visibleEntries = entries.filter(e => {
+  const visibleEntries = useMemo(() => entries.filter(e => {
     if (workerFilter && e.worker_name !== workerFilter) return false;
     if (dateFrom && e.work_date.substring(0, 10) < dateFrom) return false;
     if (dateTo && e.work_date.substring(0, 10) > dateTo) return false;
     return true;
-  });
+  }), [entries, workerFilter, dateFrom, dateTo]);
 
-  const workerNames = [...new Set(entries.map(e => e.worker_name))].sort();
+  const workerNames = useMemo(() => [...new Set(entries.map(e => e.worker_name))].sort(), [entries]);
 
   // Group by work_date, sorted most recent first
-  const entriesByDay = visibleEntries.reduce((acc, e) => {
-    const day = e.work_date.substring(0, 10);
-    if (!acc[day]) acc[day] = [];
-    acc[day].push(e);
-    return acc;
-  }, {});
-  const sortedDays = Object.keys(entriesByDay).sort((a, b) => b.localeCompare(a));
+  const { entriesByDay, sortedDays } = useMemo(() => {
+    const byDay = visibleEntries.reduce((acc, e) => {
+      const day = e.work_date.substring(0, 10);
+      if (!acc[day]) acc[day] = [];
+      acc[day].push(e);
+      return acc;
+    }, {});
+    return { entriesByDay: byDay, sortedDays: Object.keys(byDay).sort((a, b) => b.localeCompare(a)) };
+  }, [visibleEntries]);
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {

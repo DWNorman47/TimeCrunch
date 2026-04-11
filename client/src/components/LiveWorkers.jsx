@@ -82,7 +82,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
     fetchActive();
     fetchInactive();
     fetchTodayShifts();
-    intervalRef.current = setInterval(() => { fetchActive(); fetchTodayShifts(); }, 30000);
+    intervalRef.current = setInterval(() => { fetchActive(); fetchTodayShifts(); }, 90000);
     const onVisible = () => {
       if (document.visibilityState === 'visible') fetchActive();
     };

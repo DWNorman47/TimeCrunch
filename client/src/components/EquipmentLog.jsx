@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
@@ -352,8 +352,8 @@ export default function EquipmentLog({ projects }) {
     ));
   };
 
-  const totalHrs = items.reduce((s, i) => s + parseFloat(i.total_hours || 0), 0);
-  const overdueCount = items.filter(i => i.maintenance_interval_hours && parseFloat(i.total_hours) >= i.maintenance_interval_hours).length;
+  const totalHrs = useMemo(() => items.reduce((s, i) => s + parseFloat(i.total_hours || 0), 0), [items]);
+  const overdueCount = useMemo(() => items.filter(i => i.maintenance_interval_hours && parseFloat(i.total_hours) >= i.maintenance_interval_hours).length, [items]);
 
   return (
     <div>
