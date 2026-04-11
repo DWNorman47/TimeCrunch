@@ -96,7 +96,7 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
       </div>
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : t.addItem}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.addItem}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -285,7 +285,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
                     onChange={e => setNewCheckText(e.target.value)}
                   />
                   {newCheckText.trim() && (
-                    <button type="submit" style={styles.checkAddBtn} disabled={addingCheck}>{t.add}</button>
+                    <button type="submit" style={{ ...styles.checkAddBtn, ...(addingCheck ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={addingCheck}>{t.add}</button>
                   )}
                 </form>
               </>
@@ -302,7 +302,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
             </div>
           )}
           <div style={styles.itemActions}>
-            <button style={styles.advanceBtn} onClick={advance} disabled={updating}>
+            <button style={{ ...styles.advanceBtn, ...(updating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={advance} disabled={updating}>
               {updating ? '...' : nextLabel[item.status] || t.markDone}
             </button>
             {confirmingDelete ? (
@@ -409,7 +409,7 @@ export default function Punchlist({ projects }) {
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {items.length > 0 && <button style={styles.pdfBtn} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? 'Preparing…' : 'Export PDF'}</button>}
+          {items.length > 0 && <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? 'Preparing…' : 'Export PDF'}</button>}
           <button style={styles.newBtn} onClick={() => setShowForm(true)}>{t.newPunchlistItem}</button>
         </div>
       </div>

@@ -69,7 +69,7 @@ export default function TimesheetSignOff({ t }) {
           <label style={styles.label}>To</label>
           <input style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
         </div>
-        <button style={styles.loadBtn} onClick={load} disabled={loading}>{loading ? 'Loading...' : 'Load'}</button>
+        <button style={{ ...styles.loadBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={load} disabled={loading}>{loading ? 'Loading...' : 'Load'}</button>
       </div>
 
       {!loading && entries.length === 0 && (
@@ -100,14 +100,14 @@ export default function TimesheetSignOff({ t }) {
               {confirmSign ? (
                 <>
                   <span style={styles.signHint}>Sign off on {unsigned.length} entr{unsigned.length === 1 ? 'y' : 'ies'}? Your manager will be notified to review.</span>
-                  <button style={styles.signBtn} onClick={signOff} disabled={signing}>
+                  <button style={{ ...styles.signBtn, ...(signing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={signOff} disabled={signing}>
                     {signing ? 'Signing...' : 'Confirm'}
                   </button>
                   <button style={styles.cancelSignBtn} onClick={() => setConfirmSign(false)}>Cancel</button>
                 </>
               ) : (
                 <>
-                  <button style={styles.signBtn} onClick={() => setConfirmSign(true)} disabled={signing}>
+                  <button style={{ ...styles.signBtn, ...(signing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setConfirmSign(true)} disabled={signing}>
                     {`✍ Sign & Submit ${unsigned.length} entr${unsigned.length === 1 ? 'y' : 'ies'}`}
                   </button>
                   <span style={styles.signHint}>Your manager will be notified to review.</span>

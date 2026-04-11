@@ -909,7 +909,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
         </div>
         {pos.length < posTotal && (
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
-            <button style={l.loadMoreBtn} onClick={loadMorePos} disabled={loadingMore}>
+            <button style={{ ...l.loadMoreBtn, ...(loadingMore ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={loadMorePos} disabled={loadingMore}>
               {loadingMore ? t.loading : t.loadMore}
             </button>
             <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>{pos.length} / {posTotal}</span>

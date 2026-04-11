@@ -532,7 +532,7 @@ export default function ManageSchedule({ workers, projects }) {
         <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>{t.today}</button>
         <button style={styles.exportBtn} onClick={() => exportCSV(shifts, days)} title="Export week as CSV">⬇ CSV</button>
         {shifts.length > 0 && (
-          <button style={styles.copyWeekBtn} onClick={copyWeek} disabled={copyingWeek} title={t.msCopyWeek}>
+          <button style={{ ...styles.copyWeekBtn, ...(copyingWeek ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={copyWeek} disabled={copyingWeek} title={t.msCopyWeek}>
             {copyingWeek ? t.msCopying : '⧉ ' + t.msCopyWeek}
           </button>
         )}

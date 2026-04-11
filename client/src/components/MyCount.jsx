@@ -191,7 +191,7 @@ export default function MyCount() {
     <div style={s.wrap}>
       <div style={s.headerRow}>
         <h2 style={s.title}>{t.myCountTitle}</h2>
-        <button style={s.refreshBtn} onClick={() => load(true)} disabled={offline}>
+        <button style={{ ...s.refreshBtn, ...(offline ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => load(true)} disabled={offline}>
           {offline ? t.myCountOffline : t.myCountRefresh}
         </button>
       </div>

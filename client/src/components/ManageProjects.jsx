@@ -444,7 +444,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                           <input style={s.geoInput} type="number" step="0.000001" placeholder={t.latitude} value={editGeoLat} onChange={e => setEditGeoLat(e.target.value)} />
                           <input style={s.geoInput} type="number" step="0.000001" placeholder={t.longitude} value={editGeoLng} onChange={e => setEditGeoLng(e.target.value)} />
                           <input style={s.geoInput} type="number" min="50" step="50" placeholder={t.radiusFt} value={editGeoRadius} onChange={e => setEditGeoRadius(e.target.value)} />
-                          <button style={s.geoLocBtn} type="button" onClick={useMyLocation} disabled={geoLocating}>
+                          <button style={{ ...s.geoLocBtn, ...(geoLocating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="button" onClick={useMyLocation} disabled={geoLocating}>
                             {geoLocating ? '...' : t.myLocation}
                           </button>
                           {p.geo_radius_ft && (confirmingClearGeoId === p.id ? (
@@ -542,8 +542,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
               </select>
             </div>
             <div style={s.modalActions}>
-              <button style={s.cancelBtn} onClick={() => setMergeSource(null)} disabled={mergeSaving}>Cancel</button>
-              <button style={s.mergeConfirmBtn} onClick={handleConfirmMerge} disabled={!mergeTargetId || mergeSaving}>
+              <button style={{ ...s.cancelBtn, ...(mergeSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setMergeSource(null)} disabled={mergeSaving}>Cancel</button>
+              <button style={{ ...s.mergeConfirmBtn, ...(!mergeTargetId || mergeSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleConfirmMerge} disabled={!mergeTargetId || mergeSaving}>
                 {mergeSaving ? 'Merging...' : 'Merge & Delete'}
               </button>
             </div>
@@ -564,11 +564,11 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
               </div>
             )}
             <div style={s.modalDownload}>
-              <button style={s.downloadBtn} onClick={handleDownloadZip} disabled={archiveDownloading}>
+              <button style={{ ...s.downloadBtn, ...(archiveDownloading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDownloadZip} disabled={archiveDownloading}>
                 {archiveDownloading ? 'Preparing ZIP...' : 'Download media as ZIP'}
               </button>
               {!settings?.media_delete_on_project_archive && (
-                <button style={{ ...s.downloadBtn, background: '#6b7280', marginTop: 4 }} onClick={handleDownloadMediaUrls} disabled={archiveDownloading}>
+                <button style={{ ...s.downloadBtn, background: '#6b7280', marginTop: 4, ...(archiveDownloading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDownloadMediaUrls} disabled={archiveDownloading}>
                   Download media URL list (.txt)
                 </button>
               )}

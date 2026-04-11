@@ -496,7 +496,7 @@ export default function InventoryItems({ onItemChange }) {
                             <button style={s.iconBtn} onClick={() => setEditingItem(item)} aria-label="Edit item">✏️</button>
                             {pendingArchiveItemId === item.id ? (
                               <>
-                                <button style={s.confirmArchiveBtn} onClick={() => archive(item)} disabled={archiving === item.id}>{t.confirm}</button>
+                                <button style={{ ...s.confirmArchiveBtn, ...(archiving === item.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => archive(item)} disabled={archiving === item.id}>{t.confirm}</button>
                                 <button style={s.iconBtn} aria-label="Cancel archive" onClick={() => setPendingArchiveItemId(null)}>✕</button>
                               </>
                             ) : (
@@ -516,8 +516,8 @@ export default function InventoryItems({ onItemChange }) {
                   <span style={s.pageInfo}>
                     {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
                   </span>
-                  <button style={s.pageBtn} disabled={page === 0} onClick={() => { const p = page - 1; setPage(p); load(p); }}>← Prev</button>
-                  <button style={s.pageBtn} disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => { const p = page + 1; setPage(p); load(p); }}>Next →</button>
+                  <button style={{ ...s.pageBtn, ...(page === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={page === 0} onClick={() => { const p = page - 1; setPage(p); load(p); }}>← Prev</button>
+                  <button style={{ ...s.pageBtn, ...((page + 1) * PAGE_SIZE >= total ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => { const p = page + 1; setPage(p); load(p); }}>Next →</button>
                 </div>
               )}
             </div>

@@ -253,14 +253,14 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
 
           <div style={styles.cardActions}>
             {isAdmin && incident.status !== 'closed' && (
-              <button style={styles.closeBtn} onClick={handleClose} disabled={closing}>
+              <button style={{ ...styles.closeBtn, ...(closing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleClose} disabled={closing}>
                 {closing ? '…' : t.closeIncident}
               </button>
             )}
             {(!isAdmin || incident.status !== 'closed') && (
               confirmingDelete ? (
                 <>
-                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                  <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
                   <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
                 </>
               ) : (
@@ -340,7 +340,7 @@ export default function IncidentReports({ projects }) {
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {incidents.length > 0 && <button style={styles.pdfBtn} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? 'Preparing…' : 'Export PDF'}</button>}
+          {incidents.length > 0 && <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? 'Preparing…' : 'Export PDF'}</button>}
           {!showForm && <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ {t.newIncident}</button>}
         </div>
       </div>

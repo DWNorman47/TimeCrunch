@@ -224,7 +224,7 @@ function DocList({ clientId, docs, onDeleted }) {
                 <button style={s.cancelDocDeleteBtn} onClick={() => setPendingDeleteDocId(null)}>{t.cancel}</button>
               </>
             ) : (
-              <button style={s.docDeleteBtn} aria-label="Delete document" onClick={() => setPendingDeleteDocId(doc.id)} disabled={deleting === doc.id}>
+              <button style={{ ...s.docDeleteBtn, ...(deleting === doc.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Delete document" onClick={() => setPendingDeleteDocId(doc.id)} disabled={deleting === doc.id}>
                 {deleting === doc.id ? '…' : '✕'}
               </button>
             )}
@@ -326,7 +326,7 @@ function ClientCard({ client, onEdit, onDeleted }) {
             <button style={s.editBtn} onClick={() => onEdit(client)}>{t.edit}</button>
             {confirmingDelete ? (
               <>
-                <button style={s.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                <button style={{ ...s.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
                 <button style={s.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
               </>
             ) : (
