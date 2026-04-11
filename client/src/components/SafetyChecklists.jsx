@@ -141,7 +141,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
               <option value="check">{t.checklistTypeCheckbox}</option>
               <option value="text">{t.checklistTypeText}</option>
             </select>
-            <button type="button" style={styles.removeItemBtn} onClick={() => removeItem(item._id)}>✕</button>
+            <button type="button" style={styles.removeItemBtn} aria-label="Remove item" onClick={() => removeItem(item._id)}>✕</button>
           </div>
         ))}
         {items.length === 0 && <p style={styles.hint}>{t.noItemsYet}</p>}

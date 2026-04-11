@@ -404,6 +404,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                 placeholder="Add a note..."
                 maxLength={500}
               />
+              <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{clockInNotes.length}/500</div>
             </div>
             <div style={styles.modalActions}>
               <button

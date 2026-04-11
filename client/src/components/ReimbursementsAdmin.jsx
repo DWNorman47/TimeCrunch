@@ -99,6 +99,7 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
               rows={2}
               maxLength={1000}
             />
+            <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{notes.length}/1000</div>
           </div>
           {error && <div style={s.error}>{error}</div>}
           <div style={s.actions}>
