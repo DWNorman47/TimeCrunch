@@ -117,6 +117,7 @@ export default function TimeOffTab() {
           <div style={s.fieldGroup}>
             <label style={s.label}>{t.noteOptionalLabel}</label>
             <textarea style={{ ...s.input, resize: 'vertical', minHeight: 56 }} maxLength={500} value={form.note} onChange={e => set('note', e.target.value)} placeholder={t.noteDetailsPlaceholder} />
+            <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.note || '').length}/500</div>
           </div>
           {error && <p style={s.error}>{error}</p>}
           <button style={{ ...s.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>
