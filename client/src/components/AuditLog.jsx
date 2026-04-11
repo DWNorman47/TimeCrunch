@@ -101,7 +101,11 @@ export default function AuditLog({ timezone = '' }) {
       {loading && entries.length === 0 ? (
         <SkeletonList count={5} rows={2} />
       ) : entries.length === 0 ? (
-        <p style={styles.empty}>{t.auditNoActivity}</p>
+        <div style={styles.emptyState}>
+          <div style={styles.emptyIcon}>📋</div>
+          <p style={styles.emptyTitle}>{t.auditNoActivity}</p>
+          <p style={styles.emptySubtitle}>Actions taken by admins and workers will appear here.</p>
+        </div>
       ) : (
         <>
           <div style={styles.list}>
@@ -156,7 +160,10 @@ const styles = {
   filterSelect: { padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, background: '#fff' },
   filterDate: { padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 },
   clearBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '5px 12px', borderRadius: 7, fontSize: 12, cursor: 'pointer' },
-  empty: { color: '#9ca3af', fontSize: 14, padding: '16px 0' },
+  emptyState: { textAlign: 'center', padding: '40px 20px' },
+  emptyIcon: { fontSize: 32, marginBottom: 10 },
+  emptyTitle: { fontSize: 14, fontWeight: 600, color: '#374151', margin: '0 0 4px' },
+  emptySubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
   list: { display: 'flex', flexDirection: 'column', gap: 1 },
   row: { display: 'flex', gap: 16, padding: '12px 4px', borderBottom: '1px solid #f3f4f6', alignItems: 'flex-start' },
   rowTime: { display: 'flex', flexDirection: 'column', minWidth: 90, flexShrink: 0 },

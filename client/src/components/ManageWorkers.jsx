@@ -463,15 +463,15 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
             <form onSubmit={handleAdd} style={s.addForm}>
               <div style={s.formGrid}>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.firstName}</label>
+                  <label style={s.label}>{t.firstName}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
                   <input style={s.input} value={form.first_name} onChange={e => handleFirstNameChange(e.target.value)} required />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.lastName}</label>
+                  <label style={s.label}>{t.lastName}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
                   <input style={s.input} value={form.last_name} onChange={e => handleLastNameChange(e.target.value)} required />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>Username{usernameChecking ? ' (checking...)' : usernameTaken ? ' ⚠ taken' : ''}</label>
+                  <label style={s.label}>Username<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>{usernameChecking ? ' (checking...)' : usernameTaken ? ' ⚠ taken' : ''}</label>
                   <input
                     style={{ ...s.input, borderColor: usernameTaken ? '#fca5a5' : undefined }}
                     value={form.username}
@@ -481,7 +481,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.temporaryPassword}</label>
+                  <label style={s.label}>{t.temporaryPassword}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
                   <div style={{ position: 'relative' }}>
                     <input style={{ ...s.input, width: '100%', paddingRight: 36, boxSizing: 'border-box' }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
                     <button type="button" onClick={() => setShowPassword(v => !v)} style={s.eyeBtn} tabIndex={-1}>{showPassword ? '🙈' : '👁'}</button>

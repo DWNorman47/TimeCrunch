@@ -113,7 +113,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
 
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>{t.templateNameLabel}</label>
+          <label style={styles.label}>{t.templateNameLabel}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
           <input style={styles.input} type="text" maxLength={255} value={name} onChange={e => setName(e.target.value)} placeholder={t.checklistNamePlaceholder} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>

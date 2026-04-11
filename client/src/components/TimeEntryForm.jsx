@@ -86,7 +86,7 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
       {!collapsed && <form onSubmit={handleSubmit} style={styles.form}>
         <div style={styles.row} className="form-row">
           {projectsEnabled && <div style={styles.field}>
-            <label style={styles.label}>{t.project}</label>
+            <label style={styles.label}>{t.project}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
             <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)} required>
               <option value="">{t.selectProject}</option>
               {projects.map(p => (
@@ -97,17 +97,17 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
             </select>
           </div>}
           <div style={styles.field}>
-            <label style={styles.label}>{t.date}</label>
+            <label style={styles.label}>{t.date}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
             <input style={styles.input} type="date" value={form.work_date} onChange={e => set('work_date', e.target.value)} required />
           </div>
         </div>
         <div style={styles.row} className="form-row">
           <div style={styles.field}>
-            <label style={styles.label}>{t.startTime}</label>
+            <label style={styles.label}>{t.startTime}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
             <input style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.endTime}</label>
+            <label style={styles.label}>{t.endTime}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
             <input style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required />
           </div>
         </div>
@@ -146,7 +146,7 @@ const styles = {
   heading: { margin: 0, fontSize: 18, fontWeight: 700 },
   chevron: { fontSize: 16, color: '#9ca3af', transition: 'transform 0.2s', display: 'inline-block', marginBottom: 0 },
   form: { display: 'flex', flexDirection: 'column', gap: 14, marginTop: 20 },
-  row: { display: 'flex', gap: 12 },
+  row: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   field: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1 },
   label: { fontSize: 13, fontWeight: 600, color: '#555' },
   input: { padding: '9px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, width: '100%' },

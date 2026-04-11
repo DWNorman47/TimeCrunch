@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useToast } from '../contexts/ToastContext';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 function isEditable(dateStr) {
@@ -16,6 +17,7 @@ function midTime(start, end) {
 
 export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted, onClose }) {
   const t = useT();
+  const toast = useToast();
   const editable = !entry.locked && isEditable(entry.work_date);
   const mid = midTime(entry.start_time, entry.end_time);
 
@@ -44,6 +46,7 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
     try {
       await api.patch(`/time-entries/${entry.id}`, editForm);
       await onRefresh();
+      toast('Entry updated', 'success');
       onClose?.();
     } catch (err) { setEditError(err.response?.data?.error || t.entryPanelFailedSave); }
     finally { setEditSaving(false); }
@@ -119,7 +122,7 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
               </div>
               {editError && <p style={s.error}>{editError}</p>}
               <div style={s.actions}>
-                <button style={s.saveBtn} onClick={handleSaveEdit} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
+                <button style={{ ...s.saveBtn, ...(editSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleSaveEdit} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
                 <button style={s.cancelBtn} onClick={onClose}>{t.cancel}</button>
               </div>
             </>
@@ -170,7 +173,7 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
           {confirmingDelete ? (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 13, color: '#374151' }}>{t.entryPanelDeleteConfirm}</span>
-              <button style={s.deleteConfirmBtn} onClick={handleDelete} disabled={deleting}>{deleting ? t.entryPanelDeleting : t.confirm}</button>
+              <button style={{ ...s.deleteConfirmBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? t.entryPanelDeleting : t.confirm}</button>
               <button style={s.cancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
             </div>
           ) : (

@@ -199,7 +199,11 @@ export default function ReimbursementsView() {
       )}
 
       {items.length === 0 && !showForm ? (
-        <div style={s.empty}>{t.noReimbursementsYet}</div>
+        <div style={s.emptyState}>
+          <div style={s.emptyIcon}>💰</div>
+          <p style={s.emptyTitle}>{t.noReimbursementsYet}</p>
+          <p style={s.emptySubtitle}>Submit your first expense request using the button above.</p>
+        </div>
       ) : (
         <div style={s.list}>
           {items.map(item => (
@@ -264,7 +268,10 @@ const s = {
   preview: { marginTop: 8, maxWidth: 220, maxHeight: 180, borderRadius: 6, border: '1px solid #e5e7eb', objectFit: 'cover' },
   pdfHint: { marginTop: 8, fontSize: 12, color: '#6b7280' },
   submitBtn: { padding: '10px 24px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', alignSelf: 'flex-start' },
-  empty: { color: '#9ca3af', fontSize: 14, textAlign: 'center', padding: '24px 0' },
+  emptyState: { textAlign: 'center', padding: '48px 20px' },
+  emptyIcon: { fontSize: 36, marginBottom: 10 },
+  emptyTitle: { fontSize: 15, fontWeight: 600, color: '#374151', margin: '0 0 4px' },
+  emptySubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
   list: { display: 'flex', flexDirection: 'column', gap: 10 },
   card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 },
   cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },

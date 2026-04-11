@@ -139,6 +139,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       const r = await api.patch(`/admin/projects/${id}`, payload);
       onProjectUpdated(r.data);
       setExpandedId(null);
+      toast('Project updated', 'success');
     } catch {
       toast('Failed to update project', 'error');
     }

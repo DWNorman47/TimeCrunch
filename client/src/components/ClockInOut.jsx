@@ -338,7 +338,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                   autoFocus
                 />
                 <span style={styles.addedUnit}>min</span>
-                <button style={styles.removeBtn} onClick={() => { setBreakAdded(false); setBreakMinutes(''); }}>✕</button>
+                <button style={styles.removeBtn} aria-label="Remove break" onClick={() => { setBreakAdded(false); setBreakMinutes(''); }}>✕</button>
               </div>
             )}
             {mileageAdded && (
@@ -353,7 +353,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                   onChange={e => setMileage(e.target.value)}
                 />
                 <span style={styles.addedUnit}>mi</span>
-                <button style={styles.removeBtn} onClick={() => { setMileageAdded(false); setMileage(''); }}>✕</button>
+                <button style={styles.removeBtn} aria-label="Remove mileage" onClick={() => { setMileageAdded(false); setMileage(''); }}>✕</button>
               </div>
             )}
 

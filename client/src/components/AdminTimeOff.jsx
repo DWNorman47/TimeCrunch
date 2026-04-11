@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
 
 const TYPE_COLORS = { vacation: '#1d4ed8', sick: '#dc2626', personal: '#8b5cf6', other: '#6b7280' };
@@ -19,8 +20,10 @@ function days(start, end) {
 
 export default function AdminTimeOff({ settings }) {
   const t = useT();
+  const toast = useToast();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState('pending');
   const [reviewNote, setReviewNote] = useState({});
   const [acting, setActing] = useState(null);
@@ -41,10 +44,11 @@ export default function AdminTimeOff({ settings }) {
 
   const load = (status) => {
     setLoading(true);
+    setLoadError(false);
     // Load all to compute balances accurately; filter client-side if needed
     api.get('/time-off', { params: {} })
       .then(r => setRequests(r.data))
-      .catch(() => {})
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   };
 
@@ -56,6 +60,7 @@ export default function AdminTimeOff({ settings }) {
       const r = await api.patch(`/time-off/${id}/${action}`, { review_note: reviewNote[id] || null });
       setRequests(prev => prev.map(x => x.id === id ? r.data : x));
       setReviewNote(prev => { const n = { ...prev }; delete n[id]; return n; });
+      toast(action === 'approve' ? 'Request approved' : 'Request denied', 'success');
     } catch (err) {
       setActError(err.response?.data?.error || t.actionFailed);
     } finally { setActing(null); }
@@ -96,10 +101,19 @@ export default function AdminTimeOff({ settings }) {
         </div>
       </div>
 
-      {loading ? (
+      {loadError ? (
+        <div style={s.loadError}>
+          Failed to load time off requests.{' '}
+          <button style={s.retryBtn} onClick={() => load(filter)}>Try again</button>
+        </div>
+      ) : loading ? (
         <SkeletonList count={4} rows={2} />
       ) : visible.length === 0 ? (
-        <p style={s.empty}>{t.noTimeOffRequests}</p>
+        <div style={s.emptyState}>
+          <div style={s.emptyIcon}>📅</div>
+          <p style={s.emptyTitle}>{t.noTimeOffRequests}</p>
+          <p style={s.emptySubtitle}>Workers can submit time off requests from their dashboard.</p>
+        </div>
       ) : (
         <div style={s.list}>
           {[...pending, ...rest].map(r => {
@@ -201,5 +215,10 @@ const s = {
   denyBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' },
   actError: { fontSize: 12, color: '#ef4444' },
   meta: { fontSize: 12, color: '#9ca3af', marginTop: 8 },
-  empty: { color: '#9ca3af', fontSize: 14, textAlign: 'center', padding: '40px 0' },
+  loadError: { background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: 8, padding: '12px 16px', fontSize: 14 },
+  retryBtn: { background: 'none', border: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: 0 },
+  emptyState: { textAlign: 'center', padding: '48px 20px' },
+  emptyIcon: { fontSize: 36, marginBottom: 10 },
+  emptyTitle: { fontSize: 15, fontWeight: 600, color: '#374151', margin: '0 0 4px' },
+  emptySubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
 };

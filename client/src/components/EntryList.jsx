@@ -68,7 +68,13 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
     return groups;
   }, [entries]);
 
-  if (entries.length === 0) return <div style={styles.empty}>{t.noEntries}</div>;
+  if (entries.length === 0) return (
+    <div style={styles.emptyState}>
+      <div style={styles.emptyIcon}>📋</div>
+      <p style={styles.emptyTitle}>{t.noEntries}</p>
+      <p style={styles.emptySubtitle}>Log your first time entry using the form above.</p>
+    </div>
+  );
 
   const toggleExpand = id => {
     setExpandedId(prev => prev === id ? null : id);
@@ -208,5 +214,8 @@ const styles = {
   metaTag: { fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
   notes: { fontSize: 11, color: '#9ca3af', fontStyle: 'italic' },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 8, display: 'block' },
-  empty: { textAlign: 'center', color: '#888', padding: 32 },
+  emptyState: { textAlign: 'center', padding: '48px 20px', background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' },
+  emptyIcon: { fontSize: 36, marginBottom: 10 },
+  emptyTitle: { fontSize: 15, fontWeight: 600, color: '#374151', margin: '0 0 4px' },
+  emptySubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
 };

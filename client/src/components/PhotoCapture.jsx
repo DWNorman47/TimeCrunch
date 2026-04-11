@@ -47,7 +47,7 @@ export default function PhotoCapture({ photos, onChange, maxPhotos = 10 }) {
           <div key={i} style={styles.photoCard}>
             <div style={styles.photoImgWrap}>
               <img src={p.url} alt={`photo ${i + 1}`} style={styles.photoImg} loading="lazy" />
-              <button style={styles.removeBtn} onClick={() => remove(i)} title="Remove">✕</button>
+              <button style={styles.removeBtn} onClick={() => remove(i)} aria-label="Remove photo">✕</button>
             </div>
             <input
               style={styles.captionInput}
@@ -66,14 +66,14 @@ export default function PhotoCapture({ photos, onChange, maxPhotos = 10 }) {
               <span style={styles.compressingText}>Processing...</span>
             ) : (
               <>
-                <button style={styles.addBtn} onClick={() => cameraRef.current.click()} title="Take photo">
+                <button style={styles.addBtn} onClick={() => cameraRef.current.click()} aria-label="Take photo">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                     <circle cx="12" cy="13" r="4" />
                   </svg>
                   <span style={styles.addLabel}>Camera</span>
                 </button>
-                <button style={styles.addBtn} onClick={() => fileRef.current.click()} title="Upload photo">
+                <button style={styles.addBtn} onClick={() => fileRef.current.click()} aria-label="Upload photo">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="17 8 12 3 7 8" />
