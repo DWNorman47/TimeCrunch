@@ -140,7 +140,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     if (!isAdmin && report.user_id !== req.user.id) return res.status(403).json({ error: 'Not your report' });
     if (!isAdmin && report.status === 'closed') return res.status(403).json({ error: 'Closed incidents cannot be deleted' });
 
-    await pool.query('DELETE FROM incident_reports WHERE id = $1', [req.params.id]);
+    await pool.query('DELETE FROM incident_reports WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });

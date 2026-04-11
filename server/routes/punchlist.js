@@ -54,10 +54,12 @@ router.post('/', requireAuth, async (req, res) => {
   const title = req.body.title?.trim();
   const description = req.body.description?.trim() || null;
   const location = req.body.location?.trim() || null;
+  const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
   if (!title) return res.status(400).json({ error: 'title required' });
   if (title.length > 255) return res.status(400).json({ error: 'title too long (max 255 characters)' });
   if (description && description.length > 1000) return res.status(400).json({ error: 'description too long (max 1000 characters)' });
   if (location && location.length > 255) return res.status(400).json({ error: 'location too long (max 255 characters)' });
+  if (priority !== undefined && !VALID_PRIORITIES.includes(priority)) return res.status(400).json({ error: 'Invalid priority value' });
   const companyId = req.user.company_id;
 
   try {

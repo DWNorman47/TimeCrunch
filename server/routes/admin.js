@@ -2983,11 +2983,25 @@ router.patch('/clients/:id', requireAdmin, async (req, res) => {
 
 router.delete('/clients/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
+  const client = await pool.connect();
   try {
-    await pool.query('UPDATE clients SET active=false WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
-    await pool.query('UPDATE projects SET client_id=NULL WHERE client_id=$1 AND company_id=$2', [req.params.id, companyId]);
+    await client.query('BEGIN');
+    const result = await client.query(
+      'UPDATE clients SET active=false WHERE id=$1 AND company_id=$2 RETURNING id',
+      [req.params.id, companyId]
+    );
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Client not found' });
+    }
+    await client.query('UPDATE projects SET client_id=NULL WHERE client_id=$1 AND company_id=$2', [req.params.id, companyId]);
+    await client.query('COMMIT');
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  } finally { client.release(); }
 });
 
 // Client documents
@@ -3053,8 +3067,8 @@ router.delete('/clients/:id/documents/:docId', requireAdmin, async (req, res) =>
     );
     if (doc.rowCount === 0) return res.status(404).json({ error: 'Document not found' });
     const { deleteByUrl } = require('../r2');
-    await deleteByUrl(doc.rows[0].url).catch(() => {});
     await pool.query('DELETE FROM client_documents WHERE id=$1', [req.params.docId]);
+    deleteByUrl(doc.rows[0].url).catch(() => {});
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -3078,21 +3092,29 @@ router.get('/workers/:id/documents', requireAdmin, async (req, res) => {
 
 router.post('/workers/:id/documents', requireAdmin, async (req, res) => {
   const { name, data } = req.body; // data = base64 data URL
-  if (!name || !data) return res.status(400).json({ error: 'name and data required' });
-  if (name.length > 255) return res.status(400).json({ error: 'name too long' });
+  const trimmedName = name?.trim();
+  if (!trimmedName || !data) return res.status(400).json({ error: 'name and data required' });
+  if (trimmedName.length > 255) return res.status(400).json({ error: 'name too long' });
   const companyId = req.user.company_id;
+
+  const workerCheck = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [req.params.id, companyId]).catch(() => null);
+  if (!workerCheck?.rows.length) return res.status(404).json({ error: 'Worker not found' });
+
+  let uploaded = null;
   try {
-    const workerCheck = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
-    if (workerCheck.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
-    const uploaded = await uploadBase64(data, 'documents');
+    uploaded = await uploadBase64(data, 'documents');
     const result = await pool.query(
       `INSERT INTO worker_documents (company_id, user_id, name, url, size_bytes, mime_type, uploaded_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [companyId, req.params.id, name, uploaded.url, uploaded.sizeBytes || null,
+      [companyId, req.params.id, trimmedName, uploaded.url, uploaded.sizeBytes || null,
        data.match(/^data:([^;]+)/)?.[1] || null, req.user.id]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    if (uploaded?.url) deleteByUrl(uploaded.url).catch(() => {});
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 router.delete('/workers/:id/documents/:docId', requireAdmin, async (req, res) => {
