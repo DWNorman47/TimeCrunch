@@ -141,7 +141,10 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
           <input style={styles.input} type="text" maxLength={255} placeholder={t.givenByPlaceholder} value={form.given_by} onChange={e => set('given_by', e.target.value)} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>{t.talkContent}</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <label style={styles.label}>{t.talkContent}</label>
+            <span style={styles.charCount}>{form.content.length}/5000</span>
+          </div>
           <textarea style={styles.textarea} rows={5} maxLength={5000} placeholder={t.talkContentPlaceholder} value={form.content} onChange={e => set('content', e.target.value)} />
         </div>
       </div>
@@ -167,7 +170,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
                 value={q.question}
                 onChange={e => setQuestion(qi, e.target.value)}
               />
-              <button type="button" style={styles.removeQuestionBtn} onClick={() => removeQuestion(qi)}>✕</button>
+              <button type="button" style={styles.removeQuestionBtn} aria-label="Remove question" onClick={() => removeQuestion(qi)}>✕</button>
             </div>
             <div style={styles.optionsList}>
               {q.options.map((opt, oi) => (
@@ -187,7 +190,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
                     onChange={e => setOption(qi, oi, e.target.value)}
                   />
                   {q.options.length > 2 && (
-                    <button type="button" style={styles.removeOptionBtn} onClick={() => removeOption(qi, oi)}>✕</button>
+                    <button type="button" style={styles.removeOptionBtn} aria-label="Remove option" onClick={() => removeOption(qi, oi)}>✕</button>
                   )}
                 </div>
               ))}
@@ -250,7 +253,11 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
       setSignoffs(r.data.signoffs || []);
       setQuestions(r.data.questions || []);
       setAttachments(r.data.attachments || []);
-    } catch {}
+    } catch {
+      setSignoffs([]);
+      setQuestions([]);
+      setAttachments([]);
+    }
   };
 
   const handleAttachmentUpload = async e => {
@@ -426,7 +433,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                           <button style={styles.attachCancelBtn} onClick={() => setPendingDeleteAttachId(null)}>{t.cancel}</button>
                         </>
                       ) : (
-                        <button style={styles.attachDeleteBtn} onClick={() => setPendingDeleteAttachId(a.id)}>✕</button>
+                        <button style={styles.attachDeleteBtn} aria-label="Delete attachment" onClick={() => setPendingDeleteAttachId(a.id)}>✕</button>
                       ))}
                     </div>
                   ))}
@@ -641,6 +648,7 @@ const styles = {
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 4 },
   label: { fontSize: 12, fontWeight: 600, color: '#6b7280' },
+  charCount: { fontSize: 11, color: '#9ca3af' },
   input: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, width: '100%' },
   textarea: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5, width: '100%' },
   error: { color: '#ef4444', fontSize: 13, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', margin: 0 },

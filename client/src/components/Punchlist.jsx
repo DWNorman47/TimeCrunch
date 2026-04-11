@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
 import Pagination from './Pagination';
 
@@ -104,6 +105,7 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
 
 function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, existingPhases }) {
   const t = useT();
+  const toast = useToast();
   const STATUSES = [
     { value: 'open', label: t.statusOpen },
     { value: 'done', label: t.statusDone },
@@ -137,14 +139,15 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
     try {
       const r = await api.patch(`/punchlist/${item.id}`, { status: nextStatus[item.status] });
       onUpdated(r.data);
-    } finally { setUpdating(false); }
+    } catch { toast('Failed to update status', 'error'); }
+    finally { setUpdating(false); }
   };
 
   const assignTo = async workerId => {
     try {
       const r = await api.patch(`/punchlist/${item.id}`, { assigned_to: workerId || null });
       onUpdated(r.data);
-    } catch {}
+    } catch { toast('Failed to assign worker', 'error'); }
   };
 
   const savePhase = async () => {
@@ -153,11 +156,12 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
     try {
       const r = await api.patch(`/punchlist/${item.id}`, { phase: val });
       onUpdated(r.data);
-    } catch {}
+    } catch { toast('Failed to save phase', 'error'); }
   };
 
   const handleDelete = async () => {
-    try { await api.delete(`/punchlist/${item.id}`); onDeleted(item.id); } catch {}
+    try { await api.delete(`/punchlist/${item.id}`); onDeleted(item.id); }
+    catch { toast('Failed to delete item', 'error'); }
   };
 
   const toggleCheck = async (checkId, checked) => {
@@ -166,7 +170,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
       setChecklist(prev => prev.map(c => c.id === checkId ? r.data : c));
       const newDone = checklist.filter(c => c.id === checkId ? checked : c.checked).length;
       setItem(it => ({ ...it, checked_count: newDone }));
-    } catch {}
+    } catch { toast('Failed to update checklist', 'error'); }
   };
 
   const deleteCheck = async checkId => {
@@ -176,7 +180,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
       setChecklist(updated);
       const newDone = updated.filter(c => c.checked).length;
       setItem(it => ({ ...it, checklist_total: updated.length, checked_count: newDone }));
-    } catch {}
+    } catch { toast('Failed to delete checklist item', 'error'); }
   };
 
   const addCheck = async e => {
@@ -188,7 +192,8 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
       setChecklist(prev => [...(prev || []), r.data]);
       setItem(it => ({ ...it, checklist_total: parseInt(it.checklist_total || 0) + 1 }));
       setNewCheckText('');
-    } catch {} finally { setAddingCheck(false); }
+    } catch { toast('Failed to add checklist item', 'error'); }
+    finally { setAddingCheck(false); }
   };
 
   const priorityDot = { high: '🔴', normal: '🟡', low: '⚪' }[item.priority] || '🟡';

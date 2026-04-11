@@ -523,7 +523,7 @@ export default function ApprovalQueue({ onCountChange }) {
                               </select>
                             </div>
                             {splitSegments.length > 2 && (
-                              <button style={styles.splitRemoveBtn} onClick={() => setSplitSegments(prev => prev.filter((_, j) => j !== i))}>✕</button>
+                              <button style={styles.splitRemoveBtn} aria-label="Remove segment" onClick={() => setSplitSegments(prev => prev.filter((_, j) => j !== i))}>✕</button>
                             )}
                           </div>
                         </div>

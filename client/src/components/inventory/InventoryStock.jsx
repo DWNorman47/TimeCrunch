@@ -182,7 +182,10 @@ function AdjustModal({ item, locations, onClose, onDone }) {
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
           </select>
-          <label style={a.label}>{t.invStockAdjNotesLabel}</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <label style={a.label}>{t.invStockAdjNotesLabel}</label>
+            <span style={{ fontSize: 11, color: '#9ca3af' }}>{notes.length}/1000</span>
+          </div>
           <input
             type="text"
             placeholder={t.invStockAdjReasonPlaceholder}
