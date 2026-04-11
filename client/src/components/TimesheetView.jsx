@@ -63,6 +63,7 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
       const r = await api.post('/time-entries/copy-last-week');
       const { created, skipped } = r.data;
       setCopyMsg(`${created} entr${created === 1 ? 'y' : 'ies'} copied${skipped > 0 ? `, ${skipped} skipped` : ''}`);
+      setTimeout(() => setCopyMsg(''), 4000);
       if (created > 0 && onRefresh) await onRefresh();
     } catch {
       setCopyMsg(t.copyFailed);

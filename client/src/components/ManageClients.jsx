@@ -162,12 +162,12 @@ function DocUploadForm({ clientId, onUploaded }) {
             type="button"
             style={{ ...s.dirBtn, ...(direction === 'from_client' ? s.dirBtnActive : {}) }}
             onClick={() => setDirection('from_client')}
-          >← From Client</button>
+          >{t.docFromClient}</button>
           <button
             type="button"
             style={{ ...s.dirBtn, ...(direction === 'from_company' ? s.dirBtnActive : {}) }}
             onClick={() => setDirection('from_company')}
-          >From Us →</button>
+          >{t.docFromCompany}</button>
         </div>
         {needsExpiry && (
           <div style={s.expiryField}>

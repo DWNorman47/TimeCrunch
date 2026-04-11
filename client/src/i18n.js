@@ -1069,6 +1069,9 @@ const translations = {
     submittedOn: 'Submitted',
     dayLabel: 'day',
     daysLabel: 'days',
+    billingPastDue: '⚠ Payment past due',
+    billingCanceled: 'Canceled',
+    billingTrialEnded: 'Trial ended',
 
     // ── Admin: Reports ────────────────────────────────────────────────────────
     runReport: 'Run Report',
@@ -1141,6 +1144,8 @@ const translations = {
     noClientsYet: 'No clients yet. Add your first client above.',
     searchClientsPlaceholder: 'Search clients…',
     noClientsMatch: 'No clients match your search.',
+    docFromClient: '← From Client',
+    docFromCompany: 'From Us →',
     expiredCOI: 'COI Expired',
     expiringSoon: 'expiring soon',
     documentsSection: 'Documents',
@@ -1162,6 +1167,9 @@ const translations = {
     addOption: 'Add',
     reimbursementCategoriesSection: 'Reimbursement Categories',
     itemUnitsSection: 'Item Units',
+    mileageRateSection: 'Per-mile reimbursement rate (USD)',
+    mileageRateHint: 'per mile · IRS standard rate for 2025 is $0.670',
+    saveRate: 'Save Rate',
 
     // ── Reimbursements (worker) ───────────────────────────────────────────────
     reimbursementsTitle: 'Reimbursements',
@@ -2820,6 +2828,9 @@ const translations = {
     submittedOn: 'Enviado',
     dayLabel: 'día',
     daysLabel: 'días',
+    billingPastDue: '⚠ Pago vencido',
+    billingCanceled: 'Cancelado',
+    billingTrialEnded: 'Prueba terminada',
 
     // ── Admin: Reports ────────────────────────────────────────────────────────
     runReport: 'Generar Reporte',
@@ -2892,6 +2903,8 @@ const translations = {
     noClientsYet: 'Sin clientes aún. Agrega el primero arriba.',
     searchClientsPlaceholder: 'Buscar clientes…',
     noClientsMatch: 'Ningún cliente coincide con la búsqueda.',
+    docFromClient: '← Del Cliente',
+    docFromCompany: 'De Nosotros →',
     expiredCOI: 'COI Vencido',
     expiringSoon: 'vence pronto',
     documentsSection: 'Documentos',
@@ -2913,6 +2926,9 @@ const translations = {
     addOption: 'Agregar',
     reimbursementCategoriesSection: 'Categorías de Reembolso',
     itemUnitsSection: 'Unidades de Artículo',
+    mileageRateSection: 'Tarifa de reembolso por milla (USD)',
+    mileageRateHint: 'por milla · Tarifa estándar IRS para 2025 es $0.670',
+    saveRate: 'Guardar Tarifa',
 
     // ── Reimbursements (worker) ───────────────────────────────────────────────
     reimbursementsTitle: 'Reembolsos',

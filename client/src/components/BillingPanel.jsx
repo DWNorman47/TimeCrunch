@@ -19,9 +19,9 @@ function StatusBadge({ status, trialEndsAt, plan, t }) {
     const text = d <= 3 ? '#991b1b' : '#92400e';
     return <span style={{ ...badge, background: color, color: text }}>Trial — {d} {d !== 1 ? t.daysLabel : t.dayLabel} left</span>;
   }
-  if (status === 'past_due') return <span style={{ ...badge, background: '#fef2f2', color: '#991b1b' }}>⚠ Payment past due</span>;
-  if (status === 'canceled') return <span style={{ ...badge, background: '#f3f4f6', color: '#374151' }}>Canceled</span>;
-  if (status === 'trial_expired') return <span style={{ ...badge, background: '#fef2f2', color: '#991b1b' }}>Trial ended</span>;
+  if (status === 'past_due') return <span style={{ ...badge, background: '#fef2f2', color: '#991b1b' }}>{t.billingPastDue}</span>;
+  if (status === 'canceled') return <span style={{ ...badge, background: '#f3f4f6', color: '#374151' }}>{t.billingCanceled}</span>;
+  if (status === 'trial_expired') return <span style={{ ...badge, background: '#fef2f2', color: '#991b1b' }}>{t.billingTrialEnded}</span>;
   return null;
 }
 

@@ -113,12 +113,13 @@ function CollapsibleCategory({ title, children }) {
 }
 
 function MileageRateSection({ cfg, onSave, saving }) {
+  const t = useT();
   const [rate, setRate] = useState(String(cfg?.rate ?? 0.67));
   const [dirty, setDirty] = useState(false);
   useEffect(() => { setRate(String(cfg?.rate ?? 0.67)); setDirty(false); }, [cfg]);
   return (
     <div style={s.catSection}>
-      <div style={s.catLabel}>Per-mile reimbursement rate (USD)</div>
+      <div style={s.catLabel}>{t.mileageRateSection}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
         <span style={{ fontSize: 14, color: '#374151' }}>$</span>
         <input
@@ -130,11 +131,11 @@ function MileageRateSection({ cfg, onSave, saving }) {
           value={rate}
           onChange={e => { setRate(e.target.value); setDirty(true); }}
         />
-        <span style={{ fontSize: 13, color: '#6b7280' }}>per mile · IRS standard rate for 2025 is $0.670</span>
+        <span style={{ fontSize: 13, color: '#6b7280' }}>{t.mileageRateHint}</span>
       </div>
       {dirty && (
         <button style={{ ...s.saveBtn, marginTop: 8, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => onSave({ rate })} disabled={saving}>
-          {saving ? 'Saving…' : 'Save Rate'}
+          {saving ? t.saving : t.saveRate}
         </button>
       )}
     </div>
