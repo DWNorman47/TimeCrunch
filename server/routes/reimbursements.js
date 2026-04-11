@@ -213,7 +213,7 @@ router.get('/admin', requireAdmin, async (req, res) => {
     const [reimb, settings] = await Promise.all([
       pool.query(
         `SELECT r.id, r.amount, r.description, r.category, r.expense_date, r.receipt_url,
-                r.status, r.admin_notes, r.created_at, r.project_id, r.miles, r.mileage_rate,
+                r.status, r.admin_notes, r.created_at, r.updated_at, r.project_id, r.miles, r.mileage_rate,
                 r.qbo_purchase_id, r.qbo_synced_at,
                 p.name AS project_name, u.full_name, u.username
          FROM reimbursements r
@@ -237,20 +237,29 @@ router.get('/admin', requireAdmin, async (req, res) => {
 router.patch('/admin/:id', requireAdmin, async (req, res) => {
   const { status } = req.body;
   const admin_notes = req.body.admin_notes?.trim() || null;
+  const clientUpdatedAt = req.body.updated_at || null;
   if (!['approved', 'rejected', 'pending'].includes(status)) {
     return res.status(400).json({ error: 'status must be approved, rejected, or pending' });
   }
   if (admin_notes && admin_notes.length > 1000) return res.status(400).json({ error: 'admin_notes too long (max 1000 characters)' });
   try {
+    const existing = await pool.query(
+      'SELECT updated_at FROM reimbursements WHERE id=$1 AND company_id=$2',
+      [req.params.id, req.user.company_id]
+    );
+    if (!existing.rows.length) return res.status(404).json({ error: 'Not found' });
+    if (clientUpdatedAt && new Date(existing.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+      return res.status(409).json({ error: 'conflict' });
+    }
+
     const { rows } = await pool.query(
       `UPDATE reimbursements
        SET status = $1, admin_notes = $2, updated_at = NOW()
        WHERE id = $3 AND company_id = $4
        RETURNING id, amount, description, category, expense_date, receipt_url,
-                 status, admin_notes, created_at, project_id, user_id`,
+                 status, admin_notes, created_at, updated_at, project_id, user_id`,
       [status, admin_notes, req.params.id, req.user.company_id]
     );
-    if (!rows.length) return res.status(404).json({ error: 'Not found' });
     const reimb = rows[0];
     res.json(reimb);
 

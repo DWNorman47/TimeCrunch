@@ -3033,6 +3033,8 @@ router.post('/clients/:id/documents', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const safeType = CLIENT_DOC_TYPES.includes(doc_type) ? doc_type : 'other';
   try {
+    const clientCheck = await pool.query('SELECT id FROM clients WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    if (clientCheck.rowCount === 0) return res.status(404).json({ error: 'Client not found' });
     const result = await pool.query(
       `INSERT INTO client_documents (company_id, client_id, name, url, size_bytes, doc_type, expires_at, uploaded_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,

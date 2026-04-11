@@ -38,11 +38,18 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
   const act = async status => {
     setSaving(true); setError('');
     try {
-      const r = await api.patch(`/reimbursements/admin/${item.id}`, { status, admin_notes: notes || null });
+      const r = await api.patch(`/reimbursements/admin/${item.id}`, {
+        status,
+        admin_notes: notes || null,
+        updated_at: item.updated_at,
+      });
       onUpdate(r.data);
       setExpanded(false);
     } catch (err) {
-      setError(err.response?.data?.error || t.failedSave);
+      const msg = err.response?.status === 409
+        ? 'This reimbursement was already updated by someone else. Refresh to see the latest.'
+        : err.response?.data?.error || t.failedSave;
+      setError(msg);
     } finally {
       setSaving(false);
     }

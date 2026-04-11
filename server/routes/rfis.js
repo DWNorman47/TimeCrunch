@@ -84,10 +84,15 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   if (submitted_by !== undefined && submitted_by && submitted_by.length > 255) return res.status(400).json({ error: 'submitted_by too long (max 255 characters)' });
   if (description !== undefined && description && description.length > 2000) return res.status(400).json({ error: 'description too long (max 2000 characters)' });
   if (response !== undefined && response && response.length > 2000) return res.status(400).json({ error: 'response too long (max 2000 characters)' });
+  const { updated_at: clientUpdatedAt } = req.body;
   try {
     const existing = await pool.query('SELECT * FROM rfis WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
     if (existing.rowCount === 0) return res.status(404).json({ error: 'RFI not found' });
     const r = existing.rows[0];
+
+    if (clientUpdatedAt && new Date(r.updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+      return res.status(409).json({ error: 'conflict' });
+    }
 
     // Auto-set status to 'answered' when response is added
     let newStatus = status ?? r.status;

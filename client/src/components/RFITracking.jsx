@@ -40,7 +40,7 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
     setSaving(true); setError('');
     try {
       const r = isEdit
-        ? await api.patch(`/rfis/${initial.id}`, form)
+        ? await api.patch(`/rfis/${initial.id}`, { ...form, updated_at: initial.updated_at })
         : await api.post('/rfis', form);
       if (!isEdit && r.data?.offline) {
         onSaved({ id: 'pending-' + Date.now(), pending: true, ...form, rfi_number: '?', status: 'open' }, false);
@@ -48,7 +48,10 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       }
       onSaved(r.data, isEdit);
     } catch (err) {
-      setError(err.response?.data?.error || t.failedToSave);
+      const msg = err.response?.status === 409
+        ? 'This RFI was modified by someone else. Refresh to see the latest version.'
+        : err.response?.data?.error || t.failedToSave;
+      setError(msg);
     } finally { setSaving(false); }
   };
 
