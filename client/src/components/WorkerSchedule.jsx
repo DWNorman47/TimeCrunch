@@ -145,6 +145,7 @@ export default function WorkerSchedule() {
                       maxLength={200}
                       autoFocus
                     />
+                    <div style={styles.charCount}>{(pendingFlag.note || '').length}/200</div>
                     <div style={styles.noteActions}>
                       <button style={styles.confirmBtn} onClick={confirmCantMakeIt}>{t.wsConfirm}</button>
                       <button style={styles.cancelNoteBtn} onClick={() => setPendingFlag(null)}>{t.cancel || 'Cancel'}</button>
@@ -181,6 +182,7 @@ const styles = {
   undoBtn: { marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: '#6b7280', background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' },
   noteBox: { marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 },
   noteInput: { fontSize: 12, padding: '6px 10px', border: '1px solid #fca5a5', borderRadius: 6, outline: 'none', color: '#374151' },
+  charCount: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
   noteActions: { display: 'flex', gap: 6 },
   confirmBtn: { fontSize: 12, fontWeight: 700, background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' },
   cancelNoteBtn: { fontSize: 12, fontWeight: 600, background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#6b7280' },

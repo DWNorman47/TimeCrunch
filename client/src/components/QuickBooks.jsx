@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
 
 const VENDOR_TYPES = ['contractor', 'subcontractor'];
@@ -24,6 +25,7 @@ function Paginator({ page, total, pageSize, onChange }) {
 
 export default function QuickBooks({ workers, projects, onWorkersImported, onProjectsImported, settings, onSettingsChange }) {
   const t = useT();
+  const toast = useToast();
   const [status, setStatus] = useState(null);
   const [qboEmployees, setQboEmployees] = useState([]);
   const [qboVendors, setQboVendors] = useState([]);
@@ -158,17 +160,23 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
 
   const saveEmployeeMapping = async (workerId, qboEmployeeId) => {
     setEmployeeMappings(m => ({ ...m, [workerId]: qboEmployeeId }));
-    await api.patch(`/qbo/workers/${workerId}/mapping`, { qbo_employee_id: qboEmployeeId || null });
+    try {
+      await api.patch(`/qbo/workers/${workerId}/mapping`, { qbo_employee_id: qboEmployeeId || null });
+    } catch { toast('Failed to save employee mapping', 'error'); }
   };
 
   const saveVendorMapping = async (workerId, qboVendorId) => {
     setVendorMappings(m => ({ ...m, [workerId]: qboVendorId }));
-    await api.patch(`/qbo/workers/${workerId}/mapping`, { qbo_vendor_id: qboVendorId || null });
+    try {
+      await api.patch(`/qbo/workers/${workerId}/mapping`, { qbo_vendor_id: qboVendorId || null });
+    } catch { toast('Failed to save vendor mapping', 'error'); }
   };
 
   const saveProjectMapping = async (projectId, qboCustomerId) => {
     setProjectMappings(m => ({ ...m, [projectId]: qboCustomerId }));
-    await api.patch(`/qbo/projects/${projectId}/mapping`, { qbo_customer_id: qboCustomerId || null });
+    try {
+      await api.patch(`/qbo/projects/${projectId}/mapping`, { qbo_customer_id: qboCustomerId || null });
+    } catch { toast('Failed to save project mapping', 'error'); }
   };
 
   const handlePush = async () => {

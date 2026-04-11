@@ -462,7 +462,10 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
           </select>
         </div>}
         <div>
-          <label style={styles.label}>{t.notesOptional}</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <label style={styles.label}>{t.notesOptional}</label>
+            <span style={styles.charCount}>{notes.length}/500</span>
+          </div>
           <input
             style={styles.input}
             type="text"
@@ -560,6 +563,7 @@ const styles = {
   heading: { marginBottom: 16, fontSize: 18, fontWeight: 700 },
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   label: { fontSize: 13, fontWeight: 600, color: '#555', display: 'block', marginBottom: 4 },
+  charCount: { fontSize: 11, color: '#9ca3af' },
   input: { padding: '9px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, width: '100%' },
   locationDenied: { background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 },
   locationDeniedTitle: { fontSize: 14, fontWeight: 700, color: '#854d0e' },

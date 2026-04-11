@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
 
 function fmt(dateStr) {
@@ -20,6 +21,7 @@ function defaultPeriod() {
 
 export default function ManagePayPeriods() {
   const t = useT();
+  const toast = useToast();
   const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ from: defaultPeriod().from, to: defaultPeriod().to, label: '' });
@@ -54,6 +56,8 @@ export default function ManagePayPeriods() {
     try {
       await api.delete(`/admin/pay-periods/${id}`);
       setPeriods(prev => prev.filter(p => p.id !== id));
+    } catch {
+      toast('Failed to unlock pay period', 'error');
     } finally { setUnlocking(null); }
   };
 

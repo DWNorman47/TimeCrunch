@@ -323,6 +323,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
             onChange={e => setCaptureNote(e.target.value)}
             autoFocus
           />
+          <div style={s.charCount}>{captureNote.length}/2000</div>
           {error && <p style={s.error}>{error}</p>}
           <div style={s.captureActions}>
             <button style={s.submitBtn} onClick={submitNote} disabled={saving || !captureNote.trim()}>
@@ -491,6 +492,7 @@ const s = {
   actionBtnOn: { borderColor: '#059669', color: '#059669', background: '#f0fdf4' },
   capturePanel: { background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.07)', marginBottom: 16 },
   noteTextarea: { width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' },
+  charCount: { fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 3 },
   captureActions: { display: 'flex', gap: 8, marginTop: 12 },
   submitBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' },
   cancelBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '10px 16px', borderRadius: 8, fontSize: 14, cursor: 'pointer' },

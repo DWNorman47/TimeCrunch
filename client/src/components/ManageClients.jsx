@@ -94,7 +94,10 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
       </div>
 
       <div style={s.field}>
-        <label style={s.label}>{t.notes} <span style={s.opt}>({t.optional})</span></label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <label style={s.label}>{t.notes} <span style={s.opt}>({t.optional})</span></label>
+          <span style={s.charCount}>{(form.notes || '').length}/1000</span>
+        </div>
         <textarea style={s.textarea} rows={2} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional information..." />
       </div>
 
@@ -477,6 +480,7 @@ const s = {
   field: { display: 'flex', flexDirection: 'column', gap: 5, flex: 1, minWidth: 180 },
   label: { fontSize: 13, fontWeight: 600, color: '#374151' },
   opt: { fontWeight: 400, color: '#9ca3af' },
+  charCount: { fontSize: 11, color: '#9ca3af' },
   input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 },
   textarea: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 },
   error: { color: '#ef4444', fontSize: 13, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', margin: 0 },

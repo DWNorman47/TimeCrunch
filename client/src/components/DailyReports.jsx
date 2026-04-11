@@ -259,7 +259,10 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
 
       {/* Work Performed */}
       <div style={styles.section}>
-        <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.workPerformed}</span></div>
+        <div style={styles.sectionHead}>
+          <span style={styles.sectionTitle}>{t.workPerformed}</span>
+          <span style={styles.charCount}>{(form.work_performed || '').length}/2000</span>
+        </div>
         <textarea style={styles.textarea} rows={4} placeholder={t.workPerformedPlaceholder} maxLength={2000} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
       </div>
 
@@ -323,13 +326,19 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
 
       {/* Delays */}
       <div style={styles.section}>
-        <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.delaysIssues}</span></div>
+        <div style={styles.sectionHead}>
+          <span style={styles.sectionTitle}>{t.delaysIssues}</span>
+          <span style={styles.charCount}>{(form.delays_issues || '').length}/2000</span>
+        </div>
         <textarea style={styles.textarea} rows={3} placeholder={t.delaysIssuesPlaceholder} maxLength={2000} value={form.delays_issues} onChange={e => set('delays_issues', e.target.value)} />
       </div>
 
       {/* Visitor log */}
       <div style={styles.section}>
-        <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.visitorLog}</span></div>
+        <div style={styles.sectionHead}>
+          <span style={styles.sectionTitle}>{t.visitorLog}</span>
+          <span style={styles.charCount}>{(form.visitor_log || '').length}/2000</span>
+        </div>
         <textarea style={styles.textarea} rows={2} placeholder={t.visitorLogPlaceholder} maxLength={2000} value={form.visitor_log} onChange={e => set('visitor_log', e.target.value)} />
       </div>
 
@@ -620,6 +629,7 @@ const styles = {
   input: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, width: '100%' },
   section: { marginBottom: 20 },
   sectionHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 },
+  charCount: { fontSize: 11, color: '#9ca3af', flexShrink: 0 },
   sectionTitle: { fontWeight: 700, fontSize: 13, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.04em' },
   autofillBtn: { fontSize: 12, color: '#1a56db', background: '#eff6ff', border: 'none', padding: '5px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600, flexShrink: 0 },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 6 },

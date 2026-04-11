@@ -121,17 +121,26 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
       )}
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>{t.descriptionField} *</label>
+        <div style={styles.labelRow}>
+          <label style={styles.label}>{t.descriptionField} *</label>
+          <span style={styles.charCount}>{form.description.length}/2000</span>
+        </div>
         <textarea style={styles.textarea} rows={4} placeholder={t.describeWhatHappened} maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} required />
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>{t.witnessesLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
+        <div style={styles.labelRow}>
+          <label style={styles.label}>{t.witnessesLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
+          <span style={styles.charCount}>{form.witnesses.length}/500</span>
+        </div>
         <input style={styles.input} type="text" placeholder={t.witnessesPlaceholder} maxLength={500} value={form.witnesses} onChange={e => set('witnesses', e.target.value)} />
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>{t.correctiveActionLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
+        <div style={styles.labelRow}>
+          <label style={styles.label}>{t.correctiveActionLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
+          <span style={styles.charCount}>{form.corrective_action.length}/2000</span>
+        </div>
         <textarea style={styles.textarea} rows={3} placeholder={t.correctiveActionPlaceholder} maxLength={2000} value={form.corrective_action} onChange={e => set('corrective_action', e.target.value)} />
       </div>
 
@@ -435,7 +444,9 @@ const styles = {
   formTitle: { fontSize: 17, fontWeight: 700, margin: 0 },
   row: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 5, flex: 1, minWidth: 180 },
+  labelRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
   label: { fontSize: 13, fontWeight: 600, color: '#374151' },
+  charCount: { fontSize: 11, color: '#9ca3af' },
   optional: { fontWeight: 400, color: '#9ca3af' },
   input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, background: '#fff' },
   textarea: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 },
