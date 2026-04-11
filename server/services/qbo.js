@@ -276,6 +276,17 @@ async function listClasses(companyId) {
   return data.QueryResponse?.Class || [];
 }
 
+async function getInvoice(companyId, invoiceId) {
+  const data = await qboGet(companyId, `/invoice/${invoiceId}?minorversion=65`);
+  return data.Invoice || null;
+}
+
+async function createVendor(companyId, { displayName }) {
+  const body = { DisplayName: displayName };
+  const data = await qboPost(companyId, '/vendor?minorversion=65', body);
+  return data.Vendor;
+}
+
 async function createCustomer(companyId, { displayName }) {
   const body = { DisplayName: displayName };
   const data = await qboPost(companyId, '/customer?minorversion=65', body);
@@ -305,4 +316,4 @@ async function createJournalEntry(companyId, { txnDate, description, debitAccoun
   return data.JournalEntry;
 }
 
-module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getCompanyInfo, listEmployees, listCustomers, listVendors, listItems, listAccounts, listClasses, createInvoice, createPurchase, createCustomer, createJournalEntry, deleteTimeActivity, pushTimeActivity };
+module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getCompanyInfo, listEmployees, listCustomers, listVendors, listItems, listAccounts, listClasses, createInvoice, getInvoice, createPurchase, createCustomer, createVendor, createJournalEntry, deleteTimeActivity, pushTimeActivity };

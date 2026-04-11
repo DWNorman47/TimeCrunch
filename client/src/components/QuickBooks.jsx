@@ -33,6 +33,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [loadingMappings, setLoadingMappings] = useState(false);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [clearingErrors, setClearingErrors] = useState(false);
+  const [retryingErrors, setRetryingErrors] = useState(new Set());
   // Bulk expense push
   const [expFrom, setExpFrom] = useState('');
   const [expTo, setExpTo] = useState('');
@@ -250,6 +251,19 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
     catch { /* non-fatal */ }
   };
 
+  const retryError = async (id) => {
+    setRetryingErrors(prev => new Set(prev).add(id));
+    setError('');
+    try {
+      await api.post(`/qbo/retry-error/${id}`);
+      setSyncErrors(prev => prev.filter(e => e.id !== id));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Retry failed');
+    } finally {
+      setRetryingErrors(prev => { const n = new Set(prev); n.delete(id); return n; });
+    }
+  };
+
   const pushExpenses = async () => {
     setExpPushing(true); setExpResult(null); setError('');
     try {
@@ -382,6 +396,11 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                     {e.entity_id && <span style={styles.errorEntityId}>#{e.entity_id}</span>}
                     <span style={styles.errorMsg}>{e.error_message}</span>
                     <span style={styles.errorTime}>{new Date(e.created_at).toLocaleString()}</span>
+                    {(e.entity_type === 'time_entry' || e.entity_type === 'reimbursement') && (
+                      <button style={styles.errorRetry} onClick={() => retryError(e.id)} disabled={retryingErrors.has(e.id)}>
+                        {retryingErrors.has(e.id) ? '…' : 'Retry'}
+                      </button>
+                    )}
                     <button style={styles.errorDismiss} onClick={() => dismissError(e.id)}>✕</button>
                   </div>
                 ))}
@@ -973,4 +992,5 @@ const styles = {
   errorMsg: { flex: 1, color: '#374151', minWidth: 120 },
   errorTime: { color: '#9ca3af', fontSize: 11, flexShrink: 0 },
   errorDismiss: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px', flexShrink: 0 },
+  errorRetry: { padding: '2px 10px', background: '#eff6ff', color: '#1a56db', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
 };

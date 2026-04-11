@@ -159,6 +159,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const [docsLoaded, setDocsLoaded] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [pendingDocDelete, setPendingDocDelete] = useState(null);
+  const [invoiceHistory, setInvoiceHistory] = useState(null);
+  const [checkingInvoice, setCheckingInvoice] = useState(new Set());
 
   const m = metrics || {};
   const fmtHours = h => {
@@ -288,6 +290,11 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 
   useEffect(() => {
     if (tab === 'billing' && !billData) loadBilling();
+    if (tab === 'billing' && invoiceHistory === null && project.qbo_customer_id) {
+      api.get(`/qbo/invoices/project/${project.id}`)
+        .then(r => setInvoiceHistory(r.data))
+        .catch(() => setInvoiceHistory([]));
+    }
   }, [tab]);
 
   const downloadPDF = async () => {
@@ -339,12 +346,32 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
         amount: total,
         description,
         txn_date: billTo || new Date().toLocaleDateString('en-CA'),
+        project_id: project.id,
       });
       setQboPushResult({ success: true, invoiceId: r.data.Id, docNumber: r.data.DocNumber });
       setShowQboPicker(false);
+      // Refresh invoice history
+      api.get(`/qbo/invoices/project/${project.id}`)
+        .then(res => setInvoiceHistory(res.data))
+        .catch(() => {});
     } catch (err) {
       setQboPushResult({ success: false, error: err.response?.data?.error || 'Push failed' });
     } finally { setQboPushing(false); }
+  };
+
+  const checkInvoicePayment = async (qboInvoiceId) => {
+    setCheckingInvoice(prev => new Set(prev).add(qboInvoiceId));
+    try {
+      const r = await api.post(`/qbo/invoices/${qboInvoiceId}/check-payment`);
+      setInvoiceHistory(prev => prev.map(inv =>
+        inv.qbo_invoice_id === qboInvoiceId
+          ? { ...inv, balance: r.data.balance, payment_status: r.data.payment_status, last_checked_at: new Date().toISOString() }
+          : inv
+      ));
+    } catch { /* non-fatal */ }
+    finally {
+      setCheckingInvoice(prev => { const n = new Set(prev); n.delete(qboInvoiceId); return n; });
+    }
   };
 
   const handleEditSave = async () => {
@@ -1007,6 +1034,34 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                         : `Error: ${qboPushResult.error}`}
                     </div>
                   )}
+
+                  {invoiceHistory && invoiceHistory.length > 0 && (
+                    <div style={styles.invoiceHistory}>
+                      <div style={styles.invoiceHistoryTitle}>QuickBooks Invoice History</div>
+                      {invoiceHistory.map(inv => {
+                        const statusColor = inv.payment_status === 'paid' ? '#059669' : inv.payment_status === 'partial' ? '#d97706' : '#dc2626';
+                        const statusLabel = inv.payment_status === 'paid' ? 'Paid' : inv.payment_status === 'partial' ? 'Partial' : inv.payment_status === 'unknown' ? 'Unknown' : 'Unpaid';
+                        return (
+                          <div key={inv.id} style={styles.invoiceRow}>
+                            <span style={styles.invoiceNum}>#{inv.doc_number || inv.qbo_invoice_id}</span>
+                            <span style={styles.invoiceAmt}>{fmtMoney(inv.amount)}</span>
+                            <span style={styles.invoiceDate}>{inv.txn_date ? String(inv.txn_date).substring(0, 10) : '—'}</span>
+                            <span style={{ ...styles.invoiceStatus, color: statusColor }}>
+                              {statusLabel}
+                              {inv.balance != null && inv.payment_status !== 'paid' && ` (${fmtMoney(inv.balance)} remaining)`}
+                            </span>
+                            <button
+                              style={styles.checkPaymentBtn}
+                              onClick={() => checkInvoicePayment(inv.qbo_invoice_id)}
+                              disabled={checkingInvoice.has(inv.qbo_invoice_id)}
+                            >
+                              {checkingInvoice.has(inv.qbo_invoice_id) ? '…' : 'Check Status'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1527,6 +1582,14 @@ const styles = {
   qboConfirmBtn: { background: '#2CA01C', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   qboCancelBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer', color: '#6b7280' },
   qboResult: { marginTop: 10, fontSize: 13, padding: '10px 14px', borderRadius: 8, border: '1px solid', color: '#374151' },
+  invoiceHistory: { marginTop: 16, borderTop: '1px solid #e5e7eb', paddingTop: 14 },
+  invoiceHistoryTitle: { fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 },
+  invoiceRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid #f3f4f6', flexWrap: 'wrap' },
+  invoiceNum: { fontSize: 13, fontWeight: 600, color: '#111827', minWidth: 70 },
+  invoiceAmt: { fontSize: 13, fontWeight: 700, color: '#111827', minWidth: 80 },
+  invoiceDate: { fontSize: 12, color: '#6b7280', minWidth: 80 },
+  invoiceStatus: { fontSize: 12, fontWeight: 600, flex: 1 },
+  checkPaymentBtn: { padding: '4px 12px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12, fontWeight: 600, color: '#374151', cursor: 'pointer' },
   // Entries table
   entriesTable: { display: 'flex', flexDirection: 'column', gap: 2 },
   tableHeader: { display: 'flex', gap: 8, padding: '6px 10px', background: '#f9fafb', borderRadius: 6, marginBottom: 4 },

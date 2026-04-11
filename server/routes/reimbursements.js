@@ -202,6 +202,7 @@ router.get('/admin', requireAdmin, async (req, res) => {
       pool.query(
         `SELECT r.id, r.amount, r.description, r.category, r.expense_date, r.receipt_url,
                 r.status, r.admin_notes, r.created_at, r.project_id, r.miles, r.mileage_rate,
+                r.qbo_purchase_id, r.qbo_synced_at,
                 p.name AS project_name, u.full_name, u.username
          FROM reimbursements r
          JOIN users u ON u.id = r.user_id

@@ -318,6 +318,7 @@ export default function AdministrationPage() {
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
+  const [qboConnected, setQboConnected] = useState(false);
 
   const tabs = [
     { id: 'company',      label: t.adminTabCompany      },
@@ -333,10 +334,12 @@ export default function AdministrationPage() {
       api.get('/admin/workers', { params: { all_roles: true } }),
       api.get('/admin/projects'),
       api.get('/admin/settings'),
-    ]).then(([w, p, s]) => {
+      plan.hasQbo ? api.get('/qbo/status').catch(() => ({ data: { connected: false } })) : Promise.resolve({ data: { connected: false } }),
+    ]).then(([w, p, s, qbo]) => {
       setWorkers(w.data);
       setProjects(p.data);
       setSettings(s.data);
+      setQboConnected(qbo.data?.connected && !qbo.data?.disconnected);
     }).catch(() => {});
   }, []);
 
@@ -387,6 +390,7 @@ export default function AdministrationPage() {
               identityEditable={true}
               currency={settings?.currency ?? 'USD'}
               currentUser={user}
+              qboConnected={qboConnected}
             />
           </div>
         )}

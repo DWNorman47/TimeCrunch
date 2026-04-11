@@ -116,7 +116,7 @@ function RoleBadge({ role }) {
   );
 }
 
-export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, defaultTempPassword = '', showRate = true, identityEditable = true, currency = 'USD', currentUser = null }) {
+export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, defaultTempPassword = '', showRate = true, identityEditable = true, currency = 'USD', currentUser = null, qboConnected = false }) {
   const toast = useToast();
   const t = useT();
   const rateTypes = [
@@ -144,6 +144,9 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const [usernameTaken, setUsernameTaken] = useState(false);
   const [usernameChecking, setUsernameChecking] = useState(false);
   const [archivedConflict, setArchivedConflict] = useState(null);
+  const [qboVendorPrompt, setQboVendorPrompt] = useState(null); // { user_id, display_name }
+  const [qboVendorCreating, setQboVendorCreating] = useState(false);
+  const [qboVendorResult, setQboVendorResult] = useState(null); // 'ok' | 'error'
 
   // Expand / edit state
   const [expandedId, setExpandedId] = useState(null);
@@ -215,8 +218,14 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const full_name = [form.first_name, form.last_name].filter(Boolean).join(' ');
       const r = await api.post('/admin/workers', { ...form, full_name });
       onWorkerAdded(r.data);
+      const workerType = form.worker_type;
       setForm({ first_name: '', last_name: '', username: '', password: defaultTempPassword, email: '', role: 'worker', worker_type: 'employee', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
       setUsernameEdited(false); setUsernameTaken(false); setShowForm(false);
+      // Offer to create as QBO Vendor if connected and worker is contractor/subcontractor
+      if (qboConnected && (workerType === 'contractor' || workerType === 'subcontractor')) {
+        setQboVendorPrompt({ user_id: r.data.id, display_name: r.data.full_name });
+        setQboVendorResult(null);
+      }
     } catch (err) {
       const data = err.response?.data;
       if (data?.archived_id) { setArchivedConflict({ id: data.archived_id, name: data.archived_name }); setError(data.error); }
@@ -247,6 +256,20 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     if (!archivedConflict) return;
     await handleRestore(archivedConflict.id);
     setArchivedConflict(null); setError(''); setShowForm(false);
+  };
+
+  const createQboVendor = async () => {
+    if (!qboVendorPrompt) return;
+    setQboVendorCreating(true);
+    try {
+      await api.post('/qbo/workers/create-vendor', {
+        user_id: qboVendorPrompt.user_id,
+        display_name: qboVendorPrompt.display_name,
+      });
+      setQboVendorResult('ok');
+    } catch {
+      setQboVendorResult('error');
+    } finally { setQboVendorCreating(false); }
   };
 
   // ── Expand / panel edit helpers ─────────────────────────────────────────────
@@ -936,6 +959,35 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
           </div>
         )}
       </div>
+
+      {/* QBO Vendor creation prompt */}
+      {qboVendorPrompt && (
+        <div style={s.qboPromptOverlay}>
+          <div style={s.qboPromptModal}>
+            <div style={s.qboPromptTitle}>Create QuickBooks Vendor?</div>
+            <p style={s.qboPromptBody}>
+              <strong>{qboVendorPrompt.display_name}</strong> was added as a contractor.
+              Would you like to create them as a Vendor in QuickBooks Online so they can be mapped for expense tracking?
+            </p>
+            {qboVendorResult === 'ok' && (
+              <div style={s.qboPromptSuccess}>Vendor created successfully in QuickBooks.</div>
+            )}
+            {qboVendorResult === 'error' && (
+              <div style={s.qboPromptError}>Failed to create vendor in QuickBooks. You can set the mapping manually in QBO settings.</div>
+            )}
+            <div style={s.qboPromptActions}>
+              {!qboVendorResult && (
+                <button style={s.saveBtn} onClick={createQboVendor} disabled={qboVendorCreating}>
+                  {qboVendorCreating ? 'Creating…' : 'Yes, Create Vendor'}
+                </button>
+              )}
+              <button style={s.cancelBtn} onClick={() => { setQboVendorPrompt(null); setQboVendorResult(null); }}>
+                {qboVendorResult ? 'Close' : 'Skip'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -992,4 +1044,11 @@ const s = {
   historyList: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 },
   historyItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#f9fafb', borderRadius: 7 },
   restoreBtn: { padding: '4px 12px', background: 'none', border: '1px solid #6ee7b7', color: '#059669', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  qboPromptOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  qboPromptModal: { background: '#fff', borderRadius: 12, padding: 28, maxWidth: 440, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 12 },
+  qboPromptTitle: { fontSize: 17, fontWeight: 700, color: '#111827' },
+  qboPromptBody: { fontSize: 14, color: '#374151', margin: 0, lineHeight: 1.5 },
+  qboPromptActions: { display: 'flex', gap: 10, marginTop: 4 },
+  qboPromptSuccess: { fontSize: 13, color: '#059669', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 7, padding: '8px 12px' },
+  qboPromptError: { fontSize: 13, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 7, padding: '8px 12px' },
 };

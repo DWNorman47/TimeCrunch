@@ -59,6 +59,9 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
           <span style={s.date}>{fmtDate(item.expense_date)}</span>
         </div>
         <div style={s.rowRight}>
+          {item.qbo_purchase_id && (
+            <span style={s.qboBadge}>QB ✓</span>
+          )}
           <StatusBadge status={item.status} />
           <span style={s.chevron}>{expanded ? '▾' : '▸'}</span>
         </div>
@@ -378,4 +381,5 @@ const s = {
   resetBtn: { padding: '8px 18px', background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   milesMeta: { fontSize: 13, color: '#059669', fontWeight: 600, background: '#f0fdf4', borderRadius: 6, padding: '5px 10px' },
   mileageCalc: { fontSize: 12, color: '#059669', fontWeight: 600, whiteSpace: 'nowrap' },
+  qboBadge: { fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 8, background: '#d1fae5', color: '#065f46', border: '1px solid #6ee7b7' },
 };
