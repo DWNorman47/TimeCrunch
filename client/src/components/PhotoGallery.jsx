@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
 
@@ -87,6 +88,7 @@ function Lightbox({ items, index, onClose }) {
 
 export default function PhotoGallery({ projects }) {
   const { user } = useAuth();
+  const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const [media, setMedia] = useState([]);
@@ -124,7 +126,7 @@ export default function PhotoGallery({ projects }) {
   return (
     <div>
       <div style={styles.topRow}>
-        <h1 style={styles.heading}>Media Gallery</h1>
+        <h1 style={styles.heading}>{t.mediaGallery}</h1>
         <span style={styles.count}>
           {photoCount > 0 && `${photoCount} photo${photoCount !== 1 ? 's' : ''}`}
           {photoCount > 0 && videoCount > 0 && ' · '}
@@ -136,12 +138,12 @@ export default function PhotoGallery({ projects }) {
       <div className="filter-row" style={styles.filterBar}>
         {projects.length > 0 && (
           <select style={styles.filterSelect} value={filters.project_id || ''} onChange={e => setFilter('project_id', e.target.value)}>
-            <option value="">All projects</option>
+            <option value="">{t.allProjectsOpt}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
-        <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title="From date" />
-        <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title="To date" />
+        <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title={t.fromDate} />
+        <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title={t.toDate} />
       </div>
 
       {lightbox !== null && (

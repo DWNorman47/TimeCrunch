@@ -101,7 +101,7 @@ export default function TimeOffTab() {
           <div style={s.row}>
             <div style={s.fieldGroup}>
               <label style={s.label}>{t.typeLabel}</label>
-              <select style={s.input} value={form.type} onChange={e => set('type', e.target.value)}>
+              <select style={s.input} value={form.type} onChange={e => set('type', e.target.value)} disabled={saving}>
                 <option value="vacation">{t.typeVacation}</option>
                 <option value="sick">{t.typeSick}</option>
                 <option value="personal">{t.typePersonal}</option>
@@ -110,16 +110,16 @@ export default function TimeOffTab() {
             </div>
             <div style={s.fieldGroup}>
               <label style={s.label}>{t.startDate}</label>
-              <input style={s.input} type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} required />
+              <input style={s.input} type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} required disabled={saving} />
             </div>
             <div style={s.fieldGroup}>
               <label style={s.label}>{t.endDate}</label>
-              <input style={s.input} type="date" value={form.end_date} min={form.start_date} onChange={e => set('end_date', e.target.value)} required />
+              <input style={s.input} type="date" value={form.end_date} min={form.start_date} onChange={e => set('end_date', e.target.value)} required disabled={saving} />
             </div>
           </div>
           <div style={s.fieldGroup}>
             <label style={s.label}>{t.noteOptionalLabel}</label>
-            <textarea style={{ ...s.input, resize: 'vertical', minHeight: 56 }} maxLength={500} value={form.note} onChange={e => set('note', e.target.value)} placeholder={t.noteDetailsPlaceholder} />
+            <textarea style={{ ...s.input, resize: 'vertical', minHeight: 56 }} maxLength={500} value={form.note} onChange={e => set('note', e.target.value)} placeholder={t.noteDetailsPlaceholder} disabled={saving} />
             <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.note || '').length}/500</div>
           </div>
           {error && <p style={s.error}>{error}</p>}

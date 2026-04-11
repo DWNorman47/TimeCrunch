@@ -264,7 +264,7 @@ export default function ReimbursementsAdmin() {
             </div>
             {isMileage ? (
               <div style={s.field}>
-                <label style={s.fieldLabel}>Miles *</label>
+                <label style={s.fieldLabel}>{t.milesLabel} *</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input style={{ ...s.input, width: 90 }} type="number" min="0.1" step="0.1" placeholder="0.0" value={form.miles} onChange={e => setForm(f => ({ ...f, miles: e.target.value }))} required />
                   {form.miles > 0 && (

@@ -46,6 +46,11 @@ const translations = {
     // Shared field labels
     breakMin: 'Break (min)',
     mileageMi: 'Mileage (mi)',
+    milesLabel: 'Miles',
+    mediaGallery: 'Media Gallery',
+    inviteSentPrefix: 'Invite sent to',
+    sendAnother: 'Send another',
+    workerInviteEmailFailed: 'Worker created, but the invite email failed to send.',
     optional: 'Optional',
     optionalNotes: 'Optional notes',
     start: 'Start',
@@ -1833,6 +1838,11 @@ const translations = {
     // Shared field labels
     breakMin: 'Descanso (min)',
     mileageMi: 'Millas (mi)',
+    milesLabel: 'Millas',
+    mediaGallery: 'Galería de Medios',
+    inviteSentPrefix: 'Invitación enviada a',
+    sendAnother: 'Enviar otro',
+    workerInviteEmailFailed: 'Trabajador creado, pero el correo de invitación no se pudo enviar.',
     optional: 'Opcional',
     optionalNotes: 'Notas opcionales',
     start: 'Entrada',

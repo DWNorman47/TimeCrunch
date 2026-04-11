@@ -133,20 +133,20 @@ export default function ReimbursementsView() {
           <div style={s.formRow}>
             <div style={s.field}>
               <label style={s.label}>{t.date} *</label>
-              <input style={s.input} type="date" value={form.expense_date} onChange={e => setForm(f => ({ ...f, expense_date: e.target.value }))} required max={new Date().toLocaleDateString('en-CA')} />
+              <input style={s.input} type="date" value={form.expense_date} onChange={e => setForm(f => ({ ...f, expense_date: e.target.value }))} required max={new Date().toLocaleDateString('en-CA')} disabled={saving} />
             </div>
             <div style={s.field}>
               <label style={s.label}>{t.categoryLabel}</label>
-              <select style={s.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value, miles: '', amount: '' }))}>
+              <select style={s.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value, miles: '', amount: '' }))} disabled={saving}>
                 <option value="">{t.selectPlaceholder}</option>
                 {categories.active.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             {isMileage ? (
               <div style={s.field}>
-                <label style={s.label}>Miles *</label>
+                <label style={s.label}>{t.milesLabel} *</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input style={{ ...s.input, width: 100 }} type="number" min="0.1" step="0.1" placeholder="0.0" value={form.miles} onChange={e => setForm(f => ({ ...f, miles: e.target.value }))} required />
+                  <input style={{ ...s.input, width: 100 }} type="number" min="0.1" step="0.1" placeholder="0.0" value={form.miles} onChange={e => setForm(f => ({ ...f, miles: e.target.value }))} required disabled={saving} />
                   {form.miles > 0 && (
                     <span style={s.mileageCalc}>= ${(parseFloat(form.miles) * mileageRate).toFixed(2)} @ ${mileageRate}/mi</span>
                   )}
@@ -155,13 +155,13 @@ export default function ReimbursementsView() {
             ) : (
               <div style={s.field}>
                 <label style={s.label}>{t.amountLabel}</label>
-                <input style={{ ...s.input, width: 110 }} type="number" min="0.01" step="0.01" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required={!isMileage} />
+                <input style={{ ...s.input, width: 110 }} type="number" min="0.01" step="0.01" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required={!isMileage} disabled={saving} />
               </div>
             )}
             {projects.length > 0 && (
               <div style={s.field}>
                 <label style={s.label}>{t.project}</label>
-                <select style={s.input} value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}>
+                <select style={s.input} value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))} disabled={saving}>
                   <option value="">{t.noProject}</option>
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
@@ -170,7 +170,7 @@ export default function ReimbursementsView() {
           </div>
           <div style={s.field}>
             <label style={s.label}>{t.descriptionLabel}</label>
-            <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder={isMileage ? t.mileageDescPlaceholder : t.descriptionPlaceholder} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+            <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder={isMileage ? t.mileageDescPlaceholder : t.descriptionPlaceholder} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} disabled={saving} />
             <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{form.description.length}/500</div>
           </div>
           {!isMileage && (

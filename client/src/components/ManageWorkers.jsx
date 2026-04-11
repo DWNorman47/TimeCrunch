@@ -261,10 +261,11 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const r = await api.post('/admin/workers/invite', { ...inviteForm, full_name: inv_full_name });
       onWorkerAdded(r.data);
       if (r.data.email_sent === false) {
-        setInviteError('Worker created, but the invite email failed to send.');
+        setInviteError(t.workerInviteEmailFailed);
         setInviteForm({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
       } else {
         setInviteSent(inviteForm.email);
+        setTimeout(() => setInviteSent(''), 6000);
         setInviteForm({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
       }
     } catch (err) {
@@ -422,7 +423,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       if (r.data.email_sent) {
         setInvitedIds(s => new Set(s).add(id));
       } else {
-        toast('Worker created, but the invite email failed to send.', 'error');
+        toast(t.workerInviteEmailFailed, 'error');
       }
     } catch (err) {
       toast(err.response?.data?.error || 'Failed to send invite', 'error');
@@ -562,8 +563,8 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
             <form onSubmit={handleInvite} style={s.addForm}>
               {inviteSent ? (
                 <div style={s.inviteSuccess}>
-                  Invite sent to <strong>{inviteSent}</strong>.{' '}
-                  <button type="button" style={s.restoreInlineBtn} onClick={() => setInviteSent('')}>Send another</button>
+                  {t.inviteSentPrefix} <strong>{inviteSent}</strong>.{' '}
+                  <button type="button" style={s.restoreInlineBtn} onClick={() => setInviteSent('')}>{t.sendAnother}</button>
                 </div>
               ) : (
                 <>

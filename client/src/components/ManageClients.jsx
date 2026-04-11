@@ -69,28 +69,28 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
       <div style={s.row}>
         <div style={s.field}>
           <label style={s.label}>{t.clientCompanyName} *</label>
-          <input style={s.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Construction Inc." required />
+          <input style={s.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Construction Inc." required disabled={saving} />
         </div>
         <div style={s.field}>
           <label style={s.label}>{t.contactName}</label>
-          <input style={s.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" />
+          <input style={s.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" disabled={saving} />
         </div>
       </div>
 
       <div style={s.row}>
         <div style={s.field}>
           <label style={s.label}>{t.contactEmail}</label>
-          <input style={s.input} type="email" maxLength={255} value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder="jane@example.com" />
+          <input style={s.input} type="email" maxLength={255} value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder="jane@example.com" disabled={saving} />
         </div>
         <div style={s.field}>
           <label style={s.label}>{t.contactPhone}</label>
-          <input style={s.input} type="tel" maxLength={50} value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder="(555) 000-0000" />
+          <input style={s.input} type="tel" maxLength={50} value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder="(555) 000-0000" disabled={saving} />
         </div>
       </div>
 
       <div style={s.field}>
         <label style={s.label}>{t.address}</label>
-        <input style={s.input} maxLength={255} value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, State 00000" />
+        <input style={s.input} maxLength={255} value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, State 00000" disabled={saving} />
       </div>
 
       <div style={s.field}>
@@ -98,7 +98,7 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
           <label style={s.label}>{t.notes} <span style={s.opt}>({t.optional})</span></label>
           <span style={s.charCount}>{(form.notes || '').length}/1000</span>
         </div>
-        <textarea style={s.textarea} rows={2} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional information..." />
+        <textarea style={s.textarea} rows={2} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional information..." disabled={saving} />
       </div>
 
       {error && <p style={s.error}>{error}</p>}
