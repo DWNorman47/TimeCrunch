@@ -3,7 +3,7 @@ const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { uploadBase64 } = require('../r2');
+const { uploadBase64, deleteByUrl } = require('../r2');
 const { incrementStorage, decrementStorage, checkStorageLimit } = require('../storage');
 const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
 const qbo = require('../services/qbo');
@@ -85,10 +85,10 @@ router.post('/', reimbLimiter, async (req, res) => {
     if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
   }
 
-  try {
-    let receiptUrl = null;
-    let receiptSizeBytes = null;
+  let receiptUrl = null;
+  let receiptSizeBytes = null;
 
+  try {
     if (receipt) {
       const { allowed } = await checkStorageLimit(req.user.company_id, 5 * 1024 * 1024);
       if (!allowed) return res.status(400).json({ error: 'Storage limit reached. Upgrade your plan to upload more files.' });
@@ -109,6 +109,11 @@ router.post('/', reimbLimiter, async (req, res) => {
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error(err);
+    // If the DB insert failed after a successful R2 upload, clean up the orphaned file
+    if (receiptUrl) {
+      deleteByUrl(receiptUrl).catch(e => console.error('R2 cleanup failed:', e));
+      decrementStorage(req.user.company_id, receiptSizeBytes).catch(() => {});
+    }
     res.status(500).json({ error: 'Failed to submit reimbursement' });
   }
 });
@@ -161,12 +166,13 @@ router.post('/admin', requireAdmin, async (req, res) => {
     if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
   }
 
-  try {
-    const worker = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [user_id, req.user.company_id]);
-    if (!worker.rows.length) return res.status(404).json({ error: 'Worker not found' });
+  const worker = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [user_id, req.user.company_id]).catch(() => null);
+  if (!worker?.rows.length) return res.status(404).json({ error: 'Worker not found' });
 
-    let receiptUrl = null;
-    let receiptSizeBytes = null;
+  let receiptUrl = null;
+  let receiptSizeBytes = null;
+
+  try {
     if (receipt) {
       const { allowed } = await checkStorageLimit(req.user.company_id, 5 * 1024 * 1024);
       if (!allowed) return res.status(400).json({ error: 'Storage limit reached.' });
@@ -186,6 +192,11 @@ router.post('/admin', requireAdmin, async (req, res) => {
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error(err);
+    // If the DB insert failed after a successful R2 upload, clean up the orphaned file
+    if (receiptUrl) {
+      deleteByUrl(receiptUrl).catch(e => console.error('R2 cleanup failed:', e));
+      decrementStorage(req.user.company_id, receiptSizeBytes).catch(() => {});
+    }
     res.status(500).json({ error: 'Failed to submit reimbursement' });
   }
 });
