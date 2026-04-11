@@ -15,7 +15,8 @@ router.get('/', requireAuth, async (req, res) => {
        LEFT JOIN equipment_hours h ON h.equipment_id = e.id
        WHERE e.company_id = $1 AND e.active = true
        GROUP BY e.id
-       ORDER BY e.name ASC`,
+       ORDER BY e.name ASC
+       LIMIT 500`,
       [companyId]
     );
     res.json(result.rows);

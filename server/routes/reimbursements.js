@@ -40,7 +40,8 @@ router.get('/', async (req, res) => {
          FROM reimbursements r
          LEFT JOIN projects p ON p.id = r.project_id
          WHERE r.company_id = $1 AND r.user_id = $2
-         ORDER BY r.expense_date DESC, r.created_at DESC`,
+         ORDER BY r.expense_date DESC, r.created_at DESC
+         LIMIT 500`,
         [req.user.company_id, req.user.id]
       ),
       getAdvancedSettings(req.user.company_id),
@@ -208,7 +209,8 @@ router.get('/admin', requireAdmin, async (req, res) => {
          JOIN users u ON u.id = r.user_id
          LEFT JOIN projects p ON p.id = r.project_id
          WHERE ${conditions.join(' AND ')}
-         ORDER BY r.expense_date DESC, r.created_at DESC`,
+         ORDER BY r.expense_date DESC, r.created_at DESC
+         LIMIT 1000`,
         params
       ),
       getAdvancedSettings(req.user.company_id),
