@@ -16,9 +16,9 @@ function Paginator({ page, total, pageSize, onChange }) {
   const end = Math.min((page + 1) * pageSize, total);
   return (
     <div style={styles.paginator}>
-      <button style={styles.pageBtn} onClick={() => onChange(page - 1)} disabled={page === 0}>‹</button>
+      <button style={{ ...styles.pageBtn, ...(page === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => onChange(page - 1)} disabled={page === 0}>‹</button>
       <span style={styles.pageInfo}>{start}–{end} of {total}</span>
-      <button style={styles.pageBtn} onClick={() => onChange(page + 1)} disabled={page >= totalPages - 1}>›</button>
+      <button style={{ ...styles.pageBtn, ...(page >= totalPages - 1 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => onChange(page + 1)} disabled={page >= totalPages - 1}>›</button>
     </div>
   );
 }
@@ -394,7 +394,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             <div style={styles.errorPanel}>
               <div style={styles.errorPanelHeader}>
                 <span style={{ fontWeight: 700, color: '#92400e' }}>⚠ {syncErrors.length} QBO sync error{syncErrors.length !== 1 ? 's' : ''}</span>
-                <button style={styles.clearAllBtn} onClick={dismissAllErrors} disabled={clearingErrors}>
+                <button style={{ ...styles.clearAllBtn, ...(clearingErrors ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={dismissAllErrors} disabled={clearingErrors}>
                   {clearingErrors ? '…' : 'Dismiss all'}
                 </button>
               </div>
@@ -406,7 +406,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                     <span style={styles.errorMsg}>{e.error_message}</span>
                     <span style={styles.errorTime}>{new Date(e.created_at).toLocaleString()}</span>
                     {(e.entity_type === 'time_entry' || e.entity_type === 'reimbursement') && (
-                      <button style={styles.errorRetry} onClick={() => retryError(e.id)} disabled={retryingErrors.has(e.id)}>
+                      <button style={{ ...styles.errorRetry, ...(retryingErrors.has(e.id) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => retryError(e.id)} disabled={retryingErrors.has(e.id)}>
                         {retryingErrors.has(e.id) ? '…' : 'Retry'}
                       </button>
                     )}
@@ -673,7 +673,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
               )}
 
               <button
-                style={{ ...styles.pushBtn, marginTop: 16, opacity: totalSelections === 0 ? 0.5 : 1 }}
+                style={{ ...styles.pushBtn, marginTop: 16, opacity: (importing || totalSelections === 0) ? 0.5 : 1, cursor: (importing || totalSelections === 0) ? 'not-allowed' : 'pointer' }}
                 onClick={handleImport}
                 disabled={importing || totalSelections === 0}
               >
@@ -822,7 +822,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 <label style={styles.label}>To</label>
                 <input style={styles.dateInput} type="date" value={expTo} onChange={e => setExpTo(e.target.value)} />
               </div>
-              <button style={styles.pushBtn} onClick={pushExpenses} disabled={expPushing}>
+              <button style={{ ...styles.pushBtn, ...(expPushing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={pushExpenses} disabled={expPushing}>
                 {expPushing ? 'Pushing…' : 'Push Expenses'}
               </button>
             </div>
@@ -885,7 +885,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
               </div>
             </div>
             <button
-              style={{ ...styles.pushBtn, opacity: (!payFrom || !payTo || !payDebitId || !payCreditId) ? 0.5 : 1 }}
+              style={{ ...styles.pushBtn, opacity: (payPushing || !payFrom || !payTo || !payDebitId || !payCreditId) ? 0.5 : 1, cursor: (payPushing || !payFrom || !payTo || !payDebitId || !payCreditId) ? 'not-allowed' : 'pointer' }}
               onClick={pushPayroll}
               disabled={payPushing || !payFrom || !payTo || !payDebitId || !payCreditId}
             >
@@ -914,7 +914,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 <label style={styles.label}>{t.qboTo}</label>
                 <input style={styles.dateInput} type="date" value={pushTo} onChange={e => setPushTo(e.target.value)} />
               </div>
-              <button style={styles.pushBtn} onClick={handlePush} disabled={pushing}>
+              <button style={{ ...styles.pushBtn, ...(pushing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handlePush} disabled={pushing}>
                 {pushing ? t.qboPushing : t.qboPush}
               </button>
             </div>
