@@ -52,18 +52,14 @@ router.post('/', requireAdmin, async (req, res) => {
   if (description && description.length > 2000) return res.status(400).json({ error: 'description too long (max 2000 characters)' });
   const companyId = req.user.company_id;
   try {
-    // Auto-number: next sequential RFI number for this company
-    const numResult = await pool.query(
-      'SELECT COALESCE(MAX(rfi_number), 0) + 1 AS next_num FROM rfis WHERE company_id = $1',
-      [companyId]
-    );
-    const rfiNumber = numResult.rows[0].next_num;
-
+    // Auto-number atomically: subquery inside INSERT so concurrent requests can't
+    // both read the same MAX and produce duplicate rfi_number values.
     const result = await pool.query(
       `INSERT INTO rfis (company_id, project_id, rfi_number, subject, description, directed_to,
          submitted_by, date_submitted, date_due, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [companyId, project_id || null, rfiNumber, subject, description,
+       VALUES ($1,$2,(SELECT COALESCE(MAX(rfi_number),0)+1 FROM rfis WHERE company_id=$1),$3,$4,$5,$6,$7,$8,$9)
+       RETURNING *`,
+      [companyId, project_id || null, subject, description,
        directed_to, submitted_by, date_submitted,
        date_due || null, req.user.id]
     );

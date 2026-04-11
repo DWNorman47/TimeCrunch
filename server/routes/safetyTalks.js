@@ -226,13 +226,6 @@ router.post('/:id/signoff', requireAuth, async (req, res) => {
     );
     if (talk.rowCount === 0) return res.status(404).json({ error: 'Not found' });
 
-    // Check already signed
-    const existing = await pool.query(
-      'SELECT id FROM safety_talk_signoffs WHERE talk_id=$1 AND worker_id=$2',
-      [req.params.id, req.user.id]
-    );
-    if (existing.rowCount > 0) return res.json({ already_signed: true });
-
     // Check if quiz is required
     const questions = await pool.query(
       'SELECT id, correct_index FROM safety_talk_questions WHERE talk_id=$1 ORDER BY order_index',
@@ -256,12 +249,16 @@ router.post('/:id/signoff', requireAuth, async (req, res) => {
       }
     }
 
-    await pool.query(
+    // ON CONFLICT eliminates the check-then-insert race (two tabs submitting simultaneously)
+    const inserted = await pool.query(
       `INSERT INTO safety_talk_signoffs (talk_id, worker_id, worker_name, quiz_score, quiz_passed)
-       VALUES ($1, $2, $3, $4, $5)`,
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (talk_id, worker_id) DO NOTHING
+       RETURNING id`,
       [req.params.id, req.user.id, req.user.full_name, quizScore, quizPassed]
     );
 
+    if (inserted.rowCount === 0) return res.json({ already_signed: true });
     res.json({ signed: true, quiz_score: quizScore, quiz_passed: quizPassed });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
