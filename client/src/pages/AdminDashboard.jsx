@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePlan } from '../hooks/usePlan';
 import { useT } from '../hooks/useT';
 import NotificationBell from '../components/NotificationBell';
-import LiveWorkers from '../components/LiveWorkers';
 import CompanyChat from '../components/CompanyChat';
 import LiveKPIs from '../components/LiveKPIs';
 import BroadcastMessage from '../components/BroadcastMessage';
@@ -12,7 +11,9 @@ import TabBar from '../components/TabBar';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import api from '../api';
 
-// Non-default tabs — lazy-loaded on first visit to reduce initial bundle size
+// Heavy components — lazy-loaded on first render to reduce initial bundle size
+// LiveWorkers pulls in leaflet + react-leaflet (~200 kB), so lazy-load it
+const LiveWorkers = lazy(() => import('../components/LiveWorkers'));
 const WorkerMetrics = lazy(() => import('../components/WorkerMetrics'));
 const ProjectReports = lazy(() => import('../components/ProjectReports'));
 const ApprovalQueue = lazy(() => import('../components/ApprovalQueue'));
@@ -196,11 +197,17 @@ export default function AdminDashboard() {
             {plan.isBusiness && settings?.feature_broadcast !== false ? <BroadcastMessage /> : null}
             {settings?.feature_chat !== false ? (
               <div style={styles.liveLayout} className="live-layout">
-                <div style={styles.liveMain}><LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} /></div>
+                <div style={styles.liveMain}>
+                  <Suspense fallback={<TabLoader />}>
+                    <LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} />
+                  </Suspense>
+                </div>
                 <div style={styles.liveChat}><CompanyChat workers={workers} /></div>
               </div>
             ) : (
-              <LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} />
+              <Suspense fallback={<TabLoader />}>
+                <LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} />
+              </Suspense>
             )}
           </>
         ) : tab === 'approvals' ? (

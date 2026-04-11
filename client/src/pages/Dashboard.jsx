@@ -1,12 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ClockInOut from '../components/ClockInOut';
 import TimeEntryForm from '../components/TimeEntryForm';
 import EntryList from '../components/EntryList';
-import TimesheetView from '../components/TimesheetView';
 import UpcomingShifts from '../components/UpcomingShifts';
-import WorkerSummary from '../components/WorkerSummary';
-import TimesheetSignOff from '../components/TimesheetSignOff';
 import CompanyChat from '../components/CompanyChat';
 import AppSwitcher from '../components/AppSwitcher';
 import NotificationBell from '../components/NotificationBell';
@@ -16,10 +13,19 @@ import { getOrFetch, setCached } from '../offlineDb';
 import { useOffline } from '../contexts/OfflineContext';
 import OfflineBanner from '../components/OfflineBanner';
 import SignatureModal from '../components/SignatureModal';
-import TimeOffTab from '../components/TimeOffTab';
-import AvailabilityTab from '../components/AvailabilityTab';
-import WorkerSchedule from '../components/WorkerSchedule';
-import ReimbursementsView from '../components/ReimbursementsView';
+
+// Secondary tabs — lazy-loaded on first visit
+const TimesheetView    = lazy(() => import('../components/TimesheetView'));
+const WorkerSummary    = lazy(() => import('../components/WorkerSummary'));
+const TimesheetSignOff = lazy(() => import('../components/TimesheetSignOff'));
+const TimeOffTab       = lazy(() => import('../components/TimeOffTab'));
+const AvailabilityTab  = lazy(() => import('../components/AvailabilityTab'));
+const WorkerSchedule   = lazy(() => import('../components/WorkerSchedule'));
+const ReimbursementsView = lazy(() => import('../components/ReimbursementsView'));
+
+function TabLoader() {
+  return <div style={{ padding: '32px 0', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>Loading…</div>;
+}
 
 const isPwa = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
@@ -451,7 +457,7 @@ ${signatureDataUrl ? `
         )}
 
         {tab === 'timesheet' && (
-          <>
+          <Suspense fallback={<TabLoader />}>
             <UpcomingShifts onFillEntry={handleFillFromShift} />
             {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} rateType={user?.rate_type ?? 'hourly'} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 0} overtimeEnabled={settings?.feature_overtime ?? true} overtimeRule={settings?.overtime_rule ?? 'daily'} overtimeThreshold={settings?.overtime_threshold ?? 8} showWages={settings?.show_worker_wages ?? false} currency={settings?.currency ?? 'USD'} />}
             <TimesheetSignOff t={t} />
@@ -472,16 +478,16 @@ ${signatureDataUrl ? `
             ) : (
               <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} currentUserId={user?.id} projects={projects} onRefresh={refreshEntries} />
             )}
-          </>
+          </Suspense>
         )}
 
-        {tab === 'timeoff' && <TimeOffTab />}
+        {tab === 'timeoff' && <Suspense fallback={<TabLoader />}><TimeOffTab /></Suspense>}
 
-        {tab === 'availability' && <AvailabilityTab />}
+        {tab === 'availability' && <Suspense fallback={<TabLoader />}><AvailabilityTab /></Suspense>}
 
-        {tab === 'schedule' && <WorkerSchedule />}
+        {tab === 'schedule' && <Suspense fallback={<TabLoader />}><WorkerSchedule /></Suspense>}
 
-        {tab === 'reimbursements' && <ReimbursementsView />}
+        {tab === 'reimbursements' && <Suspense fallback={<TabLoader />}><ReimbursementsView /></Suspense>}
 
       </main>
     </div>

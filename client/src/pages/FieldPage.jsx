@@ -1,20 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
 import FieldDayLog from '../components/FieldDayLog';
-import DailyReports from '../components/DailyReports';
 
-import Punchlist from '../components/Punchlist';
-import SafetyTalks from '../components/SafetyTalks';
-import SafetyChecklists from '../components/SafetyChecklists';
-import IncidentReports from '../components/IncidentReports';
-import PhotoGallery from '../components/PhotoGallery';
-import SubReports from '../components/SubReports';
-import EquipmentLog from '../components/EquipmentLog';
-import RFITracking from '../components/RFITracking';
-import InspectionChecklists from '../components/InspectionChecklists';
+// Tab components — lazy-loaded on first visit since only one tab is visible at a time
+const DailyReports        = lazy(() => import('../components/DailyReports'));
+const Punchlist           = lazy(() => import('../components/Punchlist'));
+const SafetyTalks         = lazy(() => import('../components/SafetyTalks'));
+const SafetyChecklists    = lazy(() => import('../components/SafetyChecklists'));
+const IncidentReports     = lazy(() => import('../components/IncidentReports'));
+const PhotoGallery        = lazy(() => import('../components/PhotoGallery'));
+const SubReports          = lazy(() => import('../components/SubReports'));
+const EquipmentLog        = lazy(() => import('../components/EquipmentLog'));
+const RFITracking         = lazy(() => import('../components/RFITracking'));
+const InspectionChecklists = lazy(() => import('../components/InspectionChecklists'));
+
+function TabLoader() {
+  return <div style={{ padding: '40px 0', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>Loading…</div>;
+}
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
@@ -78,29 +83,31 @@ export default function FieldPage() {
           ]}
         />
 
-        {fieldTab === 'daily' ? (
-          <DailyReports projects={projects} />
-        ) : fieldTab === 'punchlist' ? (
-          <Punchlist projects={projects} />
-        ) : fieldTab === 'safety' ? (
-          <SafetyTalks projects={projects} />
-        ) : fieldTab === 'checklists' ? (
-          <SafetyChecklists projects={projects} />
-        ) : fieldTab === 'incident' ? (
-          <IncidentReports projects={projects} />
-        ) : fieldTab === 'gallery' ? (
-          <PhotoGallery projects={projects} />
-        ) : fieldTab === 'subs' ? (
-          <SubReports projects={projects} />
-        ) : fieldTab === 'equip' ? (
-          <EquipmentLog projects={projects} />
-        ) : fieldTab === 'rfi' ? (
-          <RFITracking projects={projects} />
-        ) : fieldTab === 'inspect' ? (
-          <InspectionChecklists projects={projects} />
-        ) : (
-          <FieldDayLog projects={projects} isAdmin={isAdmin} />
-        )}
+        <Suspense fallback={<TabLoader />}>
+          {fieldTab === 'daily' ? (
+            <DailyReports projects={projects} />
+          ) : fieldTab === 'punchlist' ? (
+            <Punchlist projects={projects} />
+          ) : fieldTab === 'safety' ? (
+            <SafetyTalks projects={projects} />
+          ) : fieldTab === 'checklists' ? (
+            <SafetyChecklists projects={projects} />
+          ) : fieldTab === 'incident' ? (
+            <IncidentReports projects={projects} />
+          ) : fieldTab === 'gallery' ? (
+            <PhotoGallery projects={projects} />
+          ) : fieldTab === 'subs' ? (
+            <SubReports projects={projects} />
+          ) : fieldTab === 'equip' ? (
+            <EquipmentLog projects={projects} />
+          ) : fieldTab === 'rfi' ? (
+            <RFITracking projects={projects} />
+          ) : fieldTab === 'inspect' ? (
+            <InspectionChecklists projects={projects} />
+          ) : (
+            <FieldDayLog projects={projects} isAdmin={isAdmin} />
+          )}
+        </Suspense>
       </main>
     </div>
   );
