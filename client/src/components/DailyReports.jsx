@@ -211,7 +211,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
           <label style={styles.label}>
             {t.weather}
             <button type="button" style={{ ...styles.weatherBtn, ...(gettingWeather ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={autoFillWeather} disabled={gettingWeather} title="Auto-fill from current location">
-              {gettingWeather ? '...' : '🌤 Auto'}
+              {gettingWeather ? t.loading : '🌤 Auto'}
             </button>
           </label>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -229,7 +229,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
         <div style={styles.sectionHead}>
           <span style={styles.sectionTitle}>{t.manpowerSection}</span>
           <button style={{ ...styles.autofillBtn, ...(suggesting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={autoFillManpower} disabled={suggesting}>
-            {suggesting ? '...' : `⚡ ${t.autoFillEntries}`}
+            {suggesting ? t.loading : `⚡ ${t.autoFillEntries}`}
           </button>
         </div>
         <table style={styles.table}>

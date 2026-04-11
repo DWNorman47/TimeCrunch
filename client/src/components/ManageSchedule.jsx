@@ -517,7 +517,7 @@ export default function ManageSchedule({ workers, projects }) {
           </div>
           <div style={styles.field}>
             <label style={styles.label}>&nbsp;</label>
-            <button style={{ ...styles.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? '...' : t.addShift}</button>
+            <button style={{ ...styles.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.addShift}</button>
           </div>
         </div>
         {availabilityWarning && <p style={styles.overlapWarning}>📅 {availabilityWarning}</p>}

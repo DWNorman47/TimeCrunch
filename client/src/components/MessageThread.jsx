@@ -64,7 +64,7 @@ export default function MessageThread({ entryId, currentUserId, onUnreadChange }
           disabled={sending}
         />
         <button style={{ ...styles.sendBtn, ...((sending || !body.trim()) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={sending || !body.trim()}>
-          {sending ? '...' : 'Send'}
+          {sending ? t.sending : 'Send'}
         </button>
       </form>
     </div>

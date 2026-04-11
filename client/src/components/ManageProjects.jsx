@@ -446,7 +446,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                           <input style={s.geoInput} type="number" step="0.000001" placeholder={t.longitude} value={editGeoLng} onChange={e => setEditGeoLng(e.target.value)} />
                           <input style={s.geoInput} type="number" min="50" step="50" placeholder={t.radiusFt} value={editGeoRadius} onChange={e => setEditGeoRadius(e.target.value)} />
                           <button style={{ ...s.geoLocBtn, ...(geoLocating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="button" onClick={useMyLocation} disabled={geoLocating}>
-                            {geoLocating ? '...' : t.myLocation}
+                            {geoLocating ? t.loading : t.myLocation}
                           </button>
                           {p.geo_radius_ft && (confirmingClearGeoId === p.id ? (
                             <>

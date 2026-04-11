@@ -463,7 +463,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     <div style={s.card}>
       <div style={s.cardHeader}>
         <h3 style={s.cardTitle}>{t.users}</h3>
-        <button style={s.addBtn} onClick={() => { setShowForm(v => !v); setError(''); setArchivedConflict(null); setInviteError(''); setInviteSent(''); }}>
+        <button style={s.addBtn} onClick={() => { setShowForm(v => !v); setError(''); setArchivedConflict(null); setInviteError(''); setInviteSent(''); setForm({ first_name: '', last_name: '', username: '', password: defaultTempPassword, email: '', role: 'worker', worker_type: 'employee', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' }); setInviteForm({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) }); setUsernameEdited(false); setAddMode('manual'); }}>
           {showForm ? t.cancel : t.addUser}
         </button>
       </div>

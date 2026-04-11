@@ -489,7 +489,7 @@ export default function ApprovalQueue({ onCountChange }) {
                         </select>
                       </div>
                       <div style={styles.editTimesActions}>
-                        <button style={{ ...styles.saveTimesBtn, ...(editSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => { setEditSaveError(''); saveEdit(e.id); }} disabled={editSaving}>{editSaving ? '...' : t.save}</button>
+                        <button style={{ ...styles.saveTimesBtn, ...(editSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => { setEditSaveError(''); saveEdit(e.id); }} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
                         <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
                         {editSaveError && <span style={styles.inlineError}>{editSaveError}</span>}
                       </div>
@@ -533,7 +533,7 @@ export default function ApprovalQueue({ onCountChange }) {
                         setSplitSegments(prev => [...prev, { _key: Date.now(), start_time: last.end_time, end_time: last.end_time, project_id: '' }]);
                       }}>{t.aqAddSegment}</button>
                       <div style={styles.editTimesActions}>
-                        <button style={{ ...styles.saveTimesBtn, ...(splitSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveSplit(e.id)} disabled={splitSaving}>{splitSaving ? '...' : t.aqSplitSave}</button>
+                        <button style={{ ...styles.saveTimesBtn, ...(splitSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveSplit(e.id)} disabled={splitSaving}>{splitSaving ? t.saving : t.aqSplitSave}</button>
                         <button style={styles.cancelBtn} onClick={() => setSplittingId(null)}>{t.cancel}</button>
                       </div>
                     </div>
@@ -543,14 +543,14 @@ export default function ApprovalQueue({ onCountChange }) {
                         <input style={styles.rejectInput} placeholder={t.reasonOptional} maxLength={500} value={rejectNote} onChange={ev => setRejectNote(ev.target.value)} autoFocus />
                         <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{rejectNote.length}/500</div>
                       </div>
-                      <button style={{ ...styles.confirmRejectBtn, ...(working === e.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => submitReject(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.confirmReject}</button>
+                      <button style={{ ...styles.confirmRejectBtn, ...(working === e.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => submitReject(e.id)} disabled={working === e.id}>{working === e.id ? t.saving : t.confirmReject}</button>
                       <button style={styles.cancelBtn} onClick={() => { setRejectingId(null); setRejectNote(''); }}>{t.cancel}</button>
                     </div>
                   ) : (
                     <div style={styles.actions}>
                       <button style={styles.editTimesBtn} onClick={() => startEdit(e)}>✏️ Edit</button>
                       <button style={styles.splitBtn} onClick={() => startSplit(e)}>⇌ Split</button>
-                      <button style={{ ...styles.approveBtn, ...(working === e.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => approve(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.approve}</button>
+                      <button style={{ ...styles.approveBtn, ...(working === e.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => approve(e.id)} disabled={working === e.id}>{working === e.id ? t.saving : t.approve}</button>
                       <button style={styles.rejectBtn} onClick={() => { setRejectingId(e.id); setRejectNote(''); }}>{t.reject}</button>
                     </div>
                   )}

@@ -304,7 +304,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
           )}
           <div style={styles.itemActions}>
             <button style={{ ...styles.advanceBtn, ...(updating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={advance} disabled={updating}>
-              {updating ? '...' : nextLabel[item.status] || t.markDone}
+              {updating ? t.saving : nextLabel[item.status] || t.markDone}
             </button>
             {confirmingDelete ? (
               <>

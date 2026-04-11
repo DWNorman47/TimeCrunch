@@ -109,7 +109,7 @@ export default function ManagePayPeriods() {
                 onClick={() => unlock(p.id)}
                 disabled={unlocking === p.id}
               >
-                {unlocking === p.id ? '...' : t.unlock}
+                {unlocking === p.id ? t.saving : t.unlock}
               </button>
             </div>
           ))}

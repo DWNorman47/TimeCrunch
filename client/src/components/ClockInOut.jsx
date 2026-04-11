@@ -382,7 +382,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                 </select>
                 <div style={styles.switchActions}>
                   <button style={{ ...styles.switchConfirmBtn, ...(loading || !switchProject ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleSwitchProject} disabled={loading || !switchProject}>
-                    {loading ? '...' : t.confirmSwitch}
+                    {loading ? t.saving : t.confirmSwitch}
                   </button>
                   <button style={styles.switchCancelBtn} onClick={() => { setSwitchingProject(false); setSwitchProject(''); setError(''); }}>
                     {t.cancel}

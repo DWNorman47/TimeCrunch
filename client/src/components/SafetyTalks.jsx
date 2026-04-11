@@ -452,7 +452,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                   disabled={signing || (questions?.length > 0 && !allAnswered)}
                   title={questions?.length > 0 && !allAnswered ? t.answerQuestionsFirst : ''}
                 >
-                  {signing ? '...' : `✍️ ${t.signOff}`}
+                  {signing ? t.saving : `✍️ ${t.signOff}`}
                 </button>
               )}
               {!isAdmin && alreadySigned && (
@@ -482,7 +482,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
             <div style={styles.cardActions}>
               {confirmingDelete ? (
                 <>
-                  <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
+                  <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? t.saving : t.confirm}</button>
                   <button style={styles.cancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
                 </>
               ) : (
