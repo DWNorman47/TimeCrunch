@@ -154,7 +154,7 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
               <select style={styles.typeSelect} value={item.type} onChange={e => updateItem(item._id, 'type', e.target.value)}>
                 {ITEM_TYPES.map(it => <option key={it.value} value={it.value}>{it.label}</option>)}
               </select>
-              <button type="button" style={styles.removeItemBtn} aria-label="Remove item" onClick={() => removeItem(item._id)}>✕</button>
+              <button type="button" style={styles.removeItemBtn} aria-label={t.removeItem} onClick={() => removeItem(item._id)}>✕</button>
             </div>
           ))}
         </div>
@@ -251,7 +251,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.inspInspectionName}</label>
-          <input style={styles.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Daily Site Safety - Mar 25" />
+          <input style={styles.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.inspectionNamePlaceholder} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.date}</label>

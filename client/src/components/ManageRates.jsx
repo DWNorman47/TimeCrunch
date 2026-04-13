@@ -556,7 +556,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <input
               style={{ ...styles.input, width: 180, textAlign: 'right' }}
               type="text"
-              placeholder="e.g. Welcome1!"
+              placeholder={t.tempPasswordPlaceholder}
               value={form.default_temp_password}
               onChange={e => set('default_temp_password', e.target.value)}
             />

@@ -57,7 +57,7 @@ export default function OnboardingChecklist({ workers, projects, settings }) {
             </span>
           </div>
         </div>
-        <button style={styles.closeBtn} aria-label="Dismiss" onClick={dismiss} title="Dismiss">✕</button>
+        <button style={styles.closeBtn} aria-label={t.dismiss} onClick={dismiss} title={t.dismiss}>✕</button>
       </div>
 
       <div style={styles.steps}>

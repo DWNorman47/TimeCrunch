@@ -355,7 +355,7 @@ export default function ApprovalQueue({ onCountChange }) {
             style={styles.dateInput}
             value={dateFrom}
             onChange={e => setDateFrom(e.target.value)}
-            title="From date"
+            title={t.fromDate}
           />
           <span style={{ fontSize: 12, color: '#9ca3af' }}>–</span>
           <input
@@ -363,7 +363,7 @@ export default function ApprovalQueue({ onCountChange }) {
             style={styles.dateInput}
             value={dateTo}
             onChange={e => setDateTo(e.target.value)}
-            title="To date"
+            title={t.toDate}
           />
           <button style={styles.applyDateBtn} onClick={() => { setSelectedIds(new Set()); fetch(); }}>{t.apply}</button>
           {(dateFrom || dateTo) && (

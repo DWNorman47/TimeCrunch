@@ -152,7 +152,7 @@ function SummaryView({ shifts, days }) {
               <tr key={row.name} style={hasCant ? styles.summaryRowCant : {}}>
                 <td style={styles.summaryTdWorker} title={row.name}>
                   {row.name}
-                  {hasCant && <span style={styles.summaryCantDot} title="Can't make it">✗</span>}
+                  {hasCant && <span style={styles.summaryCantDot} title={t.wsCantMakeIt}>✗</span>}
                 </td>
                 {days.map(day => {
                   const key = toISO(day);
@@ -530,7 +530,7 @@ export default function ManageSchedule({ workers, projects }) {
         <span style={styles.weekLabel}>{fmtDay(days[0])} – {fmtDay(days[6])}</span>
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>{t.nextWeek}</button>
         <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>{t.today}</button>
-        <button style={styles.exportBtn} onClick={() => exportCSV(shifts, days)} title="Export week as CSV">⬇ CSV</button>
+        <button style={styles.exportBtn} onClick={() => exportCSV(shifts, days)} title={t.exportWeekCSV}>⬇ CSV</button>
         {shifts.length > 0 && (
           <button style={{ ...styles.copyWeekBtn, ...(copyingWeek ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={copyWeek} disabled={copyingWeek} title={t.msCopyWeek}>
             {copyingWeek ? t.msCopying : '⧉ ' + t.msCopyWeek}

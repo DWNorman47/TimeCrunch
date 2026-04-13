@@ -52,7 +52,7 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.titleField} *</label>
-          <input style={styles.input} type="text" placeholder="e.g. Patch drywall in office 2B" maxLength={255} value={form.title} onChange={e => set('title', e.target.value)} />
+          <input style={styles.input} type="text" placeholder={t.punchlistTitlePlaceholder} maxLength={255} value={form.title} onChange={e => set('title', e.target.value)} />
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
@@ -80,18 +80,18 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
         )}
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.phaseField}</label>
-          <input style={styles.input} type="text" list="phase-suggestions" placeholder="e.g. Foundation, Rough-in" maxLength={255} value={form.phase} onChange={e => set('phase', e.target.value)} />
+          <input style={styles.input} type="text" list="phase-suggestions" placeholder={t.punchlistPhasePlaceholder} maxLength={255} value={form.phase} onChange={e => set('phase', e.target.value)} />
           <datalist id="phase-suggestions">
             {existingPhases.map(p => <option key={p} value={p} />)}
           </datalist>
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.locationField}</label>
-          <input style={styles.input} type="text" placeholder="e.g. 2nd floor, north wing" maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} />
+          <input style={styles.input} type="text" placeholder={t.punchlistLocationPlaceholder} maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.descriptionField}</label>
-          <textarea style={styles.textarea} rows={3} placeholder="Additional details..." maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
+          <textarea style={styles.textarea} rows={3} placeholder={t.punchlistDetailPlaceholder} maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
           <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.description || '').length}/1000</div>
         </div>
       </div>
@@ -272,7 +272,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
                         <span style={{ ...styles.checkText, textDecoration: c.checked ? 'line-through' : 'none', color: c.checked ? '#9ca3af' : '#374151' }}>
                           {c.text}
                         </span>
-                        <button style={styles.checkDeleteBtn} aria-label="Delete checklist item" onClick={() => deleteCheck(c.id)}>✕</button>
+                        <button style={styles.checkDeleteBtn} aria-label={t.deleteChecklistItem} onClick={() => deleteCheck(c.id)}>✕</button>
                       </div>
                     ))}
                   </div>

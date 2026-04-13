@@ -653,7 +653,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               </div>
                               <div style={s.fieldGroup}>
                                 <label style={s.label}>Invoice Name <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
-                                <input style={s.input} value={editInfoForm.invoice_name} onChange={e => setEditInfoForm(f => ({ ...f, invoice_name: e.target.value }))} placeholder="e.g. Acme Contracting LLC" />
+                                <input style={s.input} value={editInfoForm.invoice_name} onChange={e => setEditInfoForm(f => ({ ...f, invoice_name: e.target.value }))} placeholder={t.invoiceNamePlaceholder} />
                               </div>
                               <div style={s.fieldGroup}>
                                 <label style={s.label}>{t.email}</label>

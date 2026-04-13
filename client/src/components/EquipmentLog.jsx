@@ -46,21 +46,21 @@ function ItemForm({ initial, onSaved, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.name} *</label>
-          <input style={styles.input} type="text" placeholder="e.g. Excavator CAT 320" value={form.name} onChange={e => set('name', e.target.value)} required maxLength={255} />
+          <input style={styles.input} type="text" placeholder={t.equipmentNamePlaceholder} value={form.name} onChange={e => set('name', e.target.value)} required maxLength={255} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.equipmentType}</label>
-          <input style={styles.input} type="text" placeholder="e.g. Excavator, Skid Steer, Generator" value={form.type} onChange={e => set('type', e.target.value)} maxLength={100} />
+          <input style={styles.input} type="text" placeholder={t.equipmentTypePlaceholder} value={form.type} onChange={e => set('type', e.target.value)} maxLength={100} />
         </div>
       </div>
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.unitSerial}</label>
-          <input style={styles.input} type="text" placeholder="e.g. Unit 4, SN-12345" value={form.unit_number} onChange={e => set('unit_number', e.target.value)} maxLength={100} />
+          <input style={styles.input} type="text" placeholder={t.equipmentUnitPlaceholder} value={form.unit_number} onChange={e => set('unit_number', e.target.value)} maxLength={100} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.maintenanceEvery} <span style={styles.optional}>({t.optional})</span></label>
-          <input style={styles.input} type="number" min="0" placeholder="e.g. 250" value={form.maintenance_interval_hours} onChange={e => set('maintenance_interval_hours', e.target.value)} />
+          <input style={styles.input} type="number" min="0" placeholder={t.equipmentIntervalPlaceholder} value={form.maintenance_interval_hours} onChange={e => set('maintenance_interval_hours', e.target.value)} />
         </div>
       </div>
       <div style={styles.fieldGroup}>
@@ -303,7 +303,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
                               <button style={styles.cancelEntryBtn} onClick={() => setPendingDeleteEntryId(null)}>{t.cancel}</button>
                             </>
                           ) : (
-                            <button style={styles.delEntryBtn} aria-label="Delete entry" onClick={() => setPendingDeleteEntryId(h.id)}>✕</button>
+                            <button style={styles.delEntryBtn} aria-label={t.deleteEntry} onClick={() => setPendingDeleteEntryId(h.id)}>✕</button>
                           ))}
                         </td>
                       </tr>

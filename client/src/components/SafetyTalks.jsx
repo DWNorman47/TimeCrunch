@@ -121,7 +121,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label style={styles.label}>{t.topicTitle}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-          <input style={styles.input} type="text" maxLength={200} placeholder="e.g. Ladder Safety, PPE Requirements, Fall Protection" value={form.title} onChange={e => set('title', e.target.value)} />
+          <input style={styles.input} type="text" maxLength={200} placeholder={t.safetyTalkTitlePlaceholder} value={form.title} onChange={e => set('title', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.date}</label>
@@ -170,7 +170,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
                 value={q.question}
                 onChange={e => setQuestion(qi, e.target.value)}
               />
-              <button type="button" style={styles.removeQuestionBtn} aria-label="Remove question" onClick={() => removeQuestion(qi)}>✕</button>
+              <button type="button" style={styles.removeQuestionBtn} aria-label={t.removeQuestion} onClick={() => removeQuestion(qi)}>✕</button>
             </div>
             <div style={styles.optionsList}>
               {q.options.map((opt, oi) => (
@@ -180,7 +180,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
                     name={`correct-${qi}`}
                     checked={q.correct_index === oi}
                     onChange={() => setCorrect(qi, oi)}
-                    title="Mark as correct answer"
+                    title={t.markCorrectAnswer}
                   />
                   <input
                     style={{ ...styles.input, flex: 1 }}
@@ -190,7 +190,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
                     onChange={e => setOption(qi, oi, e.target.value)}
                   />
                   {q.options.length > 2 && (
-                    <button type="button" style={styles.removeOptionBtn} aria-label="Remove option" onClick={() => removeOption(qi, oi)}>✕</button>
+                    <button type="button" style={styles.removeOptionBtn} aria-label={t.removeOption} onClick={() => removeOption(qi, oi)}>✕</button>
                   )}
                 </div>
               ))}
@@ -433,7 +433,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                           <button style={styles.attachCancelBtn} onClick={() => setPendingDeleteAttachId(null)}>{t.cancel}</button>
                         </>
                       ) : (
-                        <button style={styles.attachDeleteBtn} aria-label="Delete attachment" onClick={() => setPendingDeleteAttachId(a.id)}>✕</button>
+                        <button style={styles.attachDeleteBtn} aria-label={t.deleteAttachment} onClick={() => setPendingDeleteAttachId(a.id)}>✕</button>
                       ))}
                     </div>
                   ))}

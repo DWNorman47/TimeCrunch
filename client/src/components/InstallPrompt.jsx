@@ -88,7 +88,7 @@ export default function InstallPrompt() {
 
   return (
     <div style={styles.banner}>
-      <button style={styles.closeBtn} onClick={dismiss} aria-label="Dismiss">✕</button>
+      <button style={styles.closeBtn} onClick={dismiss} aria-label={t.dismiss}>✕</button>
       <div style={styles.icon}>📲</div>
 
       {platform === 'ios' && (

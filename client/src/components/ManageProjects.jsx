@@ -342,7 +342,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                     {p.client_name && <span style={s.clientTag}>{p.client_name}</span>}
                     {p.geo_radius_ft && <span style={s.indicatorBadge} title={`Geofence: ${p.geo_radius_ft.toLocaleString()} ft radius`}>📍</span>}
                     {hasBudget(p) && <span style={s.indicatorBadge} title={[parseFloat(p.budget_hours) > 0 && `${p.budget_hours} hrs`, parseFloat(p.budget_dollars) > 0 && `$${Number(p.budget_dollars).toLocaleString()}`].filter(Boolean).join(' / ')}>💰</span>}
-                    {p.required_checklist_template_id && <span style={s.indicatorBadge} title="Checklist required for clock-in">☑</span>}
+                    {p.required_checklist_template_id && <span style={s.indicatorBadge} title={t.checklistRequiredBadge}>☑</span>}
                     {showWageType && (
                       <span style={{ ...s.wageBadge, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                         {p.wage_type === 'prevailing' ? t.prevailingWages : t.regularWages}
@@ -370,7 +370,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                               onChange={e => setEditName(e.target.value)}
                               onKeyDown={e => { if (e.key === 'Escape') setExpandedId(null); }}
                               autoFocus
-                              placeholder="Project name"
+                              placeholder={t.projectNamePlaceholder}
                             />
                           </div>
                         )}
@@ -407,11 +407,11 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                         </div>
                         <div style={s.fieldGroup}>
                           <label style={s.fieldLabel}>Client Name</label>
-                          <input style={s.editInput} value={editClientName} onChange={e => setEditClientName(e.target.value)} placeholder="e.g. Acme Corp" />
+                          <input style={s.editInput} value={editClientName} onChange={e => setEditClientName(e.target.value)} placeholder={t.clientNameShortPlaceholder} />
                         </div>
                         <div style={s.fieldGroup}>
                           <label style={s.fieldLabel}>Job Number</label>
-                          <input style={s.editInput} value={editJobNumber} onChange={e => setEditJobNumber(e.target.value)} placeholder="e.g. JOB-2024-001" />
+                          <input style={s.editInput} value={editJobNumber} onChange={e => setEditJobNumber(e.target.value)} placeholder={t.jobNumberPlaceholder} />
                         </div>
                         <div style={s.fieldGroup}>
                           <label style={s.fieldLabel}>Start Date</label>
@@ -424,16 +424,16 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
                         <label style={s.fieldLabel}>Address / Location</label>
-                        <input style={s.editInput} maxLength={255} value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="123 Main St, City, State" />
+                        <input style={s.editInput} maxLength={255} value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder={t.projectAddressPlaceholder} />
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
                         <label style={s.fieldLabel}>Description</label>
-                        <textarea style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Brief project description..." />
+                        <textarea style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder={t.projectDescPlaceholder} />
                         <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(editDescription || '').length}/1000</div>
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
                         <label style={s.fieldLabel}>Progress % (0–100)</label>
-                        <input style={s.editInput} type="number" min="0" max="100" value={editProgressPct} onChange={e => setEditProgressPct(e.target.value)} placeholder="e.g. 45" />
+                        <input style={s.editInput} type="number" min="0" max="100" value={editProgressPct} onChange={e => setEditProgressPct(e.target.value)} placeholder={t.progressPctPlaceholder} />
                       </div>
                     </div>
 
@@ -469,11 +469,11 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                         <div style={s.geoFields}>
                           <div style={s.budgetField}>
                             <label style={s.budgetLabel}>{t.hours}</label>
-                            <input style={s.geoInput} type="number" min="0" step="0.5" placeholder="e.g. 200" value={editBudgetHours} onChange={e => setEditBudgetHours(e.target.value)} />
+                            <input style={s.geoInput} type="number" min="0" step="0.5" placeholder={t.budgetHoursPlaceholder} value={editBudgetHours} onChange={e => setEditBudgetHours(e.target.value)} />
                           </div>
                           <div style={s.budgetField}>
                             <label style={s.budgetLabel}>{t.budgetDollars}</label>
-                            <input style={s.geoInput} type="number" min="0" step="100" placeholder="e.g. 15000" value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
+                            <input style={s.geoInput} type="number" min="0" step="100" placeholder={t.budgetDollarsPlaceholder} value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
                           </div>
                           {hasBudget(p) && (confirmingClearBudgetId === p.id ? (
                             <>

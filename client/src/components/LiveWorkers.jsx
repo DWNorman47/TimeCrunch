@@ -217,7 +217,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
               </div>
             </div>
           </div>
-          <button style={styles.dismissBtn} aria-label="Dismiss alert" onClick={() => setDismissedInactive(true)}>✕</button>
+          <button style={styles.dismissBtn} aria-label={t.dismissAlert} onClick={() => setDismissedInactive(true)}>✕</button>
         </div>
       )}
       {actionError && (

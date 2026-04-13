@@ -338,7 +338,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                   autoFocus
                 />
                 <span style={styles.addedUnit}>min</span>
-                <button style={styles.removeBtn} aria-label="Remove break" onClick={() => { setBreakAdded(false); setBreakMinutes(''); }}>✕</button>
+                <button style={styles.removeBtn} aria-label={t.removeBreak} onClick={() => { setBreakAdded(false); setBreakMinutes(''); }}>✕</button>
               </div>
             )}
             {mileageAdded && (
@@ -353,7 +353,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                   onChange={e => setMileage(e.target.value)}
                 />
                 <span style={styles.addedUnit}>mi</span>
-                <button style={styles.removeBtn} aria-label="Remove mileage" onClick={() => { setMileageAdded(false); setMileage(''); }}>✕</button>
+                <button style={styles.removeBtn} aria-label={t.removeMileage} onClick={() => { setMileageAdded(false); setMileage(''); }}>✕</button>
               </div>
             )}
 
@@ -441,7 +441,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
             <div style={styles.clockOutSummaryProject}>{clockOutSummary.projectName}</div>
             <div style={styles.clockOutSummaryDuration}>{t.clockOutSummaryDuration}: <strong>{formatElapsed(clockOutSummary.seconds)}</strong></div>
           </div>
-          <button style={styles.clockOutSummaryDismiss} aria-label="Dismiss" onClick={() => setClockOutSummary(null)}>✕</button>
+          <button style={styles.clockOutSummaryDismiss} aria-label={t.dismiss} onClick={() => setClockOutSummary(null)}>✕</button>
         </div>
       )}
       <h2 style={styles.heading}>{t.clockIn}</h2>

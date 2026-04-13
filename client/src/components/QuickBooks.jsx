@@ -10,15 +10,16 @@ const IMPORT_PAGE_SIZE = 15;
 const MAP_PAGE_SIZE = 20;
 
 function Paginator({ page, total, pageSize, onChange }) {
+  const t = useT();
   if (total <= pageSize) return null;
   const totalPages = Math.ceil(total / pageSize);
   const start = page * pageSize + 1;
   const end = Math.min((page + 1) * pageSize, total);
   return (
     <div style={styles.paginator}>
-      <button style={{ ...styles.pageBtn, ...(page === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Previous page" onClick={() => onChange(page - 1)} disabled={page === 0}>‹</button>
+      <button style={{ ...styles.pageBtn, ...(page === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.prevPage} onClick={() => onChange(page - 1)} disabled={page === 0}>‹</button>
       <span style={styles.pageInfo}>{start}–{end} of {total}</span>
-      <button style={{ ...styles.pageBtn, ...(page >= totalPages - 1 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Next page" onClick={() => onChange(page + 1)} disabled={page >= totalPages - 1}>›</button>
+      <button style={{ ...styles.pageBtn, ...(page >= totalPages - 1 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.nextPage} onClick={() => onChange(page + 1)} disabled={page >= totalPages - 1}>›</button>
     </div>
   );
 }
@@ -410,7 +411,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                         {retryingErrors.has(e.id) ? t.saving : 'Retry'}
                       </button>
                     )}
-                    <button style={styles.errorDismiss} aria-label="Dismiss error" onClick={() => dismissError(e.id)}>✕</button>
+                    <button style={styles.errorDismiss} aria-label={t.dismissError} onClick={() => dismissError(e.id)}>✕</button>
                   </div>
                 ))}
               </div>
@@ -549,7 +550,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
               <input
                 style={styles.searchInput}
                 type="text"
-                placeholder="Search by name or email…"
+                placeholder={t.searchNameOrEmail}
                 value={importSearch}
                 onChange={e => setImportSearch(e.target.value)}
               />

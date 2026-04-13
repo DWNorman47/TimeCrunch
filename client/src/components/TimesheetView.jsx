@@ -102,9 +102,9 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
     <div style={styles.card} className="mobile-card">
       <div style={styles.header}>
         <div style={styles.navGroup}>
-          <button style={styles.navBtn} aria-label="Previous week" onClick={prevWeek}>‹</button>
+          <button style={styles.navBtn} aria-label={t.prevWeekLabel} onClick={prevWeek}>‹</button>
           <span style={styles.weekLabel}>{weekLabel}</span>
-          <button style={styles.navBtn} aria-label="Next week" onClick={nextWeek}>›</button>
+          <button style={styles.navBtn} aria-label={t.nextWeekLabel} onClick={nextWeek}>›</button>
         </div>
         <div style={styles.headerRight}>
           <span style={styles.weekTotal}>{fmtHours(weekTotalHours)}</span>
@@ -184,7 +184,7 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
         <div style={styles.selectedPanel}>
           <div style={styles.selectedHeader}>
             <span style={styles.selectedTitle}>{selectedEntry.project_name} — {formatTime(selectedEntry.start_time)}–{formatTime(selectedEntry.end_time)}</span>
-            <button style={styles.closeBtn} aria-label="Close" onClick={() => setSelectedEntry(null)}>✕</button>
+            <button style={styles.closeBtn} aria-label={t.labelModalClose} onClick={() => setSelectedEntry(null)}>✕</button>
           </div>
           <EntryPanel
             entry={selectedEntry}

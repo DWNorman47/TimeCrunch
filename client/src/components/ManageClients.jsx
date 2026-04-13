@@ -69,28 +69,28 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
       <div style={s.row}>
         <div style={s.field}>
           <label style={s.label}>{t.clientCompanyName} *</label>
-          <input style={s.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Construction Inc." required disabled={saving} />
+          <input style={s.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.clientNamePlaceholder} required disabled={saving} />
         </div>
         <div style={s.field}>
           <label style={s.label}>{t.contactName}</label>
-          <input style={s.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" disabled={saving} />
+          <input style={s.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder={t.contactNamePlaceholder} disabled={saving} />
         </div>
       </div>
 
       <div style={s.row}>
         <div style={s.field}>
           <label style={s.label}>{t.contactEmail}</label>
-          <input style={s.input} type="email" maxLength={255} value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder="jane@example.com" disabled={saving} />
+          <input style={s.input} type="email" maxLength={255} value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder={t.contactEmailPlaceholder} disabled={saving} />
         </div>
         <div style={s.field}>
           <label style={s.label}>{t.contactPhone}</label>
-          <input style={s.input} type="tel" maxLength={50} value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder="(555) 000-0000" disabled={saving} />
+          <input style={s.input} type="tel" maxLength={50} value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder={t.contactPhonePlaceholder} disabled={saving} />
         </div>
       </div>
 
       <div style={s.field}>
         <label style={s.label}>{t.address}</label>
-        <input style={s.input} maxLength={255} value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, State 00000" disabled={saving} />
+        <input style={s.input} maxLength={255} value={form.address} onChange={e => set('address', e.target.value)} placeholder={t.clientAddressPlaceholder} disabled={saving} />
       </div>
 
       <div style={s.field}>
@@ -98,7 +98,7 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
           <label style={s.label}>{t.notes} <span style={s.opt}>({t.optional})</span></label>
           <span style={s.charCount}>{(form.notes || '').length}/1000</span>
         </div>
-        <textarea style={s.textarea} rows={2} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional information..." disabled={saving} />
+        <textarea style={s.textarea} rows={2} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.clientNotesPlaceholder} disabled={saving} />
       </div>
 
       {error && <p style={s.error}>{error}</p>}
@@ -224,7 +224,7 @@ function DocList({ clientId, docs, onDeleted }) {
                 <button style={s.cancelDocDeleteBtn} onClick={() => setPendingDeleteDocId(null)}>{t.cancel}</button>
               </>
             ) : (
-              <button style={{ ...s.docDeleteBtn, ...(deleting === doc.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Delete document" onClick={() => setPendingDeleteDocId(doc.id)} disabled={deleting === doc.id}>
+              <button style={{ ...s.docDeleteBtn, ...(deleting === doc.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.deleteDocument} onClick={() => setPendingDeleteDocId(doc.id)} disabled={deleting === doc.id}>
                 {deleting === doc.id ? '…' : '✕'}
               </button>
             )}
