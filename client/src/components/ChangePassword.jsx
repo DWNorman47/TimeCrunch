@@ -39,7 +39,7 @@ export default function ChangePassword({ onClose, t }) {
   };
 
   return (
-    <div style={styles.overlay}>
+    <div style={styles.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={styles.modal}>
         <h3 style={styles.title}>{t.changePasswordTitle}</h3>
         <form onSubmit={handleSubmit} style={styles.form}>

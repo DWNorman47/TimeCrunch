@@ -70,6 +70,7 @@ export default function SuperAdmin() {
   const [afForm, setAfForm]         = useState(null);
   const [afSaving, setAfSaving]     = useState(false);
   const [afError, setAfError]       = useState('');
+  const [afDeleteError, setAfDeleteError] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -184,11 +185,14 @@ export default function SuperAdmin() {
   };
 
   const deleteAffiliate = async (id) => {
+    setAfDeleteError('');
     try {
       await api.delete(`/superadmin/affiliates/${id}`);
       setAfList(prev => prev.filter(a => a.id !== id));
       setConfirmingAfId(null);
-    } catch {}
+    } catch (err) {
+      setAfDeleteError(err.response?.data?.error || 'Failed to delete affiliate');
+    }
   };
 
   const COMMISSION_RATE = 0.30;
@@ -517,10 +521,11 @@ export default function SuperAdmin() {
                             <>
                               <span style={{ fontSize: 12, color: '#6b7280' }}>Their companies will become unassigned.</span>
                               <button style={styles.deleteBtn} onClick={() => deleteAffiliate(a.id)}>Confirm</button>
-                              <button style={styles.actionBtn} onClick={() => setConfirmingAfId(null)}>Cancel</button>
+                              <button style={styles.actionBtn} onClick={() => { setConfirmingAfId(null); setAfDeleteError(''); }}>Cancel</button>
+                              {afDeleteError && <span style={{ fontSize: 12, color: '#ef4444' }}>{afDeleteError}</span>}
                             </>
                           ) : (
-                            <button style={styles.deleteBtn} onClick={() => setConfirmingAfId(a.id)}>Delete</button>
+                            <button style={styles.deleteBtn} onClick={() => { setConfirmingAfId(a.id); setAfDeleteError(''); }}>Delete</button>
                           )}
                         </div>
                       </div>

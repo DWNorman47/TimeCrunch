@@ -24,7 +24,7 @@ export default function WelcomeModal() {
   }, []);
 
   return (
-    <div style={styles.overlay}>
+    <div style={styles.overlay} onClick={e => { if (e.target === e.currentTarget) handleStart(); }}>
       <div style={styles.modal}>
         <div style={styles.brand}>{t.welcomeBrand}</div>
         <div style={styles.emoji}>{isAdmin ? '🏗️' : '👷'}</div>

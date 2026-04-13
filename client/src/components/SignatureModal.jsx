@@ -66,7 +66,7 @@ export default function SignatureModal({ onConfirm, onCancel, required = false }
   };
 
   return (
-    <div style={styles.overlay}>
+    <div style={styles.overlay} onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
       <div style={styles.modal}>
         <h3 style={styles.title}>{t.signInvoice}</h3>
         <p style={styles.hint}>{t.signatureHint}</p>
