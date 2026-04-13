@@ -538,7 +538,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   style={styles.activityToggle}
                   onClick={() => { setPunchOpen(o => !o); if (!punchOpen) loadPunch(); }}
                 >
-                  <span>Punchlist</span>
+                  <span>{t.punchlistTitle}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {punch.filter(p => p.status === 'open').length > 0 && (
                       <span style={{ ...styles.activityCount, background: '#f59e0b' }}>
@@ -604,9 +604,9 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                           value={punchForm.priority}
                           onChange={e => setPunchForm(f => ({ ...f, priority: e.target.value }))}
                         >
-                          <option value="low">Low priority</option>
-                          <option value="normal">Normal priority</option>
-                          <option value="high">High priority</option>
+                          <option value="low">{t.optLowPriority}</option>
+                          <option value="normal">{t.optNormalPriority}</option>
+                          <option value="high">{t.optHighPriority}</option>
                         </select>
                         <textarea
                           style={{ ...styles.rfiInput, resize: 'vertical', minHeight: 56, fontFamily: 'inherit' }}
@@ -721,7 +721,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                     style={styles.activityToggle}
                     onClick={() => setActivityOpen(o => !o)}
                   >
-                    <span>Recent Activity</span>
+                    <span>{t.recentActivity}</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {activity.length > 0 && <span style={styles.activityCount}>{activity.length}</span>}
                       <span style={{ fontSize: 12, color: '#9ca3af' }}>{activityOpen ? '▴' : '▾'}</span>
@@ -768,7 +768,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   style={styles.activityToggle}
                   onClick={() => { setPhotosOpen(o => !o); if (!photosOpen) loadPhotos(); }}
                 >
-                  <span>Photos</span>
+                  <span>{t.photosLabel}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {photos.length > 0 && <span style={styles.activityCount}>{photos.length}</span>}
                     <span style={{ fontSize: 12, color: '#9ca3af' }}>{photosOpen ? '▴' : '▾'}</span>
@@ -777,7 +777,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 
                 {photosOpen && (
                   photosLoaded && photos.length === 0 ? (
-                    <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0' }}>No photos yet.</p>
+                    <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0' }}>{t.noPhotosYet}</p>
                   ) : (
                     <div style={styles.photoGrid}>
                       {photos.map((ph, i) => (
@@ -796,7 +796,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   style={styles.activityToggle}
                   onClick={() => { setDocsOpen(o => !o); if (!docsOpen) loadDocs(); }}
                 >
-                  <span>Documents</span>
+                  <span>{t.documentsLabel}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {docs.length > 0 && <span style={styles.activityCount}>{docs.length}</span>}
                     <span style={{ fontSize: 12, color: '#9ca3af' }}>{docsOpen ? '▴' : '▾'}</span>
@@ -1012,11 +1012,11 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                     <div style={styles.qboPicker}>
                       <div style={styles.qboPickerLabel}>Select QuickBooks service item:</div>
                       {qboItems.length === 0 ? (
-                        <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>No service items found in QuickBooks.</p>
+                        <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>{t.noQboServiceItems}</p>
                       ) : (
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                           <select style={styles.qboSelect} value={qboItemId} onChange={e => setQboItemId(e.target.value)}>
-                            <option value="">Select item…</option>
+                            <option value="">{t.selectItemPh}</option>
                             {qboItems.map(item => (
                               <option key={item.Id} value={item.Id}>{item.Name}</option>
                             ))}
@@ -1096,7 +1096,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   </div>
                 );
               })}
-              {entries.length > 200 && <p style={styles.moreText}>Showing first 200 of {entries.length} entries</p>}
+              {entries.length > 200 && <p style={styles.moreText}>{t.showingFirst200.replace('{n}', entries.length)}</p>}
             </div>
           )}
 
@@ -1108,66 +1108,66 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   onClick={handleMarkComplete}
                   disabled={editSaving}
                 >
-                  Mark as Complete
+                  {t.markAsComplete}
                 </button>
               )}
               {editForm.status === 'completed' && (
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#059669', background: '#d1fae5', borderRadius: 8, padding: '10px 14px' }}>
-                  This project is marked as complete.
+                  {t.projectIsComplete}
                 </div>
               )}
 
               <div style={pf.field}>
-                <label style={pf.label}>Project Name</label>
+                <label style={pf.label}>{t.projectNameLabel}</label>
                 <input style={pf.input} value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
               </div>
 
               <div style={pf.row}>
                 <div style={pf.field}>
-                  <label style={pf.label}>Status</label>
+                  <label style={pf.label}>{t.status}</label>
                   <select style={pf.input} value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}>
-                    <option value="planning">Planning</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="on_hold">On Hold</option>
-                    <option value="completed">Completed</option>
+                    <option value="planning">{t.statusPlanning}</option>
+                    <option value="in_progress">{t.statusInProgress}</option>
+                    <option value="on_hold">{t.statusOnHold}</option>
+                    <option value="completed">{t.statusCompleted}</option>
                   </select>
                 </div>
                 <div style={pf.field}>
-                  <label style={pf.label}>Progress %</label>
+                  <label style={pf.label}>{t.progressPctLabel}</label>
                   <input style={pf.input} type="number" min="0" max="100" placeholder="0–100" value={editForm.progress_pct} onChange={e => setEditForm(f => ({ ...f, progress_pct: e.target.value }))} />
                 </div>
               </div>
 
               <div style={pf.row}>
                 <div style={pf.field}>
-                  <label style={pf.label}>Client Name</label>
-                  <input style={pf.input} value={editForm.client_name} onChange={e => setEditForm(f => ({ ...f, client_name: e.target.value }))} placeholder="Acme Corp" />
+                  <label style={pf.label}>{t.clientNameLabel}</label>
+                  <input style={pf.input} value={editForm.client_name} onChange={e => setEditForm(f => ({ ...f, client_name: e.target.value }))} placeholder={t.clientNameShortPlaceholder} />
                 </div>
                 <div style={pf.field}>
-                  <label style={pf.label}>Job Number</label>
-                  <input style={pf.input} value={editForm.job_number} onChange={e => setEditForm(f => ({ ...f, job_number: e.target.value }))} placeholder="JOB-2025-001" />
+                  <label style={pf.label}>{t.jobNumberLabel}</label>
+                  <input style={pf.input} value={editForm.job_number} onChange={e => setEditForm(f => ({ ...f, job_number: e.target.value }))} placeholder={t.jobNumberPlaceholder} />
                 </div>
               </div>
 
               <div style={pf.field}>
-                <label style={pf.label}>Address</label>
-                <input style={pf.input} value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, City, State" />
+                <label style={pf.label}>{t.address}</label>
+                <input style={pf.input} value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder={t.adminAddressPh} />
               </div>
 
               <div style={pf.row}>
                 <div style={pf.field}>
-                  <label style={pf.label}>Start Date</label>
+                  <label style={pf.label}>{t.startDate}</label>
                   <input style={pf.input} type="date" value={editForm.start_date} onChange={e => setEditForm(f => ({ ...f, start_date: e.target.value }))} />
                 </div>
                 <div style={pf.field}>
-                  <label style={pf.label}>End Date</label>
+                  <label style={pf.label}>{t.endDate}</label>
                   <input style={pf.input} type="date" value={editForm.end_date} onChange={e => setEditForm(f => ({ ...f, end_date: e.target.value }))} />
                 </div>
               </div>
 
               <div style={pf.field}>
-                <label style={pf.label}>Description</label>
-                <textarea style={pf.textarea} rows={3} value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder="Scope of work, notes…" />
+                <label style={pf.label}>{t.descriptionLabel}</label>
+                <textarea style={pf.textarea} rows={3} value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder={t.scopeOfWorkPh} />
               </div>
 
               {editMsg && (
@@ -1176,7 +1176,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 
               <div style={pf.actions}>
                 <button style={pf.saveBtn} onClick={handleEditSave} disabled={editSaving || !editForm.name.trim()}>
-                  {editSaving ? 'Saving…' : 'Save Changes'}
+                  {editSaving ? t.saving : t.saveChanges}
                 </button>
               </div>
             </div>
@@ -1190,12 +1190,13 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 // ── Project Row (list view) ───────────────────────────────────────────────────
 
 function ProjectRow({ project, metrics, settings, onClick }) {
+  const t = useT();
   const m = metrics || {};
   const totalHours = parseFloat(m.total_hours || 0);
   const fmtHours = h => { const n = parseFloat(h); return isNaN(n) || n === 0 ? '0h' : n % 1 === 0 ? `${n}h` : `${n.toFixed(1)}h`; };
   const statusColors = { planning: '#dbeafe|#1d4ed8', in_progress: '#d1fae5|#065f46', on_hold: '#fef3c7|#92400e', completed: '#e5e7eb|#374151' };
   const [statusBg, statusFg] = (statusColors[project.status] || '#f3f4f6|#6b7280').split('|');
-  const statusLabel = { planning: 'Planning', in_progress: 'In Progress', on_hold: 'On Hold', completed: 'Completed' }[project.status];
+  const statusLabel = { planning: t.statusPlanning, in_progress: t.statusInProgress, on_hold: t.statusOnHold, completed: t.statusCompleted }[project.status];
   const budgetHours = parseFloat(project.budget_hours || 0);
   const hoursUsedPct = budgetHours > 0 ? Math.min(100, (totalHours / budgetHours) * 100) : 0;
   const hourColor = hoursUsedPct >= 100 ? '#ef4444' : hoursUsedPct >= 85 ? '#f59e0b' : '#059669';
@@ -1218,7 +1219,7 @@ function ProjectRow({ project, metrics, settings, onClick }) {
         )}
         {budgetHours === 0 && totalHours > 0 && <span style={{ fontSize: 12, color: '#6b7280', flexShrink: 0 }}>{fmtHours(totalHours)}</span>}
         <span style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>{parseInt(m.worker_count || 0)} worker{parseInt(m.worker_count || 0) !== 1 ? 's' : ''}</span>
-        {project.active === false && <span style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Archived</span>}
+        {project.active === false && <span style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>{t.archivedLabel}</span>}
       </div>
     </div>
   );
@@ -1229,6 +1230,7 @@ function ProjectRow({ project, metrics, settings, onClick }) {
 const BLANK_PROJECT = { name: '', client_id: '', job_number: '', address: '', start_date: '', end_date: '', status: 'in_progress', description: '', wage_type: 'regular' };
 
 function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
+  const t = useT();
   const [form, setForm] = useState(BLANK_PROJECT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -1237,7 +1239,7 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!form.name.trim()) { setError('Project name is required.'); return; }
+    if (!form.name.trim()) { setError(t.projectNameRequired); return; }
     setSaving(true); setError('');
     try {
       const r = await api.post('/admin/projects', {
@@ -1247,79 +1249,79 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
       });
       onSaved(r.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create project.');
+      setError(err.response?.data?.error || t.failedCreateProject);
     } finally { setSaving(false); }
   };
 
   return (
     <div style={pf.card}>
-      <h3 style={pf.title}>New Project</h3>
+      <h3 style={pf.title}>{t.newProject}</h3>
       <form onSubmit={handleSubmit} style={pf.form}>
         <div style={pf.row}>
           <div style={pf.field}>
-            <label style={pf.label}>Project Name *</label>
-            <input style={pf.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Downtown Office Renovation" required autoFocus />
+            <label style={pf.label}>{t.projectNameLabel} *</label>
+            <input style={pf.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.projectNamePlaceholder} required autoFocus />
           </div>
           <div style={pf.field}>
-            <label style={pf.label}>Job Number</label>
-            <input style={pf.input} value={form.job_number} onChange={e => set('job_number', e.target.value)} placeholder="JOB-2025-001" />
+            <label style={pf.label}>{t.jobNumberLabel}</label>
+            <input style={pf.input} value={form.job_number} onChange={e => set('job_number', e.target.value)} placeholder={t.jobNumberPlaceholder} />
           </div>
         </div>
 
         <div style={pf.row}>
           <div style={pf.field}>
-            <label style={pf.label}>Client</label>
+            <label style={pf.label}>{t.client}</label>
             <select style={pf.input} value={form.client_id} onChange={e => set('client_id', e.target.value)}>
-              <option value="">— No client —</option>
+              <option value="">{t.noClient}</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div style={pf.field}>
-            <label style={pf.label}>Status</label>
+            <label style={pf.label}>{t.status}</label>
             <select style={pf.input} value={form.status} onChange={e => set('status', e.target.value)}>
-              <option value="planning">Planning</option>
-              <option value="in_progress">In Progress</option>
-              <option value="on_hold">On Hold</option>
-              <option value="completed">Completed</option>
+              <option value="planning">{t.statusPlanning}</option>
+              <option value="in_progress">{t.statusInProgress}</option>
+              <option value="on_hold">{t.statusOnHold}</option>
+              <option value="completed">{t.statusCompleted}</option>
             </select>
           </div>
         </div>
 
         <div style={pf.field}>
-          <label style={pf.label}>Address / Location</label>
-          <input style={pf.input} value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, State" />
+          <label style={pf.label}>{t.addressLocation}</label>
+          <input style={pf.input} value={form.address} onChange={e => set('address', e.target.value)} placeholder={t.adminAddressPh} />
         </div>
 
         <div style={pf.row}>
           <div style={pf.field}>
-            <label style={pf.label}>Start Date</label>
+            <label style={pf.label}>{t.startDate}</label>
             <input style={pf.input} type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} />
           </div>
           <div style={pf.field}>
-            <label style={pf.label}>End Date</label>
+            <label style={pf.label}>{t.endDate}</label>
             <input style={pf.input} type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)} />
           </div>
           {showPrevailing && (
             <div style={pf.field}>
-              <label style={pf.label}>Wage Type</label>
+              <label style={pf.label}>{t.wageType}</label>
               <select style={pf.input} value={form.wage_type} onChange={e => set('wage_type', e.target.value)}>
-                <option value="regular">Regular</option>
-                <option value="prevailing">Prevailing</option>
+                <option value="regular">{t.regular}</option>
+                <option value="prevailing">{t.prevailing}</option>
               </select>
             </div>
           )}
         </div>
 
         <div style={pf.field}>
-          <label style={pf.label}>Description <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span></label>
-          <textarea style={pf.textarea} rows={2} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Scope of work, notes…" />
+          <label style={pf.label}>{t.descriptionLabel} <span style={{ fontWeight: 400, color: '#9ca3af' }}>{t.optionalHint}</span></label>
+          <textarea style={pf.textarea} rows={2} value={form.description} onChange={e => set('description', e.target.value)} placeholder={t.scopeOfWorkPh} />
         </div>
 
         {error && <p style={pf.error}>{error}</p>}
 
         <div style={pf.actions}>
-          <button style={pf.saveBtn} type="submit" disabled={saving}>{saving ? 'Creating…' : 'Create Project'}</button>
-          <button style={pf.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+          <button style={pf.saveBtn} type="submit" disabled={saving}>{saving ? t.creating : t.createProjectBtn}</button>
+          <button style={pf.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
         </div>
       </form>
     </div>

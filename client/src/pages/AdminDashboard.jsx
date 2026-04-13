@@ -248,10 +248,10 @@ export default function AdminDashboard() {
               {!collapsedSections.overtime && (plan.isStarter ? <OvertimeReport currency={settings?.currency ?? 'USD'} /> : <UpgradePrompt requiredPlan="starter" feature={t.overtimeReport} />)}
             </>}
             <button style={styles.sectionToggle} onClick={() => toggleSection('payroll')}>
-              <span>Payroll</span>
+              <span>{t.payrollLabel}</span>
               <span style={styles.chevron}>{collapsedSections.payroll ? '▶' : '▼'}</span>
             </button>
-            {!collapsedSections.payroll && (plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature="Payroll" />)}
+            {!collapsedSections.payroll && (plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature={t.payrollLabel} />)}
             <button style={styles.sectionToggle} onClick={() => toggleSection('export')}>
               <span>{t.export}</span>
               <span style={styles.chevron}>{collapsedSections.export ? '▶' : '▼'}</span>
