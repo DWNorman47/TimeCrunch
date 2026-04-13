@@ -4,6 +4,7 @@ import { currencySymbol } from '../utils';
 import { useT } from '../hooks/useT';
 
 import { silentError } from '../errorReporter';
+import HelpTip from './HelpTip';
 const TIMEZONES = [
   { value: 'America/New_York',    label: 'Eastern Time (ET)' },
   { value: 'America/Chicago',     label: 'Central Time (CT)' },
@@ -285,7 +286,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </div>
           </div>
           <div style={styles.row}>
-            <label style={styles.label}>{t.ratesPrevailingWage}</label>
+            <label style={styles.label}>{t.ratesPrevailingWage}<HelpTip text={t.ratesPrevailingWageHelp} /></label>
             {!prevailingEnabled
               ? <button style={styles.addPrevBtn} type="button" onClick={() => { setPrevailingEnabled(true); set('prevailing_wage_rate', '0'); }}>+ Add</button>
               : <div style={styles.inputGroup}>
@@ -336,7 +337,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </div>
           </div>
           <div style={styles.row}>
-            <label style={styles.label}>{t.ratesCalcMethod}</label>
+            <label style={styles.label}>{t.ratesCalcMethod}<HelpTip text={t.ratesCalcMethodHelp} /></label>
             <div style={styles.inputGroup}>
               <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.overtime_rule} onChange={e => set('overtime_rule', e.target.value)}>
                 <option value="daily">{t.ratesDailyMethod}</option>

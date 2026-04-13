@@ -6,6 +6,7 @@ import { SkeletonList } from './Skeleton';
 import ModalShell from './ModalShell';
 
 import { silentError } from '../errorReporter';
+import HelpTip from './HelpTip';
 export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true, showGeofenceBudget = true, defaultPrevailingRate = '', currency = 'USD', settings = null }) {
   const toast = useToast();
   const t = useT();
@@ -443,7 +444,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                     {/* Geofence */}
                     {showGeofenceBudget && (
                       <div style={s.section}>
-                        <div style={s.sectionTitle}>{t.geofenceOptional}</div>
+                        <div style={s.sectionTitle}>{t.geofenceOptional}<HelpTip text={t.geofenceHelp} side="bottom" /></div>
                         <div style={s.geoFields}>
                           <input style={s.geoInput} type="number" step="0.000001" placeholder={t.latitude} value={editGeoLat} onChange={e => setEditGeoLat(e.target.value)} />
                           <input style={s.geoInput} type="number" step="0.000001" placeholder={t.longitude} value={editGeoLng} onChange={e => setEditGeoLng(e.target.value)} />
