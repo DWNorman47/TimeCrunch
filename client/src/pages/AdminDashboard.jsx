@@ -183,7 +183,7 @@ export default function AdminDashboard() {
             { id: 'live', label: t.tabLive, dot: chatUnread && settings?.feature_chat !== false ? '#3b82f6' : null },
             ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
-            { id: 'timeoff', label: '🏖 Time Off' },
+            ...(settings?.feature_pto !== false ? [{ id: 'timeoff', label: '🏖 Time Off' }] : []),
             ...(settings?.feature_reimbursements !== false ? [{ id: 'expenses', label: '💳 Expenses', dot: pendingReimbursements > 0 ? '#f59e0b' : null }] : []),
             ...(settings?.feature_scheduling !== false ? [{ id: 'manage', label: t.tabManage }] : []),
           ]}
@@ -265,7 +265,7 @@ export default function AdminDashboard() {
             </button>
             {!collapsedSections.export && (plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />)}
           </Suspense>
-        ) : tab === 'timeoff' ? (
+        ) : tab === 'timeoff' && settings?.feature_pto !== false ? (
           <Suspense fallback={<TabLoader />}>
             <AdminTimeOff settings={settings} />
           </Suspense>

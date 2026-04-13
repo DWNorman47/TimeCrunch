@@ -95,6 +95,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     feature_broadcast: settings?.feature_broadcast ?? true,
     feature_media_gallery: settings?.feature_media_gallery ?? false,
     feature_reimbursements: settings?.feature_reimbursements ?? true,
+    feature_pto: settings?.feature_pto ?? true,
     show_worker_wages: settings?.show_worker_wages ?? false,
     global_required_checklist_template_id: settings?.global_required_checklist_template_id ?? '',
     currency: settings?.currency ?? 'USD',
@@ -169,6 +170,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       feature_broadcast: settings.feature_broadcast ?? true,
       feature_media_gallery: settings.feature_media_gallery ?? false,
       feature_reimbursements: settings.feature_reimbursements ?? true,
+      feature_pto: settings.feature_pto ?? true,
       show_worker_wages: settings.show_worker_wages ?? false,
       global_required_checklist_template_id: settings.global_required_checklist_template_id ?? '',
       currency: settings.currency ?? 'USD',
@@ -222,6 +224,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_broadcast: form.feature_broadcast,
         feature_media_gallery: form.feature_media_gallery,
         feature_reimbursements: form.feature_reimbursements,
+        feature_pto: form.feature_pto,
         show_worker_wages: form.show_worker_wages,
         global_required_checklist_template_id: form.global_required_checklist_template_id,
         currency: form.currency,
@@ -438,6 +441,16 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
           <div style={styles.row}>
             <div>
+              <div style={styles.label}>{t.featPto || 'Paid Time Off'}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.featPtoDesc || 'Workers request time off, admins approve, optional PTO balance tracking'}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_pto ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_pto} onChange={e => set('feature_pto', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_pto ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
               <div style={styles.label}>Global Clock-in Checklist</div>
               <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Require all workers to complete a safety checklist before clocking in (any project)</div>
             </div>
@@ -608,7 +621,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         {!collapsed.overtime && <SectionFooter section="overtime" />}
       </div>}
 
-      {/* ── PTO ── */}
+      {/* ── PTO (feature-gated) ── */}
+      {form.feature_pto && (
       <div style={styles.section}>
         <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('pto')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('pto')}>
           <span style={styles.sectionIcon}>🏖️</span>
@@ -648,6 +662,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         </div>}
         {!collapsed.pto && <SectionFooter section="pto" />}
       </div>
+      )}
 
       {/* ── Reimbursements (feature-gated) ── */}
       {form.feature_reimbursements && (
@@ -777,16 +792,18 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={{ ...styles.toggleKnob, transform: form.feature_overtime_alerts ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>Time Off Request Notifications</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Email admins when a worker submits a time off request</div>
+          {form.feature_pto && (
+            <div style={styles.row}>
+              <div>
+                <div style={styles.label}>Time Off Request Notifications</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Email admins when a worker submits a time off request</div>
+              </div>
+              <label style={{ ...styles.toggle, background: form.notify_timeoff_requests ? '#1a56db' : '#d1d5db' }}>
+                <input type="checkbox" checked={form.notify_timeoff_requests} onChange={e => set('notify_timeoff_requests', e.target.checked)} style={{ display: 'none' }} />
+                <span style={{ ...styles.toggleKnob, transform: form.notify_timeoff_requests ? 'translateX(46px)' : 'translateX(0)' }} />
+              </label>
             </div>
-            <label style={{ ...styles.toggle, background: form.notify_timeoff_requests ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.notify_timeoff_requests} onChange={e => set('notify_timeoff_requests', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.notify_timeoff_requests ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
+          )}
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Budget Alert Notifications</div>
