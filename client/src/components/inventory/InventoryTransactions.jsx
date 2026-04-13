@@ -3,6 +3,7 @@ import api from '../../api';
 import UomConversionModal from './UomConversionModal';
 import { useT } from '../../hooks/useT';
 import { SkeletonList } from '../Skeleton';
+import ModalShell from '../ModalShell';
 const TYPE_COLORS = {
   receive:  { color: '#059669', bg: '#d1fae5' },
   issue:    { color: '#d97706', bg: '#fef3c7' },
@@ -488,7 +489,11 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
     <div style={s.wrap}>
       {showForm && (
         <div style={s.formOverlay} onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
-          <div style={s.formModal}>
+          <ModalShell
+            onClose={() => setShowForm(false)}
+            ariaLabel={t.invTxLogMovement}
+            style={s.formModal}
+          >
             <TransactionForm
               isAdmin={isAdmin}
               locations={locations}
@@ -497,7 +502,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
               onCancel={() => setShowForm(false)}
               onConversionSaved={onConversionSaved}
             />
-          </div>
+          </ModalShell>
         </div>
       )}
       <>

@@ -5,6 +5,7 @@ import { parseItemQR } from './ItemLabelModal';
 import UomConversionModal from './UomConversionModal';
 import { useT } from '../../hooks/useT';
 import { SkeletonList } from '../Skeleton';
+import ModalShell from '../ModalShell';
 
 function useCountTypes(t) {
   return {
@@ -693,8 +694,12 @@ function CycleCountDetail({ count, onBack, onComplete }) {
 
       {reportLines && (
         <div style={d.modalOverlay}>
-          <div style={{ ...d.modal, maxWidth: 560 }}>
-            <h3 style={d.modalTitle}>{t.invCycVarianceReport}</h3>
+          <ModalShell
+            onClose={() => { setReportLines(null); onComplete(); }}
+            titleId="cyc-variance-title"
+            style={{ ...d.modal, maxWidth: 560 }}
+          >
+            <h3 id="cyc-variance-title" style={d.modalTitle}>{t.invCycVarianceReport}</h3>
             {(() => {
               const withVariance = reportLines.filter(l => {
                 if (l.counted_qty == null) return false;
@@ -754,14 +759,18 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 {t.invCycDownloadCSV}
               </button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
 
       {confirmOpen && (
         <div style={d.modalOverlay}>
-          <div style={d.modal}>
-            <h3 style={d.modalTitle}>{t.invCycConfirmComplete} {COUNT_TYPES[countData.count_type]?.label || ''}?</h3>
+          <ModalShell
+            onClose={() => !completing && setConfirmOpen(false)}
+            titleId="cyc-confirm-title"
+            style={d.modal}
+          >
+            <h3 id="cyc-confirm-title" style={d.modalTitle}>{t.invCycConfirmComplete} {COUNT_TYPES[countData.count_type]?.label || ''}?</h3>
             {variantLines.length > 0 ? (
               <>
                 <p style={d.modalBody}>{variantLines.length} {t.invCycAdjustments}</p>
@@ -785,7 +794,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 {completing ? t.invCycCompleting : t.invCycConfirmBtn}
               </button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
 
@@ -808,8 +817,12 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       {/* ── Override Modal ── */}
       {overrideModal && (
         <div style={d.modalOverlay}>
-          <div style={d.modal}>
-            <h3 style={d.modalTitle}>{t.invCycOverrideTitle}: {overrideModal.line.item_name}</h3>
+          <ModalShell
+            onClose={() => setOverrideModal(null)}
+            titleId="cyc-override-title"
+            style={d.modal}
+          >
+            <h3 id="cyc-override-title" style={d.modalTitle}>{t.invCycOverrideTitle}: {overrideModal.line.item_name}</h3>
             <p style={d.modalBody}>
               {t.invCycOverrideExpected}: {parseFloat(overrideModal.line.expected_qty)} {overrideModal.line.unit}.
               {' '}{t.invCycOverrideDesc}
@@ -833,7 +846,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 {overriding ? t.invCycOverrideSaving : t.invCycOverride}
               </button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
     </div>

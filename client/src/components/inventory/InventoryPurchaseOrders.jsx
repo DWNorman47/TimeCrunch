@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
 import { SkeletonList } from '../Skeleton';
+import ModalShell from '../ModalShell';
 
 function useStatus(t) {
   return {
@@ -67,9 +68,9 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
 
   return (
     <div style={m.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={m.modal}>
+      <ModalShell onClose={onClose} titleId="po-receive-title" style={m.modal}>
         <div style={m.header}>
-          <h3 style={m.title}>{t.invPOReceiveTitle} — {po.po_number}</h3>
+          <h3 id="po-receive-title" style={m.title}>{t.invPOReceiveTitle} — {po.po_number}</h3>
           <button style={m.closeBtn} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
 
@@ -132,7 +133,7 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
             {saving ? t.invPOReceiving : t.invPOConfirmReceipt}
           </button>
         </div>
-      </div>
+      </ModalShell>
     </div>
   );
 }
