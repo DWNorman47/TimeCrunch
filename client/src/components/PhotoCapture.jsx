@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { useT } from '../hooks/useT';
 
 // Compress an image file to a JPEG data URL, max 1200px wide, quality 0.75
 function compressImage(file) {
@@ -20,6 +21,7 @@ function compressImage(file) {
 }
 
 export default function PhotoCapture({ photos, onChange, maxPhotos = 10 }) {
+  const t = useT();
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
   const [compressing, setCompressing] = useState(false);
@@ -47,12 +49,12 @@ export default function PhotoCapture({ photos, onChange, maxPhotos = 10 }) {
           <div key={i} style={styles.photoCard}>
             <div style={styles.photoImgWrap}>
               <img src={p.url} alt={`photo ${i + 1}`} style={styles.photoImg} loading="lazy" />
-              <button style={styles.removeBtn} onClick={() => remove(i)} aria-label="Remove photo">✕</button>
+              <button style={styles.removeBtn} onClick={() => remove(i)} aria-label={t.removePhoto}>✕</button>
             </div>
             <input
               style={styles.captionInput}
               type="text"
-              placeholder="Caption (optional)"
+              placeholder={t.captionOptional}
               value={p.caption}
               onChange={e => updateCaption(i, e.target.value)}
               maxLength={500}
@@ -63,23 +65,23 @@ export default function PhotoCapture({ photos, onChange, maxPhotos = 10 }) {
         {photos.length < maxPhotos && (
           <div style={styles.addCard}>
             {compressing ? (
-              <span style={styles.compressingText}>Processing...</span>
+              <span style={styles.compressingText}>{t.photoProcessing}</span>
             ) : (
               <>
-                <button style={styles.addBtn} onClick={() => cameraRef.current.click()} aria-label="Take photo">
+                <button style={styles.addBtn} onClick={() => cameraRef.current.click()} aria-label={t.takePhoto}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                     <circle cx="12" cy="13" r="4" />
                   </svg>
-                  <span style={styles.addLabel}>Camera</span>
+                  <span style={styles.addLabel}>{t.photoCamera}</span>
                 </button>
-                <button style={styles.addBtn} onClick={() => fileRef.current.click()} aria-label="Upload photo">
+                <button style={styles.addBtn} onClick={() => fileRef.current.click()} aria-label={t.uploadPhoto}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="17 8 12 3 7 8" />
                     <line x1="12" y1="3" x2="12" y2="15" />
                   </svg>
-                  <span style={styles.addLabel}>Upload</span>
+                  <span style={styles.addLabel}>{t.photoUpload}</span>
                 </button>
               </>
             )}

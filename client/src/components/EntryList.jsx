@@ -72,7 +72,7 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
     <div style={styles.emptyState}>
       <div style={styles.emptyIcon}>📋</div>
       <p style={styles.emptyTitle}>{t.noEntries}</p>
-      <p style={styles.emptySubtitle}>Log your first time entry using the form above.</p>
+      <p style={styles.emptySubtitle}>{t.logFirstEntryHint}</p>
     </div>
   );
 

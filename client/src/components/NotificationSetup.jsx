@@ -53,7 +53,7 @@ export default function NotificationSetup() {
       if (Notification.permission === 'denied') {
         setState('denied');
       } else {
-        const msg = err.response?.data?.error || err.message || 'Failed to enable notifications.';
+        const msg = err.response?.data?.error || err.message || t.failedEnableNotifications;
         setErrorMsg(msg);
         setState('error');
       }

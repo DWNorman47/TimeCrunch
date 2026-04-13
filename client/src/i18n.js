@@ -69,6 +69,7 @@ const translations = {
     // EntryList
     yourEntries: 'Your Entries',
     noEntries: 'No entries yet. Log your first time entry above.',
+    logFirstEntryHint: 'Log your first time entry using the form above.',
     delete: 'Delete',
     confirmDelete: 'Delete this entry?',
     failedDeleteEntry: 'Failed to delete entry',
@@ -421,6 +422,7 @@ const translations = {
     wsUndo: '↩ Undo',
     wsAddNote: 'Add a note (optional)...',
     wsConfirm: 'Confirm',
+    couldNotLoadSchedule: 'Could not load schedule.',
 
     // ── Manage Schedule — summary/grid view ──────────────────────────────────
     msViewGrid: 'Grid',
@@ -660,6 +662,15 @@ const translations = {
     enabling: 'Enabling...',
     enable: 'Enable',
     blockedInBrowser: 'Blocked in browser settings',
+    failedEnableNotifications: 'Failed to enable notifications.',
+
+    // ── InstallPrompt ────────────────────────────────────────────────────────
+    installOpsFloa: 'Install OpsFloa',
+    installNativeAppNote: 'Opens full-screen like a native app. No browser bars.',
+    installOpenSafariHeading: 'Open in Safari to Install',
+    installAndroidBody: 'Add OpsFloa to your home screen for quick clock-in access.',
+    installInstalling: 'Installing...',
+    installAddToHomeScreen: 'Add to Home Screen',
 
     // ── PayStubView ──────────────────────────────────────────────────────────
     payStubs: 'Pay Stubs',
@@ -726,6 +737,12 @@ const translations = {
     selectVideoFirst: 'Select a video first.',
     tapToRecord: 'Tap to select or record a video',
     captionOptional: 'Caption (optional)',
+    photoCamera: 'Camera',
+    photoUpload: 'Upload',
+    photoProcessing: 'Processing...',
+    removePhoto: 'Remove photo',
+    takePhoto: 'Take photo',
+    uploadPhoto: 'Upload photo',
     reviewedLabel: 'Reviewed',
     yesterday: 'Yesterday',
     failedToSave: 'Failed to save',
@@ -1996,6 +2013,7 @@ const translations = {
     // EntryList
     yourEntries: 'Tus Entradas',
     noEntries: 'Sin entradas aún. Registra tu primera entrada arriba.',
+    logFirstEntryHint: 'Registra tu primera entrada usando el formulario de arriba.',
     delete: 'Eliminar',
     confirmDelete: '¿Eliminar esta entrada?',
     failedDeleteEntry: 'Error al eliminar la entrada',
@@ -2348,6 +2366,7 @@ const translations = {
     wsUndo: '↩ Deshacer',
     wsAddNote: 'Agrega una nota (opcional)...',
     wsConfirm: 'Confirmar',
+    couldNotLoadSchedule: 'No se pudo cargar el horario.',
 
     // ── Manage Schedule — summary/grid view ──────────────────────────────────
     msViewGrid: 'Cuadrícula',
@@ -2577,6 +2596,15 @@ const translations = {
     enabling: 'Activando...',
     enable: 'Activar',
     blockedInBrowser: 'Bloqueado en la configuración del navegador',
+    failedEnableNotifications: 'No se pudieron activar las notificaciones.',
+
+    // ── InstallPrompt ────────────────────────────────────────────────────────
+    installOpsFloa: 'Instalar OpsFloa',
+    installNativeAppNote: 'Se abre a pantalla completa como una app nativa. Sin barras del navegador.',
+    installOpenSafariHeading: 'Ábrelo en Safari para instalar',
+    installAndroidBody: 'Agrega OpsFloa a tu pantalla de inicio para un acceso rápido.',
+    installInstalling: 'Instalando...',
+    installAddToHomeScreen: 'Agregar a pantalla de inicio',
 
     // ── PayStubView ──────────────────────────────────────────────────────────
     payStubs: 'Recibos de Pago',
@@ -2643,6 +2671,12 @@ const translations = {
     selectVideoFirst: 'Selecciona un video primero.',
     tapToRecord: 'Toca para seleccionar o grabar un video',
     captionOptional: 'Leyenda (opcional)',
+    photoCamera: 'Cámara',
+    photoUpload: 'Subir',
+    photoProcessing: 'Procesando...',
+    removePhoto: 'Eliminar foto',
+    takePhoto: 'Tomar foto',
+    uploadPhoto: 'Subir foto',
     reviewedLabel: 'Revisado',
     yesterday: 'Ayer',
     failedToSave: 'Error al guardar',

@@ -1,6 +1,8 @@
 import React from 'react';
+import { useT } from '../hooks/useT';
 
 export default function Pagination({ page, pages, onChange }) {
+  const t = useT();
   if (!pages || pages <= 1) return null;
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '16px 0' }}>
@@ -13,9 +15,9 @@ export default function Pagination({ page, pages, onChange }) {
           cursor: page <= 1 ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 500,
         }}
       >
-        ← Previous
+        ← {t.paginationPrev}
       </button>
-      <span style={{ fontSize: 13, color: '#6b7280' }}>Page {page} of {pages}</span>
+      <span style={{ fontSize: 13, color: '#6b7280' }}>{t.paginationPage} {page} {t.ofLabel} {pages}</span>
       <button
         onClick={() => onChange(page + 1)}
         disabled={page >= pages}
@@ -25,7 +27,7 @@ export default function Pagination({ page, pages, onChange }) {
           cursor: page >= pages ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 500,
         }}
       >
-        Next →
+        {t.paginationNext} →
       </button>
     </div>
   );

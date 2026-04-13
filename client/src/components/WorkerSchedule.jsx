@@ -39,7 +39,7 @@ export default function WorkerSchedule() {
   useEffect(() => {
     api.get('/shifts/mine')
       .then(r => setShifts(r.data))
-      .catch(() => setError('Could not load schedule.'))
+      .catch(() => setError(t.couldNotLoadSchedule))
       .finally(() => setLoading(false));
   }, []);
 
