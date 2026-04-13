@@ -117,7 +117,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
   useEffect(() => {
     api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(silentError('managerates'));
   }, []);
-  const DEFAULT_COLLAPSED = { wages: true, overtime: true, reimbursements: true, notifications: true, reports: true, access: true, modules: true, features: true, storage: true };
+  const DEFAULT_COLLAPSED = { wages: true, overtime: true, reimbursements: true, inventoryCount: true, notifications: true, reports: true, access: true, modules: true, features: true, storage: true };
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem('opsfloa_company_sections');
@@ -315,36 +315,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={{ ...styles.toggleKnob, transform: form.module_inventory ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
-          {form.module_inventory && (
-            <>
-              <div style={styles.row}>
-                <div>
-                  <div style={styles.label}>Cycle Count — Audit %</div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Percentage of counted items randomly selected for audit (0–100)</div>
-                </div>
-                <input style={{ ...styles.input, width: 70 }} type="number" min="0" max="100" step="1"
-                  value={form.cycle_count_audit_pct}
-                  onChange={e => set('cycle_count_audit_pct', e.target.value)} />
-              </div>
-              <div style={styles.row}>
-                <div>
-                  <div style={styles.label}>Cycle Count — Reconcile Threshold</div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Variance that triggers reconciliation (0 = never)</div>
-                </div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <input style={{ ...styles.input, width: 80 }} type="number" min="0" step="any"
-                    value={form.cycle_count_reconcile_threshold}
-                    onChange={e => set('cycle_count_reconcile_threshold', e.target.value)} />
-                  <select style={{ ...styles.input, width: 90 }}
-                    value={form.cycle_count_reconcile_threshold_type}
-                    onChange={e => set('cycle_count_reconcile_threshold_type', e.target.value)}>
-                    <option value="units">units</option>
-                    <option value="pct">%</option>
-                  </select>
-                </div>
-              </div>
-            </>
-          )}
+          {/* Inventory count settings (Audit % / Reconcile Threshold) are now
+              a separate section rendered after Reimbursements — see below. */}
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Analytics</div>
@@ -641,6 +613,49 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <MileageRateEditor />
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Inventory Count (module-gated) ── */}
+      {form.module_inventory && (
+        <div style={styles.section}>
+          <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('inventoryCount')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('inventoryCount')}>
+            <span style={styles.sectionIcon}>📦</span>
+            <div style={{ flex: 1 }}>
+              <div style={styles.sectionTitle}>{t.ratesInventoryCount || 'Inventory Count'}</div>
+              <div style={styles.sectionSub}>{t.ratesInventoryCountDesc || 'Audit and reconciliation thresholds for full and cycle counts'}</div>
+            </div>
+            <span style={styles.collapseChevron}>{collapsed.inventoryCount ? '▶' : '▼'}</span>
+          </div>
+          {!collapsed.inventoryCount && <div style={styles.sectionBody}>
+            <div style={styles.row}>
+              <div>
+                <div style={styles.label}>Audit %</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Percentage of counted items randomly selected for audit (0–100)</div>
+              </div>
+              <input style={{ ...styles.input, width: 70 }} type="number" min="0" max="100" step="1"
+                value={form.cycle_count_audit_pct}
+                onChange={e => set('cycle_count_audit_pct', e.target.value)} />
+            </div>
+            <div style={styles.row}>
+              <div>
+                <div style={styles.label}>Reconcile Threshold</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Variance that triggers reconciliation (0 = never)</div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input style={{ ...styles.input, width: 80 }} type="number" min="0" step="any"
+                  value={form.cycle_count_reconcile_threshold}
+                  onChange={e => set('cycle_count_reconcile_threshold', e.target.value)} />
+                <select style={{ ...styles.input, width: 90 }}
+                  value={form.cycle_count_reconcile_threshold_type}
+                  onChange={e => set('cycle_count_reconcile_threshold_type', e.target.value)}>
+                  <option value="units">units</option>
+                  <option value="pct">%</option>
+                </select>
+              </div>
+            </div>
+          </div>}
+          {!collapsed.inventoryCount && <SectionFooter section="inventoryCount" />}
         </div>
       )}
 
