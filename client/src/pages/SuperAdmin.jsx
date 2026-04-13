@@ -73,6 +73,14 @@ export default function SuperAdmin() {
   const [afError, setAfError]       = useState('');
   const [afDeleteError, setAfDeleteError] = useState('');
 
+  // ── Client errors state ──
+  const [errLoading, setErrLoading]     = useState(false);
+  const [errList, setErrList]           = useState([]);
+  const [errKindFilter, setErrKindFilter] = useState('all');
+  const [errSinceHours, setErrSinceHours] = useState(24);
+  const [errExpandedId, setErrExpandedId] = useState(null);
+  const [errError, setErrError]         = useState('');
+
   useEffect(() => {
     Promise.all([
       api.get('/superadmin/companies'),
@@ -94,6 +102,21 @@ export default function SuperAdmin() {
   useEffect(() => {
     if (tab === 'affiliates' && afList.length === 0) loadAffiliates();
   }, [tab]);
+
+  const loadClientErrors = () => {
+    setErrLoading(true);
+    setErrError('');
+    const since = new Date(Date.now() - errSinceHours * 3600 * 1000).toISOString();
+    api.get('/superadmin/client-errors', { params: { since, limit: 200 } })
+      .then(r => setErrList(r.data))
+      .catch(e => setErrError(e.response?.data?.error || 'Failed to load errors'))
+      .finally(() => setErrLoading(false));
+  };
+
+  useEffect(() => {
+    if (tab === 'errors') loadClientErrors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, errSinceHours]);
 
   // ── Companies handlers ──
   const patchCompany = async (id, patch) => {
@@ -255,6 +278,9 @@ export default function SuperAdmin() {
           </button>
           <button style={{ ...styles.tabBtn, ...(tab === 'affiliates' ? styles.tabActive : {}) }} onClick={() => setTab('affiliates')}>
             Affiliates {afList.length > 0 && <span style={styles.tabCount}>{afList.length}</span>}
+          </button>
+          <button style={{ ...styles.tabBtn, ...(tab === 'errors' ? styles.tabActive : {}) }} onClick={() => setTab('errors')}>
+            Client Errors {errList.length > 0 && <span style={styles.tabCount}>{errList.length}</span>}
           </button>
         </div>
 
@@ -581,6 +607,149 @@ export default function SuperAdmin() {
                 })}
               </div>
             )}
+          </>
+        )}
+
+        {/* ── Client Errors tab ── */}
+        {tab === 'errors' && (
+          <>
+            <div style={styles.titleRow}>
+              <h2 style={styles.title}>Client Errors</h2>
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <label style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
+                  Kind:&nbsp;
+                  <select
+                    style={styles.controlSelect}
+                    value={errKindFilter}
+                    onChange={e => setErrKindFilter(e.target.value)}
+                  >
+                    <option value="all">All</option>
+                    <option value="render">Render</option>
+                    <option value="unhandled">Unhandled</option>
+                    <option value="rejection">Rejection</option>
+                    <option value="console">Console</option>
+                  </select>
+                </label>
+                <label style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
+                  Window:&nbsp;
+                  <select
+                    style={styles.controlSelect}
+                    value={errSinceHours}
+                    onChange={e => setErrSinceHours(parseInt(e.target.value))}
+                  >
+                    <option value={1}>Last 1h</option>
+                    <option value={24}>Last 24h</option>
+                    <option value={168}>Last 7 days</option>
+                    <option value={720}>Last 30 days</option>
+                  </select>
+                </label>
+                <button style={styles.actionBtn} onClick={loadClientErrors} disabled={errLoading}>
+                  {errLoading ? 'Loading…' : 'Refresh'}
+                </button>
+              </div>
+            </div>
+
+            {errError && <p style={{ color: '#dc2626', fontSize: 13 }} role="alert">{errError}</p>}
+
+            {(() => {
+              const filtered = errKindFilter === 'all'
+                ? errList
+                : errList.filter(e => e.kind === errKindFilter);
+
+              // Group by (kind|message) to show each distinct bug once with an occurrence count.
+              const groupsMap = new Map();
+              for (const e of filtered) {
+                const key = `${e.kind}|${(e.message || '').slice(0, 200)}`;
+                if (!groupsMap.has(key)) {
+                  groupsMap.set(key, { key, kind: e.kind, message: e.message, count: 0, users: new Set(), latest: e, sample: e });
+                }
+                const g = groupsMap.get(key);
+                g.count++;
+                if (e.user_id) g.users.add(e.user_id);
+                if (new Date(e.created_at) > new Date(g.latest.created_at)) g.latest = e;
+              }
+              const groups = [...groupsMap.values()].sort((a, b) => new Date(b.latest.created_at) - new Date(a.latest.created_at));
+
+              if (errLoading && groups.length === 0) {
+                return <p style={{ color: '#6b7280' }}>Loading…</p>;
+              }
+              if (!errLoading && groups.length === 0) {
+                return (
+                  <div style={{ ...styles.card, textAlign: 'center', color: '#6b7280' }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
+                    <p style={{ margin: 0 }}>No errors in this window.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={styles.list}>
+                  <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 4px' }}>
+                    {groups.length} unique issue{groups.length === 1 ? '' : 's'} · {filtered.length} total occurrence{filtered.length === 1 ? '' : 's'}
+                  </p>
+                  {groups.map(g => {
+                    const isExpanded = errExpandedId === g.key;
+                    const kindBg = { render: '#fee2e2', unhandled: '#fef3c7', rejection: '#ede9fe', console: '#dbeafe' }[g.kind] || '#f3f4f6';
+                    const kindFg = { render: '#dc2626', unhandled: '#92400e', rejection: '#6b21a8', console: '#1e40af' }[g.kind] || '#374151';
+                    return (
+                      <div key={g.key} style={styles.card}>
+                        <div style={styles.cardTop}>
+                          <div style={styles.cardLeft}>
+                            <div style={{ ...styles.companyName, marginBottom: 6 }}>
+                              <span style={{ ...tag(kindBg, kindFg), textTransform: 'uppercase' }}>{g.kind}</span>
+                              <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#111827', wordBreak: 'break-word' }}>
+                                {g.message || '(no message)'}
+                              </span>
+                            </div>
+                            <div style={styles.meta}>
+                              <span><b>{g.count}</b> occurrence{g.count === 1 ? '' : 's'}</span>
+                              <span style={styles.sep}>·</span>
+                              <span>{g.users.size} user{g.users.size === 1 ? '' : 's'}</span>
+                              <span style={styles.sep}>·</span>
+                              <span>latest {formatDate(g.latest.created_at, locale)}</span>
+                              {g.latest.app_version && (
+                                <>
+                                  <span style={styles.sep}>·</span>
+                                  <span style={styles.slug}>{g.latest.app_version}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div style={styles.cardActions}>
+                            <button style={styles.expandBtn} onClick={() => setErrExpandedId(isExpanded ? null : g.key)}>
+                              {isExpanded ? 'Hide details' : 'Show details'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div style={{ marginTop: 14, borderTop: '1px solid #f0f0f0', paddingTop: 14 }}>
+                            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
+                              Latest event — {g.latest.company_name || '(no company)'} · {g.latest.user_name || 'anonymous'}
+                            </div>
+                            {g.latest.url && (
+                              <div style={{ fontSize: 12, color: '#374151', marginBottom: 6, wordBreak: 'break-all' }}>
+                                <b>URL:</b> {g.latest.url}
+                              </div>
+                            )}
+                            {g.latest.user_agent && (
+                              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6, wordBreak: 'break-all' }}>
+                                <b>UA:</b> {g.latest.user_agent}
+                              </div>
+                            )}
+                            {g.latest.stack && (
+                              <pre style={{ fontSize: 11, background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: 6, padding: 10, overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#374151', marginTop: 8 }}>
+                                {g.latest.stack}
+                              </pre>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </>
         )}
       </main>
