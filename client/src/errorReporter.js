@@ -11,6 +11,7 @@
 // window to avoid flooding when a bug fires in a render loop.
 
 import api from './api';
+import * as Sentry from '@sentry/react';
 
 const APP_VERSION = (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown');
 const RECENT_WINDOW_MS = 5000;
@@ -40,6 +41,13 @@ function shouldSend(kind, message, stack) {
 export function reportClientError({ kind, message, stack }) {
   try {
     if (!shouldSend(kind, message, stack)) return;
+    // Fire-and-forget to Sentry too (no-op when DSN is absent). Sentry gets
+    // grouped/symbolicated errors with breadcrumbs; our DB gets the raw firehose.
+    if (import.meta.env.VITE_SENTRY_DSN) {
+      const err = new Error(String(message || 'unknown'));
+      if (stack) err.stack = String(stack);
+      Sentry.captureException(err, { tags: { kind } });
+    }
     const payload = {
       kind,
       message: String(message || 'unknown'),

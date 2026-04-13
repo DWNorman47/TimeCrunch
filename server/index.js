@@ -7,6 +7,18 @@ if (missing.length) {
   process.exit(1);
 }
 
+// Sentry must be initialised before any other import that you want instrumented.
+// Absent DSN = Sentry is a no-op; safe to leave in prod with empty env.
+const Sentry = require('@sentry/node');
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    release: process.env.APP_VERSION || undefined,
+    tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0'),
+  });
+}
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -207,14 +219,25 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
+// Express error handler — bubble unhandled errors to Sentry and log them.
+// Must come after all routes. Returning a generic 500 so we don't leak internals.
+app.use((err, req, res, _next) => {
+  if (process.env.SENTRY_DSN) Sentry.captureException(err);
+  (req.log || logger).error({ err }, 'unhandled route error');
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'Server error' });
+});
+
 // Last-chance error logging. Node's default is to crash on an uncaught
 // exception — we log structured first so the cause is visible in logs,
 // then let the process exit (Render restarts it).
 process.on('uncaughtException', err => {
+  if (process.env.SENTRY_DSN) Sentry.captureException(err);
   logger.fatal({ err }, 'uncaughtException');
   setTimeout(() => process.exit(1), 200); // give pino time to flush
 });
 process.on('unhandledRejection', reason => {
+  if (process.env.SENTRY_DSN) Sentry.captureException(reason);
   logger.error({ reason }, 'unhandledRejection');
 });
 
