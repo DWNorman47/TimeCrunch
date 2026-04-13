@@ -4,6 +4,7 @@ import { useT } from '../../hooks/useT';
 import { useAuth } from '../../contexts/AuthContext';
 import { langToLocale } from '../../utils';
 import { SkeletonList } from '../Skeleton';
+import ModalShell from '../ModalShell';
 
 function formatBin(area_name, rack_name, bay_name, compartment_name) {
   return [area_name, rack_name, bay_name, compartment_name]
@@ -41,18 +42,12 @@ function HistoryPanel({ item, onClose }) {
 
   useEffect(() => { load(); }, [item.item_id]);
 
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
-
   return (
     <div style={h.overlay} onClick={onClose}>
-      <div style={h.panel} onClick={e => e.stopPropagation()}>
+      <ModalShell onClose={onClose} titleId="is-history-title" style={h.panel} onClick={e => e.stopPropagation()}>
         <div style={h.header}>
           <div>
-            <div style={h.title}>{item.item_name}</div>
+            <div id="is-history-title" style={h.title}>{item.item_name}</div>
             <div style={h.sub}>{t.invStockRecentMovements}</div>
           </div>
           <button style={h.close} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
@@ -103,7 +98,7 @@ function HistoryPanel({ item, onClose }) {
             </table>
           </div>
         )}
-      </div>
+      </ModalShell>
     </div>
   );
 }
@@ -172,9 +167,9 @@ function AdjustModal({ item, locations, onClose, onDone }) {
 
   return (
     <div style={a.overlay} onClick={onClose}>
-      <div style={a.modal} onClick={e => e.stopPropagation()}>
+      <ModalShell onClose={onClose} titleId="is-adj-title" style={a.modal} onClick={e => e.stopPropagation()}>
         <div style={a.header}>
-          <div style={a.title}>{t.invStockCurrentStock} — {item.item_name}</div>
+          <div id="is-adj-title" style={a.title}>{t.invStockCurrentStock} — {item.item_name}</div>
           <button style={a.close} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
         <div style={a.body}>
@@ -220,7 +215,7 @@ function AdjustModal({ item, locations, onClose, onDone }) {
             {!warning && <button style={{ ...a.save, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submit} disabled={saving}>{saving ? t.saving : t.invStockSaveAdj}</button>}
           </div>
         </div>
-      </div>
+      </ModalShell>
     </div>
   );
 }
@@ -318,9 +313,9 @@ function IssueModal({ item, projects, onClose, onDone }) {
 
   return (
     <div style={a.overlay} onClick={onClose}>
-      <div style={a.modal} onClick={e => e.stopPropagation()}>
+      <ModalShell onClose={onClose} titleId="is-issue-title" style={a.modal} onClick={e => e.stopPropagation()}>
         <div style={a.header}>
-          <div style={a.title}>{t.invTxTypeIssue} — {item.item_name}</div>
+          <div id="is-issue-title" style={a.title}>{t.invTxTypeIssue} — {item.item_name}</div>
           <button style={a.close} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
         <div style={a.body}>
@@ -384,7 +379,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
             </button>}
           </div>
         </div>
-      </div>
+      </ModalShell>
     </div>
   );
 }

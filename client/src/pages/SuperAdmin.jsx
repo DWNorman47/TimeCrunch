@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { langToLocale } from '../utils';
 import api from '../api';
+import ModalShell from '../components/ModalShell';
 
 function formatDate(str, locale = 'en-US') {
   return new Date(str).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -213,8 +214,12 @@ export default function SuperAdmin() {
       {/* Delete confirm modal */}
       {deleteTarget && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <div style={styles.modalTitle}>Delete company</div>
+          <ModalShell
+            onClose={() => !deleteWorking && (setDeleteTarget(null), setDeleteConfirm(''))}
+            titleId="sa-delete-title"
+            style={styles.modal}
+          >
+            <div id="sa-delete-title" style={styles.modalTitle}>Delete company</div>
             <p style={styles.modalBody}>
               This will permanently delete <strong>{deleteTarget.name}</strong> and all of its data
               (workers, projects, time entries, reports, settings). This cannot be undone.
@@ -239,7 +244,7 @@ export default function SuperAdmin() {
                 Cancel
               </button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
 

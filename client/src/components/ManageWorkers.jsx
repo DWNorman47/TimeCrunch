@@ -4,6 +4,7 @@ import { useToast } from '../contexts/ToastContext';
 import { formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
 import { SkeletonList } from './Skeleton';
+import ModalShell from './ModalShell';
 
 function WorkerDocuments({ workerId }) {
   const t = useT();
@@ -1006,8 +1007,12 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       {/* QBO Vendor creation prompt */}
       {qboVendorPrompt && (
         <div style={s.qboPromptOverlay}>
-          <div style={s.qboPromptModal}>
-            <div style={s.qboPromptTitle}>Create QuickBooks Vendor?</div>
+          <ModalShell
+            onClose={() => { setQboVendorPrompt(null); setQboVendorResult(null); }}
+            titleId="mw-qbo-vendor-title"
+            style={s.qboPromptModal}
+          >
+            <div id="mw-qbo-vendor-title" style={s.qboPromptTitle}>Create QuickBooks Vendor?</div>
             <p style={s.qboPromptBody}>
               <strong>{qboVendorPrompt.display_name}</strong> was added as a contractor.
               Would you like to create them as a Vendor in QuickBooks Online so they can be mapped for expense tracking?
@@ -1028,7 +1033,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 {qboVendorResult ? 'Close' : 'Skip'}
               </button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
     </div>

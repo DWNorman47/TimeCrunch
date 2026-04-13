@@ -3,6 +3,7 @@ import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { useT } from '../hooks/useT';
 import { SkeletonList } from './Skeleton';
+import ModalShell from './ModalShell';
 
 export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true, showGeofenceBudget = true, defaultPrevailingRate = '', currency = 'USD', settings = null }) {
   const toast = useToast();
@@ -524,8 +525,12 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
 
       {mergeSource && (
         <div style={s.modalOverlay}>
-          <div style={s.modal}>
-            <div style={s.modalTitle}>Merge "{mergeSource.name}"</div>
+          <ModalShell
+            onClose={() => !mergeSaving && setMergeSource(null)}
+            titleId="mp-merge-title"
+            style={s.modal}
+          >
+            <div id="mp-merge-title" style={s.modalTitle}>Merge "{mergeSource.name}"</div>
             <p style={s.modalBody}>
               All time entries, field reports, and other data will be moved to the target project.
               "{mergeSource.name}" will be permanently deleted. This cannot be undone.
@@ -550,14 +555,18 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                 {mergeSaving ? t.saving : t.mergeAndDelete}
               </button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
 
       {archiveTarget && (
         <div style={s.modalOverlay}>
-          <div style={s.modal}>
-            <div style={s.modalTitle}>Archive "{archiveTarget.name}"?</div>
+          <ModalShell
+            onClose={() => setArchiveTarget(null)}
+            titleId="mp-archive-title"
+            style={s.modal}
+          >
+            <div id="mp-archive-title" style={s.modalTitle}>Archive "{archiveTarget.name}"?</div>
             <p style={s.modalBody}>
               Time entries will be kept and the project can be restored later from Inactive.
             </p>
@@ -581,7 +590,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
               <button style={s.cancelBtn} onClick={() => setArchiveTarget(null)}>{t.cancel}</button>
               <button style={s.archiveBtn} onClick={handleConfirmArchive}>{t.archiveProject}</button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
 

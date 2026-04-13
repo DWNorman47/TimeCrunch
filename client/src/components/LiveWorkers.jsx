@@ -7,6 +7,7 @@ import { SkeletonList } from './Skeleton';
 import { useT } from '../hooks/useT';
 import { useAuth } from '../contexts/AuthContext';
 import { formatInTz, langToLocale } from '../utils';
+import ModalShell from './ModalShell';
 
 // SVG divIcon — avoids all CDN/bundler PNG loading issues
 function makePinIcon(color) {
@@ -372,8 +373,12 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
       )}
       {showClockInModal && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <h3 style={styles.modalTitle}>{t.lwClockInWorkerTitle}</h3>
+          <ModalShell
+            onClose={() => { setShowClockInModal(false); setClockInUserId(''); setClockInProjectId(''); setClockInNotes(''); }}
+            titleId="lw-clockin-title"
+            style={styles.modal}
+          >
+            <h3 id="lw-clockin-title" style={styles.modalTitle}>{t.lwClockInWorkerTitle}</h3>
             <div style={styles.modalField}>
               <label style={styles.modalLabel}>{t.worker}</label>
               <select
@@ -429,7 +434,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                 {t.cancel}
               </button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
     </div>
