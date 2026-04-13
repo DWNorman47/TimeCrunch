@@ -17,7 +17,7 @@ function isVideo(item) {
 function MediaTile({ item, onClick }) {
   const video = isVideo(item);
   return (
-    <div style={styles.tile} onClick={onClick}>
+    <div style={styles.tile} onClick={onClick} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onClick()}>
       {video ? (
         <div style={styles.videoThumb}>
           <video src={item.url} style={styles.tileImg} preload="metadata" muted playsInline />

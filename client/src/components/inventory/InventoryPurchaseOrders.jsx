@@ -880,7 +880,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
             const received = parseFloat(po.total_received || 0);
             const pct = ordered > 0 ? Math.round((received / ordered) * 100) : 0;
             return (
-              <div key={po.id} style={l.card} onClick={() => openDetail(po)}>
+              <div key={po.id} style={l.card} onClick={() => openDetail(po)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && openDetail(po)}>
                 <div style={l.cardTop}>
                   <div style={l.cardLeft}>
                     <div style={l.cardPo}>{po.po_number}</div>

@@ -43,12 +43,12 @@ export default function ChangePassword({ onClose, t }) {
       <div style={styles.modal}>
         <h3 style={styles.title}>{t.changePasswordTitle}</h3>
         <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>{t.currentPassword}</label>
-          <PasswordInput style={styles.input} value={form.current_password} onChange={e => set('current_password', e.target.value)} required minLength={6} autoFocus />
-          <label style={styles.label}>{t.newPassword}</label>
-          <PasswordInput style={styles.input} value={form.new_password} onChange={e => set('new_password', e.target.value)} required minLength={6} />
-          <label style={styles.label}>{t.confirmNewPassword}</label>
-          <PasswordInput style={styles.input} value={form.confirm_password} onChange={e => set('confirm_password', e.target.value)} required />
+          <label htmlFor="cp-current" style={styles.label}>{t.currentPassword}</label>
+          <PasswordInput id="cp-current" style={styles.input} value={form.current_password} onChange={e => set('current_password', e.target.value)} required minLength={6} autoFocus />
+          <label htmlFor="cp-new" style={styles.label}>{t.newPassword}</label>
+          <PasswordInput id="cp-new" style={styles.input} value={form.new_password} onChange={e => set('new_password', e.target.value)} required minLength={6} />
+          <label htmlFor="cp-confirm" style={styles.label}>{t.confirmNewPassword}</label>
+          <PasswordInput id="cp-confirm" style={styles.input} value={form.confirm_password} onChange={e => set('confirm_password', e.target.value)} required />
           {error && <p style={styles.error}>{error}</p>}
           {success && <p style={styles.success}>{t.passwordChanged}</p>}
           <div style={styles.buttons}>

@@ -46,8 +46,9 @@ export default function ResetPassword() {
         <h1 style={styles.logo}>OpsFloa</h1>
         <h2 style={styles.title}>{t.resetTitle}</h2>
         <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>{t.resetNewPasswordLabel}</label>
+          <label htmlFor="reset-password" style={styles.label}>{t.resetNewPasswordLabel}</label>
           <PasswordInput
+            id="reset-password"
             style={styles.input}
             placeholder={t.loginAtLeastChars}
             value={password}
@@ -56,8 +57,9 @@ export default function ResetPassword() {
             minLength={6}
             autoFocus
           />
-          <label style={styles.label}>{t.resetConfirmPasswordLabel}</label>
+          <label htmlFor="reset-confirm" style={styles.label}>{t.resetConfirmPasswordLabel}</label>
           <PasswordInput
+            id="reset-confirm"
             style={styles.input}
             placeholder={t.loginRepeatPasswordPh}
             value={confirm}

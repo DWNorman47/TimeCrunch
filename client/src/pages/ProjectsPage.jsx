@@ -1216,7 +1216,7 @@ function ProjectRow({ project, metrics, settings, onClick }) {
   const hourColor = hoursUsedPct >= 100 ? '#ef4444' : hoursUsedPct >= 85 ? '#f59e0b' : '#059669';
 
   return (
-    <div style={styles.row} onClick={onClick}>
+    <div style={styles.row} onClick={onClick} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onClick()}>
       <div style={styles.rowLeft}>
         <span style={styles.rowName}>{project.name}</span>
         {project.client_name && <span style={styles.rowClient}>{project.client_name}{project.job_number ? ` · ${project.job_number}` : ''}</span>}

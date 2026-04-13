@@ -418,7 +418,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
                 {allPhotos.map((p, i) => {
                   const vid = p.media_type === 'video' || /\.(mp4|mov|webm|avi|m4v)$/i.test(p.url || '');
                   return (
-                    <div key={i} style={s.photoCell} onClick={() => setLightbox({ photos: allPhotos, index: i })}>
+                    <div key={i} style={s.photoCell} onClick={() => setLightbox({ photos: allPhotos, index: i })} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setLightbox({ photos: allPhotos, index: i })}>
                       {vid ? (
                         <>
                           <video src={p.url} style={s.photoThumb} preload="metadata" muted playsInline />

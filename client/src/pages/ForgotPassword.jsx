@@ -40,8 +40,9 @@ export default function ForgotPassword() {
             <h2 style={styles.title}>{t.forgotTitle}</h2>
             <p style={styles.body}>{t.forgotSubtitle}</p>
             <form onSubmit={handleSubmit} style={styles.form}>
-              <label style={styles.label}>{t.email}</label>
+              <label htmlFor="forgot-email" style={styles.label}>{t.email}</label>
               <input
+                id="forgot-email"
                 style={styles.input}
                 type="email"
                 placeholder={t.forgotEmailPh}
@@ -50,10 +51,11 @@ export default function ForgotPassword() {
                 required
                 autoFocus
               />
-              <label style={styles.label}>
+              <label htmlFor="forgot-company" style={styles.label}>
                 {t.forgotCompanyLabel} <span style={styles.optional}>{t.forgotCompanyOptional}</span>
               </label>
               <input
+                id="forgot-company"
                 style={styles.input}
                 type="text"
                 placeholder={t.forgotCompanyPh}

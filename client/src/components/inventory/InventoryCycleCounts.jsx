@@ -999,7 +999,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
             const sc = STATUS_COLORS[count.status] || STATUS_COLORS.draft;
             const pct = count.line_count > 0 ? Math.round((count.counted_count / count.line_count) * 100) : 0;
             return (
-              <div key={count.id} style={s.card} onClick={() => openCount(count)}>
+              <div key={count.id} style={s.card} onClick={() => openCount(count)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && openCount(count)}>
                 <div style={s.cardTop}>
                   <div>
                     <div style={s.cardTitle}>{count.location_name}</div>

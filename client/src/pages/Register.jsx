@@ -82,8 +82,9 @@ export default function Register() {
         <h1 style={styles.logo}>OpsFloa</h1>
         <h2 style={styles.title}>{t.registerTitle}</h2>
         <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>{t.companyName}</label>
+          <label htmlFor="reg-company" style={styles.label}>{t.companyName}</label>
           <input
+            id="reg-company"
             style={styles.input}
             placeholder={t.registerCompanyPh}
             maxLength={100}
@@ -92,31 +93,35 @@ export default function Register() {
             onBlur={e => set('company_name', e.target.value.trim())}
             required
           />
-          <label style={styles.label}>{t.firstName}</label>
+          <label htmlFor="reg-first-name" style={styles.label}>{t.firstName}</label>
           <input
+            id="reg-first-name"
             style={styles.input}
             placeholder={t.registerFirstNamePh}
             value={form.first_name}
             onChange={e => handleNameChange('first_name', e.target.value)}
             required
           />
-          <label style={styles.label}>{t.registerMiddleName} <span style={styles.hint}>{t.optionalHint}</span></label>
+          <label htmlFor="reg-middle-name" style={styles.label}>{t.registerMiddleName} <span style={styles.hint}>{t.optionalHint}</span></label>
           <input
+            id="reg-middle-name"
             style={styles.input}
             placeholder={t.registerMiddleNamePh}
             value={form.middle_name}
             onChange={e => set('middle_name', e.target.value)}
           />
-          <label style={styles.label}>{t.lastName}</label>
+          <label htmlFor="reg-last-name" style={styles.label}>{t.lastName}</label>
           <input
+            id="reg-last-name"
             style={styles.input}
             placeholder={t.registerLastNamePh}
             value={form.last_name}
             onChange={e => handleNameChange('last_name', e.target.value)}
             required
           />
-          <label style={styles.label}>{t.email}</label>
+          <label htmlFor="reg-email" style={styles.label}>{t.email}</label>
           <input
+            id="reg-email"
             style={styles.input}
             type="email"
             placeholder={t.registerEmailPh}
@@ -125,8 +130,9 @@ export default function Register() {
             onBlur={e => set('email', e.target.value.trim())}
             required
           />
-          <label style={styles.label}>{t.username}</label>
+          <label htmlFor="reg-username" style={styles.label}>{t.username}</label>
           <input
+            id="reg-username"
             style={styles.input}
             placeholder={t.registerUsernamePh}
             maxLength={50}
@@ -136,8 +142,9 @@ export default function Register() {
             onBlur={e => set('username', e.target.value.trim())}
             required
           />
-          <label style={styles.label}>{t.loginPasswordLabel}</label>
+          <label htmlFor="reg-password" style={styles.label}>{t.loginPasswordLabel}</label>
           <PasswordInput
+            id="reg-password"
             style={styles.input}
             placeholder={t.registerPasswordPh}
             value={form.password}

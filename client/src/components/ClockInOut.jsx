@@ -447,8 +447,9 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
       <h2 style={styles.heading}>{t.clockIn}</h2>
       <div style={styles.form}>
         {projectsEnabled && <div>
-          <label style={styles.label}>{t.project}</label>
+          <label htmlFor="clockin-project" style={styles.label}>{t.project}</label>
           <select
+            id="clockin-project"
             style={styles.input}
             value={selectedProject}
             onChange={e => setSelectedProject(e.target.value)}
@@ -463,10 +464,11 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
         </div>}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <label style={styles.label}>{t.notesOptional}</label>
+            <label htmlFor="clockin-notes" style={styles.label}>{t.notesOptional}</label>
             <span style={styles.charCount}>{notes.length}/500</span>
           </div>
           <input
+            id="clockin-notes"
             style={styles.input}
             type="text"
             placeholder={t.notesPlaceholder}
