@@ -307,13 +307,13 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                             <div style={s.form}>
                               <p style={s.hint}>Break times must fall within {minToDisplay(seg.start)} – {minToDisplay(seg.end)}.</p>
                               <div style={s.timeRow}>
-                                <label style={s.miniLabel}>Break start</label>
-                                <input type="time" style={s.timeInput} value={splitBreakForm.breakStart}
+                                <label htmlFor="dt-break-start" style={s.miniLabel}>Break start</label>
+                                <input id="dt-break-start" type="time" style={s.timeInput} value={splitBreakForm.breakStart}
                                   onChange={e => setSplitBreakForm(f => ({ ...f, breakStart: e.target.value }))} />
                               </div>
                               <div style={s.timeRow}>
-                                <label style={s.miniLabel}>Break end</label>
-                                <input type="time" style={s.timeInput} value={splitBreakForm.breakEnd}
+                                <label htmlFor="dt-break-end" style={s.miniLabel}>Break end</label>
+                                <input id="dt-break-end" type="time" style={s.timeInput} value={splitBreakForm.breakEnd}
                                   onChange={e => setSplitBreakForm(f => ({ ...f, breakEnd: e.target.value }))} />
                               </div>
                               <button style={{ ...s.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => doSplitBreak(seg.entry)} disabled={saving}>
@@ -326,8 +326,8 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                             <div style={s.form}>
                               <p style={s.hint}>{t.dtSwitchHint}</p>
                               <div style={s.timeRow}>
-                                <label style={s.miniLabel}>{t.dtSwitchAt}</label>
-                                <input type="time" style={s.timeInput} value={splitSwitchForm.at}
+                                <label htmlFor="dt-switch-at" style={s.miniLabel}>{t.dtSwitchAt}</label>
+                                <input id="dt-switch-at" type="time" style={s.timeInput} value={splitSwitchForm.at}
                                   onChange={e => setSplitSwitchForm(f => ({ ...f, at: e.target.value }))} />
                               </div>
                               <select style={s.select} value={splitSwitchForm.project_id}

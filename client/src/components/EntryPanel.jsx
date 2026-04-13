@@ -114,11 +114,11 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
           {editable ? (
             <>
               <div style={s.row}>
-                <div style={s.field}><label style={s.label}>{t.entryPanelStart}</label><input style={s.input} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} disabled={editSaving} /></div>
-                <div style={s.field}><label style={s.label}>{t.entryPanelEnd}</label><input style={s.input} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} disabled={editSaving} /></div>
-                <div style={s.field}><label style={s.label}>{t.entryPanelBreakMin}</label><input style={s.input} type="number" min="0" max="480" value={editForm.break_minutes} onChange={ev => setEditForm(f => ({ ...f, break_minutes: ev.target.value }))} disabled={editSaving} /></div>
-                <div style={s.field}><label style={s.label}>{t.entryPanelMileage}</label><input style={s.input} type="number" min="0" step="0.1" value={editForm.mileage} onChange={ev => setEditForm(f => ({ ...f, mileage: ev.target.value }))} placeholder={t.optional} disabled={editSaving} /></div>
-                <div style={{ ...s.field, flex: 2 }}><label style={s.label}>{t.notes}</label><input style={s.input} type="text" maxLength={500} value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} disabled={editSaving} /></div>
+                <div style={s.field}><label htmlFor="ep-start" style={s.label}>{t.entryPanelStart}</label><input id="ep-start" style={s.input} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} disabled={editSaving} /></div>
+                <div style={s.field}><label htmlFor="ep-end" style={s.label}>{t.entryPanelEnd}</label><input id="ep-end" style={s.input} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} disabled={editSaving} /></div>
+                <div style={s.field}><label htmlFor="ep-break" style={s.label}>{t.entryPanelBreakMin}</label><input id="ep-break" style={s.input} type="number" min="0" max="480" value={editForm.break_minutes} onChange={ev => setEditForm(f => ({ ...f, break_minutes: ev.target.value }))} disabled={editSaving} /></div>
+                <div style={s.field}><label htmlFor="ep-mileage" style={s.label}>{t.entryPanelMileage}</label><input id="ep-mileage" style={s.input} type="number" min="0" step="0.1" value={editForm.mileage} onChange={ev => setEditForm(f => ({ ...f, mileage: ev.target.value }))} placeholder={t.optional} disabled={editSaving} /></div>
+                <div style={{ ...s.field, flex: 2 }}><label htmlFor="ep-notes" style={s.label}>{t.notes}</label><input id="ep-notes" style={s.input} type="text" maxLength={500} value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} disabled={editSaving} /></div>
               </div>
               {editError && <p style={s.error}>{editError}</p>}
               <div style={s.actions}>
@@ -136,8 +136,8 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
         <div>
           <p style={s.hint}>{t.entryPanelBreakHint}</p>
           <div style={s.row}>
-            <div style={s.field}><label style={s.label}>{t.entryPanelBreakStart}</label><input type="time" style={s.input} value={breakForm.breakStart} onChange={e => setBreakForm(f => ({ ...f, breakStart: e.target.value }))} /></div>
-            <div style={s.field}><label style={s.label}>{t.entryPanelBreakEnd}</label><input type="time" style={s.input} value={breakForm.breakEnd} onChange={e => setBreakForm(f => ({ ...f, breakEnd: e.target.value }))} /></div>
+            <div style={s.field}><label htmlFor="ep-break-start" style={s.label}>{t.entryPanelBreakStart}</label><input id="ep-break-start" type="time" style={s.input} value={breakForm.breakStart} onChange={e => setBreakForm(f => ({ ...f, breakStart: e.target.value }))} /></div>
+            <div style={s.field}><label htmlFor="ep-break-end" style={s.label}>{t.entryPanelBreakEnd}</label><input id="ep-break-end" type="time" style={s.input} value={breakForm.breakEnd} onChange={e => setBreakForm(f => ({ ...f, breakEnd: e.target.value }))} /></div>
           </div>
           {splitError && <p style={s.error}>{splitError}</p>}
           <div style={s.actions}>
@@ -151,10 +151,10 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
         <div>
           <p style={s.hint}>{t.entryPanelSwitchHint}</p>
           <div style={s.row}>
-            <div style={s.field}><label style={s.label}>{t.entryPanelSwitchAt}</label><input type="time" style={s.input} value={switchForm.at} onChange={e => setSwitchForm(f => ({ ...f, at: e.target.value }))} /></div>
+            <div style={s.field}><label htmlFor="ep-switch-at" style={s.label}>{t.entryPanelSwitchAt}</label><input id="ep-switch-at" type="time" style={s.input} value={switchForm.at} onChange={e => setSwitchForm(f => ({ ...f, at: e.target.value }))} /></div>
             <div style={{ ...s.field, flex: 2 }}>
-              <label style={s.label}>{t.entryPanelSwitchToProject}</label>
-              <select style={s.input} value={switchForm.project_id} onChange={e => setSwitchForm(f => ({ ...f, project_id: e.target.value }))}>
+              <label htmlFor="ep-switch-project" style={s.label}>{t.entryPanelSwitchToProject}</label>
+              <select id="ep-switch-project" style={s.input} value={switchForm.project_id} onChange={e => setSwitchForm(f => ({ ...f, project_id: e.target.value }))}>
                 <option value="">{t.selectPlaceholder}…</option>
                 {projects.filter(p => p.active !== false).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>

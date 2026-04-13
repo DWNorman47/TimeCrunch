@@ -363,8 +363,9 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       <div style={s.fieldsGrid}>
                         {nameEditable && (
                           <div style={s.fieldGroup}>
-                            <label style={s.fieldLabel}>Name</label>
+                            <label htmlFor="mp-name" style={s.fieldLabel}>Name</label>
                             <input
+                              id="mp-name"
                               style={s.editInput}
                               value={editName}
                               onChange={e => setEditName(e.target.value)}
@@ -376,8 +377,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                         )}
                         {showWageType && (
                           <div style={s.fieldGroup}>
-                            <label style={s.fieldLabel}>Wage type</label>
-                            <select style={s.editInput} value={editWageType} onChange={e => { setEditWageType(e.target.value); setEditPrevailingRate(''); }}>
+                            <label htmlFor="mp-wage-type" style={s.fieldLabel}>Wage type</label>
+                            <select id="mp-wage-type" style={s.editInput} value={editWageType} onChange={e => { setEditWageType(e.target.value); setEditPrevailingRate(''); }}>
                               <option value="regular">{t.regularWages}</option>
                               <option value="prevailing">{t.prevailingWages}</option>
                             </select>
@@ -385,8 +386,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                         )}
                         {editWageType === 'prevailing' && (
                           <div style={s.fieldGroup}>
-                            <label style={s.fieldLabel}>Rate ($/hr)</label>
-                            <input style={s.editInput} type="number" min="0" step="0.01" placeholder={defaultPrevailingRate || '45.00'} value={editPrevailingRate} onChange={e => setEditPrevailingRate(e.target.value)} />
+                            <label htmlFor="mp-rate" style={s.fieldLabel}>Rate ($/hr)</label>
+                            <input id="mp-rate" style={s.editInput} type="number" min="0" step="0.01" placeholder={defaultPrevailingRate || '45.00'} value={editPrevailingRate} onChange={e => setEditPrevailingRate(e.target.value)} />
                           </div>
                         )}
                       </div>
@@ -397,8 +398,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       <div style={s.sectionTitle}>Project Info</div>
                       <div style={s.fieldsGrid}>
                         <div style={s.fieldGroup}>
-                          <label style={s.fieldLabel}>Status</label>
-                          <select style={s.editInput} value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                          <label htmlFor="mp-status" style={s.fieldLabel}>Status</label>
+                          <select id="mp-status" style={s.editInput} value={editStatus} onChange={e => setEditStatus(e.target.value)}>
                             <option value="planning">Planning</option>
                             <option value="in_progress">In Progress</option>
                             <option value="on_hold">On Hold</option>
@@ -406,34 +407,34 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                           </select>
                         </div>
                         <div style={s.fieldGroup}>
-                          <label style={s.fieldLabel}>Client Name</label>
-                          <input style={s.editInput} value={editClientName} onChange={e => setEditClientName(e.target.value)} placeholder={t.clientNameShortPlaceholder} />
+                          <label htmlFor="mp-client-name" style={s.fieldLabel}>Client Name</label>
+                          <input id="mp-client-name" style={s.editInput} value={editClientName} onChange={e => setEditClientName(e.target.value)} placeholder={t.clientNameShortPlaceholder} />
                         </div>
                         <div style={s.fieldGroup}>
-                          <label style={s.fieldLabel}>Job Number</label>
-                          <input style={s.editInput} value={editJobNumber} onChange={e => setEditJobNumber(e.target.value)} placeholder={t.jobNumberPlaceholder} />
+                          <label htmlFor="mp-job-number" style={s.fieldLabel}>Job Number</label>
+                          <input id="mp-job-number" style={s.editInput} value={editJobNumber} onChange={e => setEditJobNumber(e.target.value)} placeholder={t.jobNumberPlaceholder} />
                         </div>
                         <div style={s.fieldGroup}>
-                          <label style={s.fieldLabel}>Start Date</label>
-                          <input style={s.editInput} type="date" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
+                          <label htmlFor="mp-start-date" style={s.fieldLabel}>Start Date</label>
+                          <input id="mp-start-date" style={s.editInput} type="date" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
                         </div>
                         <div style={s.fieldGroup}>
-                          <label style={s.fieldLabel}>Target End Date</label>
-                          <input style={s.editInput} type="date" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} />
+                          <label htmlFor="mp-end-date" style={s.fieldLabel}>Target End Date</label>
+                          <input id="mp-end-date" style={s.editInput} type="date" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} />
                         </div>
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
-                        <label style={s.fieldLabel}>Address / Location</label>
-                        <input style={s.editInput} maxLength={255} value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder={t.projectAddressPlaceholder} />
+                        <label htmlFor="mp-address" style={s.fieldLabel}>Address / Location</label>
+                        <input id="mp-address" style={s.editInput} maxLength={255} value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder={t.projectAddressPlaceholder} />
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
-                        <label style={s.fieldLabel}>Description</label>
-                        <textarea style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder={t.projectDescPlaceholder} />
+                        <label htmlFor="mp-description" style={s.fieldLabel}>Description</label>
+                        <textarea id="mp-description" style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder={t.projectDescPlaceholder} />
                         <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(editDescription || '').length}/1000</div>
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
-                        <label style={s.fieldLabel}>Progress % (0–100)</label>
-                        <input style={s.editInput} type="number" min="0" max="100" value={editProgressPct} onChange={e => setEditProgressPct(e.target.value)} placeholder={t.progressPctPlaceholder} />
+                        <label htmlFor="mp-progress" style={s.fieldLabel}>Progress % (0–100)</label>
+                        <input id="mp-progress" style={s.editInput} type="number" min="0" max="100" value={editProgressPct} onChange={e => setEditProgressPct(e.target.value)} placeholder={t.progressPctPlaceholder} />
                       </div>
                     </div>
 
@@ -468,12 +469,12 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                         <div style={s.sectionTitle}>{t.budgetOptional}</div>
                         <div style={s.geoFields}>
                           <div style={s.budgetField}>
-                            <label style={s.budgetLabel}>{t.hours}</label>
-                            <input style={s.geoInput} type="number" min="0" step="0.5" placeholder={t.budgetHoursPlaceholder} value={editBudgetHours} onChange={e => setEditBudgetHours(e.target.value)} />
+                            <label htmlFor="mp-budget-hours" style={s.budgetLabel}>{t.hours}</label>
+                            <input id="mp-budget-hours" style={s.geoInput} type="number" min="0" step="0.5" placeholder={t.budgetHoursPlaceholder} value={editBudgetHours} onChange={e => setEditBudgetHours(e.target.value)} />
                           </div>
                           <div style={s.budgetField}>
-                            <label style={s.budgetLabel}>{t.budgetDollars}</label>
-                            <input style={s.geoInput} type="number" min="0" step="100" placeholder={t.budgetDollarsPlaceholder} value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
+                            <label htmlFor="mp-budget-dollars" style={s.budgetLabel}>{t.budgetDollars}</label>
+                            <input id="mp-budget-dollars" style={s.geoInput} type="number" min="0" step="100" placeholder={t.budgetDollarsPlaceholder} value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
                           </div>
                           {hasBudget(p) && (confirmingClearBudgetId === p.id ? (
                             <>
@@ -530,8 +531,9 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
               "{mergeSource.name}" will be permanently deleted. This cannot be undone.
             </p>
             <div style={s.fieldGroup}>
-              <label style={s.fieldLabel}>{t.mergeIntoLabel}</label>
+              <label htmlFor="mp-merge-into" style={s.fieldLabel}>{t.mergeIntoLabel}</label>
               <select
+                id="mp-merge-into"
                 style={s.editInput}
                 value={mergeTargetId}
                 onChange={e => setMergeTargetId(e.target.value)}

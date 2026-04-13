@@ -121,32 +121,32 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
 
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>{t.topicTitle}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-          <input style={styles.input} type="text" maxLength={200} placeholder={t.safetyTalkTitlePlaceholder} value={form.title} onChange={e => set('title', e.target.value)} />
+          <label htmlFor="st-title" style={styles.label}>{t.topicTitle}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
+          <input id="st-title" style={styles.input} type="text" maxLength={200} placeholder={t.safetyTalkTitlePlaceholder} value={form.title} onChange={e => set('title', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.date}</label>
-          <input style={styles.input} type="date" value={form.talk_date} onChange={e => set('talk_date', e.target.value)} />
+          <label htmlFor="st-date" style={styles.label}>{t.date}</label>
+          <input id="st-date" style={styles.input} type="date" value={form.talk_date} onChange={e => set('talk_date', e.target.value)} />
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.project}</label>
-            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+            <label htmlFor="st-project" style={styles.label}>{t.project}</label>
+            <select id="st-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
               <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
         )}
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.givenBy}</label>
-          <input style={styles.input} type="text" maxLength={255} placeholder={t.givenByPlaceholder} value={form.given_by} onChange={e => set('given_by', e.target.value)} />
+          <label htmlFor="st-given-by" style={styles.label}>{t.givenBy}</label>
+          <input id="st-given-by" style={styles.input} type="text" maxLength={255} placeholder={t.givenByPlaceholder} value={form.given_by} onChange={e => set('given_by', e.target.value)} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <label style={styles.label}>{t.talkContent}</label>
+            <label htmlFor="st-content" style={styles.label}>{t.talkContent}</label>
             <span style={styles.charCount}>{form.content.length}/5000</span>
           </div>
-          <textarea style={styles.textarea} rows={5} maxLength={5000} placeholder={t.talkContentPlaceholder} value={form.content} onChange={e => set('content', e.target.value)} />
+          <textarea id="st-content" style={styles.textarea} rows={5} maxLength={5000} placeholder={t.talkContentPlaceholder} value={form.content} onChange={e => set('content', e.target.value)} />
         </div>
       </div>
 
@@ -204,8 +204,9 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
 
         {questions.length > 0 && (
           <div style={styles.thresholdRow}>
-            <label style={styles.label}>{t.passIfAtLeast}</label>
+            <label htmlFor="st-threshold" style={styles.label}>{t.passIfAtLeast}</label>
             <input
+              id="st-threshold"
               style={{ ...styles.input, width: 64, textAlign: 'center' }}
               type="number"
               min={1}

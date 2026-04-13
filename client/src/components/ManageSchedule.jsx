@@ -481,38 +481,38 @@ export default function ManageSchedule({ workers, projects }) {
       <form onSubmit={addShift} style={styles.form}>
         <div style={styles.formRow}>
           <div style={styles.field}>
-            <label style={styles.label}>{t.worker}</label>
-            <select style={styles.input} value={form.user_id} onChange={e => set('user_id', e.target.value)} required>
+            <label htmlFor="ms-worker" style={styles.label}>{t.worker}</label>
+            <select id="ms-worker" style={styles.input} value={form.user_id} onChange={e => set('user_id', e.target.value)} required>
               <option value="">{t.selectWorker}</option>
               {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
             </select>
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.project}</label>
-            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+            <label htmlFor="ms-project" style={styles.label}>{t.project}</label>
+            <select id="ms-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
               <option value="">{t.noProject}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.date}</label>
-            <input style={styles.input} type="date" value={form.shift_date} onChange={e => set('shift_date', e.target.value)} required />
+            <label htmlFor="ms-date" style={styles.label}>{t.date}</label>
+            <input id="ms-date" style={styles.input} type="date" value={form.shift_date} onChange={e => set('shift_date', e.target.value)} required />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.start}</label>
-            <input style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required />
+            <label htmlFor="ms-start" style={styles.label}>{t.start}</label>
+            <input id="ms-start" style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.end}</label>
-            <input style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required />
+            <label htmlFor="ms-end" style={styles.label}>{t.end}</label>
+            <input id="ms-end" style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required />
           </div>
           <div style={{ ...styles.field, flex: 2 }}>
-            <label style={styles.label}>{t.notes}</label>
-            <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.optional} maxLength={500} />
+            <label htmlFor="ms-notes" style={styles.label}>{t.notes}</label>
+            <input id="ms-notes" style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.optional} maxLength={500} />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.msRepeat}</label>
-            <select style={styles.input} value={form.repeat} onChange={e => set('repeat', e.target.value)}>
+            <label htmlFor="ms-repeat" style={styles.label}>{t.msRepeat}</label>
+            <select id="ms-repeat" style={styles.input} value={form.repeat} onChange={e => set('repeat', e.target.value)}>
               <option value="none">{t.msRepeatNone}</option>
               <option value="weekly-4">{t.msRepeatWeekly4}</option>
               <option value="biweekly-4">{t.msRepeatBiweekly4}</option>
@@ -600,27 +600,27 @@ export default function ManageSchedule({ workers, projects }) {
           </div>
           <div style={styles.editGrid}>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>{t.date}</label>
-              <input style={styles.editInput} type="date" value={editForm.shift_date} onChange={ev => setEditForm(f => ({ ...f, shift_date: ev.target.value }))} />
+              <label htmlFor="ms-edit-date" style={styles.editLabel}>{t.date}</label>
+              <input id="ms-edit-date" style={styles.editInput} type="date" value={editForm.shift_date} onChange={ev => setEditForm(f => ({ ...f, shift_date: ev.target.value }))} />
             </div>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>{t.start}</label>
-              <input style={styles.editInput} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} />
+              <label htmlFor="ms-edit-start" style={styles.editLabel}>{t.start}</label>
+              <input id="ms-edit-start" style={styles.editInput} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} />
             </div>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>{t.end}</label>
-              <input style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
+              <label htmlFor="ms-edit-end" style={styles.editLabel}>{t.end}</label>
+              <input id="ms-edit-end" style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
             </div>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>{t.project}</label>
-              <select style={styles.editInput} value={editForm.project_id} onChange={ev => setEditForm(f => ({ ...f, project_id: ev.target.value }))}>
+              <label htmlFor="ms-edit-project" style={styles.editLabel}>{t.project}</label>
+              <select id="ms-edit-project" style={styles.editInput} value={editForm.project_id} onChange={ev => setEditForm(f => ({ ...f, project_id: ev.target.value }))}>
                 <option value="">{t.none}</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div style={{ ...styles.editField, flex: 2 }}>
-              <label style={styles.editLabel}>{t.notes}</label>
-              <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} maxLength={500} />
+              <label htmlFor="ms-edit-notes" style={styles.editLabel}>{t.notes}</label>
+              <input id="ms-edit-notes" style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} maxLength={500} />
             </div>
           </div>
           <div style={styles.editActions}>

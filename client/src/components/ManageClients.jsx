@@ -68,37 +68,37 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
 
       <div style={s.row}>
         <div style={s.field}>
-          <label style={s.label}>{t.clientCompanyName} *</label>
-          <input style={s.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.clientNamePlaceholder} required disabled={saving} />
+          <label htmlFor="mc-name" style={s.label}>{t.clientCompanyName} *</label>
+          <input id="mc-name" style={s.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.clientNamePlaceholder} required disabled={saving} />
         </div>
         <div style={s.field}>
-          <label style={s.label}>{t.contactName}</label>
-          <input style={s.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder={t.contactNamePlaceholder} disabled={saving} />
+          <label htmlFor="mc-contact-name" style={s.label}>{t.contactName}</label>
+          <input id="mc-contact-name" style={s.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder={t.contactNamePlaceholder} disabled={saving} />
         </div>
       </div>
 
       <div style={s.row}>
         <div style={s.field}>
-          <label style={s.label}>{t.contactEmail}</label>
-          <input style={s.input} type="email" maxLength={255} value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder={t.contactEmailPlaceholder} disabled={saving} />
+          <label htmlFor="mc-contact-email" style={s.label}>{t.contactEmail}</label>
+          <input id="mc-contact-email" style={s.input} type="email" maxLength={255} value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder={t.contactEmailPlaceholder} disabled={saving} />
         </div>
         <div style={s.field}>
-          <label style={s.label}>{t.contactPhone}</label>
-          <input style={s.input} type="tel" maxLength={50} value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder={t.contactPhonePlaceholder} disabled={saving} />
+          <label htmlFor="mc-contact-phone" style={s.label}>{t.contactPhone}</label>
+          <input id="mc-contact-phone" style={s.input} type="tel" maxLength={50} value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder={t.contactPhonePlaceholder} disabled={saving} />
         </div>
       </div>
 
       <div style={s.field}>
-        <label style={s.label}>{t.address}</label>
-        <input style={s.input} maxLength={255} value={form.address} onChange={e => set('address', e.target.value)} placeholder={t.clientAddressPlaceholder} disabled={saving} />
+        <label htmlFor="mc-address" style={s.label}>{t.address}</label>
+        <input id="mc-address" style={s.input} maxLength={255} value={form.address} onChange={e => set('address', e.target.value)} placeholder={t.clientAddressPlaceholder} disabled={saving} />
       </div>
 
       <div style={s.field}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <label style={s.label}>{t.notes} <span style={s.opt}>({t.optional})</span></label>
+          <label htmlFor="mc-notes" style={s.label}>{t.notes} <span style={s.opt}>({t.optional})</span></label>
           <span style={s.charCount}>{(form.notes || '').length}/1000</span>
         </div>
-        <textarea style={s.textarea} rows={2} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.clientNotesPlaceholder} disabled={saving} />
+        <textarea id="mc-notes" style={s.textarea} rows={2} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.clientNotesPlaceholder} disabled={saving} />
       </div>
 
       {error && <p style={s.error}>{error}</p>}
@@ -171,8 +171,8 @@ function DocUploadForm({ clientId, onUploaded }) {
         </div>
         {needsExpiry && (
           <div style={s.expiryField}>
-            <label style={s.uploadLabel}>{t.expiryDate}</label>
-            <input style={s.uploadInput} type="date" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
+            <label htmlFor="mc-expires-at" style={s.uploadLabel}>{t.expiryDate}</label>
+            <input id="mc-expires-at" style={s.uploadInput} type="date" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
           </div>
         )}
         <label style={{ ...s.uploadFileBtn, opacity: uploading ? 0.6 : 1 }}>
