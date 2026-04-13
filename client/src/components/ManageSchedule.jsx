@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
+import { SkeletonList } from './Skeleton';
 import {
   DndContext, DragOverlay, PointerSensor, TouchSensor,
   useSensor, useSensors, useDroppable, useDraggable,
@@ -15,7 +18,7 @@ function startOfWeek(date) {
 }
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
 function toISO(d) { return d.toLocaleDateString('en-CA'); }
-function fmtDay(d) { return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
+function fmtDay(d, locale = 'en-US') { return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' }); }
 function fmtTime(t) { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m}${hr < 12 ? 'a' : 'p'}`; }
 
 // Visual content of a shift pill — used both inline and in the drag overlay
@@ -97,18 +100,22 @@ function SummaryView({ shifts, days }) {
   const [cantOnly, setCantOnly] = useState(false);
 
   // Build worker → day → shifts map
-  const workerMap = {};
-  shifts.forEach(s => {
-    const name = s.worker_name;
-    if (!workerMap[name]) workerMap[name] = { name, byDay: {} };
-    const key = s.shift_date.substring(0, 10);
-    if (!workerMap[name].byDay[key]) workerMap[name].byDay[key] = [];
-    workerMap[name].byDay[key].push(s);
-  });
-  let rows = Object.values(workerMap).sort((a, b) => a.name.localeCompare(b.name));
-  if (cantOnly) rows = rows.filter(row => Object.values(row.byDay).some(arr => arr.some(s => s.cant_make_it)));
+  const { workerMap, hasCantFlags } = useMemo(() => {
+    const map = {};
+    shifts.forEach(s => {
+      const name = s.worker_name;
+      if (!map[name]) map[name] = { name, byDay: {} };
+      const key = s.shift_date.substring(0, 10);
+      if (!map[name].byDay[key]) map[name].byDay[key] = [];
+      map[name].byDay[key].push(s);
+    });
+    return { workerMap: map, hasCantFlags: shifts.some(s => s.cant_make_it) };
+  }, [shifts]);
 
-  const hasCantFlags = shifts.some(s => s.cant_make_it);
+  let rows = useMemo(() => {
+    const sorted = Object.values(workerMap).sort((a, b) => a.name.localeCompare(b.name));
+    return cantOnly ? sorted.filter(row => Object.values(row.byDay).some(arr => arr.some(s => s.cant_make_it))) : sorted;
+  }, [workerMap, cantOnly]);
 
   if (Object.values(workerMap).length === 0) return <p style={{ color: '#9ca3af', fontSize: 13, padding: '16px 0' }}>{t.msNoShiftsWeek}</p>;
 
@@ -131,7 +138,7 @@ function SummaryView({ shifts, days }) {
               const isToday = toISO(day) === toISO(new Date());
               return (
                 <th key={toISO(day)} style={{ ...styles.summaryTh, color: isToday ? '#1a56db' : '#374151' }}>
-                  <div>{day.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                  <div>{day.toLocaleDateString(locale, { weekday: 'short' })}</div>
                   <div style={{ fontWeight: 400, fontSize: 10 }}>{day.getDate()}</div>
                 </th>
               );
@@ -145,9 +152,9 @@ function SummaryView({ shifts, days }) {
             const hasCant = Object.values(row.byDay).some(arr => arr.some(s => s.cant_make_it));
             return (
               <tr key={row.name} style={hasCant ? styles.summaryRowCant : {}}>
-                <td style={styles.summaryTdWorker}>
+                <td style={styles.summaryTdWorker} title={row.name}>
                   {row.name}
-                  {hasCant && <span style={styles.summaryCantDot} title="Can't make it">✗</span>}
+                  {hasCant && <span style={styles.summaryCantDot} title={t.wsCantMakeIt}>✗</span>}
                 </td>
                 {days.map(day => {
                   const key = toISO(day);
@@ -181,6 +188,8 @@ function SummaryView({ shifts, days }) {
 export default function ManageSchedule({ workers, projects }) {
   const toast = useToast();
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -237,7 +246,7 @@ export default function ManageSchedule({ workers, projects }) {
           notes: shift.notes || '',
         });
       }));
-      toast(`${Object.keys(pendingMoves).length} shift${Object.keys(pendingMoves).length !== 1 ? 's' : ''} saved`, 'success');
+      toast(t.shiftsSaved.replace('{n}', Object.keys(pendingMoves).length), 'success');
     } catch {
       toast(t.someShiftsFailed, 'error');
     } finally {
@@ -248,7 +257,7 @@ export default function ManageSchedule({ workers, projects }) {
     }
   };
 
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const from = toISO(days[0]);
   const to = toISO(days[6]);
 
@@ -334,7 +343,7 @@ export default function ManageSchedule({ workers, projects }) {
       setShifts(prev => [...prev, ...newShifts].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
       setForm(f => ({ ...f, notes: '', repeat: 'none' }));
       setOverlapWarning(''); setAvailabilityWarning('');
-      toast(baseDates.length > 1 ? `${baseDates.length} shifts added` : t.shiftAdded, 'success');
+      toast(baseDates.length > 1 ? t.shiftsAddedN.replace('{n}', baseDates.length) : t.shiftAdded, 'success');
     } catch (err) {
       setError(err.response?.data?.error || t.failedSaveShift);
     } finally { setSaving(false); }
@@ -384,7 +393,7 @@ export default function ManageSchedule({ workers, projects }) {
       const today = toISO(new Date());
       setShifts(prev => prev.filter(s => !(s.recurrence_group_id === groupId && s.shift_date >= today)));
       setEditingId(null);
-      toast(`${r.data.deleted} shift${r.data.deleted !== 1 ? 's' : ''} cancelled`, 'success');
+      toast(t.shiftsCancelled.replace('{n}', r.data.deleted), 'success');
     } catch { toast(t.failedSaveShift, 'error'); }
     finally { setDeleting(null); }
   };
@@ -414,6 +423,7 @@ export default function ManageSchedule({ workers, projects }) {
       start_time: s.start_time.substring(0, 5),
       end_time: s.end_time.substring(0, 5),
       notes: s.notes || '',
+      updated_at: s.updated_at,
     });
   };
 
@@ -424,7 +434,10 @@ export default function ManageSchedule({ workers, projects }) {
       setShifts(prev => prev.map(s => s.id === id ? r.data : s));
       setEditingId(null);
     } catch (err) {
-      toast(err.response?.data?.error || 'Failed to update shift', 'error');
+      const msg = err.response?.status === 409
+        ? t.concurrentModification
+        : err.response?.data?.error || 'Failed to update shift';
+      toast(msg, 'error');
     } finally { setEditSaving(false); }
   };
 
@@ -448,15 +461,18 @@ export default function ManageSchedule({ workers, projects }) {
     setPendingMoves(prev => ({ ...prev, [shiftId]: newDate }));
   };
 
-  const shiftsByDay = {};
-  days.forEach(d => { shiftsByDay[toISO(d)] = []; });
-  shifts.forEach(s => {
-    const key = s.shift_date.substring(0, 10);
-    if (shiftsByDay[key]) shiftsByDay[key].push(s);
-  });
+  const shiftsByDay = useMemo(() => {
+    const map = {};
+    days.forEach(d => { map[toISO(d)] = []; });
+    shifts.forEach(s => {
+      const key = s.shift_date.substring(0, 10);
+      if (map[key]) map[key].push(s);
+    });
+    return map;
+  }, [shifts, days]);
 
   const shiftProps = { editingId, startEdit, setEditingId, dragMode };
-  const editingShift = editingId ? shifts.find(s => s.id === editingId) : null;
+  const editingShift = useMemo(() => editingId ? shifts.find(s => s.id === editingId) : null, [editingId, shifts]);
 
   return (
     <div style={styles.card}>
@@ -465,38 +481,38 @@ export default function ManageSchedule({ workers, projects }) {
       <form onSubmit={addShift} style={styles.form}>
         <div style={styles.formRow}>
           <div style={styles.field}>
-            <label style={styles.label}>{t.worker}</label>
-            <select style={styles.input} value={form.user_id} onChange={e => set('user_id', e.target.value)} required>
+            <label htmlFor="ms-worker" style={styles.label}>{t.worker}</label>
+            <select id="ms-worker" style={styles.input} value={form.user_id} onChange={e => set('user_id', e.target.value)} required>
               <option value="">{t.selectWorker}</option>
               {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
             </select>
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.project}</label>
-            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+            <label htmlFor="ms-project" style={styles.label}>{t.project}</label>
+            <select id="ms-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
               <option value="">{t.noProject}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.date}</label>
-            <input style={styles.input} type="date" value={form.shift_date} onChange={e => set('shift_date', e.target.value)} required />
+            <label htmlFor="ms-date" style={styles.label}>{t.date}</label>
+            <input id="ms-date" style={styles.input} type="date" value={form.shift_date} onChange={e => set('shift_date', e.target.value)} required />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.start}</label>
-            <input style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required />
+            <label htmlFor="ms-start" style={styles.label}>{t.start}</label>
+            <input id="ms-start" style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.end}</label>
-            <input style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required />
+            <label htmlFor="ms-end" style={styles.label}>{t.end}</label>
+            <input id="ms-end" style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required />
           </div>
           <div style={{ ...styles.field, flex: 2 }}>
-            <label style={styles.label}>{t.notes}</label>
-            <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.optional} maxLength={500} />
+            <label htmlFor="ms-notes" style={styles.label}>{t.notes}</label>
+            <input id="ms-notes" style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.optional} maxLength={500} />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.msRepeat}</label>
-            <select style={styles.input} value={form.repeat} onChange={e => set('repeat', e.target.value)}>
+            <label htmlFor="ms-repeat" style={styles.label}>{t.msRepeat}</label>
+            <select id="ms-repeat" style={styles.input} value={form.repeat} onChange={e => set('repeat', e.target.value)}>
               <option value="none">{t.msRepeatNone}</option>
               <option value="weekly-4">{t.msRepeatWeekly4}</option>
               <option value="biweekly-4">{t.msRepeatBiweekly4}</option>
@@ -505,7 +521,7 @@ export default function ManageSchedule({ workers, projects }) {
           </div>
           <div style={styles.field}>
             <label style={styles.label}>&nbsp;</label>
-            <button style={styles.addBtn} type="submit" disabled={saving}>{saving ? '...' : t.addShift}</button>
+            <button style={{ ...styles.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.addShift}</button>
           </div>
         </div>
         {availabilityWarning && <p style={styles.overlapWarning}>📅 {availabilityWarning}</p>}
@@ -515,12 +531,12 @@ export default function ManageSchedule({ workers, projects }) {
 
       <div style={styles.weekNav}>
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, -7))}>{t.prevWeek}</button>
-        <span style={styles.weekLabel}>{fmtDay(days[0])} – {fmtDay(days[6])}</span>
+        <span style={styles.weekLabel}>{fmtDay(days[0], locale)} – {fmtDay(days[6], locale)}</span>
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>{t.nextWeek}</button>
         <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>{t.today}</button>
-        <button style={styles.exportBtn} onClick={() => exportCSV(shifts, days)} title="Export week as CSV">⬇ CSV</button>
+        <button style={styles.exportBtn} onClick={() => exportCSV(shifts, days)} title={t.exportWeekCSV}>⬇ CSV</button>
         {shifts.length > 0 && (
-          <button style={styles.copyWeekBtn} onClick={copyWeek} disabled={copyingWeek} title={t.msCopyWeek}>
+          <button style={{ ...styles.copyWeekBtn, ...(copyingWeek ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={copyWeek} disabled={copyingWeek} title={t.msCopyWeek}>
             {copyingWeek ? t.msCopying : '⧉ ' + t.msCopyWeek}
           </button>
         )}
@@ -535,16 +551,16 @@ export default function ManageSchedule({ workers, projects }) {
               <span style={styles.dragModeLabel}>
                 {t.dragMode}{Object.keys(pendingMoves).length > 0 ? ` · ${Object.keys(pendingMoves).length} unsaved` : ''}
               </span>
-              <button style={styles.saveDragBtn} onClick={saveDragMoves} disabled={savingMoves || Object.keys(pendingMoves).length === 0}>
+              <button style={{ ...styles.saveDragBtn, ...((savingMoves || Object.keys(pendingMoves).length === 0) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={saveDragMoves} disabled={savingMoves || Object.keys(pendingMoves).length === 0}>
                 {savingMoves ? t.saving : t.saveAndNotify}
               </button>
-              <button style={styles.discardDragBtn} onClick={discardDrag} disabled={savingMoves}>{t.discard}</button>
+              <button style={{ ...styles.discardDragBtn, ...(savingMoves ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={discardDrag} disabled={savingMoves}>{t.discard}</button>
             </div>
           )
         }
       </div>
 
-      {loading ? <p style={{ color: '#888', fontSize: 13 }}>{t.loading}</p> : viewMode === 'summary' ? (
+      {loading ? <SkeletonList count={4} rows={2} /> : viewMode === 'summary' ? (
         <SummaryView shifts={shifts} days={days} />
       ) : (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -556,7 +572,7 @@ export default function ManageSchedule({ workers, projects }) {
               return (
                 <DroppableDay key={key} date={key} isToday={isToday}>
                   <div style={{ ...styles.dayHead, color: isToday ? '#1a56db' : '#374151' }}>
-                    {day.toLocaleDateString('en-US', { weekday: 'short' })} {day.getDate()}
+                    {day.toLocaleDateString(locale, { weekday: 'short' })} {day.getDate()}
                   </div>
                   {dayShifts.length === 0
                     ? <div style={styles.emptyDay} />
@@ -580,47 +596,47 @@ export default function ManageSchedule({ workers, projects }) {
       {editingShift && (
         <div style={styles.editPanel}>
           <div style={styles.editPanelHeader}>
-            <span style={styles.editPanelTitle}>Editing: {editingShift.worker_name} · {fmtDay(new Date(editingShift.shift_date + 'T00:00:00'))}</span>
+            <span style={styles.editPanelTitle}>Editing: {editingShift.worker_name} · {fmtDay(new Date(editingShift.shift_date + 'T00:00:00'), locale)}</span>
           </div>
           <div style={styles.editGrid}>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>{t.date}</label>
-              <input style={styles.editInput} type="date" value={editForm.shift_date} onChange={ev => setEditForm(f => ({ ...f, shift_date: ev.target.value }))} />
+              <label htmlFor="ms-edit-date" style={styles.editLabel}>{t.date}</label>
+              <input id="ms-edit-date" style={styles.editInput} type="date" value={editForm.shift_date} onChange={ev => setEditForm(f => ({ ...f, shift_date: ev.target.value }))} />
             </div>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>{t.start}</label>
-              <input style={styles.editInput} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} />
+              <label htmlFor="ms-edit-start" style={styles.editLabel}>{t.start}</label>
+              <input id="ms-edit-start" style={styles.editInput} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} />
             </div>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>{t.end}</label>
-              <input style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
+              <label htmlFor="ms-edit-end" style={styles.editLabel}>{t.end}</label>
+              <input id="ms-edit-end" style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
             </div>
             <div style={styles.editField}>
-              <label style={styles.editLabel}>{t.project}</label>
-              <select style={styles.editInput} value={editForm.project_id} onChange={ev => setEditForm(f => ({ ...f, project_id: ev.target.value }))}>
+              <label htmlFor="ms-edit-project" style={styles.editLabel}>{t.project}</label>
+              <select id="ms-edit-project" style={styles.editInput} value={editForm.project_id} onChange={ev => setEditForm(f => ({ ...f, project_id: ev.target.value }))}>
                 <option value="">{t.none}</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div style={{ ...styles.editField, flex: 2 }}>
-              <label style={styles.editLabel}>{t.notes}</label>
-              <input style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} maxLength={500} />
+              <label htmlFor="ms-edit-notes" style={styles.editLabel}>{t.notes}</label>
+              <input id="ms-edit-notes" style={styles.editInput} type="text" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} maxLength={500} />
             </div>
           </div>
           <div style={styles.editActions}>
             <div style={styles.editActionsLeft}>
-              <button style={styles.saveBtn} onClick={() => saveEdit(editingShift.id)} disabled={editSaving}>{editSaving ? '…' : t.save}</button>
+              <button style={{ ...styles.saveBtn, ...(editSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveEdit(editingShift.id)} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
               <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
             </div>
             <div style={styles.editActionsRight}>
               <button style={styles.dupBtn} onClick={() => duplicateShift(editingShift)}>{t.copy}</button>
               {editingShift.recurrence_group_id && (
-                <button style={styles.seriesBtn} onClick={() => cancelSeries(editingShift.recurrence_group_id)} disabled={deleting === editingShift.recurrence_group_id}>
-                  {deleting === editingShift.recurrence_group_id ? '…' : t.msCancelSeries}
+                <button style={{ ...styles.seriesBtn, ...(deleting === editingShift.recurrence_group_id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => cancelSeries(editingShift.recurrence_group_id)} disabled={deleting === editingShift.recurrence_group_id}>
+                  {deleting === editingShift.recurrence_group_id ? t.saving : t.msCancelSeries}
                 </button>
               )}
-              <button style={styles.deleteBtn} onClick={() => deleteShift(editingShift.id)} disabled={deleting === editingShift.id}>
-                {deleting === editingShift.id ? '…' : t.del}
+              <button style={{ ...styles.deleteBtn, ...(deleting === editingShift.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => deleteShift(editingShift.id)} disabled={deleting === editingShift.id}>
+                {deleting === editingShift.id ? t.saving : t.del}
               </button>
             </div>
           </div>

@@ -103,25 +103,25 @@ function CompanyTab() {
         {/* Contact info */}
         <div style={{ borderTop: '1px solid #f3f4f6', marginTop: 14 }}>
           <button style={styles.accordionTrigger} onClick={() => setShowContact(o => !o)}>
-            <span style={styles.accordionLabel}>Contact Info <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: 12 }}>— used in worker invoices</span></span>
+            <span style={styles.accordionLabel}>{t.contactInfoHeading}</span>
             <span style={{ ...styles.accordionChevron, transform: showContact ? 'rotate(180deg)' : 'none' }}>▾</span>
           </button>
           {showContact && (
             <div style={{ ...styles.accordionBody, gap: 10 }}>
               {editing ? (
                 <>
-                  <input style={styles.input} placeholder="Physical address (e.g. 123 Main St, City, ST 00000)" value={address} onChange={e => setAddress(e.target.value)} />
+                  <input style={styles.input} placeholder={t.adminAddressPh} value={address} onChange={e => setAddress(e.target.value)} />
                   <div style={{ display: 'flex', gap: 10 }}>
-                    <input style={{ ...styles.input, flex: 1 }} placeholder="Phone (e.g. (555) 123-4567)" value={phone} onChange={e => setPhone(e.target.value)} />
-                    <input style={{ ...styles.input, flex: 2 }} type="email" placeholder="Email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} />
+                    <input style={{ ...styles.input, flex: 1 }} placeholder={t.adminPhonePh} value={phone} onChange={e => setPhone(e.target.value)} />
+                    <input style={{ ...styles.input, flex: 2 }} type="email" placeholder={t.email} value={contactEmail} onChange={e => setContactEmail(e.target.value)} />
                   </div>
                 </>
               ) : (
                 <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.7 }}>
-                  {company?.address ? <div>{company.address}</div> : <div style={{ color: '#d1d5db' }}>No address set</div>}
+                  {company?.address ? <div>{company.address}</div> : <div style={{ color: '#d1d5db' }}>{t.adminNoAddress}</div>}
                   <div style={{ display: 'flex', gap: 20 }}>
-                    {company?.phone ? <span>{company.phone}</span> : <span style={{ color: '#d1d5db' }}>No phone</span>}
-                    {company?.contact_email ? <span>{company.contact_email}</span> : <span style={{ color: '#d1d5db' }}>No email</span>}
+                    {company?.phone ? <span>{company.phone}</span> : <span style={{ color: '#d1d5db' }}>{t.adminNoPhone}</span>}
+                    {company?.contact_email ? <span>{company.contact_email}</span> : <span style={{ color: '#d1d5db' }}>{t.adminNoEmail}</span>}
                   </div>
                 </div>
               )}
@@ -132,18 +132,18 @@ function CompanyTab() {
         {/* Subscription info */}
         <div style={{ borderTop: '1px solid #f3f4f6' }}>
           <button style={styles.accordionTrigger} onClick={() => setShowSubscription(o => !o)}>
-            <span style={styles.accordionLabel}>Subscription</span>
+            <span style={styles.accordionLabel}>{t.subscriptionLabel}</span>
             <span style={{ ...styles.accordionChevron, transform: showSubscription ? 'rotate(180deg)' : 'none' }}>▾</span>
           </button>
           {showSubscription && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 20px 16px' }}>
               <span style={{ ...styles.planBadge, background: si.bg, color: si.color }}>{si.label}</span>
               {company?.plan && (
-                <span style={styles.planName}>{company.plan.charAt(0).toUpperCase() + company.plan.slice(1)} plan</span>
+                <span style={styles.planName}>{company.plan.charAt(0).toUpperCase() + company.plan.slice(1)} {t.planSuffix}</span>
               )}
               {company?.subscription_status === 'trial' && trialDaysLeft !== null && (
                 <span style={{ fontSize: 13, color: trialDaysLeft <= 3 ? '#dc2626' : '#6b7280', marginLeft: 'auto' }}>
-                  {trialDaysLeft > 0 ? `${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''} left in trial` : t.trialExpired}
+                  {trialDaysLeft > 0 ? (trialDaysLeft === 1 ? t.trialDayLeft.replace('{n}', trialDaysLeft) : t.trialDaysLeft.replace('{n}', trialDaysLeft)) : t.trialExpired}
                 </span>
               )}
             </div>
@@ -187,9 +187,9 @@ function AccountTab() {
     try {
       await api.post('/admin/support', supportForm);
       setSupportForm({ subject: '', message: '' });
-      setSupportMsg({ text: "Message sent! We'll be in touch soon.", ok: true });
+      setSupportMsg({ text: t.supportSentMsg, ok: true });
     } catch (err) {
-      setSupportMsg({ text: err.response?.data?.error || 'Failed to send. Please email support@opsfloa.com directly.', ok: false });
+      setSupportMsg({ text: err.response?.data?.error || t.supportFailedMsg, ok: false });
     } finally { setSupportSending(false); }
   };
 
@@ -241,16 +241,16 @@ function AccountTab() {
         {showPasswordForm && (
           <form onSubmit={changePassword} style={styles.accordionBody}>
             <div style={styles.fieldGroup}>
-              <label style={styles.label}>{t.currentPassword}</label>
-              <PasswordInput style={styles.input} value={form.current_password} onChange={e => set('current_password', e.target.value)} autoFocus />
+              <label htmlFor="current-password" style={styles.label}>{t.currentPassword}</label>
+              <PasswordInput id="current-password" style={styles.input} value={form.current_password} onChange={e => set('current_password', e.target.value)} autoFocus />
             </div>
             <div style={styles.fieldGroup}>
-              <label style={styles.label}>{t.newPassword}</label>
-              <PasswordInput style={styles.input} value={form.new_password} onChange={e => set('new_password', e.target.value)} />
+              <label htmlFor="new-password" style={styles.label}>{t.newPassword}</label>
+              <PasswordInput id="new-password" style={styles.input} value={form.new_password} onChange={e => set('new_password', e.target.value)} />
             </div>
             <div style={styles.fieldGroup}>
-              <label style={styles.label}>{t.confirmNewPassword}</label>
-              <PasswordInput style={styles.input} value={form.confirm} onChange={e => set('confirm', e.target.value)} />
+              <label htmlFor="confirm-password" style={styles.label}>{t.confirmNewPassword}</label>
+              <PasswordInput id="confirm-password" style={styles.input} value={form.confirm} onChange={e => set('confirm', e.target.value)} />
             </div>
             {msg && (
               <p style={{ ...styles.feedback, color: msg.includes('success') || msg.includes('exitosamente') ? '#059669' : '#dc2626' }}>{msg}</p>
@@ -269,20 +269,20 @@ function AccountTab() {
 
       <div style={styles.card}>
         <div style={{ padding: '16px 20px 0' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 2 }}>Support</div>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 14 }}>Send a message to our team for help or suggestions.</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 2 }}>{t.supportTitle}</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 14 }}>{t.supportSubtitle}</div>
         </div>
         <form onSubmit={sendSupport} style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input
             style={styles.input}
             type="text"
-            placeholder="Subject (optional)"
+            placeholder={t.supportSubjectPh}
             value={supportForm.subject}
             onChange={e => setSupportForm(f => ({ ...f, subject: e.target.value }))}
           />
           <textarea
             style={{ ...styles.input, minHeight: 90, resize: 'vertical', fontFamily: 'inherit' }}
-            placeholder="Describe your issue or suggestion..."
+            placeholder={t.supportMessagePh}
             value={supportForm.message}
             onChange={e => setSupportForm(f => ({ ...f, message: e.target.value }))}
             required
@@ -292,7 +292,7 @@ function AccountTab() {
           )}
           <div>
             <button style={styles.saveBtn} type="submit" disabled={supportSending || !supportForm.message.trim()}>
-              {supportSending ? 'Sending...' : 'Send Message'}
+              {supportSending ? t.supportSending : t.supportSendBtn}
             </button>
           </div>
         </form>
@@ -318,6 +318,7 @@ export default function AdministrationPage() {
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
+  const [qboConnected, setQboConnected] = useState(false);
 
   const tabs = [
     { id: 'company',      label: t.adminTabCompany      },
@@ -333,10 +334,12 @@ export default function AdministrationPage() {
       api.get('/admin/workers', { params: { all_roles: true } }),
       api.get('/admin/projects'),
       api.get('/admin/settings'),
-    ]).then(([w, p, s]) => {
+      plan.hasQbo ? api.get('/qbo/status').catch(() => ({ data: { connected: false } })) : Promise.resolve({ data: { connected: false } }),
+    ]).then(([w, p, s, qbo]) => {
       setWorkers(w.data);
       setProjects(p.data);
       setSettings(s.data);
+      setQboConnected(qbo.data?.connected && !qbo.data?.disconnected);
     }).catch(() => {});
   }, []);
 
@@ -387,6 +390,7 @@ export default function AdministrationPage() {
               identityEditable={true}
               currency={settings?.currency ?? 'USD'}
               currentUser={user}
+              qboConnected={qboConnected}
             />
           </div>
         )}
@@ -402,6 +406,8 @@ export default function AdministrationPage() {
             <QuickBooks
               workers={workers}
               projects={projects}
+              settings={settings}
+              onSettingsChange={setSettings}
               onWorkersImported={imported => setWorkers(prev => [...prev, ...imported.map(w => ({ ...w, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 }))])}
               onProjectsImported={imported => setProjects(prev => [...prev, ...imported])}
             />

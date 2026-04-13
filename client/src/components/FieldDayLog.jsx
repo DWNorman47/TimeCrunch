@@ -3,6 +3,9 @@ import api from '../api';
 import PhotoCapture from './PhotoCapture';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
+import { SkeletonList } from './Skeleton';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -16,11 +19,11 @@ function shiftDate(dateStr, n) {
   return d.toLocaleDateString('en-CA');
 }
 
-function dayLabel(dateStr, t) {
+function dayLabel(dateStr, t, locale = 'en-US') {
   const today = todayISO();
   if (dateStr === today) return t ? t.today : 'Today';
   if (dateStr === shiftDate(today, -1)) return t ? t.yesterday : 'Yesterday';
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString(locale, {
     weekday: 'short', month: 'short', day: 'numeric',
   });
 }
@@ -67,6 +70,17 @@ function Lightbox({ photos, startIndex, onClose }) {
   const [idx, setIdx] = useState(startIndex);
   const item = photos[idx];
   const isVid = item.media_type === 'video' || /\.(mp4|mov|webm|avi|m4v)$/i.test(item.url || '');
+
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowLeft') setIdx(i => Math.max(0, i - 1));
+      else if (e.key === 'ArrowRight') setIdx(i => Math.min(photos.length - 1, i + 1));
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div style={s.lbBackdrop} onClick={onClose}>
       {isVid ? (
@@ -76,9 +90,9 @@ function Lightbox({ photos, startIndex, onClose }) {
       )}
       {item.caption && <div style={s.lbCaption}>{item.caption}</div>}
       <div style={s.lbNav} onClick={e => e.stopPropagation()}>
-        <button style={s.lbBtn} aria-label="Previous photo" onClick={() => setIdx(i => i - 1)} disabled={idx === 0}>‹</button>
+        <button style={{ ...s.lbBtn, ...(idx === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.prevPhoto} onClick={() => setIdx(i => i - 1)} disabled={idx === 0}>‹</button>
         <span style={s.lbCount}>{idx + 1} / {photos.length}</span>
-        <button style={s.lbBtn} aria-label="Next photo" onClick={() => setIdx(i => i + 1)} disabled={idx === photos.length - 1}>›</button>
+        <button style={{ ...s.lbBtn, ...(idx === photos.length - 1 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.nextPhoto} onClick={() => setIdx(i => i + 1)} disabled={idx === photos.length - 1}>›</button>
       </div>
     </div>
   );
@@ -88,6 +102,8 @@ function Lightbox({ photos, startIndex, onClose }) {
 
 export default function FieldDayLog({ projects, isAdmin }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const { onSync } = useOffline() || {};
 
   const [project, setProject] = useState('');
@@ -128,7 +144,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
       const params = { from: d, to: d };
       if (proj) params.project_id = proj;
       const r = await api.get('/field-reports', { params });
-      setDayReports(r.data);
+      setDayReports(r.data.items);
     } catch { setError(t.failedLoadFieldReports); } finally { setLoading(false); }
   };
 
@@ -273,9 +289,9 @@ export default function FieldDayLog({ projects, isAdmin }) {
         </select>
 
         <div style={s.dateNav}>
-          <button style={s.dateArrow} onClick={prevDay}>‹</button>
-          <span style={s.dateLabel}>{dayLabel(date, t)}</span>
-          <button style={{ ...s.dateArrow, opacity: isToday ? 0.3 : 1 }} onClick={nextDay} disabled={isToday}>›</button>
+          <button style={s.dateArrow} aria-label={t.prevDay} onClick={prevDay}>‹</button>
+          <span style={s.dateLabel}>{dayLabel(date, t, locale)}</span>
+          <button style={{ ...s.dateArrow, opacity: isToday ? 0.3 : 1, ...(isToday ? { cursor: 'not-allowed' } : {}) }} aria-label={t.nextDay} onClick={nextDay} disabled={isToday}>›</button>
         </div>
       </div>
 
@@ -300,7 +316,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
           <PhotoCapture photos={capturePhotos} onChange={setCapturePhotos} />
           {error && <p style={s.error}>{error}</p>}
           <div style={s.captureActions}>
-            <button style={s.submitBtn} onClick={submitPhotos} disabled={saving || capturePhotos.length === 0}>
+            <button style={{ ...s.submitBtn, ...(saving || capturePhotos.length === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitPhotos} disabled={saving || capturePhotos.length === 0}>
               {saving ? t.submitting : capturePhotos.length > 0
                 ? `${t.submitPhotos} (${capturePhotos.length})`
                 : t.submitPhotos}
@@ -322,9 +338,10 @@ export default function FieldDayLog({ projects, isAdmin }) {
             onChange={e => setCaptureNote(e.target.value)}
             autoFocus
           />
+          <div style={s.charCount}>{captureNote.length}/2000</div>
           {error && <p style={s.error}>{error}</p>}
           <div style={s.captureActions}>
-            <button style={s.submitBtn} onClick={submitNote} disabled={saving || !captureNote.trim()}>
+            <button style={{ ...s.submitBtn, ...(saving || !captureNote.trim() ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitNote} disabled={saving || !captureNote.trim()}>
               {saving ? t.submitting : t.submitNote}
             </button>
             <button style={s.cancelBtn} onClick={() => { setNoteOpen(false); setCaptureNote(''); setError(''); }}>{t.cancel}</button>
@@ -338,7 +355,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
           {captureVideo ? (
             <div style={s.videoPreviewWrap}>
               <video src={captureVideo.previewUrl} style={s.videoPreview} controls playsInline />
-              <button style={s.removeBtnSm} onClick={() => { URL.revokeObjectURL(captureVideo.previewUrl); setCaptureVideo(null); }}>✕ Remove</button>
+              <button style={s.removeBtnSm} onClick={() => { URL.revokeObjectURL(captureVideo.previewUrl); setCaptureVideo(null); }}>{t.removeVideo}</button>
             </div>
           ) : (
             <label style={s.videoPickerLabel}>
@@ -370,7 +387,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
           )}
           {error && <p style={s.error}>{error}</p>}
           <div style={s.captureActions}>
-            <button style={s.submitBtn} onClick={submitVideo} disabled={saving || !captureVideo}>
+            <button style={{ ...s.submitBtn, ...(saving || !captureVideo ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitVideo} disabled={saving || !captureVideo}>
               {saving ? (uploadProgress > 0 ? `${t.uploading} ${uploadProgress}%` : t.submitting) : t.submitVideo}
             </button>
             <button style={s.cancelBtn} onClick={() => { if (captureVideo) URL.revokeObjectURL(captureVideo.previewUrl); setCaptureVideo(null); setVideoCaption(''); setVideoOpen(false); setError(''); }}>{t.cancel}</button>
@@ -380,7 +397,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
 
       {/* Day content */}
       {loading ? (
-        <p style={s.hint}>Loading…</p>
+        <SkeletonList count={3} rows={2} />
       ) : dayReports.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>📋</div>
@@ -401,14 +418,14 @@ export default function FieldDayLog({ projects, isAdmin }) {
                 {allPhotos.map((p, i) => {
                   const vid = p.media_type === 'video' || /\.(mp4|mov|webm|avi|m4v)$/i.test(p.url || '');
                   return (
-                    <div key={i} style={s.photoCell} onClick={() => setLightbox({ photos: allPhotos, index: i })}>
+                    <div key={i} style={s.photoCell} onClick={() => setLightbox({ photos: allPhotos, index: i })} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setLightbox({ photos: allPhotos, index: i })}>
                       {vid ? (
                         <>
                           <video src={p.url} style={s.photoThumb} preload="metadata" muted playsInline />
                           <div style={s.playOverlay}>▶</div>
                         </>
                       ) : (
-                        <img src={p.url} style={s.photoThumb} alt={p.caption || `photo ${i + 1}`} />
+                        <img src={p.url} style={s.photoThumb} alt={p.caption || `photo ${i + 1}`} loading="lazy" />
                       )}
                       {p.caption && <div style={s.photoCaption}>{p.caption}</div>}
                       {isAdmin && p.worker_name && <div style={s.photoWorker}>{p.worker_name}</div>}
@@ -438,7 +455,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
                         <span style={s.noteWorker}>{r.worker_name}</span>
                       )}
                       <span style={s.noteTime}>
-                        {new Date(r.reported_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                        {new Date(r.reported_at).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}
                       </span>
                       {r.pending && <span style={s.pendingBadge}>⏳ {t.pendingSync}</span>}
                       {r.lat && (
@@ -490,6 +507,7 @@ const s = {
   actionBtnOn: { borderColor: '#059669', color: '#059669', background: '#f0fdf4' },
   capturePanel: { background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.07)', marginBottom: 16 },
   noteTextarea: { width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' },
+  charCount: { fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 3 },
   captureActions: { display: 'flex', gap: 8, marginTop: 12 },
   submitBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' },
   cancelBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '10px 16px', borderRadius: 8, fontSize: 14, cursor: 'pointer' },

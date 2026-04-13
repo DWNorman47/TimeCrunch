@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
 import api from '../api';
 import PasswordInput from '../components/PasswordInput';
 
@@ -17,6 +18,7 @@ const OTHER = '__other__';
 
 export default function Login() {
   const { login, confirmMfa, loginWithToken } = useAuth();
+  const t = useT();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionExpired = searchParams.get('session') === 'expired';
@@ -70,10 +72,10 @@ export default function Login() {
       const data = err.response?.data;
       if (data?.error === 'email_not_confirmed') {
         setUnconfirmedEmail(data.email || '');
-        setError('Please confirm your email before signing in.');
+        setError(t.loginConfirmEmailFirst);
       } else {
         setUnconfirmedEmail('');
-        setError(data?.error || 'Login failed');
+        setError(data?.error || t.loginFailed);
       }
     } finally {
       setLoading(false);
@@ -88,7 +90,7 @@ export default function Login() {
       const user = await confirmMfa(mfaToken, mfaCode);
       navigateAfterLogin(user);
     } catch (err) {
-      setError(err.response?.data?.error || 'Invalid code');
+      setError(err.response?.data?.error || t.loginInvalidCode);
       setMfaCode('');
       setTimeout(() => mfaInputRef.current?.focus(), 50);
     } finally {
@@ -99,7 +101,7 @@ export default function Login() {
   if (setupToken) {
     const handleSetup = async e => {
       e.preventDefault();
-      if (setupForm.password !== setupForm.confirm) { setError('Passwords do not match'); return; }
+      if (setupForm.password !== setupForm.confirm) { setError(t.loginPasswordsDontMatch); return; }
       setError('');
       setLoading(true);
       try {
@@ -107,7 +109,7 @@ export default function Login() {
         await loginWithToken(r.data.token);
         navigateAfterLogin(r.data.user);
       } catch (err) {
-        setError(err.response?.data?.error || 'Failed to set password');
+        setError(err.response?.data?.error || t.loginFailedSetPassword);
       } finally {
         setLoading(false);
       }
@@ -116,32 +118,34 @@ export default function Login() {
       <div style={styles.container}>
         <div style={styles.card}>
           <h1 style={styles.title}>OpsFloa</h1>
-          <p style={styles.subtitle}>Set your password</p>
+          <p style={styles.subtitle}>{t.loginSetPasswordTitle}</p>
           <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16, textAlign: 'center' }}>
-            You're using a temporary password. Please set a permanent one to continue.
+            {t.loginTempPasswordNote}
           </p>
           <form onSubmit={handleSetup} style={styles.form}>
-            <label style={styles.label}>New password</label>
+            <label htmlFor="setup-password" style={styles.label}>{t.loginNewPasswordLabel}</label>
             <PasswordInput
+              id="setup-password"
               style={styles.input}
-              placeholder="At least 6 characters"
+              placeholder={t.loginAtLeastChars}
               value={setupForm.password}
               onChange={e => setSetupForm(f => ({ ...f, password: e.target.value }))}
               required
               minLength={6}
               autoFocus
             />
-            <label style={styles.label}>Confirm password</label>
+            <label htmlFor="setup-confirm" style={styles.label}>{t.loginConfirmPasswordLabel}</label>
             <PasswordInput
+              id="setup-confirm"
               style={styles.input}
-              placeholder="Repeat password"
+              placeholder={t.loginRepeatPasswordPh}
               value={setupForm.confirm}
               onChange={e => setSetupForm(f => ({ ...f, confirm: e.target.value }))}
               required
             />
             {error && <p style={styles.error}>{error}</p>}
             <button style={styles.button} type="submit" disabled={loading}>
-              {loading ? 'Saving...' : 'Set password & sign in'}
+              {loading ? t.saving : t.loginSetPasswordBtn}
             </button>
           </form>
         </div>
@@ -154,10 +158,11 @@ export default function Login() {
       <div style={styles.container}>
         <div style={styles.card}>
           <h1 style={styles.title}>OpsFloa</h1>
-          <p style={styles.subtitle}>Two-factor authentication</p>
+          <p style={styles.subtitle}>{t.loginMfaTitle}</p>
           <form onSubmit={handleMfaSubmit} style={styles.form}>
-            <label style={styles.label}>Enter the 6-digit code from your authenticator app</label>
+            <label htmlFor="mfa-code" style={styles.label}>{t.loginMfaCodeLabel}</label>
             <input
+              id="mfa-code"
               ref={mfaInputRef}
               style={{ ...styles.input, textAlign: 'center', fontSize: 22, letterSpacing: 8, fontWeight: 700 }}
               type="text"
@@ -170,10 +175,10 @@ export default function Login() {
             />
             {error && <p style={styles.error}>{error}</p>}
             <button style={styles.button} type="submit" disabled={loading || mfaCode.length !== 6}>
-              {loading ? 'Verifying...' : 'Verify'}
+              {loading ? t.loginVerifying : t.loginVerify}
             </button>
             <button type="button" style={styles.forgotLink} onClick={() => { setMfaToken(null); setError(''); setMfaCode(''); }}>
-              ← Back to sign in
+              {t.loginBackToSignIn}
             </button>
           </form>
         </div>
@@ -185,27 +190,28 @@ export default function Login() {
     <div style={styles.container}>
       <div style={styles.card}>
         <h1 style={styles.title}>OpsFloa</h1>
-        <p style={styles.subtitle}>Track your time, simply.</p>
+        <p style={styles.subtitle}>{t.loginSubtitle}</p>
         {sessionExpired && (
-          <p style={styles.sessionMsg}>Your session expired. Please sign in again.</p>
+          <p style={styles.sessionMsg}>{t.loginSessionExpired}</p>
         )}
         <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>Company name</label>
+          <label htmlFor="company" style={styles.label}>{t.loginCompanyLabel}</label>
           {savedCompanies.length > 0 ? (
             <>
               <select
+                id="company"
                 style={styles.input}
                 value={selected}
                 onChange={e => setSelected(e.target.value)}
               >
                 {savedCompanies.map(c => <option key={c} value={c}>{c}</option>)}
-                <option value={OTHER}>— Other company —</option>
+                <option value={OTHER}>{t.loginOtherCompany}</option>
               </select>
               {selected === OTHER && (
                 <input
                   style={styles.input}
                   type="text"
-                  placeholder="Enter company name"
+                  placeholder={t.loginEnterCompanyPh}
                   value={otherText}
                   onChange={e => setOtherText(e.target.value)}
                   onBlur={e => setOtherText(e.target.value.trim())}
@@ -216,6 +222,7 @@ export default function Login() {
             </>
           ) : (
             <input
+              id="company"
               style={styles.input}
               type="text"
               value={otherText}
@@ -225,8 +232,9 @@ export default function Login() {
               required
             />
           )}
-          <label style={styles.label}>Username</label>
+          <label htmlFor="username" style={styles.label}>{t.username}</label>
           <input
+            id="username"
             style={styles.input}
             type="text"
             value={form.username}
@@ -234,8 +242,9 @@ export default function Login() {
             onBlur={e => setForm(f => ({ ...f, username: e.target.value.trim() }))}
             required
           />
-          <label style={styles.label}>Password</label>
+          <label htmlFor="login-password" style={styles.label}>{t.loginPasswordLabel}</label>
           <PasswordInput
+            id="login-password"
             style={styles.input}
             value={form.password}
             onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
@@ -253,18 +262,18 @@ export default function Login() {
                       .then(() => setResentConfirmation(true));
                   }}
                 >
-                  {resentConfirmation ? 'Sent! Check your inbox.' : 'Resend confirmation email'}
+                  {resentConfirmation ? t.loginResentConfirmation : t.loginResendConfirmation}
                 </button>
               )}
             </div>
           )}
           <button style={styles.button} type="submit" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? t.loginSigningIn : t.loginSignIn}
           </button>
-          <Link to="/forgot-password" style={styles.forgotLink}>Forgot password?</Link>
+          <Link to="/forgot-password" style={styles.forgotLink}>{t.loginForgotPassword}</Link>
         </form>
         <p style={styles.registerLink}>
-          New to OpsFloa? <Link to="/register" style={styles.link}>Create an account</Link>
+          {t.loginNewToOpsFloa} <Link to="/register" style={styles.link}>{t.loginCreateAccount}</Link>
         </p>
       </div>
     </div>

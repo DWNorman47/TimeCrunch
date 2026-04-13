@@ -338,7 +338,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                   autoFocus
                 />
                 <span style={styles.addedUnit}>min</span>
-                <button style={styles.removeBtn} onClick={() => { setBreakAdded(false); setBreakMinutes(''); }}>✕</button>
+                <button style={styles.removeBtn} aria-label={t.removeBreak} onClick={() => { setBreakAdded(false); setBreakMinutes(''); }}>✕</button>
               </div>
             )}
             {mileageAdded && (
@@ -353,7 +353,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                   onChange={e => setMileage(e.target.value)}
                 />
                 <span style={styles.addedUnit}>mi</span>
-                <button style={styles.removeBtn} onClick={() => { setMileageAdded(false); setMileage(''); }}>✕</button>
+                <button style={styles.removeBtn} aria-label={t.removeMileage} onClick={() => { setMileageAdded(false); setMileage(''); }}>✕</button>
               </div>
             )}
 
@@ -381,8 +381,8 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                   ))}
                 </select>
                 <div style={styles.switchActions}>
-                  <button style={styles.switchConfirmBtn} onClick={handleSwitchProject} disabled={loading || !switchProject}>
-                    {loading ? '...' : t.confirmSwitch}
+                  <button style={{ ...styles.switchConfirmBtn, ...(loading || !switchProject ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleSwitchProject} disabled={loading || !switchProject}>
+                    {loading ? t.saving : t.confirmSwitch}
                   </button>
                   <button style={styles.switchCancelBtn} onClick={() => { setSwitchingProject(false); setSwitchProject(''); setError(''); }}>
                     {t.cancel}
@@ -391,22 +391,22 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
               </div>
             ) : (
               projectsEnabled && projects?.length > 1 && (
-                <button style={styles.switchProjectBtn} onClick={() => setSwitchingProject(true)} disabled={loading}>
+                <button style={{ ...styles.switchProjectBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setSwitchingProject(true)} disabled={loading}>
                   {t.switchProject}
                 </button>
               )
             )}
 
-            <button style={styles.clockOutBtn} className="clock-btn" onClick={handleClockOut} disabled={loading}>
+            <button style={{ ...styles.clockOutBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} className="clock-btn" onClick={handleClockOut} disabled={loading}>
               {loading ? t.clockingOut : t.clockOut}
             </button>
             {confirmingCancelClock ? (
               <>
-                <button style={styles.confirmCancelBtn} onClick={handleCancelClockIn} disabled={loading}>{t.confirm}</button>
+                <button style={{ ...styles.confirmCancelBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleCancelClockIn} disabled={loading}>{t.confirm}</button>
                 <button style={styles.cancelClockInBtn} onClick={() => setConfirmingCancelClock(false)}>{t.cancel}</button>
               </>
             ) : (
-              <button style={styles.cancelClockInBtn} onClick={() => setConfirmingCancelClock(true)} disabled={loading}>
+              <button style={{ ...styles.cancelClockInBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setConfirmingCancelClock(true)} disabled={loading}>
                 {t.cancelClockIn}
               </button>
             )}
@@ -441,14 +441,15 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
             <div style={styles.clockOutSummaryProject}>{clockOutSummary.projectName}</div>
             <div style={styles.clockOutSummaryDuration}>{t.clockOutSummaryDuration}: <strong>{formatElapsed(clockOutSummary.seconds)}</strong></div>
           </div>
-          <button style={styles.clockOutSummaryDismiss} onClick={() => setClockOutSummary(null)}>✕</button>
+          <button style={styles.clockOutSummaryDismiss} aria-label={t.dismiss} onClick={() => setClockOutSummary(null)}>✕</button>
         </div>
       )}
       <h2 style={styles.heading}>{t.clockIn}</h2>
       <div style={styles.form}>
         {projectsEnabled && <div>
-          <label style={styles.label}>{t.project}</label>
+          <label htmlFor="clockin-project" style={styles.label}>{t.project}</label>
           <select
+            id="clockin-project"
             style={styles.input}
             value={selectedProject}
             onChange={e => setSelectedProject(e.target.value)}
@@ -462,8 +463,12 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
           </select>
         </div>}
         <div>
-          <label style={styles.label}>{t.notesOptional}</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <label htmlFor="clockin-notes" style={styles.label}>{t.notesOptional}</label>
+            <span style={styles.charCount}>{notes.length}/500</span>
+          </div>
           <input
+            id="clockin-notes"
             style={styles.input}
             type="text"
             placeholder={t.notesPlaceholder}
@@ -491,7 +496,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
         {error && <p style={styles.error}>{error}</p>}
         {pendingChecklist && (
           <div style={styles.checklistGate}>
-            <div style={styles.checklistGateTitle}>☑ Required: {pendingChecklist.name}</div>
+            <div style={styles.checklistGateTitle}>{t.checklistRequiredTitle} {pendingChecklist.name}</div>
             <div style={styles.checklistGateSub}>{t.checklistCompleteToClock}</div>
             {(pendingChecklist.items || []).map((item, i) => (
               <div key={i} style={styles.checklistGateItem}>
@@ -521,7 +526,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
               </div>
             ))}
             <button
-              style={styles.checklistGateSubmitBtn}
+              style={{ ...styles.checklistGateSubmitBtn, ...(checklistSubmitting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
               onClick={handleChecklistSubmit}
               disabled={checklistSubmitting}
             >
@@ -533,7 +538,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
           </div>
         )}
         {!pendingChecklist && (
-          <button style={styles.clockInBtn} className="clock-btn" onClick={handleClockIn} disabled={loading}>
+          <button style={{ ...styles.clockInBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} className="clock-btn" onClick={handleClockIn} disabled={loading}>
             {loading ? t.clockingIn : t.clockIn}
           </button>
         )}
@@ -560,6 +565,7 @@ const styles = {
   heading: { marginBottom: 16, fontSize: 18, fontWeight: 700 },
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   label: { fontSize: 13, fontWeight: 600, color: '#555', display: 'block', marginBottom: 4 },
+  charCount: { fontSize: 11, color: '#9ca3af' },
   input: { padding: '9px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, width: '100%' },
   locationDenied: { background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 },
   locationDeniedTitle: { fontSize: 14, fontWeight: 700, color: '#854d0e' },

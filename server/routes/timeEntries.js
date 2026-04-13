@@ -171,7 +171,7 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
       [req.params.id, req.user.company_id, req.user.id, body.trim()]
     );
     const msg = { ...result.rows[0], sender_name: req.user.full_name };
-    const entryOwner = await pool.query('SELECT user_id FROM time_entries WHERE id = $1', [req.params.id]);
+    const entryOwner = await pool.query('SELECT user_id FROM time_entries WHERE id = $1 AND company_id = $2', [req.params.id, req.user.company_id]);
     const ownerId = entryOwner.rows[0]?.user_id;
     const isWorker = req.user.role === 'worker';
     const snippet = body.trim().substring(0, 100);

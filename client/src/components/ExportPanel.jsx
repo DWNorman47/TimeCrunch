@@ -50,30 +50,30 @@ export default function ExportPanel({ workers, projects }) {
 
       <div style={styles.filters} className="export-filters">
         <div style={styles.filterGroup}>
-          <label style={styles.label}>{t.from}</label>
-          <input style={styles.input} type="date" value={from} onChange={e => setFrom(e.target.value)} />
+          <label htmlFor="exp-from" style={styles.label}>{t.from}</label>
+          <input id="exp-from" style={styles.input} type="date" value={from} onChange={e => setFrom(e.target.value)} />
         </div>
         <div style={styles.filterGroup}>
-          <label style={styles.label}>{t.to}</label>
-          <input style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
+          <label htmlFor="exp-to" style={styles.label}>{t.to}</label>
+          <input id="exp-to" style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
         </div>
         <div style={styles.filterGroup}>
-          <label style={styles.label}>{t.worker}</label>
-          <select style={styles.input} value={workerId} onChange={e => setWorkerId(e.target.value)}>
+          <label htmlFor="exp-worker" style={styles.label}>{t.worker}</label>
+          <select id="exp-worker" style={styles.input} value={workerId} onChange={e => setWorkerId(e.target.value)}>
             <option value="">{t.allWorkers}</option>
             {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
           </select>
         </div>
         <div style={styles.filterGroup}>
-          <label style={styles.label}>{t.project}</label>
-          <select style={styles.input} value={projectId} onChange={e => setProjectId(e.target.value)}>
+          <label htmlFor="exp-project" style={styles.label}>{t.project}</label>
+          <select id="exp-project" style={styles.input} value={projectId} onChange={e => setProjectId(e.target.value)}>
             <option value="">{t.allProjectsOpt}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
         <div style={styles.filterGroup}>
-          <label style={styles.label}>{t.status}</label>
-          <select style={styles.input} value={status} onChange={e => setStatus(e.target.value)}>
+          <label htmlFor="exp-status" style={styles.label}>{t.status}</label>
+          <select id="exp-status" style={styles.input} value={status} onChange={e => setStatus(e.target.value)}>
             <option value="">{t.allStatuses}</option>
             <option value="approved">{t.approved}</option>
             <option value="pending">{t.pending}</option>
@@ -85,7 +85,7 @@ export default function ExportPanel({ workers, projects }) {
       {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.actions}>
-        <button style={styles.downloadBtn} onClick={download} disabled={loading || !from || !to}>
+        <button style={{ ...styles.downloadBtn, ...((loading || !from || !to) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={download} disabled={loading || !from || !to}>
           {loading ? t.preparing : t.downloadCSV}
         </button>
         <span style={styles.hint}>{t.exportColumns}</span>

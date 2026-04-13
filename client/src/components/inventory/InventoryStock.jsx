@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
+import { useAuth } from '../../contexts/AuthContext';
+import { langToLocale } from '../../utils';
+import { SkeletonList } from '../Skeleton';
 
 function formatBin(area_name, rack_name, bay_name, compartment_name) {
   return [area_name, rack_name, bay_name, compartment_name]
     .filter(Boolean).join(' › ') || null;
 }
 
-function formatDate(iso) {
+function formatDate(iso, locale = 'en-US') {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleString(locale, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 const TYPE_COLOR  = { receive: '#059669', issue: '#dc2626', transfer: '#2563eb', adjust: '#d97706', count: '#7c3aed', convert: '#0891b2' };
@@ -18,6 +21,8 @@ const TYPE_COLOR  = { receive: '#059669', issue: '#dc2626', transfer: '#2563eb',
 
 function HistoryPanel({ item, onClose }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const TYPE_LABELS = {
     receive: t.invTxTypeReceive, issue: t.invTxTypeIssue, transfer: t.invTxTypeTransfer,
     adjust: t.invTxTypeAdjust, count: t.invCycCycleCount, convert: t.invTxTypeConvert,
@@ -26,13 +31,21 @@ function HistoryPanel({ item, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
 
-  useEffect(() => {
-    setLoading(true);
+  const load = () => {
+    setLoading(true); setError('');
     api.get(`/inventory/transactions?item_id=${item.item_id}&limit=30`)
       .then(r => setRows(r.data.transactions || r.data))
       .catch(() => setError(t.invStockFailedHistory))
       .finally(() => setLoading(false));
-  }, [item.item_id]);
+  };
+
+  useEffect(() => { load(); }, [item.item_id]);
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <div style={h.overlay} onClick={onClose}>
@@ -42,11 +55,11 @@ function HistoryPanel({ item, onClose }) {
             <div style={h.title}>{item.item_name}</div>
             <div style={h.sub}>{t.invStockRecentMovements}</div>
           </div>
-          <button style={h.close} onClick={onClose}>✕</button>
+          <button style={h.close} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
-        {error && <div style={h.error}>{error}</div>}
+        {error && <div style={h.error}>{error} <button style={h.retryBtn} onClick={load}>{t.tryAgain || 'Try again'}</button></div>}
         {loading ? (
-          <div style={h.empty}>{t.loading}</div>
+          <SkeletonList count={3} rows={1} />
         ) : rows.length === 0 ? (
           <div style={h.empty}>{t.invStockNoHistory}</div>
         ) : (
@@ -71,7 +84,7 @@ function HistoryPanel({ item, onClose }) {
                   const location = r.to_location_name || r.from_location_name || '—';
                   return (
                     <tr key={r.id} style={i % 2 === 0 ? h.rowEven : h.row}>
-                      <td style={{ ...h.td, fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatDate(r.created_at)}</td>
+                      <td style={{ ...h.td, fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatDate(r.created_at, locale)}</td>
                       <td style={h.td}>
                         <span style={{ ...h.badge, color: TYPE_COLOR[r.type] || '#374151', background: '#f3f4f6' }}>
                           {TYPE_LABELS[r.type] || r.type}
@@ -102,7 +115,8 @@ const h = {
   title:     { fontSize: 16, fontWeight: 700, color: '#111827' },
   sub:       { fontSize: 12, color: '#6b7280', marginTop: 2 },
   close:     { background: 'none', border: 'none', fontSize: 18, color: '#6b7280', cursor: 'pointer', padding: '2px 6px' },
-  error:     { background: '#fee2e2', color: '#dc2626', padding: '10px 20px', fontSize: 14 },
+  error:     { background: '#fee2e2', color: '#dc2626', padding: '10px 20px', fontSize: 14, display: 'flex', alignItems: 'center', gap: 10 },
+  retryBtn:  { background: 'none', border: '1px solid #dc2626', color: '#dc2626', borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
   empty:     { padding: '40px 20px', textAlign: 'center', color: '#6b7280', fontSize: 14 },
   tableWrap: { overflowY: 'auto', flex: 1 },
   table:     { width: '100%', borderCollapse: 'collapse' },
@@ -124,6 +138,12 @@ function AdjustModal({ item, locations, onClose, onDone }) {
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
   const [warning, setWarning] = useState('');
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   const submit = async () => {
     const n = parseFloat(qty);
@@ -155,7 +175,7 @@ function AdjustModal({ item, locations, onClose, onDone }) {
       <div style={a.modal} onClick={e => e.stopPropagation()}>
         <div style={a.header}>
           <div style={a.title}>{t.invStockCurrentStock} — {item.item_name}</div>
-          <button style={a.close} onClick={onClose}>✕</button>
+          <button style={a.close} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
         <div style={a.body}>
           <div style={a.currentRow}>
@@ -164,25 +184,30 @@ function AdjustModal({ item, locations, onClose, onDone }) {
           </div>
           {error && <div style={a.error}>{error}</div>}
           {warning && <div style={{ ...a.error, background: '#fef3c7', color: '#92400e' }}>{warning}</div>}
-          <label style={a.label}>{t.invStockAdjQtyLabel}</label>
+          <label htmlFor="is-adj-qty" style={a.label}>{t.invStockAdjQtyLabel}</label>
           <input
+            id="is-adj-qty"
             type="number"
             step="any"
-            placeholder="e.g. -5 or +10"
+            placeholder={t.invAdjustPlaceholder}
             value={qty}
             onChange={e => setQty(e.target.value)}
             style={a.input}
             autoFocus
           />
-          <label style={a.label}>{t.invStockAdjLocLabel}</label>
-          <select value={locId} onChange={e => setLocId(e.target.value)} style={a.input}>
+          <label htmlFor="is-adj-loc" style={a.label}>{t.invStockAdjLocLabel}</label>
+          <select id="is-adj-loc" value={locId} onChange={e => setLocId(e.target.value)} style={a.input}>
             <option value="">{t.invStockSelectLocOption}</option>
             {locations.filter(l => l.active).map(l => (
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
           </select>
-          <label style={a.label}>{t.invStockAdjNotesLabel}</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <label htmlFor="is-adj-notes" style={a.label}>{t.invStockAdjNotesLabel}</label>
+            <span style={{ fontSize: 11, color: '#9ca3af' }}>{notes.length}/1000</span>
+          </div>
           <input
+            id="is-adj-notes"
             type="text"
             placeholder={t.invStockAdjReasonPlaceholder}
             value={notes}
@@ -191,8 +216,8 @@ function AdjustModal({ item, locations, onClose, onDone }) {
             maxLength={1000}
           />
           <div style={a.actions}>
-            <button style={a.cancel} onClick={warning ? onDone : onClose} disabled={saving}>{warning ? t.back : t.cancel}</button>
-            {!warning && <button style={a.save} onClick={submit} disabled={saving}>{saving ? t.saving : t.invStockSaveAdj}</button>}
+            <button style={{ ...a.cancel, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={warning ? onDone : onClose} disabled={saving}>{warning ? t.back : t.cancel}</button>
+            {!warning && <button style={{ ...a.save, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submit} disabled={saving}>{saving ? t.saving : t.invStockSaveAdj}</button>}
           </div>
         </div>
       </div>
@@ -240,6 +265,12 @@ function IssueModal({ item, projects, onClose, onDone }) {
       .then(r => setItemUoms(r.data.filter(u => u.active)))
       .catch(() => {});
   }, [item.item_id]);
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   const selectedUom = itemUoms.find(u => String(u.id) === uomId);
   const stockUom    = item.uom_id ? itemUoms.find(u => u.id === item.uom_id) : null;
@@ -290,7 +321,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
       <div style={a.modal} onClick={e => e.stopPropagation()}>
         <div style={a.header}>
           <div style={a.title}>{t.invTxTypeIssue} — {item.item_name}</div>
-          <button style={a.close} onClick={onClose}>✕</button>
+          <button style={a.close} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
         <div style={a.body}>
           <div style={a.currentRow}>
@@ -299,8 +330,9 @@ function IssueModal({ item, projects, onClose, onDone }) {
           </div>
           {error && <div style={a.error}>{error}</div>}
           {warning && <div style={{ ...a.error, background: '#fef3c7', color: '#92400e' }}>{warning}</div>}
-          <label style={a.label}>{t.invStockQtyToIssue}</label>
+          <label htmlFor="is-issue-qty" style={a.label}>{t.invStockQtyToIssue}</label>
           <input
+            id="is-issue-qty"
             type="number"
             step="any"
             min="0.001"
@@ -312,8 +344,8 @@ function IssueModal({ item, projects, onClose, onDone }) {
           />
           {itemUoms.length > 1 && (
             <>
-              <label style={a.label}>{t.invStockUnitLabel}</label>
-              <select value={uomId} onChange={e => setUomId(e.target.value)} style={a.input}>
+              <label htmlFor="is-issue-unit" style={a.label}>{t.invStockUnitLabel}</label>
+              <select id="is-issue-unit" value={uomId} onChange={e => setUomId(e.target.value)} style={a.input}>
                 <option value="">{t.invStockDefaultUnit} ({item.unit})</option>
                 {itemUoms.map(u => (
                   <option key={u.id} value={u.id}>
@@ -328,15 +360,16 @@ function IssueModal({ item, projects, onClose, onDone }) {
           )}
           {projects && projects.length > 0 && (
             <>
-              <label style={a.label}>{t.invStockProjectLabel}</label>
-              <select value={projectId} onChange={e => setProjectId(e.target.value)} style={a.input}>
+              <label htmlFor="is-issue-project" style={a.label}>{t.invStockProjectLabel}</label>
+              <select id="is-issue-project" value={projectId} onChange={e => setProjectId(e.target.value)} style={a.input}>
                 <option value="">{t.invStockNoProject}</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </>
           )}
-          <label style={a.label}>{t.invStockAdjNotesLabel}</label>
+          <label htmlFor="is-issue-notes" style={a.label}>{t.invStockAdjNotesLabel}</label>
           <input
+            id="is-issue-notes"
             type="text"
             placeholder={t.invStockIssuePlaceholder}
             value={notes}
@@ -345,8 +378,8 @@ function IssueModal({ item, projects, onClose, onDone }) {
             maxLength={1000}
           />
           <div style={a.actions}>
-            <button style={a.cancel} onClick={warning ? onDone : onClose} disabled={saving}>{warning ? t.back : t.cancel}</button>
-            {!warning && <button style={{ ...a.save, background: '#d97706' }} onClick={submit} disabled={saving}>
+            <button style={{ ...a.cancel, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={warning ? onDone : onClose} disabled={saving}>{warning ? t.back : t.cancel}</button>
+            {!warning && <button style={{ ...a.save, background: '#d97706', ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submit} disabled={saving}>
               {saving ? t.invStockIssuing : t.invStockIssueMaterials}
             </button>}
           </div>
@@ -490,7 +523,7 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
       {error && <div style={s.error}>{error}</div>}
 
       {loading ? (
-        <div style={s.empty}>{t.loading}</div>
+        <SkeletonList count={5} rows={2} />
       ) : stock.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>📦</div>
@@ -583,7 +616,7 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
         </div>
         {stock.length < stockTotal && (
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
-            <button style={s.refreshBtn} onClick={loadMore} disabled={loadingMore}>
+            <button style={{ ...s.refreshBtn, ...(loadingMore ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={loadMore} disabled={loadingMore}>
               {loadingMore ? t.loading : t.loadMore}
             </button>
             <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>

@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { SkeletonList } from './Skeleton';
+import { langToLocale } from '../utils';
 
 const TYPE_COLORS = { vacation: '#1d4ed8', sick: '#dc2626', personal: '#8b5cf6', other: '#6b7280' };
 const STATUS_COLORS = { pending: '#d97706', approved: '#059669', denied: '#ef4444' };
 
-function fmt(d) {
+function fmt(d, locale = 'en-US') {
   if (!d) return '';
-  return new Date(d.toString().substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(d.toString().substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function days(start, end) {
@@ -18,8 +22,12 @@ function days(start, end) {
 
 export default function AdminTimeOff({ settings }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
+  const toast = useToast();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState('pending');
   const [reviewNote, setReviewNote] = useState({});
   const [acting, setActing] = useState(null);
@@ -40,10 +48,11 @@ export default function AdminTimeOff({ settings }) {
 
   const load = (status) => {
     setLoading(true);
+    setLoadError(false);
     // Load all to compute balances accurately; filter client-side if needed
     api.get('/time-off', { params: {} })
       .then(r => setRequests(r.data))
-      .catch(() => {})
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   };
 
@@ -55,6 +64,7 @@ export default function AdminTimeOff({ settings }) {
       const r = await api.patch(`/time-off/${id}/${action}`, { review_note: reviewNote[id] || null });
       setRequests(prev => prev.map(x => x.id === id ? r.data : x));
       setReviewNote(prev => { const n = { ...prev }; delete n[id]; return n; });
+      toast(action === 'approve' ? t.requestApproved : t.requestDenied, 'success');
     } catch (err) {
       setActError(err.response?.data?.error || t.actionFailed);
     } finally { setActing(null); }
@@ -95,10 +105,19 @@ export default function AdminTimeOff({ settings }) {
         </div>
       </div>
 
-      {loading ? (
-        <p style={s.empty}>{t.loading}</p>
+      {loadError ? (
+        <div style={s.loadError}>
+          {t.failedLoadTimeOff}{' '}
+          <button style={s.retryBtn} onClick={() => load(filter)}>{t.retry}</button>
+        </div>
+      ) : loading ? (
+        <SkeletonList count={4} rows={2} />
       ) : visible.length === 0 ? (
-        <p style={s.empty}>{t.noTimeOffRequests}</p>
+        <div style={s.emptyState}>
+          <div style={s.emptyIcon}>📅</div>
+          <p style={s.emptyTitle}>{t.noTimeOffRequests}</p>
+          <p style={s.emptySubtitle}>{t.timeOffEmptySub}</p>
+        </div>
       ) : (
         <div style={s.list}>
           {[...pending, ...rest].map(r => {
@@ -126,7 +145,7 @@ export default function AdminTimeOff({ settings }) {
               </div>
 
               <div style={s.dates}>
-                {fmt(r.start_date)} – {fmt(r.end_date)}
+                {fmt(r.start_date, locale)} – {fmt(r.end_date, locale)}
                 <span style={s.dayCount}>
                   {d} {d !== 1 ? t.daysLabel : t.dayLabel}
                 </span>
@@ -136,26 +155,29 @@ export default function AdminTimeOff({ settings }) {
 
               {r.status === 'pending' && (
                 <div style={s.actionRow}>
-                  <input
-                    style={s.noteInput}
-                    placeholder={t.reviewNotePlaceholder}
-                    maxLength={500}
-                    value={reviewNote[r.id] || ''}
-                    onChange={e => setReviewNote(prev => ({ ...prev, [r.id]: e.target.value }))}
-                  />
+                  <div style={{ flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column' }}>
+                    <input
+                      style={{ ...s.noteInput, flex: 'unset' }}
+                      placeholder={t.reviewNotePlaceholder}
+                      maxLength={500}
+                      value={reviewNote[r.id] || ''}
+                      onChange={e => setReviewNote(prev => ({ ...prev, [r.id]: e.target.value }))}
+                    />
+                    <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(reviewNote[r.id] || '').length}/500</div>
+                  </div>
                   <button
-                    style={s.approveBtn}
+                    style={{ ...s.approveBtn, ...(acting === r.id + 'approve' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                     disabled={acting === r.id + 'approve'}
                     onClick={() => { setActError(''); act(r.id, 'approve'); }}
                   >
-                    {acting === r.id + 'approve' ? '…' : `✓ ${t.filterApproved}`}
+                    {acting === r.id + 'approve' ? t.saving : `✓ ${t.filterApproved}`}
                   </button>
                   <button
-                    style={s.denyBtn}
+                    style={{ ...s.denyBtn, ...(acting === r.id + 'deny' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                     disabled={acting === r.id + 'deny'}
                     onClick={() => { setActError(''); act(r.id, 'deny'); }}
                   >
-                    {acting === r.id + 'deny' ? '…' : t.denyAction}
+                    {acting === r.id + 'deny' ? t.saving : t.denyAction}
                   </button>
                   {actError && <span style={s.actError}>{actError}</span>}
                 </div>
@@ -166,7 +188,7 @@ export default function AdminTimeOff({ settings }) {
               )}
 
               <div style={s.meta}>
-                {t.submittedOn} {fmt(r.created_at)}
+                {t.submittedOn} {fmt(r.created_at, locale)}
                 {r.reviewer_name && ` · ${STATUS_LABELS[r.status] || r.status} by ${r.reviewer_name}`}
               </div>
             </div>
@@ -200,5 +222,10 @@ const s = {
   denyBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' },
   actError: { fontSize: 12, color: '#ef4444' },
   meta: { fontSize: 12, color: '#9ca3af', marginTop: 8 },
-  empty: { color: '#9ca3af', fontSize: 14, textAlign: 'center', padding: '40px 0' },
+  loadError: { background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: 8, padding: '12px 16px', fontSize: 14 },
+  retryBtn: { background: 'none', border: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: 0 },
+  emptyState: { textAlign: 'center', padding: '48px 20px' },
+  emptyIcon: { fontSize: 36, marginBottom: 10 },
+  emptyTitle: { fontSize: 15, fontWeight: 600, color: '#374151', margin: '0 0 4px' },
+  emptySubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
 };

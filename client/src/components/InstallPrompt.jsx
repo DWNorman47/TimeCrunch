@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useT } from '../hooks/useT';
 
 function getPlatform() {
   if (typeof window === 'undefined') return null;
@@ -48,6 +49,7 @@ function Step({ n, children }) {
 }
 
 export default function InstallPrompt() {
+  const t = useT();
   const [platform, setPlatform] = useState(null);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [installing, setInstalling] = useState(false);
@@ -86,24 +88,24 @@ export default function InstallPrompt() {
 
   return (
     <div style={styles.banner}>
-      <button style={styles.closeBtn} onClick={dismiss} aria-label="Dismiss">✕</button>
+      <button style={styles.closeBtn} onClick={dismiss} aria-label={t.dismiss}>✕</button>
       <div style={styles.icon}>📲</div>
 
       {platform === 'ios' && (
         <>
-          <div style={styles.heading}>Install OpsFloa</div>
+          <div style={styles.heading}>{t.installOpsFloa}</div>
           <div style={styles.steps}>
             <Step n={1}>Tap the <strong>Share</strong> button <ShareIcon /> at the bottom of Safari</Step>
             <Step n={2}>Scroll down and tap <strong>"Add to Home Screen"</strong></Step>
             <Step n={3}>Tap <strong>"Add"</strong> in the top right — done!</Step>
           </div>
-          <div style={styles.note}>Opens full-screen like a native app. No browser bars.</div>
+          <div style={styles.note}>{t.installNativeAppNote}</div>
         </>
       )}
 
       {platform === 'ios-wrong-browser' && (
         <>
-          <div style={styles.heading}>Open in Safari to Install</div>
+          <div style={styles.heading}>{t.installOpenSafariHeading}</div>
           <div style={styles.body}>
             iPhone only supports installing apps from <strong>Safari</strong>. Copy this URL, open Safari, paste it, then tap Share <ShareIcon /> → <strong>Add to Home Screen</strong>.
           </div>
@@ -112,12 +114,12 @@ export default function InstallPrompt() {
 
       {platform === 'android' && (
         <>
-          <div style={styles.heading}>Install OpsFloa</div>
+          <div style={styles.heading}>{t.installOpsFloa}</div>
           {deferredPrompt ? (
             <>
-              <div style={styles.body}>Add OpsFloa to your home screen for quick clock-in access.</div>
-              <button style={styles.installBtn} onClick={androidInstall} disabled={installing}>
-                {installing ? 'Installing...' : 'Add to Home Screen'}
+              <div style={styles.body}>{t.installAndroidBody}</div>
+              <button style={{ ...styles.installBtn, ...(installing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={androidInstall} disabled={installing}>
+                {installing ? t.installInstalling : t.installAddToHomeScreen}
               </button>
             </>
           ) : (
@@ -127,7 +129,7 @@ export default function InstallPrompt() {
                 <Step n={2}>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong></Step>
                 <Step n={3}>Tap <strong>"Add"</strong> — done!</Step>
               </div>
-              <div style={styles.note}>Opens full-screen like a native app. No browser bars.</div>
+              <div style={styles.note}>{t.installNativeAppNote}</div>
             </>
           )}
         </>

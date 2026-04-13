@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
 
@@ -21,6 +21,12 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
 
   const uomLabel = uom.unit + (uom.unit_spec ? ` (${uom.unit_spec})` : '');
 
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onDismiss(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   const save = async () => {
     const n = parseFloat(factor);
     if (!factor || isNaN(n) || n <= 0) { setError(t.uomConvEnterPositive); return; }
@@ -39,7 +45,7 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
       <div style={m.modal} onClick={e => e.stopPropagation()}>
         <div style={m.header}>
           <div style={m.title}>{t.uomConvTitle}</div>
-          <button style={m.close} onClick={onDismiss}>✕</button>
+          <button style={m.close} aria-label={t.labelModalClose} onClick={onDismiss}>✕</button>
         </div>
         <div style={m.body}>
           <p style={m.desc}>
@@ -65,7 +71,7 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
           </div>
           <div style={m.actions}>
             <button style={m.skipBtn} onClick={onDismiss}>{t.uomConvSkip}</button>
-            <button style={m.saveBtn} onClick={save} disabled={saving}>
+            <button style={{ ...m.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={save} disabled={saving}>
               {saving ? t.saving : t.uomConvSave}
             </button>
           </div>

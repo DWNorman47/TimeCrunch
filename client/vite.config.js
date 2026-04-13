@@ -17,6 +17,18 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Stable vendor libs — cached long-term separately from app code
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-leaflet': ['leaflet', 'react-leaflet'],
+          'vendor-charts': ['recharts'],
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       '/api': 'http://localhost:3001',

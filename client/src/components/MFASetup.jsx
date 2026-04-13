@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
 
 export default function MFASetup() {
+  const t = useT();
   const { user, updateUser } = useAuth();
   const [step, setStep] = useState('idle'); // idle | setup | disable
   const [qr, setQr] = useState('');
@@ -22,7 +24,7 @@ export default function MFASetup() {
       setCode('');
       setStep('setup');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to start setup');
+      setError(err.response?.data?.error || t.mfaFailedSetup);
     } finally {
       setLoading(false);
     }
@@ -38,7 +40,7 @@ export default function MFASetup() {
       setStep('idle');
       setCode('');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to enable MFA');
+      setError(err.response?.data?.error || t.mfaFailedEnable);
       setCode('');
     } finally {
       setLoading(false);
@@ -55,7 +57,7 @@ export default function MFASetup() {
       setStep('idle');
       setPassword('');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to disable MFA');
+      setError(err.response?.data?.error || t.mfaFailedDisable);
       setPassword('');
     } finally {
       setLoading(false);
@@ -68,28 +70,26 @@ export default function MFASetup() {
     <div style={s.card}>
       <div style={s.row}>
         <div>
-          <div style={s.label}>Two-Factor Authentication</div>
+          <div style={s.label}>{t.mfaTitle}</div>
           <div style={s.sub}>
-            {user?.mfa_enabled
-              ? '🔒 Enabled — your account requires a code from your authenticator app at login'
-              : 'Add a second layer of security using an authenticator app (Google Authenticator, Authy, etc.)'}
+            {user?.mfa_enabled ? t.mfaEnabledDesc : t.mfaDisabledDesc}
           </div>
         </div>
         {step === 'idle' && (
           user?.mfa_enabled
-            ? <button style={s.disableBtn} onClick={() => { setStep('disable'); setError(''); }}>Disable</button>
-            : <button style={s.enableBtn} onClick={startSetup} disabled={loading}>
-                {loading ? 'Loading...' : 'Enable'}
+            ? <button style={s.disableBtn} onClick={() => { setStep('disable'); setError(''); }}>{t.mfaDisableBtn}</button>
+            : <button style={{ ...s.enableBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={startSetup} disabled={loading}>
+                {loading ? t.loading : t.mfaEnableBtn}
               </button>
         )}
       </div>
 
       {step === 'setup' && (
         <div style={s.setupBox}>
-          <p style={s.hint}>Scan this QR code with your authenticator app, then enter the 6-digit code to confirm.</p>
+          <p style={s.hint}>{t.mfaScanHint}</p>
           <img src={qr} alt="MFA QR code" style={s.qr} />
           <div style={s.manualCode}>
-            <span style={s.manualLabel}>Can't scan? Enter this code manually:</span>
+            <span style={s.manualLabel}>{t.mfaManualCode}</span>
             <code style={s.secretCode}>{secret}</code>
           </div>
           <form onSubmit={handleEnable} style={s.form}>
@@ -98,7 +98,7 @@ export default function MFASetup() {
               type="text"
               inputMode="numeric"
               maxLength={6}
-              placeholder="6-digit code"
+              placeholder={t.mfaCodePlaceholder}
               value={code}
               onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
               autoFocus
@@ -106,9 +106,9 @@ export default function MFASetup() {
             />
             {error && <p style={s.error}>{error}</p>}
             <div style={s.btnRow}>
-              <button type="button" style={s.cancelBtn} onClick={cancel}>Cancel</button>
-              <button style={s.confirmBtn} type="submit" disabled={loading || code.length !== 6}>
-                {loading ? 'Verifying...' : 'Confirm & Enable'}
+              <button type="button" style={s.cancelBtn} onClick={cancel}>{t.cancel}</button>
+              <button style={{ ...s.confirmBtn, ...(loading || code.length !== 6 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={loading || code.length !== 6}>
+                {loading ? t.mfaVerifying : t.mfaConfirmEnable}
               </button>
             </div>
           </form>
@@ -117,12 +117,12 @@ export default function MFASetup() {
 
       {step === 'disable' && (
         <div style={s.setupBox}>
-          <p style={s.hint}>Enter your password to disable two-factor authentication.</p>
+          <p style={s.hint}>{t.mfaDisableHint}</p>
           <form onSubmit={handleDisable} style={s.form}>
             <input
               style={s.codeInput}
               type="password"
-              placeholder="Your password"
+              placeholder={t.mfaPasswordPlaceholder}
               value={password}
               onChange={e => setPassword(e.target.value)}
               autoFocus
@@ -130,9 +130,9 @@ export default function MFASetup() {
             />
             {error && <p style={s.error}>{error}</p>}
             <div style={s.btnRow}>
-              <button type="button" style={s.cancelBtn} onClick={cancel}>Cancel</button>
-              <button style={{ ...s.confirmBtn, background: '#dc2626' }} type="submit" disabled={loading || !password}>
-                {loading ? 'Disabling...' : 'Disable MFA'}
+              <button type="button" style={s.cancelBtn} onClick={cancel}>{t.cancel}</button>
+              <button style={{ ...s.confirmBtn, background: '#dc2626', ...(loading || !password ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={loading || !password}>
+                {loading ? t.mfaDisabling : t.mfaDisableMFA}
               </button>
             </div>
           </form>

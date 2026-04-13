@@ -1,8 +1,11 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink } from '@react-pdf/renderer';
+import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
-function fmtDate(str) {
-  return new Date(str + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDate(str, locale = 'en-US') {
+  return new Date(str + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 const pdf = StyleSheet.create({
@@ -35,9 +38,10 @@ const pdf = StyleSheet.create({
   footerText: { fontSize: 7, color: '#9ca3af' },
 });
 
-export function SafetyTalkDocument({ talks, companyName }) {
+export function SafetyTalkDocument({ talks, companyName, t, language }) {
+  const locale = langToLocale(language);
   const totalSignoffs = talks.reduce((s, t) => s + parseInt(t.signoff_count || 0), 0);
-  const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const dateStr = new Date().toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
     <Document>
@@ -45,27 +49,27 @@ export function SafetyTalkDocument({ talks, companyName }) {
         {/* Header */}
         <View style={pdf.headerRow} fixed>
           <View>
-            <Text style={pdf.companyName}>{companyName || 'Safety Talks'}</Text>
-            <Text style={pdf.reportTitle}>Safety / Toolbox Talk Log</Text>
+            <Text style={pdf.companyName}>{companyName || t.pdfSafetyTalkLog}</Text>
+            <Text style={pdf.reportTitle}>{t.pdfSafetyTalkLog}</Text>
           </View>
           <View>
-            <Text style={pdf.headerMeta}>Generated: {dateStr}</Text>
-            <Text style={pdf.headerMeta}>{talks.length} talk{talks.length !== 1 ? 's' : ''}</Text>
+            <Text style={pdf.headerMeta}>{t.pdfGenerated}{dateStr}</Text>
+            <Text style={pdf.headerMeta}>{talks.length !== 1 ? t.pdfTalkCountPlural.replace('{n}', talks.length) : t.pdfTalkCount.replace('{n}', talks.length)}</Text>
           </View>
         </View>
 
         {/* Summary */}
         <View style={pdf.summaryBar}>
           <View style={pdf.summaryCard}>
-            <Text style={pdf.summaryLabel}>Talks</Text>
+            <Text style={pdf.summaryLabel}>{t.pdfTalks}</Text>
             <Text style={pdf.summaryValue}>{talks.length}</Text>
           </View>
           <View style={pdf.summaryCard}>
-            <Text style={pdf.summaryLabel}>Total Sign-offs</Text>
+            <Text style={pdf.summaryLabel}>{t.pdfTotalSignoffs}</Text>
             <Text style={pdf.summaryValue}>{totalSignoffs}</Text>
           </View>
           <View style={pdf.summaryCard}>
-            <Text style={pdf.summaryLabel}>Avg Sign-offs</Text>
+            <Text style={pdf.summaryLabel}>{t.pdfAvgSignoffs}</Text>
             <Text style={pdf.summaryValue}>{talks.length > 0 ? (totalSignoffs / talks.length).toFixed(1) : '0'}</Text>
           </View>
         </View>
@@ -73,8 +77,8 @@ export function SafetyTalkDocument({ talks, companyName }) {
         {/* Talks */}
         {talks.map((talk, i) => {
           const metaParts = [
-            fmtDate(talk.talk_date),
-            talk.given_by ? `by ${talk.given_by}` : null,
+            fmtDate(talk.talk_date, locale),
+            talk.given_by ? `${t.pdfBy} ${talk.given_by}` : null,
             talk.project_name,
           ].filter(Boolean).join(' · ');
 
@@ -86,20 +90,20 @@ export function SafetyTalkDocument({ talks, companyName }) {
                   <Text style={pdf.talkMeta}>{metaParts}</Text>
                 </View>
                 <View style={pdf.signoffBadge}>
-                  <Text>{talk.signoff_count} signed</Text>
+                  <Text>{talk.signoff_count} {t.pdfSigned}</Text>
                 </View>
               </View>
 
               {talk.content && (
                 <>
-                  <Text style={pdf.sectionLabel}>Content / Notes</Text>
+                  <Text style={pdf.sectionLabel}>{t.pdfContentNotes}</Text>
                   <Text style={pdf.contentText}>{talk.content}</Text>
                 </>
               )}
 
               {talk.signoffs && talk.signoffs.length > 0 && (
                 <>
-                  <Text style={pdf.sectionLabel}>Sign-offs</Text>
+                  <Text style={pdf.sectionLabel}>{t.pdfSignoffsLabel}</Text>
                   <View style={pdf.signoffRow}>
                     {talk.signoffs.map((s, j) => (
                       <View key={j} style={pdf.signoffChip}>
@@ -115,7 +119,7 @@ export function SafetyTalkDocument({ talks, companyName }) {
 
         {/* Footer */}
         <View style={pdf.footer} fixed>
-          <Text style={pdf.footerText}>{companyName} — Safety Talk Log — {dateStr}</Text>
+          <Text style={pdf.footerText}>{companyName} — {t.pdfSafetyTalkLogShort} — {dateStr}</Text>
           <Text style={pdf.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>
@@ -124,14 +128,16 @@ export function SafetyTalkDocument({ talks, companyName }) {
 }
 
 export function SafetyTalkPDFButton({ talks, companyName, style }) {
+  const t = useT();
+  const { user } = useAuth();
   const fileName = `safety-talks-${new Date().toLocaleDateString('en-CA')}.pdf`;
   return (
     <PDFDownloadLink
-      document={<SafetyTalkDocument talks={talks} companyName={companyName} />}
+      document={<SafetyTalkDocument talks={talks} companyName={companyName} t={t} language={user?.language} />}
       fileName={fileName}
       style={style}
     >
-      {({ loading }) => loading ? 'Preparing PDF...' : '⬇ Export PDF'}
+      {({ loading }) => loading ? t.pdfPreparingBtn : t.pdfExportBtn}
     </PDFDownloadLink>
   );
 }

@@ -12,18 +12,27 @@ const FULL_SELECT = `
 router.get('/', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   const { project_id, status, from, to } = req.query;
+  const page  = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
   const conditions = ['r.company_id = $1'];
   const params = [companyId];
   if (project_id) { params.push(project_id); conditions.push(`r.project_id = $${params.length}`); }
   if (status) { params.push(status); conditions.push(`r.status = $${params.length}`); }
   if (from) { params.push(from); conditions.push(`r.date_submitted >= $${params.length}`); }
   if (to) { params.push(to); conditions.push(`r.date_submitted <= $${params.length}`); }
+  const where = conditions.join(' AND ');
   try {
-    const result = await pool.query(
-      `${FULL_SELECT} WHERE ${conditions.join(' AND ')} ORDER BY r.rfi_number DESC LIMIT 500`,
-      params
-    );
-    res.json(result.rows);
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(`SELECT COUNT(*) FROM rfis r WHERE ${where}`, params),
+      pool.query(
+        `${FULL_SELECT} WHERE ${where} ORDER BY r.rfi_number DESC
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+    ]);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -43,18 +52,14 @@ router.post('/', requireAdmin, async (req, res) => {
   if (description && description.length > 2000) return res.status(400).json({ error: 'description too long (max 2000 characters)' });
   const companyId = req.user.company_id;
   try {
-    // Auto-number: next sequential RFI number for this company
-    const numResult = await pool.query(
-      'SELECT COALESCE(MAX(rfi_number), 0) + 1 AS next_num FROM rfis WHERE company_id = $1',
-      [companyId]
-    );
-    const rfiNumber = numResult.rows[0].next_num;
-
+    // Auto-number atomically: subquery inside INSERT so concurrent requests can't
+    // both read the same MAX and produce duplicate rfi_number values.
     const result = await pool.query(
       `INSERT INTO rfis (company_id, project_id, rfi_number, subject, description, directed_to,
          submitted_by, date_submitted, date_due, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [companyId, project_id || null, rfiNumber, subject, description,
+       VALUES ($1,$2,(SELECT COALESCE(MAX(rfi_number),0)+1 FROM rfis WHERE company_id=$1),$3,$4,$5,$6,$7,$8,$9)
+       RETURNING *`,
+      [companyId, project_id || null, subject, description,
        directed_to, submitted_by, date_submitted,
        date_due || null, req.user.id]
     );
@@ -79,10 +84,15 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   if (submitted_by !== undefined && submitted_by && submitted_by.length > 255) return res.status(400).json({ error: 'submitted_by too long (max 255 characters)' });
   if (description !== undefined && description && description.length > 2000) return res.status(400).json({ error: 'description too long (max 2000 characters)' });
   if (response !== undefined && response && response.length > 2000) return res.status(400).json({ error: 'response too long (max 2000 characters)' });
+  const { updated_at: clientUpdatedAt } = req.body;
   try {
     const existing = await pool.query('SELECT * FROM rfis WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
     if (existing.rowCount === 0) return res.status(404).json({ error: 'RFI not found' });
     const r = existing.rows[0];
+
+    if (clientUpdatedAt && new Date(r.updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+      return res.status(409).json({ error: 'conflict' });
+    }
 
     // Auto-set status to 'answered' when response is added
     let newStatus = status ?? r.status;

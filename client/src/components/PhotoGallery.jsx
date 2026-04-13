@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
+import { langToLocale } from '../utils';
+import Pagination from './Pagination';
+import { SkeletonList } from './Skeleton';
 
-function fmtDate(str) {
-  return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDate(str, locale = 'en-US') {
+  return new Date(str).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function isVideo(item) {
@@ -13,7 +17,7 @@ function isVideo(item) {
 function MediaTile({ item, onClick }) {
   const video = isVideo(item);
   return (
-    <div style={styles.tile} onClick={onClick}>
+    <div style={styles.tile} onClick={onClick} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onClick()}>
       {video ? (
         <div style={styles.videoThumb}>
           <video src={item.url} style={styles.tileImg} preload="metadata" muted playsInline />
@@ -30,8 +34,20 @@ function MediaTile({ item, onClick }) {
 
 function Lightbox({ items, index, onClose }) {
   const [idx, setIdx] = useState(index);
+  const t = useT();
   const item = items[idx];
   const video = isVideo(item);
+
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowLeft') setIdx(i => Math.max(0, i - 1));
+      else if (e.key === 'ArrowRight') setIdx(i => Math.min(items.length - 1, i + 1));
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div style={styles.backdrop} onClick={onClose}>
       <div style={styles.lbContent} onClick={e => e.stopPropagation()}>
@@ -53,7 +69,7 @@ function Lightbox({ items, index, onClose }) {
         <div style={styles.metaLine}>
           {item.worker_name && <span>{item.worker_name} · </span>}
           {item.project_name && <span>{item.project_name} · </span>}
-          <span>{fmtDate(item.reported_at)}</span>
+          <span>{fmtDate(item.reported_at, locale)}</span>
           {item.lat && (
             <a href={`https://www.google.com/maps?q=${item.lat},${item.lng}`}
                target="_blank" rel="noopener noreferrer" style={styles.mapLink}>
@@ -63,36 +79,41 @@ function Lightbox({ items, index, onClose }) {
         </div>
       </div>
       <div style={styles.navRow} onClick={e => e.stopPropagation()}>
-        <button style={styles.navBtn} onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0}>‹</button>
+        <button style={{ ...styles.navBtn, ...(idx === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.prevPhoto} onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0}>‹</button>
         <span style={styles.navCount}>{idx + 1} / {items.length}</span>
-        <button style={styles.navBtn} onClick={() => setIdx(i => Math.min(items.length - 1, i + 1))} disabled={idx === items.length - 1}>›</button>
+        <button style={{ ...styles.navBtn, ...(idx === items.length - 1 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.nextPhoto} onClick={() => setIdx(i => Math.min(items.length - 1, i + 1))} disabled={idx === items.length - 1}>›</button>
       </div>
-      <button style={styles.closeBtn} onClick={onClose}>✕</button>
+      <button style={styles.closeBtn} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
     </div>
   );
 }
 
 export default function PhotoGallery({ projects }) {
   const { user } = useAuth();
+  const t = useT();
+  const locale = langToLocale(user?.language);
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const [media, setMedia] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({});
   const [lightbox, setLightbox] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
 
-  const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
+  const setFilter = (k, v) => { setPage(1); setFilters(f => ({ ...f, [k]: v })); };
 
-  const loadMedia = async (f = filters) => {
+  const loadMedia = async (f = filters, p = page) => {
     try {
-      const params = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
+      const params = { ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), page: p, limit: 100 };
       const r = await api.get('/field-reports/photos', { params });
-      setMedia(r.data);
+      setMedia(r.data.items);
+      setPages(r.data.pages || 1);
     } catch {}
   };
 
-  useEffect(() => { loadMedia().finally(() => setLoading(false)); }, []);
-  useEffect(() => { if (!loading) loadMedia(filters); }, [filters]);
+  useEffect(() => { loadMedia(filters, page).finally(() => setLoading(false)); }, []);
+  useEffect(() => { if (!loading) loadMedia(filters, page); }, [filters, page]);
 
   const grouped = media.reduce((acc, item) => {
     const day = item.reported_at?.substring(0, 10) ?? 'Unknown';
@@ -108,7 +129,7 @@ export default function PhotoGallery({ projects }) {
   return (
     <div>
       <div style={styles.topRow}>
-        <h1 style={styles.heading}>Media Gallery</h1>
+        <h1 style={styles.heading}>{t.mediaGallery}</h1>
         <span style={styles.count}>
           {photoCount > 0 && `${photoCount} photo${photoCount !== 1 ? 's' : ''}`}
           {photoCount > 0 && videoCount > 0 && ' · '}
@@ -117,10 +138,10 @@ export default function PhotoGallery({ projects }) {
         </span>
       </div>
 
-      <div style={styles.filterBar}>
+      <div className="filter-row" style={styles.filterBar}>
         {projects.length > 0 && (
           <select style={styles.filterSelect} value={filters.project_id || ''} onChange={e => setFilter('project_id', e.target.value)}>
-            <option value="">All projects</option>
+            <option value="">{t.allProjectsOpt}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
@@ -133,27 +154,30 @@ export default function PhotoGallery({ projects }) {
       )}
 
       {loading ? (
-        <p style={styles.hint}>Loading…</p>
+        <SkeletonList count={4} rows={2} />
       ) : media.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>🖼️</div>
           <p style={styles.emptyText}>No media yet. Photos and videos from field notes appear here.</p>
         </div>
       ) : (
-        days.map(day => (
-          <div key={day} style={styles.dayGroup}>
-            <div style={styles.dayHeader}>
-              <span style={styles.dayLabel}>{fmtDate(day + 'T12:00:00')}</span>
-              <span style={styles.dayCount}>{grouped[day].length} item{grouped[day].length !== 1 ? 's' : ''}</span>
+        <>
+          {days.map(day => (
+            <div key={day} style={styles.dayGroup}>
+              <div style={styles.dayHeader}>
+                <span style={styles.dayLabel}>{fmtDate(day + 'T12:00:00', locale)}</span>
+                <span style={styles.dayCount}>{grouped[day].length} item{grouped[day].length !== 1 ? 's' : ''}</span>
+              </div>
+              <div style={styles.grid}>
+                {grouped[day].map(item => {
+                  const idx = media.indexOf(item);
+                  return <MediaTile key={item.id} item={item} onClick={() => setLightbox(idx)} />;
+                })}
+              </div>
             </div>
-            <div style={styles.grid}>
-              {grouped[day].map(item => {
-                const idx = media.indexOf(item);
-                return <MediaTile key={item.id} item={item} onClick={() => setLightbox(idx)} />;
-              })}
-            </div>
-          </div>
-        ))
+          ))}
+          <Pagination page={page} pages={pages} onChange={setPage} />
+        </>
       )}
     </div>
   );
@@ -174,7 +198,7 @@ const styles = {
   dayHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   dayLabel: { fontSize: 14, fontWeight: 700, color: '#374151' },
   dayCount: { fontSize: 12, color: '#9ca3af' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 },
   tile: { position: 'relative', borderRadius: 10, overflow: 'hidden', cursor: 'pointer', aspectRatio: '1', background: '#111827' },
   videoThumb: { width: '100%', height: '100%', position: 'relative' },
   tileImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },

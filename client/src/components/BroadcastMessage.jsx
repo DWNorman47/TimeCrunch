@@ -29,7 +29,7 @@ export default function BroadcastMessage() {
         <input
           style={styles.input}
           type="text"
-          placeholder="e.g. Site closed tomorrow — no work"
+          placeholder={t.broadcastPlaceholder}
           value={message}
           maxLength={200}
           onChange={e => setMessage(e.target.value)}
@@ -37,7 +37,7 @@ export default function BroadcastMessage() {
           disabled={state === 'sending' || state === 'sent'}
         />
         <button
-          style={state === 'sent' ? styles.btnSent : styles.btn}
+          style={{ ...(state === 'sent' ? styles.btnSent : styles.btn), ...((!message.trim() || state === 'sending') ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
           onClick={handleSend}
           disabled={!message.trim() || state === 'sending' || state === 'sent'}
         >

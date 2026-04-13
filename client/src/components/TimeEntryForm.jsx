@@ -31,13 +31,15 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
 
   const { clearPersisted } = useFormPersist('time-entry', form, setForm);
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
 
   const selectedProject = projects.find(p => p.id === parseInt(form.project_id));
 
   const handleSubmit = async e => {
     e.preventDefault();
     setError('');
+    if (projectsEnabled && !form.project_id) { setError(t.selectProjectFirst); return; }
+    if (!form.start_time || !form.end_time) { setError(t.startEndRequired); return; }
     if (form.start_time >= form.end_time) {
       setError(t.endAfterStart);
       return;
@@ -86,8 +88,8 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
       {!collapsed && <form onSubmit={handleSubmit} style={styles.form}>
         <div style={styles.row} className="form-row">
           {projectsEnabled && <div style={styles.field}>
-            <label style={styles.label}>{t.project}</label>
-            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)} required>
+            <label htmlFor="tef-project" style={styles.label}>{t.project}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
+            <select id="tef-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)} required disabled={saving}>
               <option value="">{t.selectProject}</option>
               {projects.map(p => (
                 <option key={p.id} value={p.id}>
@@ -97,18 +99,18 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
             </select>
           </div>}
           <div style={styles.field}>
-            <label style={styles.label}>{t.date}</label>
-            <input style={styles.input} type="date" value={form.work_date} onChange={e => set('work_date', e.target.value)} required />
+            <label htmlFor="tef-date" style={styles.label}>{t.date}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
+            <input id="tef-date" style={styles.input} type="date" value={form.work_date} onChange={e => set('work_date', e.target.value)} required disabled={saving} />
           </div>
         </div>
         <div style={styles.row} className="form-row">
           <div style={styles.field}>
-            <label style={styles.label}>{t.startTime}</label>
-            <input style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required />
+            <label htmlFor="tef-start" style={styles.label}>{t.startTime}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
+            <input id="tef-start" style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required disabled={saving} />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.endTime}</label>
-            <input style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required />
+            <label htmlFor="tef-end" style={styles.label}>{t.endTime}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
+            <input id="tef-end" style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required disabled={saving} />
           </div>
         </div>
         {selectedProject && (
@@ -120,21 +122,24 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
         )}
         <div style={styles.row} className="form-row">
           <div style={styles.field}>
-            <label style={styles.label}>{t.entryPanelBreakMin}</label>
-            <input style={styles.input} type="number" min="0" max="480" step="1" value={form.break_minutes} onChange={e => set('break_minutes', e.target.value)} placeholder="0" />
+            <label htmlFor="tef-break" style={styles.label}>{t.entryPanelBreakMin}</label>
+            <input id="tef-break" style={styles.input} type="number" min="0" max="480" step="1" value={form.break_minutes} onChange={e => set('break_minutes', e.target.value)} placeholder="0" disabled={saving} />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.entryPanelMileage}</label>
-            <input style={styles.input} type="number" min="0" step="0.1" value={form.mileage} onChange={e => set('mileage', e.target.value)} placeholder="Optional" />
+            <label htmlFor="tef-mileage" style={styles.label}>{t.entryPanelMileage}</label>
+            <input id="tef-mileage" style={styles.input} type="number" min="0" step="0.1" value={form.mileage} onChange={e => set('mileage', e.target.value)} placeholder={t.optional} disabled={saving} />
           </div>
         </div>
         <div style={styles.field}>
-          <label style={styles.label}>{t.notesOptional}</label>
-          <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.notesPlaceholder} maxLength={500} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <label htmlFor="tef-notes" style={styles.label}>{t.notesOptional}</label>
+            <span style={styles.charCount}>{form.notes.length}/500</span>
+          </div>
+          <input id="tef-notes" style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.notesPlaceholder} maxLength={500} disabled={saving} />
         </div>
         {error && <p style={styles.error}>{error}</p>}
         {success && <p style={styles.success}>{t.entrySaved}</p>}
-        <button style={styles.button} type="submit" disabled={saving}>{saving ? t.saving : t.logEntry}</button>
+        <button style={{ ...styles.button, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.logEntry}</button>
       </form>}
     </div>
   );
@@ -146,7 +151,7 @@ const styles = {
   heading: { margin: 0, fontSize: 18, fontWeight: 700 },
   chevron: { fontSize: 16, color: '#9ca3af', transition: 'transform 0.2s', display: 'inline-block', marginBottom: 0 },
   form: { display: 'flex', flexDirection: 'column', gap: 14, marginTop: 20 },
-  row: { display: 'flex', gap: 12 },
+  row: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   field: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1 },
   label: { fontSize: 13, fontWeight: 600, color: '#555' },
   input: { padding: '9px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, width: '100%' },
@@ -154,4 +159,5 @@ const styles = {
   error: { color: '#e53e3e', fontSize: 13 },
   success: { color: '#38a169', fontSize: 13 },
   button: { padding: '11px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600 },
+  charCount: { fontSize: 11, color: '#9ca3af' },
 };

@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
+import { getOrFetch } from '../offlineDb';
+import { SkeletonList } from './Skeleton';
 import MessageThread from './MessageThread';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
-import { fmtHours } from '../utils';
+import { fmtHours, langToLocale } from '../utils';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -38,9 +40,9 @@ function FitBounds({ positions }) {
   return null;
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr, locale = 'en-US') {
   const d = new Date(dateStr.substring(0, 10) + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function formatTime(t) {
@@ -64,6 +66,7 @@ function formatHours(start, end) {
 export default function ApprovalQueue({ onCountChange }) {
   const { user } = useAuth();
   const t = useT();
+  const locale = langToLocale(user?.language);
   const [entries, setEntries] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -75,12 +78,14 @@ export default function ApprovalQueue({ onCountChange }) {
   const [openMapId, setOpenMapId] = useState(null);
   const [fetchError, setFetchError] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [workerFilter, setWorkerFilter] = useState('');
   // Edit state
   const [editingId, setEditingId] = useState(null);
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
   const [editProject, setEditProject] = useState('');
+  const [editUpdatedAt, setEditUpdatedAt] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
   // Split state
   const [splittingId, setSplittingId] = useState(null);
@@ -107,11 +112,22 @@ export default function ApprovalQueue({ onCountChange }) {
     if (dateTo) params.to = dateTo;
     Promise.all([
       api.get('/admin/entries/pending', { params }),
-      api.get('/projects'),
+      getOrFetch('projects', () => api.get('/projects').then(r => r.data)),
     ])
-      .then(([r, p]) => { setEntries(r.data.entries); setHasMore(r.data.has_more); setProjects(p.data); })
+      .then(([r, p]) => { setEntries(r.data.entries); setHasMore(r.data.has_more); setProjects(p); })
       .catch(() => setFetchError(true))
       .finally(() => setLoading(false));
+  };
+
+  const loadMore = () => {
+    setLoadingMore(true);
+    const params = { offset: entries.length };
+    if (dateFrom) params.from = dateFrom;
+    if (dateTo) params.to = dateTo;
+    api.get('/admin/entries/pending', { params })
+      .then(r => { setEntries(prev => [...prev, ...r.data.entries]); setHasMore(r.data.has_more); })
+      .catch(() => {})
+      .finally(() => setLoadingMore(false));
   };
 
   const fetchRecentApproved = () => {
@@ -120,7 +136,23 @@ export default function ApprovalQueue({ onCountChange }) {
       .catch(() => {});
   };
 
-  useEffect(() => { fetch(); fetchRecentApproved(); }, []);
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setFetchError(false);
+    const params = {};
+    if (dateFrom) params.from = dateFrom;
+    if (dateTo) params.to = dateTo;
+    Promise.all([
+      api.get('/admin/entries/pending', { params }),
+      getOrFetch('projects', () => api.get('/projects').then(r => r.data)),
+    ])
+      .then(([r, p]) => { if (!mounted) return; setEntries(r.data.entries); setHasMore(r.data.has_more); setProjects(p); })
+      .catch(() => { if (mounted) setFetchError(true); })
+      .finally(() => { if (mounted) setLoading(false); });
+    fetchRecentApproved();
+    return () => { mounted = false; };
+  }, []);
   useEffect(() => { if (onCountChange) onCountChange(entries.length); }, [entries]);
 
   const startEdit = (e) => {
@@ -128,6 +160,7 @@ export default function ApprovalQueue({ onCountChange }) {
     setEditStart(e.start_time.substring(0, 5));
     setEditEnd(e.end_time.substring(0, 5));
     setEditProject(e.project_id ? String(e.project_id) : '');
+    setEditUpdatedAt(e.updated_at || null);
     setSplittingId(null);
   };
 
@@ -138,11 +171,15 @@ export default function ApprovalQueue({ onCountChange }) {
         start_time: editStart,
         end_time: editEnd,
         project_id: editProject ? parseInt(editProject) : null,
+        updated_at: editUpdatedAt,
       });
       setEntries(prev => prev.map(e => e.id === id ? { ...e, ...updated.data } : e));
       setEditingId(null);
     } catch (err) {
-      setEditSaveError(err.response?.data?.error || t.failedToSave);
+      const msg = err.response?.status === 409
+        ? t.concurrentModification
+        : err.response?.data?.error || t.failedToSave;
+      setEditSaveError(msg);
     } finally {
       setEditSaving(false);
     }
@@ -217,23 +254,25 @@ export default function ApprovalQueue({ onCountChange }) {
     } finally { setWorking(null); }
   };
 
-  const visibleEntries = entries.filter(e => {
+  const visibleEntries = useMemo(() => entries.filter(e => {
     if (workerFilter && e.worker_name !== workerFilter) return false;
     if (dateFrom && e.work_date.substring(0, 10) < dateFrom) return false;
     if (dateTo && e.work_date.substring(0, 10) > dateTo) return false;
     return true;
-  });
+  }), [entries, workerFilter, dateFrom, dateTo]);
 
-  const workerNames = [...new Set(entries.map(e => e.worker_name))].sort();
+  const workerNames = useMemo(() => [...new Set(entries.map(e => e.worker_name))].sort(), [entries]);
 
   // Group by work_date, sorted most recent first
-  const entriesByDay = visibleEntries.reduce((acc, e) => {
-    const day = e.work_date.substring(0, 10);
-    if (!acc[day]) acc[day] = [];
-    acc[day].push(e);
-    return acc;
-  }, {});
-  const sortedDays = Object.keys(entriesByDay).sort((a, b) => b.localeCompare(a));
+  const { entriesByDay, sortedDays } = useMemo(() => {
+    const byDay = visibleEntries.reduce((acc, e) => {
+      const day = e.work_date.substring(0, 10);
+      if (!acc[day]) acc[day] = [];
+      acc[day].push(e);
+      return acc;
+    }, {});
+    return { entriesByDay: byDay, sortedDays: Object.keys(byDay).sort((a, b) => b.localeCompare(a)) };
+  }, [visibleEntries]);
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -273,10 +312,10 @@ export default function ApprovalQueue({ onCountChange }) {
     } finally { setApprovingAll(false); }
   };
 
-  if (loading) return <div style={styles.card}><p style={{ color: '#888' }}>{t.loading}</p></div>;
+  if (loading) return <div className="admin-card" style={styles.card}><SkeletonList count={4} rows={2} /></div>;
 
   return (
-    <div style={styles.card}>
+    <div className="admin-card" style={styles.card}>
       <div style={styles.header}>
         <h3 style={styles.title}>{t.approvalQueue}</h3>
         {entries.length > 0 && (
@@ -296,14 +335,14 @@ export default function ApprovalQueue({ onCountChange }) {
             )}
             {selectedIds.size > 0 ? (
               <>
-                <button style={styles.approveSelectedBtn} onClick={approveSelected} disabled={approvingSelected}>
+                <button style={{ ...styles.approveSelectedBtn, ...(approvingSelected ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={approveSelected} disabled={approvingSelected}>
                   {approvingSelected ? t.aqApprovingSelected : `${t.aqApproveSelected} (${selectedIds.size})`}
                 </button>
                 <button style={styles.cancelApproveAllBtn} onClick={deselectAll}>{t.cancel}</button>
               </>
             ) : confirmingApproveAll ? (
               <>
-                <button style={styles.approveAllBtn} onClick={approveAll} disabled={approvingAll}>
+                <button style={{ ...styles.approveAllBtn, ...(approvingAll ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={approveAll} disabled={approvingAll}>
                   {approvingAll ? t.aqApprovingAll : t.confirm}
                 </button>
                 <button style={styles.cancelApproveAllBtn} onClick={() => setConfirmingApproveAll(false)}>{t.cancel}</button>
@@ -313,7 +352,7 @@ export default function ApprovalQueue({ onCountChange }) {
                 <button style={styles.selectAllBtn} onClick={selectedIds.size > 0 ? deselectAll : selectAll}>
                   {selectedIds.size > 0 ? t.aqDeselectAll : t.aqSelectAll}
                 </button>
-                <button style={styles.approveAllBtn} onClick={() => setConfirmingApproveAll(true)} disabled={approvingAll || visibleEntries.length === 0}>
+                <button style={{ ...styles.approveAllBtn, ...((approvingAll || visibleEntries.length === 0) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setConfirmingApproveAll(true)} disabled={approvingAll || visibleEntries.length === 0}>
                   {workerFilter ? `${t.approve} ${workerFilter.split(' ')[0]}'s` : t.aqApproveAll}
                 </button>
               </>
@@ -323,13 +362,13 @@ export default function ApprovalQueue({ onCountChange }) {
       </div>
 
       {entries.length > 0 && (
-        <div style={styles.dateFilterRow}>
+        <div className="filter-row" style={styles.dateFilterRow}>
           <input
             type="date"
             style={styles.dateInput}
             value={dateFrom}
             onChange={e => setDateFrom(e.target.value)}
-            title="From date"
+            title={t.fromDate}
           />
           <span style={{ fontSize: 12, color: '#9ca3af' }}>–</span>
           <input
@@ -337,11 +376,11 @@ export default function ApprovalQueue({ onCountChange }) {
             style={styles.dateInput}
             value={dateTo}
             onChange={e => setDateTo(e.target.value)}
-            title="To date"
+            title={t.toDate}
           />
           <button style={styles.applyDateBtn} onClick={() => { setSelectedIds(new Set()); fetch(); }}>{t.apply}</button>
           {(dateFrom || dateTo) && (
-            <button style={styles.clearDateBtn} onClick={() => { setDateFrom(''); setDateTo(''); setSelectedIds(new Set()); fetch(); }}>✕</button>
+            <button style={styles.clearDateBtn} aria-label={t.clearDateFilters} onClick={() => { setDateFrom(''); setDateTo(''); setSelectedIds(new Set()); fetch(); }}>✕</button>
           )}
         </div>
       )}
@@ -349,13 +388,23 @@ export default function ApprovalQueue({ onCountChange }) {
       {fetchError ? (
         <p style={styles.fetchError}>{t.failedLoadPending} <button style={styles.retryBtn} onClick={fetch}>{t.retry}</button></p>
       ) : entries.length === 0 ? (
-        <p style={styles.empty}>{t.allCaughtUp}</p>
+        <div style={styles.emptyState}>
+          <div style={styles.emptyIcon}>✓</div>
+          <p style={styles.emptyTitle}>{t.allCaughtUp}</p>
+          <p style={styles.emptySubtitle}>No pending time entries to review.</p>
+        </div>
       ) : (
         <div style={styles.list}>
           {hasMore && (
-            <p style={{ color: '#b45309', fontSize: 13, marginBottom: 8 }}>
-              {t.showingOldest200}
-            </p>
+            <div style={{ textAlign: 'center', padding: '12px 0 4px' }}>
+              <button
+                style={{ fontSize: 13, fontWeight: 600, color: '#1a56db', background: 'none', border: '1px solid #bfdbfe', borderRadius: 7, padding: '7px 20px', cursor: loadingMore ? 'not-allowed' : 'pointer', opacity: loadingMore ? 0.6 : 1 }}
+                onClick={loadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? '…' : t.loadMore || 'Load More'}
+              </button>
+            </div>
           )}
           {visibleEntries.length === 0 && workerFilter && (
             <p style={styles.empty}>{t.aqNoPendingFor} {workerFilter}.</p>
@@ -366,11 +415,11 @@ export default function ApprovalQueue({ onCountChange }) {
           {sortedDays.map(day => (
             <div key={day}>
               <div style={styles.dayHeader}>
-                {formatDate(day + 'T00:00:00')}
+                {formatDate(day + 'T00:00:00', locale)}
                 <span style={styles.dayCount}>{entriesByDay[day].length}</span>
               </div>
               {entriesByDay[day].map(e => (
-                <div key={e.id} style={{ ...styles.row, ...(selectedIds.has(e.id) ? styles.rowSelected : {}) }}>
+                <div key={e.id} className="approval-row" style={{ ...styles.row, ...(selectedIds.has(e.id) ? styles.rowSelected : {}) }}>
                   <input
                     type="checkbox"
                     checked={selectedIds.has(e.id)}
@@ -459,7 +508,7 @@ export default function ApprovalQueue({ onCountChange }) {
                         </select>
                       </div>
                       <div style={styles.editTimesActions}>
-                        <button style={styles.saveTimesBtn} onClick={() => { setEditSaveError(''); saveEdit(e.id); }} disabled={editSaving}>{editSaving ? '...' : t.save}</button>
+                        <button style={{ ...styles.saveTimesBtn, ...(editSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => { setEditSaveError(''); saveEdit(e.id); }} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
                         <button style={styles.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
                         {editSaveError && <span style={styles.inlineError}>{editSaveError}</span>}
                       </div>
@@ -493,7 +542,7 @@ export default function ApprovalQueue({ onCountChange }) {
                               </select>
                             </div>
                             {splitSegments.length > 2 && (
-                              <button style={styles.splitRemoveBtn} onClick={() => setSplitSegments(prev => prev.filter((_, j) => j !== i))}>✕</button>
+                              <button style={styles.splitRemoveBtn} aria-label={t.removeSegment} onClick={() => setSplitSegments(prev => prev.filter((_, j) => j !== i))}>✕</button>
                             )}
                           </div>
                         </div>
@@ -503,21 +552,24 @@ export default function ApprovalQueue({ onCountChange }) {
                         setSplitSegments(prev => [...prev, { _key: Date.now(), start_time: last.end_time, end_time: last.end_time, project_id: '' }]);
                       }}>{t.aqAddSegment}</button>
                       <div style={styles.editTimesActions}>
-                        <button style={styles.saveTimesBtn} onClick={() => saveSplit(e.id)} disabled={splitSaving}>{splitSaving ? '...' : t.aqSplitSave}</button>
+                        <button style={{ ...styles.saveTimesBtn, ...(splitSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveSplit(e.id)} disabled={splitSaving}>{splitSaving ? t.saving : t.aqSplitSave}</button>
                         <button style={styles.cancelBtn} onClick={() => setSplittingId(null)}>{t.cancel}</button>
                       </div>
                     </div>
                   ) : rejectingId === e.id ? (
                     <div style={styles.rejectForm}>
-                      <input style={styles.rejectInput} placeholder={t.reasonOptional} maxLength={500} value={rejectNote} onChange={ev => setRejectNote(ev.target.value)} autoFocus />
-                      <button style={styles.confirmRejectBtn} onClick={() => submitReject(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.confirmReject}</button>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <input style={styles.rejectInput} placeholder={t.reasonOptional} maxLength={500} value={rejectNote} onChange={ev => setRejectNote(ev.target.value)} autoFocus />
+                        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{rejectNote.length}/500</div>
+                      </div>
+                      <button style={{ ...styles.confirmRejectBtn, ...(working === e.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => submitReject(e.id)} disabled={working === e.id}>{working === e.id ? t.saving : t.confirmReject}</button>
                       <button style={styles.cancelBtn} onClick={() => { setRejectingId(null); setRejectNote(''); }}>{t.cancel}</button>
                     </div>
                   ) : (
                     <div style={styles.actions}>
                       <button style={styles.editTimesBtn} onClick={() => startEdit(e)}>✏️ Edit</button>
                       <button style={styles.splitBtn} onClick={() => startSplit(e)}>⇌ Split</button>
-                      <button style={styles.approveBtn} onClick={() => approve(e.id)} disabled={working === e.id}>{working === e.id ? '...' : t.approve}</button>
+                      <button style={{ ...styles.approveBtn, ...(working === e.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => approve(e.id)} disabled={working === e.id}>{working === e.id ? t.saving : t.approve}</button>
                       <button style={styles.rejectBtn} onClick={() => { setRejectingId(e.id); setRejectNote(''); }}>{t.reject}</button>
                     </div>
                   )}
@@ -540,17 +592,22 @@ export default function ApprovalQueue({ onCountChange }) {
                 <div key={e.id} style={styles.recentRow}>
                   <div style={styles.recentInfo}>
                     <span style={styles.recentWorker}>{e.worker_name}</span>
-                    <span style={styles.recentDate}>{formatDate(e.work_date)}</span>
+                    <span style={styles.recentDate}>{formatDate(e.work_date, locale)}</span>
                     <span style={styles.recentTime}>{formatTime(e.start_time)} – {formatTime(e.end_time)}</span>
                     {e.project_name && <span style={styles.recentProject}>{e.project_name}</span>}
+                    {e.qbo_activity_id && (
+                      <span style={styles.qboSyncBadge} title={`Synced to QuickBooks${e.qbo_synced_at ? ' · ' + new Date(e.qbo_synced_at).toLocaleTimeString() : ''}`}>
+                        QB ✓
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
                     <button
-                      style={styles.unapproveBtn}
+                      style={{ ...styles.unapproveBtn, ...(unapproving === e.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                       onClick={() => { setUnapproveError(''); unapprove(e.id); }}
                       disabled={unapproving === e.id}
                     >
-                      {unapproving === e.id ? '…' : t.aqUnapprove}
+                      {unapproving === e.id ? t.saving : t.aqUnapprove}
                     </button>
                     {unapproveError && unapproving === null && <span style={styles.inlineError}>{unapproveError}</span>}
                   </div>
@@ -575,6 +632,10 @@ const styles = {
   badge: { background: '#fef3c7', color: '#b45309', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 700 },
   filterSelect: { padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, color: '#374151', background: '#fff' },
   empty: { color: '#059669', fontSize: 14, fontWeight: 500 },
+  emptyState: { textAlign: 'center', padding: '36px 0 28px' },
+  emptyIcon: { fontSize: 36, color: '#059669', marginBottom: 8 },
+  emptyTitle: { fontSize: 16, fontWeight: 700, color: '#059669', margin: '0 0 4px' },
+  emptySubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
   fetchError: { color: '#991b1b', fontSize: 14 },
   retryBtn: { background: 'none', border: 'none', color: '#1a56db', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: 14 },
   list:      { display: 'flex', flexDirection: 'column', gap: 16 },
@@ -628,6 +689,7 @@ const styles = {
   recentTime: { color: '#6b7280' },
   recentProject: { background: '#e0e7ff', color: '#3730a3', borderRadius: 6, padding: '1px 7px', fontSize: 11, fontWeight: 600 },
   unapproveBtn: { padding: '5px 12px', background: '#fff', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  qboSyncBadge: { background: '#d1fae5', color: '#065f46', border: '1px solid #6ee7b7', borderRadius: 6, padding: '1px 6px', fontSize: 11, fontWeight: 700 },
   cancelApproveAllBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '5px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
   inlineError: { fontSize: 12, color: '#ef4444' },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 6 },

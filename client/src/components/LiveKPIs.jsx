@@ -14,7 +14,7 @@ export default function LiveKPIs() {
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 60000);
+    const timer = setInterval(load, 300000);
     return () => clearInterval(timer);
   }, []);
 

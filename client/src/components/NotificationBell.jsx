@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 export default function NotificationBell() {
+  const t = useT();
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -45,16 +47,16 @@ export default function NotificationBell() {
     const d = new Date(ts);
     const now = new Date();
     const diffMin = Math.floor((now - d) / 60000);
-    if (diffMin < 1) return 'Just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffMin < 1) return t.justNow;
+    if (diffMin < 60) return t.minutesAgo.replace('{n}', diffMin);
     const diffH = Math.floor(diffMin / 60);
-    if (diffH < 24) return `${diffH}h ago`;
+    if (diffH < 24) return t.hoursAgo.replace('{n}', diffH);
     return d.toLocaleDateString();
   };
 
   return (
     <div ref={ref} style={styles.wrap}>
-      <button style={styles.bell} onClick={() => setOpen(o => !o)} aria-label="Notifications">
+      <button style={styles.bell} onClick={() => setOpen(o => !o)} aria-label={t.notifAriaLabel}>
         <BellIcon />
         {unread > 0 && <span style={styles.badge}>{unread > 9 ? '9+' : unread}</span>}
       </button>
@@ -62,14 +64,14 @@ export default function NotificationBell() {
       {open && (
         <div style={styles.dropdown}>
           <div style={styles.dropHeader}>
-            <span style={styles.dropTitle}>Notifications</span>
+            <span style={styles.dropTitle}>{t.notifications}</span>
             {unread > 0 && (
-              <button style={styles.markAllBtn} onClick={markAllRead}>Mark all read</button>
+              <button style={styles.markAllBtn} onClick={markAllRead}>{t.markAllRead}</button>
             )}
           </div>
 
           {items.length === 0 ? (
-            <div style={styles.empty}>No notifications yet</div>
+            <div style={styles.empty}>{t.noNotificationsYet}</div>
           ) : (
             <div style={styles.list}>
               {items.map(item => (

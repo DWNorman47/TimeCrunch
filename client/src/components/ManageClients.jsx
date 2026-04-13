@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useToast } from '../contexts/ToastContext';
+import { SkeletonList, SkeletonBlock } from './Skeleton';
 
 // Document type metadata
 const DOC_TYPES = [
@@ -49,11 +51,14 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
     setSaving(true); setError('');
     try {
       const r = isEdit
-        ? await api.patch(`/admin/clients/${initial.id}`, form)
+        ? await api.patch(`/admin/clients/${initial.id}`, { ...form, updated_at: initial.updated_at })
         : await api.post('/admin/clients', form);
       onSaved(r.data, isEdit);
     } catch (err) {
-      setError(err.response?.data?.error || t.failedSaveClient);
+      const msg = err.response?.status === 409
+        ? t.concurrentModification
+        : err.response?.data?.error || t.failedSaveClient;
+      setError(msg);
     } finally { setSaving(false); }
   };
 
@@ -63,40 +68,43 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
 
       <div style={s.row}>
         <div style={s.field}>
-          <label style={s.label}>{t.clientCompanyName} *</label>
-          <input style={s.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Construction Inc." required />
+          <label htmlFor="mc-name" style={s.label}>{t.clientCompanyName} *</label>
+          <input id="mc-name" style={s.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.clientNamePlaceholder} required disabled={saving} />
         </div>
         <div style={s.field}>
-          <label style={s.label}>{t.contactName}</label>
-          <input style={s.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" />
+          <label htmlFor="mc-contact-name" style={s.label}>{t.contactName}</label>
+          <input id="mc-contact-name" style={s.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder={t.contactNamePlaceholder} disabled={saving} />
         </div>
       </div>
 
       <div style={s.row}>
         <div style={s.field}>
-          <label style={s.label}>{t.contactEmail}</label>
-          <input style={s.input} type="email" maxLength={255} value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder="jane@example.com" />
+          <label htmlFor="mc-contact-email" style={s.label}>{t.contactEmail}</label>
+          <input id="mc-contact-email" style={s.input} type="email" maxLength={255} value={form.contact_email} onChange={e => set('contact_email', e.target.value)} placeholder={t.contactEmailPlaceholder} disabled={saving} />
         </div>
         <div style={s.field}>
-          <label style={s.label}>{t.contactPhone}</label>
-          <input style={s.input} type="tel" maxLength={50} value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder="(555) 000-0000" />
+          <label htmlFor="mc-contact-phone" style={s.label}>{t.contactPhone}</label>
+          <input id="mc-contact-phone" style={s.input} type="tel" maxLength={50} value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder={t.contactPhonePlaceholder} disabled={saving} />
         </div>
       </div>
 
       <div style={s.field}>
-        <label style={s.label}>{t.address}</label>
-        <input style={s.input} maxLength={255} value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, State 00000" />
+        <label htmlFor="mc-address" style={s.label}>{t.address}</label>
+        <input id="mc-address" style={s.input} maxLength={255} value={form.address} onChange={e => set('address', e.target.value)} placeholder={t.clientAddressPlaceholder} disabled={saving} />
       </div>
 
       <div style={s.field}>
-        <label style={s.label}>{t.notes} <span style={s.opt}>({t.optional})</span></label>
-        <textarea style={s.textarea} rows={2} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional information..." />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <label htmlFor="mc-notes" style={s.label}>{t.notes} <span style={s.opt}>({t.optional})</span></label>
+          <span style={s.charCount}>{(form.notes || '').length}/1000</span>
+        </div>
+        <textarea id="mc-notes" style={s.textarea} rows={2} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.clientNotesPlaceholder} disabled={saving} />
       </div>
 
       {error && <p style={s.error}>{error}</p>}
 
       <div style={s.formActions}>
-        <button style={s.saveBtn} type="submit" disabled={saving}>{saving ? '…' : isEdit ? t.saveChanges : t.addClient}</button>
+        <button style={{ ...s.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.addClient}</button>
         <button style={s.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -107,6 +115,7 @@ function ClientForm({ initial = BLANK_CLIENT, onSaved, onCancel }) {
 
 function DocUploadForm({ clientId, onUploaded }) {
   const t = useT();
+  const toast = useToast();
   const [docType, setDocType] = useState('coi');
   const [direction, setDirection] = useState('from_client');
   const [expiresAt, setExpiresAt] = useState('');
@@ -134,6 +143,7 @@ function DocUploadForm({ clientId, onUploaded }) {
         direction,
       });
       onUploaded(doc);
+      toast(t.documentUploaded, 'success');
       setExpiresAt('');
       fileRef.current.value = '';
     } catch (err) {
@@ -152,21 +162,21 @@ function DocUploadForm({ clientId, onUploaded }) {
             type="button"
             style={{ ...s.dirBtn, ...(direction === 'from_client' ? s.dirBtnActive : {}) }}
             onClick={() => setDirection('from_client')}
-          >← From Client</button>
+          >{t.docFromClient}</button>
           <button
             type="button"
             style={{ ...s.dirBtn, ...(direction === 'from_company' ? s.dirBtnActive : {}) }}
             onClick={() => setDirection('from_company')}
-          >From Us →</button>
+          >{t.docFromCompany}</button>
         </div>
         {needsExpiry && (
           <div style={s.expiryField}>
-            <label style={s.uploadLabel}>{t.expiryDate}</label>
-            <input style={s.uploadInput} type="date" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
+            <label htmlFor="mc-expires-at" style={s.uploadLabel}>{t.expiryDate}</label>
+            <input id="mc-expires-at" style={s.uploadInput} type="date" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
           </div>
         )}
         <label style={{ ...s.uploadFileBtn, opacity: uploading ? 0.6 : 1 }}>
-          {uploading ? '…' : t.uploadDocument}
+          {uploading ? t.uploading : t.uploadDocument}
           <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={handleFile} disabled={uploading}
             accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.txt,.csv" />
         </label>
@@ -203,7 +213,7 @@ function DocList({ clientId, docs, onDeleted }) {
           <div key={doc.id} style={s.docRow}>
             <span style={{ ...s.docTypeBadge, color: meta.color, background: meta.bg }}>{meta.label}</span>
             <span style={{ ...s.dirBadge, ...(doc.direction === 'from_company' ? s.dirBadgeOurs : s.dirBadgeTheirs) }}>
-              {doc.direction === 'from_company' ? 'From Us' : 'From Client'}
+              {doc.direction === 'from_company' ? t.docDirectionFromCompany : t.docDirectionFromClient}
             </span>
             <a href={doc.url} target="_blank" rel="noopener noreferrer" style={s.docName}>{doc.name}</a>
             {fmt(doc.size_bytes) && <span style={s.docSize}>{fmt(doc.size_bytes)}</span>}
@@ -214,7 +224,7 @@ function DocList({ clientId, docs, onDeleted }) {
                 <button style={s.cancelDocDeleteBtn} onClick={() => setPendingDeleteDocId(null)}>{t.cancel}</button>
               </>
             ) : (
-              <button style={s.docDeleteBtn} onClick={() => setPendingDeleteDocId(doc.id)} disabled={deleting === doc.id}>
+              <button style={{ ...s.docDeleteBtn, ...(deleting === doc.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.deleteDocument} onClick={() => setPendingDeleteDocId(doc.id)} disabled={deleting === doc.id}>
                 {deleting === doc.id ? '…' : '✕'}
               </button>
             )}
@@ -267,7 +277,7 @@ function ClientCard({ client, onEdit, onDeleted }) {
 
   return (
     <div style={s.card}>
-      <div style={s.cardHeader} onClick={handleExpand}>
+      <div style={s.cardHeader} onClick={handleExpand} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleExpand()}>
         <div style={s.cardLeft}>
           <div style={s.clientName}>
             {client.name}
@@ -303,7 +313,7 @@ function ClientCard({ client, onEdit, onDeleted }) {
             onUploaded={doc => setDocs(prev => prev ? [doc, ...prev] : [doc])}
           />
           {loadingDocs ? (
-            <p style={s.hint}>Loading…</p>
+            <SkeletonBlock width="100%" height={60} style={{ marginTop: 8 }} />
           ) : (
             <DocList
               clientId={client.id}
@@ -316,7 +326,7 @@ function ClientCard({ client, onEdit, onDeleted }) {
             <button style={s.editBtn} onClick={() => onEdit(client)}>{t.edit}</button>
             {confirmingDelete ? (
               <>
-                <button style={s.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                <button style={{ ...s.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
                 <button style={s.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
               </>
             ) : (
@@ -405,7 +415,7 @@ export default function ManageClients() {
       )}
 
       {loading ? (
-        <p style={s.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : clients.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>🏢</div>
@@ -470,6 +480,7 @@ const s = {
   field: { display: 'flex', flexDirection: 'column', gap: 5, flex: 1, minWidth: 180 },
   label: { fontSize: 13, fontWeight: 600, color: '#374151' },
   opt: { fontWeight: 400, color: '#9ca3af' },
+  charCount: { fontSize: 11, color: '#9ca3af' },
   input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 },
   textarea: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 },
   error: { color: '#ef4444', fontSize: 13, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', margin: 0 },

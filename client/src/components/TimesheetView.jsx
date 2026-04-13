@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { fmtHours } from '../utils';
 import EntryPanel from './EntryPanel';
 import api from '../api';
 import { getT } from '../i18n';
+import { langToLocale } from '../utils';
 
 function startOfWeek(date) {
   const d = new Date(date);
@@ -22,12 +23,12 @@ function toDateKey(date) {
   return date.toLocaleDateString('en-CA');
 }
 
-function formatMonthDay(date) {
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+function formatMonthDay(date, locale) {
+  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
-function formatWeekDay(date) {
-  return date.toLocaleDateString('en-US', { weekday: 'short' });
+function formatWeekDay(date, locale) {
+  return date.toLocaleDateString(locale, { weekday: 'short' });
 }
 
 function formatTime(t) {
@@ -47,6 +48,7 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function TimesheetView({ entries, language, projects = [], onRefresh }) {
   const t = getT(language);
+  const locale = langToLocale(language);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [copying, setCopying] = useState(false);
@@ -63,6 +65,7 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
       const r = await api.post('/time-entries/copy-last-week');
       const { created, skipped } = r.data;
       setCopyMsg(`${created} entr${created === 1 ? 'y' : 'ies'} copied${skipped > 0 ? `, ${skipped} skipped` : ''}`);
+      setTimeout(() => setCopyMsg(''), 4000);
       if (created > 0 && onRefresh) await onRefresh();
     } catch {
       setCopyMsg(t.copyFailed);
@@ -71,43 +74,46 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
     }
   };
 
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const todayKey = toDateKey(new Date());
 
   // Group entries by date
-  const byDate = {};
-  entries.forEach(e => {
-    const key = e.work_date.substring(0, 10);
-    if (!byDate[key]) byDate[key] = [];
-    byDate[key].push(e);
-  });
+  const byDate = useMemo(() => {
+    const map = {};
+    entries.forEach(e => {
+      const key = e.work_date.substring(0, 10);
+      if (!map[key]) map[key] = [];
+      map[key].push(e);
+    });
+    return map;
+  }, [entries]);
 
-  const weekLabel = `${formatMonthDay(days[0])} \u2013 ${formatMonthDay(days[6])}, ${days[6].getFullYear()}`;
+  const weekLabel = `${formatMonthDay(days[0], locale)} \u2013 ${formatMonthDay(days[6], locale)}, ${days[6].getFullYear()}`;
 
-  const weekTotalHours = days.reduce((sum, d) => {
+  const weekTotalHours = useMemo(() => days.reduce((sum, d) => {
     const key = toDateKey(d);
     return sum + (byDate[key] || []).reduce((s, e) => s + netHours(e.start_time, e.end_time, e.break_minutes), 0);
-  }, 0);
+  }, 0), [days, byDate]);
 
-  const weekTotalMiles = days.reduce((sum, d) => {
+  const weekTotalMiles = useMemo(() => days.reduce((sum, d) => {
     const key = toDateKey(d);
     return sum + (byDate[key] || []).reduce((s, e) => s + (parseFloat(e.mileage) || 0), 0);
-  }, 0);
+  }, 0), [days, byDate]);
 
   return (
     <div style={styles.card} className="mobile-card">
       <div style={styles.header}>
         <div style={styles.navGroup}>
-          <button style={styles.navBtn} onClick={prevWeek}>‹</button>
+          <button style={styles.navBtn} aria-label={t.prevWeekLabel} onClick={prevWeek}>‹</button>
           <span style={styles.weekLabel}>{weekLabel}</span>
-          <button style={styles.navBtn} onClick={nextWeek}>›</button>
+          <button style={styles.navBtn} aria-label={t.nextWeekLabel} onClick={nextWeek}>›</button>
         </div>
         <div style={styles.headerRight}>
           <span style={styles.weekTotal}>{fmtHours(weekTotalHours)}</span>
           {weekTotalMiles > 0 && <span style={styles.weekMiles}>🚗 {weekTotalMiles.toFixed(1)} mi</span>}
           <button style={styles.todayBtn} onClick={goToday}>{t.todayBtn}</button>
-          <button style={{ ...styles.todayBtn, borderColor: '#1a56db', color: '#1a56db' }} onClick={copyLastWeek} disabled={copying}>
-            {copying ? '…' : t.copyLastWeekBtn}
+          <button style={{ ...styles.todayBtn, borderColor: '#1a56db', color: '#1a56db', ...(copying ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={copyLastWeek} disabled={copying}>
+            {copying ? t.saving : t.copyLastWeekBtn}
           </button>
           {copyMsg && <span style={{ fontSize: 12, color: '#6b7280' }}>{copyMsg}</span>}
         </div>
@@ -133,7 +139,7 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
             >
               <div style={styles.dayHeader}>
                 <span style={{ ...styles.dayName, color: isToday ? '#1a56db' : '#6b7280' }}>
-                  {formatWeekDay(day)}
+                  {formatWeekDay(day, locale)}
                 </span>
                 <span style={{ ...styles.dayNum, fontWeight: isToday ? 700 : 400, color: isToday ? '#1a56db' : '#374151' }}>
                   {day.getDate()}
@@ -155,7 +161,7 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
                       }}
                       onClick={() => setSelectedEntry(selectedEntry?.id === e.id ? null : e)}
                     >
-                      <div style={styles.pillProject}>{e.project_name}</div>
+                      <div style={styles.pillProject} title={e.project_name}>{e.project_name}</div>
                       <div style={styles.pillTimes}>{formatTime(e.start_time)}–{formatTime(e.end_time)}</div>
                       <div style={styles.pillHours}>{fmtHours(netHours(e.start_time, e.end_time, e.break_minutes))}</div>
                       {e.break_minutes > 0 && <div style={styles.pillBreak}>☕ {e.break_minutes}m</div>}
@@ -180,7 +186,7 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
         <div style={styles.selectedPanel}>
           <div style={styles.selectedHeader}>
             <span style={styles.selectedTitle}>{selectedEntry.project_name} — {formatTime(selectedEntry.start_time)}–{formatTime(selectedEntry.end_time)}</span>
-            <button style={styles.closeBtn} onClick={() => setSelectedEntry(null)}>✕</button>
+            <button style={styles.closeBtn} aria-label={t.labelModalClose} onClick={() => setSelectedEntry(null)}>✕</button>
           </div>
           <EntryPanel
             entry={selectedEntry}

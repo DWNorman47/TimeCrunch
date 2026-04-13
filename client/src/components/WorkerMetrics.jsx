@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import api from '../api';
-import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
-import BillPDF from './BillPDF';
 import { fmtHours, formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
 
 function downloadCSV(rows, filename) {
   const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -29,12 +28,15 @@ function defaultDates() {
 
 export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = {}, overtimeEnabled = true, projectsEnabled = true, projects = [] }) {
   const t = useT();
+  const { user } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const [from, setFrom] = useState(defaultDates().from);
   const [to, setTo] = useState(defaultDates().to);
   const [billData, setBillData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
   const [showAddEntry, setShowAddEntry] = useState(false);
   const [addForm, setAddForm] = useState({ work_date: defaultDates().to, start_time: '08:00', end_time: '17:00', project_id: '', notes: '', break_minutes: '0' });
   const [addSaving, setAddSaving] = useState(false);
@@ -54,11 +56,12 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
         break_minutes: parseInt(addForm.break_minutes) || 0,
       });
       setAddSuccess(true);
+      setTimeout(() => setAddSuccess(false), 3000);
       setShowAddEntry(false);
       setAddForm({ work_date: defaultDates().to, start_time: '08:00', end_time: '17:00', project_id: '', notes: '', break_minutes: '0' });
       if (billData) fetchBill();
     } catch (err) {
-      setAddError(err.response?.data?.error || 'Failed to add entry');
+      setAddError(err.response?.data?.error || t.failedAddEntry);
     } finally {
       setAddSaving(false);
     }
@@ -77,9 +80,45 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
     }
   };
 
+  const makeBillElement = async () => {
+    const [{ pdf }, { default: BillPDF }] = await Promise.all([
+      import('@react-pdf/renderer'),
+      import('./BillPDF'),
+    ]);
+    const el = React.createElement(BillPDF, { data: billData, currency, companyInfo, overtimeEnabled, showProject: projectsEnabled, showRateType: (companyInfo?.prevailing_wage_rate ?? 0) > 0, t, language: user?.language });
+    return { pdf, el };
+  };
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const { pdf, el } = await makeBillElement();
+      const blob = await pdf(el).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `bill-${worker.username}-${from || 'all'}-to-${to || 'all'}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
+
+  const togglePreview = async () => {
+    if (showPreview) {
+      setShowPreview(false);
+      return;
+    }
+    setPdfGenerating(true);
+    try {
+      const { pdf, el } = await makeBillElement();
+      const blob = await pdf(el).toBlob();
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+      setShowPreview(true);
+    } finally { setPdfGenerating(false); }
+  };
+
   return (
     <div style={styles.card}>
-      <div style={styles.summary} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.summary} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div>
           <span style={styles.name}>{worker.full_name}</span>
           <span style={styles.username}>@{worker.username}</span>
@@ -99,45 +138,45 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
           <div style={styles.sectionHeader}>
             <h4 style={styles.billHeading}>{t.generateBill}</h4>
             <button style={styles.addEntryBtn} onClick={() => { setShowAddEntry(v => !v); setAddError(''); setAddSuccess(false); }}>
-              {showAddEntry ? '✕ Cancel' : '+ Add Entry'}
+              {showAddEntry ? `✕ ${t.cancel}` : `+ ${t.addEntry}`}
             </button>
           </div>
-          {addSuccess && <div style={styles.addSuccess}>Entry added successfully.</div>}
+          {addSuccess && <div style={styles.addSuccess}>{t.entryAddedSuccess}</div>}
           {showAddEntry && (
             <form onSubmit={handleAddEntry} style={styles.addForm}>
               <div style={styles.addRow}>
                 <div style={styles.addField}>
-                  <label style={styles.label}>Date</label>
-                  <input style={styles.input} type="date" value={addForm.work_date} onChange={e => setAddForm(f => ({ ...f, work_date: e.target.value }))} required />
+                  <label style={styles.label}>{t.date}</label>
+                  <input style={styles.input} type="date" value={addForm.work_date} onChange={e => setAddForm(f => ({ ...f, work_date: e.target.value }))} required disabled={addSaving} />
                 </div>
                 <div style={styles.addField}>
-                  <label style={styles.label}>Start</label>
-                  <input style={styles.input} type="time" value={addForm.start_time} onChange={e => setAddForm(f => ({ ...f, start_time: e.target.value }))} required />
+                  <label style={styles.label}>{t.startTime}</label>
+                  <input style={styles.input} type="time" value={addForm.start_time} onChange={e => setAddForm(f => ({ ...f, start_time: e.target.value }))} required disabled={addSaving} />
                 </div>
                 <div style={styles.addField}>
-                  <label style={styles.label}>End</label>
-                  <input style={styles.input} type="time" value={addForm.end_time} onChange={e => setAddForm(f => ({ ...f, end_time: e.target.value }))} required />
+                  <label style={styles.label}>{t.endTime}</label>
+                  <input style={styles.input} type="time" value={addForm.end_time} onChange={e => setAddForm(f => ({ ...f, end_time: e.target.value }))} required disabled={addSaving} />
                 </div>
                 <div style={styles.addField}>
-                  <label style={styles.label}>Break (min)</label>
-                  <input style={{ ...styles.input, width: 70 }} type="number" min="0" value={addForm.break_minutes} onChange={e => setAddForm(f => ({ ...f, break_minutes: e.target.value }))} />
+                  <label style={styles.label}>{t.breakMin}</label>
+                  <input style={{ ...styles.input, width: 70 }} type="number" min="0" value={addForm.break_minutes} onChange={e => setAddForm(f => ({ ...f, break_minutes: e.target.value }))} disabled={addSaving} />
                 </div>
               </div>
               {projectsEnabled && projects.length > 0 && (
                 <div style={styles.addField}>
-                  <label style={styles.label}>Project</label>
-                  <select style={styles.input} value={addForm.project_id} onChange={e => setAddForm(f => ({ ...f, project_id: e.target.value }))}>
-                    <option value="">No project</option>
+                  <label style={styles.label}>{t.project}</label>
+                  <select style={styles.input} value={addForm.project_id} onChange={e => setAddForm(f => ({ ...f, project_id: e.target.value }))} disabled={addSaving}>
+                    <option value="">{t.noProject}</option>
                     {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
               )}
               <div style={styles.addField}>
-                <label style={styles.label}>Notes</label>
-                <input style={{ ...styles.input, width: '100%' }} type="text" maxLength={500} value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
+                <label style={styles.label}>{t.notes}</label>
+                <input style={{ ...styles.input, width: '100%' }} type="text" maxLength={500} value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} placeholder={t.optional} disabled={addSaving} />
               </div>
               {addError && <div style={styles.addError}>{addError}</div>}
-              <button style={styles.fetchBtn} type="submit" disabled={addSaving}>{addSaving ? 'Saving…' : 'Add Entry'}</button>
+              <button style={{ ...styles.fetchBtn, ...(addSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={addSaving}>{addSaving ? t.saving : t.addEntry}</button>
             </form>
           )}
           <div style={styles.dateRow}>
@@ -149,7 +188,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
               <label style={styles.label}>{t.to}</label>
               <input style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
             </div>
-            <button style={styles.fetchBtn} onClick={fetchBill} disabled={loading}>
+            <button style={{ ...styles.fetchBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={fetchBill} disabled={loading}>
               {loading ? t.loading : t.loadEntries}
             </button>
           </div>
@@ -174,8 +213,8 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
                 <span style={{ fontWeight: 700 }}>{t.totalCostLabel} <b>{formatCurrency(billData.summary.total_cost, currency)}</b></span>
               </div>
               <div style={styles.btnRow}>
-                <button style={styles.previewBtn} onClick={() => setShowPreview(p => !p)}>
-                  {showPreview ? t.hideBill : t.previewBill}
+                <button style={{ ...styles.previewBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={togglePreview} disabled={pdfGenerating}>
+                  {pdfGenerating ? t.preparing : showPreview ? t.hideBill : t.previewBill}
                 </button>
                 <button style={styles.csvBtn} onClick={() => {
                   const headers = ['Date', 'Type', 'Project', 'Category / Wage Type', 'Start', 'End', 'Hours', 'Amount'];
@@ -188,18 +227,12 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
                   ]);
                   downloadCSV([headers, ...timeRows, ...reimbRows], `${worker.username}-${from||'all'}-to-${to||'all'}.csv`);
                 }}>{t.exportCSV}</button>
-                <PDFDownloadLink
-                  document={<BillPDF data={billData} currency={currency} companyInfo={companyInfo} overtimeEnabled={overtimeEnabled} showProject={projectsEnabled} showRateType={(companyInfo?.prevailing_wage_rate ?? 0) > 0} />}
-                  fileName={`bill-${worker.username}-${from || 'all'}-to-${to || 'all'}.pdf`}
-                  style={styles.pdfBtn}
-                >
-                  {({ loading: l }) => l ? t.preparingPDF : t.downloadPDF}
-                </PDFDownloadLink>
+                <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>
+                  {pdfGenerating ? t.preparingPDF : t.downloadPDF}
+                </button>
               </div>
-              {showPreview && (
-                <PDFViewer style={styles.pdfViewer}>
-                  <BillPDF data={billData} currency={currency} companyInfo={companyInfo} overtimeEnabled={overtimeEnabled} showProject={projectsEnabled} showRateType={(companyInfo?.prevailing_wage_rate ?? 0) > 0} />
-                </PDFViewer>
+              {showPreview && previewUrl && (
+                <iframe src={previewUrl} style={styles.pdfViewer} title="Bill Preview" />
               )}
             </div>
           )}

@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { SkeletonList } from './Skeleton';
+import { langToLocale } from '../utils';
 
 const TYPE_LABELS_EN = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' };
 const TYPE_COLORS = { vacation: '#1d4ed8', sick: '#dc2626', personal: '#8b5cf6', other: '#6b7280' };
 const STATUS_COLORS = { pending: '#d97706', approved: '#059669', denied: '#ef4444' };
 
-function fmt(d) {
+function fmt(d, locale = 'en-US') {
   if (!d) return '';
-  return new Date(d.toString().substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(d.toString().substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function days(start, end) {
@@ -19,6 +23,9 @@ function days(start, end) {
 
 export default function TimeOffTab() {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
+  const toast = useToast();
   const TYPE_LABELS = { vacation: t.typeVacation, sick: t.typeSick, personal: t.typePersonal, other: t.typeOther };
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,15 +36,16 @@ export default function TimeOffTab() {
   const [pendingCancelId, setPendingCancelId] = useState(null);
   const [cancelError, setCancelError] = useState('');
   const [balance, setBalance] = useState(null);
+  const [loadError, setLoadError] = useState('');
 
   const load = () => {
-    setLoading(true);
+    setLoading(true); setLoadError('');
     Promise.all([
       api.get('/time-off/mine'),
       api.get('/time-off/balance'),
     ])
       .then(([r, b]) => { setRequests(r.data); setBalance(b.data); })
-      .catch(() => {})
+      .catch(() => setLoadError(t.failedLoadTimeOff || 'Failed to load time off requests.'))
       .finally(() => setLoading(false));
   };
 
@@ -55,6 +63,7 @@ export default function TimeOffTab() {
       setRequests(prev => [r.data, ...prev]);
       setForm({ type: 'vacation', start_date: '', end_date: '', note: '' });
       setShowForm(false);
+      toast(t.requestSubmitted, 'success');
     } catch (err) {
       setError(err.response?.data?.error || t.failedSubmitRequest);
     } finally { setSaving(false); }
@@ -73,6 +82,7 @@ export default function TimeOffTab() {
 
   return (
     <div style={s.wrap}>
+      {loadError && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 12 }}>{loadError}</p>}
       <div style={s.headerRow}>
         <h2 style={s.title}>{t.timeOffRequests}</h2>
         <button style={s.addBtn} onClick={() => setShowForm(o => !o)}>
@@ -97,7 +107,7 @@ export default function TimeOffTab() {
           <div style={s.row}>
             <div style={s.fieldGroup}>
               <label style={s.label}>{t.typeLabel}</label>
-              <select style={s.input} value={form.type} onChange={e => set('type', e.target.value)}>
+              <select style={s.input} value={form.type} onChange={e => set('type', e.target.value)} disabled={saving}>
                 <option value="vacation">{t.typeVacation}</option>
                 <option value="sick">{t.typeSick}</option>
                 <option value="personal">{t.typePersonal}</option>
@@ -106,26 +116,27 @@ export default function TimeOffTab() {
             </div>
             <div style={s.fieldGroup}>
               <label style={s.label}>{t.startDate}</label>
-              <input style={s.input} type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} required />
+              <input style={s.input} type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} required disabled={saving} />
             </div>
             <div style={s.fieldGroup}>
               <label style={s.label}>{t.endDate}</label>
-              <input style={s.input} type="date" value={form.end_date} min={form.start_date} onChange={e => set('end_date', e.target.value)} required />
+              <input style={s.input} type="date" value={form.end_date} min={form.start_date} onChange={e => set('end_date', e.target.value)} required disabled={saving} />
             </div>
           </div>
           <div style={s.fieldGroup}>
             <label style={s.label}>{t.noteOptionalLabel}</label>
-            <textarea style={{ ...s.input, resize: 'vertical', minHeight: 56 }} maxLength={500} value={form.note} onChange={e => set('note', e.target.value)} placeholder={t.noteDetailsPlaceholder} />
+            <textarea style={{ ...s.input, resize: 'vertical', minHeight: 56 }} maxLength={500} value={form.note} onChange={e => set('note', e.target.value)} placeholder={t.noteDetailsPlaceholder} disabled={saving} />
+            <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.note || '').length}/500</div>
           </div>
           {error && <p style={s.error}>{error}</p>}
-          <button style={s.submitBtn} type="submit" disabled={saving}>
+          <button style={{ ...s.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>
             {saving ? t.submitting : t.submitRequest}
           </button>
         </form>
       )}
 
       {loading ? (
-        <p style={s.empty}>{t.loading}</p>
+        <SkeletonList count={3} rows={2} />
       ) : requests.length === 0 ? (
         <p style={s.empty}>{t.noTimeOffYet}</p>
       ) : (
@@ -141,7 +152,7 @@ export default function TimeOffTab() {
                 </span>
               </div>
               <div style={s.dates}>
-                {fmt(r.start_date)} – {fmt(r.end_date)}
+                {fmt(r.start_date, locale)} – {fmt(r.end_date, locale)}
                 {(() => { const d = days(r.start_date?.toString().substring(0,10), r.end_date?.toString().substring(0,10)); return <span style={s.dayCount}>{d} {d !== 1 ? t.days : t.day}</span>; })()}
               </div>
               {r.note && <p style={s.note}>{r.note}</p>}
@@ -151,7 +162,7 @@ export default function TimeOffTab() {
                 </p>
               )}
               <div style={s.meta}>
-                {t.submitted} {fmt(r.created_at)}
+                {t.submitted} {fmt(r.created_at, locale)}
                 {r.status === 'pending' && (
                   pendingCancelId === r.id ? (
                     <>

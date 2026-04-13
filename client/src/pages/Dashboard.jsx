@@ -1,25 +1,32 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ClockInOut from '../components/ClockInOut';
 import TimeEntryForm from '../components/TimeEntryForm';
 import EntryList from '../components/EntryList';
-import TimesheetView from '../components/TimesheetView';
 import UpcomingShifts from '../components/UpcomingShifts';
-import WorkerSummary from '../components/WorkerSummary';
-import TimesheetSignOff from '../components/TimesheetSignOff';
 import CompanyChat from '../components/CompanyChat';
 import AppSwitcher from '../components/AppSwitcher';
 import NotificationBell from '../components/NotificationBell';
 import { getT } from '../i18n';
+import { langToLocale } from '../utils';
 import api from '../api';
 import { getOrFetch, setCached } from '../offlineDb';
 import { useOffline } from '../contexts/OfflineContext';
 import OfflineBanner from '../components/OfflineBanner';
 import SignatureModal from '../components/SignatureModal';
-import TimeOffTab from '../components/TimeOffTab';
-import AvailabilityTab from '../components/AvailabilityTab';
-import WorkerSchedule from '../components/WorkerSchedule';
-import ReimbursementsView from '../components/ReimbursementsView';
+
+// Secondary tabs — lazy-loaded on first visit
+const TimesheetView    = lazy(() => import('../components/TimesheetView'));
+const WorkerSummary    = lazy(() => import('../components/WorkerSummary'));
+const TimesheetSignOff = lazy(() => import('../components/TimesheetSignOff'));
+const TimeOffTab       = lazy(() => import('../components/TimeOffTab'));
+const AvailabilityTab  = lazy(() => import('../components/AvailabilityTab'));
+const WorkerSchedule   = lazy(() => import('../components/WorkerSchedule'));
+const ReimbursementsView = lazy(() => import('../components/ReimbursementsView'));
+
+function TabLoader() {
+  return <div style={{ padding: '32px 0', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>Loading…</div>;
+}
 
 const isPwa = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
@@ -33,6 +40,7 @@ export default function Dashboard() {
   const [companyInfo, setCompanyInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [refreshError, setRefreshError] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [headerClock, setHeaderClock] = useState(null); // null=loading, false=not clocked in, {clock_in_time}=clocked in
   const [headerElapsed, setHeaderElapsed] = useState(0);
@@ -75,7 +83,10 @@ export default function Dashboard() {
       const data = await api.get('/time-entries').then(r => r.data);
       await setCached('entries', data);
       setEntries(data);
-    } catch {}
+      setRefreshError(false);
+    } catch {
+      setRefreshError(true);
+    }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -158,8 +169,9 @@ export default function Dashboard() {
     }
 
     const fmtTime = s => { const [h, m] = s.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`; };
-    const fmtDate = d => new Date(d.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-    const fmtDateShort = d => new Date(d.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const locale = langToLocale(user?.language);
+    const fmtDate = d => new Date(d.substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    const fmtDateShort = d => new Date(d.substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
     const fmtH = h => { const wh = Math.floor(h); const wm = Math.round((h - wh) * 60); return wm > 0 ? `${wh}h ${wm}m` : `${wh}h`; };
     const fmtMoney = v => `$${v.toFixed(2)}`;
 
@@ -172,7 +184,7 @@ export default function Dashboard() {
     const now = new Date();
     const pad2 = n => String(n).padStart(2, '0');
     const invoiceNo = `INV-${now.getFullYear()}${pad2(now.getMonth()+1)}${pad2(now.getDate())}-${String(Date.now()).slice(-5)}`;
-    const invoiceDate = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const invoiceDate = now.toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' });
 
     // Company info (Bill To)
     const ci = companyInfo || {};
@@ -420,7 +432,7 @@ ${signatureDataUrl ? `
 
       <main style={styles.main} className="mobile-main">
         <div style={styles.tabs} className="tab-bar">
-          {settings?.module_timeclock !== false && <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); history.replaceState(null, '', '#clock'); }}>🕐 Clock</button>}
+          {settings?.module_timeclock !== false && <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); history.replaceState(null, '', '#clock'); }}>{t.tabClock}</button>}
           {settings?.module_timeclock !== false && (
             <button
               style={tab === 'messages' ? styles.tabActive : styles.tab}
@@ -431,14 +443,14 @@ ${signatureDataUrl ? `
                 localStorage.setItem('chatLastRead', new Date().toISOString());
               }}
             >
-              💬 Messages{chatUnread && <span style={styles.unreadDot} />}
+              {t.tabMessages}{chatUnread && <span style={styles.unreadDot} />}
             </button>
           )}
-          {settings?.module_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); history.replaceState(null, '', '#timesheet'); }}>📋 Timesheet</button>}
-          <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); history.replaceState(null, '', '#timeoff'); }}>🏖 Time Off</button>
-          {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); history.replaceState(null, '', '#schedule'); }}>📅 Schedule</button>}
-          {settings?.feature_scheduling !== false && <button style={tab === 'availability' ? styles.tabActive : styles.tab} onClick={() => { setTab('availability'); history.replaceState(null, '', '#availability'); }}>📆 Availability</button>}
-          <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>💳 Expenses</button>
+          {settings?.module_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); history.replaceState(null, '', '#timesheet'); }}>{t.tabTimesheet}</button>}
+          <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); history.replaceState(null, '', '#timeoff'); }}>{t.tabTimeOff}</button>
+          {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); history.replaceState(null, '', '#schedule'); }}>{t.tabSchedule}</button>}
+          {settings?.feature_scheduling !== false && <button style={tab === 'availability' ? styles.tabActive : styles.tab} onClick={() => { setTab('availability'); history.replaceState(null, '', '#availability'); }}>{t.tabAvailability}</button>}
+          <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>{t.tabExpenses}</button>
         </div>
 
         {tab === 'messages' && <CompanyChat onRead={() => { setChatUnread(false); localStorage.setItem('chatLastRead', new Date().toISOString()); }} />}
@@ -451,7 +463,7 @@ ${signatureDataUrl ? `
         )}
 
         {tab === 'timesheet' && (
-          <>
+          <Suspense fallback={<TabLoader />}>
             <UpcomingShifts onFillEntry={handleFillFromShift} />
             {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} rateType={user?.rate_type ?? 'hourly'} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 0} overtimeEnabled={settings?.feature_overtime ?? true} overtimeRule={settings?.overtime_rule ?? 'daily'} overtimeThreshold={settings?.overtime_threshold ?? 8} showWages={settings?.show_worker_wages ?? false} currency={settings?.currency ?? 'USD'} />}
             <TimesheetSignOff t={t} />
@@ -464,24 +476,25 @@ ${signatureDataUrl ? `
                 <button style={styles.exportBtn} onClick={() => {
                   if ((settings?.invoice_signature ?? 'optional') === 'none') handleExportPDF(null);
                   else setShowSignatureModal(true);
-                }}>⬇ Export PDF</button>
+                }}>⬇ {t.exportPDF}</button>
               )}
             </div>
+            {refreshError && <p style={{ color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 12px', fontSize: 13, margin: '0 0 8px' }}>{t.loadError} <button onClick={() => { setRefreshError(false); refreshEntries(); }} style={{ textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: '#b45309' }}>{t.retry}</button></p>}
             {loadError ? <p style={{ color: '#dc2626', padding: '12px' }}>{t.loadError} <button onClick={fetchData} style={{ textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}>{t.retry}</button></p> : loading ? <p>{t.loadingEntries}</p> : entryView === 'timesheet' ? (
               <TimesheetView entries={entries} language={user?.language} projects={projects} onRefresh={refreshEntries} />
             ) : (
               <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} currentUserId={user?.id} projects={projects} onRefresh={refreshEntries} />
             )}
-          </>
+          </Suspense>
         )}
 
-        {tab === 'timeoff' && <TimeOffTab />}
+        {tab === 'timeoff' && <Suspense fallback={<TabLoader />}><TimeOffTab /></Suspense>}
 
-        {tab === 'availability' && <AvailabilityTab />}
+        {tab === 'availability' && <Suspense fallback={<TabLoader />}><AvailabilityTab /></Suspense>}
 
-        {tab === 'schedule' && <WorkerSchedule />}
+        {tab === 'schedule' && <Suspense fallback={<TabLoader />}><WorkerSchedule /></Suspense>}
 
-        {tab === 'reimbursements' && <ReimbursementsView />}
+        {tab === 'reimbursements' && <Suspense fallback={<TabLoader />}><ReimbursementsView /></Suspense>}
 
       </main>
     </div>

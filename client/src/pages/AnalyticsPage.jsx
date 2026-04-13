@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePlan } from '../hooks/usePlan';
+import { useT } from '../hooks/useT';
 import api from '../api';
+import { getOrFetch } from '../offlineDb';
 import AppSwitcher from '../components/AppSwitcher';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
+import { SkeletonStatRow, SkeletonList } from '../components/Skeleton';
 
 function UpgradePrompt() {
+  const t = useT();
   return (
     <div style={{ background: '#f9fafb', border: '2px dashed #d1d5db', borderRadius: 10, padding: '32px 24px', textAlign: 'center' }}>
       <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 6 }}>Analytics requires the Business plan</div>
-      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>Upgrade to unlock detailed daily, weekly, and project-level analytics.</div>
+      <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 6 }}>{t.analyticsUpgradeTitle}</div>
+      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>{t.analyticsUpgradeDesc}</div>
       <button
         style={{ background: '#1a56db', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
         onClick={() => window.location.href = '/administration#billing'}
       >
-        View Plans
+        {t.viewPlans}
       </button>
     </div>
   );
@@ -23,13 +27,14 @@ function UpgradePrompt() {
 
 export default function AnalyticsPage() {
   const { user, logout } = useAuth();
+  const t = useT();
   const plan = usePlan();
   const [features, setFeatures] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/settings')
-      .then(r => setFeatures(r.data))
+    getOrFetch('settings', () => api.get('/settings').then(r => r.data))
+      .then(s => setFeatures(s))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -42,18 +47,18 @@ export default function AnalyticsPage() {
             <AppSwitcher currentApp="analytics" userRole={user?.role} features={features} />
             {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
           </div>
-          <button style={styles.headerBtn} className="header-btn" onClick={logout}>Logout</button>
+          <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
         </div>
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
       <main style={styles.main} className="admin-main">
         <div style={styles.pageHeader}>
-          <h1 style={styles.pageTitle}>Analytics</h1>
+          <h1 style={styles.pageTitle}>{t.analyticsTitle}</h1>
         </div>
 
         {loading ? (
-          <p style={styles.loadingText}>Loading…</p>
+          <><SkeletonStatRow count={4} style={{ marginBottom: 16 }} /><SkeletonList count={4} /></>
         ) : plan.isBusiness ? (
           <AnalyticsDashboard />
         ) : (

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { formatInTz } from '../utils';
+import { formatInTz, langToLocale } from '../utils';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { SkeletonList } from './Skeleton';
 
-function formatDt(str, tz) {
+function formatDt(str, tz, locale = 'en-US') {
   return {
-    date: formatInTz(str, tz, { month: 'short', day: 'numeric', year: 'numeric' }),
-    time: formatInTz(str, tz, { hour: 'numeric', minute: '2-digit' }),
+    date: formatInTz(str, tz, { month: 'short', day: 'numeric', year: 'numeric' }, locale),
+    time: formatInTz(str, tz, { hour: 'numeric', minute: '2-digit' }, locale),
   };
 }
 
@@ -21,6 +23,8 @@ function ActionBadge({ action, actionMeta }) {
 
 export default function AuditLog({ timezone = '' }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [entries, setEntries] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -84,28 +88,32 @@ export default function AuditLog({ timezone = '' }) {
         <span style={styles.totalBadge}>{total} {t.auditEvents}</span>
       </div>
 
-      <div style={styles.filters}>
+      <div className="filter-row" style={styles.filters}>
         <select style={styles.filterSelect} value={group} onChange={e => setGroup(e.target.value)}>
           {Object.entries(ACTION_GROUPS).map(([val, label]) => (
             <option key={val} value={val}>{label}</option>
           ))}
         </select>
-        <input style={styles.filterDate} type="date" value={from} onChange={e => setFrom(e.target.value)} placeholder="From" title={t.fromDate} />
-        <input style={styles.filterDate} type="date" value={to} onChange={e => setTo(e.target.value)} placeholder="To" title={t.toDate} />
+        <input style={styles.filterDate} type="date" value={from} onChange={e => setFrom(e.target.value)} placeholder={t.fromDate} title={t.fromDate} />
+        <input style={styles.filterDate} type="date" value={to} onChange={e => setTo(e.target.value)} placeholder={t.toDate} title={t.toDate} />
         {(group || from || to) && (
           <button style={styles.clearBtn} onClick={() => { setGroup(''); setFrom(''); setTo(''); }}>{t.auditClear}</button>
         )}
       </div>
 
       {loading && entries.length === 0 ? (
-        <p style={styles.empty}>{t.loading}</p>
+        <SkeletonList count={5} rows={2} />
       ) : entries.length === 0 ? (
-        <p style={styles.empty}>{t.auditNoActivity}</p>
+        <div style={styles.emptyState}>
+          <div style={styles.emptyIcon}>📋</div>
+          <p style={styles.emptyTitle}>{t.auditNoActivity}</p>
+          <p style={styles.emptySubtitle}>{t.auditEmptySub}</p>
+        </div>
       ) : (
         <>
           <div style={styles.list}>
             {entries.map(e => {
-              const dt = formatDt(e.created_at, timezone);
+              const dt = formatDt(e.created_at, timezone, locale);
               return (
                 <div key={e.id} style={styles.row}>
                   <div style={styles.rowTime}>
@@ -133,11 +141,11 @@ export default function AuditLog({ timezone = '' }) {
 
           {totalPages > 1 && (
             <div style={styles.pagination}>
-              <button style={styles.pageBtn} onClick={() => goTo(0)} disabled={page === 0 || loading}>«</button>
-              <button style={styles.pageBtn} onClick={() => goTo(page - 1)} disabled={page === 0 || loading}>‹ {t.paginationPrev}</button>
+              <button style={{ ...styles.pageBtn, ...(page === 0 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.firstPage} onClick={() => goTo(0)} disabled={page === 0 || loading}>«</button>
+              <button style={{ ...styles.pageBtn, ...(page === 0 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => goTo(page - 1)} disabled={page === 0 || loading}>‹ {t.paginationPrev}</button>
               <span style={styles.pageInfo}>{t.paginationPage} {page + 1} {t.ofLabel} {totalPages}</span>
-              <button style={styles.pageBtn} onClick={() => goTo(page + 1)} disabled={page >= totalPages - 1 || loading}>{t.paginationNext} ›</button>
-              <button style={styles.pageBtn} onClick={() => goTo(totalPages - 1)} disabled={page >= totalPages - 1 || loading}>»</button>
+              <button style={{ ...styles.pageBtn, ...(page >= totalPages - 1 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => goTo(page + 1)} disabled={page >= totalPages - 1 || loading}>{t.paginationNext} ›</button>
+              <button style={{ ...styles.pageBtn, ...(page >= totalPages - 1 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.lastPage} onClick={() => goTo(totalPages - 1)} disabled={page >= totalPages - 1 || loading}>»</button>
             </div>
           )}
         </>
@@ -155,7 +163,10 @@ const styles = {
   filterSelect: { padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, background: '#fff' },
   filterDate: { padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 },
   clearBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '5px 12px', borderRadius: 7, fontSize: 12, cursor: 'pointer' },
-  empty: { color: '#9ca3af', fontSize: 14, padding: '16px 0' },
+  emptyState: { textAlign: 'center', padding: '40px 20px' },
+  emptyIcon: { fontSize: 32, marginBottom: 10 },
+  emptyTitle: { fontSize: 14, fontWeight: 600, color: '#374151', margin: '0 0 4px' },
+  emptySubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
   list: { display: 'flex', flexDirection: 'column', gap: 1 },
   row: { display: 'flex', gap: 16, padding: '12px 4px', borderBottom: '1px solid #f3f4f6', alignItems: 'flex-start' },
   rowTime: { display: 'flex', flexDirection: 'column', minWidth: 90, flexShrink: 0 },

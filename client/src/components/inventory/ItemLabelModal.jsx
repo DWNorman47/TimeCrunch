@@ -28,6 +28,12 @@ export default function ItemLabelModal({ item, onClose }) {
       .catch(console.error);
   }, [item.id, item.sku, item.name]);
 
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   const printLabel = () => {
     if (!qrDataUrl) return;
     const win = window.open('', '_blank', 'width=380,height=480');
@@ -68,7 +74,7 @@ export default function ItemLabelModal({ item, onClose }) {
       <div style={s.modal}>
         <div style={s.header}>
           <h3 style={s.title}>{t.itemLabelTitle}</h3>
-          <button style={s.closeBtn} onClick={onClose}>✕</button>
+          <button style={s.closeBtn} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
 
         <div style={s.preview}>
@@ -88,7 +94,7 @@ export default function ItemLabelModal({ item, onClose }) {
 
         <div style={s.actions}>
           <button style={s.cancelBtn} onClick={onClose}>{t.labelModalClose}</button>
-          <button style={s.printBtn} onClick={printLabel} disabled={!qrDataUrl}>
+          <button style={{ ...s.printBtn, ...(!qrDataUrl ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={printLabel} disabled={!qrDataUrl}>
             {t.labelModalPrint}
           </button>
         </div>

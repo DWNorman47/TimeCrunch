@@ -35,20 +35,27 @@ router.put('/', requireAuth, async (req, res) => {
 
   const userId = req.user.id;
   const companyId = req.user.company_id;
+  const client = await pool.connect();
   try {
-    await pool.query('DELETE FROM worker_availability WHERE user_id = $1', [userId]);
+    await client.query('BEGIN');
+    await client.query('DELETE FROM worker_availability WHERE user_id = $1 AND company_id = $2', [userId, companyId]);
     if (deduped.length > 0) {
       const values = deduped.map((_, i) =>
         `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`
       ).join(', ');
       const params = deduped.flatMap(a => [userId, companyId, parseInt(a.day_of_week), a.start_time, a.end_time]);
-      await pool.query(
+      await client.query(
         `INSERT INTO worker_availability (user_id, company_id, day_of_week, start_time, end_time) VALUES ${values}`,
         params
       );
     }
+    await client.query('COMMIT');
     res.json({ ok: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  } finally { client.release(); }
 });
 
 // GET /availability/admin — all workers' availability for this company

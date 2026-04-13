@@ -9,6 +9,9 @@ const { checkStorageLimit, incrementStorage, decrementStorage } = require('../st
 router.get('/', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
+  const page  = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
   try {
     const { project_id, worker_id, status, from, to } = req.query;
     const conditions = ['r.company_id = $1'];
@@ -29,19 +32,25 @@ router.get('/', requireAuth, async (req, res) => {
     if (from) { params.push(from); conditions.push(`COALESCE(r.report_date, r.reported_at::date) >= $${params.length}::date`); }
     if (to) { params.push(to); conditions.push(`COALESCE(r.report_date, r.reported_at::date) <= $${params.length}::date`); }
 
-    const result = await pool.query(
-      `SELECT r.*, u.full_name as worker_name, p.name as project_name,
-              COALESCE(json_agg(ph ORDER BY ph.created_at) FILTER (WHERE ph.id IS NOT NULL), '[]') as photos
-       FROM field_reports r
-       JOIN users u ON r.user_id = u.id
-       LEFT JOIN projects p ON r.project_id = p.id
-       LEFT JOIN field_report_photos ph ON ph.report_id = r.id
-       WHERE ${conditions.join(' AND ')}
-       GROUP BY r.id, u.full_name, p.name
-       ORDER BY r.reported_at DESC LIMIT 500`,
-      params
-    );
-    res.json(result.rows);
+    const where = conditions.join(' AND ');
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(`SELECT COUNT(DISTINCT r.id) FROM field_reports r WHERE ${where}`, params),
+      pool.query(
+        `SELECT r.*, u.full_name as worker_name, p.name as project_name,
+                COALESCE(json_agg(ph ORDER BY ph.created_at) FILTER (WHERE ph.id IS NOT NULL), '[]') as photos
+         FROM field_reports r
+         JOIN users u ON r.user_id = u.id
+         LEFT JOIN projects p ON r.project_id = p.id
+         LEFT JOIN field_report_photos ph ON ph.report_id = r.id
+         WHERE ${where}
+         GROUP BY r.id, u.full_name, p.name
+         ORDER BY r.reported_at DESC
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+    ]);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -199,7 +208,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     );
     const totalBytes = parseInt(photoSum.rows[0].total);
 
-    await pool.query('DELETE FROM field_reports WHERE id = $1', [req.params.id]);
+    await pool.query('DELETE FROM field_reports WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
 
     if (totalBytes > 0) decrementStorage(companyId, totalBytes).catch(() => {});
 
@@ -212,6 +221,9 @@ router.get('/photos', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
   const { project_id, from, to } = req.query;
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 100));
+  const offset = (page - 1) * limit;
 
   const conditions = ['r.company_id = $1'];
   const params = [companyId];
@@ -224,21 +236,29 @@ router.get('/photos', requireAuth, async (req, res) => {
   if (from) { params.push(from); conditions.push(`r.reported_at >= $${params.length}`); }
   if (to) { params.push(to); conditions.push(`r.reported_at < ($${params.length}::date + interval '1 day')`); }
 
+  const where = conditions.join(' AND ');
   try {
-    const result = await pool.query(
-      `SELECT ph.id, ph.url, ph.caption, ph.media_type,
-              r.id as report_id, r.reported_at, r.title as report_title,
-              r.project_id, r.lat, r.lng,
-              p.name as project_name, u.full_name as worker_name
-       FROM field_report_photos ph
-       JOIN field_reports r ON ph.report_id = r.id
-       JOIN users u ON r.user_id = u.id
-       LEFT JOIN projects p ON r.project_id = p.id
-       WHERE ${conditions.join(' AND ')}
-       ORDER BY r.reported_at DESC, ph.id ASC LIMIT 500`,
-      params
-    );
-    res.json(result.rows);
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) FROM field_report_photos ph JOIN field_reports r ON ph.report_id = r.id WHERE ${where}`,
+        params
+      ),
+      pool.query(
+        `SELECT ph.id, ph.url, ph.caption, ph.media_type,
+                r.id as report_id, r.reported_at, r.title as report_title,
+                r.project_id, r.lat, r.lng,
+                p.name as project_name, u.full_name as worker_name
+         FROM field_report_photos ph
+         JOIN field_reports r ON ph.report_id = r.id
+         JOIN users u ON r.user_id = u.id
+         LEFT JOIN projects p ON r.project_id = p.id
+         WHERE ${where}
+         ORDER BY r.reported_at DESC, ph.id ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+    ]);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

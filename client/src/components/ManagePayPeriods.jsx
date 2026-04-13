@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { SkeletonList } from './Skeleton';
+import { langToLocale } from '../utils';
 
-function fmt(dateStr) {
-  return new Date(dateStr.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function fmt(dateStr, locale = 'en-US') {
+  return new Date(dateStr.substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function defaultPeriod() {
@@ -19,6 +23,9 @@ function defaultPeriod() {
 
 export default function ManagePayPeriods() {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
+  const toast = useToast();
   const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ from: defaultPeriod().from, to: defaultPeriod().to, label: '' });
@@ -43,8 +50,9 @@ export default function ManagePayPeriods() {
       setPeriods(prev => [r.data, ...prev]);
       const next = defaultPeriod();
       setForm({ from: next.from, to: next.to, label: '' });
+      toast(t.payPeriodLocked, 'success');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to lock period');
+      setError(err.response?.data?.error || t.failedLockPeriod);
     } finally { setSaving(false); }
   };
 
@@ -53,6 +61,9 @@ export default function ManagePayPeriods() {
     try {
       await api.delete(`/admin/pay-periods/${id}`);
       setPeriods(prev => prev.filter(p => p.id !== id));
+      toast(t.payPeriodUnlocked, 'success');
+    } catch {
+      toast(t.failedUnlockPeriod, 'error');
     } finally { setUnlocking(null); }
   };
 
@@ -64,20 +75,20 @@ export default function ManagePayPeriods() {
       <form onSubmit={lock} style={styles.form}>
         <div style={styles.formRow}>
           <div style={styles.field}>
-            <label style={styles.label}>{t.from}</label>
-            <input style={styles.input} type="date" value={form.from} onChange={e => setForm(f => ({ ...f, from: e.target.value }))} required />
+            <label htmlFor="pp-from" style={styles.label}>{t.from}</label>
+            <input id="pp-from" style={styles.input} type="date" value={form.from} onChange={e => setForm(f => ({ ...f, from: e.target.value }))} required />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.to}</label>
-            <input style={styles.input} type="date" value={form.to} onChange={e => setForm(f => ({ ...f, to: e.target.value }))} required />
+            <label htmlFor="pp-to" style={styles.label}>{t.to}</label>
+            <input id="pp-to" style={styles.input} type="date" value={form.to} onChange={e => setForm(f => ({ ...f, to: e.target.value }))} required />
           </div>
           <div style={{ ...styles.field, flex: 2 }}>
-            <label style={styles.label}>{t.labelOptional}</label>
-            <input style={styles.input} type="text" maxLength={100} value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="e.g. Week of Mar 10" />
+            <label htmlFor="pp-label" style={styles.label}>{t.labelOptional}</label>
+            <input id="pp-label" style={styles.input} type="text" maxLength={100} value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder={t.periodLabelExample} />
           </div>
           <div style={styles.field}>
             <label style={styles.label}>&nbsp;</label>
-            <button style={styles.lockBtn} type="submit" disabled={saving}>
+            <button style={{ ...styles.lockBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>
               {saving ? t.locking : t.lockPeriod}
             </button>
           </div>
@@ -85,7 +96,7 @@ export default function ManagePayPeriods() {
         {error && <p style={styles.error}>{error}</p>}
       </form>
 
-      {loading ? <p style={{ color: '#888', fontSize: 13 }}>{t.loading}</p> : periods.length === 0 ? (
+      {loading ? <SkeletonList count={3} rows={1} /> : periods.length === 0 ? (
         <p style={styles.empty}>{t.noLockedPeriods}</p>
       ) : (
         <div style={styles.list}>
@@ -93,16 +104,16 @@ export default function ManagePayPeriods() {
             <div key={p.id} style={styles.row}>
               <div style={styles.lockIcon}>🔒</div>
               <div style={styles.periodInfo}>
-                <div style={styles.periodLabel}>{p.label || `${fmt(p.period_start)} – ${fmt(p.period_end)}`}</div>
-                {p.label && <div style={styles.periodDates}>{fmt(p.period_start)} – {fmt(p.period_end)}</div>}
+                <div style={styles.periodLabel}>{p.label || `${fmt(p.period_start, locale)} – ${fmt(p.period_end, locale)}`}</div>
+                {p.label && <div style={styles.periodDates}>{fmt(p.period_start, locale)} – {fmt(p.period_end, locale)}</div>}
                 <div style={styles.periodMeta}>Locked by {p.locked_by_name} · {new Date(p.created_at).toLocaleDateString()}</div>
               </div>
               <button
-                style={styles.unlockBtn}
+                style={{ ...styles.unlockBtn, ...(unlocking === p.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                 onClick={() => unlock(p.id)}
                 disabled={unlocking === p.id}
               >
-                {unlocking === p.id ? '...' : t.unlock}
+                {unlocking === p.id ? t.saving : t.unlock}
               </button>
             </div>
           ))}

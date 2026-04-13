@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import Pagination from './Pagination';
+import { SkeletonList } from './Skeleton';
 
 function today() {
   return new Date().toLocaleDateString('en-CA');
@@ -20,7 +22,7 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
   const isEdit = !!initial.id;
 
   const handleSubmit = async e => {
@@ -48,7 +50,7 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.date} *</label>
-          <input style={styles.input} type="date" value={form.report_date} onChange={e => set('report_date', e.target.value)} required />
+          <input style={styles.input} type="date" value={form.report_date} onChange={e => set('report_date', e.target.value)} required max={today()} />
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
@@ -74,23 +76,25 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.headcount} <span style={styles.optional}>({t.workersOnSite})</span></label>
-        <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" placeholder="0" value={form.headcount} onChange={e => set('headcount', e.target.value)} />
+        <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="1" placeholder="0" value={form.headcount} onChange={e => set('headcount', e.target.value)} />
       </div>
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.workPerformed}</label>
         <textarea style={styles.textarea} rows={3} placeholder={t.subWorkPerformedPlaceholder} maxLength={2000} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
+        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{form.work_performed.length}/2000</div>
       </div>
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.notes} <span style={styles.optional}>({t.optional})</span></label>
         <textarea style={styles.textarea} rows={2} placeholder={t.issuesPlaceholder} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 
       {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.addReport}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.addReport}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -115,7 +119,7 @@ function SubCard({ report, onEdit, onDeleted }) {
 
   return (
     <div style={styles.card}>
-      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={styles.cardLeft}>
           <div style={styles.subName}>
             {report.sub_company}
@@ -150,7 +154,7 @@ function SubCard({ report, onEdit, onDeleted }) {
               <button style={styles.editBtn} onClick={() => onEdit(report)}>{t.edit}</button>
               {confirmingDelete ? (
                 <>
-                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                  <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
                   <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
                 </>
               ) : (
@@ -170,6 +174,8 @@ export default function SubReports({ projects }) {
   const t = useT();
   const { onSync } = useOffline() || {};
   const [reports, setReports] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -177,17 +183,19 @@ export default function SubReports({ projects }) {
 
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
-  const loadReports = async (f = filters) => {
+  const loadReports = async (f = filters, p = 1) => {
+    setPage(p);
     try {
-      const params = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
+      const params = { ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), page: p, limit: 50 };
       const r = await api.get('/sub-reports', { params });
-      setReports(r.data);
+      setReports(r.data.items);
+      setTotalPages(r.data.pages);
     } catch {}
   };
 
-  useEffect(() => { loadReports().finally(() => setLoading(false)); }, []);
-  useEffect(() => { if (!loading) loadReports(filters); }, [filters]);
-  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadReports(); }); }, [onSync]);
+  useEffect(() => { loadReports(filters, 1).finally(() => setLoading(false)); }, []);
+  useEffect(() => { if (!loading) loadReports(filters, 1); }, [filters]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadReports(filters, page); }); }, [onSync]);
 
   const handleSaved = (report, isEdit) => {
     if (isEdit) {
@@ -200,7 +208,7 @@ export default function SubReports({ projects }) {
   };
 
   // Unique sub company names for filter
-  const subNames = [...new Set(reports.map(r => r.sub_company))].sort();
+  const subNames = useMemo(() => [...new Set(reports.map(r => r.sub_company))].sort(), [reports]);
 
   return (
     <div>
@@ -222,7 +230,7 @@ export default function SubReports({ projects }) {
         </div>
       )}
 
-      <div style={styles.filterBar}>
+      <div className="filter-row" style={styles.filterBar}>
         {projects.length > 0 && (
           <select style={styles.filterSelect} value={filters.project_id || ''} onChange={e => setFilter('project_id', e.target.value)}>
             <option value="">{t.allProjects}</option>
@@ -240,23 +248,26 @@ export default function SubReports({ projects }) {
       </div>
 
       {loading ? (
-        <p style={styles.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : reports.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>🏗️</div>
           <p style={styles.emptyText}>{t.noSubReports}</p>
         </div>
       ) : (
-        <div style={styles.list}>
-          {reports.map(r => (
-            <SubCard
-              key={r.id}
-              report={r}
-              onEdit={r => { setEditing({ ...r, project_id: r.project_id || '', headcount: r.headcount ?? '' }); setShowForm(false); }}
-              onDeleted={id => setReports(prev => prev.filter(r => r.id !== id))}
-            />
-          ))}
-        </div>
+        <>
+          <div style={styles.list}>
+            {reports.map(r => (
+              <SubCard
+                key={r.id}
+                report={r}
+                onEdit={r => { setEditing({ ...r, project_id: r.project_id || '', headcount: r.headcount ?? '' }); setShowForm(false); }}
+                onDeleted={id => setReports(prev => prev.filter(r => r.id !== id))}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pages={totalPages} onChange={p => loadReports(filters, p)} />
+        </>
       )}
     </div>
   );

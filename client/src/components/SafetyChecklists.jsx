@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 import { useT } from '../hooks/useT';
+import Pagination from './Pagination';
+import { SkeletonList } from './Skeleton';
 
 const today = () => new Date().toLocaleDateString('en-CA');
 
@@ -111,7 +114,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
 
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>{t.templateNameLabel}</label>
+          <label style={styles.label}>{t.templateNameLabel}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
           <input style={styles.input} type="text" maxLength={255} value={name} onChange={e => setName(e.target.value)} placeholder={t.checklistNamePlaceholder} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
@@ -139,7 +142,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
               <option value="check">{t.checklistTypeCheckbox}</option>
               <option value="text">{t.checklistTypeText}</option>
             </select>
-            <button type="button" style={styles.removeItemBtn} onClick={() => removeItem(item._id)}>✕</button>
+            <button type="button" style={styles.removeItemBtn} aria-label={t.removeItem} onClick={() => removeItem(item._id)}>✕</button>
           </div>
         ))}
         {items.length === 0 && <p style={styles.hint}>{t.noItemsYet}</p>}
@@ -147,7 +150,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.createTemplate}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.createTemplate}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -260,12 +263,13 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.additionalNotes}</label>
           <textarea style={styles.textarea} rows={2} placeholder={t.anyObservations} maxLength={1000} value={notes} onChange={e => setNotes(e.target.value)} />
+          <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{notes.length}/1000</div>
         </div>
       )}
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving || !templateId}>
+        <button style={{ ...styles.submitBtn, ...((saving || !templateId) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving || !templateId}>
           {saving ? t.submitting : t.submitChecklist}
         </button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
@@ -278,6 +282,8 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
 
 function SubmissionCard({ sub, isAdmin, onDeleted }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -300,11 +306,11 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
 
   return (
     <div style={styles.card}>
-      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={styles.cardLeft}>
           <div style={styles.cardTitle}>{sub.template_name}</div>
           <div style={styles.cardMeta}>
-            {new Date(sub.check_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+            {new Date(sub.check_date + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
             {sub.project_name && <span style={styles.projectTag}>{sub.project_name}</span>}
             {sub.submitted_by_name && <span style={styles.submittedBy}>{t.submittedBy} {sub.submitted_by_name}</span>}
           </div>
@@ -347,7 +353,7 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
             <div style={styles.cardActions}>
               {confirmingDelete ? (
                 <>
-                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
+                  <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? t.saving : t.confirm}</button>
                   <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
                 </>
               ) : (
@@ -371,6 +377,8 @@ export default function SafetyChecklists({ projects }) {
   const [view, setView] = useState('list'); // 'list' | 'fill' | 'templates'
   const [templates, setTemplates] = useState([]);
   const [submissions, setSubmissions] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [filterProject, setFilterProject] = useState('');
   const [editingTemplate, setEditingTemplate] = useState(null);
@@ -378,27 +386,31 @@ export default function SafetyChecklists({ projects }) {
   const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
 
   // Attach template items to submissions for rendering
-  const templatesById = Object.fromEntries(templates.map(t => [t.id, t]));
-  const enriched = submissions.map(s => ({
-    ...s,
-    template_items: templatesById[s.template_id]?.items ?? [],
-  }));
+  const { templatesById, enriched } = useMemo(() => {
+    const byId = Object.fromEntries(templates.map(t => [t.id, t]));
+    return {
+      templatesById: byId,
+      enriched: submissions.map(s => ({ ...s, template_items: byId[s.template_id]?.items ?? [] })),
+    };
+  }, [templates, submissions]);
 
-  const load = async (proj = filterProject) => {
+  const load = async (proj = filterProject, p = 1) => {
+    setPage(p);
     try {
-      const params = {};
+      const params = { page: p, limit: 50 };
       if (proj) params.project_id = proj;
       const [t, s] = await Promise.all([
         api.get('/safety-checklists/templates'),
         api.get('/safety-checklists', { params }),
       ]);
       setTemplates(t.data);
-      setSubmissions(s.data);
+      setSubmissions(s.data.items);
+      setTotalPages(s.data.pages);
     } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
-  useEffect(() => { if (!loading) load(filterProject); }, [filterProject]);
+  useEffect(() => { if (!loading) load(filterProject, 1); }, [filterProject]);
 
   if (view === 'fill') {
     return (
@@ -442,6 +454,9 @@ export default function SafetyChecklists({ projects }) {
           <div style={styles.empty}>
             <div style={styles.emptyIcon}>📋</div>
             <p style={styles.emptyText}>{t.noTemplatesAdmin}</p>
+            <button style={styles.emptyCtaBtn} onClick={() => setShowTemplateForm(true)}>
+              + Create Template
+            </button>
           </div>
         ) : (
           <div style={styles.list}>
@@ -486,14 +501,14 @@ export default function SafetyChecklists({ projects }) {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {isAdmin && <button style={styles.templatesBtn} onClick={() => setView('templates')}>{t.manageTemplates}</button>}
-          <button style={styles.newBtn} onClick={() => setView('fill')} disabled={templates.length === 0}>
+          <button style={{ ...styles.newBtn, ...(templates.length === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setView('fill')} disabled={templates.length === 0}>
             {templates.length === 0 ? t.noTemplates : `+ ${t.fillOut}`}
           </button>
         </div>
       </div>
 
       {projects.length > 0 && (
-        <div style={styles.filters}>
+        <div className="filter-row" style={styles.filters}>
           <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
             <option value="">{t.allProjectsOpt}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -502,7 +517,7 @@ export default function SafetyChecklists({ projects }) {
       )}
 
       {loading ? (
-        <p style={styles.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : submissions.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>☑️</div>
@@ -513,16 +528,19 @@ export default function SafetyChecklists({ projects }) {
           </p>
         </div>
       ) : (
-        <div style={styles.list}>
-          {enriched.map(s => (
-            <SubmissionCard
-              key={s.id}
-              sub={s}
-              isAdmin={isAdmin}
-              onDeleted={id => setSubmissions(prev => prev.filter(x => x.id !== id))}
-            />
-          ))}
-        </div>
+        <>
+          <div style={styles.list}>
+            {enriched.map(s => (
+              <SubmissionCard
+                key={s.id}
+                sub={s}
+                isAdmin={isAdmin}
+                onDeleted={id => setSubmissions(prev => prev.filter(x => x.id !== id))}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pages={totalPages} onChange={p => load(filterProject, p)} />
+        </>
       )}
     </div>
   );
@@ -605,5 +623,6 @@ const styles = {
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { color: '#9ca3af', fontSize: 15 },
+  emptyCtaBtn: { marginTop: 14, background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   hint: { color: '#9ca3af', fontSize: 14 },
 };

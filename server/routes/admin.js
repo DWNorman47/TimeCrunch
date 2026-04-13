@@ -12,6 +12,7 @@ const { sendPushToUser, sendPushToAllWorkers } = require('../push');
 const { sendEmail } = require('../email');
 const { hoursWorked, computeOT, computeDailyPayCosts } = require('../utils/payCalculations');
 const { createInboxItem, createInboxItemBatch } = require('./inbox');
+const qbo = require('../services/qbo');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -154,7 +155,7 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
   const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
   const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour', 'chat_retention_days'];
   const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold', 'media_retention_days'];
-  const stringKeys = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id'];
+  const stringKeys = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id', 'qbo_expense_account_id', 'qbo_bank_account_id'];
   const allowed = [...numericKeys, ...stringKeys, ...FEATURE_KEYS];
   const companyId = req.user.company_id;
   try {
@@ -217,12 +218,12 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
 
 // ── Advanced Settings ──────────────────────────────────────────────────────────
 
-const ADVANCED_SETTING_KEYS = ['reimbursement_categories', 'item_units'];
+const ADVANCED_SETTING_KEYS = ['reimbursement_categories', 'item_units', 'mileage_rate'];
 
 // Hardcoded defaults — never stored in DB unless overridden
 const ADVANCED_DEFAULTS = {
   reimbursement_categories: {
-    defaults: ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'],
+    defaults: ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Mileage', 'Other'],
     suppressed: [],
     custom: [],
   },
@@ -231,6 +232,7 @@ const ADVANCED_DEFAULTS = {
     suppressed: [],
     custom: [],
   },
+  mileage_rate: { rate: 0.67 },
 };
 
 async function getAdvancedSettings(companyId) {
@@ -273,6 +275,10 @@ router.patch('/advanced-settings/:key', requireAdmin, requirePermission('manage_
         ? req.body.custom.map(s => String(s).trim()).filter(Boolean)
         : [];
       value = { suppressed, custom };
+    } else if (key === 'mileage_rate') {
+      const rate = parseFloat(req.body.rate);
+      if (isNaN(rate) || rate < 0 || rate > 10) return res.status(400).json({ error: 'rate must be between 0 and 10' });
+      value = { rate };
     }
 
     await pool.query(
@@ -455,8 +461,16 @@ router.patch('/entries/:id/times', requireAdmin, requirePermission('manage_worke
 router.patch('/entries/:id/edit', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const { start_time, end_time, project_id } = req.body;
+  const clientUpdatedAt = req.body.updated_at || null;
   if (!start_time || !end_time) return res.status(400).json({ error: 'start_time and end_time required' });
   try {
+    if (clientUpdatedAt) {
+      const cur = await pool.query('SELECT updated_at FROM time_entries WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+      if (!cur.rows.length) return res.status(404).json({ error: 'Entry not found' });
+      if (new Date(cur.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+        return res.status(409).json({ error: 'conflict' });
+      }
+    }
     // Derive wage_type from new project if provided
     let wage_type = 'regular';
     if (project_id) {
@@ -465,7 +479,7 @@ router.patch('/entries/:id/edit', requireAdmin, requirePermission('approve_entri
       wage_type = proj.rows[0].wage_type;
     }
     const result = await pool.query(
-      `UPDATE time_entries SET start_time=$1, end_time=$2, project_id=$3, wage_type=$4
+      `UPDATE time_entries SET start_time=$1, end_time=$2, project_id=$3, wage_type=$4, updated_at=NOW()
        WHERE id=$5 AND company_id=$6 RETURNING *`,
       [start_time, end_time, project_id || null, wage_type, req.params.id, companyId]
     );
@@ -1107,10 +1121,19 @@ router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), 
         fields.push(`guaranteed_weekly_hours = $${idx++}`); values.push(gn);
       }
     }
+    const workerClientUpdatedAt = req.body.updated_at || null;
+    if (workerClientUpdatedAt) {
+      const cur = await pool.query('SELECT updated_at FROM users WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+      if (!cur.rows.length) return res.status(404).json({ error: 'Worker not found' });
+      if (new Date(cur.rows[0].updated_at).getTime() !== new Date(workerClientUpdatedAt).getTime()) {
+        return res.status(409).json({ error: 'conflict' });
+      }
+    }
+    fields.push(`updated_at = NOW()`);
     values.push(req.params.id);
     values.push(companyId);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, invoice_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type, guaranteed_weekly_hours`,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, invoice_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type, guaranteed_weekly_hours, updated_at`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
@@ -1432,6 +1455,15 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
     }
     if (active !== undefined) { fields.push(`active = $${idx++}`); values.push(!!active); }
     if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+    const clientUpdatedAt = req.body.updated_at || null;
+    if (clientUpdatedAt) {
+      const cur = await pool.query('SELECT updated_at FROM projects WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+      if (!cur.rows.length) return res.status(404).json({ error: 'Project not found' });
+      if (new Date(cur.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+        return res.status(409).json({ error: 'conflict' });
+      }
+    }
+    fields.push(`updated_at = NOW()`);
     values.push(req.params.id);
     values.push(companyId);
     const result = await pool.query(
@@ -1472,7 +1504,22 @@ router.post('/projects', requireAdmin, requirePermission('manage_projects'), asy
        address?.trim() || null, start_date || null, end_date || null, st, description?.trim() || null]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.created', 'project', result.rows[0].id, name, { wage_type: wt });
-    res.status(201).json(result.rows[0]);
+    const newProject = result.rows[0];
+    res.status(201).json(newProject);
+
+    // QBO auto-create customer — fire-and-forget
+    setImmediate(async () => {
+      try {
+        const setting = await pool.query("SELECT value FROM settings WHERE company_id = $1 AND key = 'qbo_auto_create_customers'", [companyId]);
+        if (setting.rows[0]?.value !== '1') return;
+        const company = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
+        if (!company.rows[0]?.qbo_realm_id) return;
+        const customer = await qbo.createCustomer(companyId, { displayName: name });
+        if (customer?.Id) {
+          await pool.query('UPDATE projects SET qbo_customer_id = $1 WHERE id = $2', [customer.Id, newProject.id]);
+        }
+      } catch (err) { console.error('[QBO auto-create customer]', err.message); }
+    });
   } catch (err) {
     if (err.code === '23505') {
       const existing = await pool.query('SELECT id, name, active FROM projects WHERE name = $1 AND company_id = $2', [name, companyId]);
@@ -1983,12 +2030,13 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
   }
 });
 
-// GET /admin/entries/pending — pending time entries for this company (max 200; has_more signals overflow)
+// GET /admin/entries/pending — pending time entries for this company (max 200 per page; has_more signals more available)
 router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const LIMIT = 200;
   const accessIds = req.user.worker_access_ids;
-  const { from, to } = req.query;
+  const { from, to, offset: offsetParam } = req.query;
+  const offset = parseInt(offsetParam) || 0;
   try {
     const conditions = [`te.company_id = $1`, `te.status = 'pending'`];
     const params = [companyId];
@@ -1997,6 +2045,8 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
     if (to) { params.push(to); conditions.push(`te.work_date <= $${params.length}`); }
     params.push(LIMIT + 1);
     const limitIdx = params.length;
+    params.push(offset);
+    const offsetIdx = params.length;
     const result = await pool.query(
       `SELECT te.*, COALESCE(u.invoice_name, u.full_name) as worker_name, u.email as worker_email, p.name as project_name,
               te.clock_source, te.clocked_in_by, admin_u.full_name AS clocked_in_by_name
@@ -2006,7 +2056,7 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
        LEFT JOIN users admin_u ON te.clocked_in_by = admin_u.id
        WHERE ${conditions.join(' AND ')}
        ORDER BY te.worker_signed_at DESC NULLS LAST, te.work_date DESC, te.start_time DESC
-       LIMIT $${limitIdx}`,
+       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
       params
     );
     const has_more = result.rows.length > LIMIT;
@@ -2026,6 +2076,7 @@ router.get('/entries/recently-approved', requireAdmin, requirePermission('approv
     const params = accessIds && accessIds.length ? [companyId, accessIds] : [companyId];
     const { rows } = await pool.query(
       `SELECT te.id, te.work_date, te.start_time, te.end_time, te.project_id, te.user_id, te.approved_at,
+              te.qbo_activity_id, te.qbo_synced_at,
               COALESCE(u.invoice_name, u.full_name) AS worker_name, p.name AS project_name
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
@@ -2131,6 +2182,48 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
       `Your entry for ${entry.work_date?.toString().substring(0,10)} (${entry.start_time}–${entry.end_time}) was approved.`, '/dashboard');
     res.json(entry);
 
+    // QBO auto-sync — fire-and-forget, never blocks the response
+    setImmediate(async () => {
+      try {
+        const autopush = await pool.query("SELECT value FROM settings WHERE company_id = $1 AND key = 'qbo_auto_push'", [companyId]);
+        if (autopush.rows[0]?.value !== '1') return;
+        const company = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
+        if (!company.rows[0]?.qbo_realm_id) return;
+        const worker = await pool.query('SELECT qbo_employee_id, qbo_vendor_id, worker_type FROM users WHERE id = $1', [entry.user_id]);
+        const w = worker.rows[0];
+        if (!w) return;
+        const usesVendor = w.worker_type === 'contractor' || w.worker_type === 'subcontractor';
+        const mappedId = usesVendor ? w.qbo_vendor_id : w.qbo_employee_id;
+        if (!mappedId) return;
+        if (!entry.project_id) return;
+        const proj = await pool.query('SELECT qbo_customer_id, qbo_class_id FROM projects WHERE id = $1', [entry.project_id]);
+        const customerId = proj.rows[0]?.qbo_customer_id;
+        if (!customerId) return;
+        let ms = new Date(`1970-01-01T${entry.end_time}`) - new Date(`1970-01-01T${entry.start_time}`);
+        if (ms < 0) ms += 86400000;
+        const hours = Math.max(0, ms / 3600000 - (entry.break_minutes || 0) / 60);
+        const workDate = entry.work_date.toISOString().substring(0, 10);
+        const activity = await qbo.pushTimeActivity(companyId, {
+          ...(usesVendor ? { vendorId: w.qbo_vendor_id } : { employeeId: w.qbo_employee_id }),
+          customerId,
+          classId: proj.rows[0]?.qbo_class_id || null,
+          workDate,
+          hours,
+          description: entry.notes || '',
+        });
+        await pool.query(
+          'UPDATE time_entries SET qbo_activity_id = $1, qbo_synced_at = NOW() WHERE id = $2',
+          [activity?.Id || 'synced', entry.id]
+        );
+      } catch (err) {
+        console.error('[QBO auto-sync]', err.message);
+        pool.query(
+          'INSERT INTO qbo_sync_errors (company_id, entity_type, entity_id, error_message) VALUES ($1, $2, $3, $4)',
+          [companyId, 'time_entry', entry.id, err.message]
+        ).catch(() => {});
+      }
+    });
+
     // Budget alert — fire-and-forget after response is sent
     if (entry.project_id) {
       setImmediate(async () => {
@@ -2225,6 +2318,16 @@ router.patch('/entries/:id/reject', requireAdmin, requirePermission('approve_ent
     createInboxItem(rejEntry.user_id, companyId, 'rejection', 'Time entry rejected',
       `Your entry for ${rejEntry.work_date?.toString().substring(0,10)} was rejected.${note ? ` Reason: ${note}` : ''}`, '/dashboard');
     res.json(rejEntry);
+
+    // QBO cleanup — void the time activity if already synced
+    if (rejEntry.qbo_activity_id && rejEntry.qbo_activity_id !== 'synced') {
+      setImmediate(async () => {
+        try {
+          await qbo.deleteTimeActivity(companyId, rejEntry.qbo_activity_id);
+          await pool.query('UPDATE time_entries SET qbo_activity_id = NULL, qbo_synced_at = NULL WHERE id = $1 AND company_id = $2', [rejEntry.id, companyId]);
+        } catch (err) { console.error('[QBO delete on reject]', err.message); }
+      });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -2236,11 +2339,16 @@ router.patch('/entries/:id/unapprove', requireAdmin, requirePermission('approve_
   const companyId = req.user.company_id;
   const accessIds = req.user.worker_access_ids;
   try {
+    // Fetch existing qbo_activity_id before clearing it
+    const existing = await pool.query('SELECT qbo_activity_id FROM time_entries WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
+    const existingActivityId = existing.rows[0]?.qbo_activity_id;
+
     const workerFilter = accessIds && accessIds.length ? `AND user_id = ANY($3)` : '';
     const params = accessIds && accessIds.length ? [req.params.id, companyId, accessIds] : [req.params.id, companyId];
     const result = await pool.query(
       `UPDATE time_entries
-       SET status = 'pending', locked = false, approved_by = NULL, approved_at = NULL, approval_note = NULL
+       SET status = 'pending', locked = false, approved_by = NULL, approved_at = NULL, approval_note = NULL,
+           qbo_activity_id = NULL, qbo_synced_at = NULL
        WHERE id = $1 AND company_id = $2 AND status = 'approved' ${workerFilter}
        RETURNING *`,
       params
@@ -2248,6 +2356,14 @@ router.patch('/entries/:id/unapprove', requireAdmin, requirePermission('approve_
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found or not in approved state' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.unapproved', 'time_entry', parseInt(req.params.id), null);
     res.json(result.rows[0]);
+
+    // QBO cleanup — delete the time activity that was previously pushed
+    if (existingActivityId && existingActivityId !== 'synced') {
+      setImmediate(async () => {
+        try { await qbo.deleteTimeActivity(companyId, existingActivityId); }
+        catch (err) { console.error('[QBO delete on unapprove]', err.message); }
+      });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -2880,12 +2996,20 @@ router.post('/clients', requireAdmin, async (req, res) => {
 
 router.patch('/clients/:id', requireAdmin, async (req, res) => {
   const { name, contact_name, contact_email, contact_phone, address, notes } = req.body;
+  const clientUpdatedAt = req.body.updated_at || null;
   if (!name?.trim()) return res.status(400).json({ error: 'Client name is required' });
   const companyId = req.user.company_id;
   try {
+    if (clientUpdatedAt) {
+      const cur = await pool.query('SELECT updated_at FROM clients WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+      if (!cur.rows.length) return res.status(404).json({ error: 'Not found' });
+      if (new Date(cur.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+        return res.status(409).json({ error: 'conflict' });
+      }
+    }
     const result = await pool.query(
       `UPDATE clients SET name=$1, contact_name=$2, contact_email=$3, contact_phone=$4,
-       address=$5, notes=$6 WHERE id=$7 AND company_id=$8 RETURNING *`,
+       address=$5, notes=$6, updated_at=NOW() WHERE id=$7 AND company_id=$8 RETURNING *`,
       [name.trim(), contact_name || null, contact_email || null, contact_phone || null,
        address || null, notes || null, req.params.id, companyId]
     );
@@ -2896,11 +3020,25 @@ router.patch('/clients/:id', requireAdmin, async (req, res) => {
 
 router.delete('/clients/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
+  const client = await pool.connect();
   try {
-    await pool.query('UPDATE clients SET active=false WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
-    await pool.query('UPDATE projects SET client_id=NULL WHERE client_id=$1 AND company_id=$2', [req.params.id, companyId]);
+    await client.query('BEGIN');
+    const result = await client.query(
+      'UPDATE clients SET active=false WHERE id=$1 AND company_id=$2 RETURNING id',
+      [req.params.id, companyId]
+    );
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Client not found' });
+    }
+    await client.query('UPDATE projects SET client_id=NULL WHERE client_id=$1 AND company_id=$2', [req.params.id, companyId]);
+    await client.query('COMMIT');
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  } finally { client.release(); }
 });
 
 // Client documents
@@ -2932,6 +3070,8 @@ router.post('/clients/:id/documents', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const safeType = CLIENT_DOC_TYPES.includes(doc_type) ? doc_type : 'other';
   try {
+    const clientCheck = await pool.query('SELECT id FROM clients WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
+    if (clientCheck.rowCount === 0) return res.status(404).json({ error: 'Client not found' });
     const result = await pool.query(
       `INSERT INTO client_documents (company_id, client_id, name, url, size_bytes, doc_type, expires_at, uploaded_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
@@ -2966,8 +3106,8 @@ router.delete('/clients/:id/documents/:docId', requireAdmin, async (req, res) =>
     );
     if (doc.rowCount === 0) return res.status(404).json({ error: 'Document not found' });
     const { deleteByUrl } = require('../r2');
-    await deleteByUrl(doc.rows[0].url).catch(() => {});
     await pool.query('DELETE FROM client_documents WHERE id=$1', [req.params.docId]);
+    deleteByUrl(doc.rows[0].url).catch(() => {});
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -2991,21 +3131,29 @@ router.get('/workers/:id/documents', requireAdmin, async (req, res) => {
 
 router.post('/workers/:id/documents', requireAdmin, async (req, res) => {
   const { name, data } = req.body; // data = base64 data URL
-  if (!name || !data) return res.status(400).json({ error: 'name and data required' });
-  if (name.length > 255) return res.status(400).json({ error: 'name too long' });
+  const trimmedName = name?.trim();
+  if (!trimmedName || !data) return res.status(400).json({ error: 'name and data required' });
+  if (trimmedName.length > 255) return res.status(400).json({ error: 'name too long' });
   const companyId = req.user.company_id;
+
+  const workerCheck = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [req.params.id, companyId]).catch(() => null);
+  if (!workerCheck?.rows.length) return res.status(404).json({ error: 'Worker not found' });
+
+  let uploaded = null;
   try {
-    const workerCheck = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
-    if (workerCheck.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
-    const uploaded = await uploadBase64(data, 'documents');
+    uploaded = await uploadBase64(data, 'documents');
     const result = await pool.query(
       `INSERT INTO worker_documents (company_id, user_id, name, url, size_bytes, mime_type, uploaded_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [companyId, req.params.id, name, uploaded.url, uploaded.sizeBytes || null,
+      [companyId, req.params.id, trimmedName, uploaded.url, uploaded.sizeBytes || null,
        data.match(/^data:([^;]+)/)?.[1] || null, req.user.id]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    if (uploaded?.url) deleteByUrl(uploaded.url).catch(() => {});
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 router.delete('/workers/:id/documents/:docId', requireAdmin, async (req, res) => {
@@ -3016,7 +3164,7 @@ router.delete('/workers/:id/documents/:docId', requireAdmin, async (req, res) =>
       [req.params.docId, req.params.id, companyId]
     );
     if (doc.rowCount === 0) return res.status(404).json({ error: 'Document not found' });
-    await pool.query('DELETE FROM worker_documents WHERE id = $1', [req.params.docId]);
+    await pool.query('DELETE FROM worker_documents WHERE id = $1 AND company_id = $2', [req.params.docId, companyId]);
     deleteByUrl(doc.rows[0].url).catch(() => {});
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }

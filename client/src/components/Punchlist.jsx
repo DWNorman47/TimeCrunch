@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 import { useOffline } from '../contexts/OfflineContext';
-import { PunchlistPDFButton } from './PunchlistPDF';
 import { useT } from '../hooks/useT';
+import { useToast } from '../contexts/ToastContext';
+import { SkeletonList } from './Skeleton';
+import Pagination from './Pagination';
 
 const STATUS_COLORS = {
   open: { color: '#92400e', bg: '#fef3c7' },
@@ -49,52 +52,53 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
       <h3 style={styles.formTitle}>{t.newPunchlistItemForm}</h3>
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>{t.titleField} *</label>
-          <input style={styles.input} type="text" placeholder="e.g. Patch drywall in office 2B" maxLength={255} value={form.title} onChange={e => set('title', e.target.value)} />
+          <label htmlFor="pl-title" style={styles.label}>{t.titleField} *</label>
+          <input id="pl-title" style={styles.input} type="text" placeholder={t.punchlistTitlePlaceholder} maxLength={255} value={form.title} onChange={e => set('title', e.target.value)} />
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>Project</label>
-            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+            <label htmlFor="pl-project" style={styles.label}>Project</label>
+            <select id="pl-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
               <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
         )}
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.priorityField}</label>
-          <select style={styles.input} value={form.priority} onChange={e => set('priority', e.target.value)}>
+          <label htmlFor="pl-priority" style={styles.label}>{t.priorityField}</label>
+          <select id="pl-priority" style={styles.input} value={form.priority} onChange={e => set('priority', e.target.value)}>
             {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
         </div>
         {isAdmin && workers.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.assignTo}</label>
-            <select style={styles.input} value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)}>
+            <label htmlFor="pl-assign-to" style={styles.label}>{t.assignTo}</label>
+            <select id="pl-assign-to" style={styles.input} value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)}>
               <option value="">{t.unassigned}</option>
               {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
             </select>
           </div>
         )}
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.phaseField}</label>
-          <input style={styles.input} type="text" list="phase-suggestions" placeholder="e.g. Foundation, Rough-in" maxLength={255} value={form.phase} onChange={e => set('phase', e.target.value)} />
+          <label htmlFor="pl-phase" style={styles.label}>{t.phaseField}</label>
+          <input id="pl-phase" style={styles.input} type="text" list="phase-suggestions" placeholder={t.punchlistPhasePlaceholder} maxLength={255} value={form.phase} onChange={e => set('phase', e.target.value)} />
           <datalist id="phase-suggestions">
             {existingPhases.map(p => <option key={p} value={p} />)}
           </datalist>
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.locationField}</label>
-          <input style={styles.input} type="text" placeholder="e.g. 2nd floor, north wing" maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} />
+          <label htmlFor="pl-location" style={styles.label}>{t.locationField}</label>
+          <input id="pl-location" style={styles.input} type="text" placeholder={t.punchlistLocationPlaceholder} maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>{t.descriptionField}</label>
-          <textarea style={styles.textarea} rows={3} placeholder="Additional details..." maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
+          <label htmlFor="pl-description" style={styles.label}>{t.descriptionField}</label>
+          <textarea id="pl-description" style={styles.textarea} rows={3} placeholder={t.punchlistDetailPlaceholder} maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
+          <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.description || '').length}/1000</div>
         </div>
       </div>
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : t.addItem}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.addItem}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -103,6 +107,9 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
 
 function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, existingPhases }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
+  const toast = useToast();
   const STATUSES = [
     { value: 'open', label: t.statusOpen },
     { value: 'done', label: t.statusDone },
@@ -136,14 +143,15 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
     try {
       const r = await api.patch(`/punchlist/${item.id}`, { status: nextStatus[item.status] });
       onUpdated(r.data);
-    } finally { setUpdating(false); }
+    } catch { toast(t.failedUpdateStatus, 'error'); }
+    finally { setUpdating(false); }
   };
 
   const assignTo = async workerId => {
     try {
       const r = await api.patch(`/punchlist/${item.id}`, { assigned_to: workerId || null });
       onUpdated(r.data);
-    } catch {}
+    } catch { toast(t.failedAssignWorker, 'error'); }
   };
 
   const savePhase = async () => {
@@ -152,11 +160,12 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
     try {
       const r = await api.patch(`/punchlist/${item.id}`, { phase: val });
       onUpdated(r.data);
-    } catch {}
+    } catch { toast(t.failedSavePhase, 'error'); }
   };
 
   const handleDelete = async () => {
-    try { await api.delete(`/punchlist/${item.id}`); onDeleted(item.id); } catch {}
+    try { await api.delete(`/punchlist/${item.id}`); onDeleted(item.id); }
+    catch { toast(t.failedDeleteItem, 'error'); }
   };
 
   const toggleCheck = async (checkId, checked) => {
@@ -165,7 +174,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
       setChecklist(prev => prev.map(c => c.id === checkId ? r.data : c));
       const newDone = checklist.filter(c => c.id === checkId ? checked : c.checked).length;
       setItem(it => ({ ...it, checked_count: newDone }));
-    } catch {}
+    } catch { toast(t.failedUpdateChecklist, 'error'); }
   };
 
   const deleteCheck = async checkId => {
@@ -175,7 +184,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
       setChecklist(updated);
       const newDone = updated.filter(c => c.checked).length;
       setItem(it => ({ ...it, checklist_total: updated.length, checked_count: newDone }));
-    } catch {}
+    } catch { toast(t.failedDeleteChecklistItem, 'error'); }
   };
 
   const addCheck = async e => {
@@ -187,7 +196,8 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
       setChecklist(prev => [...(prev || []), r.data]);
       setItem(it => ({ ...it, checklist_total: parseInt(it.checklist_total || 0) + 1 }));
       setNewCheckText('');
-    } catch {} finally { setAddingCheck(false); }
+    } catch { toast(t.failedAddChecklistItem, 'error'); }
+    finally { setAddingCheck(false); }
   };
 
   const priorityDot = { high: '🔴', normal: '🟡', low: '⚪' }[item.priority] || '🟡';
@@ -196,7 +206,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
 
   return (
     <div style={{ ...styles.item, opacity: item.status === 'verified' ? 0.65 : 1 }}>
-      <div style={styles.itemRow} onClick={handleExpand}>
+      <div style={styles.itemRow} onClick={handleExpand} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleExpand()}>
         <span style={styles.priorityDot} title={`Priority: ${item.priority}`}>{priorityDot}</span>
         <div style={styles.itemMain}>
           <span style={{ ...styles.itemTitle, textDecoration: item.status === 'verified' ? 'line-through' : 'none' }}>
@@ -227,13 +237,14 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
         <div style={styles.itemBody}>
           {item.description && <p style={styles.desc}>{item.description}</p>}
           {item.resolved_at && item.status === 'verified' && (
-            <p style={styles.resolvedNote}>{t.verifiedOn} {new Date(item.resolved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+            <p style={styles.resolvedNote}>{t.verifiedOn} {new Date(item.resolved_at).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
           )}
 
           {/* Phase edit */}
           <div style={styles.phaseEditRow}>
-            <label style={styles.label}>{t.phaseField}</label>
+            <label htmlFor="pl-edit-phase" style={styles.label}>{t.phaseField}</label>
             <input
+              id="pl-edit-phase"
               style={styles.phaseInput}
               type="text"
               list="phase-suggestions"
@@ -265,7 +276,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
                         <span style={{ ...styles.checkText, textDecoration: c.checked ? 'line-through' : 'none', color: c.checked ? '#9ca3af' : '#374151' }}>
                           {c.text}
                         </span>
-                        <button style={styles.checkDeleteBtn} onClick={() => deleteCheck(c.id)}>✕</button>
+                        <button style={styles.checkDeleteBtn} aria-label={t.deleteChecklistItem} onClick={() => deleteCheck(c.id)}>✕</button>
                       </div>
                     ))}
                   </div>
@@ -279,7 +290,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
                     onChange={e => setNewCheckText(e.target.value)}
                   />
                   {newCheckText.trim() && (
-                    <button type="submit" style={styles.checkAddBtn} disabled={addingCheck}>{t.add}</button>
+                    <button type="submit" style={{ ...styles.checkAddBtn, ...(addingCheck ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={addingCheck}>{t.add}</button>
                   )}
                 </form>
               </>
@@ -288,16 +299,16 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
 
           {isAdmin && (
             <div style={styles.assignRow}>
-              <label style={styles.label}>{t.assignTo}: </label>
-              <select style={styles.smallSelect} value={item.assigned_to || ''} onChange={e => assignTo(e.target.value)}>
+              <label htmlFor="pl-edit-assign" style={styles.label}>{t.assignTo}: </label>
+              <select id="pl-edit-assign" style={styles.smallSelect} value={item.assigned_to || ''} onChange={e => assignTo(e.target.value)}>
                 <option value="">{t.unassigned}</option>
                 {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
               </select>
             </div>
           )}
           <div style={styles.itemActions}>
-            <button style={styles.advanceBtn} onClick={advance} disabled={updating}>
-              {updating ? '...' : nextLabel[item.status] || t.markDone}
+            <button style={{ ...styles.advanceBtn, ...(updating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={advance} disabled={updating}>
+              {updating ? t.saving : nextLabel[item.status] || t.markDone}
             </button>
             {confirmingDelete ? (
               <>
@@ -320,21 +331,41 @@ export default function Punchlist({ projects }) {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
   const [items, setItems] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const [{ pdf }, { PunchlistDocument }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./PunchlistPDF'),
+      ]);
+      const blob = await pdf(React.createElement(PunchlistDocument, { items, companyName: user?.company_name })).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'punchlist.pdf'; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
   const [filterProject, setFilterProject] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPhase, setFilterPhase] = useState('');
 
-  const load = async (proj = filterProject, stat = filterStatus, ph = filterPhase) => {
+  const load = async (proj = filterProject, stat = filterStatus, ph = filterPhase, p = 1) => {
+    setPage(p);
     try {
-      const params = {};
+      const params = { page: p, limit: 50 };
       if (proj) params.project_id = proj;
       if (stat) params.status = stat;
       if (ph) params.phase = ph;
       const r = await api.get('/punchlist', { params });
-      setItems(r.data);
+      setItems(r.data.items);
+      setTotalPages(r.data.pages);
     } finally { setLoading(false); }
   };
 
@@ -349,24 +380,27 @@ export default function Punchlist({ projects }) {
     init();
   }, []);
 
-  useEffect(() => { if (!loading) load(filterProject, filterStatus, filterPhase); }, [filterProject, filterStatus, filterPhase]);
-  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(); }); }, [onSync]);
+  useEffect(() => { if (!loading) load(filterProject, filterStatus, filterPhase, 1); }, [filterProject, filterStatus, filterPhase]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(filterProject, filterStatus, filterPhase, page); }); }, [onSync]);
 
-  const openCount = items.filter(i => i.status === 'open').length;
-  const doneCount = items.filter(i => i.status === 'done').length;
-  const verifiedCount = items.filter(i => i.status === 'verified').length;
+  const { openCount, doneCount, verifiedCount } = useMemo(() => ({
+    openCount: items.filter(i => i.status === 'open').length,
+    doneCount: items.filter(i => i.status === 'done').length,
+    verifiedCount: items.filter(i => i.status === 'verified').length,
+  }), [items]);
 
   // All unique phases across current items (for datalist + filter dropdown)
-  const allPhases = [...new Set(items.map(i => i.phase).filter(Boolean))].sort();
+  const allPhases = useMemo(() => [...new Set(items.map(i => i.phase).filter(Boolean))].sort(), [items]);
 
   // Group items by phase when any have a phase set
-  const hasPhases = items.some(i => i.phase);
-  const grouped = hasPhases
-    ? [
-        ...allPhases.map(ph => ({ phase: ph, items: items.filter(i => i.phase === ph) })),
-        ...(items.some(i => !i.phase) ? [{ phase: null, items: items.filter(i => !i.phase) }] : []),
-      ]
-    : [{ phase: null, items }];
+  const grouped = useMemo(() => {
+    const hasPhases = items.some(i => i.phase);
+    if (!hasPhases) return [{ phase: null, items }];
+    return [
+      ...allPhases.map(ph => ({ phase: ph, items: items.filter(i => i.phase === ph) })),
+      ...(items.some(i => !i.phase) ? [{ phase: null, items: items.filter(i => !i.phase) }] : []),
+    ];
+  }, [items, allPhases]);
 
   return (
     <div>
@@ -380,7 +414,7 @@ export default function Punchlist({ projects }) {
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {items.length > 0 && <PunchlistPDFButton items={items} companyName={user?.company_name} style={styles.pdfBtn} />}
+          {items.length > 0 && <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? t.preparing : t.exportPDF}</button>}
           <button style={styles.newBtn} onClick={() => setShowForm(true)}>{t.newPunchlistItem}</button>
         </div>
       </div>
@@ -418,7 +452,7 @@ export default function Punchlist({ projects }) {
       </div>
 
       {loading ? (
-        <p style={styles.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : items.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>✅</div>
@@ -449,6 +483,7 @@ export default function Punchlist({ projects }) {
               </div>
             </div>
           ))}
+          <Pagination page={page} pages={totalPages} onChange={p => load(filterProject, filterStatus, filterPhase, p)} />
         </div>
       )}
     </div>
