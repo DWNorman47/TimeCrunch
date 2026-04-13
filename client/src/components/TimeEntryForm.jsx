@@ -87,7 +87,7 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
         <div style={styles.row} className="form-row">
           {projectsEnabled && <div style={styles.field}>
             <label style={styles.label}>{t.project}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)} required>
+            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)} required disabled={saving}>
               <option value="">{t.selectProject}</option>
               {projects.map(p => (
                 <option key={p.id} value={p.id}>
@@ -98,17 +98,17 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
           </div>}
           <div style={styles.field}>
             <label style={styles.label}>{t.date}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-            <input style={styles.input} type="date" value={form.work_date} onChange={e => set('work_date', e.target.value)} required />
+            <input style={styles.input} type="date" value={form.work_date} onChange={e => set('work_date', e.target.value)} required disabled={saving} />
           </div>
         </div>
         <div style={styles.row} className="form-row">
           <div style={styles.field}>
             <label style={styles.label}>{t.startTime}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-            <input style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required />
+            <input style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required disabled={saving} />
           </div>
           <div style={styles.field}>
             <label style={styles.label}>{t.endTime}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-            <input style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required />
+            <input style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required disabled={saving} />
           </div>
         </div>
         {selectedProject && (
@@ -121,11 +121,11 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
         <div style={styles.row} className="form-row">
           <div style={styles.field}>
             <label style={styles.label}>{t.entryPanelBreakMin}</label>
-            <input style={styles.input} type="number" min="0" max="480" step="1" value={form.break_minutes} onChange={e => set('break_minutes', e.target.value)} placeholder="0" />
+            <input style={styles.input} type="number" min="0" max="480" step="1" value={form.break_minutes} onChange={e => set('break_minutes', e.target.value)} placeholder="0" disabled={saving} />
           </div>
           <div style={styles.field}>
             <label style={styles.label}>{t.entryPanelMileage}</label>
-            <input style={styles.input} type="number" min="0" step="0.1" value={form.mileage} onChange={e => set('mileage', e.target.value)} placeholder="Optional" />
+            <input style={styles.input} type="number" min="0" step="0.1" value={form.mileage} onChange={e => set('mileage', e.target.value)} placeholder={t.optional} disabled={saving} />
           </div>
         </div>
         <div style={styles.field}>
@@ -133,7 +133,7 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
             <label style={styles.label}>{t.notesOptional}</label>
             <span style={styles.charCount}>{form.notes.length}/500</span>
           </div>
-          <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.notesPlaceholder} maxLength={500} />
+          <input style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.notesPlaceholder} maxLength={500} disabled={saving} />
         </div>
         {error && <p style={styles.error}>{error}</p>}
         {success && <p style={styles.success}>{t.entrySaved}</p>}

@@ -126,11 +126,11 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.inspTemplateName}</label>
-        <input style={styles.input} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daily Site Safety" />
+        <input style={styles.input} value={name} onChange={e => setName(e.target.value)} placeholder={t.inspTemplatePlaceholder} />
       </div>
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.inspDescriptionField} <span style={styles.optional}>{t.inspOptional}</span></label>
-        <input style={styles.input} maxLength={255} value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of when to use this checklist" />
+        <input style={styles.input} maxLength={255} value={description} onChange={e => setDescription(e.target.value)} placeholder={t.inspTemplateDescPlaceholder} />
       </div>
 
       <div>
@@ -262,11 +262,11 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.inspInspector} <span style={styles.optional}>{t.inspOptional}</span></label>
-          <input style={styles.input} maxLength={255} value={form.inspector} onChange={e => set('inspector', e.target.value)} placeholder="Name of inspector" />
+          <input style={styles.input} maxLength={255} value={form.inspector} onChange={e => set('inspector', e.target.value)} placeholder={t.inspInspectorPlaceholder} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.inspInspectionLocation} <span style={styles.optional}>{t.inspOptional}</span></label>
-          <input style={styles.input} maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} placeholder="Area or location inspected" />
+          <input style={styles.input} maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} placeholder={t.inspLocationPlaceholder} />
         </div>
       </div>
 
@@ -347,7 +347,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.notes} <span style={styles.optional}>{t.inspOptional}</span></label>
-        <textarea style={styles.textarea} rows={3} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="General notes about this inspection…" />
+        <textarea style={styles.textarea} rows={3} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.inspNotesPh} />
         <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 

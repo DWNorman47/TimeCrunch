@@ -276,7 +276,7 @@ export default function AnalyticsDashboard() {
               />
               <Tooltip
                 formatter={v => [`${v}h`, t.chartHoursLabel]}
-                labelFormatter={d => `Week of ${formatWeek(d)}`}
+                labelFormatter={d => `${t.weekOf} ${formatWeek(d)}`}
                 contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e5e7eb' }}
               />
               <Line

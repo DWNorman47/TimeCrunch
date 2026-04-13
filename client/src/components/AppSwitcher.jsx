@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useT } from '../hooks/useT';
 
 // Workers see: Time Clock, Field, Inventory, Account
 // Admins see: Time Clock, Field, Inventory, Projects, Administration, Analytics
@@ -96,6 +97,7 @@ const APPS = [
 ];
 
 export default function AppSwitcher({ currentApp = 'timeclock', userRole, features = {} }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
@@ -156,7 +158,7 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
                 {app.icon}
               </div>
               <span style={{ ...styles.itemName, color: app.soon ? '#9ca3af' : '#111827' }}>{app.name}</span>
-              {app.soon && <span style={styles.soonBadge}>Soon</span>}
+              {app.soon && <span style={styles.soonBadge}>{t.comingSoon}</span>}
             </button>
           ))}
         </div>

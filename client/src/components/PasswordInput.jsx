@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../hooks/useT';
 
 const EyeIcon = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -16,6 +17,7 @@ const EyeOffIcon = (
 );
 
 export default function PasswordInput({ style, ...props }) {
+  const t = useT();
   const [show, setShow] = useState(false);
   return (
     <div style={{ position: 'relative', display: 'flex' }}>
@@ -28,7 +30,7 @@ export default function PasswordInput({ style, ...props }) {
         type="button"
         tabIndex={-1}
         onClick={() => setShow(s => !s)}
-        aria-label={show ? 'Hide password' : 'Show password'}
+        aria-label={show ? t.hidePassword : t.showPassword}
         style={{
           position: 'absolute', right: 0, top: 0, bottom: 0,
           width: 38, background: 'none', border: 'none',

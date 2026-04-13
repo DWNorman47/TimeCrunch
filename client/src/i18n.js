@@ -218,6 +218,30 @@ const translations = {
     aqRecentlyApproved: 'Recently Approved',
     aqUnapprove: '↩ Unapprove',
 
+    // ── Notification Bell ─────────────────────────────────────────────────────
+    notifications: 'Notifications',
+    markAllRead: 'Mark all read',
+    noNotificationsYet: 'No notifications yet',
+    justNow: 'Just now',
+    minutesAgo: '{n}m ago',
+    hoursAgo: '{n}h ago',
+    notifAriaLabel: 'Notifications',
+
+    // ── Upcoming Shifts ───────────────────────────────────────────────────────
+    upcomingShifts: 'Upcoming Shifts',
+    shiftToday: 'Today',
+    shiftTomorrow: 'Tomorrow',
+
+    // ── App Switcher ──────────────────────────────────────────────────────────
+    comingSoon: 'Soon',
+
+    // ── Analytics ────────────────────────────────────────────────────────────
+    weekOf: 'Week of',
+
+    // ── Password Input ────────────────────────────────────────────────────────
+    hidePassword: 'Hide password',
+    showPassword: 'Show password',
+
     // ── Live Workers ─────────────────────────────────────────────────────────
     inactiveWorkers: 'Inactive workers',
     liveWorkers: 'Live Workers',
@@ -1018,6 +1042,7 @@ const translations = {
     ofLabel: 'of',
     auditEvents: 'events',
     auditNoActivity: 'No matching activity.',
+    auditEmptySub: 'Actions taken by admins and workers will appear here.',
     auditBy: 'by',
     auditClear: 'Clear',
     auditWorkerAdded: 'Worker added',
@@ -1883,6 +1908,11 @@ const translations = {
     inspFailedDelete: 'Failed to delete',
     inspFailedSave: 'Failed to save',
     inspOptional: '(optional)',
+    inspTemplatePlaceholder: 'e.g. Daily Site Safety',
+    inspTemplateDescPlaceholder: 'Brief description of when to use this checklist',
+    inspInspectorPlaceholder: 'Name of inspector',
+    inspLocationPlaceholder: 'Area or location inspected',
+    inspNotesPh: 'General notes about this inspection…',
     inspItemsCount: 'items',
     inspTemplateNameRequired: 'Template name is required.',
     inspAddAtLeastOne: 'Add at least one checklist item.',
@@ -2114,6 +2144,30 @@ const translations = {
     aqSplitSave: 'Dividir y Guardar',
     aqRecentlyApproved: 'Aprobados Recientemente',
     aqUnapprove: '↩ Desaprobar',
+
+    // ── Notification Bell ─────────────────────────────────────────────────────
+    notifications: 'Notificaciones',
+    markAllRead: 'Marcar todo como leído',
+    noNotificationsYet: 'Aún no hay notificaciones',
+    justNow: 'Ahora mismo',
+    minutesAgo: 'hace {n}m',
+    hoursAgo: 'hace {n}h',
+    notifAriaLabel: 'Notificaciones',
+
+    // ── Upcoming Shifts ───────────────────────────────────────────────────────
+    upcomingShifts: 'Turnos Próximos',
+    shiftToday: 'Hoy',
+    shiftTomorrow: 'Mañana',
+
+    // ── App Switcher ──────────────────────────────────────────────────────────
+    comingSoon: 'Pronto',
+
+    // ── Analytics ────────────────────────────────────────────────────────────
+    weekOf: 'Semana del',
+
+    // ── Password Input ────────────────────────────────────────────────────────
+    hidePassword: 'Ocultar contraseña',
+    showPassword: 'Mostrar contraseña',
 
     // ── Live Workers ─────────────────────────────────────────────────────────
     inactiveWorkers: 'Trabajadores inactivos',
@@ -2905,6 +2959,7 @@ const translations = {
     ofLabel: 'de',
     auditEvents: 'eventos',
     auditNoActivity: 'Sin actividad coincidente.',
+    auditEmptySub: 'Las acciones realizadas por administradores y trabajadores aparecerán aquí.',
     auditBy: 'por',
     auditClear: 'Limpiar',
     auditWorkerAdded: 'Trabajador agregado',
@@ -3769,6 +3824,11 @@ const translations = {
     inspFailedDelete: 'Error al eliminar',
     inspFailedSave: 'Error al guardar',
     inspOptional: '(opcional)',
+    inspTemplatePlaceholder: 'p.ej. Seguridad Diaria del Sitio',
+    inspTemplateDescPlaceholder: 'Breve descripción de cuándo usar esta lista',
+    inspInspectorPlaceholder: 'Nombre del inspector',
+    inspLocationPlaceholder: 'Área o ubicación inspeccionada',
+    inspNotesPh: 'Notas generales sobre esta inspección…',
     inspItemsCount: 'elementos',
     inspTemplateNameRequired: 'El nombre de la plantilla es obligatorio.',
     inspAddAtLeastOne: 'Agrega al menos un elemento de lista.',

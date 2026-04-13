@@ -104,7 +104,7 @@ export default function AuditLog({ timezone = '' }) {
         <div style={styles.emptyState}>
           <div style={styles.emptyIcon}>📋</div>
           <p style={styles.emptyTitle}>{t.auditNoActivity}</p>
-          <p style={styles.emptySubtitle}>Actions taken by admins and workers will appear here.</p>
+          <p style={styles.emptySubtitle}>{t.auditEmptySub}</p>
         </div>
       ) : (
         <>
