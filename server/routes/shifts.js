@@ -1,9 +1,22 @@
 const router = require('express').Router();
 const pool = require('../db');
+const rateLimit = require('express-rate-limit');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem, createInboxItemBatch } = require('./inbox');
 const { logAudit } = require('../auditLog');
+
+// Cap shift writes per user. Admins legitimately create shifts in bursts
+// (weekly scheduling), so the ceiling is higher than chat but still prevents
+// runaway scripts or a compromised account from flooding the table.
+const shiftWriteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyGenerator: req => String(req.user?.id || req.ip),
+  message: { error: 'Too many shift writes. Please wait a moment and try again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // GET /admin/shifts?from=&to= — all company shifts in range
 router.get('/admin', requireAdmin, async (req, res) => {
@@ -27,7 +40,7 @@ router.get('/admin', requireAdmin, async (req, res) => {
 });
 
 // POST /admin/shifts — create a shift
-router.post('/admin', requireAdmin, async (req, res) => {
+router.post('/admin', requireAdmin, shiftWriteLimiter, async (req, res) => {
   const { user_id, project_id, shift_date, start_time, end_time, recurrence_group_id } = req.body;
   const notes = req.body.notes?.trim() || null;
   if (!user_id || !shift_date || !start_time || !end_time) {
@@ -63,7 +76,7 @@ router.post('/admin', requireAdmin, async (req, res) => {
 });
 
 // PATCH /admin/shifts/:id — edit a shift
-router.patch('/admin/:id', requireAdmin, async (req, res) => {
+router.patch('/admin/:id', requireAdmin, shiftWriteLimiter, async (req, res) => {
   const { project_id, shift_date, start_time, end_time } = req.body;
   const notes = req.body.notes?.trim() || null;
   if (!shift_date || !start_time || !end_time) {
@@ -102,7 +115,7 @@ router.patch('/admin/:id', requireAdmin, async (req, res) => {
 });
 
 // DELETE /admin/shifts/:id
-router.delete('/admin/:id', requireAdmin, async (req, res) => {
+router.delete('/admin/:id', requireAdmin, shiftWriteLimiter, async (req, res) => {
   try {
     const full = await pool.query(
       `SELECT s.*, u.full_name as worker_name, p.name as project_name
@@ -123,7 +136,7 @@ router.delete('/admin/:id', requireAdmin, async (req, res) => {
 });
 
 // PATCH /shifts/:id/cant-make-it — worker flags they can't attend
-router.patch('/:id/cant-make-it', requireAuth, async (req, res) => {
+router.patch('/:id/cant-make-it', requireAuth, shiftWriteLimiter, async (req, res) => {
   const { cant_make_it, note } = req.body;
   try {
     const result = await pool.query(
@@ -155,7 +168,7 @@ router.patch('/:id/cant-make-it', requireAuth, async (req, res) => {
 });
 
 // DELETE /admin/shifts/series/:groupId — cancel all future shifts in a recurrence group
-router.delete('/admin/series/:groupId', requireAdmin, async (req, res) => {
+router.delete('/admin/series/:groupId', requireAdmin, shiftWriteLimiter, async (req, res) => {
   const companyId = req.user.company_id;
   const { groupId } = req.params;
   try {

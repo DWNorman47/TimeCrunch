@@ -53,6 +53,25 @@ router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
   if (notesTrimmed && notesTrimmed.length > 500) return res.status(400).json({ error: 'Notes must be 500 characters or fewer' });
   const companyId = req.user.company_id;
   try {
+    // Free tier: block submissions dated > 90 days ago. Matches the GET
+    // visibility clause at the top of this file so workers can't silently
+    // submit back-dated entries they'd never be able to see or edit.
+    const co = await pool.query(
+      'SELECT plan, subscription_status, trial_ends_at FROM companies WHERE id = $1',
+      [companyId]
+    );
+    const { plan, subscription_status, trial_ends_at } = co.rows[0] || {};
+    const trialActive = subscription_status === 'trial' && (!trial_ends_at || new Date(trial_ends_at) >= new Date());
+    const isFree = plan === 'free' && !trialActive;
+    if (isFree) {
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      const workDate = new Date(work_date + 'T00:00:00');
+      if (workDate < ninetyDaysAgo) {
+        return res.status(403).json({ error: 'Free plan is limited to entries within the last 90 days. Upgrade to submit older entries.' });
+      }
+    }
+
     const projectResult = await pool.query(
       'SELECT wage_type FROM projects WHERE id = $1 AND company_id = $2',
       [project_id, companyId]
