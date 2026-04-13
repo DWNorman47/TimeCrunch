@@ -17,12 +17,23 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={toast}>
       {children}
       <div style={styles.container}>
-        {toasts.map(t => (
-          <div key={t.id} style={{ ...styles.toast, ...styles[t.type] }}>
-            <span style={styles.msg}>{t.message}</span>
-            <button style={styles.close} onClick={() => dismiss(t.id)}>×</button>
-          </div>
-        ))}
+        {toasts.map(t => {
+          // Urgent feedback (error/warning) interrupts the screen reader;
+          // status messages (success/info) are announced at the next idle moment.
+          const isUrgent = t.type === 'error' || t.type === 'warning';
+          return (
+            <div
+              key={t.id}
+              role={isUrgent ? 'alert' : 'status'}
+              aria-live={isUrgent ? 'assertive' : 'polite'}
+              aria-atomic="true"
+              style={{ ...styles.toast, ...styles[t.type] }}
+            >
+              <span style={styles.msg}>{t.message}</span>
+              <button style={styles.close} aria-label="Dismiss" onClick={() => dismiss(t.id)}>×</button>
+            </div>
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );
