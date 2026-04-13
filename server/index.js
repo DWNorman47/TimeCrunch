@@ -10,12 +10,38 @@ if (missing.length) {
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const pinoHttp = require('pino-http');
+const crypto = require('crypto');
 const { requireAuth, requirePlan, requireProAddon } = require('./middleware/auth');
 const pool = require('./db');
+const logger = require('./logger');
 
 const app = express();
 app.set('trust proxy', 1); // trust first proxy (Render) so req.ip is the real client IP
 app.use(helmet());
+
+// Request logging: one line per request with a reqId that's attached to
+// req.log so handlers can log more context that correlates to the request.
+// Health checks are logged at debug only to keep prod logs clean.
+app.use(pinoHttp({
+  logger,
+  genReqId: (req, res) => {
+    const existing = req.headers['x-request-id'];
+    const id = existing || crypto.randomBytes(8).toString('hex');
+    res.setHeader('x-request-id', id);
+    return id;
+  },
+  customLogLevel: (req, res, err) => {
+    if (err || res.statusCode >= 500) return 'error';
+    if (res.statusCode >= 400) return 'warn';
+    if (req.url === '/api/health' || req.url === '/api/health/live') return 'debug';
+    return 'info';
+  },
+  serializers: {
+    req: req => ({ method: req.method, url: req.url, ip: req.ip }),
+    res: res => ({ statusCode: res.statusCode }),
+  },
+}));
 
 const ALLOWED_ORIGINS = [
   'https://opsfloa.com',
@@ -120,7 +146,7 @@ app.get('/api/settings', requireAuth, async (req, res) => {
       storage_limit_bytes: limitForPlan(resolvedPlan),
     });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err }, 'GET /api/settings failed');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -133,7 +159,10 @@ app.get('/api/company-info', requireAuth, async (req, res) => {
       [req.user.company_id]
     );
     res.json(result.rows[0] || {});
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    req.log.error({ err }, 'GET /api/company-info failed');
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // Liveness: is the process running? Fast, no dependencies.
@@ -178,9 +207,20 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
+// Last-chance error logging. Node's default is to crash on an uncaught
+// exception — we log structured first so the cause is visible in logs,
+// then let the process exit (Render restarts it).
+process.on('uncaughtException', err => {
+  logger.fatal({ err }, 'uncaughtException');
+  setTimeout(() => process.exit(1), 200); // give pino time to flush
+});
+process.on('unhandledRejection', reason => {
+  logger.error({ reason }, 'unhandledRejection');
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info({ port: PORT }, 'server listening');
   const { startInactiveWorkerJob } = require('./jobs/inactiveWorkers');
   startInactiveWorkerJob();
   const { startExpireTrialsJob } = require('./jobs/expireTrials');
