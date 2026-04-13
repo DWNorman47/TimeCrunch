@@ -70,6 +70,25 @@ export function reportClientError({ kind, message, stack }) {
   } catch { /* reporting must never throw */ }
 }
 
+/**
+ * Build a .catch() handler that reports the error to Sentry + our DB but
+ * doesn't surface it in the UI. Use for background fetches where the UX
+ * decision is "don't bother the user" but the engineering decision must
+ * still be "don't hide bugs from ourselves."
+ *
+ * Usage:
+ *   api.get('/foo').then(r => setFoo(r.data)).catch(silentError('fetch foo'));
+ */
+export function silentError(context) {
+  return err => {
+    reportClientError({
+      kind: 'unhandled',
+      message: `${context}: ${err?.message || err}`,
+      stack: err?.stack || null,
+    });
+  };
+}
+
 // Wire global handlers once. Call from main.jsx / App.jsx entrypoint.
 let installed = false;
 export function installGlobalErrorHandlers() {
