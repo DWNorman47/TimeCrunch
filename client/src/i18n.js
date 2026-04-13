@@ -456,6 +456,7 @@ const translations = {
     aqDeselectAll: 'Deselect all',
     aqApproveSelected: 'Approve Selected',
     aqApprovingSelected: 'Approving…',
+    aqNoEntriesToApprove: 'No entries to approve',
 
     // ── ManageSchedule recurring shifts ──────────────────────────────────────
     msRepeat: 'Repeat',
@@ -2841,6 +2842,7 @@ const translations = {
     aqDeselectAll: 'Deseleccionar todo',
     aqApproveSelected: 'Aprobar seleccionados',
     aqApprovingSelected: 'Aprobando…',
+    aqNoEntriesToApprove: 'No hay entradas para aprobar',
     msRepeat: 'Repetir',
     msRepeatNone: 'Sin repetición',
     msRepeatWeekly4: 'Semanal · 4 total',

@@ -89,7 +89,7 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
         <div style={styles.row} className="form-row">
           {projectsEnabled && <div style={styles.field}>
             <label htmlFor="tef-project" style={styles.label}>{t.project}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-            <select id="tef-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)} required disabled={saving}>
+            <select id="tef-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)} required disabled={saving} title={saving ? t.saving : undefined}>
               <option value="">{t.selectProject}</option>
               {projects.map(p => (
                 <option key={p.id} value={p.id}>
@@ -100,17 +100,17 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
           </div>}
           <div style={styles.field}>
             <label htmlFor="tef-date" style={styles.label}>{t.date}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-            <input id="tef-date" style={styles.input} type="date" value={form.work_date} onChange={e => set('work_date', e.target.value)} required disabled={saving} />
+            <input id="tef-date" style={styles.input} type="date" value={form.work_date} onChange={e => set('work_date', e.target.value)} required disabled={saving} title={saving ? t.saving : undefined} />
           </div>
         </div>
         <div style={styles.row} className="form-row">
           <div style={styles.field}>
             <label htmlFor="tef-start" style={styles.label}>{t.startTime}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-            <input id="tef-start" style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required disabled={saving} />
+            <input id="tef-start" style={styles.input} type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} required disabled={saving} title={saving ? t.saving : undefined} />
           </div>
           <div style={styles.field}>
             <label htmlFor="tef-end" style={styles.label}>{t.endTime}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-            <input id="tef-end" style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required disabled={saving} />
+            <input id="tef-end" style={styles.input} type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} required disabled={saving} title={saving ? t.saving : undefined} />
           </div>
         </div>
         {selectedProject && (

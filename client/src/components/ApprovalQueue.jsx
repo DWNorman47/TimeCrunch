@@ -335,7 +335,12 @@ export default function ApprovalQueue({ onCountChange }) {
             )}
             {selectedIds.size > 0 ? (
               <>
-                <button style={{ ...styles.approveSelectedBtn, ...(approvingSelected ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={approveSelected} disabled={approvingSelected}>
+                <button
+                  style={{ ...styles.approveSelectedBtn, ...(approvingSelected ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                  onClick={approveSelected}
+                  disabled={approvingSelected}
+                  title={approvingSelected ? t.aqApprovingSelected : undefined}
+                >
                   {approvingSelected ? t.aqApprovingSelected : `${t.aqApproveSelected} (${selectedIds.size})`}
                 </button>
                 <button style={styles.cancelApproveAllBtn} onClick={deselectAll}>{t.cancel}</button>
@@ -352,7 +357,12 @@ export default function ApprovalQueue({ onCountChange }) {
                 <button style={styles.selectAllBtn} onClick={selectedIds.size > 0 ? deselectAll : selectAll}>
                   {selectedIds.size > 0 ? t.aqDeselectAll : t.aqSelectAll}
                 </button>
-                <button style={{ ...styles.approveAllBtn, ...((approvingAll || visibleEntries.length === 0) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setConfirmingApproveAll(true)} disabled={approvingAll || visibleEntries.length === 0}>
+                <button
+                  style={{ ...styles.approveAllBtn, ...((approvingAll || visibleEntries.length === 0) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                  onClick={() => setConfirmingApproveAll(true)}
+                  disabled={approvingAll || visibleEntries.length === 0}
+                  title={visibleEntries.length === 0 ? t.aqNoEntriesToApprove : (approvingAll ? t.aqApprovingAll : undefined)}
+                >
                   {workerFilter ? `${t.approve} ${workerFilter.split(' ')[0]}'s` : t.aqApproveAll}
                 </button>
               </>

@@ -405,7 +405,7 @@ export default function ManageClients() {
         </div>
       )}
 
-      {clients.length > 4 && (
+      {clients.length > 0 && (
         <input
           style={s.search}
           placeholder={t.searchClientsPlaceholder}
