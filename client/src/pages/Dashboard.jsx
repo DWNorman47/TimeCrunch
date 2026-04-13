@@ -452,7 +452,7 @@ ${signatureDataUrl ? `
           <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); history.replaceState(null, '', '#timeoff'); }}>{t.tabTimeOff}</button>
           {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); history.replaceState(null, '', '#schedule'); }}>{t.tabSchedule}</button>}
           {settings?.feature_scheduling !== false && <button style={tab === 'availability' ? styles.tabActive : styles.tab} onClick={() => { setTab('availability'); history.replaceState(null, '', '#availability'); }}>{t.tabAvailability}</button>}
-          <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>{t.tabExpenses}</button>
+          {settings?.feature_reimbursements !== false && <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>{t.tabExpenses}</button>}
         </div>
 
         {tab === 'messages' && <CompanyChat onRead={() => { setChatUnread(false); localStorage.setItem('chatLastRead', new Date().toISOString()); }} />}
@@ -498,7 +498,7 @@ ${signatureDataUrl ? `
 
         {tab === 'schedule' && <Suspense fallback={<TabLoader />}><WorkerSchedule /></Suspense>}
 
-        {tab === 'reimbursements' && <Suspense fallback={<TabLoader />}><ReimbursementsView /></Suspense>}
+        {tab === 'reimbursements' && settings?.feature_reimbursements !== false && <Suspense fallback={<TabLoader />}><ReimbursementsView /></Suspense>}
 
       </main>
     </div>

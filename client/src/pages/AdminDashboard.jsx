@@ -87,7 +87,10 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchPending = () => {
       api.get('/admin/kpis').then(r => setPendingCount(r.data.pending_approvals ?? 0)).catch(silentError('admindashboard'));
-      api.get('/reimbursements/admin?status=pending').then(r => setPendingReimbursements((r.data.items ?? r.data).length)).catch(silentError('admindashboard'));
+      // Only poll reimbursements when the feature is enabled.
+      if (settings?.feature_reimbursements !== false) {
+        api.get('/reimbursements/admin?status=pending').then(r => setPendingReimbursements((r.data.items ?? r.data).length)).catch(silentError('admindashboard'));
+      }
     };
     fetchPending();
     const interval = setInterval(fetchPending, 60000);
@@ -181,7 +184,7 @@ export default function AdminDashboard() {
             ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
             { id: 'timeoff', label: '🏖 Time Off' },
-            { id: 'expenses', label: '💳 Expenses', dot: pendingReimbursements > 0 ? '#f59e0b' : null },
+            ...(settings?.feature_reimbursements !== false ? [{ id: 'expenses', label: '💳 Expenses', dot: pendingReimbursements > 0 ? '#f59e0b' : null }] : []),
             ...(settings?.feature_scheduling !== false ? [{ id: 'manage', label: t.tabManage }] : []),
           ]}
         />
@@ -266,7 +269,7 @@ export default function AdminDashboard() {
           <Suspense fallback={<TabLoader />}>
             <AdminTimeOff settings={settings} />
           </Suspense>
-        ) : tab === 'expenses' ? (
+        ) : tab === 'expenses' && settings?.feature_reimbursements !== false ? (
           <Suspense fallback={<TabLoader />}>
             <ReimbursementsAdmin />
           </Suspense>

@@ -5,6 +5,7 @@ import { useT } from '../hooks/useT';
 
 import { silentError } from '../errorReporter';
 import HelpTip from './HelpTip';
+import MileageRateEditor from './MileageRateEditor';
 const TIMEZONES = [
   { value: 'America/New_York',    label: 'Eastern Time (ET)' },
   { value: 'America/Chicago',     label: 'Central Time (CT)' },
@@ -92,6 +93,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     feature_overtime_alerts: settings?.feature_overtime_alerts ?? true,
     feature_broadcast: settings?.feature_broadcast ?? true,
     feature_media_gallery: settings?.feature_media_gallery ?? false,
+    feature_reimbursements: settings?.feature_reimbursements ?? true,
     show_worker_wages: settings?.show_worker_wages ?? false,
     global_required_checklist_template_id: settings?.global_required_checklist_template_id ?? '',
     currency: settings?.currency ?? 'USD',
@@ -115,7 +117,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
   useEffect(() => {
     api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(silentError('managerates'));
   }, []);
-  const DEFAULT_COLLAPSED = { wages: true, overtime: true, notifications: true, reports: true, access: true, modules: true, features: true, storage: true };
+  const DEFAULT_COLLAPSED = { wages: true, overtime: true, reimbursements: true, notifications: true, reports: true, access: true, modules: true, features: true, storage: true };
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem('opsfloa_company_sections');
@@ -160,6 +162,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       feature_overtime_alerts: settings.feature_overtime_alerts ?? true,
       feature_broadcast: settings.feature_broadcast ?? true,
       feature_media_gallery: settings.feature_media_gallery ?? false,
+      feature_reimbursements: settings.feature_reimbursements ?? true,
       show_worker_wages: settings.show_worker_wages ?? false,
       global_required_checklist_template_id: settings.global_required_checklist_template_id ?? '',
       currency: settings.currency ?? 'USD',
@@ -211,6 +214,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_overtime_alerts: form.feature_overtime_alerts,
         feature_broadcast: form.feature_broadcast,
         feature_media_gallery: form.feature_media_gallery,
+        feature_reimbursements: form.feature_reimbursements,
         show_worker_wages: form.show_worker_wages,
         global_required_checklist_template_id: form.global_required_checklist_template_id,
         currency: form.currency,
@@ -355,6 +359,25 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         </div>}
         {!collapsed.overtime && <SectionFooter section="overtime" />}
       </div>}
+
+      {/* ── Reimbursements (feature-gated) ── */}
+      {form.feature_reimbursements && (
+        <div style={styles.section}>
+          <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('reimbursements')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('reimbursements')}>
+            <span style={styles.sectionIcon}>🧾</span>
+            <div style={{ flex: 1 }}>
+              <div style={styles.sectionTitle}>{t.ratesReimbursements || 'Reimbursements'}</div>
+              <div style={styles.sectionSub}>{t.ratesReimbursementsDesc || 'Mileage rate and other reimbursement settings'}</div>
+            </div>
+            <span style={styles.collapseChevron}>{collapsed.reimbursements ? '▶' : '▼'}</span>
+          </div>
+          {!collapsed.reimbursements && (
+            <div style={styles.sectionBody}>
+              <MileageRateEditor />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Notifications ── */}
       <div style={styles.section}>
@@ -762,6 +785,16 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <label style={{ ...styles.toggle, background: form.feature_media_gallery ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_media_gallery} onChange={e => set('feature_media_gallery', e.target.checked)} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleKnob, transform: form.feature_media_gallery ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featReimbursements || 'Reimbursements'}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.featReimbursementsDesc || 'Workers submit mileage and expense reimbursements for admin approval'}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_reimbursements ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_reimbursements} onChange={e => set('feature_reimbursements', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_reimbursements ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
           <div style={styles.row}>

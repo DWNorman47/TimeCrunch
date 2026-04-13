@@ -112,35 +112,9 @@ function CollapsibleCategory({ title, children }) {
   );
 }
 
-function MileageRateSection({ cfg, onSave, saving }) {
-  const t = useT();
-  const [rate, setRate] = useState(String(cfg?.rate ?? 0.67));
-  const [dirty, setDirty] = useState(false);
-  useEffect(() => { setRate(String(cfg?.rate ?? 0.67)); setDirty(false); }, [cfg]);
-  return (
-    <div style={s.catSection}>
-      <div style={s.catLabel}>{t.mileageRateSection}</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-        <span style={{ fontSize: 14, color: '#374151' }}>$</span>
-        <input
-          style={{ ...s.addInput, width: 90, flex: 'none' }}
-          type="number"
-          min="0"
-          max="10"
-          step="0.001"
-          value={rate}
-          onChange={e => { setRate(e.target.value); setDirty(true); }}
-        />
-        <span style={{ fontSize: 13, color: '#6b7280' }}>{t.mileageRateHint}</span>
-      </div>
-      {dirty && (
-        <button style={{ ...s.saveBtn, marginTop: 8, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => onSave({ rate })} disabled={saving}>
-          {saving ? t.saving : t.saveRate}
-        </button>
-      )}
-    </div>
-  );
-}
+// MileageRateSection was moved to its own component (MileageRateEditor)
+// and now lives in Company > Settings > Reimbursements. The storage backend
+// is still /admin/advanced-settings/mileage_rate — only the UI relocated.
 
 export default function AdvancedSettings() {
   const t = useT();
@@ -201,15 +175,6 @@ export default function AdvancedSettings() {
                   <CategorySection
                     cfg={config.item_units}
                     onSave={makeSaver('item_units')}
-                    saving={saving}
-                  />
-                </CollapsibleCategory>
-              )}
-              {config.mileage_rate && (
-                <CollapsibleCategory title="Mileage Rate">
-                  <MileageRateSection
-                    cfg={config.mileage_rate}
-                    onSave={makeSaver('mileage_rate')}
                     saving={saving}
                   />
                 </CollapsibleCategory>
