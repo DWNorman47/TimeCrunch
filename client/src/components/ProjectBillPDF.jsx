@@ -70,10 +70,10 @@ function invoiceNumber(projectId, period) {
   return `INV-${String(projectId).padStart(4, '0')}-${ym}`;
 }
 
-export default function ProjectBillPDF({ data, currency = 'USD', companyInfo = {}, project: projectMeta = {} }) {
+export default function ProjectBillPDF({ data, currency = 'USD', companyInfo = {}, project: projectMeta = {}, t = {} }) {
   const { project, entries, summary, period } = data;
   const periodStr = period?.from || period?.to
-    ? `${period.from ? fmtDate(period.from) : 'Beginning'} – ${period.to ? fmtDate(period.to) : 'Present'}`
+    ? `${period.from ? fmtDate(period.from) : (t.pdfBeginning || 'Beginning')} – ${period.to ? fmtDate(period.to) : (t.pdfPresent || 'Present')}`
     : 'All Time';
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const invNum = invoiceNumber(project?.id || projectMeta?.id, period);
@@ -101,10 +101,10 @@ export default function ProjectBillPDF({ data, currency = 'USD', companyInfo = {
             {companyInfo.contact_email && <Text style={s.companyMeta}>{companyInfo.contact_email}</Text>}
           </View>
           <View style={s.invoiceBlock}>
-            <Text style={s.invoiceTitle}>Invoice</Text>
+            <Text style={s.invoiceTitle}>{t.pdfInvoiceWord || 'Invoice'}</Text>
             <Text style={s.invoiceNumber}>{invNum}</Text>
-            <Text style={s.invoiceDate}>Issued: {today}</Text>
-            <Text style={s.invoiceDate}>Due: {dueDate} (NET 30)</Text>
+            <Text style={s.invoiceDate}>{t.pdfIssuedLabel || 'Issued:'} {today}</Text>
+            <Text style={s.invoiceDate}>{t.pdfDueLabel || 'Due:'} {dueDate} {t.pdfNet30 || '(NET 30)'}</Text>
           </View>
         </View>
 
@@ -112,16 +112,16 @@ export default function ProjectBillPDF({ data, currency = 'USD', companyInfo = {
         <View style={s.infoRow}>
           {(clientName || clientAddress) && (
             <View style={s.infoBlock}>
-              <Text style={s.infoLabel}>Bill To</Text>
+              <Text style={s.infoLabel}>{t.billTo || 'Bill To'}</Text>
               {clientName && <Text style={s.infoValue}>{clientName}</Text>}
               {clientAddress && <Text style={[s.infoValue, { color: '#6b7280' }]}>{clientAddress}</Text>}
             </View>
           )}
           <View style={s.infoBlock}>
-            <Text style={s.infoLabel}>Project</Text>
+            <Text style={s.infoLabel}>{t.project || 'Project'}</Text>
             <Text style={s.infoValue}>{project?.name || projectMeta?.name || '—'}</Text>
             {(projectMeta?.job_number || project?.job_number) && (
-              <Text style={[s.infoValue, { color: '#6b7280' }]}>Job #{projectMeta?.job_number || project?.job_number}</Text>
+              <Text style={[s.infoValue, { color: '#6b7280' }]}>{t.pdfJobNum || 'Job #'}{projectMeta?.job_number || project?.job_number}</Text>
             )}
             <Text style={[s.infoValue, { color: '#6b7280', marginTop: 2 }]}>{periodStr}</Text>
           </View>
@@ -132,56 +132,56 @@ export default function ProjectBillPDF({ data, currency = 'USD', companyInfo = {
           <View style={s.summaryRow}>
             <View style={s.summaryItem}>
               <Text style={s.summaryVal}>{(summary.total_hours || 0).toFixed(2)}h</Text>
-              <Text style={s.summaryLabel}>Total Hours</Text>
+              <Text style={s.summaryLabel}>{t.totalHours || 'Total Hours'}</Text>
             </View>
             {summary.regular_hours > 0 && (
               <View style={s.summaryItem}>
                 <Text style={[s.summaryVal, { color: '#2563eb' }]}>{summary.regular_hours.toFixed(2)}h</Text>
-                <Text style={s.summaryLabel}>Regular</Text>
+                <Text style={s.summaryLabel}>{t.regularLabel || 'Regular'}</Text>
               </View>
             )}
             {summary.overtime_hours > 0 && (
               <View style={s.summaryItem}>
                 <Text style={[s.summaryVal, { color: '#dc2626' }]}>{summary.overtime_hours.toFixed(2)}h</Text>
-                <Text style={s.summaryLabel}>Overtime</Text>
+                <Text style={s.summaryLabel}>{t.overtimeLabel || 'Overtime'}</Text>
               </View>
             )}
             {summary.prevailing_hours > 0 && (
               <View style={s.summaryItem}>
                 <Text style={[s.summaryVal, { color: '#d97706' }]}>{summary.prevailing_hours.toFixed(2)}h</Text>
-                <Text style={s.summaryLabel}>Prevailing</Text>
+                <Text style={s.summaryLabel}>{t.prevailingLabel || 'Prevailing'}</Text>
               </View>
             )}
             <View style={s.summaryItem}>
               <Text style={[s.summaryVal, { color: '#059669' }]}>{formatCurrency(summary.total_cost, currency)}</Text>
-              <Text style={s.summaryLabel}>Amount Due</Text>
+              <Text style={s.summaryLabel}>{t.pdfAmountDue || 'Amount Due'}</Text>
             </View>
           </View>
         </View>
 
         {/* Cost breakdown */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Cost Breakdown</Text>
+          <Text style={s.sectionTitle}>{t.pdfCostBreakdown || 'Cost Breakdown'}</Text>
           {summary.regular_hours > 0 && (
             <View style={s.costRow}>
-              <Text style={{ color: '#374151' }}>Regular labor — {summary.regular_hours.toFixed(2)} hrs</Text>
+              <Text style={{ color: '#374151' }}>{(t.pdfRegularLabor || 'Regular labor — {hrs} hrs').replace('{hrs}', summary.regular_hours.toFixed(2))}</Text>
               <Text style={{ color: '#2563eb', fontWeight: 'bold' }}>{formatCurrency(summary.regular_cost, currency)}</Text>
             </View>
           )}
           {summary.overtime_hours > 0 && (
             <View style={s.costRow}>
-              <Text style={{ color: '#374151' }}>Overtime — {summary.overtime_hours.toFixed(2)} hrs × {summary.overtime_multiplier}x</Text>
+              <Text style={{ color: '#374151' }}>{(t.pdfOvertimeLabor || 'Overtime — {hrs} hrs × {mult}x').replace('{hrs}', summary.overtime_hours.toFixed(2)).replace('{mult}', summary.overtime_multiplier)}</Text>
               <Text style={{ color: '#dc2626', fontWeight: 'bold' }}>{formatCurrency(summary.overtime_cost, currency)}</Text>
             </View>
           )}
           {summary.prevailing_hours > 0 && (
             <View style={s.costRow}>
-              <Text style={{ color: '#374151' }}>Prevailing wage — {summary.prevailing_hours.toFixed(2)} hrs @ {formatCurrency(summary.prevailing_wage_rate, currency)}/hr</Text>
+              <Text style={{ color: '#374151' }}>{(t.pdfPrevailingWage || 'Prevailing wage — {hrs} hrs @ {rate}/hr').replace('{hrs}', summary.prevailing_hours.toFixed(2)).replace('{rate}', formatCurrency(summary.prevailing_wage_rate, currency))}</Text>
               <Text style={{ color: '#d97706', fontWeight: 'bold' }}>{formatCurrency(summary.prevailing_cost, currency)}</Text>
             </View>
           )}
           <View style={s.totalRow}>
-            <Text style={s.totalLabel}>Total Due</Text>
+            <Text style={s.totalLabel}>{t.totalDue || 'Total Due'}</Text>
             <Text style={s.totalValue}>{formatCurrency(summary.total_cost, currency)}</Text>
           </View>
         </View>
@@ -189,14 +189,14 @@ export default function ProjectBillPDF({ data, currency = 'USD', companyInfo = {
         {/* Time entries */}
         {entries?.length > 0 && (
           <View style={s.section}>
-            <Text style={s.sectionTitle}>Time Entries ({entries.length})</Text>
+            <Text style={s.sectionTitle}>{(t.pdfTimeEntries || 'Time Entries ({n})').replace('{n}', entries.length)}</Text>
             <View style={s.tableHeader}>
-              <Text style={[s.colWorker, s.headerText]}>Worker</Text>
-              <Text style={[s.colDate, s.headerText]}>Date</Text>
-              <Text style={[s.colTime, s.headerText]}>Start</Text>
-              <Text style={[s.colTime, s.headerText]}>End</Text>
-              <Text style={[s.colHours, s.headerText]}>Hours</Text>
-              <Text style={[s.colType, s.headerText]}>Type</Text>
+              <Text style={[s.colWorker, s.headerText]}>{t.pdfWorkerCol || 'Worker'}</Text>
+              <Text style={[s.colDate, s.headerText]}>{t.pdfDateCol || 'Date'}</Text>
+              <Text style={[s.colTime, s.headerText]}>{t.pdfStartCol || 'Start'}</Text>
+              <Text style={[s.colTime, s.headerText]}>{t.pdfEndCol || 'End'}</Text>
+              <Text style={[s.colHours, s.headerText]}>{t.pdfHoursCol || 'Hours'}</Text>
+              <Text style={[s.colType, s.headerText]}>{t.pdfTypeCol || 'Type'}</Text>
             </View>
             {entries.map(e => (
               <View key={e.id} style={s.tableRow}>
@@ -214,7 +214,7 @@ export default function ProjectBillPDF({ data, currency = 'USD', companyInfo = {
         {/* Footer */}
         <View style={s.footer}>
           <Text style={s.footerText}>{invNum}</Text>
-          <Text style={s.footerText}>Thank you for your business.</Text>
+          <Text style={s.footerText}>{t.pdfThankYouBusiness || 'Thank you for your business.'}</Text>
         </View>
 
       </Page>

@@ -105,6 +105,7 @@ function ProjectCard({ project, metrics, settings, onClick }) {
 // ── Project Detail Panel ──────────────────────────────────────────────────────
 
 function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, onProjectUpdated }) {
+  const t = useT();
   const [tab, setTab] = useState('overview');
   const [editForm, setEditForm] = useState({
     name: project.name,
@@ -305,7 +306,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
         import('@react-pdf/renderer'),
         import('../components/ProjectBillPDF'),
       ]);
-      const el = React.createElement(ProjectBillPDF, { data: billData, currency: settings?.currency || 'USD', companyInfo, project });
+      const el = React.createElement(ProjectBillPDF, { data: billData, currency: settings?.currency || 'USD', companyInfo, project, t });
       const blob = await pdf(el).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

@@ -75,7 +75,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
       import('@react-pdf/renderer'),
       import('./ProjectBillPDF'),
     ]);
-    const el = React.createElement(ProjectBillPDF, { data: billData, currency });
+    const el = React.createElement(ProjectBillPDF, { data: billData, currency, t });
     return { pdf, el };
   };
 

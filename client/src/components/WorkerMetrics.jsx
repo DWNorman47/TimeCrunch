@@ -83,7 +83,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
       import('@react-pdf/renderer'),
       import('./BillPDF'),
     ]);
-    const el = React.createElement(BillPDF, { data: billData, currency, companyInfo, overtimeEnabled, showProject: projectsEnabled, showRateType: (companyInfo?.prevailing_wage_rate ?? 0) > 0 });
+    const el = React.createElement(BillPDF, { data: billData, currency, companyInfo, overtimeEnabled, showProject: projectsEnabled, showRateType: (companyInfo?.prevailing_wage_rate ?? 0) > 0, t });
     return { pdf, el };
   };
 

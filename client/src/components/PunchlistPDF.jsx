@@ -1,8 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink } from '@react-pdf/renderer';
-
-const PRIORITY_LABEL = { high: 'High', normal: 'Normal', low: 'Low' };
-const STATUS_LABEL = { open: 'Open', done: 'Done', verified: 'Verified' };
+import { useT } from '../hooks/useT';
 
 const pdf = StyleSheet.create({
   page: { fontFamily: 'Helvetica', fontSize: 9, color: '#1a1a1a', padding: '40 48 48 48' },
@@ -33,7 +31,9 @@ const pdf = StyleSheet.create({
   footerText: { fontSize: 7, color: '#9ca3af' },
 });
 
-export function PunchlistDocument({ items, companyName }) {
+export function PunchlistDocument({ items, companyName, t }) {
+  const PRIORITY_LABEL = { high: t.priorityHigh, normal: t.priorityNormal, low: t.priorityLow };
+  const STATUS_LABEL = { open: t.statusOpen, done: t.statusDone, verified: t.statusVerified };
   const openCount = items.filter(i => i.status === 'open').length;
   const doneCount = items.filter(i => i.status === 'done').length;
   const verifiedCount = items.filter(i => i.status === 'verified').length;
@@ -45,31 +45,31 @@ export function PunchlistDocument({ items, companyName }) {
         {/* Header */}
         <View style={pdf.headerRow} fixed>
           <View>
-            <Text style={pdf.companyName}>{companyName || 'Punchlist'}</Text>
-            <Text style={pdf.reportTitle}>Punchlist Report</Text>
+            <Text style={pdf.companyName}>{companyName || t.pdfPunchlistReport}</Text>
+            <Text style={pdf.reportTitle}>{t.pdfPunchlistReport}</Text>
           </View>
           <View>
-            <Text style={pdf.headerMeta}>Generated: {dateStr}</Text>
-            <Text style={pdf.headerMeta}>{items.length} total item{items.length !== 1 ? 's' : ''}</Text>
+            <Text style={pdf.headerMeta}>{t.pdfGenerated}{dateStr}</Text>
+            <Text style={pdf.headerMeta}>{items.length !== 1 ? t.pdfItemCountPlural.replace('{n}', items.length) : t.pdfItemCount.replace('{n}', items.length)}</Text>
           </View>
         </View>
 
         {/* Summary */}
         <View style={pdf.summaryBar}>
           <View style={pdf.summaryCard}>
-            <Text style={pdf.summaryLabel}>Open</Text>
+            <Text style={pdf.summaryLabel}>{t.statusOpen}</Text>
             <Text style={pdf.summaryValue}>{openCount}</Text>
           </View>
           <View style={pdf.summaryCard}>
-            <Text style={pdf.summaryLabel}>Done</Text>
+            <Text style={pdf.summaryLabel}>{t.statusDone}</Text>
             <Text style={pdf.summaryValue}>{doneCount}</Text>
           </View>
           <View style={pdf.summaryCard}>
-            <Text style={pdf.summaryLabel}>Verified</Text>
+            <Text style={pdf.summaryLabel}>{t.statusVerified}</Text>
             <Text style={pdf.summaryValue}>{verifiedCount}</Text>
           </View>
           <View style={pdf.summaryCard}>
-            <Text style={pdf.summaryLabel}>Total</Text>
+            <Text style={pdf.summaryLabel}>{t.totalLabel}</Text>
             <Text style={pdf.summaryValue}>{items.length}</Text>
           </View>
         </View>
@@ -77,11 +77,11 @@ export function PunchlistDocument({ items, companyName }) {
         {/* Table */}
         <View style={pdf.table}>
           <View style={pdf.tableHeader}>
-            <Text style={{ ...pdf.thText, ...pdf.colTitle }}>Item</Text>
-            <Text style={{ ...pdf.thText, ...pdf.colProject }}>Project</Text>
-            <Text style={{ ...pdf.thText, ...pdf.colPriority }}>Priority</Text>
-            <Text style={{ ...pdf.thText, ...pdf.colStatus }}>Status</Text>
-            <Text style={{ ...pdf.thText, ...pdf.colAssigned }}>Assigned To</Text>
+            <Text style={{ ...pdf.thText, ...pdf.colTitle }}>{t.pdfItemHeader}</Text>
+            <Text style={{ ...pdf.thText, ...pdf.colProject }}>{t.project}</Text>
+            <Text style={{ ...pdf.thText, ...pdf.colPriority }}>{t.priorityField}</Text>
+            <Text style={{ ...pdf.thText, ...pdf.colStatus }}>{t.statusLabel}</Text>
+            <Text style={{ ...pdf.thText, ...pdf.colAssigned }}>{t.pdfAssignedTo}</Text>
           </View>
           {items.map((item, i) => (
             <View key={item.id} style={i % 2 === 0 ? pdf.tableRow : pdf.tableRowAlt}>
@@ -100,7 +100,7 @@ export function PunchlistDocument({ items, companyName }) {
 
         {/* Footer */}
         <View style={pdf.footer} fixed>
-          <Text style={pdf.footerText}>{companyName} — Punchlist Report — {dateStr}</Text>
+          <Text style={pdf.footerText}>{companyName} — {t.pdfPunchlistReport} — {dateStr}</Text>
           <Text style={pdf.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>
@@ -109,14 +109,15 @@ export function PunchlistDocument({ items, companyName }) {
 }
 
 export function PunchlistPDFButton({ items, companyName, style }) {
+  const t = useT();
   const fileName = `punchlist-${new Date().toLocaleDateString('en-CA')}.pdf`;
   return (
     <PDFDownloadLink
-      document={<PunchlistDocument items={items} companyName={companyName} />}
+      document={<PunchlistDocument items={items} companyName={companyName} t={t} />}
       fileName={fileName}
       style={style}
     >
-      {({ loading }) => loading ? 'Preparing PDF...' : '⬇ Export PDF'}
+      {({ loading }) => loading ? t.pdfPreparingBtn : t.pdfExportBtn}
     </PDFDownloadLink>
   );
 }
