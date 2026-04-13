@@ -52,7 +52,7 @@ router.get('/', requireAuth, async (req, res) => {
     ]);
     const total = parseInt(countResult.rows[0].count);
     res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /field-reports — create a report with photos
@@ -149,7 +149,7 @@ router.post('/', requireAuth, async (req, res) => {
       [report.id]
     );
     res.status(201).json(full.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /field-reports/:id — worker updates their own report (if not yet reviewed)
@@ -176,7 +176,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       [title ?? report.title, notes ?? report.notes, project_id ?? report.project_id, req.params.id]
     );
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /field-reports/:id/review — admin marks reviewed
@@ -189,7 +189,7 @@ router.patch('/:id/review', requireAdmin, async (req, res) => {
     if (result.rowCount === 0) return res.status(404).json({ error: 'Report not found' });
     logAudit(req.user.company_id, req.user.id, req.user.full_name, 'field_report.reviewed', 'field_report', req.params.id, null, null);
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /field-reports/:id — worker deletes own unreviewed report
@@ -221,7 +221,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
       { project_id: report.project_id, was_reviewed: report.status === 'reviewed' });
 
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /field-reports/photos — aggregated photo gallery for the company
@@ -267,7 +267,7 @@ router.get('/photos', requireAuth, async (req, res) => {
     ]);
     const total = parseInt(countResult.rows[0].count);
     res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /field-reports/upload-url — presigned URL for direct browser→R2 video upload
@@ -290,7 +290,7 @@ router.get('/upload-url', requireAuth, async (req, res) => {
     const ext = contentType.split('/')[1]?.split(';')[0] || 'mp4';
     const { uploadUrl, publicUrl } = await getPresignedUploadUrl('videos', ext, contentType);
     res.json({ uploadUrl, publicUrl });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to generate upload URL' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Failed to generate upload URL' }); }
 });
 
 module.exports = router;

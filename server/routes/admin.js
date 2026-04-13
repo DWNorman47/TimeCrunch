@@ -1566,7 +1566,7 @@ router.get('/projects/:id/documents/upload-url', requireAdmin, async (req, res) 
     const { getPresignedUploadUrl } = require('../r2');
     const { uploadUrl, publicUrl } = await getPresignedUploadUrl('documents', ext, contentType);
     res.json({ uploadUrl, publicUrl });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed to generate upload URL' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Failed to generate upload URL' }); }
 });
 
 router.post('/projects/:id/documents', requireAdmin, async (req, res) => {
@@ -1580,7 +1580,7 @@ router.post('/projects/:id/documents', requireAdmin, async (req, res) => {
       [companyId, req.params.id, name.trim(), url, size_bytes || null, req.user.id]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 router.get('/projects/:id/documents', requireAdmin, async (req, res) => {
@@ -1595,7 +1595,7 @@ router.get('/projects/:id/documents', requireAdmin, async (req, res) => {
       [req.params.id, companyId]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 router.delete('/projects/:id/documents/:docId', requireAdmin, async (req, res) => {
@@ -1610,7 +1610,7 @@ router.delete('/projects/:id/documents/:docId', requireAdmin, async (req, res) =
     await deleteByUrl(doc.rows[0].url).catch(() => {});
     await pool.query('DELETE FROM project_documents WHERE id=$1', [req.params.docId]);
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // RFIs for a project
@@ -2122,7 +2122,7 @@ router.post('/entries/bulk-approve', requireAdmin, requirePermission('approve_en
     }
     await logAudit(companyId, req.user.id, req.user.full_name, 'entries.bulk_approved', 'time_entry', null, null, { count: result.rowCount, ids });
     res.json({ approved: result.rowCount });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /admin/entries/approve-all — approve every pending entry for this company
@@ -2393,7 +2393,7 @@ router.get('/pay-periods', requireAdmin, async (req, res) => {
       [req.user.company_id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 router.post('/pay-periods', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
@@ -2411,7 +2411,7 @@ router.post('/pay-periods', requireAdmin, requirePermission('approve_entries'), 
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'A pay period overlapping those dates already exists' });
-    console.error(err); res.status(500).json({ error: 'Server error' });
+    req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -2425,7 +2425,7 @@ router.delete('/pay-periods/:id', requireAdmin, requirePermission('approve_entri
     if (result.rowCount === 0) return res.status(404).json({ error: 'Pay period not found' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'pay_period.unlocked', 'pay_period', parseInt(req.params.id), result.rows[0].label);
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // CSV Export
@@ -2467,7 +2467,7 @@ router.get('/export', requireAdmin, requirePermission('view_reports'), requirePl
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="timecrunch-${from}-to-${to}.csv"`);
     res.send(lines.join('\r\n'));
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // Overtime report
@@ -2544,7 +2544,7 @@ router.get('/overtime-report', requireAdmin, requirePermission('view_reports'), 
       };
     });
     res.json(rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // Payroll export CSV
@@ -2624,7 +2624,7 @@ router.get('/payroll-export', requireAdmin, requirePermission('view_reports'), r
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="payroll-${from}-to-${to}.csv"`);
     res.send(lines.join('\r\n'));
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /admin/company — company profile
@@ -2635,7 +2635,7 @@ router.get('/company', requireAdmin, async (req, res) => {
       [req.user.company_id]
     );
     res.json(result.rows[0] || {});
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /admin/company — update company profile
@@ -2662,7 +2662,7 @@ router.patch('/company', requireAdmin, async (req, res) => {
     );
     await logAudit(req.user.company_id, req.user.id, req.user.full_name, 'company.updated', 'company', req.user.company_id, result.rows[0].name);
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // Audit log
@@ -2796,7 +2796,7 @@ router.get('/certified-payroll', requireAdmin, requirePermission('view_reports')
     });
 
     res.json({ week_start: weekStart, week_end, contractor, project: projectName, workers });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // Analytics dashboard — summary, weekly trend, by-project, top workers
@@ -2922,7 +2922,7 @@ router.get('/audit-log', requireAdmin, async (req, res) => {
       pool.query(`SELECT COUNT(*) FROM audit_log WHERE ${where}`, params),
     ]);
     res.json({ entries: dataRes.rows, total: parseInt(countRes.rows[0].count) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /admin/projects/:id/rfis — create a new RFI
@@ -2947,7 +2947,7 @@ router.post('/projects/:id/rfis', requireAdmin, async (req, res) => {
        directed_to || null, req.user.full_name, date_submitted || today, date_due || null]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Clients ───────────────────────────────────────────────────────────────────
@@ -2969,7 +2969,7 @@ router.get('/clients', requireAdmin, async (req, res) => {
       [companyId]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 router.post('/clients', requireAdmin, async (req, res) => {
@@ -2984,7 +2984,7 @@ router.post('/clients', requireAdmin, async (req, res) => {
        contact_phone || null, address || null, notes || null]
     );
     res.status(201).json({ ...result.rows[0], project_count: 0, document_count: 0 });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 router.patch('/clients/:id', requireAdmin, async (req, res) => {
@@ -3008,7 +3008,7 @@ router.patch('/clients/:id', requireAdmin, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 router.delete('/clients/:id', requireAdmin, async (req, res) => {
@@ -3054,7 +3054,7 @@ router.post('/clients/:id/documents/upload', requireAdmin, async (req, res) => {
        safeType, expires_at || null, req.user.id, safeDir]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Upload failed' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Upload failed' }); }
 });
 
 router.post('/clients/:id/documents', requireAdmin, async (req, res) => {
@@ -3072,7 +3072,7 @@ router.post('/clients/:id/documents', requireAdmin, async (req, res) => {
        safeType, expires_at || null, req.user.id]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 router.get('/clients/:id/documents', requireAdmin, async (req, res) => {
@@ -3087,7 +3087,7 @@ router.get('/clients/:id/documents', requireAdmin, async (req, res) => {
       [req.params.id, companyId]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 router.delete('/clients/:id/documents/:docId', requireAdmin, async (req, res) => {
@@ -3102,7 +3102,7 @@ router.delete('/clients/:id/documents/:docId', requireAdmin, async (req, res) =>
     await pool.query('DELETE FROM client_documents WHERE id=$1', [req.params.docId]);
     deleteByUrl(doc.rows[0].url).catch(() => {});
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Worker Documents ────────────────────────────────────────────────────────
@@ -3119,7 +3119,7 @@ router.get('/workers/:id/documents', requireAdmin, async (req, res) => {
       [req.params.id, companyId]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 router.post('/workers/:id/documents', requireAdmin, async (req, res) => {
@@ -3160,7 +3160,7 @@ router.delete('/workers/:id/documents/:docId', requireAdmin, async (req, res) =>
     await pool.query('DELETE FROM worker_documents WHERE id = $1 AND company_id = $2', [req.params.docId, companyId]);
     deleteByUrl(doc.rows[0].url).catch(() => {});
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

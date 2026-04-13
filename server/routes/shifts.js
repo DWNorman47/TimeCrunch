@@ -23,7 +23,7 @@ router.get('/admin', requireAdmin, async (req, res) => {
       [companyId, from || null, to || null]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /admin/shifts — create a shift
@@ -59,7 +59,7 @@ router.post('/admin', requireAdmin, async (req, res) => {
     sendPushToUser(user_id, { title: 'New shift assigned', body: shiftBody, url: '/dashboard' });
     createInboxItem(user_id, companyId, 'shift_assigned', 'New shift assigned', shiftBody, '/dashboard#schedule');
     res.status(201).json(shift);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /admin/shifts/:id — edit a shift
@@ -98,7 +98,7 @@ router.patch('/admin/:id', requireAdmin, async (req, res) => {
     sendPushToUser(shift.user_id, { title: 'Shift updated', body: updBody, url: '/dashboard' });
     createInboxItem(shift.user_id, req.user.company_id, 'shift_updated', 'Shift updated', updBody, '/dashboard#schedule');
     res.json(shift);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /admin/shifts/:id
@@ -119,7 +119,7 @@ router.delete('/admin/:id', requireAdmin, async (req, res) => {
     sendPushToUser(shift.user_id, { title: 'Shift cancelled', body: cancelBody, url: '/dashboard' });
     createInboxItem(shift.user_id, req.user.company_id, 'shift_cancelled', 'Shift cancelled', cancelBody, '/dashboard#schedule');
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /shifts/:id/cant-make-it — worker flags they can't attend
@@ -151,7 +151,7 @@ router.patch('/:id/cant-make-it', requireAuth, async (req, res) => {
         'Worker unavailable for shift', cantBody, '/timeclock#manage');
     }
     res.json(shift);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /admin/shifts/series/:groupId — cancel all future shifts in a recurrence group
@@ -179,7 +179,7 @@ router.delete('/admin/series/:groupId', requireAdmin, async (req, res) => {
         'A series of your scheduled shifts has been cancelled.', '/dashboard#schedule');
     }
     res.json({ deleted: result.rowCount });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /shifts/mine — worker's upcoming shifts
@@ -206,7 +206,7 @@ router.get('/mine', requireAuth, async (req, res) => {
       [req.user.id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

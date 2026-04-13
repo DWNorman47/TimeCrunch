@@ -21,7 +21,7 @@ router.get('/', requireAuth, async (req, res) => {
       [companyId]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /equipment — create equipment item (admin)
@@ -47,7 +47,7 @@ router.post('/', requireAdmin, async (req, res) => {
     logAudit(companyId, req.user.id, req.user.full_name, 'equipment.created', 'equipment', result.rows[0].id, name,
       { type, unit_number });
     res.status(201).json({ ...result.rows[0], total_hours: 0, log_count: 0, last_logged: null });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /equipment/:id — update item (admin)
@@ -82,7 +82,7 @@ router.patch('/:id', requireAdmin, async (req, res) => {
     if (result.rowCount === 0) return res.status(404).json({ error: 'Equipment not found' });
     logAudit(companyId, req.user.id, req.user.full_name, 'equipment.edited', 'equipment', req.params.id, name, null);
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /equipment/:id — soft-delete (admin)
@@ -95,7 +95,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
     if (result.rowCount === 0) return res.status(404).json({ error: 'Equipment not found' });
     logAudit(req.user.company_id, req.user.id, req.user.full_name, 'equipment.archived', 'equipment', req.params.id, null, null);
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /equipment/:id/hours — hours log for one item
@@ -118,7 +118,7 @@ router.get('/:id/hours', requireAuth, async (req, res) => {
       [...params, parseInt(limit)]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /equipment/:id/hours — log hours for an item
@@ -153,7 +153,7 @@ router.post('/:id/hours', requireAuth, async (req, res) => {
     logAudit(companyId, req.user.id, req.user.full_name, 'equipment.hours_logged', 'equipment', req.params.id, null,
       { log_date, hours: parseFloat(hours), project_id: project_id || null });
     res.status(201).json(full.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /equipment/hours/:entryId — delete a single hours entry
@@ -165,7 +165,7 @@ router.delete('/hours/:entryId', requireAuth, async (req, res) => {
     const result = await pool.query(`DELETE FROM equipment_hours WHERE id = $1 AND ${cond} RETURNING id`, params);
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

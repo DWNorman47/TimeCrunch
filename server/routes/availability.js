@@ -11,7 +11,7 @@ router.get('/mine', requireAuth, async (req, res) => {
       [req.user.id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PUT /availability — worker replaces their full availability
@@ -67,7 +67,7 @@ router.get('/admin', requireAdmin, async (req, res) => {
       [req.user.company_id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

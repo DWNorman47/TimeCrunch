@@ -159,7 +159,7 @@ router.get('/:id/messages', requireAuth, async (req, res) => {
       [req.params.id, req.user.id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /time-entries/:id/messages
@@ -204,7 +204,7 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
       createInboxItem(ownerId, req.user.company_id, 'comment', `Comment from ${req.user.full_name}`, snippet, '/dashboard');
     }
     res.status(201).json(msg);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET unread message count for current user
@@ -218,7 +218,7 @@ router.get('/messages/unread-count', requireAuth, async (req, res) => {
       [req.user.company_id, req.user.id, req.user.role]
     );
     res.json({ count: parseInt(result.rows[0].count) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // Delete an entry (own entries only)
@@ -325,7 +325,7 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
       }
     }
     res.json(result);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /time-entries/sign-off — worker signs off on their entries for a date range
@@ -353,7 +353,7 @@ router.post('/sign-off', requireAuth, async (req, res) => {
       createInboxItem(adminId, req.user.company_id, 'signoff', signTitle, signBody, '/admin#approvals');
     }
     res.json({ signed: result.rowCount });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /time-entries/copy-last-week
@@ -407,7 +407,7 @@ router.post('/copy-last-week', requireAuth, async (req, res) => {
       existingDates.add(thisDateStr);
     }
     res.json({ created: created.length, skipped: lastWeek.rowCount - created.length, entries: created });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

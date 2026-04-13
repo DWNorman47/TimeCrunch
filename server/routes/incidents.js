@@ -59,7 +59,7 @@ router.get('/', requireAuth, async (req, res) => {
     ]);
     const total = parseInt(countResult.rows[0].count);
     res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /incidents — submit a new incident report
@@ -115,7 +115,7 @@ router.post('/', requireAuth, async (req, res) => {
     });
 
     res.status(201).json(full.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /incidents/:id/close — admin closes an incident
@@ -128,7 +128,7 @@ router.patch('/:id/close', requireAdmin, async (req, res) => {
     if (result.rowCount === 0) return res.status(404).json({ error: 'Incident not found' });
     logAudit(req.user.company_id, req.user.id, req.user.full_name, 'incident.closed', 'incident_report', req.params.id, null, null);
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /incidents/:id
@@ -149,7 +149,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     logAudit(companyId, req.user.id, req.user.full_name, 'incident.deleted', 'incident_report', req.params.id, null,
       { type: report.type, incident_date: report.incident_date });
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;
