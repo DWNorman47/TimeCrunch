@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const pool = require('../db');
+const logger = require('../logger');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
@@ -36,7 +37,7 @@ router.get('/status', requireAdmin, async (req, res) => {
       qbo_company_name,
     });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -82,7 +83,7 @@ async function oauthCallback(req, res) {
     );
     res.redirect(`${process.env.APP_URL}/administration#integrations`);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.redirect(`${process.env.APP_URL}/administration#integrations?error=auth_failed`);
   }
 }
@@ -101,7 +102,7 @@ router.delete('/disconnect', requireAdmin, async (req, res) => {
     logAudit(req.user.company_id, req.user.id, req.user.full_name, 'qbo.disconnected', 'company', req.user.company_id, null, null);
     res.json({ disconnected: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -112,7 +113,7 @@ router.get('/employees', requireAdmin, async (req, res) => {
     const employees = await qbo.listEmployees(req.user.company_id);
     res.json(employees);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
     res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
@@ -124,7 +125,7 @@ router.get('/customers', requireAdmin, async (req, res) => {
     const customers = await qbo.listCustomers(req.user.company_id);
     res.json(customers);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
     res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
@@ -136,7 +137,7 @@ router.get('/vendors', requireAdmin, async (req, res) => {
     const vendors = await qbo.listVendors(req.user.company_id);
     res.json(vendors);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
     res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
@@ -159,7 +160,7 @@ router.patch('/workers/:id/mapping', requireAdmin, async (req, res) => {
     }
     res.json({ saved: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -179,7 +180,7 @@ router.patch('/projects/:id/mapping', requireAdmin, async (req, res) => {
     );
     res.json({ saved: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -190,7 +191,7 @@ router.get('/items', requireAdmin, async (req, res) => {
     const items = await qbo.listItems(req.user.company_id);
     res.json(items);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
     res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
@@ -227,7 +228,7 @@ router.post('/invoices', requireAdmin, async (req, res) => {
       { amount: parsed, customer_id, project_id: project_id || null });
     res.json(invoice);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
     res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
@@ -245,7 +246,7 @@ router.get('/invoices/project/:projectId', requireAdmin, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -272,7 +273,7 @@ router.post('/invoices/:invoiceId/check-payment', requireAdmin, async (req, res)
 
     res.json({ qbo_invoice_id: req.params.invoiceId, balance, payment_status, total: totalAmt });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
     res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
@@ -284,7 +285,7 @@ router.get('/accounts', requireAdmin, async (req, res) => {
     const accounts = await qbo.listAccounts(req.user.company_id);
     res.json(accounts);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
     res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
@@ -310,7 +311,7 @@ router.post('/expenses', requireAdmin, async (req, res) => {
     });
     res.json(purchase);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
     res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
@@ -386,7 +387,7 @@ router.post('/push', requireAdmin, async (req, res) => {
       { pushed: pushed.length, skipped: skipped.length, already_synced: alreadySynced, from: from || null, to: to || null, force: !!force });
     res.json({ pushed: pushed.length, skipped, already_synced: alreadySynced });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -479,7 +480,7 @@ router.get('/classes', requireAdmin, async (req, res) => {
     const classes = await qbo.listClasses(req.user.company_id);
     res.json(classes);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
     res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }
@@ -496,7 +497,7 @@ router.get('/errors', requireAdmin, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -507,7 +508,7 @@ router.delete('/errors', requireAdmin, async (req, res) => {
     await pool.query('DELETE FROM qbo_sync_errors WHERE company_id = $1', [req.user.company_id]);
     res.json({ cleared: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -518,7 +519,7 @@ router.delete('/errors/:id', requireAdmin, async (req, res) => {
     await pool.query('DELETE FROM qbo_sync_errors WHERE id = $1 AND company_id = $2', [req.params.id, req.user.company_id]);
     res.json({ cleared: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -581,7 +582,7 @@ router.post('/push-expenses', requireAdmin, async (req, res) => {
       { pushed: pushed.length, skipped: skipped.length, already_synced: alreadySynced });
     res.json({ pushed: pushed.length, skipped, already_synced: alreadySynced });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -643,7 +644,7 @@ router.post('/push-payroll', requireAdmin, async (req, res) => {
       { amount: totalCost, from, to, entries: entries.rowCount });
     res.json({ entry_id: entry?.Id, amount: totalCost, entries: entries.rowCount, description });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     const status = err.code === 'qbo_auth_expired' ? 401 : 500;
     res.status(status).json({ error: err.code === 'qbo_auth_expired' ? err.message : 'Server error', code: err.code });
   }

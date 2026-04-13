@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
+const logger = require('../logger');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const speakeasy = require('speakeasy');
@@ -136,7 +137,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     const token = signToken(user);
     res.json({ token, first_login: isFirstLogin, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -167,7 +168,7 @@ router.get('/me', requireAuth, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -295,7 +296,7 @@ router.post('/register', authLimiter, async (req, res) => {
       console.error('Confirmation email failed — account not created:', err.response.body);
       return res.status(500).json({ error: 'Failed to send confirmation email. Please check your email address and try again.' });
     }
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   } finally {
     client.release();
@@ -319,7 +320,7 @@ router.post('/confirm-email', async (req, res) => {
     );
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -354,7 +355,7 @@ router.post('/complete-setup', async (req, res) => {
     const token = signToken(user);
     res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -396,7 +397,7 @@ router.post('/resend-confirmation', async (req, res) => {
     }
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -453,7 +454,7 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -478,7 +479,7 @@ router.post('/reset-password', authLimiter, async (req, res) => {
     );
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -505,7 +506,7 @@ router.post('/accept-invite', authLimiter, async (req, res) => {
     );
     res.json({ success: true, username: user.username, company_name: user.company_name });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -528,7 +529,7 @@ router.post('/change-password', requireAuth, authLimiter, async (req, res) => {
     await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.id]);
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -561,7 +562,7 @@ router.post('/mfa/confirm', loginLimiter, async (req, res) => {
     const token = signToken(user);
     res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -574,7 +575,7 @@ router.get('/mfa/setup', requireAuth, async (req, res) => {
     const qr = await qrcode.toDataURL(secret.otpauth_url);
     res.json({ qr, secret: secret.base32 });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -597,7 +598,7 @@ router.post('/mfa/enable', requireAuth, async (req, res) => {
     );
     res.json({ enabled: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -617,7 +618,7 @@ router.post('/mfa/disable', requireAuth, async (req, res) => {
     );
     res.json({ disabled: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -630,7 +631,7 @@ router.post('/update-language', requireAuth, async (req, res) => {
     await pool.query('UPDATE users SET language = $1 WHERE id = $2', [language, req.user.id]);
     res.json({ success: true, language });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });

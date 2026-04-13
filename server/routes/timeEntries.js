@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const pool = require('../db');
+const logger = require('../logger');
 const { requireAuth } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem } = require('./inbox');
@@ -38,7 +39,7 @@ router.get('/', requireAuth, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -115,7 +116,7 @@ router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
       } catch (err) { console.error('Entry notification error:', err); }
     });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -155,7 +156,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       { from: { start_time: entry.start_time, end_time: entry.end_time }, to: { start_time, end_time } });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -260,7 +261,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
       { work_date: result.rows[0].work_date });
     res.json({ deleted: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });

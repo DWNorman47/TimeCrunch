@@ -1,6 +1,7 @@
 // In-app notification bell — per-user inbox
 const router = require('express').Router();
 const pool = require('../db');
+const logger = require('../logger');
 const { requireAuth } = require('../middleware/auth');
 
 // GET /inbox — fetch recent notifications for the current user
@@ -16,7 +17,7 @@ router.get('/', requireAuth, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -30,7 +31,7 @@ router.patch('/:id/read', requireAuth, async (req, res) => {
     );
     res.json({ ok: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -44,7 +45,7 @@ router.patch('/read-all', requireAuth, async (req, res) => {
     );
     res.json({ ok: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });

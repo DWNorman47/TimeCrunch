@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const pool = require('../db');
+const logger = require('../logger');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadBase64 } = require('../r2');
 const { checkStorageLimit, incrementStorage } = require('../storage');
@@ -21,7 +22,7 @@ router.get('/units', requireAuth, async (req, res) => {
     const known = [...cfg.defaults, ...cfg.custom];
     res.json({ active, known });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2403,7 +2404,7 @@ router.post('/purchase-orders/:id/email', requireAdmin, async (req, res) => {
 
     res.json({ ok: true, sent_to: po.supplier_email });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });

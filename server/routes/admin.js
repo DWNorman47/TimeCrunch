@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
+const logger = require('../logger');
 const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const rateLimit = require('express-rate-limit');
@@ -127,7 +128,7 @@ router.get('/kpis', requireAdmin, async (req, res) => {
       overtime_workers_this_week: otWorkers,
     });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -138,7 +139,7 @@ router.get('/settings', requireAdmin, async (req, res) => {
     const s = await getSettings(req.user.company_id);
     res.json(s);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -204,7 +205,7 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
     const s = await getSettings(companyId);
     res.json(s);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -246,7 +247,7 @@ router.get('/advanced-settings', requireAdmin, async (req, res) => {
   try {
     res.json(await getAdvancedSettings(req.user.company_id));
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -282,7 +283,7 @@ router.patch('/advanced-settings/:key', requireAdmin, requirePermission('manage_
     );
     res.json(await getAdvancedSettings(companyId));
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -306,7 +307,7 @@ router.get('/notifications', requireAdmin, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -345,7 +346,7 @@ router.post('/clock-in', requireAdmin, requirePermission('manage_workers'), asyn
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.clocked_in_by_admin', 'user', parseInt(user_id), workerRow.rows[0].full_name);
     res.status(201).json({ ...result.rows[0], project_name: projName.rows[0]?.name, clocked_in_by_name: req.user.full_name });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -402,7 +403,7 @@ router.post('/clock-out/:user_id', requireAdmin, requirePermission('manage_worke
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.clocked_out_by_admin', 'user', parseInt(req.params.user_id), null);
     res.json(entryResult.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -424,7 +425,7 @@ router.patch('/active-clock/:user_id', requireAdmin, requirePermission('manage_w
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.clock_in_time_edited', 'user', parseInt(req.params.user_id), null);
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -445,7 +446,7 @@ router.patch('/entries/:id/times', requireAdmin, requirePermission('manage_worke
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.times_edited', 'time_entry', parseInt(req.params.id), null);
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -489,7 +490,7 @@ router.patch('/entries/:id/edit', requireAdmin, requirePermission('approve_entri
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.edited', 'time_entry', parseInt(req.params.id), null);
     res.json(full.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -552,7 +553,7 @@ router.post('/entries/:id/split', requireAdmin, requirePermission('approve_entri
       client.release();
     }
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -576,7 +577,7 @@ router.get('/active-clocks', requireAdmin, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -638,7 +639,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -654,7 +655,7 @@ router.get('/workers/archived', requireAdmin, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -671,7 +672,7 @@ router.patch('/workers/:id/restore', requireAdmin, async (req, res) => {
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.restored', 'worker', result.rows[0].id, result.rows[0].full_name);
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -716,7 +717,7 @@ router.post('/workers/:id/entries', requireAdmin, requirePermission('manage_work
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.admin_added', 'time_entry', result.rows[0].id, null);
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -805,7 +806,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
       period: { from: from || null, to: to || null },
     });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -910,7 +911,7 @@ router.post('/workers/invite', requireAdmin, requirePermission('manage_workers')
     }
     res.status(201).json({ ...result.rows[0], email_sent: emailSent });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -957,7 +958,7 @@ router.post('/workers/:id/send-invite', requireAdmin, requirePermission('manage_
     }
     res.json({ email_sent: emailSent });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1022,7 +1023,7 @@ router.post('/workers', requireAdmin, requirePermission('manage_workers'), async
       }
       return res.status(409).json({ error: 'Username already exists' });
     }
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1133,7 +1134,7 @@ router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), 
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.updated', 'worker', result.rows[0].id, result.rows[0].full_name);
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1163,7 +1164,7 @@ router.patch('/workers/:id/permissions', requireAdmin, async (req, res) => {
     if (result.rowCount === 0) return res.status(404).json({ error: 'Admin not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1189,7 +1190,7 @@ router.patch('/workers/:id/worker-access', requireAdmin, async (req, res) => {
     if (result.rowCount === 0) return res.status(404).json({ error: 'Admin not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1207,7 +1208,7 @@ router.delete('/workers/:id', requireAdmin, requirePermission('manage_workers'),
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.deleted', 'worker', parseInt(req.params.id), worker.rows[0]?.full_name);
     res.json({ removed: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1273,7 +1274,7 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
       period: { from: from || null, to: to || null },
     });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1328,7 +1329,7 @@ router.get('/projects/metrics', requireAdmin, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1347,7 +1348,7 @@ router.get('/projects', requireAdmin, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1359,7 +1360,7 @@ router.get('/projects/archived', requireAdmin, async (req, res) => {
     const result = await pool.query('SELECT * FROM projects WHERE active = false AND company_id = $1 ORDER BY name LIMIT 500', [companyId]);
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1376,7 +1377,7 @@ router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.restored', 'project', result.rows[0].id, result.rows[0].name);
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1467,7 +1468,7 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.updated', 'project', result.rows[0].id, result.rows[0].name);
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1522,7 +1523,7 @@ router.post('/projects', requireAdmin, requirePermission('manage_projects'), asy
       }
       return res.status(409).json({ error: 'Project already exists' });
     }
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1546,7 +1547,7 @@ router.get('/projects/:id/photos', requireAdmin, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1627,7 +1628,7 @@ router.get('/projects/:id/rfis', requireAdmin, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1665,7 +1666,7 @@ router.get('/projects/:id/health', requireAdmin, async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1711,7 +1712,7 @@ router.get('/projects/:id/activity', requireAdmin, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1742,7 +1743,7 @@ router.get('/projects/:id/workers', requireAdmin, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1769,7 +1770,7 @@ router.get('/projects/:id/media-urls', requireAdmin, async (req, res) => {
     ];
     res.json({ urls, count: urls.length });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1827,7 +1828,7 @@ router.get('/projects/:id/media-zip', requireAdmin, async (req, res) => {
 
     await archive.finalize();
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     if (!res.headersSent) res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1880,7 +1881,7 @@ router.post('/projects/:id/merge-into/:target_id', requireAdmin, requirePermissi
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.merged', 'project', sourceId, sourceName, `Merged into "${targetName}" (id ${targetId})`);
     res.json({ success: true, message: `Merged "${sourceName}" into "${targetName}"` });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1910,7 +1911,7 @@ router.delete('/projects/:id', requireAdmin, requirePermission('manage_projects'
 
     res.json({ removed: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2018,7 +2019,7 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
       summary: summary.rows[0],
     });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2055,7 +2056,7 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
     const has_more = result.rows.length > LIMIT;
     res.json({ entries: result.rows.slice(0, LIMIT), has_more });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2083,7 +2084,7 @@ router.get('/entries/recently-approved', requireAdmin, requirePermission('approv
     );
     res.json(rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2140,7 +2141,7 @@ router.post('/entries/approve-all', requireAdmin, requirePermission('approve_ent
     await logAudit(companyId, req.user.id, req.user.full_name, 'entries.approved_all', 'time_entry', null, null, { count: result.rowCount });
     res.json({ approved: result.rowCount });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2273,7 +2274,7 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
       });
     }
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2322,7 +2323,7 @@ router.patch('/entries/:id/reject', requireAdmin, requirePermission('approve_ent
       });
     }
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2358,7 +2359,7 @@ router.patch('/entries/:id/unapprove', requireAdmin, requirePermission('approve_
       });
     }
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2378,7 +2379,7 @@ router.patch('/entries/:id/unlock', requireAdmin, requirePermission('approve_ent
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.unlocked', 'time_entry', parseInt(req.params.id), null);
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2691,7 +2692,7 @@ router.get('/audit-log', requireAdmin, async (req, res) => {
     const total = await pool.query(`SELECT COUNT(*) FROM audit_log WHERE ${where}`, values);
     res.json({ entries: result.rows, total: parseInt(total.rows[0].count) });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2878,7 +2879,7 @@ router.get('/analytics', requireAdmin, async (req, res) => {
       project_statuses: statusRes.rows,
     });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -3029,7 +3030,7 @@ router.delete('/clients/:id', requireAdmin, async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   } finally { client.release(); }
 });
@@ -3144,7 +3145,7 @@ router.post('/workers/:id/documents', requireAdmin, async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (uploaded?.url) deleteByUrl(uploaded.url).catch(() => {});
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
