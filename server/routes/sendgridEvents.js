@@ -14,28 +14,32 @@ const BAD_EVENT_TYPES = new Set([
 ]);
 
 /**
- * POST /api/sendgrid-events
+ * POST /api/sendgrid-events/:secret
  *
  * SendGrid event webhook. Configure in SendGrid dashboard:
  *   Settings → Mail Settings → Event Webhook
- *   URL: https://<server>/api/sendgrid-events
- *   Select: Bounced, Dropped, Spam Reports, Blocked
- *   Custom headers: add "X-Webhook-Secret: <shared secret>"
+ *   POST URL: https://<server>/api/sendgrid-events/<SENDGRID_WEBHOOK_SECRET>
+ *   Select: Bounced, Dropped, Spam Reports
  *
- * Auth is a shared-secret header. This isn't ECDSA signature verification
- * (SendGrid's built-in), but the blast radius of a forged request is limited:
- * the worst an attacker can do is mark email addresses as bounced, which
- * causes us to stop sending to them. No data exfiltration or destructive
- * action is possible. We can tighten to full signature verification later
- * if needed — requires @sendgrid/eventwebhook package.
+ * Auth is a shared secret in the URL path. Not ECDSA signature verification
+ * (which SendGrid supports via the Signed Event Webhook toggle), but the
+ * blast radius of a forged request is limited: the worst an attacker can do
+ * is mark email addresses as bounced, which just causes us to stop emailing
+ * them. No data exfiltration or destructive action is possible. Can be
+ * tightened to signature verification later by flipping the Signed Event
+ * Webhook toggle in SendGrid and swapping this to @sendgrid/eventwebhook.
  */
-router.post('/', async (req, res) => {
+router.post('/:secret', async (req, res) => {
   const expected = process.env.SENDGRID_WEBHOOK_SECRET;
   if (!expected) {
     logger.warn('sendgrid-events received but SENDGRID_WEBHOOK_SECRET is not set');
     return res.status(503).json({ error: 'Webhook not configured' });
   }
-  if (req.headers['x-webhook-secret'] !== expected) {
+  // Constant-time compare so attackers can't learn the secret via timing.
+  const provided = req.params.secret || '';
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !require('crypto').timingSafeEqual(a, b)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
