@@ -96,13 +96,11 @@ export default function AnalyticsDashboard() {
       .finally(() => setLoading(false));
   }, [from, to]);
 
-  if (loading) return <><SkeletonStatRow count={4} style={{ marginBottom: 16 }} /><SkeletonList count={4} /></>;
-  if (!data) return <p style={{ color: '#e53e3e' }}>{t.failedLoadAnalytics}</p>;
-
-  const { summary, daily_hours, weekly_hours, project_hours, worker_hours } = data;
-
   // Fill daily chart — build a date range and zero-fill missing days
+  // These useMemo calls must come before any early returns (rules of hooks)
   const dailyFilled = useMemo(() => {
+    if (!data) return [];
+    const { daily_hours } = data;
     const dailyMap = Object.fromEntries(daily_hours.map(d => [d.date, parseFloat(d.hours)]));
     const result = [];
     if (showCustom && customFrom && customTo) {
@@ -127,10 +125,12 @@ export default function AnalyticsDashboard() {
       daily_hours.forEach(d => result.push({ date: d.date, hours: parseFloat(d.hours) }));
     }
     return result;
-  }, [daily_hours, showCustom, customFrom, customTo, preset]);
+  }, [data, showCustom, customFrom, customTo, preset]);
 
   // Fill weekly chart
   const weeklyFilled = useMemo(() => {
+    if (!data) return [];
+    const { weekly_hours } = data;
     const weeklyMap = Object.fromEntries((weekly_hours || []).map(d => [d.week_start, parseFloat(d.hours)]));
     const result = [];
     if (showCustom) {
@@ -146,7 +146,12 @@ export default function AnalyticsDashboard() {
       }
     }
     return result;
-  }, [weekly_hours, showCustom, customFrom, customTo, preset]);
+  }, [data, showCustom, customFrom, customTo, preset]);
+
+  if (loading) return <><SkeletonStatRow count={4} style={{ marginBottom: 16 }} /><SkeletonList count={4} /></>;
+  if (!data) return <p style={{ color: '#e53e3e' }}>{t.failedLoadAnalytics}</p>;
+
+  const { summary, daily_hours, weekly_hours, project_hours, worker_hours } = data;
 
   const rangeLabel = showCustom
     ? (customFrom && customTo ? `${customFrom} – ${customTo}` : t.adCustom)
