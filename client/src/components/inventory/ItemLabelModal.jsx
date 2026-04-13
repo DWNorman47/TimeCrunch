@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useT } from '../../hooks/useT';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 // QR payload format: {"app":"opsfloa","item":true,"id":42,"sku":"SKU123","name":"2x4 Lumber"}
 // Scanned by the Count tab to auto-jump to that item in the count list.
@@ -20,6 +21,7 @@ export function parseItemQR(raw) {
 export default function ItemLabelModal({ item, onClose }) {
   const t = useT();
   const [qrDataUrl, setQrDataUrl] = useState('');
+  const modalRef = useModalA11y(onClose);
 
   useEffect(() => {
     const payload = buildItemQRPayload(item);
@@ -27,12 +29,6 @@ export default function ItemLabelModal({ item, onClose }) {
       .then(setQrDataUrl)
       .catch(console.error);
   }, [item.id, item.sku, item.name]);
-
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
 
   const printLabel = () => {
     if (!qrDataUrl) return;
@@ -71,9 +67,9 @@ export default function ItemLabelModal({ item, onClose }) {
 
   return (
     <div style={s.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={s.modal}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="item-label-title" style={s.modal}>
         <div style={s.header}>
-          <h3 style={s.title}>{t.itemLabelTitle}</h3>
+          <h3 id="item-label-title" style={s.title}>{t.itemLabelTitle}</h3>
           <button style={s.closeBtn} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
 

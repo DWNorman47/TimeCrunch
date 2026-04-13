@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 /**
  * Shown when a non-base UOM with factor=1 is selected, prompting the admin
@@ -18,14 +19,9 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
   const [factor, setFactor] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
+  const modalRef = useModalA11y(onDismiss);
 
   const uomLabel = uom.unit + (uom.unit_spec ? ` (${uom.unit_spec})` : '');
-
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') onDismiss(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
 
   const save = async () => {
     const n = parseFloat(factor);
@@ -42,9 +38,9 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
 
   return (
     <div style={m.overlay} onClick={onDismiss}>
-      <div style={m.modal} onClick={e => e.stopPropagation()}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="uom-conv-title" style={m.modal} onClick={e => e.stopPropagation()}>
         <div style={m.header}>
-          <div style={m.title}>{t.uomConvTitle}</div>
+          <div id="uom-conv-title" style={m.title}>{t.uomConvTitle}</div>
           <button style={m.close} aria-label={t.labelModalClose} onClick={onDismiss}>✕</button>
         </div>
         <div style={m.body}>

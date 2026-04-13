@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useT } from '../../hooks/useT';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 // QR payload format: {"app":"opsfloa","bin":"area","id":42,"name":"Zone A"}
 // Scanned by the Count tab to auto-set the active bin context.
@@ -20,6 +21,7 @@ export function parseBinQR(raw) {
 export default function BinLabelModal({ item, binType, onClose }) {
   const t = useT();
   const [qrDataUrl, setQrDataUrl] = useState('');
+  const modalRef = useModalA11y(onClose);
 
   const BIN_LABELS = {
     area:        t.binLabelArea,
@@ -34,12 +36,6 @@ export default function BinLabelModal({ item, binType, onClose }) {
       .then(setQrDataUrl)
       .catch(console.error);
   }, [binType, item.id, item.name]);
-
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
 
   const typeName = BIN_LABELS[binType] || binType;
 
@@ -82,9 +78,9 @@ export default function BinLabelModal({ item, binType, onClose }) {
 
   return (
     <div style={s.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={s.modal}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="bin-label-title" style={s.modal}>
         <div style={s.header}>
-          <h3 style={s.title}>{t.labelModalTitle} — {typeName}</h3>
+          <h3 id="bin-label-title" style={s.title}>{t.labelModalTitle} — {typeName}</h3>
           <button style={s.closeBtn} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
 

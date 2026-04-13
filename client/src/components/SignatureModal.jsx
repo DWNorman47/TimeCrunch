@@ -1,9 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useT } from '../hooks/useT';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 export default function SignatureModal({ onConfirm, onCancel, required = false }) {
   const t = useT();
   const canvasRef = useRef(null);
+  const modalRef = useModalA11y(onCancel);
   const [drawing, setDrawing] = useState(false);
   const [isEmpty, setIsEmpty] = useState(true);
 
@@ -14,12 +16,6 @@ export default function SignatureModal({ onConfirm, onCancel, required = false }
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-  }, []);
-
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') onCancel(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
   }, []);
 
   const getPos = (e, canvas) => {
@@ -67,8 +63,8 @@ export default function SignatureModal({ onConfirm, onCancel, required = false }
 
   return (
     <div style={styles.overlay} onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div style={styles.modal}>
-        <h3 style={styles.title}>{t.signInvoice}</h3>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="signature-modal-title" style={styles.modal}>
+        <h3 id="signature-modal-title" style={styles.title}>{t.signInvoice}</h3>
         <p style={styles.hint}>{t.signatureHint}</p>
         <div style={styles.canvasWrap}>
           <canvas

@@ -1,20 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import api from '../api';
 import PasswordInput from './PasswordInput';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 export default function ChangePassword({ onClose, t }) {
   const [form, setForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
+  const modalRef = useModalA11y(onClose);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -40,8 +36,8 @@ export default function ChangePassword({ onClose, t }) {
 
   return (
     <div style={styles.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={styles.modal}>
-        <h3 style={styles.title}>{t.changePasswordTitle}</h3>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="change-password-title" style={styles.modal}>
+        <h3 id="change-password-title" style={styles.title}>{t.changePasswordTitle}</h3>
         <form onSubmit={handleSubmit} style={styles.form}>
           <label htmlFor="cp-current" style={styles.label}>{t.currentPassword}</label>
           <PasswordInput id="cp-current" style={styles.input} value={form.current_password} onChange={e => set('current_password', e.target.value)} required minLength={6} autoFocus />

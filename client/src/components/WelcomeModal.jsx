@@ -1,34 +1,19 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
+import { useModalA11y } from '../hooks/useModalA11y';
 
-export default function WelcomeModal() {
-  const { user, firstLogin, clearFirstLogin } = useAuth();
-  const navigate = useNavigate();
-  const t = useT();
-  if (!firstLogin || !user) return null;
-
-  const firstName = user.first_name || user.full_name?.split(' ')[0] || user.username;
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
-
-  const handleStart = () => {
-    clearFirstLogin();
-    if (isAdmin) navigate('/administration');
-  };
-
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') handleStart(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
-
+// Inner component: only rendered when we actually need the modal.
+// All hooks live here so they're called unconditionally.
+function WelcomeModalInner({ user, isAdmin, firstName, handleStart, t }) {
+  const modalRef = useModalA11y(handleStart);
   return (
     <div style={styles.overlay} onClick={e => { if (e.target === e.currentTarget) handleStart(); }}>
-      <div style={styles.modal}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="welcome-modal-title" style={styles.modal}>
         <div style={styles.brand}>{t.welcomeBrand}</div>
         <div style={styles.emoji}>{isAdmin ? '🏗️' : '👷'}</div>
-        <h2 style={styles.title}>{t.welcome}, {firstName}!</h2>
+        <h2 id="welcome-modal-title" style={styles.title}>{t.welcome}, {firstName}!</h2>
         {isAdmin ? (
           <>
             <p style={styles.body}><strong>Ops Flow Assist</strong> {t.welcomeAdminBody1}</p>
@@ -45,6 +30,31 @@ export default function WelcomeModal() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function WelcomeModal() {
+  const { user, firstLogin, clearFirstLogin } = useAuth();
+  const navigate = useNavigate();
+  const t = useT();
+  if (!firstLogin || !user) return null;
+
+  const firstName = user.first_name || user.full_name?.split(' ')[0] || user.username;
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+  const handleStart = () => {
+    clearFirstLogin();
+    if (isAdmin) navigate('/administration');
+  };
+
+  return (
+    <WelcomeModalInner
+      user={user}
+      isAdmin={isAdmin}
+      firstName={firstName}
+      handleStart={handleStart}
+      t={t}
+    />
   );
 }
 
