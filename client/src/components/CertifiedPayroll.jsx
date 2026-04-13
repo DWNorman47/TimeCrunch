@@ -123,12 +123,12 @@ export default function CertifiedPayroll({ projects }) {
 
       <div style={styles.controls}>
         <div style={styles.field}>
-          <label style={styles.label}>{t.weekEnding}</label>
-          <input style={styles.input} type="date" value={weekEnd} onChange={e => { setWeekEnd(e.target.value); setData(null); }} />
+          <label htmlFor="cp-week-end" style={styles.label}>{t.weekEnding}</label>
+          <input id="cp-week-end" style={styles.input} type="date" value={weekEnd} onChange={e => { setWeekEnd(e.target.value); setData(null); }} />
         </div>
         <div style={styles.field}>
-          <label style={styles.label}>{t.projectOptional}</label>
-          <select style={styles.input} value={projectId} onChange={e => { setProjectId(e.target.value); setData(null); }}>
+          <label htmlFor="cp-project" style={styles.label}>{t.projectOptional}</label>
+          <select id="cp-project" style={styles.input} value={projectId} onChange={e => { setProjectId(e.target.value); setData(null); }}>
             <option value="">{t.allProjectsOpt}</option>
             {(projects || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>

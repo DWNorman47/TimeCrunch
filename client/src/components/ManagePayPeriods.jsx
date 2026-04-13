@@ -75,16 +75,16 @@ export default function ManagePayPeriods() {
       <form onSubmit={lock} style={styles.form}>
         <div style={styles.formRow}>
           <div style={styles.field}>
-            <label style={styles.label}>{t.from}</label>
-            <input style={styles.input} type="date" value={form.from} onChange={e => setForm(f => ({ ...f, from: e.target.value }))} required />
+            <label htmlFor="pp-from" style={styles.label}>{t.from}</label>
+            <input id="pp-from" style={styles.input} type="date" value={form.from} onChange={e => setForm(f => ({ ...f, from: e.target.value }))} required />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>{t.to}</label>
-            <input style={styles.input} type="date" value={form.to} onChange={e => setForm(f => ({ ...f, to: e.target.value }))} required />
+            <label htmlFor="pp-to" style={styles.label}>{t.to}</label>
+            <input id="pp-to" style={styles.input} type="date" value={form.to} onChange={e => setForm(f => ({ ...f, to: e.target.value }))} required />
           </div>
           <div style={{ ...styles.field, flex: 2 }}>
-            <label style={styles.label}>{t.labelOptional}</label>
-            <input style={styles.input} type="text" maxLength={100} value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder={t.periodLabelExample} />
+            <label htmlFor="pp-label" style={styles.label}>{t.labelOptional}</label>
+            <input id="pp-label" style={styles.input} type="text" maxLength={100} value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder={t.periodLabelExample} />
           </div>
           <div style={styles.field}>
             <label style={styles.label}>&nbsp;</label>
