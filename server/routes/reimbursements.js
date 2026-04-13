@@ -7,6 +7,7 @@ const { uploadBase64, deleteByUrl } = require('../r2');
 const { incrementStorage, decrementStorage, checkStorageLimit } = require('../storage');
 const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
 const qbo = require('../services/qbo');
+const { logAudit } = require('../auditLog');
 
 // GET /api/reimbursements/categories
 // Returns:
@@ -106,6 +107,8 @@ router.post('/', reimbLimiter, async (req, res) => {
        RETURNING id, amount, description, category, expense_date, receipt_url, status, admin_notes, created_at, project_id, miles, mileage_rate`,
       [req.user.company_id, req.user.id, amt, description || null, category || null, expense_date, receiptUrl, receiptSizeBytes, project_id || null, milesVal, mileageRateVal]
     );
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'reimbursement.submitted', 'reimbursement', rows[0].id, description || null,
+      { amount: amt, category, expense_date });
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error(err);
@@ -130,6 +133,7 @@ router.delete('/:id', async (req, res) => {
     if (rows[0].receipt_size_bytes) {
       await decrementStorage(req.user.company_id, rows[0].receipt_size_bytes);
     }
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'reimbursement.deleted', 'reimbursement', req.params.id, null, null);
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -261,6 +265,8 @@ router.patch('/admin/:id', requireAdmin, async (req, res) => {
       [status, admin_notes, req.params.id, req.user.company_id]
     );
     const reimb = rows[0];
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, `reimbursement.${status}`, 'reimbursement', reimb.id, null,
+      { amount: reimb.amount, worker_user_id: reimb.user_id });
     res.json(reimb);
 
     // QBO expense auto-sync — fire-and-forget, only on approval

@@ -36,14 +36,7 @@ async function checkWorkerLimit(companyId) {
   return current >= limit ? { limit, current, plan: plan || 'free' } : null;
 }
 
-async function logAudit(companyId, actorId, actorName, action, entityType, entityId, entityName, details) {
-  try {
-    await pool.query(
-      'INSERT INTO audit_log (company_id, actor_id, actor_name, action, entity_type, entity_id, entity_name, details) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-      [companyId, actorId, actorName, action, entityType || null, entityId || null, entityName || null, details ? JSON.stringify(details) : null]
-    );
-  } catch (e) { console.error('Audit log error:', e); }
-}
+const { logAudit } = require('../auditLog');
 
 const { FEATURE_KEYS, ADMIN_SETTINGS_DEFAULTS, applySettingsRows } = require('../settingsDefaults');
 

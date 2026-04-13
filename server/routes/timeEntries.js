@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem } = require('./inbox');
 const { sendEmail } = require('../email');
+const { logAudit } = require('../auditLog');
 const rateLimit = require('express-rate-limit');
 
 const entryWriteLimiter = rateLimit({
@@ -74,6 +75,8 @@ router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(409).json({ error: 'Duplicate entry' });
     const entry = result.rows[0];
+    logAudit(companyId, req.user.id, req.user.full_name, 'entry.submitted', 'time_entry', entry.id, null,
+      { work_date, start_time, end_time, project_id });
     res.status(201).json(entry);
     // Optionally notify admins on submission
     setImmediate(async () => {
@@ -129,6 +132,8 @@ router.patch('/:id', requireAuth, async (req, res) => {
        status = 'pending', approval_note = NULL WHERE id = $6 RETURNING *`,
       [start_time, end_time, notes?.trim() || null, bm, mileageVal, req.params.id]
     );
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'entry.edited', 'time_entry', req.params.id, null,
+      { from: { start_time: entry.start_time, end_time: entry.end_time }, to: { start_time, end_time } });
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -228,10 +233,12 @@ router.delete('/:id', requireAuth, async (req, res) => {
     );
     if (locked.rowCount > 0) return res.status(403).json({ error: 'This entry is in a locked pay period' });
     const result = await pool.query(
-      'DELETE FROM time_entries WHERE id = $1 AND user_id = $2 RETURNING id',
+      'DELETE FROM time_entries WHERE id = $1 AND user_id = $2 RETURNING id, work_date',
       [req.params.id, req.user.id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'entry.deleted', 'time_entry', req.params.id, null,
+      { work_date: result.rows[0].work_date });
     res.json({ deleted: true });
   } catch (err) {
     console.error(err);

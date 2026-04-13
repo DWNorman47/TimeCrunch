@@ -2,6 +2,7 @@ const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToCompanyAdmins } = require('../push');
+const { logAudit } = require('../auditLog');
 
 const VALID_INCIDENT_TYPES = ['near_miss', 'first_aid', 'recordable', 'lost_time', 'property_damage', 'other'];
 const VALID_INCIDENT_STATUSES = ['open', 'under_review', 'closed'];
@@ -104,6 +105,9 @@ router.post('/', requireAuth, async (req, res) => {
       [report.id]
     );
 
+    logAudit(companyId, req.user.id, req.user.full_name, 'incident.submitted', 'incident_report', report.id, null,
+      { type, incident_date, project_id: project_id || null, injured_name: injured_name || null });
+
     sendPushToCompanyAdmins(companyId, {
       title: `Incident report from ${req.user.full_name}`,
       body: `${type.replace('-', ' ')} — ${incident_date}`,
@@ -122,6 +126,7 @@ router.patch('/:id/close', requireAdmin, async (req, res) => {
       [req.params.id, req.user.company_id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Incident not found' });
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'incident.closed', 'incident_report', req.params.id, null, null);
     res.json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -141,6 +146,8 @@ router.delete('/:id', requireAuth, async (req, res) => {
     if (!isAdmin && report.status === 'closed') return res.status(403).json({ error: 'Closed incidents cannot be deleted' });
 
     await pool.query('DELETE FROM incident_reports WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
+    logAudit(companyId, req.user.id, req.user.full_name, 'incident.deleted', 'incident_report', req.params.id, null,
+      { type: report.type, incident_date: report.incident_date });
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });

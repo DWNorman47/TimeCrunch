@@ -6,6 +6,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const qbo = require('../services/qbo');
 const { encrypt } = require('../services/encryption');
 const { applySettingsRows, ADMIN_SETTINGS_DEFAULTS } = require('../settingsDefaults');
+const { logAudit } = require('../auditLog');
 
 // GET /api/qbo/status — connection status for this company
 router.get('/status', requireAdmin, async (req, res) => {
@@ -97,6 +98,7 @@ router.delete('/disconnect', requireAdmin, async (req, res) => {
        WHERE id = $1`,
       [req.user.company_id]
     );
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'qbo.disconnected', 'company', req.user.company_id, null, null);
     res.json({ disconnected: true });
   } catch (err) {
     console.error(err);
@@ -221,6 +223,8 @@ router.post('/invoices', requireAdmin, async (req, res) => {
          txn_date || new Date().toLocaleDateString('en-CA'), parsed]
       ).catch(e => console.error('[QBO invoice save]', e.message));
     }
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'qbo.invoice_created', 'qbo_invoice', invoice?.Id || null, invoice?.DocNumber || null,
+      { amount: parsed, customer_id, project_id: project_id || null });
     res.json(invoice);
   } catch (err) {
     console.error(err);
@@ -378,6 +382,8 @@ router.post('/push', requireAdmin, async (req, res) => {
       }
     }
 
+    logAudit(companyId, req.user.id, req.user.full_name, 'qbo.time_pushed', null, null, null,
+      { pushed: pushed.length, skipped: skipped.length, already_synced: alreadySynced, from: from || null, to: to || null, force: !!force });
     res.json({ pushed: pushed.length, skipped, already_synced: alreadySynced });
   } catch (err) {
     console.error(err);
@@ -571,6 +577,8 @@ router.post('/push-expenses', requireAdmin, async (req, res) => {
       }
     }
 
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'qbo.expenses_pushed', null, null, null,
+      { pushed: pushed.length, skipped: skipped.length, already_synced: alreadySynced });
     res.json({ pushed: pushed.length, skipped, already_synced: alreadySynced });
   } catch (err) {
     console.error(err);
@@ -631,6 +639,8 @@ router.post('/push-payroll', requireAdmin, async (req, res) => {
       amount: totalCost,
     });
 
+    logAudit(companyId, req.user.id, req.user.full_name, 'qbo.payroll_journal_pushed', 'qbo_journal', entry?.Id || null, description,
+      { amount: totalCost, from, to, entries: entries.rowCount });
     res.json({ entry_id: entry?.Id, amount: totalCost, entries: entries.rowCount, description });
   } catch (err) {
     console.error(err);

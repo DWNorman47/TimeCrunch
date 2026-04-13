@@ -7,6 +7,7 @@ const { sendPushToCompanyAdmins } = require('../push');
 const { createInboxItemBatch } = require('./inbox');
 const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
 const { applySettingsRows, ADMIN_SETTINGS_DEFAULTS } = require('../settingsDefaults');
+const { logAudit } = require('../auditLog');
 
 // GET /api/inventory/units — active units for this company
 router.get('/units', requireAuth, async (req, res) => {
@@ -714,6 +715,10 @@ router.post('/transactions', requireAuth, async (req, res) => {
     const anyNegative = stockCheck.rows.some(r => parseFloat(r.quantity) < 0);
     if (anyNegative) warning = 'stock_negative';
 
+    logAudit(companyId, req.user.id, req.user.full_name, `inventory.${type}`, 'inventory_transaction', txn.rows[0].id, null,
+      { item_id, quantity: absQty, from_location_id: from_location_id || null, to_location_id: to_location_id || null,
+        project_id: project_id || null, reference_no: reference_no || null });
+
     res.status(201).json({ ...txn.rows[0], warning });
 
     // Fire low-stock alert (async, after response sent)
@@ -1147,6 +1152,8 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
       }
 
       await client.query('COMMIT');
+      logAudit(companyId, req.user.id, req.user.full_name, 'cycle_count.completed', 'cycle_count', req.params.id, null,
+        { adjustments_posted: linesWithVariance.length, count_type: cc.rows[0].count_type });
       res.json({ success: true, adjustments_posted: linesWithVariance.length });
     } catch (err) {
       await client.query('ROLLBACK');
@@ -1653,6 +1660,8 @@ router.post('/cycle-counts/:id/lines/:lineId/override', requireAdmin, async (req
     const updatedLine = await pool.query(
       'SELECT * FROM inventory_cycle_count_lines WHERE id=$1', [req.params.lineId]
     );
+    logAudit(companyId, req.user.id, req.user.full_name, 'cycle_count.line_overridden', 'cycle_count_line', req.params.lineId, null,
+      { cycle_count_id: req.params.id, item_id: line.item_id, previous_counted: line.counted_qty, new_counted: qty, variance });
     res.json({ line: updatedLine.rows[0], auto_completed: autoCompleted });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
