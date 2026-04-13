@@ -235,7 +235,7 @@ export default function InventoryConversions({ onConversionChange }) {
         )}
       </div>
 
-      {error && <div style={s.errorMsg}>{error}</div>}
+      {error && <div role="alert" style={s.errorMsg}>{error}</div>}
       {loading && <SkeletonList count={3} rows={1} />}
 
       {!loading && !error && (

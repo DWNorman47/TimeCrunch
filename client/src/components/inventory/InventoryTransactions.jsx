@@ -551,7 +551,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
             </button>
           </div>
 
-          {error && <div style={s.error}>{error}</div>}
+          {error && <div role="alert" style={s.error}>{error}</div>}
 
           {loading ? (
             <SkeletonList count={4} rows={2} />

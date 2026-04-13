@@ -176,7 +176,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
   return (
     <form onSubmit={submit} style={ef.form}>
       <h3 style={ef.title}>{item ? `${t.edit} ${levelSingular}` : `${t.addOption} ${levelSingular}`}</h3>
-      {error && <div style={ef.error}>{error}</div>}
+      {error && <div role="alert" style={ef.error}>{error}</div>}
 
       {/* Parent selector (only for new items on non-location levels) */}
       {!isLocation && !item && (
@@ -403,7 +403,7 @@ function SupplierPanel() {
         </label>
         <button style={sp.addBtn} onClick={openNew}>{t.invSetupAddSupplierBtn}</button>
       </div>
-      {error && <div style={sp.error}>{error}</div>}
+      {error && <div role="alert" style={sp.error}>{error}</div>}
       {loading ? (
         <SkeletonList count={3} rows={2} />
       ) : suppliers.length === 0 ? (
@@ -729,7 +729,7 @@ export default function InventorySetup({ projects }) {
             </button>
           </div>
 
-          {error && <div style={s.error}>{error}</div>}
+          {error && <div role="alert" style={s.error}>{error}</div>}
 
           {loading ? (
             <SkeletonList count={3} rows={1} />

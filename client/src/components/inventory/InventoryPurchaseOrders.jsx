@@ -74,7 +74,7 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
           <button style={m.closeBtn} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
 
-        {error && <div style={m.error}>{error}</div>}
+        {error && <div role="alert" style={m.error}>{error}</div>}
 
         <div style={m.field}>
           <label style={m.label}>{t.invPOReceivingLoc}</label>
@@ -632,7 +632,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
   return (
     <div style={c.wrap}>
       <h3 style={c.title}>{t.invPONewPO}</h3>
-      {error && <div style={c.error}>{error}</div>}
+      {error && <div role="alert" style={c.error}>{error}</div>}
 
       <div style={c.row}>
         <div style={c.field}>
@@ -863,7 +863,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
         <button style={l.createBtn} onClick={() => { setPrefillItems([]); setView('create'); }}>{t.invPONewPOBtn}</button>
       </div>
 
-      {error && <div style={l.error}>{error}</div>}
+      {error && <div role="alert" style={l.error}>{error}</div>}
       {loadDetailError && <div style={l.error}>{loadDetailError}</div>}
 
       {loading ? (

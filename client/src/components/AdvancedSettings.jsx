@@ -181,7 +181,7 @@ export default function AdvancedSettings() {
 
       {open && (
         <div style={s.body}>
-          {error && <div style={s.errorMsg}>{error}</div>}
+          {error && <div role="alert" style={s.errorMsg}>{error}</div>}
           {success && <div style={s.successMsg}>{success}</div>}
           {!config && !error ? (
             <div style={s.loading}>{t.advSettingsLoading}</div>

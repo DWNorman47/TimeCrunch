@@ -71,7 +71,7 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
   return (
     <form onSubmit={submit} style={f.form}>
       <h3 style={f.title}>{item ? t.editItem : t.addItem}</h3>
-      {error && <div style={f.error}>{error}</div>}
+      {error && <div role="alert" style={f.error}>{error}</div>}
       <div style={f.row}>
         <div style={f.field}>
           <label htmlFor="ii-name" style={f.label}>{t.itemNameLabel}</label>
@@ -224,7 +224,7 @@ function ItemUOMPanel({ item }) {
         </button>
       </div>
 
-      {error && <div style={u.error}>{error}</div>}
+      {error && <div role="alert" style={u.error}>{error}</div>}
       {removeUomError && <div style={u.error}>{removeUomError}</div>}
 
       {addOpen && (
@@ -448,7 +448,7 @@ export default function InventoryItems({ onItemChange }) {
             <button style={s.addBtn} onClick={() => setEditingItem(false)}>{t.addItemBtn}</button>
           </div>
 
-          {error && <div style={s.error}>{error}</div>}
+          {error && <div role="alert" style={s.error}>{error}</div>}
 
           {loading ? (
             <div style={s.empty}>{t.advSettingsLoading}</div>

@@ -520,7 +520,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       {saveError && <div style={d.error}>{saveError}</div>}
       {statusError && <div style={d.error}>{statusError}</div>}
       {uncountedMsg && <div style={d.warnMsg}>{uncountedMsg}</div>}
-      {error && <div style={d.error}>{error}</div>}
+      {error && <div role="alert" style={d.error}>{error}</div>}
 
       {/* ── Tab Navigation ── */}
       <div style={d.tabRow}>
@@ -995,7 +995,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
         </select>
       </div>
 
-      {error && <div style={s.error}>{error}</div>}
+      {error && <div role="alert" style={s.error}>{error}</div>}
       {loadDetailError && <p style={s.inlineError}>{loadDetailError}</p>}
 
       {loading ? (

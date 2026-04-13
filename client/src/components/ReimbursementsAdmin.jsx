@@ -102,7 +102,7 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
             />
             <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{notes.length}/1000</div>
           </div>
-          {error && <div style={s.error}>{error}</div>}
+          {error && <div role="alert" style={s.error}>{error}</div>}
           <div style={s.actions}>
             {item.status !== 'approved' && (
               <button style={{ ...s.approveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => act('approved')} disabled={saving}>

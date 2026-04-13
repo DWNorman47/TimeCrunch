@@ -49,7 +49,7 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
             {t.uomConvDescHow} <strong>{baseUnit}</strong> {t.uomConvDescAreIn} <strong>{uomLabel}</strong>?
           </p>
           <p style={m.sub}>{t.uomConvExample}</p>
-          {error && <div style={m.error}>{error}</div>}
+          {error && <div role="alert" style={m.error}>{error}</div>}
           <div style={m.inputRow}>
             <span style={m.eq}>1&nbsp;{uomLabel}&nbsp;=</span>
             <input

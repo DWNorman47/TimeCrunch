@@ -52,7 +52,7 @@ function HistoryPanel({ item, onClose }) {
           </div>
           <button style={h.close} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
-        {error && <div style={h.error}>{error} <button style={h.retryBtn} onClick={load}>{t.tryAgain || 'Try again'}</button></div>}
+        {error && <div role="alert" style={h.error}>{error} <button style={h.retryBtn} onClick={load}>{t.tryAgain || 'Try again'}</button></div>}
         {loading ? (
           <SkeletonList count={3} rows={1} />
         ) : rows.length === 0 ? (
@@ -177,7 +177,7 @@ function AdjustModal({ item, locations, onClose, onDone }) {
             <span style={a.currentLabel}>{t.invStockCurrentStock}</span>
             <span style={a.currentQty}>{parseFloat(item.quantity) % 1 === 0 ? parseFloat(item.quantity).toFixed(0) : parseFloat(item.quantity).toFixed(2)} {item.unit}</span>
           </div>
-          {error && <div style={a.error}>{error}</div>}
+          {error && <div role="alert" style={a.error}>{error}</div>}
           {warning && <div style={{ ...a.error, background: '#fef3c7', color: '#92400e' }}>{warning}</div>}
           <label htmlFor="is-adj-qty" style={a.label}>{t.invStockAdjQtyLabel}</label>
           <input
@@ -323,7 +323,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
             <span style={a.currentLabel}>{t.invStockAvailableAt} {item.location_name}</span>
             <span style={a.currentQty}>{available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} {stockUnit}</span>
           </div>
-          {error && <div style={a.error}>{error}</div>}
+          {error && <div role="alert" style={a.error}>{error}</div>}
           {warning && <div style={{ ...a.error, background: '#fef3c7', color: '#92400e' }}>{warning}</div>}
           <label htmlFor="is-issue-qty" style={a.label}>{t.invStockQtyToIssue}</label>
           <input
@@ -515,7 +515,7 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
         )}
       </div>
 
-      {error && <div style={s.error}>{error}</div>}
+      {error && <div role="alert" style={s.error}>{error}</div>}
 
       {loading ? (
         <SkeletonList count={5} rows={2} />
