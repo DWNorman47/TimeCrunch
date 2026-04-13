@@ -367,7 +367,7 @@ export default function ApprovalQueue({ onCountChange }) {
           />
           <button style={styles.applyDateBtn} onClick={() => { setSelectedIds(new Set()); fetch(); }}>{t.apply}</button>
           {(dateFrom || dateTo) && (
-            <button style={styles.clearDateBtn} aria-label="Clear date filters" onClick={() => { setDateFrom(''); setDateTo(''); setSelectedIds(new Set()); fetch(); }}>✕</button>
+            <button style={styles.clearDateBtn} aria-label={t.clearDateFilters} onClick={() => { setDateFrom(''); setDateTo(''); setSelectedIds(new Set()); fetch(); }}>✕</button>
           )}
         </div>
       )}
@@ -523,7 +523,7 @@ export default function ApprovalQueue({ onCountChange }) {
                               </select>
                             </div>
                             {splitSegments.length > 2 && (
-                              <button style={styles.splitRemoveBtn} aria-label="Remove segment" onClick={() => setSplitSegments(prev => prev.filter((_, j) => j !== i))}>✕</button>
+                              <button style={styles.splitRemoveBtn} aria-label={t.removeSegment} onClick={() => setSplitSegments(prev => prev.filter((_, j) => j !== i))}>✕</button>
                             )}
                           </div>
                         </div>

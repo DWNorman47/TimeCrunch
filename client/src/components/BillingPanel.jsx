@@ -11,7 +11,7 @@ function daysLeft(dateStr) {
 function StatusBadge({ status, trialEndsAt, plan, t }) {
   if (status === 'active') {
     const label = plan === 'business' ? t.planBusiness : plan === 'starter' ? t.planStarter : t.planFree;
-    return <span style={{ ...badge, background: '#d1fae5', color: '#065f46' }}>● Active — {label}</span>;
+    return <span style={{ ...badge, background: '#d1fae5', color: '#065f46' }}>{t.billingActivePlan.replace('{plan}', label)}</span>;
   }
   if (status === 'trial') {
     const d = daysLeft(trialEndsAt);
@@ -27,7 +27,7 @@ function StatusBadge({ status, trialEndsAt, plan, t }) {
 
 const badge = { padding: '4px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700 };
 
-function PlanCard({ name, priceEl, subline, features, color, highlight, tag, onSelect, btnLabel, disabled, current, selected }) {
+function PlanCard({ name, priceEl, subline, features, color, highlight, tag, onSelect, btnLabel, disabled, current, selected, t }) {
   return (
     <div style={{
       ...s.planCard,
@@ -35,7 +35,7 @@ function PlanCard({ name, priceEl, subline, features, color, highlight, tag, onS
       boxShadow: selected ? `0 0 0 3px ${color}22` : highlight ? '0 4px 20px rgba(124,58,237,0.12)' : undefined,
     }}>
       {tag && !selected && <div style={{ ...s.planTag, background: color }}>{tag}</div>}
-      {selected && <div style={{ ...s.selectedTag, background: color }}>✓ Selected</div>}
+      {selected && <div style={{ ...s.selectedTag, background: color }}>{t.billingSelected}</div>}
       <div style={s.planName}>{name}</div>
       <div style={{ ...s.planPrice, color }}>{priceEl}</div>
       {subline && <div style={s.planSubline}>{subline}</div>}
@@ -162,26 +162,26 @@ export default function BillingPanel() {
 
       {sub === 'past_due' && (
         <div style={s.alert}>
-          ⚠ Your last payment failed. Update your payment method to avoid losing access.
+          {t.billingPaymentFailed}
           <button style={{ ...s.alertBtn, ...(redirecting === 'portal' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={portal} disabled={redirecting === 'portal'}>
-            {redirecting === 'portal' ? 'Redirecting...' : 'Update payment'}
+            {redirecting === 'portal' ? t.billingRedirecting : t.billingUpdatePayment}
           </button>
         </div>
       )}
 
       {isTrialExpired && (
         <div style={{ ...s.alert, background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' }}>
-          Your free trial has ended. Your data is safe — subscribe below to restore full access.
+          {t.billingTrialExpiredBanner}
         </div>
       )}
 
       {isTrial && (
         <div style={s.trialBanner}>
-          <strong>You have full Business-level access during your trial.</strong>
-          {' '}Choose the plan that fits your team below — your selection won't change what you can do now.
+          <strong>{t.billingTrialActiveFull}</strong>
+          {' '}{t.billingTrialChoosePlan}
           {trialDays > 0 && (
             <span style={{ display: 'block', marginTop: 6, fontSize: 12, color: '#1e40af' }}>
-              {trialDays} day{trialDays !== 1 ? 's' : ''} remaining — remaining trial days carry over when you subscribe.
+              {trialDays !== 1 ? t.billingTrialDaysLeft.replace('{n}', trialDays) : t.billingTrialDayLeft}
             </span>
           )}
         </div>
@@ -190,11 +190,13 @@ export default function BillingPanel() {
       {isActive && (
         <div style={s.activeSection}>
           <p style={s.activeText}>
-            Your <strong>{currentPlan === 'business' ? t.planBusiness : t.planStarter}</strong> plan is active
-            {hasQbo ? ` with ${t.addonQBO}` : ''}.
+            {hasQbo
+              ? t.billingPlanActiveWithAddon.replace('{plan}', currentPlan === 'business' ? t.planBusiness : t.planStarter).replace('{addon}', t.addonQBO)
+              : t.billingPlanActiveText.replace('{plan}', currentPlan === 'business' ? t.planBusiness : t.planStarter)
+            }
           </p>
           <button style={{ ...s.portalBtn, ...(redirecting === 'portal' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={portal} disabled={redirecting === 'portal'}>
-            {redirecting === 'portal' ? 'Redirecting...' : t.manageSub}
+            {redirecting === 'portal' ? t.billingRedirecting : t.manageSub}
           </button>
         </div>
       )}
@@ -215,24 +217,25 @@ export default function BillingPanel() {
             <PlanCard
               name={t.planFree}
               priceEl={<span><span style={{ fontSize: 28, fontWeight: 800 }}>$0</span></span>}
-              subline="Up to 3 workers"
+              subline={t.billingFreeUpTo.replace('{n}', 3)}
               color="#6b7280"
               current={currentPlan === 'free' && isActive}
               selected={selectedPlan === 'free'}
               features={[
-                { text: 'Clock in/out & time tracking' },
-                { text: 'Admin approval workflow' },
-                { text: 'Basic analytics' },
-                { text: 'Scheduling (current week only)' },
-                { text: 'Timesheet PDF (latest week only)' },
-                { text: '90-day history' },
-                { text: 'GPS geofencing', lock: true },
-                { text: 'CSV payroll export', lock: true },
-                { text: 'Full history', lock: true },
+                { text: t.featClockTracking },
+                { text: t.featAdminApproval },
+                { text: t.featBasicAnalytics },
+                { text: t.featSchedulingCurrentWeek },
+                { text: t.featTimesheetLatestWeek },
+                { text: t.feat90DayHistory },
+                { text: t.featGPSGeofencing, lock: true },
+                { text: t.featCSVPayrollExport, lock: true },
+                { text: t.featFullHistory, lock: true },
               ]}
-              btnLabel={currentPlan === 'free' && isActive ? t.currentPlan : isTrial ? `Choose ${t.planFree}` : `Continue ${t.planFree}`}
+              btnLabel={currentPlan === 'free' && isActive ? t.currentPlan : isTrial ? t.billingChoosePlan.replace('{plan}', t.planFree) : t.billingContinuePlan.replace('{plan}', t.planFree)}
               disabled={currentPlan === 'free' && isActive}
               onSelect={() => isTrial ? setSelectedPlan('free') : null}
+              t={t}
             />
 
             <PlanCard
@@ -242,32 +245,33 @@ export default function BillingPanel() {
                   ? <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans ? Math.round(plans.starter.annual / 12) : 17}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
                   : <><span style={{ fontSize: 28, fontWeight: 800 }}>${plans?.starter.monthly ?? 20}</span><span style={{ fontSize: 14, color: '#6b7280' }}>/mo</span></>
               }
-              subline={annual ? `$${plans?.starter.annual ?? 200}/yr — 2 months free` : 'Up to 10 workers'}
+              subline={annual ? `$${plans?.starter.annual ?? 200}/yr — ${t.billing2MonthsFree}` : t.feat10Workers}
               color="#2563eb"
               current={currentPlan === 'starter' && isActive}
               selected={selectedPlan === 'starter'}
               features={[
-                { text: 'Everything in Free' },
-                { text: 'Up to 10 workers' },
-                { text: 'GPS geofencing' },
-                { text: 'CSV & payroll exports' },
-                { text: 'Overtime report' },
-                { text: 'Full history — no limit' },
-                { text: 'Scheduled shifts' },
-                { text: 'Worker timesheet PDF (any range)' },
-                { text: 'Broadcast announcements', lock: true },
-                { text: 'Field reports, safety, punchlist', lock: true },
+                { text: t.featEverythingFree },
+                { text: t.feat10Workers },
+                { text: t.featGPSGeofencing },
+                { text: t.featCSVPayrollExports },
+                { text: t.featOvertimeReport },
+                { text: t.featFullHistoryNoLimit },
+                { text: t.featScheduledShifts },
+                { text: t.featWorkerTimesheetPDF },
+                { text: t.featBroadcastAnnouncements, lock: true },
+                { text: t.featFieldSafety, lock: true },
               ]}
               btnLabel={
                 currentPlan === 'starter' && isActive ? t.currentPlan
-                  : isTrial ? (selectedPlan === 'starter' ? `✓ ${t.planStarter} Selected` : `Choose ${t.planStarter}`)
-                  : `Subscribe — ${annual ? `$${plans?.starter.annual ?? 200}/yr` : `$${plans?.starter.monthly ?? 20}/mo`}`
+                  : isTrial ? (selectedPlan === 'starter' ? t.billingPlanSelected.replace('{plan}', t.planStarter) : t.billingChoosePlan.replace('{plan}', t.planStarter))
+                  : annual ? t.billingSubscribeAnnual.replace('{price}', `$${plans?.starter.annual ?? 200}`) : t.billingSubscribeMonthly.replace('{price}', `$${plans?.starter.monthly ?? 20}`)
               }
               disabled={!!redirecting || (currentPlan === 'starter' && isActive)}
               onSelect={() => isTrial
                 ? setSelectedPlan('starter')
                 : checkout(annual ? plans?.starter.annual_price_id : plans?.starter.monthly_price_id)
               }
+              t={t}
             />
 
             <PlanCard
@@ -282,14 +286,14 @@ export default function BillingPanel() {
               subline={
                 annual
                   ? <span>
-                      ${businessAnnualTotal}/yr — 2 months free
-                      {businessOverage > 0 && <> · {businessOverage} extra workers</>}
+                      ${businessAnnualTotal}/yr — {t.billing2MonthsFree}
+                      {businessOverage > 0 && <> · {t.billingBusinessExtraWorkers.replace('{n}', businessOverage)}</>}
                     </span>
                   : <span>
-                      Includes {INCLUDED_WORKERS} workers
+                      {t.billingBusinessIncludes.replace('{n}', INCLUDED_WORKERS)}
                       {businessOverage > 0
                         ? <> + {businessOverage} extra = <strong style={{ color: '#8b5cf6' }}>${businessMonthly}/mo</strong></>
-                        : <> · ${PER_WORKER_MONTHLY}/worker after {INCLUDED_WORKERS}</>
+                        : <> · {t.billingBusinessPerWorkerAfter.replace('{price}', `$${PER_WORKER_MONTHLY}`).replace('{n}', INCLUDED_WORKERS)}</>
                       }
                     </span>
               }
@@ -297,19 +301,19 @@ export default function BillingPanel() {
               current={currentPlan === 'business' && isActive}
               selected={selectedPlan === 'business'}
               features={[
-                { text: 'Everything in Starter' },
-                { text: `${INCLUDED_WORKERS} workers included, $${PER_WORKER_MONTHLY}/worker after` },
-                { text: 'Broadcast announcements' },
-                { text: 'Field reports & daily reports' },
-                { text: 'Safety talks / toolbox talks' },
-                { text: 'Punchlist management' },
-                { text: 'Advanced analytics & trends' },
-                { text: 'Inactive worker alerts' },
+                { text: t.featEverythingStarter },
+                { text: t.featWorkersIncluded.replace('{n}', INCLUDED_WORKERS).replace('{price}', `$${PER_WORKER_MONTHLY}`) },
+                { text: t.featBroadcastAnnouncements },
+                { text: t.featFieldDailyReports },
+                { text: t.featSafetyTalks },
+                { text: t.featPunchlistMgmt },
+                { text: t.featAdvancedAnalytics },
+                { text: t.featInactiveAlerts },
               ]}
               btnLabel={
                 currentPlan === 'business' && isActive ? t.currentPlan
-                  : isTrial ? (selectedPlan === 'business' ? `✓ ${t.planBusiness} Selected` : `Choose ${t.planBusiness}`)
-                  : annual ? `Subscribe — $${businessAnnualTotal}/yr` : `Subscribe — $${businessMonthly}/mo`
+                  : isTrial ? (selectedPlan === 'business' ? t.billingPlanSelected.replace('{plan}', t.planBusiness) : t.billingChoosePlan.replace('{plan}', t.planBusiness))
+                  : annual ? t.billingSubscribeAnnual.replace('{price}', `$${businessAnnualTotal}`) : t.billingSubscribeMonthly.replace('{price}', `$${businessMonthly}`)
               }
               disabled={!!redirecting || (currentPlan === 'business' && isActive)}
               onSelect={() => isTrial
@@ -321,24 +325,25 @@ export default function BillingPanel() {
                     : { worker_price_id: plans?.business.worker_monthly_price_id, worker_count: workerCount }
                 )
               }
+              t={t}
             />
           </div>
 
           <div style={s.sliderWrap}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <label style={{ ...s.sliderLabel, marginBottom: 0 }}>
-                Team size (Business plan): <strong>{workerCount} workers</strong>
+                {t.billingTeamSize.replace('{n}', workerCount)}
                 {workerCount > INCLUDED_WORKERS
                   ? <span style={{ color: '#8b5cf6', marginLeft: 8 }}>
                       {annual ? `$${businessAnnualTotal}/yr` : `$${businessMonthly}/mo`}
                     </span>
-                  : <span style={{ color: '#6b7280', marginLeft: 8 }}>included in base price</span>
+                  : <span style={{ color: '#6b7280', marginLeft: 8 }}>{t.billingIncludedInBase}</span>
                 }
               </label>
               <button
                 className="worker-mode-btn btn-circle"
                 style={s.inputModeBtn}
-                title={workerInputMode === 'slider' ? 'Enter exact count' : 'Use slider'}
+                title={workerInputMode === 'slider' ? t.billingEnterExactCount : t.billingUseSlider}
                 onClick={() => {
                   if (workerInputMode === 'slider') {
                     setWorkerDraft(String(workerCount));
@@ -357,7 +362,7 @@ export default function BillingPanel() {
                   onChange={e => setWorkerCount(Number(e.target.value))}
                   style={{ width: '100%', accentColor: '#8b5cf6' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af' }}>
-                  <span>{INCLUDED_WORKERS} (included)</span><span>500+</span>
+                  <span>{t.billingIncludedCount.replace('{n}', INCLUDED_WORKERS)}</span><span>500+</span>
                 </div>
               </>
             ) : (
@@ -385,7 +390,7 @@ export default function BillingPanel() {
                     setWorkerDraft(String(v));
                   }}
                 >
-                  Update
+                  {t.billingUpdate}
                 </button>
               </div>
             )}
@@ -396,20 +401,20 @@ export default function BillingPanel() {
               <input type="checkbox" checked={addQbo} onChange={e => setAddQbo(e.target.checked)}
                 style={{ accentColor: '#d97706', width: 16, height: 16 }} />
               <span style={s.addonTitle}>
-                + QuickBooks Online Sync &nbsp;
+                {t.billingQBOAddonTitle} &nbsp;
                 <span style={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}>${plans?.qbo.monthly ?? 25}</span>
                 <span style={{ fontSize: 13, color: '#9ca3af' }}>/mo</span>
               </span>
             </label>
             <div style={{ paddingLeft: 26, fontSize: 12, color: '#6b7280', lineHeight: 1.5, marginTop: 6 }}>
-              Push approved hours and payroll data directly to QuickBooks Online. No manual entry, no double-keying.
+              {t.billingQBODesc}
             </div>
           </div>
 
           {isTrial && selectedPlan && selectedPlan !== 'free' && (
             <div style={s.trialCta}>
               <div style={{ fontSize: 14, color: '#111827' }}>
-                Ready to subscribe to <strong style={{ textTransform: 'capitalize' }}>{selectedPlan}</strong>?
+                {t.billingReadyToSubscribe.replace('{plan}', selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1))}
                 {selectedPlan === 'business' && (
                   <span style={{ color: '#6b7280' }}>
                     {annual
@@ -419,17 +424,22 @@ export default function BillingPanel() {
                 )}
               </div>
               <button style={{ ...s.ctaBtn, ...(redirecting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={subscribeSelectedPlan} disabled={!!redirecting}>
-                {redirecting ? 'Redirecting...' : `Subscribe to ${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} — ${annual ? 'Annual' : 'Monthly'}`}
+                {redirecting
+                  ? t.billingRedirecting
+                  : t.billingSubscribeTo
+                      .replace('{plan}', selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1))
+                      .replace('{billing}', annual ? t.planAnnual : t.planMonthly)
+                }
               </button>
               <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'center' }}>
-                You won't be charged until your trial ends. Remaining trial days carry over.
+                {t.billingNoChargeUntilTrial}
               </div>
             </div>
           )}
 
           {isTrial && !selectedPlan && (
             <p style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', marginTop: 8, fontStyle: 'italic' }}>
-              Select a plan above to lock in your pricing before your trial ends.
+              {t.billingSelectPlanHint}
             </p>
           )}
         </>
