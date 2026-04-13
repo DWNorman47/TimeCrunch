@@ -91,8 +91,8 @@ export default function AuditLog({ timezone = '' }) {
             <option key={val} value={val}>{label}</option>
           ))}
         </select>
-        <input style={styles.filterDate} type="date" value={from} onChange={e => setFrom(e.target.value)} placeholder="From" title={t.fromDate} />
-        <input style={styles.filterDate} type="date" value={to} onChange={e => setTo(e.target.value)} placeholder="To" title={t.toDate} />
+        <input style={styles.filterDate} type="date" value={from} onChange={e => setFrom(e.target.value)} placeholder={t.fromDate} title={t.fromDate} />
+        <input style={styles.filterDate} type="date" value={to} onChange={e => setTo(e.target.value)} placeholder={t.toDate} title={t.toDate} />
         {(group || from || to) && (
           <button style={styles.clearBtn} onClick={() => { setGroup(''); setFrom(''); setTo(''); }}>{t.auditClear}</button>
         )}
@@ -138,11 +138,11 @@ export default function AuditLog({ timezone = '' }) {
 
           {totalPages > 1 && (
             <div style={styles.pagination}>
-              <button style={{ ...styles.pageBtn, ...(page === 0 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="First page" onClick={() => goTo(0)} disabled={page === 0 || loading}>«</button>
+              <button style={{ ...styles.pageBtn, ...(page === 0 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.firstPage} onClick={() => goTo(0)} disabled={page === 0 || loading}>«</button>
               <button style={{ ...styles.pageBtn, ...(page === 0 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => goTo(page - 1)} disabled={page === 0 || loading}>‹ {t.paginationPrev}</button>
               <span style={styles.pageInfo}>{t.paginationPage} {page + 1} {t.ofLabel} {totalPages}</span>
               <button style={{ ...styles.pageBtn, ...(page >= totalPages - 1 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => goTo(page + 1)} disabled={page >= totalPages - 1 || loading}>{t.paginationNext} ›</button>
-              <button style={{ ...styles.pageBtn, ...(page >= totalPages - 1 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Last page" onClick={() => goTo(totalPages - 1)} disabled={page >= totalPages - 1 || loading}>»</button>
+              <button style={{ ...styles.pageBtn, ...(page >= totalPages - 1 || loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.lastPage} onClick={() => goTo(totalPages - 1)} disabled={page >= totalPages - 1 || loading}>»</button>
             </div>
           )}
         </>

@@ -46,7 +46,7 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
     try {
       await api.patch(`/time-entries/${entry.id}`, editForm);
       await onRefresh();
-      toast('Entry updated', 'success');
+      toast(t.entryUpdated, 'success');
       onClose?.();
     } catch (err) { setEditError(err.response?.data?.error || t.entryPanelFailedSave); }
     finally { setEditSaving(false); }

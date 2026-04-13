@@ -46,9 +46,9 @@ export default function ManagePayPeriods() {
       setPeriods(prev => [r.data, ...prev]);
       const next = defaultPeriod();
       setForm({ from: next.from, to: next.to, label: '' });
-      toast('Pay period locked', 'success');
+      toast(t.payPeriodLocked, 'success');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to lock period');
+      setError(err.response?.data?.error || t.failedLockPeriod);
     } finally { setSaving(false); }
   };
 
@@ -57,9 +57,9 @@ export default function ManagePayPeriods() {
     try {
       await api.delete(`/admin/pay-periods/${id}`);
       setPeriods(prev => prev.filter(p => p.id !== id));
-      toast('Pay period unlocked', 'success');
+      toast(t.payPeriodUnlocked, 'success');
     } catch {
-      toast('Failed to unlock pay period', 'error');
+      toast(t.failedUnlockPeriod, 'error');
     } finally { setUnlocking(null); }
   };
 

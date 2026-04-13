@@ -58,7 +58,7 @@ export default function TimeOffTab() {
       setRequests(prev => [r.data, ...prev]);
       setForm({ type: 'vacation', start_date: '', end_date: '', note: '' });
       setShowForm(false);
-      toast(t.requestSubmitted || 'Request submitted', 'success');
+      toast(t.requestSubmitted, 'success');
     } catch (err) {
       setError(err.response?.data?.error || t.failedSubmitRequest);
     } finally { setSaving(false); }

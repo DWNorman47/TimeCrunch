@@ -42,9 +42,9 @@ function WorkerDocuments({ workerId }) {
     try {
       await api.delete(`/admin/workers/${workerId}/documents/${docId}`);
       setDocs(prev => prev.filter(d => d.id !== docId));
-      toast(t.docsDeleted || 'Document deleted', 'success');
+      toast(t.docsDeleted, 'success');
     } catch {
-      toast(t.docsDeleteFailed || 'Failed to delete document', 'error');
+      toast(t.docsDeleteFailed, 'error');
     } finally { setPendingDeleteDocId(null); }
   };
 
@@ -237,7 +237,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const full_name = [form.first_name, form.last_name].filter(Boolean).join(' ');
       const r = await api.post('/admin/workers', { ...form, full_name });
       onWorkerAdded(r.data);
-      toast(t.workerCreated || 'Worker created successfully', 'success');
+      toast(t.workerCreated, 'success');
       const workerType = form.worker_type;
       setForm({ first_name: '', last_name: '', username: '', password: defaultTempPassword, email: '', role: 'worker', worker_type: 'employee', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
       setUsernameEdited(false); setUsernameTaken(false); setShowForm(false);
@@ -394,7 +394,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const r = await api.patch(`/admin/workers/${id}/permissions`, { admin_permissions: perms });
       onWorkerUpdated(r.data);
       cancelEdit();
-    } catch (err) { toast(err.response?.data?.error || 'Failed to update permissions', 'error'); }
+    } catch (err) { toast(err.response?.data?.error || t.failedUpdatePermissions, 'error'); }
     finally { setEditPermSaving(false); }
   };
 
@@ -411,7 +411,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const r = await api.patch(`/admin/workers/${id}/worker-access`, { worker_access_ids: ids });
       onWorkerUpdated(r.data);
       cancelEdit();
-    } catch (err) { toast(err.response?.data?.error || 'Failed to update worker access', 'error'); }
+    } catch (err) { toast(err.response?.data?.error || t.failedUpdateWorkerAccess, 'error'); }
     finally { setEditWorkerAccessSaving(false); }
   };
 
@@ -426,7 +426,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
         toast(t.workerInviteEmailFailed, 'error');
       }
     } catch (err) {
-      toast(err.response?.data?.error || 'Failed to send invite', 'error');
+      toast(err.response?.data?.error || t.failedSendInvite, 'error');
     } finally {
       setInviteSending(s => { const n = new Set(s); n.delete(id); return n; });
     }
@@ -449,7 +449,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       onWorkerDeleted(id);
       setArchivedFetched(false);
       if (expandedId === id) setExpandedId(null);
-    } catch { toast('Failed to remove user', 'error'); }
+    } catch { toast(t.failedRemoveUser, 'error'); }
   };
 
   const handleRestore = async id => {
@@ -457,7 +457,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const r = await api.patch(`/admin/workers/${id}/restore`);
       onWorkerRestored({ ...r.data, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 });
       setArchived(prev => prev.filter(w => w.id !== id));
-    } catch { toast('Failed to restore user', 'error'); }
+    } catch { toast(t.failedRestoreUser, 'error'); }
   };
 
   return (

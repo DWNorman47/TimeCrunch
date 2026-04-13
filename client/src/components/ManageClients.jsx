@@ -143,7 +143,7 @@ function DocUploadForm({ clientId, onUploaded }) {
         direction,
       });
       onUploaded(doc);
-      toast('Document uploaded', 'success');
+      toast(t.documentUploaded, 'success');
       setExpiresAt('');
       fileRef.current.value = '';
     } catch (err) {

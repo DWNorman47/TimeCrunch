@@ -140,7 +140,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
     try {
       const r = await api.patch(`/punchlist/${item.id}`, { status: nextStatus[item.status] });
       onUpdated(r.data);
-    } catch { toast('Failed to update status', 'error'); }
+    } catch { toast(t.failedUpdateStatus, 'error'); }
     finally { setUpdating(false); }
   };
 
@@ -148,7 +148,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
     try {
       const r = await api.patch(`/punchlist/${item.id}`, { assigned_to: workerId || null });
       onUpdated(r.data);
-    } catch { toast('Failed to assign worker', 'error'); }
+    } catch { toast(t.failedAssignWorker, 'error'); }
   };
 
   const savePhase = async () => {
@@ -157,12 +157,12 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
     try {
       const r = await api.patch(`/punchlist/${item.id}`, { phase: val });
       onUpdated(r.data);
-    } catch { toast('Failed to save phase', 'error'); }
+    } catch { toast(t.failedSavePhase, 'error'); }
   };
 
   const handleDelete = async () => {
     try { await api.delete(`/punchlist/${item.id}`); onDeleted(item.id); }
-    catch { toast('Failed to delete item', 'error'); }
+    catch { toast(t.failedDeleteItem, 'error'); }
   };
 
   const toggleCheck = async (checkId, checked) => {
@@ -171,7 +171,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
       setChecklist(prev => prev.map(c => c.id === checkId ? r.data : c));
       const newDone = checklist.filter(c => c.id === checkId ? checked : c.checked).length;
       setItem(it => ({ ...it, checked_count: newDone }));
-    } catch { toast('Failed to update checklist', 'error'); }
+    } catch { toast(t.failedUpdateChecklist, 'error'); }
   };
 
   const deleteCheck = async checkId => {
@@ -181,7 +181,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
       setChecklist(updated);
       const newDone = updated.filter(c => c.checked).length;
       setItem(it => ({ ...it, checklist_total: updated.length, checked_count: newDone }));
-    } catch { toast('Failed to delete checklist item', 'error'); }
+    } catch { toast(t.failedDeleteChecklistItem, 'error'); }
   };
 
   const addCheck = async e => {
@@ -193,7 +193,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
       setChecklist(prev => [...(prev || []), r.data]);
       setItem(it => ({ ...it, checklist_total: parseInt(it.checklist_total || 0) + 1 }));
       setNewCheckText('');
-    } catch { toast('Failed to add checklist item', 'error'); }
+    } catch { toast(t.failedAddChecklistItem, 'error'); }
     finally { setAddingCheck(false); }
   };
 

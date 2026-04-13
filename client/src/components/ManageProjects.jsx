@@ -139,9 +139,9 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       const r = await api.patch(`/admin/projects/${id}`, payload);
       onProjectUpdated(r.data);
       setExpandedId(null);
-      toast('Project updated', 'success');
+      toast(t.projectUpdated, 'success');
     } catch {
-      toast('Failed to update project', 'error');
+      toast(t.failedUpdateProject, 'error');
     }
   };
 
@@ -154,7 +154,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       setEditGeoLng('');
       setEditGeoRadius('');
     } catch {
-      toast('Failed to remove geofence', 'error');
+      toast(t.failedRemoveGeofence, 'error');
     }
   };
 
@@ -166,7 +166,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       setEditBudgetHours('');
       setEditBudgetDollars('');
     } catch {
-      toast('Failed to remove budget', 'error');
+      toast(t.failedRemoveBudget, 'error');
     }
   };
 
@@ -213,10 +213,10 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       onProjectDeleted(archiveTarget.id);
       if (expandedId === archiveTarget.id) setExpandedId(null);
       loadArchived();
-      toast(`"${archiveTarget.name}" archived`, 'success');
+      toast(t.projectArchived.replace('{name}', archiveTarget.name), 'success');
       setArchiveTarget(null);
     } catch {
-      toast('Failed to remove project', 'error');
+      toast(t.failedRemoveProject, 'error');
     }
   };
 
@@ -226,7 +226,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     try {
       const r = await api.get(`/admin/projects/${archiveTarget.id}/media-urls`);
       const { urls } = r.data;
-      if (!urls.length) { toast('No media files found for this project', 'info'); return; }
+      if (!urls.length) { toast(t.noMediaFilesFound, 'info'); return; }
       const blob = new Blob([urls.join('\n')], { type: 'text/plain' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -234,7 +234,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       a.click();
       URL.revokeObjectURL(a.href);
     } catch {
-      toast('Failed to fetch media list', 'error');
+      toast(t.failedFetchMedia, 'error');
     } finally {
       setArchiveDownloading(false);
     }
@@ -252,7 +252,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       a.click();
       URL.revokeObjectURL(a.href);
     } catch {
-      toast('No media found or download failed', 'error');
+      toast(t.noMediaDownload, 'error');
     } finally {
       setArchiveDownloading(false);
     }
@@ -267,9 +267,9 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       if (expandedId === mergeSource.id) setExpandedId(null);
       setMergeSource(null);
       setMergeTargetId('');
-      toast(`Merged into ${projects.find(p => p.id === parseInt(mergeTargetId))?.name}`, 'success');
+      toast(t.projectMergedInto.replace('{name}', projects.find(p => p.id === parseInt(mergeTargetId))?.name), 'success');
     } catch {
-      toast('Failed to merge projects', 'error');
+      toast(t.failedMergeProjects, 'error');
     } finally {
       setMergeSaving(false);
     }
@@ -281,7 +281,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       onProjectRestored(r.data);
       setArchived(prev => prev.filter(p => p.id !== id));
     } catch {
-      toast('Failed to restore project', 'error');
+      toast(t.failedRestoreProject, 'error');
     }
   };
 

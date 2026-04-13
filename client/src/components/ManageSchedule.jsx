@@ -242,7 +242,7 @@ export default function ManageSchedule({ workers, projects }) {
           notes: shift.notes || '',
         });
       }));
-      toast(`${Object.keys(pendingMoves).length} shift${Object.keys(pendingMoves).length !== 1 ? 's' : ''} saved`, 'success');
+      toast(t.shiftsSaved.replace('{n}', Object.keys(pendingMoves).length), 'success');
     } catch {
       toast(t.someShiftsFailed, 'error');
     } finally {
@@ -339,7 +339,7 @@ export default function ManageSchedule({ workers, projects }) {
       setShifts(prev => [...prev, ...newShifts].sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time)));
       setForm(f => ({ ...f, notes: '', repeat: 'none' }));
       setOverlapWarning(''); setAvailabilityWarning('');
-      toast(baseDates.length > 1 ? `${baseDates.length} shifts added` : t.shiftAdded, 'success');
+      toast(baseDates.length > 1 ? t.shiftsAddedN.replace('{n}', baseDates.length) : t.shiftAdded, 'success');
     } catch (err) {
       setError(err.response?.data?.error || t.failedSaveShift);
     } finally { setSaving(false); }
@@ -389,7 +389,7 @@ export default function ManageSchedule({ workers, projects }) {
       const today = toISO(new Date());
       setShifts(prev => prev.filter(s => !(s.recurrence_group_id === groupId && s.shift_date >= today)));
       setEditingId(null);
-      toast(`${r.data.deleted} shift${r.data.deleted !== 1 ? 's' : ''} cancelled`, 'success');
+      toast(t.shiftsCancelled.replace('{n}', r.data.deleted), 'success');
     } catch { toast(t.failedSaveShift, 'error'); }
     finally { setDeleting(null); }
   };

@@ -162,21 +162,21 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
     setEmployeeMappings(m => ({ ...m, [workerId]: qboEmployeeId }));
     try {
       await api.patch(`/qbo/workers/${workerId}/mapping`, { qbo_employee_id: qboEmployeeId || null });
-    } catch { toast('Failed to save employee mapping', 'error'); }
+    } catch { toast(t.failedSaveEmployeeMapping, 'error'); }
   };
 
   const saveVendorMapping = async (workerId, qboVendorId) => {
     setVendorMappings(m => ({ ...m, [workerId]: qboVendorId }));
     try {
       await api.patch(`/qbo/workers/${workerId}/mapping`, { qbo_vendor_id: qboVendorId || null });
-    } catch { toast('Failed to save vendor mapping', 'error'); }
+    } catch { toast(t.failedSaveVendorMapping, 'error'); }
   };
 
   const saveProjectMapping = async (projectId, qboCustomerId) => {
     setProjectMappings(m => ({ ...m, [projectId]: qboCustomerId }));
     try {
       await api.patch(`/qbo/projects/${projectId}/mapping`, { qbo_customer_id: qboCustomerId || null });
-    } catch { toast('Failed to save project mapping', 'error'); }
+    } catch { toast(t.failedSaveProjectMapping, 'error'); }
   };
 
   const handlePush = async () => {

@@ -103,8 +103,8 @@ export default function AdminTimeOff({ settings }) {
 
       {loadError ? (
         <div style={s.loadError}>
-          Failed to load time off requests.{' '}
-          <button style={s.retryBtn} onClick={() => load(filter)}>Try again</button>
+          {t.failedLoadTimeOff}{' '}
+          <button style={s.retryBtn} onClick={() => load(filter)}>{t.retry}</button>
         </div>
       ) : loading ? (
         <SkeletonList count={4} rows={2} />
@@ -112,7 +112,7 @@ export default function AdminTimeOff({ settings }) {
         <div style={s.emptyState}>
           <div style={s.emptyIcon}>📅</div>
           <p style={s.emptyTitle}>{t.noTimeOffRequests}</p>
-          <p style={s.emptySubtitle}>Workers can submit time off requests from their dashboard.</p>
+          <p style={s.emptySubtitle}>{t.timeOffEmptySub}</p>
         </div>
       ) : (
         <div style={s.list}>
