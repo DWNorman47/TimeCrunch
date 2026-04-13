@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import { langToLocale } from '../utils';
 import { SkeletonList } from './Skeleton';
 import Pagination from './Pagination';
 
@@ -16,8 +17,8 @@ const WEATHER_KEYS = [
   { value: 'windy', key: 'weatherWindy', emoji: '🌬️' },
 ];
 
-function fmtDate(str) {
-  return new Date(str + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDate(str, locale = 'en-US') {
+  return new Date(str + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function emptyRow(type) {
@@ -43,6 +44,8 @@ function RowInput({ value, onChange, type = 'text', placeholder, style, min, max
 
 function ReportEditor({ report: initial, projects, onSaved, onCancel, companyName, fieldPhotos }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const isNew = !initial?.id;
   const today = new Date().toLocaleDateString('en-CA');
   const WEATHER_OPTIONS = useMemo(() => WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` })), [t]);
@@ -77,7 +80,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
         import('@react-pdf/renderer'),
         import('./DailyReportPDF'),
       ]);
-      const blob = await pdf(React.createElement(DailyReportDocument, { report: reportData, companyName, fieldPhotos: fieldPhotos || [] })).toBlob();
+      const blob = await pdf(React.createElement(DailyReportDocument, { report: reportData, companyName, fieldPhotos: fieldPhotos || [], language: user?.language })).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = `daily-report-${reportData.report_date || 'report'}.pdf`; a.click();
@@ -373,6 +376,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
 
 function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyName, fieldPhotos }) {
   const t = useT();
+  const { user } = useAuth();
   const [report, setReport] = useState(initialReport);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -388,7 +392,7 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
         import('@react-pdf/renderer'),
         import('./DailyReportPDF'),
       ]);
-      const blob = await pdf(React.createElement(DailyReportDocument, { report, companyName, fieldPhotos: fieldPhotos || [] })).toBlob();
+      const blob = await pdf(React.createElement(DailyReportDocument, { report, companyName, fieldPhotos: fieldPhotos || [], language: user?.language })).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = `daily-report-${report.report_date || 'report'}.pdf`; a.click();
@@ -423,14 +427,14 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
   return (
     <div style={styles.reportRow}>
       <div style={styles.rowLeft} onClick={() => !report.pending && onEdit(report)}>
-        <div style={styles.rowDate}>{fmtDate(report.report_date)}{report.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
+        <div style={styles.rowDate}>{fmtDate(report.report_date, locale)}{report.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
         <div style={styles.rowProject}>{report.project_name || t.noProjectOpt}</div>
         {weather && <div style={styles.rowMeta}>{weather}{report.weather_temp != null ? ` · ${report.weather_temp}°F` : ''}</div>}
         {report.manpower_count > 0 && <div style={styles.rowMeta}>{report.manpower_count} {report.manpower_count !== 1 ? t.crewEntries : t.crewEntry}</div>}
         {isReviewed && report.reviewed_by && (
           <div style={styles.reviewedMeta}>
             ✓ {t.reviewedBy} {report.reviewed_by}
-            {report.reviewed_at && ` · ${new Date(report.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+            {report.reviewed_at && ` · ${new Date(report.reviewed_at).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}`}
           </div>
         )}
       </div>
@@ -471,6 +475,7 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
 export default function DailyReports({ projects }) {
   const { user } = useAuth();
   const t = useT();
+  const locale = langToLocale(user?.language);
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
   const [reports, setReports] = useState([]);

@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
 export default function MessageThread({ entryId, currentUserId, onUnreadChange }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [body, setBody] = useState('');
@@ -32,7 +36,7 @@ export default function MessageThread({ entryId, currentUserId, onUnreadChange }
     } finally { setSending(false); }
   };
 
-  const formatTime = str => new Date(str).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const formatTime = str => new Date(str).toLocaleString(locale, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   return (
     <div style={styles.wrap}>

@@ -4,7 +4,8 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api from '../api';
 import { useT } from '../hooks/useT';
-import { formatInTz } from '../utils';
+import { useAuth } from '../contexts/AuthContext';
+import { formatInTz, langToLocale } from '../utils';
 
 // SVG divIcon — avoids all CDN/bundler PNG loading issues
 function makePinIcon(color) {
@@ -42,6 +43,8 @@ function ElapsedTimer({ clockInTime }) {
 
 export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, projects = [] }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [workers, setWorkers] = useState([]);
   const [inactiveWorkers, setInactiveWorkers] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -231,7 +234,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
           <span style={styles.liveDot} />
           <span style={styles.liveText}>{t.liveLabel}</span>
           {lastUpdated && (
-            <span style={styles.updated}>Updated {formatInTz(lastUpdated.toISOString(), timezone)}</span>
+            <span style={styles.updated}>Updated {formatInTz(lastUpdated.toISOString(), timezone, undefined, locale)}</span>
           )}
           <button style={styles.refreshBtn} onClick={fetchActive}>{t.refresh}</button>
           <button style={styles.clockInWorkerBtn} onClick={() => setShowClockInModal(true)}>{t.lwClockInWorkerBtn}</button>
@@ -296,7 +299,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                 </div>
                 {w.notes && <div style={styles.workerNotes}>{w.notes}</div>}
                 <div style={styles.workerMeta}>
-                  <span>{t.clockedIn} {formatInTz(w.clock_in_time, timezone)}</span>
+                  <span>{t.clockedIn} {formatInTz(w.clock_in_time, timezone, undefined, locale)}</span>
                   {w.current_lat
                     ? <span style={styles.locationTag}>📍 Live · {locationAge(w.location_updated_at)}</span>
                     : w.clock_in_lat
@@ -353,7 +356,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                         ? <>📍 Live · {locationAge(w._pos.updatedAt)}<br /></>
                         : <>📍 Clock-in location<br /></>
                       }
-                      In: {formatInTz(w.clock_in_time, timezone)}
+                      In: {formatInTz(w.clock_in_time, timezone, undefined, locale)}
                     </Popup>
                   </Marker>
                 ))}

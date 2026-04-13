@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { formatInTz } from '../utils';
+import { formatInTz, langToLocale } from '../utils';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
 import { SkeletonList } from './Skeleton';
 
-function formatDt(str, tz) {
+function formatDt(str, tz, locale = 'en-US') {
   return {
-    date: formatInTz(str, tz, { month: 'short', day: 'numeric', year: 'numeric' }),
-    time: formatInTz(str, tz, { hour: 'numeric', minute: '2-digit' }),
+    date: formatInTz(str, tz, { month: 'short', day: 'numeric', year: 'numeric' }, locale),
+    time: formatInTz(str, tz, { hour: 'numeric', minute: '2-digit' }, locale),
   };
 }
 
@@ -22,6 +23,8 @@ function ActionBadge({ action, actionMeta }) {
 
 export default function AuditLog({ timezone = '' }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [entries, setEntries] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -110,7 +113,7 @@ export default function AuditLog({ timezone = '' }) {
         <>
           <div style={styles.list}>
             {entries.map(e => {
-              const dt = formatDt(e.created_at, timezone);
+              const dt = formatDt(e.created_at, timezone, locale);
               return (
                 <div key={e.id} style={styles.row}>
                   <div style={styles.rowTime}>

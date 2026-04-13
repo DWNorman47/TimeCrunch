@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
+import { useAuth } from '../../contexts/AuthContext';
+import { langToLocale } from '../../utils';
 import { SkeletonList } from '../Skeleton';
 
 const VAL_PAGE = 200;
 
 export default function InventoryValuation({ locations }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [data, setData] = useState(null);
   const [valTotal, setValTotal] = useState(0);
   const [valOffset, setValOffset] = useState(0);
@@ -78,7 +82,7 @@ export default function InventoryValuation({ locations }) {
 
   const fmt = (n) => {
     const v = parseFloat(n || 0);
-    return v.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+    return v.toLocaleString(locale, { style: 'currency', currency: 'USD' });
   };
 
   const fmtQty = (n) => {

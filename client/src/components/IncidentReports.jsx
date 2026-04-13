@@ -304,7 +304,7 @@ export default function IncidentReports({ projects }) {
         import('@react-pdf/renderer'),
         import('./IncidentReportPDF'),
       ]);
-      const blob = await pdf(React.createElement(IncidentReportDocument, { incidents, companyName: user?.company_name })).toBlob();
+      const blob = await pdf(React.createElement(IncidentReportDocument, { incidents, companyName: user?.company_name, language: user?.language })).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = 'incident-reports.pdf'; a.click();

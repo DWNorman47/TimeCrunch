@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 import { SkeletonList } from './Skeleton';
 import {
   DndContext, DragOverlay, PointerSensor, TouchSensor,
@@ -16,7 +18,7 @@ function startOfWeek(date) {
 }
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
 function toISO(d) { return d.toLocaleDateString('en-CA'); }
-function fmtDay(d) { return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
+function fmtDay(d, locale = 'en-US') { return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' }); }
 function fmtTime(t) { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m}${hr < 12 ? 'a' : 'p'}`; }
 
 // Visual content of a shift pill — used both inline and in the drag overlay
@@ -136,7 +138,7 @@ function SummaryView({ shifts, days }) {
               const isToday = toISO(day) === toISO(new Date());
               return (
                 <th key={toISO(day)} style={{ ...styles.summaryTh, color: isToday ? '#1a56db' : '#374151' }}>
-                  <div>{day.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                  <div>{day.toLocaleDateString(locale, { weekday: 'short' })}</div>
                   <div style={{ fontWeight: 400, fontSize: 10 }}>{day.getDate()}</div>
                 </th>
               );
@@ -186,6 +188,8 @@ function SummaryView({ shifts, days }) {
 export default function ManageSchedule({ workers, projects }) {
   const toast = useToast();
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -527,7 +531,7 @@ export default function ManageSchedule({ workers, projects }) {
 
       <div style={styles.weekNav}>
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, -7))}>{t.prevWeek}</button>
-        <span style={styles.weekLabel}>{fmtDay(days[0])} – {fmtDay(days[6])}</span>
+        <span style={styles.weekLabel}>{fmtDay(days[0], locale)} – {fmtDay(days[6], locale)}</span>
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>{t.nextWeek}</button>
         <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>{t.today}</button>
         <button style={styles.exportBtn} onClick={() => exportCSV(shifts, days)} title={t.exportWeekCSV}>⬇ CSV</button>
@@ -568,7 +572,7 @@ export default function ManageSchedule({ workers, projects }) {
               return (
                 <DroppableDay key={key} date={key} isToday={isToday}>
                   <div style={{ ...styles.dayHead, color: isToday ? '#1a56db' : '#374151' }}>
-                    {day.toLocaleDateString('en-US', { weekday: 'short' })} {day.getDate()}
+                    {day.toLocaleDateString(locale, { weekday: 'short' })} {day.getDate()}
                   </div>
                   {dayShifts.length === 0
                     ? <div style={styles.emptyDay} />
@@ -592,7 +596,7 @@ export default function ManageSchedule({ workers, projects }) {
       {editingShift && (
         <div style={styles.editPanel}>
           <div style={styles.editPanelHeader}>
-            <span style={styles.editPanelTitle}>Editing: {editingShift.worker_name} · {fmtDay(new Date(editingShift.shift_date + 'T00:00:00'))}</span>
+            <span style={styles.editPanelTitle}>Editing: {editingShift.worker_name} · {fmtDay(new Date(editingShift.shift_date + 'T00:00:00'), locale)}</span>
           </div>
           <div style={styles.editGrid}>
             <div style={styles.editField}>

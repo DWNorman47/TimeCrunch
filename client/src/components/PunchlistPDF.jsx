@@ -1,6 +1,8 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink } from '@react-pdf/renderer';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
 const pdf = StyleSheet.create({
   page: { fontFamily: 'Helvetica', fontSize: 9, color: '#1a1a1a', padding: '40 48 48 48' },
@@ -31,13 +33,14 @@ const pdf = StyleSheet.create({
   footerText: { fontSize: 7, color: '#9ca3af' },
 });
 
-export function PunchlistDocument({ items, companyName, t }) {
+export function PunchlistDocument({ items, companyName, t, language }) {
+  const locale = langToLocale(language);
   const PRIORITY_LABEL = { high: t.priorityHigh, normal: t.priorityNormal, low: t.priorityLow };
   const STATUS_LABEL = { open: t.statusOpen, done: t.statusDone, verified: t.statusVerified };
   const openCount = items.filter(i => i.status === 'open').length;
   const doneCount = items.filter(i => i.status === 'done').length;
   const verifiedCount = items.filter(i => i.status === 'verified').length;
-  const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const dateStr = new Date().toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
     <Document>
@@ -110,10 +113,11 @@ export function PunchlistDocument({ items, companyName, t }) {
 
 export function PunchlistPDFButton({ items, companyName, style }) {
   const t = useT();
+  const { user } = useAuth();
   const fileName = `punchlist-${new Date().toLocaleDateString('en-CA')}.pdf`;
   return (
     <PDFDownloadLink
-      document={<PunchlistDocument items={items} companyName={companyName} t={t} />}
+      document={<PunchlistDocument items={items} companyName={companyName} t={t} language={user?.language} />}
       fileName={fileName}
       style={style}
     >

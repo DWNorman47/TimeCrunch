@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
 import { SkeletonList } from './Skeleton';
+import { langToLocale } from '../utils';
 
-function fmtDate(d, t) {
+function fmtDate(d, t, locale = 'en-US') {
   const date = new Date(d + 'T00:00:00');
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -12,7 +14,7 @@ function fmtDate(d, t) {
 
   if (date.getTime() === today.getTime()) return t.wsToday;
   if (date.getTime() === tomorrow.getTime()) return t.wsTomorrow;
-  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(locale, { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
 function fmtTime(ts) {
@@ -30,6 +32,8 @@ function isToday(dateStr) {
 
 export default function WorkerSchedule() {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -52,7 +56,7 @@ export default function WorkerSchedule() {
       const r = await api.patch(`/shifts/${id}/cant-make-it`, { cant_make_it: true, note: note || '' });
       setShifts(prev => prev.map(s => s.id === id ? { ...s, cant_make_it: r.data.cant_make_it, cant_make_it_note: r.data.cant_make_it_note } : s));
     } catch {
-      // silently ignore
+      setError(t.failedSave || 'Failed to update. Please try again.');
     } finally {
       setFlagging(null);
     }
@@ -64,7 +68,7 @@ export default function WorkerSchedule() {
       const r = await api.patch(`/shifts/${shift.id}/cant-make-it`, { cant_make_it: false });
       setShifts(prev => prev.map(s => s.id === shift.id ? { ...s, cant_make_it: r.data.cant_make_it, cant_make_it_note: null } : s));
     } catch {
-      // silently ignore
+      setError(t.failedSave || 'Failed to update. Please try again.');
     } finally {
       setFlagging(null);
     }
@@ -94,7 +98,7 @@ export default function WorkerSchedule() {
           <div key={date} style={styles.dayGroup}>
             <div style={styles.dateLabel}>
               <span style={{ ...styles.dateName, color: isToday(date) ? '#1a56db' : '#374151' }}>
-                {fmtDate(date, t)}
+                {fmtDate(date, t, locale)}
               </span>
               {isToday(date) && <span style={styles.todayBadge}>{t.wsToday}</span>}
             </div>

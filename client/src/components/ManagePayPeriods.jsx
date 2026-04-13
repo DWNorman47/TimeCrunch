@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
+import { langToLocale } from '../utils';
 
-function fmt(dateStr) {
-  return new Date(dateStr.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function fmt(dateStr, locale = 'en-US') {
+  return new Date(dateStr.substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function defaultPeriod() {
@@ -21,6 +23,8 @@ function defaultPeriod() {
 
 export default function ManagePayPeriods() {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const toast = useToast();
   const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -100,8 +104,8 @@ export default function ManagePayPeriods() {
             <div key={p.id} style={styles.row}>
               <div style={styles.lockIcon}>🔒</div>
               <div style={styles.periodInfo}>
-                <div style={styles.periodLabel}>{p.label || `${fmt(p.period_start)} – ${fmt(p.period_end)}`}</div>
-                {p.label && <div style={styles.periodDates}>{fmt(p.period_start)} – {fmt(p.period_end)}</div>}
+                <div style={styles.periodLabel}>{p.label || `${fmt(p.period_start, locale)} – ${fmt(p.period_end, locale)}`}</div>
+                {p.label && <div style={styles.periodDates}>{fmt(p.period_start, locale)} – {fmt(p.period_end, locale)}</div>}
                 <div style={styles.periodMeta}>Locked by {p.locked_by_name} · {new Date(p.created_at).toLocaleDateString()}</div>
               </div>
               <button

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink } from '@react-pdf/renderer';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
 const pdf = StyleSheet.create({
   page: { fontFamily: 'Helvetica', fontSize: 9, color: '#1a1a1a', padding: '40 48 48 48' },
@@ -33,7 +35,8 @@ const pdf = StyleSheet.create({
   footerText: { fontSize: 7, color: '#9ca3af' },
 });
 
-export function IncidentReportDocument({ incidents, companyName, t }) {
+export function IncidentReportDocument({ incidents, companyName, t, language }) {
+  const locale = langToLocale(language);
   const TYPE_LABELS = {
     'injury': t.typeInjury,
     'near-miss': t.typeNearMiss,
@@ -50,7 +53,7 @@ export function IncidentReportDocument({ incidents, companyName, t }) {
   const openCount = incidents.filter(i => i.status === 'open').length;
   const closedCount = incidents.filter(i => i.status === 'closed').length;
   const injuryCount = incidents.filter(i => i.type === 'injury').length;
-  const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const dateStr = new Date().toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
     <Document>
@@ -159,10 +162,11 @@ export function IncidentReportDocument({ incidents, companyName, t }) {
 
 export function IncidentReportPDFButton({ incidents, companyName, style }) {
   const t = useT();
+  const { user } = useAuth();
   const fileName = `incident-reports-${new Date().toLocaleDateString('en-CA')}.pdf`;
   return (
     <PDFDownloadLink
-      document={<IncidentReportDocument incidents={incidents} companyName={companyName} t={t} />}
+      document={<IncidentReportDocument incidents={incidents} companyName={companyName} t={t} language={user?.language} />}
       fileName={fileName}
       style={style}
     >

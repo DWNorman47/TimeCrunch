@@ -5,7 +5,7 @@ import { SkeletonList } from './Skeleton';
 import MessageThread from './MessageThread';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
-import { fmtHours } from '../utils';
+import { fmtHours, langToLocale } from '../utils';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -40,9 +40,9 @@ function FitBounds({ positions }) {
   return null;
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr, locale = 'en-US') {
   const d = new Date(dateStr.substring(0, 10) + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function formatTime(t) {
@@ -66,6 +66,7 @@ function formatHours(start, end) {
 export default function ApprovalQueue({ onCountChange }) {
   const { user } = useAuth();
   const t = useT();
+  const locale = langToLocale(user?.language);
   const [entries, setEntries] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -396,7 +397,7 @@ export default function ApprovalQueue({ onCountChange }) {
           {sortedDays.map(day => (
             <div key={day}>
               <div style={styles.dayHeader}>
-                {formatDate(day + 'T00:00:00')}
+                {formatDate(day + 'T00:00:00', locale)}
                 <span style={styles.dayCount}>{entriesByDay[day].length}</span>
               </div>
               {entriesByDay[day].map(e => (
@@ -573,7 +574,7 @@ export default function ApprovalQueue({ onCountChange }) {
                 <div key={e.id} style={styles.recentRow}>
                   <div style={styles.recentInfo}>
                     <span style={styles.recentWorker}>{e.worker_name}</span>
-                    <span style={styles.recentDate}>{formatDate(e.work_date)}</span>
+                    <span style={styles.recentDate}>{formatDate(e.work_date, locale)}</span>
                     <span style={styles.recentTime}>{formatTime(e.start_time)} – {formatTime(e.end_time)}</span>
                     {e.project_name && <span style={styles.recentProject}>{e.project_name}</span>}
                     {e.qbo_activity_id && (

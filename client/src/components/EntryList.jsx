@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import api from '../api';
 import MessageThread from './MessageThread';
 import EntryPanel from './EntryPanel';
-import { fmtHours } from '../utils';
+import { fmtHours, langToLocale } from '../utils';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 function isEditable(dateStr) {
@@ -10,8 +10,7 @@ function isEditable(dateStr) {
 }
 function formatDate(dateStr, language) {
   const d = new Date(dateStr.substring(0, 10) + 'T00:00:00');
-  const locale = language === 'Spanish' ? 'es-MX' : 'en-US';
-  return d.toLocaleDateString(locale, { weekday: 'long', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(langToLocale(language), { weekday: 'long', month: 'short', day: 'numeric' });
 }
 function formatTime(t) {
   const [h, m] = t.split(':');

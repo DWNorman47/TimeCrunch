@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
@@ -281,6 +282,8 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
 
 function SubmissionCard({ sub, isAdmin, onDeleted }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -307,7 +310,7 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
         <div style={styles.cardLeft}>
           <div style={styles.cardTitle}>{sub.template_name}</div>
           <div style={styles.cardMeta}>
-            {new Date(sub.check_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+            {new Date(sub.check_date + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
             {sub.project_name && <span style={styles.projectTag}>{sub.project_name}</span>}
             {sub.submitted_by_name && <span style={styles.submittedBy}>{t.submittedBy} {sub.submitted_by_name}</span>}
           </div>

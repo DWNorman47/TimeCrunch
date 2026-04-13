@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
 import { useToast } from '../contexts/ToastContext';
@@ -106,6 +107,8 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
 
 function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, existingPhases }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const toast = useToast();
   const STATUSES = [
     { value: 'open', label: t.statusOpen },
@@ -234,7 +237,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
         <div style={styles.itemBody}>
           {item.description && <p style={styles.desc}>{item.description}</p>}
           {item.resolved_at && item.status === 'verified' && (
-            <p style={styles.resolvedNote}>{t.verifiedOn} {new Date(item.resolved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+            <p style={styles.resolvedNote}>{t.verifiedOn} {new Date(item.resolved_at).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
           )}
 
           {/* Phase edit */}

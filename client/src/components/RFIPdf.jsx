@@ -3,6 +3,8 @@ import {
   Document, Page, Text, View, StyleSheet, PDFDownloadLink,
 } from '@react-pdf/renderer';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
 const STATUS_COLORS = {
   open: { bg: '#fef3c7', text: '#92400e' },
@@ -45,9 +47,10 @@ function SectionHeader({ title }) {
   );
 }
 
-export function RFIDocument({ rfi, companyName, t }) {
+export function RFIDocument({ rfi, companyName, t, language }) {
+  const locale = langToLocale(language);
   const statusColors = STATUS_COLORS[rfi.status] || STATUS_COLORS.open;
-  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
   return (
     <Document>
@@ -138,10 +141,11 @@ const linkStyle = {
 
 export function RFIDownloadLink({ rfi, companyName }) {
   const t = useT();
+  const { user } = useAuth();
   const fileName = `RFI-${rfi.rfi_number}-${(rfi.subject || 'rfi').replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`;
   return (
     <PDFDownloadLink
-      document={<RFIDocument rfi={rfi} companyName={companyName} t={t} />}
+      document={<RFIDocument rfi={rfi} companyName={companyName} t={t} language={user?.language} />}
       fileName={fileName}
       style={linkStyle}
     >

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -12,8 +14,8 @@ function fmtH(h) {
   return wm > 0 ? `${wh}h ${wm}m` : `${wh}h`;
 }
 
-function fmtDate(d) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDate(d, locale = 'en-US') {
+  return new Date(d + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function lastSunday() {
@@ -24,6 +26,8 @@ function lastSunday() {
 
 export default function CertifiedPayroll({ projects }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [weekEnd, setWeekEnd] = useState(lastSunday());
   const [projectId, setProjectId] = useState('');
   const [data, setData] = useState(null);
@@ -96,15 +100,15 @@ export default function CertifiedPayroll({ projects }) {
       <h1>Payroll Report</h1>
       <div class="meta">
         <div><strong>Contractor:</strong> ${data.contractor}</div>
-        <div><strong>Week ending:</strong> ${fmtDate(data.week_end)}</div>
+        <div><strong>Week ending:</strong> ${fmtDate(data.week_end, locale)}</div>
         <div><strong>Project:</strong> ${data.project || t.allProjectsOpt}</div>
-        <div><strong>Week starting:</strong> ${fmtDate(data.week_start)}</div>
+        <div><strong>Week starting:</strong> ${fmtDate(data.week_start, locale)}</div>
       </div>
       <table>
         <thead>${headerRow}</thead>
         <tbody>${workerRows || '<tr><td colspan="12" style="text-align:center;color:#9ca3af;padding:16px">No entries for this period</td></tr>'}</tbody>
       </table>
-      <p class="footer">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <p class="footer">${new Date().toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' })}</p>
     </body></html>`);
     win.document.close();
     win.print();
@@ -142,7 +146,7 @@ export default function CertifiedPayroll({ projects }) {
             <div>
               <div style={styles.metaLine}><strong>{t.contractorLabel}</strong> {data.contractor}</div>
               <div style={styles.metaLine}><strong>{t.project}:</strong> {data.project || t.allProjectsOpt}</div>
-              <div style={styles.metaLine}><strong>Period:</strong> {fmtDate(data.week_start)} – {fmtDate(data.week_end)}</div>
+              <div style={styles.metaLine}><strong>Period:</strong> {fmtDate(data.week_start, locale)} – {fmtDate(data.week_end, locale)}</div>
             </div>
             <button style={styles.printBtn} onClick={printReport}>{t.printSavePDF}</button>
           </div>

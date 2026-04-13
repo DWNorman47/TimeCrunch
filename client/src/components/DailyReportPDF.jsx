@@ -3,6 +3,8 @@ import {
   Document, Page, Text, View, StyleSheet, PDFDownloadLink, Image,
 } from '@react-pdf/renderer';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
 const pdf = StyleSheet.create({
   page: { fontFamily: 'Helvetica', fontSize: 9, color: '#1a1a1a', padding: '40 48 48 48' },
@@ -67,7 +69,8 @@ function TextBlock({ text, noneLabel }) {
   return <Text style={pdf.textBlock}>{text}</Text>;
 }
 
-export function DailyReportDocument({ report, companyName, fieldPhotos = [], t }) {
+export function DailyReportDocument({ report, companyName, fieldPhotos = [], t, language }) {
+  const locale = langToLocale(language);
   const WEATHER_LABELS = {
     sunny: t.weatherSunny, partly_cloudy: t.weatherPartlyCloudy, cloudy: t.weatherCloudy,
     rainy: t.weatherRainy, stormy: t.weatherStormy, snow: t.weatherSnow, windy: t.weatherWindy,
@@ -76,7 +79,7 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [], t }
   const totalHours = report.manpower?.reduce((s, m) => s + (parseFloat(m.hours) || 0), 0) || 0;
   const weather = report.weather_condition ? WEATHER_LABELS[report.weather_condition] || report.weather_condition : null;
   const weatherStr = [weather, report.weather_temp != null ? `${report.weather_temp}°F` : null].filter(Boolean).join(', ');
-  const dateStr = new Date(report.report_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const dateStr = new Date(report.report_date + 'T00:00:00').toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const isSubmitted = report.status === 'submitted';
   const isReviewed = report.status === 'reviewed';
 
@@ -103,7 +106,7 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [], t }
               <Text style={{ ...pdf.headerMeta, marginTop: 4, color: '#1a56db' }}>
                 <Text style={pdf.headerMetaBold}>{t.reviewedBy}: </Text>
                 {report.reviewed_by}
-                {report.reviewed_at ? ` · ${new Date(report.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+                {report.reviewed_at ? ` · ${new Date(report.reviewed_at).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
               </Text>
             )}
           </View>
@@ -241,10 +244,11 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [], t }
 
 export function PDFButton({ report, companyName, fieldPhotos, style }) {
   const t = useT();
+  const { user } = useAuth();
   const fileName = `daily-report-${report.report_date}-${(report.project_name || 'site').toLowerCase().replace(/\s+/g, '-')}.pdf`;
   return (
     <PDFDownloadLink
-      document={<DailyReportDocument report={report} companyName={companyName} fieldPhotos={fieldPhotos} t={t} />}
+      document={<DailyReportDocument report={report} companyName={companyName} fieldPhotos={fieldPhotos} t={t} language={user?.language} />}
       fileName={fileName}
       style={style}
     >

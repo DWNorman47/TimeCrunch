@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
+import { langToLocale } from '../utils';
 
 const TYPE_COLORS = { vacation: '#1d4ed8', sick: '#dc2626', personal: '#8b5cf6', other: '#6b7280' };
 const STATUS_COLORS = { pending: '#d97706', approved: '#059669', denied: '#ef4444' };
 
-function fmt(d) {
+function fmt(d, locale = 'en-US') {
   if (!d) return '';
-  return new Date(d.toString().substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(d.toString().substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function days(start, end) {
@@ -20,6 +22,8 @@ function days(start, end) {
 
 export default function AdminTimeOff({ settings }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const toast = useToast();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -141,7 +145,7 @@ export default function AdminTimeOff({ settings }) {
               </div>
 
               <div style={s.dates}>
-                {fmt(r.start_date)} – {fmt(r.end_date)}
+                {fmt(r.start_date, locale)} – {fmt(r.end_date, locale)}
                 <span style={s.dayCount}>
                   {d} {d !== 1 ? t.daysLabel : t.dayLabel}
                 </span>
@@ -184,7 +188,7 @@ export default function AdminTimeOff({ settings }) {
               )}
 
               <div style={s.meta}>
-                {t.submittedOn} {fmt(r.created_at)}
+                {t.submittedOn} {fmt(r.created_at, locale)}
                 {r.reviewer_name && ` · ${STATUS_LABELS[r.status] || r.status} by ${r.reviewer_name}`}
               </div>
             </div>

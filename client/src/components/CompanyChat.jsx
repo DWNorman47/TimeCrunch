@@ -2,15 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
+import { langToLocale } from '../utils';
 
-function formatTime(str) {
-  return new Date(str).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+function formatTime(str, locale = 'en-US') {
+  return new Date(str).toLocaleString(locale, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 // Worker view — shows their own private thread with admin
 function WorkerChat({ onRead }) {
   const { user } = useAuth();
   const t = useT();
+  const locale = langToLocale(user?.language);
   const [messages, setMessages] = useState([]);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
@@ -182,7 +184,7 @@ function Thread({ messages, loading, currentUserId, bottomRef, t }) {
                     {isMine ? t.chatYou : m.sender_name}
                     {m.sender_role === 'admin' && !isMine && <span style={styles.adminBadge}> {t.chatAdminBadge}</span>}
                   </span>
-                  <span style={styles.time}>{formatTime(m.created_at)}</span>
+                  <span style={styles.time}>{formatTime(m.created_at, locale)}</span>
                 </div>
                 <div style={styles.msgBody}>{m.body}</div>
               </div>

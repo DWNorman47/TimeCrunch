@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
-function fmtDate(str) {
+function fmtDate(str, locale = 'en-US') {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function fmtMoney(v) {
@@ -26,6 +28,8 @@ function StatusBadge({ status }) {
 
 export default function ReimbursementsView() {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [items, setItems] = useState([]);
   const [mileageRate, setMileageRate] = useState(0.67);
   const [loading, setLoading] = useState(true);
@@ -238,7 +242,7 @@ export default function ReimbursementsView() {
                 </div>
               )}
               <div style={s.meta}>
-                <span>{fmtDate(item.expense_date)}</span>
+                <span>{fmtDate(item.expense_date, locale)}</span>
                 {item.receipt_url && (
                   <a href={item.receipt_url} target="_blank" rel="noopener noreferrer" style={s.receiptLink}>{t.viewReceipt}</a>
                 )}

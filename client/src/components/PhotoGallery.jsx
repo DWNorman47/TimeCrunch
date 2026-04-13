@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
+import { langToLocale } from '../utils';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
 
-function fmtDate(str) {
-  return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDate(str, locale = 'en-US') {
+  return new Date(str).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function isVideo(item) {
@@ -68,7 +69,7 @@ function Lightbox({ items, index, onClose }) {
         <div style={styles.metaLine}>
           {item.worker_name && <span>{item.worker_name} · </span>}
           {item.project_name && <span>{item.project_name} · </span>}
-          <span>{fmtDate(item.reported_at)}</span>
+          <span>{fmtDate(item.reported_at, locale)}</span>
           {item.lat && (
             <a href={`https://www.google.com/maps?q=${item.lat},${item.lng}`}
                target="_blank" rel="noopener noreferrer" style={styles.mapLink}>
@@ -90,6 +91,7 @@ function Lightbox({ items, index, onClose }) {
 export default function PhotoGallery({ projects }) {
   const { user } = useAuth();
   const t = useT();
+  const locale = langToLocale(user?.language);
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const [media, setMedia] = useState([]);
@@ -163,7 +165,7 @@ export default function PhotoGallery({ projects }) {
           {days.map(day => (
             <div key={day} style={styles.dayGroup}>
               <div style={styles.dayHeader}>
-                <span style={styles.dayLabel}>{fmtDate(day + 'T12:00:00')}</span>
+                <span style={styles.dayLabel}>{fmtDate(day + 'T12:00:00', locale)}</span>
                 <span style={styles.dayCount}>{grouped[day].length} item{grouped[day].length !== 1 ? 's' : ''}</span>
               </div>
               <div style={styles.grid}>

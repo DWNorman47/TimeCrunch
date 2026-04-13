@@ -1,9 +1,11 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink } from '@react-pdf/renderer';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
-function fmtDate(str) {
-  return new Date(str + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDate(str, locale = 'en-US') {
+  return new Date(str + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 const pdf = StyleSheet.create({
@@ -36,9 +38,10 @@ const pdf = StyleSheet.create({
   footerText: { fontSize: 7, color: '#9ca3af' },
 });
 
-export function SafetyTalkDocument({ talks, companyName, t }) {
+export function SafetyTalkDocument({ talks, companyName, t, language }) {
+  const locale = langToLocale(language);
   const totalSignoffs = talks.reduce((s, t) => s + parseInt(t.signoff_count || 0), 0);
-  const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const dateStr = new Date().toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
     <Document>
@@ -74,7 +77,7 @@ export function SafetyTalkDocument({ talks, companyName, t }) {
         {/* Talks */}
         {talks.map((talk, i) => {
           const metaParts = [
-            fmtDate(talk.talk_date),
+            fmtDate(talk.talk_date, locale),
             talk.given_by ? `${t.pdfBy} ${talk.given_by}` : null,
             talk.project_name,
           ].filter(Boolean).join(' · ');
@@ -126,10 +129,11 @@ export function SafetyTalkDocument({ talks, companyName, t }) {
 
 export function SafetyTalkPDFButton({ talks, companyName, style }) {
   const t = useT();
+  const { user } = useAuth();
   const fileName = `safety-talks-${new Date().toLocaleDateString('en-CA')}.pdf`;
   return (
     <PDFDownloadLink
-      document={<SafetyTalkDocument talks={talks} companyName={companyName} t={t} />}
+      document={<SafetyTalkDocument talks={talks} companyName={companyName} t={t} language={user?.language} />}
       fileName={fileName}
       style={style}
     >

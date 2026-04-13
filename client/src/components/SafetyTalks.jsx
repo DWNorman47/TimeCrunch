@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import { langToLocale } from '../utils';
 import Pagination from './Pagination';
 import { SkeletonList, SkeletonBlock } from './Skeleton';
 
@@ -28,8 +29,8 @@ const TALK_LIBRARY = [
   { title: 'First Aid & Emergency Response', content: `Emergency number: 911\nSite address: _______________\nNearest hospital: _______________\nSupervisor emergency contact: _______________\nAssembly point: _______________\n\nLocation of:\n• First aid kits: _______________\n• Eyewash stations: _______________\n• AED (if on site): _______________\n\nBasic first aid:\n• Cuts/bleeding: apply direct pressure with clean cloth\n• Burns: cool with running water for 10+ minutes\n• Eye injuries: flush with clean water for 15-20 minutes\n• Suspected fractures: immobilize and wait for EMS\n• Do not move a seriously injured worker\n\nCPR/AED:\n• Begin CPR if trained and victim has no pulse\n• Use AED as soon as available — it guides you through the steps` },
 ];
 
-function fmtDate(str) {
-  return new Date(str + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDate(str, locale = 'en-US') {
+  return new Date(str + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function formatBytes(bytes) {
@@ -230,6 +231,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
 function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
   const t = useT();
   const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [talk, setTalk] = useState(initialTalk);
   const [expanded, setExpanded] = useState(false);
   const [signing, setSigning] = useState(false);
@@ -334,7 +336,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
           <div>
             <div style={styles.talkTitle}>{talk.title}{talk.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
             <div style={styles.talkMeta}>
-              {fmtDate(talk.talk_date)}
+              {fmtDate(talk.talk_date, locale)}
               {talk.project_name && <span style={styles.projectTag}>{talk.project_name}</span>}
               {talk.given_by && <span style={styles.givenBy}>{t.talkGivenBy} {talk.given_by}</span>}
               {hasQuiz && <span style={styles.quizBadge}>📝 {talk.question_count} question{talk.question_count !== '1' ? 's' : ''}</span>}
@@ -470,7 +472,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                     {s.full_name || s.worker_name}
                     {s.quiz_score != null && <span style={styles.quizScore}>{s.quiz_score}/{questions?.length ?? '?'}</span>}
                     <span style={styles.signoffTime}>
-                      {new Date(s.signed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                      {new Date(s.signed_at).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}
                     </span>
                   </span>
                 ))}
@@ -517,7 +519,7 @@ export default function SafetyTalks({ projects }) {
         import('@react-pdf/renderer'),
         import('./SafetyTalkPDF'),
       ]);
-      const blob = await pdf(React.createElement(SafetyTalkDocument, { talks, companyName: user?.company_name })).toBlob();
+      const blob = await pdf(React.createElement(SafetyTalkDocument, { talks, companyName: user?.company_name, language: user?.language })).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = 'safety-talks.pdf'; a.click();

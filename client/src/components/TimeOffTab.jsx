@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
+import { langToLocale } from '../utils';
 
 const TYPE_LABELS_EN = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' };
 const TYPE_COLORS = { vacation: '#1d4ed8', sick: '#dc2626', personal: '#8b5cf6', other: '#6b7280' };
 const STATUS_COLORS = { pending: '#d97706', approved: '#059669', denied: '#ef4444' };
 
-function fmt(d) {
+function fmt(d, locale = 'en-US') {
   if (!d) return '';
-  return new Date(d.toString().substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(d.toString().substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function days(start, end) {
@@ -21,6 +23,8 @@ function days(start, end) {
 
 export default function TimeOffTab() {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const toast = useToast();
   const TYPE_LABELS = { vacation: t.typeVacation, sick: t.typeSick, personal: t.typePersonal, other: t.typeOther };
   const [requests, setRequests] = useState([]);
@@ -32,15 +36,16 @@ export default function TimeOffTab() {
   const [pendingCancelId, setPendingCancelId] = useState(null);
   const [cancelError, setCancelError] = useState('');
   const [balance, setBalance] = useState(null);
+  const [loadError, setLoadError] = useState('');
 
   const load = () => {
-    setLoading(true);
+    setLoading(true); setLoadError('');
     Promise.all([
       api.get('/time-off/mine'),
       api.get('/time-off/balance'),
     ])
       .then(([r, b]) => { setRequests(r.data); setBalance(b.data); })
-      .catch(() => {})
+      .catch(() => setLoadError(t.failedLoadTimeOff || 'Failed to load time off requests.'))
       .finally(() => setLoading(false));
   };
 
@@ -77,6 +82,7 @@ export default function TimeOffTab() {
 
   return (
     <div style={s.wrap}>
+      {loadError && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 12 }}>{loadError}</p>}
       <div style={s.headerRow}>
         <h2 style={s.title}>{t.timeOffRequests}</h2>
         <button style={s.addBtn} onClick={() => setShowForm(o => !o)}>
@@ -146,7 +152,7 @@ export default function TimeOffTab() {
                 </span>
               </div>
               <div style={s.dates}>
-                {fmt(r.start_date)} – {fmt(r.end_date)}
+                {fmt(r.start_date, locale)} – {fmt(r.end_date, locale)}
                 {(() => { const d = days(r.start_date?.toString().substring(0,10), r.end_date?.toString().substring(0,10)); return <span style={s.dayCount}>{d} {d !== 1 ? t.days : t.day}</span>; })()}
               </div>
               {r.note && <p style={s.note}>{r.note}</p>}
@@ -156,7 +162,7 @@ export default function TimeOffTab() {
                 </p>
               )}
               <div style={s.meta}>
-                {t.submitted} {fmt(r.created_at)}
+                {t.submitted} {fmt(r.created_at, locale)}
                 {r.status === 'pending' && (
                   pendingCancelId === r.id ? (
                     <>

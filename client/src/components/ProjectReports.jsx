@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { fmtHours, formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
 import { SkeletonList } from './Skeleton';
 
 function downloadCSV(rows, filename) {
@@ -27,6 +28,7 @@ function defaultDates() {
 
 export default function ProjectReports({ currency = 'USD' }) {
   const t = useT();
+  const { user } = useAuth();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -75,7 +77,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
       import('@react-pdf/renderer'),
       import('./ProjectBillPDF'),
     ]);
-    const el = React.createElement(ProjectBillPDF, { data: billData, currency, t });
+    const el = React.createElement(ProjectBillPDF, { data: billData, currency, t, language: user?.language });
     return { pdf, el };
   };
 

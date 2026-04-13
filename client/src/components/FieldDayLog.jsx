@@ -3,6 +3,8 @@ import api from '../api';
 import PhotoCapture from './PhotoCapture';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 import { SkeletonList } from './Skeleton';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -17,11 +19,11 @@ function shiftDate(dateStr, n) {
   return d.toLocaleDateString('en-CA');
 }
 
-function dayLabel(dateStr, t) {
+function dayLabel(dateStr, t, locale = 'en-US') {
   const today = todayISO();
   if (dateStr === today) return t ? t.today : 'Today';
   if (dateStr === shiftDate(today, -1)) return t ? t.yesterday : 'Yesterday';
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString(locale, {
     weekday: 'short', month: 'short', day: 'numeric',
   });
 }
@@ -100,6 +102,8 @@ function Lightbox({ photos, startIndex, onClose }) {
 
 export default function FieldDayLog({ projects, isAdmin }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const { onSync } = useOffline() || {};
 
   const [project, setProject] = useState('');
@@ -286,7 +290,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
 
         <div style={s.dateNav}>
           <button style={s.dateArrow} aria-label={t.prevDay} onClick={prevDay}>‹</button>
-          <span style={s.dateLabel}>{dayLabel(date, t)}</span>
+          <span style={s.dateLabel}>{dayLabel(date, t, locale)}</span>
           <button style={{ ...s.dateArrow, opacity: isToday ? 0.3 : 1, ...(isToday ? { cursor: 'not-allowed' } : {}) }} aria-label={t.nextDay} onClick={nextDay} disabled={isToday}>›</button>
         </div>
       </div>
@@ -451,7 +455,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
                         <span style={s.noteWorker}>{r.worker_name}</span>
                       )}
                       <span style={s.noteTime}>
-                        {new Date(r.reported_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                        {new Date(r.reported_at).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}
                       </span>
                       {r.pending && <span style={s.pendingBadge}>⏳ {t.pendingSync}</span>}
                       {r.lat && (

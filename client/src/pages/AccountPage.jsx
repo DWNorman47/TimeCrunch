@@ -17,6 +17,7 @@ export default function AccountPage() {
   const [settings, setSettings] = useState(null);
   const [companyInfo, setCompanyInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [langError, setLangError] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -29,10 +30,13 @@ export default function AccountPage() {
   }, []);
 
   const handleLanguageChange = async lang => {
+    setLangError('');
     try {
       await api.post('/auth/update-language', { language: lang });
       updateUser({ language: lang });
-    } catch {}
+    } catch {
+      setLangError(t.failedSave || 'Failed to save language preference.');
+    }
   };
 
   return (
@@ -56,6 +60,7 @@ export default function AccountPage() {
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
+      {langError && <p style={{ color: '#dc2626', fontSize: 13, margin: '8px 24px 0' }}>{langError}</p>}
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
 
       <main style={styles.main} className="mobile-main">

@@ -4,6 +4,8 @@ import {
 } from 'recharts';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 import { SkeletonStatRow, SkeletonList } from './Skeleton';
 
 const BLUE = '#1a56db';
@@ -58,15 +60,6 @@ function HorizontalBars({ data, color, noDataLabel }) {
   );
 }
 
-function formatDay(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function formatWeek(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
 
 function presetLabel(days, t) {
   if (days === 14) return t.ad14Days;
@@ -77,6 +70,10 @@ function presetLabel(days, t) {
 
 export default function AnalyticsDashboard() {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
+  const formatDay = dateStr => new Date(dateStr + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+  const formatWeek = dateStr => new Date(dateStr + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric' });
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [preset, setPreset] = useState(14); // days; null = custom

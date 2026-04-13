@@ -14,6 +14,8 @@ function punchColor(status) {
 // ── Project Card ──────────────────────────────────────────────────────────────
 
 function ProjectCard({ project, metrics, settings, onClick }) {
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const m = metrics || {};
   const totalHours = parseFloat(m.total_hours || 0);
   const budgetHours = parseFloat(project.budget_hours || 0);
@@ -33,7 +35,7 @@ function ProjectCard({ project, metrics, settings, onClick }) {
   const fmtMoney = v => {
     const n = parseFloat(v);
     if (isNaN(n) || n === 0) return null;
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: settings?.currency || 'USD', maximumFractionDigits: 0 }).format(n);
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: settings?.currency || 'USD', maximumFractionDigits: 0 }).format(n);
   };
 
   const statusColors = { planning: '#dbeafe|#1d4ed8', in_progress: '#d1fae5|#065f46', on_hold: '#fef3c7|#92400e', completed: '#e5e7eb|#374151' };
@@ -177,7 +179,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const fmtMoney = v => {
     const n = parseFloat(v);
     if (isNaN(n) || n === 0) return '—';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: settings?.currency || 'USD', maximumFractionDigits: 0 }).format(n);
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: settings?.currency || 'USD', maximumFractionDigits: 0 }).format(n);
   };
 
   useEffect(() => {
@@ -313,7 +315,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
         import('@react-pdf/renderer'),
         import('../components/ProjectBillPDF'),
       ]);
-      const el = React.createElement(ProjectBillPDF, { data: billData, currency: settings?.currency || 'USD', companyInfo, project, t });
+      const el = React.createElement(ProjectBillPDF, { data: billData, currency: settings?.currency || 'USD', companyInfo, project, t, language: user?.language });
       const blob = await pdf(el).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -488,8 +490,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   {project.client_name && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Client</span><span style={styles.budgetValue}>{project.client_name}</span></div>}
                   {project.job_number && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Job #</span><span style={styles.budgetValue}>{project.job_number}</span></div>}
                   {project.address && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Address</span><span style={{ ...styles.budgetValue, textAlign: 'right', maxWidth: 220 }}>{project.address}</span></div>}
-                  {project.start_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Start</span><span style={styles.budgetValue}>{new Date(project.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
-                  {project.end_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Target End</span><span style={styles.budgetValue}>{new Date(project.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
+                  {project.start_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Start</span><span style={styles.budgetValue}>{new Date(project.start_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
+                  {project.end_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Target End</span><span style={styles.budgetValue}>{new Date(project.end_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
                   {project.description && <p style={{ fontSize: 13, color: '#374151', margin: '8px 0 0', lineHeight: 1.5 }}>{project.description}</p>}
                 </div>
               )}
@@ -581,7 +583,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                                 <div style={styles.activityMeta}>
                                   {item.location && <span>{item.location} · </span>}
                                   {item.assigned_to_name && <span>→ {item.assigned_to_name} · </span>}
-                                  <span>{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                  <span>{new Date(item.created_at).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}</span>
                                 </div>
                               </div>
                             </div>
@@ -759,7 +761,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                               <div style={styles.activityMeta}>
                                 {item.type === 'note' ? '📝' : '✅'}
                                 {item.worker_name && <span>{item.worker_name} · </span>}
-                                <span>{new Date(item.event_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {new Date(item.event_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+                                <span>{new Date(item.event_at).toLocaleDateString(locale, { month: 'short', day: 'numeric' })} {new Date(item.event_at).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}</span>
                               </div>
                             </div>
                           </div>
@@ -874,8 +876,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                                 </div>
                                 <div style={styles.activityMeta}>
                                   {r.directed_to && <span>{r.directed_to} · </span>}
-                                  <span>{new Date(r.date_submitted).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                                  {r.date_due && <span> · Due {new Date(r.date_due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                                  <span>{new Date(r.date_submitted).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                  {r.date_due && <span> · Due {new Date(r.date_due).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}</span>}
                                 </div>
                               </div>
                             </div>
@@ -1098,7 +1100,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 if (hrs < 0) hrs += 24;
                 return (
                   <div key={e.id} style={styles.tableRow}>
-                    <span style={styles.tdDate}>{new Date(e.work_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    <span style={styles.tdDate}>{new Date(e.work_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                     <span style={styles.tdWorker}>{e.worker_name}</span>
                     <span style={styles.tdHours}>{hrs.toFixed(1)}h</span>
                   </div>

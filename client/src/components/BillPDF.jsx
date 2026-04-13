@@ -1,14 +1,15 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { langToLocale } from '../utils';
 
-function fmtDate(str) {
+function fmtDate(str, locale = 'en-US') {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function fmtDateShort(str) {
+function fmtDateShort(str, locale = 'en-US') {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function fmtTime(t) {
@@ -70,14 +71,15 @@ const s = StyleSheet.create({
   reimbRow: { flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 4, borderBottomWidth: 0.5, borderBottomColor: '#f3f4f6', borderBottomStyle: 'solid' },
 });
 
-export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true, showProject = true, showRateType = true, t = {} }) {
+export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true, showProject = true, showRateType = true, t = {}, language }) {
+  const locale = langToLocale(language);
   const { worker, entries, reimbursements = [], summary, period } = data;
 
   const periodStr = period.from || period.to
-    ? `${period.from ? fmtDateShort(period.from) : (t.pdfBeginning || 'Beginning')} – ${period.to ? fmtDateShort(period.to) : (t.pdfPresent || 'Present')}`
+    ? `${period.from ? fmtDateShort(period.from, locale) : (t.pdfBeginning || 'Beginning')} – ${period.to ? fmtDateShort(period.to, locale) : (t.pdfPresent || 'Present')}`
     : 'All Time';
 
-  const invoiceDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const invoiceDate = new Date().toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
   const invoiceNum = `INV-${(period.from || '').replace(/-/g, '') || 'ALL'}-${worker.id}`;
 
   const ci = companyInfo || {};
@@ -149,7 +151,7 @@ export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true
           const isPrev = e.wage_type === 'prevailing';
           return (
             <View key={e.id} style={s.tableRow}>
-              <Text style={[s.td, { width: colDate }]}>{fmtDate(e.work_date_str || e.work_date)}</Text>
+              <Text style={[s.td, { width: colDate }]}>{fmtDate(e.work_date_str || e.work_date, locale)}</Text>
               {showProject && <Text style={[s.td, { width: colProject }]}>{e.project_name || '—'}</Text>}
               <Text style={[s.td, { width: colDesc, color: '#6b7280' }]}>{e.notes || ''}</Text>
               <Text style={[s.td, { width: colIn }]}>{fmtTime(e.start_time)}</Text>
@@ -176,7 +178,7 @@ export default function BillPDF({ data, companyInfo = {}, overtimeEnabled = true
             </View>
             {reimbursements.map(r => (
               <View key={r.id} style={s.reimbRow}>
-                <Text style={[s.td, { width: '18%' }]}>{fmtDateShort(r.expense_date)}</Text>
+                <Text style={[s.td, { width: '18%' }]}>{fmtDateShort(r.expense_date, locale)}</Text>
                 <Text style={[s.td, { width: '22%' }]}>{r.category || '—'}</Text>
                 <Text style={[s.td, { flex: 1, color: '#6b7280' }]}>{r.description || ''}</Text>
                 {showProject && <Text style={[s.td, { width: '20%' }]}>{r.project_name || '—'}</Text>}

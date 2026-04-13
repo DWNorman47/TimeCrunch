@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import api from '../api';
 import { fmtHours, formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
 
 function downloadCSV(rows, filename) {
   const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -27,6 +28,7 @@ function defaultDates() {
 
 export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = {}, overtimeEnabled = true, projectsEnabled = true, projects = [] }) {
   const t = useT();
+  const { user } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const [from, setFrom] = useState(defaultDates().from);
   const [to, setTo] = useState(defaultDates().to);
@@ -83,7 +85,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
       import('@react-pdf/renderer'),
       import('./BillPDF'),
     ]);
-    const el = React.createElement(BillPDF, { data: billData, currency, companyInfo, overtimeEnabled, showProject: projectsEnabled, showRateType: (companyInfo?.prevailing_wage_rate ?? 0) > 0, t });
+    const el = React.createElement(BillPDF, { data: billData, currency, companyInfo, overtimeEnabled, showProject: projectsEnabled, showRateType: (companyInfo?.prevailing_wage_rate ?? 0) > 0, t, language: user?.language });
     return { pdf, el };
   };
 

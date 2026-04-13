@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { fmtHours } from '../utils';
+import { fmtHours, langToLocale } from '../utils';
+import { useAuth } from '../contexts/AuthContext';
 
 function weekBounds() {
   const today = new Date();
@@ -12,6 +13,8 @@ function weekBounds() {
 }
 
 export default function TimesheetSignOff({ t }) {
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [from, setFrom] = useState(weekBounds().from);
   const [to, setTo] = useState(weekBounds().to);
   const [entries, setEntries] = useState([]);
@@ -49,7 +52,7 @@ export default function TimesheetSignOff({ t }) {
   const unsigned = entries.filter(e => !e.worker_signed_at);
   const alreadySigned = entries.filter(e => e.worker_signed_at);
 
-  const fmtDate = s => new Date(s.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const fmtDate = s => new Date(s.substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
   const fmtTime = t => { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`; };
   const calcHours = (s, e, brk) => fmtHours((new Date(`1970-01-01T${e}`) - new Date(`1970-01-01T${s}`)) / 3600000 - (brk || 0) / 60);
 

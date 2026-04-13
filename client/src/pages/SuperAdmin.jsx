@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 import api from '../api';
 
-function formatDate(str) {
-  return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function formatDate(str, locale = 'en-US') {
+  return new Date(str).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function formatMrr(cents) {
+function formatMrr(cents, locale = 'en-US') {
   if (!cents) return '—';
-  return '$' + (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return '$' + (cents / 100).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function statusTag(status, plan) {
@@ -34,6 +35,7 @@ const PLANS    = ['free','starter','business'];
 
 export default function SuperAdmin() {
   const { logout, user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [tab, setTab] = useState('companies');
 
   // ── Companies state ──
@@ -290,10 +292,10 @@ export default function SuperAdmin() {
                         <div style={styles.meta}>
                           <span>slug: <code style={styles.slug}>{c.slug}</code></span>
                           <span style={styles.sep}>·</span>
-                          <span>Joined {formatDate(c.created_at)}</span>
+                          <span>Joined {formatDate(c.created_at, locale)}</span>
                           {c.mrr_cents > 0 && <>
                             <span style={styles.sep}>·</span>
-                            <span style={{ color: '#059669', fontWeight: 600 }}>MRR {formatMrr(c.mrr_cents)}</span>
+                            <span style={{ color: '#059669', fontWeight: 600 }}>MRR {formatMrr(c.mrr_cents, locale)}</span>
                           </>}
                         </div>
 
@@ -301,7 +303,7 @@ export default function SuperAdmin() {
                           <span style={styles.stat}><strong>{c.worker_count}</strong> workers</span>
                           <span style={styles.stat}><strong>{c.admin_count}</strong> admins</span>
                           <span style={styles.stat}><strong>{c.entry_count}</strong> entries</span>
-                          {c.last_entry_at && <span style={styles.stat}>Last entry: {formatDate(c.last_entry_at)}</span>}
+                          {c.last_entry_at && <span style={styles.stat}>Last entry: {formatDate(c.last_entry_at, locale)}</span>}
                         </div>
 
                         {/* Controls row */}
@@ -498,11 +500,11 @@ export default function SuperAdmin() {
                             </div>
                             <div style={styles.afStat}>
                               <div style={styles.afStatLabel}>Active MRR</div>
-                              <div style={{ ...styles.afStatVal, color: '#059669' }}>{formatMrr(mrrCents)}</div>
+                              <div style={{ ...styles.afStatVal, color: '#059669' }}>{formatMrr(mrrCents, locale)}</div>
                             </div>
                             <div style={styles.afStat}>
                               <div style={styles.afStatLabel}>Commission (30%)</div>
-                              <div style={{ ...styles.afStatVal, color: '#1a56db', fontWeight: 800 }}>{formatMrr(commissionCents)}<span style={{ fontSize: 11, fontWeight: 400, color: '#6b7280' }}>/mo</span></div>
+                              <div style={{ ...styles.afStatVal, color: '#1a56db', fontWeight: 800 }}>{formatMrr(commissionCents, locale)}<span style={{ fontSize: 11, fontWeight: 400, color: '#6b7280' }}>/mo</span></div>
                             </div>
                           </div>
                         </div>
@@ -551,11 +553,11 @@ export default function SuperAdmin() {
                                           {c.subscription_status || 'trial'}
                                         </span>
                                       </td>
-                                      <td style={styles.td}>{formatMrr(cMrr)}</td>
+                                      <td style={styles.td}>{formatMrr(cMrr, locale)}</td>
                                       <td style={{ ...styles.td, color: '#1a56db', fontWeight: 600 }}>
-                                        {formatMrr(Math.round(cMrr * COMMISSION_RATE))}
+                                        {formatMrr(Math.round(cMrr * COMMISSION_RATE), locale)}
                                       </td>
-                                      <td style={styles.td}>{formatDate(c.created_at)}</td>
+                                      <td style={styles.td}>{formatDate(c.created_at, locale)}</td>
                                     </tr>
                                   );
                                 })}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
-import { formatCurrency } from '../utils';
+import { formatCurrency, langToLocale } from '../utils';
 
 const s = StyleSheet.create({
   page: { padding: '40 48', fontSize: 10, fontFamily: 'Helvetica', color: '#1a1a1a' },
@@ -45,9 +45,9 @@ const s = StyleSheet.create({
   footerText: { fontSize: 8, color: '#9ca3af' },
 });
 
-function fmtDate(d) {
+function fmtDate(d, locale = 'en-US') {
   if (!d) return '';
-  return new Date(d.toString().substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(d.toString().substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function fmtTime(t) {
@@ -70,19 +70,20 @@ function invoiceNumber(projectId, period) {
   return `INV-${String(projectId).padStart(4, '0')}-${ym}`;
 }
 
-export default function ProjectBillPDF({ data, currency = 'USD', companyInfo = {}, project: projectMeta = {}, t = {} }) {
+export default function ProjectBillPDF({ data, currency = 'USD', companyInfo = {}, project: projectMeta = {}, t = {}, language }) {
+  const locale = langToLocale(language);
   const { project, entries, summary, period } = data;
   const periodStr = period?.from || period?.to
-    ? `${period.from ? fmtDate(period.from) : (t.pdfBeginning || 'Beginning')} – ${period.to ? fmtDate(period.to) : (t.pdfPresent || 'Present')}`
+    ? `${period.from ? fmtDate(period.from, locale) : (t.pdfBeginning || 'Beginning')} – ${period.to ? fmtDate(period.to, locale) : (t.pdfPresent || 'Present')}`
     : 'All Time';
-  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const today = new Date().toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' });
   const invNum = invoiceNumber(project?.id || projectMeta?.id, period);
 
   // Due date: NET 30
   const dueDate = (() => {
     const d = new Date();
     d.setDate(d.getDate() + 30);
-    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    return d.toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' });
   })();
 
   const clientName = projectMeta?.client_name || project?.client_name || '';
@@ -201,7 +202,7 @@ export default function ProjectBillPDF({ data, currency = 'USD', companyInfo = {
             {entries.map(e => (
               <View key={e.id} style={s.tableRow}>
                 <Text style={s.colWorker}>{e.invoice_name || e.worker_name}</Text>
-                <Text style={s.colDate}>{fmtDate(e.work_date)}</Text>
+                <Text style={s.colDate}>{fmtDate(e.work_date, locale)}</Text>
                 <Text style={s.colTime}>{fmtTime(e.start_time)}</Text>
                 <Text style={s.colTime}>{fmtTime(e.end_time)}</Text>
                 <Text style={s.colHours}>{calcHours(e.start_time, e.end_time)}</Text>

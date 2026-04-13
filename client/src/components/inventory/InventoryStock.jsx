@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
+import { useAuth } from '../../contexts/AuthContext';
+import { langToLocale } from '../../utils';
 import { SkeletonList } from '../Skeleton';
 
 function formatBin(area_name, rack_name, bay_name, compartment_name) {
@@ -8,9 +10,9 @@ function formatBin(area_name, rack_name, bay_name, compartment_name) {
     .filter(Boolean).join(' › ') || null;
 }
 
-function formatDate(iso) {
+function formatDate(iso, locale = 'en-US') {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleString(locale, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 const TYPE_COLOR  = { receive: '#059669', issue: '#dc2626', transfer: '#2563eb', adjust: '#d97706', count: '#7c3aed', convert: '#0891b2' };
@@ -19,6 +21,8 @@ const TYPE_COLOR  = { receive: '#059669', issue: '#dc2626', transfer: '#2563eb',
 
 function HistoryPanel({ item, onClose }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const TYPE_LABELS = {
     receive: t.invTxTypeReceive, issue: t.invTxTypeIssue, transfer: t.invTxTypeTransfer,
     adjust: t.invTxTypeAdjust, count: t.invCycCycleCount, convert: t.invTxTypeConvert,
@@ -80,7 +84,7 @@ function HistoryPanel({ item, onClose }) {
                   const location = r.to_location_name || r.from_location_name || '—';
                   return (
                     <tr key={r.id} style={i % 2 === 0 ? h.rowEven : h.row}>
-                      <td style={{ ...h.td, fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatDate(r.created_at)}</td>
+                      <td style={{ ...h.td, fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatDate(r.created_at, locale)}</td>
                       <td style={h.td}>
                         <span style={{ ...h.badge, color: TYPE_COLOR[r.type] || '#374151', background: '#f3f4f6' }}>
                           {TYPE_LABELS[r.type] || r.type}

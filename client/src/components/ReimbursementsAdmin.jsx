@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
+import { langToLocale } from '../utils';
 
-function fmtDate(str) {
+function fmtDate(str, locale = 'en-US') {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function fmtMoney(v) {
@@ -63,7 +64,7 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
           <span style={s.amount}>{fmtMoney(item.amount)}</span>
           {item.category && <span style={s.cat}>{resolveCategory(item.category)}</span>}
           {item.project_name && <span style={s.projectTag}>{item.project_name}</span>}
-          <span style={s.date}>{fmtDate(item.expense_date)}</span>
+          <span style={s.date}>{fmtDate(item.expense_date, locale)}</span>
         </div>
         <div style={s.rowRight}>
           {item.qbo_purchase_id && (
@@ -128,6 +129,7 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
 export default function ReimbursementsAdmin() {
   const t = useT();
   const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [items, setItems] = useState([]);
   const [mileageRate, setMileageRate] = useState(0.67);
   const [loading, setLoading] = useState(true);
@@ -141,6 +143,7 @@ export default function ReimbursementsAdmin() {
   const [receiptPreview, setReceiptPreview] = useState(null);
   const [noReceipt, setNoReceipt] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const fileRef = useRef();
@@ -154,10 +157,11 @@ export default function ReimbursementsAdmin() {
   };
 
   const load = useCallback(() => {
+    setLoadError('');
     const params = filter !== 'all' ? `?status=${filter}` : '';
     api.get(`/reimbursements/admin${params}`)
       .then(r => { setItems(r.data.items); setMileageRate(r.data.mileage_rate); })
-      .catch(() => {})
+      .catch(() => setLoadError(t.failedLoad || 'Failed to load reimbursements.'))
       .finally(() => setLoading(false));
   }, [filter]);
 
@@ -223,6 +227,7 @@ export default function ReimbursementsAdmin() {
 
   return (
     <div style={s.wrap}>
+      {loadError && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 12 }}>{loadError}</p>}
       <div style={s.header}>
         <div style={s.title}>{t.expenseReimbursements}</div>
         <div style={s.headerRight}>

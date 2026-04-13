@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
@@ -364,6 +365,8 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
 
 function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -378,7 +381,7 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
   };
 
   const statusStyle = STATUS_STYLES[ins.status] || STATUS_STYLES.pending;
-  const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const fmtDate = d => d ? new Date(d).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
 
   // Build a label lookup map from the template this inspection was based on
   const template = templates?.find(tpl => tpl.id === ins.template_id);
