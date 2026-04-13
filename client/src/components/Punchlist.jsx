@@ -52,47 +52,47 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
       <h3 style={styles.formTitle}>{t.newPunchlistItemForm}</h3>
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>{t.titleField} *</label>
-          <input style={styles.input} type="text" placeholder={t.punchlistTitlePlaceholder} maxLength={255} value={form.title} onChange={e => set('title', e.target.value)} />
+          <label htmlFor="pl-title" style={styles.label}>{t.titleField} *</label>
+          <input id="pl-title" style={styles.input} type="text" placeholder={t.punchlistTitlePlaceholder} maxLength={255} value={form.title} onChange={e => set('title', e.target.value)} />
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>Project</label>
-            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+            <label htmlFor="pl-project" style={styles.label}>Project</label>
+            <select id="pl-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
               <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
         )}
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.priorityField}</label>
-          <select style={styles.input} value={form.priority} onChange={e => set('priority', e.target.value)}>
+          <label htmlFor="pl-priority" style={styles.label}>{t.priorityField}</label>
+          <select id="pl-priority" style={styles.input} value={form.priority} onChange={e => set('priority', e.target.value)}>
             {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
         </div>
         {isAdmin && workers.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.assignTo}</label>
-            <select style={styles.input} value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)}>
+            <label htmlFor="pl-assign-to" style={styles.label}>{t.assignTo}</label>
+            <select id="pl-assign-to" style={styles.input} value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)}>
               <option value="">{t.unassigned}</option>
               {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
             </select>
           </div>
         )}
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.phaseField}</label>
-          <input style={styles.input} type="text" list="phase-suggestions" placeholder={t.punchlistPhasePlaceholder} maxLength={255} value={form.phase} onChange={e => set('phase', e.target.value)} />
+          <label htmlFor="pl-phase" style={styles.label}>{t.phaseField}</label>
+          <input id="pl-phase" style={styles.input} type="text" list="phase-suggestions" placeholder={t.punchlistPhasePlaceholder} maxLength={255} value={form.phase} onChange={e => set('phase', e.target.value)} />
           <datalist id="phase-suggestions">
             {existingPhases.map(p => <option key={p} value={p} />)}
           </datalist>
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.locationField}</label>
-          <input style={styles.input} type="text" placeholder={t.punchlistLocationPlaceholder} maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} />
+          <label htmlFor="pl-location" style={styles.label}>{t.locationField}</label>
+          <input id="pl-location" style={styles.input} type="text" placeholder={t.punchlistLocationPlaceholder} maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>{t.descriptionField}</label>
-          <textarea style={styles.textarea} rows={3} placeholder={t.punchlistDetailPlaceholder} maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
+          <label htmlFor="pl-description" style={styles.label}>{t.descriptionField}</label>
+          <textarea id="pl-description" style={styles.textarea} rows={3} placeholder={t.punchlistDetailPlaceholder} maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
           <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.description || '').length}/1000</div>
         </div>
       </div>
@@ -242,8 +242,9 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
 
           {/* Phase edit */}
           <div style={styles.phaseEditRow}>
-            <label style={styles.label}>{t.phaseField}</label>
+            <label htmlFor="pl-edit-phase" style={styles.label}>{t.phaseField}</label>
             <input
+              id="pl-edit-phase"
               style={styles.phaseInput}
               type="text"
               list="phase-suggestions"
@@ -298,8 +299,8 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
 
           {isAdmin && (
             <div style={styles.assignRow}>
-              <label style={styles.label}>{t.assignTo}: </label>
-              <select style={styles.smallSelect} value={item.assigned_to || ''} onChange={e => assignTo(e.target.value)}>
+              <label htmlFor="pl-edit-assign" style={styles.label}>{t.assignTo}: </label>
+              <select id="pl-edit-assign" style={styles.smallSelect} value={item.assigned_to || ''} onChange={e => assignTo(e.target.value)}>
                 <option value="">{t.unassigned}</option>
                 {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
               </select>

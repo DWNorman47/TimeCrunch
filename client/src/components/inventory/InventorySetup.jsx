@@ -180,8 +180,9 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       {/* Parent selector (only for new items on non-location levels) */}
       {!isLocation && !item && (
         <div style={ef.field}>
-          <label style={ef.label}>{LEVEL_SGl[level.parentLevel] || level.parentLabel} *</label>
+          <label htmlFor="isu-parent" style={ef.label}>{LEVEL_SGl[level.parentLevel] || level.parentLabel} *</label>
           <select
+            id="isu-parent"
             style={ef.input}
             value={form[level.parentKey]}
             onChange={e => set(level.parentKey, e.target.value)}
@@ -196,8 +197,9 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       )}
 
       <div style={ef.field}>
-        <label style={ef.label}>{t.invSetupNameField}</label>
+        <label htmlFor="isu-name" style={ef.label}>{t.invSetupNameField}</label>
         <input
+          id="isu-name"
           style={ef.input}
           value={form.name}
           onChange={e => set('name', e.target.value)}
@@ -209,14 +211,15 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       {isLocation && (
         <>
           <div style={ef.field}>
-            <label style={ef.label}>{t.invSetupTypeField}</label>
-            <select style={ef.input} value={form.type} onChange={e => set('type', e.target.value)}>
+            <label htmlFor="isu-type" style={ef.label}>{t.invSetupTypeField}</label>
+            <select id="isu-type" style={ef.input} value={form.type} onChange={e => set('type', e.target.value)}>
               {level.typeOptions.map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
             </select>
           </div>
           <div style={ef.field}>
-            <label style={ef.label}>{t.invSetupAddressField} <span style={ef.labelHint}>({t.optional})</span></label>
+            <label htmlFor="isu-address" style={ef.label}>{t.invSetupAddressField} <span style={ef.labelHint}>({t.optional})</span></label>
             <textarea
+              id="isu-address"
               style={{ ...ef.input, minHeight: 56, resize: 'vertical' }}
               value={form.address}
               onChange={e => set('address', e.target.value)}
@@ -228,8 +231,9 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       )}
 
       <div style={ef.field}>
-        <label style={ef.label}>{t.notes}</label>
+        <label htmlFor="isu-notes" style={ef.label}>{t.notes}</label>
         <textarea
+          id="isu-notes"
           style={{ ...ef.input, minHeight: 56, resize: 'vertical' }}
           value={form.notes}
           onChange={e => set('notes', e.target.value)}
@@ -354,31 +358,31 @@ function SupplierPanel() {
         {formErr && <div style={sp.error}>{formErr}</div>}
         <div style={sp.row}>
           <div style={sp.field}>
-            <label style={sp.label}>{t.invSetupNameField}</label>
-            <input style={sp.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.invSupplierNamePlaceholder} />
+            <label htmlFor="isu-sup-name" style={sp.label}>{t.invSetupNameField}</label>
+            <input id="isu-sup-name" style={sp.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.invSupplierNamePlaceholder} />
           </div>
           <div style={sp.field}>
-            <label style={sp.label}>{t.invSetupContactName}</label>
-            <input style={sp.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder={t.contactNamePlaceholder} />
+            <label htmlFor="isu-sup-contact-name" style={sp.label}>{t.invSetupContactName}</label>
+            <input id="isu-sup-contact-name" style={sp.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder={t.contactNamePlaceholder} />
           </div>
         </div>
         <div style={sp.row}>
           <div style={sp.field}>
-            <label style={sp.label}>{t.invSetupPhone}</label>
-            <input style={sp.input} maxLength={50} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder={t.contactPhonePlaceholder} />
+            <label htmlFor="isu-sup-phone" style={sp.label}>{t.invSetupPhone}</label>
+            <input id="isu-sup-phone" style={sp.input} maxLength={50} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder={t.contactPhonePlaceholder} />
           </div>
           <div style={sp.field}>
-            <label style={sp.label}>{t.invSetupEmail}</label>
-            <input style={sp.input} type="email" maxLength={255} value={form.email} onChange={e => set('email', e.target.value)} placeholder={t.invSupplierEmailPlaceholder} />
+            <label htmlFor="isu-sup-email" style={sp.label}>{t.invSetupEmail}</label>
+            <input id="isu-sup-email" style={sp.input} type="email" maxLength={255} value={form.email} onChange={e => set('email', e.target.value)} placeholder={t.invSupplierEmailPlaceholder} />
           </div>
           <div style={sp.field}>
-            <label style={sp.label}>{t.invSetupWebsite}</label>
-            <input style={sp.input} value={form.website} onChange={e => set('website', e.target.value)} placeholder={t.invSupplierWebsitePlaceholder} />
+            <label htmlFor="isu-sup-website" style={sp.label}>{t.invSetupWebsite}</label>
+            <input id="isu-sup-website" style={sp.input} value={form.website} onChange={e => set('website', e.target.value)} placeholder={t.invSupplierWebsitePlaceholder} />
           </div>
         </div>
         <div style={sp.field}>
-          <label style={sp.label}>{t.notes}</label>
-          <textarea style={{ ...sp.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
+          <label htmlFor="isu-sup-notes" style={sp.label}>{t.notes}</label>
+          <textarea id="isu-sup-notes" style={{ ...sp.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
           <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
         </div>
         <div style={sp.actions}>

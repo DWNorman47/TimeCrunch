@@ -194,16 +194,16 @@ export default function InventoryConversions({ onConversionChange }) {
             {addError && <div style={s.addError}>{addError}</div>}
             <div style={s.addRow}>
               <div style={s.addField}>
-                <label style={s.addLabel}>{t.invTxColItem} *</label>
-                <select style={s.addInput} value={addItemId} onChange={e => setAddItemId(e.target.value)}>
+                <label htmlFor="ic-item" style={s.addLabel}>{t.invTxColItem} *</label>
+                <select id="ic-item" style={s.addInput} value={addItemId} onChange={e => setAddItemId(e.target.value)}>
                   <option value="">{t.invTxSelectItem}</option>
                   {items.map(i => <option key={i.id} value={i.id}>{i.name}{i.sku ? ` (${i.sku})` : ''}</option>)}
                 </select>
                 {selectedItem && <div style={s.baseUomNote}>{t.invConvBaseUnitNote} <strong>{selectedItem.unit}</strong></div>}
               </div>
               <div style={s.addField}>
-                <label style={s.addLabel}>{t.invConvAltUnitLabel} *</label>
-                <select style={s.addInput} value={addUnit} onChange={e => setAddUnit(e.target.value)}>
+                <label htmlFor="ic-unit" style={s.addLabel}>{t.invConvAltUnitLabel} *</label>
+                <select id="ic-unit" style={s.addInput} value={addUnit} onChange={e => setAddUnit(e.target.value)}>
                   {units.active.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
                 {addUnit === 'other' && (
@@ -212,16 +212,16 @@ export default function InventoryConversions({ onConversionChange }) {
                 )}
               </div>
               <div style={s.addField}>
-                <label style={s.addLabel}>{t.invConvSpecLabel} <span style={s.optional}>({t.optional.toLowerCase()})</span></label>
-                <input style={s.addInput} value={addSpec} onChange={e => setAddSpec(e.target.value)} placeholder={t.invConvSpecPlaceholder} />
+                <label htmlFor="ic-spec" style={s.addLabel}>{t.invConvSpecLabel} <span style={s.optional}>({t.optional.toLowerCase()})</span></label>
+                <input id="ic-spec" style={s.addInput} value={addSpec} onChange={e => setAddSpec(e.target.value)} placeholder={t.invConvSpecPlaceholder} />
               </div>
               <div style={s.addField}>
-                <label style={s.addLabel}>
+                <label htmlFor="ic-factor" style={s.addLabel}>
                   {t.invConvFactorLabel} * <span style={s.optional}>
                     {selectedItem ? `${t.invConvHowMany} ${selectedItem.unit} ${t.invConvPerOne} ${addUnit === 'other' ? (addCustomUnit || 'unit') : addUnit}` : ''}
                   </span>
                 </label>
-                <input style={s.addInput} type="number" min="0.0001" step="any"
+                <input id="ic-factor" style={s.addInput} type="number" min="0.0001" step="any"
                   value={addFactor} onChange={e => setAddFactor(e.target.value)} placeholder={t.invConvFactorPlaceholder} />
               </div>
             </div>

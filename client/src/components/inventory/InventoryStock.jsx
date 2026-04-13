@@ -184,8 +184,9 @@ function AdjustModal({ item, locations, onClose, onDone }) {
           </div>
           {error && <div style={a.error}>{error}</div>}
           {warning && <div style={{ ...a.error, background: '#fef3c7', color: '#92400e' }}>{warning}</div>}
-          <label style={a.label}>{t.invStockAdjQtyLabel}</label>
+          <label htmlFor="is-adj-qty" style={a.label}>{t.invStockAdjQtyLabel}</label>
           <input
+            id="is-adj-qty"
             type="number"
             step="any"
             placeholder={t.invAdjustPlaceholder}
@@ -194,18 +195,19 @@ function AdjustModal({ item, locations, onClose, onDone }) {
             style={a.input}
             autoFocus
           />
-          <label style={a.label}>{t.invStockAdjLocLabel}</label>
-          <select value={locId} onChange={e => setLocId(e.target.value)} style={a.input}>
+          <label htmlFor="is-adj-loc" style={a.label}>{t.invStockAdjLocLabel}</label>
+          <select id="is-adj-loc" value={locId} onChange={e => setLocId(e.target.value)} style={a.input}>
             <option value="">{t.invStockSelectLocOption}</option>
             {locations.filter(l => l.active).map(l => (
               <option key={l.id} value={l.id}>{l.name}</option>
             ))}
           </select>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <label style={a.label}>{t.invStockAdjNotesLabel}</label>
+            <label htmlFor="is-adj-notes" style={a.label}>{t.invStockAdjNotesLabel}</label>
             <span style={{ fontSize: 11, color: '#9ca3af' }}>{notes.length}/1000</span>
           </div>
           <input
+            id="is-adj-notes"
             type="text"
             placeholder={t.invStockAdjReasonPlaceholder}
             value={notes}
@@ -328,8 +330,9 @@ function IssueModal({ item, projects, onClose, onDone }) {
           </div>
           {error && <div style={a.error}>{error}</div>}
           {warning && <div style={{ ...a.error, background: '#fef3c7', color: '#92400e' }}>{warning}</div>}
-          <label style={a.label}>{t.invStockQtyToIssue}</label>
+          <label htmlFor="is-issue-qty" style={a.label}>{t.invStockQtyToIssue}</label>
           <input
+            id="is-issue-qty"
             type="number"
             step="any"
             min="0.001"
@@ -341,8 +344,8 @@ function IssueModal({ item, projects, onClose, onDone }) {
           />
           {itemUoms.length > 1 && (
             <>
-              <label style={a.label}>{t.invStockUnitLabel}</label>
-              <select value={uomId} onChange={e => setUomId(e.target.value)} style={a.input}>
+              <label htmlFor="is-issue-unit" style={a.label}>{t.invStockUnitLabel}</label>
+              <select id="is-issue-unit" value={uomId} onChange={e => setUomId(e.target.value)} style={a.input}>
                 <option value="">{t.invStockDefaultUnit} ({item.unit})</option>
                 {itemUoms.map(u => (
                   <option key={u.id} value={u.id}>
@@ -357,15 +360,16 @@ function IssueModal({ item, projects, onClose, onDone }) {
           )}
           {projects && projects.length > 0 && (
             <>
-              <label style={a.label}>{t.invStockProjectLabel}</label>
-              <select value={projectId} onChange={e => setProjectId(e.target.value)} style={a.input}>
+              <label htmlFor="is-issue-project" style={a.label}>{t.invStockProjectLabel}</label>
+              <select id="is-issue-project" value={projectId} onChange={e => setProjectId(e.target.value)} style={a.input}>
                 <option value="">{t.invStockNoProject}</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </>
           )}
-          <label style={a.label}>{t.invStockAdjNotesLabel}</label>
+          <label htmlFor="is-issue-notes" style={a.label}>{t.invStockAdjNotesLabel}</label>
           <input
+            id="is-issue-notes"
             type="text"
             placeholder={t.invStockIssuePlaceholder}
             value={notes}

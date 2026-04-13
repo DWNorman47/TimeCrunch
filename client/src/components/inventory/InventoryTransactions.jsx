@@ -203,8 +203,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
 
       {isAdmin && (
         <div style={f.field}>
-          <label style={f.label}>{t.invTxTypeLabel}</label>
-          <select style={f.input} value={form.type} onChange={e => set('type', e.target.value)}>
+          <label htmlFor="itx-type" style={f.label}>{t.invTxTypeLabel}</label>
+          <select id="itx-type" style={f.input} value={form.type} onChange={e => set('type', e.target.value)}>
             <option value="receive">{t.invTxTypeReceiveDesc}</option>
             <option value="issue">{t.invTxTypeIssueDesc}</option>
             <option value="transfer">{t.invTxTypeTransferDesc}</option>
@@ -216,8 +216,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
 
       <div style={f.row}>
         <div style={f.field}>
-          <label style={f.label}>{t.invTxColItem} *</label>
-          <select style={f.input} value={form.item_id} onChange={e => {
+          <label htmlFor="itx-item" style={f.label}>{t.invTxColItem} *</label>
+          <select id="itx-item" style={f.input} value={form.item_id} onChange={e => {
             const item = items.find(i => String(i.id) === e.target.value);
             set('item_id', e.target.value);
             if (item?.unit_cost) set('unit_cost', String(item.unit_cost));
@@ -228,8 +228,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
         </div>
         {itemUoms.length > 0 && (
           <div style={f.field}>
-            <label style={f.label}>{isConvert ? t.invTxConvertFrom : t.invTxUomLabel}</label>
-            <select style={f.input} value={form.uom_id} onChange={e => set('uom_id', e.target.value)}>
+            <label htmlFor="itx-uom" style={f.label}>{isConvert ? t.invTxConvertFrom : t.invTxUomLabel}</label>
+            <select id="itx-uom" style={f.input} value={form.uom_id} onChange={e => set('uom_id', e.target.value)}>
               <option value="">{t.invTxDefaultUnit}</option>
               {itemUoms.map(u => (
                 <option key={u.id} value={u.id}>
@@ -240,12 +240,13 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
           </div>
         )}
         <div style={f.field}>
-          <label style={f.label}>
+          <label htmlFor="itx-qty" style={f.label}>
             {t.quantity} *
             {form.type === 'adjust' && <span style={f.hint}> {t.invTxAdjHint}</span>}
             {isConvert && <span style={f.hint}> {t.invTxConvertHint}</span>}
           </label>
           <input
+            id="itx-qty"
             style={f.input} type="number" step="any"
             min={form.type === 'adjust' ? undefined : 0}
             value={form.quantity} onChange={e => set('quantity', e.target.value)}
@@ -257,8 +258,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
       {isConvert && (
         <div style={f.row}>
           <div style={f.field}>
-            <label style={f.label}>{t.invTxConvertToUom}</label>
-            <select style={f.input} value={form.to_uom_id} onChange={e => set('to_uom_id', e.target.value)}>
+            <label htmlFor="itx-to-uom" style={f.label}>{t.invTxConvertToUom}</label>
+            <select id="itx-to-uom" style={f.input} value={form.to_uom_id} onChange={e => set('to_uom_id', e.target.value)}>
               <option value="">{t.invTxSelectTargetUom}</option>
               {itemUoms.filter(u => String(u.id) !== form.uom_id).map(u => (
                 <option key={u.id} value={u.id}>
@@ -268,11 +269,12 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
             </select>
           </div>
           <div style={f.field}>
-            <label style={f.label}>
+            <label htmlFor="itx-to-qty" style={f.label}>
               {t.invTxResultingQty}
               {suggestedToQty && <span style={f.hint}> — {t.invTxSuggested} {suggestedToQty}</span>}
             </label>
             <input
+              id="itx-to-qty"
               style={f.input} type="number" step="any" min="0"
               value={form.to_quantity}
               onChange={e => set('to_quantity', e.target.value)}
@@ -284,8 +286,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
 
       {showFrom && (
         <div style={f.field}>
-          <label style={f.label}>{t.invTxFromLoc}</label>
-          <select style={f.input} value={form.from_location_id} onChange={e => set('from_location_id', e.target.value)}>
+          <label htmlFor="itx-from-loc" style={f.label}>{t.invTxFromLoc}</label>
+          <select id="itx-from-loc" style={f.input} value={form.from_location_id} onChange={e => set('from_location_id', e.target.value)}>
             <option value="">{t.invCycSelectLocation}</option>
             {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
@@ -309,8 +311,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
       {(showTo || showToAdj) && (
         <>
           <div style={f.field}>
-            <label style={f.label}>{showToAdj ? t.invTxLocOnly : t.invTxToLoc}</label>
-            <select style={f.input} value={form.to_location_id} onChange={e => set('to_location_id', e.target.value)}>
+            <label htmlFor="itx-to-loc" style={f.label}>{showToAdj ? t.invTxLocOnly : t.invTxToLoc}</label>
+            <select id="itx-to-loc" style={f.input} value={form.to_location_id} onChange={e => set('to_location_id', e.target.value)}>
               <option value="">{t.invCycSelectLocation}</option>
               {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
@@ -318,16 +320,16 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
           {binOpts.areas.length > 0 && (
             <div style={f.binRow}>
               <div style={f.binField}>
-                <label style={f.label}>{t.binLabelArea}</label>
-                <select style={f.input} value={form.area_id} onChange={e => set('area_id', e.target.value)}>
+                <label htmlFor="itx-bin-area" style={f.label}>{t.binLabelArea}</label>
+                <select id="itx-bin-area" style={f.input} value={form.area_id} onChange={e => set('area_id', e.target.value)}>
                   <option value="">{t.none}</option>
                   {binOpts.areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
               </div>
               {form.area_id && binOpts.racks.length > 0 && (
                 <div style={f.binField}>
-                  <label style={f.label}>{t.binLabelRack}</label>
-                  <select style={f.input} value={form.rack_id} onChange={e => set('rack_id', e.target.value)}>
+                  <label htmlFor="itx-bin-rack" style={f.label}>{t.binLabelRack}</label>
+                  <select id="itx-bin-rack" style={f.input} value={form.rack_id} onChange={e => set('rack_id', e.target.value)}>
                     <option value="">{t.none}</option>
                     {binOpts.racks.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
@@ -335,8 +337,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
               )}
               {form.rack_id && binOpts.bays.length > 0 && (
                 <div style={f.binField}>
-                  <label style={f.label}>{t.binLabelBay}</label>
-                  <select style={f.input} value={form.bay_id} onChange={e => set('bay_id', e.target.value)}>
+                  <label htmlFor="itx-bin-bay" style={f.label}>{t.binLabelBay}</label>
+                  <select id="itx-bin-bay" style={f.input} value={form.bay_id} onChange={e => set('bay_id', e.target.value)}>
                     <option value="">{t.none}</option>
                     {binOpts.bays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
@@ -344,8 +346,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
               )}
               {form.bay_id && binOpts.compartments.length > 0 && (
                 <div style={f.binField}>
-                  <label style={f.label}>{t.binLabelCompartment}</label>
-                  <select style={f.input} value={form.compartment_id} onChange={e => set('compartment_id', e.target.value)}>
+                  <label htmlFor="itx-bin-compartment" style={f.label}>{t.binLabelCompartment}</label>
+                  <select id="itx-bin-compartment" style={f.input} value={form.compartment_id} onChange={e => set('compartment_id', e.target.value)}>
                     <option value="">{t.none}</option>
                     {binOpts.compartments.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
@@ -358,8 +360,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
 
       {(form.type === 'issue' || form.type === 'receive') && (
         <div style={f.field}>
-          <label style={f.label}>{t.project}</label>
-          <select style={f.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+          <label htmlFor="itx-project" style={f.label}>{t.project}</label>
+          <select id="itx-project" style={f.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
             <option value="">{t.none}</option>
             {projects.filter(p => p.active !== false).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
@@ -370,19 +372,19 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
         <>
           <div style={f.row}>
             <div style={f.field}>
-              <label style={f.label}>{t.invTxUnitCost}</label>
-              <input style={f.input} type="number" min="0" step="0.01" value={form.unit_cost} onChange={e => set('unit_cost', e.target.value)} placeholder={t.optional} />
+              <label htmlFor="itx-unit-cost" style={f.label}>{t.invTxUnitCost}</label>
+              <input id="itx-unit-cost" style={f.input} type="number" min="0" step="0.01" value={form.unit_cost} onChange={e => set('unit_cost', e.target.value)} placeholder={t.optional} />
             </div>
             <div style={f.field}>
-              <label style={f.label}>{t.invTxRefPO}</label>
-              <input style={f.input} maxLength={100} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder={t.optional} />
+              <label htmlFor="itx-ref-po" style={f.label}>{t.invTxRefPO}</label>
+              <input id="itx-ref-po" style={f.input} maxLength={100} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder={t.optional} />
             </div>
           </div>
           <div style={f.row}>
             {form.type === 'receive' && suppliers.length > 0 && (
               <div style={f.field}>
-                <label style={f.label}>{t.invPOSupplier}</label>
-                <select style={f.input} value={form.supplier_id} onChange={e => set('supplier_id', e.target.value)}>
+                <label htmlFor="itx-supplier" style={f.label}>{t.invPOSupplier}</label>
+                <select id="itx-supplier" style={f.input} value={form.supplier_id} onChange={e => set('supplier_id', e.target.value)}>
                   <option value="">{t.none}</option>
                   {suppliers.map(sup => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
                 </select>
@@ -390,8 +392,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
             )}
             {(form.type === 'receive' || form.type === 'adjust') && (
               <div style={f.field}>
-                <label style={f.label}>{t.invTxLotBatch}</label>
-                <input style={f.input} value={form.lot_number} onChange={e => set('lot_number', e.target.value)} placeholder={t.optional} />
+                <label htmlFor="itx-lot" style={f.label}>{t.invTxLotBatch}</label>
+                <input id="itx-lot" style={f.input} value={form.lot_number} onChange={e => set('lot_number', e.target.value)} placeholder={t.optional} />
               </div>
             )}
           </div>
@@ -399,8 +401,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
       )}
 
       <div style={f.field}>
-        <label style={f.label}>{t.notes}</label>
-        <textarea style={{ ...f.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
+        <label htmlFor="itx-notes" style={f.label}>{t.notes}</label>
+        <textarea id="itx-notes" style={{ ...f.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
         <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 
