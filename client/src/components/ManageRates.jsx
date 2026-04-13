@@ -78,6 +78,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     notification_start_hour: String(settings?.notification_start_hour ?? 6),
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
+    pto_annual_days: String(settings?.pto_annual_days ?? 0),
     feature_overtime: settings?.feature_overtime ?? true,
     module_field: settings?.module_field ?? false,
     feature_scheduling: settings?.feature_scheduling ?? true,
@@ -113,11 +114,15 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     report_monthly_valuation: settings?.report_monthly_valuation ?? false,
   });
   const [prevailingEnabled, setPrevailingEnabled] = useState(() => (settings?.prevailing_wage_rate ?? 0) > 0);
+  // PTO tracking is "enabled" when a non-zero value is stored. While editing
+  // from 0, we flip this on so the input shows; on save, it goes back to
+  // reflecting the stored value (so admin can disable by saving 0).
+  const [ptoEditing, setPtoEditing] = useState(false);
   const [checklistTemplates, setChecklistTemplates] = useState([]);
   useEffect(() => {
     api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(silentError('managerates'));
   }, []);
-  const DEFAULT_COLLAPSED = { wages: true, overtime: true, reimbursements: true, inventoryCount: true, notifications: true, reports: true, access: true, modules: true, features: true, storage: true };
+  const DEFAULT_COLLAPSED = { wages: true, overtime: true, pto: true, reimbursements: true, inventoryCount: true, notifications: true, reports: true, access: true, modules: true, features: true, storage: true };
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem('opsfloa_company_sections');
@@ -147,6 +152,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       notification_start_hour: String(settings.notification_start_hour ?? 6),
       notification_end_hour: String(settings.notification_end_hour ?? 20),
       chat_retention_days: String(settings.chat_retention_days ?? 3),
+      pto_annual_days: String(settings.pto_annual_days ?? 0),
       feature_overtime: settings.feature_overtime ?? true,
       module_field: settings.module_field ?? false,
       feature_scheduling: settings.feature_scheduling ?? true,
@@ -199,6 +205,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         notification_start_hour: parseFloat(form.notification_start_hour),
         notification_end_hour: parseFloat(form.notification_end_hour),
         chat_retention_days: parseFloat(form.chat_retention_days),
+        pto_annual_days: parseFloat(form.pto_annual_days) || 0,
         feature_overtime: form.feature_overtime,
         module_field: form.module_field,
         feature_scheduling: form.feature_scheduling,
@@ -235,6 +242,10 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       });
       onSettingsUpdated(r.data);
       setSaved(section);
+      // If PTO was saved at 0, collapse the input back to the "+ Enable" button.
+      if (section === 'pto' && (parseFloat(form.pto_annual_days) || 0) === 0) {
+        setPtoEditing(false);
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save settings');
     } finally {
@@ -597,6 +608,47 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         {!collapsed.overtime && <SectionFooter section="overtime" />}
       </div>}
 
+      {/* ── PTO ── */}
+      <div style={styles.section}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('pto')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('pto')}>
+          <span style={styles.sectionIcon}>🏖️</span>
+          <div style={{ flex: 1 }}>
+            <div style={styles.sectionTitle}>{t.ratesPto || 'Paid Time Off'}</div>
+            <div style={styles.sectionSub}>{t.ratesPtoDesc || 'Annual PTO balance tracking per worker'}</div>
+          </div>
+          <span style={styles.collapseChevron}>{collapsed.pto ? '▶' : '▼'}</span>
+        </div>
+        {!collapsed.pto && <div style={styles.sectionBody}>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.ratesPtoAnnualDays || 'Annual PTO days per worker'}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.ratesPtoAnnualDaysDesc || 'Applies to every worker unless overridden. Set to 0 to disable PTO balance tracking.'}</div>
+            </div>
+            {((parseFloat(form.pto_annual_days) || 0) > 0 || ptoEditing) ? (
+              <div style={styles.inputGroup}>
+                <input
+                  style={styles.input}
+                  type="number" min="0" max="365" step="1"
+                  value={form.pto_annual_days}
+                  onChange={e => set('pto_annual_days', e.target.value)}
+                  autoFocus={ptoEditing && (parseFloat(form.pto_annual_days) || 0) === 0}
+                />
+                <span style={styles.suffix}>{t.ratesDays || 'days'}</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                style={styles.enableBtn}
+                onClick={() => { setPtoEditing(true); set('pto_annual_days', '10'); }}
+              >
+                + {t.ratesPtoEnable || 'Enable PTO tracking'}
+              </button>
+            )}
+          </div>
+        </div>}
+        {!collapsed.pto && <SectionFooter section="pto" />}
+      </div>
+
       {/* ── Reimbursements (feature-gated) ── */}
       {form.feature_reimbursements && (
         <div style={styles.section}>
@@ -767,16 +819,6 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </select>
           </div>
           <div style={styles.row}>
-            <div>
-              <div style={styles.label}>{t.ratesPtoAnnualDays}</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.ratesPtoAnnualDaysDesc}</div>
-            </div>
-            <div style={styles.inputGroup}>
-              <input style={styles.input} type="number" min="0" max="365" step="1" value={form.pto_annual_days} onChange={e => set('pto_annual_days', e.target.value)} />
-              <span style={styles.suffix}>{t.ratesDays}</span>
-            </div>
-          </div>
-          <div style={styles.row}>
             <label style={styles.label}>{t.ratesClearChat}</label>
             <div style={styles.inputGroup}>
               <input style={styles.input} type="number" min="1" max="90" step="1" value={form.chat_retention_days} onChange={e => set('chat_retention_days', e.target.value)} required />
@@ -945,5 +987,6 @@ const styles = {
   errorMsg: { color: '#e53e3e', fontSize: 13 },
   saveBtn: { padding: '7px 18px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   addPrevBtn: { padding: '6px 14px', background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  enableBtn: { padding: '6px 14px', background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   collapseChevron: { fontSize: 11, color: '#6b7280' },
 };
