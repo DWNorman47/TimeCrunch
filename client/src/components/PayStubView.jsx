@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { langToLocale } from '../utils';
 
-function fmtDate(str) {
+function fmtDate(str, locale = 'en-US') {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function fmtDateShort(str) {
+function fmtDateShort(str, locale = 'en-US') {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function fmtTime(t) {
@@ -35,9 +36,10 @@ function netHours(start, end, brk) {
 }
 
 function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
+  const locale = langToLocale(user?.language);
   const [open, setOpen] = useState(defaultOpen);
 
-  const label = stub.label || `${fmtDateShort(stub.period_start)} – ${fmtDateShort(stub.period_end)}`;
+  const label = stub.label || `${fmtDateShort(stub.period_start, locale)} – ${fmtDateShort(stub.period_end, locale)}`;
   const { regular_hours, overtime_hours, prevailing_hours, total_mileage,
           guarantee_shortfall_hours = 0, guarantee_min_hours = 0 } = stub.summary;
   const totalHours = regular_hours + overtime_hours + prevailing_hours;
@@ -132,7 +134,7 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
                   const isPrev = e.wage_type === 'prevailing';
                   return (
                     <tr key={e.id} style={s.tr}>
-                      <td style={s.td}>{fmtDate(e.work_date_str || e.work_date)}</td>
+                      <td style={s.td}>{fmtDate(e.work_date_str || e.work_date, locale)}</td>
                       <td style={s.td}>{e.project_name || '—'}</td>
                       <td style={{ ...s.td, color: '#6b7280' }}>{e.notes || ''}</td>
                       <td style={s.td}>{fmtTime(e.start_time)}</td>
@@ -174,7 +176,7 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
               )}
               {guarantee_shortfall_hours > 0 && (
                 <div style={{ ...s.sumRow, color: '#2563eb' }}>
-                  <span>Minimum Guarantee ({fmtH(guarantee_min_hours)}/period shortfall)</span>
+                  <span>{t.minimumGuaranteeShortfall.replace('{hours}', fmtH(guarantee_min_hours))}</span>
                   <span>+{fmtH(guarantee_shortfall_hours)}</span>
                 </div>
               )}
@@ -204,7 +206,7 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
                   )}
                   {guarantee_shortfall_hours > 0 && workerRate > 0 && (
                     <div style={{ ...s.sumRow, color: '#2563eb' }}>
-                      <span>Minimum Guarantee ({fmtH(guarantee_shortfall_hours)} @ {fmtMoney(workerRate)}/hr)</span>
+                      <span>{t.minimumGuaranteePay.replace('{hours}', fmtH(guarantee_shortfall_hours)).replace('{rate}', `${fmtMoney(workerRate)}/hr`)}</span>
                       <span>{fmtMoney(guaranteePay)}</span>
                     </div>
                   )}

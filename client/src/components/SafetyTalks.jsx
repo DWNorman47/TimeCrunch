@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
-import { SafetyTalkPDFButton } from './SafetyTalkPDF';
 import { useT } from '../hooks/useT';
+import { langToLocale } from '../utils';
+import Pagination from './Pagination';
+import { SkeletonList, SkeletonBlock } from './Skeleton';
 
 const TALK_LIBRARY = [
   { title: 'Fall Protection', content: 'Key Points:\n• Workers at 6 ft or more must be protected from falls\n• Fall protection methods: guardrails, safety nets, personal fall arrest systems (PFAS)\n• Inspect all harnesses and lanyards before each use — retire any that has been in a fall\n• Keep work areas clear of tripping hazards\n\nHazards to watch for:\n• Unprotected floor openings and roof edges without guardrails\n• Scaffolding without toe boards\n\nAction: Report missing or damaged fall protection immediately. Do not work at heights without protection in place.' },
@@ -27,8 +29,8 @@ const TALK_LIBRARY = [
   { title: 'First Aid & Emergency Response', content: `Emergency number: 911\nSite address: _______________\nNearest hospital: _______________\nSupervisor emergency contact: _______________\nAssembly point: _______________\n\nLocation of:\n• First aid kits: _______________\n• Eyewash stations: _______________\n• AED (if on site): _______________\n\nBasic first aid:\n• Cuts/bleeding: apply direct pressure with clean cloth\n• Burns: cool with running water for 10+ minutes\n• Eye injuries: flush with clean water for 15-20 minutes\n• Suspected fractures: immobilize and wait for EMS\n• Do not move a seriously injured worker\n\nCPR/AED:\n• Begin CPR if trained and victim has no pulse\n• Use AED as soon as available — it guides you through the steps` },
 ];
 
-function fmtDate(str) {
-  return new Date(str + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDate(str, locale = 'en-US') {
+  return new Date(str + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function formatBytes(bytes) {
@@ -119,29 +121,32 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
 
       <div style={styles.formGrid}>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>{t.topicTitle}</label>
-          <input style={styles.input} type="text" maxLength={200} placeholder="e.g. Ladder Safety, PPE Requirements, Fall Protection" value={form.title} onChange={e => set('title', e.target.value)} />
+          <label htmlFor="st-title" style={styles.label}>{t.topicTitle}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
+          <input id="st-title" style={styles.input} type="text" maxLength={200} placeholder={t.safetyTalkTitlePlaceholder} value={form.title} onChange={e => set('title', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.date}</label>
-          <input style={styles.input} type="date" value={form.talk_date} onChange={e => set('talk_date', e.target.value)} />
+          <label htmlFor="st-date" style={styles.label}>{t.date}</label>
+          <input id="st-date" style={styles.input} type="date" value={form.talk_date} onChange={e => set('talk_date', e.target.value)} />
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.project}</label>
-            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+            <label htmlFor="st-project" style={styles.label}>{t.project}</label>
+            <select id="st-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
               <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
         )}
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.givenBy}</label>
-          <input style={styles.input} type="text" maxLength={255} placeholder={t.givenByPlaceholder} value={form.given_by} onChange={e => set('given_by', e.target.value)} />
+          <label htmlFor="st-given-by" style={styles.label}>{t.givenBy}</label>
+          <input id="st-given-by" style={styles.input} type="text" maxLength={255} placeholder={t.givenByPlaceholder} value={form.given_by} onChange={e => set('given_by', e.target.value)} />
         </div>
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
-          <label style={styles.label}>{t.talkContent}</label>
-          <textarea style={styles.textarea} rows={5} maxLength={5000} placeholder={t.talkContentPlaceholder} value={form.content} onChange={e => set('content', e.target.value)} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <label htmlFor="st-content" style={styles.label}>{t.talkContent}</label>
+            <span style={styles.charCount}>{form.content.length}/5000</span>
+          </div>
+          <textarea id="st-content" style={styles.textarea} rows={5} maxLength={5000} placeholder={t.talkContentPlaceholder} value={form.content} onChange={e => set('content', e.target.value)} />
         </div>
       </div>
 
@@ -166,7 +171,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
                 value={q.question}
                 onChange={e => setQuestion(qi, e.target.value)}
               />
-              <button type="button" style={styles.removeQuestionBtn} onClick={() => removeQuestion(qi)}>✕</button>
+              <button type="button" style={styles.removeQuestionBtn} aria-label={t.removeQuestion} onClick={() => removeQuestion(qi)}>✕</button>
             </div>
             <div style={styles.optionsList}>
               {q.options.map((opt, oi) => (
@@ -176,7 +181,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
                     name={`correct-${qi}`}
                     checked={q.correct_index === oi}
                     onChange={() => setCorrect(qi, oi)}
-                    title="Mark as correct answer"
+                    title={t.markCorrectAnswer}
                   />
                   <input
                     style={{ ...styles.input, flex: 1 }}
@@ -186,7 +191,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
                     onChange={e => setOption(qi, oi, e.target.value)}
                   />
                   {q.options.length > 2 && (
-                    <button type="button" style={styles.removeOptionBtn} onClick={() => removeOption(qi, oi)}>✕</button>
+                    <button type="button" style={styles.removeOptionBtn} aria-label={t.removeOption} onClick={() => removeOption(qi, oi)}>✕</button>
                   )}
                 </div>
               ))}
@@ -199,8 +204,9 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
 
         {questions.length > 0 && (
           <div style={styles.thresholdRow}>
-            <label style={styles.label}>{t.passIfAtLeast}</label>
+            <label htmlFor="st-threshold" style={styles.label}>{t.passIfAtLeast}</label>
             <input
+              id="st-threshold"
               style={{ ...styles.input, width: 64, textAlign: 'center' }}
               type="number"
               min={1}
@@ -216,7 +222,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : t.createTalk}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.createTalk}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -226,6 +232,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
 function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
   const t = useT();
   const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [talk, setTalk] = useState(initialTalk);
   const [expanded, setExpanded] = useState(false);
   const [signing, setSigning] = useState(false);
@@ -249,7 +256,11 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
       setSignoffs(r.data.signoffs || []);
       setQuestions(r.data.questions || []);
       setAttachments(r.data.attachments || []);
-    } catch {}
+    } catch {
+      setSignoffs([]);
+      setQuestions([]);
+      setAttachments([]);
+    }
   };
 
   const handleAttachmentUpload = async e => {
@@ -320,13 +331,13 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
 
   return (
     <div style={styles.card}>
-      <div style={styles.cardHeader} onClick={handleExpand}>
+      <div style={styles.cardHeader} onClick={handleExpand} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleExpand()}>
         <div style={styles.cardLeft}>
           <div style={styles.talkIcon}>🦺</div>
           <div>
             <div style={styles.talkTitle}>{talk.title}{talk.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
             <div style={styles.talkMeta}>
-              {fmtDate(talk.talk_date)}
+              {fmtDate(talk.talk_date, locale)}
               {talk.project_name && <span style={styles.projectTag}>{talk.project_name}</span>}
               {talk.given_by && <span style={styles.givenBy}>{t.talkGivenBy} {talk.given_by}</span>}
               {hasQuiz && <span style={styles.quizBadge}>📝 {talk.question_count} question{talk.question_count !== '1' ? 's' : ''}</span>}
@@ -399,7 +410,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                 <span style={styles.attachmentsTitle}>{t.attachmentsSection}</span>
                 {isAdmin && (
                   <>
-                    <button style={styles.attachBtn} onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                    <button style={{ ...styles.attachBtn, ...(uploading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => fileInputRef.current?.click()} disabled={uploading}>
                       {uploading ? t.uploading : `+ ${t.attachFile}`}
                     </button>
                     <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleAttachmentUpload} />
@@ -409,7 +420,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
               {uploadError && <p style={styles.error}>{uploadError}</p>}
               {attachDeleteError && <p style={styles.error}>{attachDeleteError}</p>}
               {attachments === null ? (
-                <p style={styles.hint}>Loading...</p>
+                <SkeletonBlock width="100%" height={36} style={{ marginTop: 8 }} />
               ) : attachments.length === 0 ? (
                 <p style={styles.hint}>{t.noAttachments}</p>
               ) : (
@@ -417,7 +428,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                   {attachments.map(a => (
                     <div key={a.id} style={styles.attachmentRow}>
                       <span style={styles.attachIcon}>{fileIcon(a.content_type)}</span>
-                      <a href={a.url} target="_blank" rel="noopener noreferrer" style={styles.attachName}>{a.name}</a>
+                      <a href={a.url} target="_blank" rel="noopener noreferrer" style={styles.attachName} title={a.name}>{a.name}</a>
                       {a.size_bytes && <span style={styles.attachSize}>{formatBytes(a.size_bytes)}</span>}
                       {isAdmin && (pendingDeleteAttachId === a.id ? (
                         <>
@@ -425,7 +436,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                           <button style={styles.attachCancelBtn} onClick={() => setPendingDeleteAttachId(null)}>{t.cancel}</button>
                         </>
                       ) : (
-                        <button style={styles.attachDeleteBtn} onClick={() => setPendingDeleteAttachId(a.id)}>✕</button>
+                        <button style={styles.attachDeleteBtn} aria-label={t.deleteAttachment} onClick={() => setPendingDeleteAttachId(a.id)}>✕</button>
                       ))}
                     </div>
                   ))}
@@ -439,12 +450,12 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
               <span style={styles.signoffTitle}>{t.signoffsLabel} ({signoffs?.length ?? talk.signoff_count})</span>
               {!isAdmin && !alreadySigned && (
                 <button
-                  style={styles.signBtn}
+                  style={{ ...styles.signBtn, ...((signing || (questions?.length > 0 && !allAnswered)) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                   onClick={handleSignoff}
                   disabled={signing || (questions?.length > 0 && !allAnswered)}
                   title={questions?.length > 0 && !allAnswered ? t.answerQuestionsFirst : ''}
                 >
-                  {signing ? '...' : `✍️ ${t.signOff}`}
+                  {signing ? t.saving : `✍️ ${t.signOff}`}
                 </button>
               )}
               {!isAdmin && alreadySigned && (
@@ -452,7 +463,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
               )}
             </div>
             {signoffs === null ? (
-              <p style={styles.hint}>Loading...</p>
+              <SkeletonBlock width="60%" height={24} style={{ marginTop: 6 }} />
             ) : signoffs.length === 0 ? (
               <p style={styles.hint}>{t.noSignoffs}</p>
             ) : (
@@ -462,7 +473,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                     {s.full_name || s.worker_name}
                     {s.quiz_score != null && <span style={styles.quizScore}>{s.quiz_score}/{questions?.length ?? '?'}</span>}
                     <span style={styles.signoffTime}>
-                      {new Date(s.signed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                      {new Date(s.signed_at).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}
                     </span>
                   </span>
                 ))}
@@ -474,7 +485,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
             <div style={styles.cardActions}>
               {confirmingDelete ? (
                 <>
-                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
+                  <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? t.saving : t.confirm}</button>
                   <button style={styles.cancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
                 </>
               ) : (
@@ -495,22 +506,42 @@ export default function SafetyTalks({ projects }) {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
   const [talks, setTalks] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filterProject, setFilterProject] = useState('');
+  const [pdfGenerating, setPdfGenerating] = useState(false);
 
-  const load = async (proj = filterProject) => {
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
     try {
-      const params = {};
+      const [{ pdf }, { SafetyTalkDocument }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./SafetyTalkPDF'),
+      ]);
+      const blob = await pdf(React.createElement(SafetyTalkDocument, { talks, companyName: user?.company_name, language: user?.language })).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'safety-talks.pdf'; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
+
+  const load = async (proj = filterProject, p = 1) => {
+    setPage(p);
+    try {
+      const params = { page: p, limit: 50 };
       if (proj) params.project_id = proj;
       const r = await api.get('/safety-talks', { params });
-      setTalks(r.data);
+      setTalks(r.data.items);
+      setTotalPages(r.data.pages);
     } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
-  useEffect(() => { if (!loading) load(filterProject); }, [filterProject]);
-  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(); }); }, [onSync]);
+  useEffect(() => { if (!loading) load(filterProject, 1); }, [filterProject]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(filterProject, page); }); }, [onSync]);
 
   const totalSignoffs = talks.reduce((s, t) => s + parseInt(t.signoff_count || 0), 0);
 
@@ -524,7 +555,7 @@ export default function SafetyTalks({ projects }) {
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {talks.length > 0 && <SafetyTalkPDFButton talks={talks} companyName={user?.company_name} style={styles.pdfBtn} />}
+          {talks.length > 0 && <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? t.preparing : t.exportPDF}</button>}
           {isAdmin && <button style={styles.newBtn} onClick={() => setShowForm(true)}>{t.newTalk}</button>}
         </div>
       </div>
@@ -540,7 +571,7 @@ export default function SafetyTalks({ projects }) {
       )}
 
       {projects.length > 0 && (
-        <div style={styles.filters}>
+        <div className="filter-row" style={styles.filters}>
           <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
             <option value="">{t.allProjectsOpt}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -549,7 +580,7 @@ export default function SafetyTalks({ projects }) {
       )}
 
       {loading ? (
-        <p style={styles.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : talks.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>🦺</div>
@@ -558,16 +589,19 @@ export default function SafetyTalks({ projects }) {
           </p>
         </div>
       ) : (
-        <div style={styles.list}>
-          {talks.map(t => (
-            <TalkCard
-              key={t.id}
-              talk={t}
-              isAdmin={isAdmin}
-              onDeleted={id => setTalks(prev => prev.filter(t => t.id !== id))}
-            />
-          ))}
-        </div>
+        <>
+          <div style={styles.list}>
+            {talks.map(t => (
+              <TalkCard
+                key={t.id}
+                talk={t}
+                isAdmin={isAdmin}
+                onDeleted={id => setTalks(prev => prev.filter(t => t.id !== id))}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pages={totalPages} onChange={p => load(filterProject, p)} />
+        </>
       )}
     </div>
   );
@@ -617,6 +651,7 @@ const styles = {
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 4 },
   label: { fontSize: 12, fontWeight: 600, color: '#6b7280' },
+  charCount: { fontSize: 11, color: '#9ca3af' },
   input: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, width: '100%' },
   textarea: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5, width: '100%' },
   error: { color: '#ef4444', fontSize: 13, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', margin: 0 },

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useT } from '../hooks/useT';
 import api from '../api';
 import PasswordInput from '../components/PasswordInput';
 
 export default function AcceptInvite() {
+  const t = useT();
   const [params] = useSearchParams();
   const token = params.get('token');
   const navigate = useNavigate();
@@ -18,8 +20,8 @@ export default function AcceptInvite() {
   const handleSubmit = async e => {
     e.preventDefault();
     setError('');
-    if (password !== confirm) return setError('Passwords do not match');
-    if (password.length < 6) return setError('Password must be at least 6 characters');
+    if (password !== confirm) return setError(t.invitePasswordsDontMatch);
+    if (password.length < 6) return setError(t.invitePasswordTooShort);
     setLoading(true);
     try {
       const r = await api.post('/auth/accept-invite', { token, password });
@@ -27,7 +29,7 @@ export default function AcceptInvite() {
       setCompanyName(r.data.company_name || '');
       setDone(true);
     } catch (err) {
-      setError(err.response?.data?.error || 'Something went wrong');
+      setError(err.response?.data?.error || t.inviteSomethingWrong);
     } finally {
       setLoading(false);
     }
@@ -36,7 +38,7 @@ export default function AcceptInvite() {
   if (!token) return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <p style={styles.error}>Invalid invite link.</p>
+        <p style={styles.error}>{t.inviteInvalidLink}</p>
       </div>
     </div>
   );
@@ -44,9 +46,9 @@ export default function AcceptInvite() {
   if (done) return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <h2 style={styles.title}>You're all set!</h2>
-        <p style={styles.sub}>Your password has been set. Your username is <strong>{username}</strong>.</p>
-        <button style={styles.btn} onClick={() => navigate(`/login${companyName ? `?company=${encodeURIComponent(companyName)}` : ''}`)}>Go to login</button>
+        <h2 style={styles.title}>{t.inviteAllSetTitle}</h2>
+        <p style={styles.sub}>{t.invitePasswordSetDesc.split('{username}')[0]}<strong>{username}</strong>{t.invitePasswordSetDesc.split('{username}')[1]}</p>
+        <button style={styles.btn} onClick={() => navigate(`/login${companyName ? `?company=${encodeURIComponent(companyName)}` : ''}`)}>{t.inviteGoToLogin}</button>
       </div>
     </div>
   );
@@ -54,13 +56,13 @@ export default function AcceptInvite() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <h2 style={styles.title}>Set your password</h2>
-        <p style={styles.sub}>Welcome to OpsFloa. Create a password to activate your account.</p>
+        <h2 style={styles.title}>{t.inviteTitle}</h2>
+        <p style={styles.sub}>{t.inviteWelcome}</p>
         <form onSubmit={handleSubmit} style={styles.form}>
-          <PasswordInput style={styles.input} placeholder="New password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
-          <PasswordInput style={styles.input} placeholder="Confirm password" value={confirm} onChange={e => setConfirm(e.target.value)} required />
+          <PasswordInput style={styles.input} placeholder={t.inviteNewPasswordPh} value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+          <PasswordInput style={styles.input} placeholder={t.inviteConfirmPasswordPh} value={confirm} onChange={e => setConfirm(e.target.value)} required />
           {error && <p style={styles.error}>{error}</p>}
-          <button style={styles.btn} type="submit" disabled={loading}>{loading ? 'Saving...' : 'Set password'}</button>
+          <button style={styles.btn} type="submit" disabled={loading}>{loading ? t.saving : t.inviteSetPasswordBtn}</button>
         </form>
       </div>
     </div>

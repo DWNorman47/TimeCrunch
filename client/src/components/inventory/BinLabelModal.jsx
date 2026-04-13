@@ -35,6 +35,12 @@ export default function BinLabelModal({ item, binType, onClose }) {
       .catch(console.error);
   }, [binType, item.id, item.name]);
 
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   const typeName = BIN_LABELS[binType] || binType;
 
   const printLabel = () => {
@@ -79,7 +85,7 @@ export default function BinLabelModal({ item, binType, onClose }) {
       <div style={s.modal}>
         <div style={s.header}>
           <h3 style={s.title}>{t.labelModalTitle} — {typeName}</h3>
-          <button style={s.closeBtn} onClick={onClose}>✕</button>
+          <button style={s.closeBtn} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
 
         <div style={s.preview}>
@@ -99,7 +105,7 @@ export default function BinLabelModal({ item, binType, onClose }) {
 
         <div style={s.actions}>
           <button style={s.cancelBtn} onClick={onClose}>{t.labelModalClose}</button>
-          <button style={s.printBtn} onClick={printLabel} disabled={!qrDataUrl}>
+          <button style={{ ...s.printBtn, ...(!qrDataUrl ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={printLabel} disabled={!qrDataUrl}>
             {t.labelModalPrint}
           </button>
         </div>

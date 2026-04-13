@@ -502,7 +502,7 @@ router.delete('/locations/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const stock = await pool.query(
-      'SELECT COALESCE(SUM(ABS(quantity)),0) as total FROM inventory_stock WHERE location_id=$1 AND company_id=$2',
+      'SELECT COALESCE(SUM(quantity),0) as total FROM inventory_stock WHERE location_id=$1 AND company_id=$2',
       [req.params.id, companyId]
     );
     if (parseFloat(stock.rows[0].total) > 0) {

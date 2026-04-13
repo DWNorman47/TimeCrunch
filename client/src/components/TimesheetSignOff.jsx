@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { fmtHours } from '../utils';
+import { fmtHours, langToLocale } from '../utils';
+import { useAuth } from '../contexts/AuthContext';
 
 function weekBounds() {
   const today = new Date();
@@ -12,6 +13,8 @@ function weekBounds() {
 }
 
 export default function TimesheetSignOff({ t }) {
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [from, setFrom] = useState(weekBounds().from);
   const [to, setTo] = useState(weekBounds().to);
   const [entries, setEntries] = useState([]);
@@ -49,31 +52,31 @@ export default function TimesheetSignOff({ t }) {
   const unsigned = entries.filter(e => !e.worker_signed_at);
   const alreadySigned = entries.filter(e => e.worker_signed_at);
 
-  const fmtDate = s => new Date(s.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const fmtDate = s => new Date(s.substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
   const fmtTime = t => { const [h, m] = t.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`; };
   const calcHours = (s, e, brk) => fmtHours((new Date(`1970-01-01T${e}`) - new Date(`1970-01-01T${s}`)) / 3600000 - (brk || 0) / 60);
 
   return (
     <div style={styles.card}>
       <div style={styles.header}>
-        <h3 style={styles.title}>Sign Timesheet</h3>
-        <p style={styles.sub}>Review your entries and sign off to notify your manager they're ready for approval.</p>
+        <h3 style={styles.title}>{t.signTimesheetTitle}</h3>
+        <p style={styles.sub}>{t.signTimesheetSub}</p>
       </div>
 
       <div style={styles.rangeRow}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Week from</label>
-          <input style={styles.input} type="date" value={from} onChange={e => setFrom(e.target.value)} />
+          <label style={styles.label}>{t.weekFrom}</label>
+          <input style={styles.input} type="date" value={from} onChange={e => setFrom(e.target.value)} disabled={loading} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>To</label>
-          <input style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
+          <label style={styles.label}>{t.to}</label>
+          <input style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} disabled={loading} />
         </div>
-        <button style={styles.loadBtn} onClick={load} disabled={loading}>{loading ? 'Loading...' : 'Load'}</button>
+        <button style={{ ...styles.loadBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={load} disabled={loading}>{loading ? t.loading : t.load}</button>
       </div>
 
       {!loading && entries.length === 0 && (
-        <p style={styles.empty}>No pending entries for this period.</p>
+        <p style={styles.empty}>{t.noPendingForPeriod}</p>
       )}
 
       {!loading && entries.length > 0 && (
@@ -88,8 +91,8 @@ export default function TimesheetSignOff({ t }) {
                 </div>
                 <div style={styles.rowRight}>
                   {e.worker_signed_at
-                    ? <span style={styles.signedBadge}>✓ Signed</span>
-                    : <span style={styles.pendingBadge}>Unsigned</span>}
+                    ? <span style={styles.signedBadge}>{t.signedBadge}</span>
+                    : <span style={styles.pendingBadge}>{t.unsignedBadge}</span>}
                 </div>
               </div>
             ))}
@@ -99,24 +102,24 @@ export default function TimesheetSignOff({ t }) {
             <div style={styles.signArea}>
               {confirmSign ? (
                 <>
-                  <span style={styles.signHint}>Sign off on {unsigned.length} entr{unsigned.length === 1 ? 'y' : 'ies'}? Your manager will be notified to review.</span>
-                  <button style={styles.signBtn} onClick={signOff} disabled={signing}>
-                    {signing ? 'Signing...' : 'Confirm'}
+                  <span style={styles.signHint}>{`${t.signAndSubmit} ${unsigned.length} ${unsigned.length === 1 ? t.entry : t.entries}? ${t.confirmSignHint}`}</span>
+                  <button style={{ ...styles.signBtn, ...(signing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={signOff} disabled={signing}>
+                    {signing ? t.signingLabel : t.confirm}
                   </button>
-                  <button style={styles.cancelSignBtn} onClick={() => setConfirmSign(false)}>Cancel</button>
+                  <button style={styles.cancelSignBtn} onClick={() => setConfirmSign(false)}>{t.cancel}</button>
                 </>
               ) : (
                 <>
-                  <button style={styles.signBtn} onClick={() => setConfirmSign(true)} disabled={signing}>
-                    {`✍ Sign & Submit ${unsigned.length} entr${unsigned.length === 1 ? 'y' : 'ies'}`}
+                  <button style={{ ...styles.signBtn, ...(signing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setConfirmSign(true)} disabled={signing}>
+                    {`${t.signAndSubmit} ${unsigned.length} ${unsigned.length === 1 ? t.entry : t.entries}`}
                   </button>
-                  <span style={styles.signHint}>Your manager will be notified to review.</span>
+                  <span style={styles.signHint}>{t.confirmSignHint}</span>
                 </>
               )}
             </div>
           ) : (
             <div style={styles.allSignedMsg}>
-              ✓ All entries signed — your manager has been notified.
+              {t.allSignedMsg}
             </div>
           )}
         </>

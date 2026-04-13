@@ -66,6 +66,9 @@ router.delete('/templates/:id', requireAdmin, async (req, res) => {
 // GET /inspections
 router.get('/', requireAuth, async (req, res) => {
   const { project_id, status, from, to, template_id } = req.query;
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
   const conditions = ['i.company_id = $1'];
   const params = [req.user.company_id];
   if (project_id) { params.push(project_id); conditions.push(`i.project_id = $${params.length}`); }
@@ -76,16 +79,21 @@ router.get('/', requireAuth, async (req, res) => {
   if (template_id) { params.push(template_id); conditions.push(`i.template_id = $${params.length}`); }
   if (from) { params.push(from); conditions.push(`i.inspected_at >= $${params.length}`); }
   if (to) { params.push(to); conditions.push(`i.inspected_at <= $${params.length}`); }
+  const where = conditions.join(' AND ');
   try {
-    const result = await pool.query(
-      `SELECT i.*, p.name AS project_name, u.full_name AS created_by_name
-       FROM inspections i
-       LEFT JOIN projects p ON i.project_id = p.id
-       LEFT JOIN users u ON i.created_by = u.id
-       WHERE ${conditions.join(' AND ')} ORDER BY i.inspected_at DESC LIMIT 500`,
-      params
-    );
-    res.json(result.rows);
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(`SELECT COUNT(*) FROM inspections i WHERE ${where}`, params),
+      pool.query(
+        `SELECT i.*, p.name AS project_name, u.full_name AS created_by_name
+         FROM inspections i
+         LEFT JOIN projects p ON i.project_id = p.id
+         LEFT JOIN users u ON i.created_by = u.id
+         WHERE ${where} ORDER BY i.inspected_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+    ]);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

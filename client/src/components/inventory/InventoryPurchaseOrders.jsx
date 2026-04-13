@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
+import { SkeletonList } from '../Skeleton';
 
 function useStatus(t) {
   return {
@@ -69,7 +70,7 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
       <div style={m.modal}>
         <div style={m.header}>
           <h3 style={m.title}>{t.invPOReceiveTitle} — {po.po_number}</h3>
-          <button style={m.closeBtn} onClick={onClose}>✕</button>
+          <button style={m.closeBtn} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
 
         {error && <div style={m.error}>{error}</div>}
@@ -127,7 +128,7 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
 
         <div style={m.actions}>
           <button style={m.cancelBtn} onClick={onClose}>{t.cancel}</button>
-          <button style={m.confirmBtn} onClick={submit} disabled={saving}>
+          <button style={{ ...m.confirmBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submit} disabled={saving}>
             {saving ? t.invPOReceiving : t.invPOConfirmReceipt}
           </button>
         </div>
@@ -298,18 +299,18 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             {isDraft && !editing && (
               <>
                 <button style={d.editBtn} onClick={() => setEditing(true)}>{t.invPOEditBtn}</button>
-                <button style={d.submitBtn} onClick={submitPO} disabled={saving}>{t.invPOSubmitBtn}</button>
+                <button style={{ ...d.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitPO} disabled={saving}>{t.invPOSubmitBtn}</button>
               </>
             )}
             {editing && (
               <>
                 <button style={d.cancelEditBtn} onClick={() => setEditing(false)}>{t.cancel}</button>
-                <button style={d.submitBtn} onClick={saveEdit} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
+                <button style={{ ...d.submitBtn, ...(editSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={saveEdit} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
               </>
             )}
             {po.supplier_name && !isDraft && (
               <button
-                style={{ ...d.editBtn, color: emailSent ? '#059669' : '#2563eb', borderColor: emailSent ? '#059669' : '#bfdbfe', background: emailSent ? '#d1fae5' : '#eff6ff' }}
+                style={{ ...d.editBtn, color: emailSent ? '#059669' : '#2563eb', borderColor: emailSent ? '#059669' : '#bfdbfe', background: emailSent ? '#d1fae5' : '#eff6ff', ...(emailSending ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                 onClick={emailPO}
                 disabled={emailSending}
                 title={`Email PO to ${po.supplier_name}`}
@@ -322,7 +323,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             )}
             {!isFinished && (confirmingCancel ? (
               <>
-                <button style={d.confirmCancelBtn} onClick={cancelPO} disabled={saving}>{saving ? '…' : t.confirm}</button>
+                <button style={{ ...d.confirmCancelBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={cancelPO} disabled={saving}>{saving ? '…' : t.confirm}</button>
                 <button style={d.smallCancelBtn} onClick={() => setConfirmingCancel(false)}>{t.cancel}</button>
               </>
             ) : (
@@ -362,6 +363,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             <div style={{ ...d.editField, flexBasis: '100%' }}>
               <label style={d.editLabel}>{t.notes}</label>
               <textarea style={{ ...d.editInput, minHeight: 52, resize: 'vertical' }} value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} maxLength={1000} />
+              <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(editForm.notes || '').length}/1000</div>
             </div>
           </div>
         ) : (
@@ -453,10 +455,10 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
                         {pendingRemoveLineId === line.id ? (
                           <>
                             <button style={d.confirmLineRemoveBtn} onClick={() => removeLine(line.id)}>{t.confirm}</button>
-                            <button style={d.removeBtn} onClick={() => setPendingRemoveLineId(null)}>✕</button>
+                            <button style={d.removeBtn} aria-label={t.cancelRemoveLine} onClick={() => setPendingRemoveLineId(null)}>✕</button>
                           </>
                         ) : (
-                          <button style={d.removeBtn} onClick={() => setPendingRemoveLineId(line.id)} title="Remove line">🗑️</button>
+                          <button style={d.removeBtn} aria-label={t.removeLine} onClick={() => setPendingRemoveLineId(line.id)}>🗑️</button>
                         )}
                       </td>
                     )}
@@ -523,8 +525,8 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             </div>
             <div style={d.addLineBtns}>
               <button style={d.cancelEditBtn} onClick={() => { setAddingLine(false); setLineErr(''); }}>{t.cancel}</button>
-              <button style={d.submitBtn} onClick={addLine} disabled={saving}>
-                {saving ? '…' : t.invPOAddLineBtn}
+              <button style={{ ...d.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={addLine} disabled={saving}>
+                {saving ? t.saving : t.invPOAddLineBtn}
               </button>
             </div>
           </div>
@@ -663,6 +665,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
       <div style={c.field}>
         <label style={c.label}>{t.notes}</label>
         <textarea style={{ ...c.input, minHeight: 52, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} maxLength={1000} />
+        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 
       <div style={c.linesHeader}>
@@ -708,7 +711,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
                       onChange={e => updateLine(line.key, 'notes', e.target.value)} placeholder={t.optional} maxLength={500} />
                   </td>
                   <td style={c.td}>
-                    <button style={c.removeBtn} onClick={() => removeLine(line.key)}>✕</button>
+                    <button style={c.removeBtn} aria-label={t.removeLine} onClick={() => removeLine(line.key)}>✕</button>
                   </td>
                 </tr>
               ))}
@@ -719,7 +722,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
 
       <div style={c.actions}>
         <button style={c.cancelBtn} onClick={onCancel}>{t.cancel}</button>
-        <button style={c.saveBtn} onClick={submit} disabled={saving}>
+        <button style={{ ...c.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submit} disabled={saving}>
           {saving ? t.invPOCreating : t.invPOCreateDraft}
         </button>
       </div>
@@ -863,7 +866,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
       {loadDetailError && <div style={l.error}>{loadDetailError}</div>}
 
       {loading ? (
-        <div style={l.empty}>{t.loading}</div>
+        <SkeletonList count={4} rows={2} />
       ) : pos.length === 0 ? (
         <div style={l.empty}>
           <div style={l.emptyIcon}>📋</div>
@@ -877,7 +880,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
             const received = parseFloat(po.total_received || 0);
             const pct = ordered > 0 ? Math.round((received / ordered) * 100) : 0;
             return (
-              <div key={po.id} style={l.card} onClick={() => openDetail(po)}>
+              <div key={po.id} style={l.card} onClick={() => openDetail(po)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && openDetail(po)}>
                 <div style={l.cardTop}>
                   <div style={l.cardLeft}>
                     <div style={l.cardPo}>{po.po_number}</div>
@@ -908,7 +911,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
         </div>
         {pos.length < posTotal && (
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
-            <button style={l.loadMoreBtn} onClick={loadMorePos} disabled={loadingMore}>
+            <button style={{ ...l.loadMoreBtn, ...(loadingMore ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={loadMorePos} disabled={loadingMore}>
               {loadingMore ? t.loading : t.loadMore}
             </button>
             <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>{pos.length} / {posTotal}</span>

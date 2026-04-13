@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import Pagination from './Pagination';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
@@ -60,11 +62,11 @@ const PRESET_TEMPLATES = [
 
 function TemplateBuilder({ initial, onSaved, onCancel }) {
   const t = useT();
-  const ITEM_TYPES = [
+  const ITEM_TYPES = useMemo(() => [
     { value: 'pass_fail', label: t.inspPassFail },
     { value: 'text', label: t.inspTextNote },
     { value: 'number', label: t.inspNumber },
-  ];
+  ], [t]);
   const isEdit = !!initial?.id;
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -125,11 +127,11 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.inspTemplateName}</label>
-        <input style={styles.input} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daily Site Safety" />
+        <input style={styles.input} value={name} onChange={e => setName(e.target.value)} placeholder={t.inspTemplatePlaceholder} />
       </div>
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.inspDescriptionField} <span style={styles.optional}>{t.inspOptional}</span></label>
-        <input style={styles.input} maxLength={255} value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of when to use this checklist" />
+        <input style={styles.input} maxLength={255} value={description} onChange={e => setDescription(e.target.value)} placeholder={t.inspTemplateDescPlaceholder} />
       </div>
 
       <div>
@@ -153,7 +155,7 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
               <select style={styles.typeSelect} value={item.type} onChange={e => updateItem(item._id, 'type', e.target.value)}>
                 {ITEM_TYPES.map(it => <option key={it.value} value={it.value}>{it.label}</option>)}
               </select>
-              <button type="button" style={styles.removeItemBtn} onClick={() => removeItem(item._id)}>✕</button>
+              <button type="button" style={styles.removeItemBtn} aria-label={t.removeItem} onClick={() => removeItem(item._id)}>✕</button>
             </div>
           ))}
         </div>
@@ -161,7 +163,7 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.inspSaveChanges : t.inspCreateTemplate}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.inspSaveChanges : t.inspCreateTemplate}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -250,7 +252,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.inspInspectionName}</label>
-          <input style={styles.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Daily Site Safety - Mar 25" />
+          <input style={styles.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.inspectionNamePlaceholder} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.date}</label>
@@ -261,11 +263,11 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.inspInspector} <span style={styles.optional}>{t.inspOptional}</span></label>
-          <input style={styles.input} maxLength={255} value={form.inspector} onChange={e => set('inspector', e.target.value)} placeholder="Name of inspector" />
+          <input style={styles.input} maxLength={255} value={form.inspector} onChange={e => set('inspector', e.target.value)} placeholder={t.inspInspectorPlaceholder} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.inspInspectionLocation} <span style={styles.optional}>{t.inspOptional}</span></label>
-          <input style={styles.input} maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} placeholder="Area or location inspected" />
+          <input style={styles.input} maxLength={255} value={form.location} onChange={e => set('location', e.target.value)} placeholder={t.inspLocationPlaceholder} />
         </div>
       </div>
 
@@ -346,12 +348,13 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
 
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.notes} <span style={styles.optional}>{t.inspOptional}</span></label>
-        <textarea style={styles.textarea} rows={3} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="General notes about this inspection…" />
+        <textarea style={styles.textarea} rows={3} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.inspNotesPh} />
+        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.inspSaveChanges : t.inspSaveInspection}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.inspSaveChanges : t.inspSaveInspection}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -362,6 +365,8 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
 
 function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -376,7 +381,7 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
   };
 
   const statusStyle = STATUS_STYLES[ins.status] || STATUS_STYLES.pending;
-  const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const fmtDate = d => d ? new Date(d).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
 
   // Build a label lookup map from the template this inspection was based on
   const template = templates?.find(tpl => tpl.id === ins.template_id);
@@ -394,7 +399,7 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
 
   return (
     <div style={{ ...styles.card, ...(ins.status === 'fail' ? styles.cardFail : {}) }}>
-      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={styles.cardMiddle}>
           <div style={styles.cardName}>
             {ins.name}
@@ -451,7 +456,7 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
               <button style={styles.editBtn} onClick={() => onEdit(ins)}>{t.edit}</button>
               {confirmingDelete ? (
                 <>
-                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                  <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
                   <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
                 </>
               ) : (
@@ -482,20 +487,23 @@ export default function InspectionChecklists({ projects }) {
   const [editing, setEditing] = useState(null);
   const [filters, setFilters] = useState({});
   const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
 
-  const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
+  const setFilter = (k, v) => { setPage(1); setFilters(f => ({ ...f, [k]: v })); };
 
-  const loadAll = async () => {
+  const loadAll = async (p = page) => {
     const [insRes, tplRes] = await Promise.all([
-      api.get('/inspections', { params: Object.fromEntries(Object.entries(filters).filter(([,v]) => v)) }),
+      api.get('/inspections', { params: { ...Object.fromEntries(Object.entries(filters).filter(([,v]) => v)), page: p, limit: 50 } }),
       api.get('/inspections/templates'),
     ]);
-    setInspections(insRes.data);
+    setInspections(insRes.data.items);
+    setPages(insRes.data.pages || 1);
     setTemplates(tplRes.data);
   };
 
-  useEffect(() => { loadAll().finally(() => setLoading(false)); }, []);
-  useEffect(() => { if (!loading) loadAll(); }, [filters]);
+  useEffect(() => { loadAll(1).finally(() => setLoading(false)); }, []);
+  useEffect(() => { if (!loading) loadAll(page); }, [filters, page]);
 
   const handleSaved = (item, isEdit) => {
     if (view === 'templates') {
@@ -632,18 +640,21 @@ export default function InspectionChecklists({ projects }) {
           <p style={styles.emptyText}>{isAdmin ? t.inspNoInspectionsAdmin : t.inspNoInspectionsWorker}</p>
         </div>
       ) : (
-        <div style={styles.list}>
-          {inspections.map(ins => (
-            <InspectionCard
-              key={ins.id}
-              ins={ins}
-              isAdmin={isAdmin}
-              templates={templates}
-              onEdit={ins => { setEditing(ins); setShowForm(false); }}
-              onDeleted={id => setInspections(prev => prev.filter(i => i.id !== id))}
-            />
-          ))}
-        </div>
+        <>
+          <div style={styles.list}>
+            {inspections.map(ins => (
+              <InspectionCard
+                key={ins.id}
+                ins={ins}
+                isAdmin={isAdmin}
+                templates={templates}
+                onEdit={ins => { setEditing(ins); setShowForm(false); }}
+                onDeleted={id => setInspections(prev => prev.filter(i => i.id !== id))}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pages={pages} onChange={setPage} />
+        </>
       )}
     </div>
   );

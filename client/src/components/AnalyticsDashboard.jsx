@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line,
 } from 'recharts';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
+import { SkeletonStatRow, SkeletonList } from './Skeleton';
 
 const BLUE = '#1a56db';
 const GREEN = '#059669';
@@ -57,15 +60,6 @@ function HorizontalBars({ data, color, noDataLabel }) {
   );
 }
 
-function formatDay(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function formatWeek(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
 
 function presetLabel(days, t) {
   if (days === 14) return t.ad14Days;
@@ -76,6 +70,10 @@ function presetLabel(days, t) {
 
 export default function AnalyticsDashboard() {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
+  const formatDay = dateStr => new Date(dateStr + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+  const formatWeek = dateStr => new Date(dateStr + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric' });
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [preset, setPreset] = useState(14); // days; null = custom
@@ -98,51 +96,62 @@ export default function AnalyticsDashboard() {
       .finally(() => setLoading(false));
   }, [from, to]);
 
-  if (loading) return <p style={{ color: '#888' }}>{t.loadingAnalytics}</p>;
+  // Fill daily chart — build a date range and zero-fill missing days
+  // These useMemo calls must come before any early returns (rules of hooks)
+  const dailyFilled = useMemo(() => {
+    if (!data) return [];
+    const { daily_hours } = data;
+    const dailyMap = Object.fromEntries(daily_hours.map(d => [d.date, parseFloat(d.hours)]));
+    const result = [];
+    if (showCustom && customFrom && customTo) {
+      const start = new Date(customFrom + 'T00:00:00');
+      const end = new Date(customTo + 'T00:00:00');
+      const rangeDays = Math.min(90, Math.round((end - start) / 86400000) + 1);
+      for (let i = 0; i < rangeDays; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const key = toLocalDate(d);
+        result.push({ date: key, hours: dailyMap[key] || 0 });
+      }
+    } else if (!showCustom) {
+      for (let i = preset - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = toLocalDate(d);
+        result.push({ date: key, hours: dailyMap[key] || 0 });
+      }
+    } else {
+      // Custom mode but dates not fully set — show whatever server returned
+      daily_hours.forEach(d => result.push({ date: d.date, hours: parseFloat(d.hours) }));
+    }
+    return result;
+  }, [data, showCustom, customFrom, customTo, preset]);
+
+  // Fill weekly chart
+  const weeklyFilled = useMemo(() => {
+    if (!data) return [];
+    const { weekly_hours } = data;
+    const weeklyMap = Object.fromEntries((weekly_hours || []).map(d => [d.week_start, parseFloat(d.hours)]));
+    const result = [];
+    if (showCustom) {
+      // Use server data as-is for custom range
+      (weekly_hours || []).forEach(w => result.push({ week_start: w.week_start, hours: parseFloat(w.hours) }));
+    } else {
+      const weekCount = Math.ceil(preset / 7);
+      for (let i = weekCount - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - d.getDay() - i * 7);
+        const key = toLocalDate(d);
+        result.push({ week_start: key, hours: weeklyMap[key] || 0 });
+      }
+    }
+    return result;
+  }, [data, showCustom, customFrom, customTo, preset]);
+
+  if (loading) return <><SkeletonStatRow count={4} style={{ marginBottom: 16 }} /><SkeletonList count={4} /></>;
   if (!data) return <p style={{ color: '#e53e3e' }}>{t.failedLoadAnalytics}</p>;
 
   const { summary, daily_hours, weekly_hours, project_hours, worker_hours } = data;
-
-  // Fill daily chart — build a date range and zero-fill missing days
-  const dailyMap = Object.fromEntries(daily_hours.map(d => [d.date, parseFloat(d.hours)]));
-  const dailyFilled = [];
-  if (showCustom && customFrom && customTo) {
-    const start = new Date(customFrom + 'T00:00:00');
-    const end = new Date(customTo + 'T00:00:00');
-    const rangeDays = Math.min(90, Math.round((end - start) / 86400000) + 1);
-    for (let i = 0; i < rangeDays; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      const key = toLocalDate(d);
-      dailyFilled.push({ date: key, hours: dailyMap[key] || 0 });
-    }
-  } else if (!showCustom) {
-    for (let i = preset - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = toLocalDate(d);
-      dailyFilled.push({ date: key, hours: dailyMap[key] || 0 });
-    }
-  } else {
-    // Custom mode but dates not fully set — show whatever server returned
-    daily_hours.forEach(d => dailyFilled.push({ date: d.date, hours: parseFloat(d.hours) }));
-  }
-
-  // Fill weekly chart
-  const weeklyMap = Object.fromEntries((weekly_hours || []).map(d => [d.week_start, parseFloat(d.hours)]));
-  const weeklyFilled = [];
-  if (showCustom) {
-    // Use server data as-is for custom range
-    (weekly_hours || []).forEach(w => weeklyFilled.push({ week_start: w.week_start, hours: parseFloat(w.hours) }));
-  } else {
-    const weekCount = Math.ceil(preset / 7);
-    for (let i = weekCount - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - d.getDay() - i * 7);
-      const key = toLocalDate(d);
-      weeklyFilled.push({ week_start: key, hours: weeklyMap[key] || 0 });
-    }
-  }
 
   const rangeLabel = showCustom
     ? (customFrom && customTo ? `${customFrom} – ${customTo}` : t.adCustom)
@@ -269,7 +278,7 @@ export default function AnalyticsDashboard() {
               />
               <Tooltip
                 formatter={v => [`${v}h`, t.chartHoursLabel]}
-                labelFormatter={d => `Week of ${formatWeek(d)}`}
+                labelFormatter={d => `${t.weekOf} ${formatWeek(d)}`}
                 contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e5e7eb' }}
               />
               <Line

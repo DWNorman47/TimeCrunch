@@ -2,6 +2,9 @@ import React from 'react';
 import {
   Document, Page, Text, View, StyleSheet, PDFDownloadLink,
 } from '@react-pdf/renderer';
+import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
 const STATUS_COLORS = {
   open: { bg: '#fef3c7', text: '#92400e' },
@@ -44,9 +47,10 @@ function SectionHeader({ title }) {
   );
 }
 
-function RFIDocument({ rfi, companyName }) {
+export function RFIDocument({ rfi, companyName, t, language }) {
+  const locale = langToLocale(language);
   const statusColors = STATUS_COLORS[rfi.status] || STATUS_COLORS.open;
-  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
   return (
     <Document>
@@ -55,11 +59,11 @@ function RFIDocument({ rfi, companyName }) {
         <View style={pdf.headerRow}>
           <View>
             <Text style={pdf.companyName}>{companyName}</Text>
-            <Text style={pdf.reportTitle}>Request for Information</Text>
+            <Text style={pdf.reportTitle}>{t.pdfRequestForInfo}</Text>
           </View>
           <View style={pdf.headerRight}>
             <Text style={pdf.rfiNumber}>RFI #{rfi.rfi_number}</Text>
-            <Text style={pdf.headerMeta}>{rfi.project_name || 'No Project'}</Text>
+            <Text style={pdf.headerMeta}>{rfi.project_name || t.pdfNoProject}</Text>
             <View style={[pdf.statusBadge, { backgroundColor: statusColors.bg }]}>
               <Text style={[pdf.statusText, { color: statusColors.text }]}>
                 {rfi.status.toUpperCase()}
@@ -72,19 +76,19 @@ function RFIDocument({ rfi, companyName }) {
         <View style={pdf.section}>
           <View style={pdf.metaGrid}>
             <View style={pdf.metaItem}>
-              <Text style={pdf.metaLabel}>Submitted By</Text>
+              <Text style={pdf.metaLabel}>{t.submittedBy}</Text>
               <Text style={pdf.metaValue}>{rfi.submitted_by || rfi.created_by_name || '—'}</Text>
             </View>
             <View style={pdf.metaItem}>
-              <Text style={pdf.metaLabel}>Directed To</Text>
+              <Text style={pdf.metaLabel}>{t.directedTo}</Text>
               <Text style={pdf.metaValue}>{rfi.directed_to || '—'}</Text>
             </View>
             <View style={pdf.metaItem}>
-              <Text style={pdf.metaLabel}>Date Submitted</Text>
+              <Text style={pdf.metaLabel}>{t.dateSubmitted}</Text>
               <Text style={pdf.metaValueLight}>{fmtDate(rfi.date_submitted)}</Text>
             </View>
             <View style={pdf.metaItem}>
-              <Text style={pdf.metaLabel}>Date Due</Text>
+              <Text style={pdf.metaLabel}>{t.pdfDateDue}</Text>
               <Text style={pdf.metaValueLight}>{fmtDate(rfi.date_due)}</Text>
             </View>
           </View>
@@ -92,14 +96,14 @@ function RFIDocument({ rfi, companyName }) {
 
         {/* Subject */}
         <View style={pdf.section}>
-          <SectionHeader title="Subject" />
+          <SectionHeader title={t.subjectField} />
           <Text style={[pdf.textBlock, { fontFamily: 'Helvetica-Bold', fontSize: 10 }]}>{rfi.subject}</Text>
         </View>
 
         {/* Description */}
         {rfi.description ? (
           <View style={pdf.section}>
-            <SectionHeader title="Description / Question" />
+            <SectionHeader title={t.pdfDescriptionQuestion} />
             <Text style={pdf.textBlock}>{rfi.description}</Text>
           </View>
         ) : null}
@@ -107,7 +111,7 @@ function RFIDocument({ rfi, companyName }) {
         {/* Response */}
         {rfi.response ? (
           <View style={pdf.section}>
-            <SectionHeader title="Response" />
+            <SectionHeader title={t.rfiResponse} />
             <Text style={pdf.responseBlock}>{rfi.response}</Text>
           </View>
         ) : null}
@@ -136,14 +140,16 @@ const linkStyle = {
 };
 
 export function RFIDownloadLink({ rfi, companyName }) {
+  const t = useT();
+  const { user } = useAuth();
   const fileName = `RFI-${rfi.rfi_number}-${(rfi.subject || 'rfi').replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`;
   return (
     <PDFDownloadLink
-      document={<RFIDocument rfi={rfi} companyName={companyName} />}
+      document={<RFIDocument rfi={rfi} companyName={companyName} t={t} language={user?.language} />}
       fileName={fileName}
       style={linkStyle}
     >
-      {({ loading }) => (loading ? 'Preparing…' : '⬇ PDF')}
+      {({ loading }) => (loading ? t.pdfPreparingShort : t.pdfPDFLink)}
     </PDFDownloadLink>
   );
 }

@@ -1,38 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
+import { useT } from '../hooks/useT';
 import api from '../api';
 
 export default function ConfirmEmail() {
+  const t = useT();
   const [params] = useSearchParams();
   const token = params.get('token');
   const [status, setStatus] = useState('loading'); // 'loading' | 'success' | 'error'
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!token) { setStatus('error'); setError('No confirmation token found.'); return; }
+    if (!token) { setStatus('error'); setError(t.confirmEmailNoToken); return; }
     api.post('/auth/confirm-email', { token })
       .then(() => setStatus('success'))
-      .catch(err => { setStatus('error'); setError(err.response?.data?.error || 'Something went wrong.'); });
+      .catch(err => { setStatus('error'); setError(err.response?.data?.error || t.confirmEmailError); });
   }, [token]);
 
   return (
     <div style={styles.page}>
       <div style={styles.card}>
         <h1 style={styles.logo}>OpsFloa</h1>
-        {status === 'loading' && <p style={styles.msg}>Confirming your email...</p>}
+        {status === 'loading' && <p style={styles.msg}>{t.confirmEmailLoading}</p>}
         {status === 'success' && (
           <>
             <div style={styles.icon}>✓</div>
-            <h2 style={styles.title}>Email confirmed!</h2>
-            <p style={styles.sub}>Your account is now active. You can sign in.</p>
-            <Link to="/login" style={styles.btn}>Go to login</Link>
+            <h2 style={styles.title}>{t.confirmEmailSuccessTitle}</h2>
+            <p style={styles.sub}>{t.confirmEmailActiveDesc}</p>
+            <Link to="/login" style={styles.btn}>{t.confirmEmailGoToLogin}</Link>
           </>
         )}
         {status === 'error' && (
           <>
-            <h2 style={{ ...styles.title, color: '#e53e3e' }}>Confirmation failed</h2>
+            <h2 style={{ ...styles.title, color: '#e53e3e' }}>{t.confirmEmailFailedTitle}</h2>
             <p style={styles.sub}>{error}</p>
-            <p style={styles.sub}>The link may have expired. <Link to="/login" style={styles.link}>Request a new one</Link> from the login page.</p>
+            <p style={styles.sub}>{t.confirmEmailExpiredLink} <Link to="/login" style={styles.link}>{t.confirmEmailRequestNew}</Link> {t.confirmEmailFromLoginPage}</p>
           </>
         )}
       </div>

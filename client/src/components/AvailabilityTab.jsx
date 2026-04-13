@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 export default function AvailabilityTab() {
   const t = useT();
@@ -13,6 +14,8 @@ export default function AvailabilityTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     api.get('/availability/mine')
@@ -27,7 +30,7 @@ export default function AvailabilityTab() {
         });
         setDays(next);
       })
-      .catch(() => {})
+      .catch(() => setLoadError(t.failedLoad || 'Failed to load availability.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -42,27 +45,30 @@ export default function AvailabilityTab() {
   };
 
   const save = async () => {
-    setSaving(true); setSaved(false);
+    setSaving(true); setSaved(false); setSaveError('');
     const availability = days
       .map((d, i) => d.enabled ? { day_of_week: i, start_time: d.start_time, end_time: d.end_time } : null)
       .filter(Boolean);
     try {
       await api.put('/availability', { availability });
       setSaved(true);
-    } catch { /* ignore */ }
-    finally { setSaving(false); }
+    } catch {
+      setSaveError(t.failedSave || 'Failed to save availability.');
+    } finally { setSaving(false); }
   };
 
-  if (loading) return <p style={s.empty}>{t.loading}</p>;
+  if (loading) return <SkeletonList count={3} rows={1} />;
+  if (loadError) return <p style={{ color: '#dc2626', fontSize: 13, padding: 16 }}>{loadError}</p>;
 
   return (
     <div style={s.wrap}>
+      {saveError && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 12 }}>{saveError}</p>}
       <div style={s.headerRow}>
         <div>
           <h2 style={s.title}>{t.availTitle}</h2>
           <p style={s.subtitle}>{t.availSubtitle}</p>
         </div>
-        <button style={s.saveBtn} onClick={save} disabled={saving}>
+        <button style={{ ...s.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={save} disabled={saving}>
           {saving ? t.saving : saved ? `✓ ${t.availSaved}` : t.availSave}
         </button>
       </div>

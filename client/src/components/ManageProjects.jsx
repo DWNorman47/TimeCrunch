@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true, showGeofenceBudget = true, defaultPrevailingRate = '', currency = 'USD', settings = null }) {
   const toast = useToast();
@@ -138,8 +139,9 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       const r = await api.patch(`/admin/projects/${id}`, payload);
       onProjectUpdated(r.data);
       setExpandedId(null);
+      toast(t.projectUpdated, 'success');
     } catch {
-      toast('Failed to update project', 'error');
+      toast(t.failedUpdateProject, 'error');
     }
   };
 
@@ -152,7 +154,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       setEditGeoLng('');
       setEditGeoRadius('');
     } catch {
-      toast('Failed to remove geofence', 'error');
+      toast(t.failedRemoveGeofence, 'error');
     }
   };
 
@@ -164,7 +166,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       setEditBudgetHours('');
       setEditBudgetDollars('');
     } catch {
-      toast('Failed to remove budget', 'error');
+      toast(t.failedRemoveBudget, 'error');
     }
   };
 
@@ -211,9 +213,10 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       onProjectDeleted(archiveTarget.id);
       if (expandedId === archiveTarget.id) setExpandedId(null);
       loadArchived();
+      toast(t.projectArchived.replace('{name}', archiveTarget.name), 'success');
       setArchiveTarget(null);
     } catch {
-      toast('Failed to remove project', 'error');
+      toast(t.failedRemoveProject, 'error');
     }
   };
 
@@ -223,7 +226,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     try {
       const r = await api.get(`/admin/projects/${archiveTarget.id}/media-urls`);
       const { urls } = r.data;
-      if (!urls.length) { toast('No media files found for this project', 'info'); return; }
+      if (!urls.length) { toast(t.noMediaFilesFound, 'info'); return; }
       const blob = new Blob([urls.join('\n')], { type: 'text/plain' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -231,7 +234,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       a.click();
       URL.revokeObjectURL(a.href);
     } catch {
-      toast('Failed to fetch media list', 'error');
+      toast(t.failedFetchMedia, 'error');
     } finally {
       setArchiveDownloading(false);
     }
@@ -249,7 +252,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       a.click();
       URL.revokeObjectURL(a.href);
     } catch {
-      toast('No media found or download failed', 'error');
+      toast(t.noMediaDownload, 'error');
     } finally {
       setArchiveDownloading(false);
     }
@@ -264,9 +267,9 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       if (expandedId === mergeSource.id) setExpandedId(null);
       setMergeSource(null);
       setMergeTargetId('');
-      toast(`Merged into ${projects.find(p => p.id === parseInt(mergeTargetId))?.name}`, 'success');
+      toast(t.projectMergedInto.replace('{name}', projects.find(p => p.id === parseInt(mergeTargetId))?.name), 'success');
     } catch {
-      toast('Failed to merge projects', 'error');
+      toast(t.failedMergeProjects, 'error');
     } finally {
       setMergeSaving(false);
     }
@@ -278,7 +281,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
       onProjectRestored(r.data);
       setArchived(prev => prev.filter(p => p.id !== id));
     } catch {
-      toast('Failed to restore project', 'error');
+      toast(t.failedRestoreProject, 'error');
     }
   };
 
@@ -309,7 +312,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
         {showWageType && wageType === 'prevailing' && (
           <input style={{ ...s.input, maxWidth: 120 }} type="number" min="0" step="0.01" placeholder={`Rate (${defaultPrevailingRate || '45.00'})`} value={prevailingRate} onChange={e => setPrevailingRate(e.target.value)} />
         )}
-        <button style={s.addBtn} type="submit" disabled={saving}>{saving ? t.adding : t.add}</button>
+        <button style={{ ...s.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.adding : t.add}</button>
       </form>
       {error && (
         <div style={s.errorBox}>
@@ -339,7 +342,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                     {p.client_name && <span style={s.clientTag}>{p.client_name}</span>}
                     {p.geo_radius_ft && <span style={s.indicatorBadge} title={`Geofence: ${p.geo_radius_ft.toLocaleString()} ft radius`}>📍</span>}
                     {hasBudget(p) && <span style={s.indicatorBadge} title={[parseFloat(p.budget_hours) > 0 && `${p.budget_hours} hrs`, parseFloat(p.budget_dollars) > 0 && `$${Number(p.budget_dollars).toLocaleString()}`].filter(Boolean).join(' / ')}>💰</span>}
-                    {p.required_checklist_template_id && <span style={s.indicatorBadge} title="Checklist required for clock-in">☑</span>}
+                    {p.required_checklist_template_id && <span style={s.indicatorBadge} title={t.checklistRequiredBadge}>☑</span>}
                     {showWageType && (
                       <span style={{ ...s.wageBadge, background: p.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                         {p.wage_type === 'prevailing' ? t.prevailingWages : t.regularWages}
@@ -360,21 +363,22 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       <div style={s.fieldsGrid}>
                         {nameEditable && (
                           <div style={s.fieldGroup}>
-                            <label style={s.fieldLabel}>Name</label>
+                            <label htmlFor="mp-name" style={s.fieldLabel}>Name</label>
                             <input
+                              id="mp-name"
                               style={s.editInput}
                               value={editName}
                               onChange={e => setEditName(e.target.value)}
                               onKeyDown={e => { if (e.key === 'Escape') setExpandedId(null); }}
                               autoFocus
-                              placeholder="Project name"
+                              placeholder={t.projectNamePlaceholder}
                             />
                           </div>
                         )}
                         {showWageType && (
                           <div style={s.fieldGroup}>
-                            <label style={s.fieldLabel}>Wage type</label>
-                            <select style={s.editInput} value={editWageType} onChange={e => { setEditWageType(e.target.value); setEditPrevailingRate(''); }}>
+                            <label htmlFor="mp-wage-type" style={s.fieldLabel}>Wage type</label>
+                            <select id="mp-wage-type" style={s.editInput} value={editWageType} onChange={e => { setEditWageType(e.target.value); setEditPrevailingRate(''); }}>
                               <option value="regular">{t.regularWages}</option>
                               <option value="prevailing">{t.prevailingWages}</option>
                             </select>
@@ -382,8 +386,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                         )}
                         {editWageType === 'prevailing' && (
                           <div style={s.fieldGroup}>
-                            <label style={s.fieldLabel}>Rate ($/hr)</label>
-                            <input style={s.editInput} type="number" min="0" step="0.01" placeholder={defaultPrevailingRate || '45.00'} value={editPrevailingRate} onChange={e => setEditPrevailingRate(e.target.value)} />
+                            <label htmlFor="mp-rate" style={s.fieldLabel}>Rate ($/hr)</label>
+                            <input id="mp-rate" style={s.editInput} type="number" min="0" step="0.01" placeholder={defaultPrevailingRate || '45.00'} value={editPrevailingRate} onChange={e => setEditPrevailingRate(e.target.value)} />
                           </div>
                         )}
                       </div>
@@ -394,8 +398,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       <div style={s.sectionTitle}>Project Info</div>
                       <div style={s.fieldsGrid}>
                         <div style={s.fieldGroup}>
-                          <label style={s.fieldLabel}>Status</label>
-                          <select style={s.editInput} value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                          <label htmlFor="mp-status" style={s.fieldLabel}>Status</label>
+                          <select id="mp-status" style={s.editInput} value={editStatus} onChange={e => setEditStatus(e.target.value)}>
                             <option value="planning">Planning</option>
                             <option value="in_progress">In Progress</option>
                             <option value="on_hold">On Hold</option>
@@ -403,33 +407,34 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                           </select>
                         </div>
                         <div style={s.fieldGroup}>
-                          <label style={s.fieldLabel}>Client Name</label>
-                          <input style={s.editInput} value={editClientName} onChange={e => setEditClientName(e.target.value)} placeholder="e.g. Acme Corp" />
+                          <label htmlFor="mp-client-name" style={s.fieldLabel}>Client Name</label>
+                          <input id="mp-client-name" style={s.editInput} value={editClientName} onChange={e => setEditClientName(e.target.value)} placeholder={t.clientNameShortPlaceholder} />
                         </div>
                         <div style={s.fieldGroup}>
-                          <label style={s.fieldLabel}>Job Number</label>
-                          <input style={s.editInput} value={editJobNumber} onChange={e => setEditJobNumber(e.target.value)} placeholder="e.g. JOB-2024-001" />
+                          <label htmlFor="mp-job-number" style={s.fieldLabel}>Job Number</label>
+                          <input id="mp-job-number" style={s.editInput} value={editJobNumber} onChange={e => setEditJobNumber(e.target.value)} placeholder={t.jobNumberPlaceholder} />
                         </div>
                         <div style={s.fieldGroup}>
-                          <label style={s.fieldLabel}>Start Date</label>
-                          <input style={s.editInput} type="date" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
+                          <label htmlFor="mp-start-date" style={s.fieldLabel}>Start Date</label>
+                          <input id="mp-start-date" style={s.editInput} type="date" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
                         </div>
                         <div style={s.fieldGroup}>
-                          <label style={s.fieldLabel}>Target End Date</label>
-                          <input style={s.editInput} type="date" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} />
+                          <label htmlFor="mp-end-date" style={s.fieldLabel}>Target End Date</label>
+                          <input id="mp-end-date" style={s.editInput} type="date" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} />
                         </div>
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
-                        <label style={s.fieldLabel}>Address / Location</label>
-                        <input style={s.editInput} maxLength={255} value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="123 Main St, City, State" />
+                        <label htmlFor="mp-address" style={s.fieldLabel}>Address / Location</label>
+                        <input id="mp-address" style={s.editInput} maxLength={255} value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder={t.projectAddressPlaceholder} />
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
-                        <label style={s.fieldLabel}>Description</label>
-                        <textarea style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Brief project description..." />
+                        <label htmlFor="mp-description" style={s.fieldLabel}>Description</label>
+                        <textarea id="mp-description" style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder={t.projectDescPlaceholder} />
+                        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(editDescription || '').length}/1000</div>
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
-                        <label style={s.fieldLabel}>Progress % (0–100)</label>
-                        <input style={s.editInput} type="number" min="0" max="100" value={editProgressPct} onChange={e => setEditProgressPct(e.target.value)} placeholder="e.g. 45" />
+                        <label htmlFor="mp-progress" style={s.fieldLabel}>Progress % (0–100)</label>
+                        <input id="mp-progress" style={s.editInput} type="number" min="0" max="100" value={editProgressPct} onChange={e => setEditProgressPct(e.target.value)} placeholder={t.progressPctPlaceholder} />
                       </div>
                     </div>
 
@@ -441,8 +446,8 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                           <input style={s.geoInput} type="number" step="0.000001" placeholder={t.latitude} value={editGeoLat} onChange={e => setEditGeoLat(e.target.value)} />
                           <input style={s.geoInput} type="number" step="0.000001" placeholder={t.longitude} value={editGeoLng} onChange={e => setEditGeoLng(e.target.value)} />
                           <input style={s.geoInput} type="number" min="50" step="50" placeholder={t.radiusFt} value={editGeoRadius} onChange={e => setEditGeoRadius(e.target.value)} />
-                          <button style={s.geoLocBtn} type="button" onClick={useMyLocation} disabled={geoLocating}>
-                            {geoLocating ? '...' : t.myLocation}
+                          <button style={{ ...s.geoLocBtn, ...(geoLocating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="button" onClick={useMyLocation} disabled={geoLocating}>
+                            {geoLocating ? t.loading : t.myLocation}
                           </button>
                           {p.geo_radius_ft && (confirmingClearGeoId === p.id ? (
                             <>
@@ -464,12 +469,12 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                         <div style={s.sectionTitle}>{t.budgetOptional}</div>
                         <div style={s.geoFields}>
                           <div style={s.budgetField}>
-                            <label style={s.budgetLabel}>{t.hours}</label>
-                            <input style={s.geoInput} type="number" min="0" step="0.5" placeholder="e.g. 200" value={editBudgetHours} onChange={e => setEditBudgetHours(e.target.value)} />
+                            <label htmlFor="mp-budget-hours" style={s.budgetLabel}>{t.hours}</label>
+                            <input id="mp-budget-hours" style={s.geoInput} type="number" min="0" step="0.5" placeholder={t.budgetHoursPlaceholder} value={editBudgetHours} onChange={e => setEditBudgetHours(e.target.value)} />
                           </div>
                           <div style={s.budgetField}>
-                            <label style={s.budgetLabel}>Dollars ($)</label>
-                            <input style={s.geoInput} type="number" min="0" step="100" placeholder="e.g. 15000" value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
+                            <label htmlFor="mp-budget-dollars" style={s.budgetLabel}>{t.budgetDollars}</label>
+                            <input id="mp-budget-dollars" style={s.geoInput} type="number" min="0" step="100" placeholder={t.budgetDollarsPlaceholder} value={editBudgetDollars} onChange={e => setEditBudgetDollars(e.target.value)} />
                           </div>
                           {hasBudget(p) && (confirmingClearBudgetId === p.id ? (
                             <>
@@ -486,18 +491,18 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
 
                     {/* Clock-in Checklist */}
                     <div style={s.section}>
-                      <div style={s.sectionTitle}>Clock-in Checklist</div>
+                      <div style={s.sectionTitle}>{t.clockInChecklist}</div>
                       <select
                         style={s.editInput}
                         value={editRequiredChecklist}
                         onChange={e => setEditRequiredChecklist(e.target.value)}
                       >
-                        <option value="">None — no checklist required</option>
+                        <option value="">{t.noChecklistRequired}</option>
                         {checklistTemplates.map(t => (
                           <option key={t.id} value={t.id}>{t.name}</option>
                         ))}
                       </select>
-                      <p style={s.hint}>Workers must complete this checklist before clocking into this project.</p>
+                      <p style={s.hint}>{t.clockInChecklistHint}</p>
                     </div>
 
                     {/* Actions */}
@@ -505,7 +510,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       <button style={s.saveBtn} onClick={() => handleEditSave(p.id)}>{t.save}</button>
                       <button style={s.cancelBtn} onClick={() => setExpandedId(null)}>{t.cancel}</button>
                       {projects.length > 1 && (
-                        <button style={s.mergeBtn} onClick={() => { setMergeSource({ id: p.id, name: p.name }); setMergeTargetId(''); }}>Merge into...</button>
+                        <button style={s.mergeBtn} onClick={() => { setMergeSource({ id: p.id, name: p.name }); setMergeTargetId(''); }}>{t.mergeIntoBtn}</button>
                       )}
                       <button style={s.removeBtn} onClick={() => handleRemove(p.id, p.name)}>{t.remove}</button>
                     </div>
@@ -526,22 +531,23 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
               "{mergeSource.name}" will be permanently deleted. This cannot be undone.
             </p>
             <div style={s.fieldGroup}>
-              <label style={s.fieldLabel}>Merge into</label>
+              <label htmlFor="mp-merge-into" style={s.fieldLabel}>{t.mergeIntoLabel}</label>
               <select
+                id="mp-merge-into"
                 style={s.editInput}
                 value={mergeTargetId}
                 onChange={e => setMergeTargetId(e.target.value)}
               >
-                <option value="">— select project —</option>
+                <option value="">{t.selectProject}</option>
                 {projects.filter(p => p.id !== mergeSource.id).map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
             </div>
             <div style={s.modalActions}>
-              <button style={s.cancelBtn} onClick={() => setMergeSource(null)} disabled={mergeSaving}>Cancel</button>
-              <button style={s.mergeConfirmBtn} onClick={handleConfirmMerge} disabled={!mergeTargetId || mergeSaving}>
-                {mergeSaving ? 'Merging...' : 'Merge & Delete'}
+              <button style={{ ...s.cancelBtn, ...(mergeSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setMergeSource(null)} disabled={mergeSaving}>{t.cancel}</button>
+              <button style={{ ...s.mergeConfirmBtn, ...(!mergeTargetId || mergeSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleConfirmMerge} disabled={!mergeTargetId || mergeSaving}>
+                {mergeSaving ? t.saving : t.mergeAndDelete}
               </button>
             </div>
           </div>
@@ -561,19 +567,19 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
               </div>
             )}
             <div style={s.modalDownload}>
-              <button style={s.downloadBtn} onClick={handleDownloadZip} disabled={archiveDownloading}>
-                {archiveDownloading ? 'Preparing ZIP...' : 'Download media as ZIP'}
+              <button style={{ ...s.downloadBtn, ...(archiveDownloading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDownloadZip} disabled={archiveDownloading}>
+                {archiveDownloading ? t.preparing : t.downloadMediaZip}
               </button>
               {!settings?.media_delete_on_project_archive && (
-                <button style={{ ...s.downloadBtn, background: '#6b7280', marginTop: 4 }} onClick={handleDownloadMediaUrls} disabled={archiveDownloading}>
-                  Download media URL list (.txt)
+                <button style={{ ...s.downloadBtn, background: '#6b7280', marginTop: 4, ...(archiveDownloading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDownloadMediaUrls} disabled={archiveDownloading}>
+                  {t.downloadMediaUrls}
                 </button>
               )}
               <span style={s.downloadHint}>Download all photos and attachments for this project before archiving</span>
             </div>
             <div style={s.modalActions}>
-              <button style={s.cancelBtn} onClick={() => setArchiveTarget(null)}>Cancel</button>
-              <button style={s.archiveBtn} onClick={handleConfirmArchive}>Archive Project</button>
+              <button style={s.cancelBtn} onClick={() => setArchiveTarget(null)}>{t.cancel}</button>
+              <button style={s.archiveBtn} onClick={handleConfirmArchive}>{t.archiveProject}</button>
             </div>
           </div>
         </div>
@@ -586,7 +592,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
         {showHistory && (
           <div style={s.historyList}>
             {loadingArchived ? (
-              <p style={s.empty}>{t.loading}</p>
+              <SkeletonList count={3} rows={1} />
             ) : archived.length === 0 ? (
               <p style={s.empty}>{t.noRemovedProjects}</p>
             ) : (

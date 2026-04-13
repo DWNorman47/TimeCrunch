@@ -73,14 +73,14 @@ export default function OvertimeReport({ currency = 'USD' }) {
         <h3 style={styles.title}>{t.overtimeReport}</h3>
         <div style={styles.controls}>
           <div style={styles.filterGroup}>
-            <label style={styles.label}>{t.qboFrom}</label>
-            <input style={styles.input} type="date" value={from} onChange={e => setFrom(e.target.value)} />
+            <label htmlFor="ot-from" style={styles.label}>{t.qboFrom}</label>
+            <input id="ot-from" style={styles.input} type="date" value={from} onChange={e => setFrom(e.target.value)} />
           </div>
           <div style={styles.filterGroup}>
-            <label style={styles.label}>{t.qboTo}</label>
-            <input style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
+            <label htmlFor="ot-to" style={styles.label}>{t.qboTo}</label>
+            <input id="ot-to" style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
           </div>
-          <button style={styles.runBtn} onClick={load} disabled={loading || !from || !to}>
+          <button style={{ ...styles.runBtn, ...(loading || !from || !to ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={load} disabled={loading || !from || !to}>
             {loading ? t.loading : t.runReport}
           </button>
           {rows && rows.length > 0 && (

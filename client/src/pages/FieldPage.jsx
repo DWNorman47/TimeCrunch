@@ -1,25 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
 import api from '../api';
+import { getOrFetch } from '../offlineDb';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
 import FieldDayLog from '../components/FieldDayLog';
-import DailyReports from '../components/DailyReports';
 
-import Punchlist from '../components/Punchlist';
-import SafetyTalks from '../components/SafetyTalks';
-import SafetyChecklists from '../components/SafetyChecklists';
-import IncidentReports from '../components/IncidentReports';
-import PhotoGallery from '../components/PhotoGallery';
-import SubReports from '../components/SubReports';
-import EquipmentLog from '../components/EquipmentLog';
-import RFITracking from '../components/RFITracking';
-import InspectionChecklists from '../components/InspectionChecklists';
+// Tab components — lazy-loaded on first visit since only one tab is visible at a time
+const DailyReports        = lazy(() => import('../components/DailyReports'));
+const Punchlist           = lazy(() => import('../components/Punchlist'));
+const SafetyTalks         = lazy(() => import('../components/SafetyTalks'));
+const SafetyChecklists    = lazy(() => import('../components/SafetyChecklists'));
+const IncidentReports     = lazy(() => import('../components/IncidentReports'));
+const PhotoGallery        = lazy(() => import('../components/PhotoGallery'));
+const SubReports          = lazy(() => import('../components/SubReports'));
+const EquipmentLog        = lazy(() => import('../components/EquipmentLog'));
+const RFITracking         = lazy(() => import('../components/RFITracking'));
+const InspectionChecklists = lazy(() => import('../components/InspectionChecklists'));
+
+function TabLoader() {
+  return <div style={{ padding: '40px 0', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>Loading…</div>;
+}
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function FieldPage() {
   const { user, logout } = useAuth();
+  const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const [projects, setProjects] = useState([]);
@@ -32,9 +40,12 @@ export default function FieldPage() {
 
   useEffect(() => {
     const init = async () => {
-      const [p, s] = await Promise.all([api.get('/projects'), api.get('/settings')]);
-      setFeatures(s.data);
-      setProjects(p.data);
+      const [p, s] = await Promise.all([
+        getOrFetch('projects', () => api.get('/projects').then(r => r.data)),
+        getOrFetch('settings', () => api.get('/settings').then(r => r.data)),
+      ]);
+      setFeatures(s);
+      setProjects(p);
       setLoading(false);
     };
     init();
@@ -50,7 +61,7 @@ export default function FieldPage() {
           </div>
           <div style={styles.headerRight}>
             {!isAdmin && <span style={styles.userName}>{user?.full_name}</span>}
-            <button style={styles.headerBtn} onClick={logout}>Logout</button>
+            <button style={styles.headerBtn} onClick={logout}>{t.logout}</button>
           </div>
         </div>
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
@@ -62,45 +73,47 @@ export default function FieldPage() {
           active={fieldTab}
           onChange={switchTab}
           tabs={[
-            { id: 'notes', label: '📷 Field Notes' },
-            { id: 'punchlist', label: '✅ Punch' },
-            { id: 'safety', label: '🦺 Safety' },
-            { id: 'checklists', label: '☑️ Checklists' },
-            { id: 'incident', label: '🚨 Incidents' },
-            { id: 'equip', label: '🚜 Equipment' },
+            { id: 'notes', label: t.fieldTabNotes },
+            { id: 'punchlist', label: t.fieldTabPunch },
+            { id: 'safety', label: t.fieldTabSafety },
+            { id: 'checklists', label: t.fieldTabChecklists },
+            { id: 'incident', label: t.fieldTabIncidents },
+            { id: 'equip', label: t.fieldTabEquip },
             ...(isAdmin ? [
-              { id: 'daily', label: '📋 Daily Reports' },
-              { id: 'rfi', label: '📝 RFIs' },
-              { id: 'inspect', label: '✅ Inspect' },
-              { id: 'subs', label: '🏗️ Subs' },
-              ...(features.feature_media_gallery ? [{ id: 'gallery', label: '🎬 Media' }] : []),
+              { id: 'daily', label: t.fieldTabDaily },
+              { id: 'rfi', label: t.fieldTabRFI },
+              { id: 'inspect', label: t.fieldTabInspect },
+              { id: 'subs', label: t.fieldTabSubs },
+              ...(features.feature_media_gallery ? [{ id: 'gallery', label: t.fieldTabMedia }] : []),
             ] : []),
           ]}
         />
 
-        {fieldTab === 'daily' ? (
-          <DailyReports projects={projects} />
-        ) : fieldTab === 'punchlist' ? (
-          <Punchlist projects={projects} />
-        ) : fieldTab === 'safety' ? (
-          <SafetyTalks projects={projects} />
-        ) : fieldTab === 'checklists' ? (
-          <SafetyChecklists projects={projects} />
-        ) : fieldTab === 'incident' ? (
-          <IncidentReports projects={projects} />
-        ) : fieldTab === 'gallery' ? (
-          <PhotoGallery projects={projects} />
-        ) : fieldTab === 'subs' ? (
-          <SubReports projects={projects} />
-        ) : fieldTab === 'equip' ? (
-          <EquipmentLog projects={projects} />
-        ) : fieldTab === 'rfi' ? (
-          <RFITracking projects={projects} />
-        ) : fieldTab === 'inspect' ? (
-          <InspectionChecklists projects={projects} />
-        ) : (
-          <FieldDayLog projects={projects} isAdmin={isAdmin} />
-        )}
+        <Suspense fallback={<TabLoader />}>
+          {fieldTab === 'daily' ? (
+            <DailyReports projects={projects} />
+          ) : fieldTab === 'punchlist' ? (
+            <Punchlist projects={projects} />
+          ) : fieldTab === 'safety' ? (
+            <SafetyTalks projects={projects} />
+          ) : fieldTab === 'checklists' ? (
+            <SafetyChecklists projects={projects} />
+          ) : fieldTab === 'incident' ? (
+            <IncidentReports projects={projects} />
+          ) : fieldTab === 'gallery' ? (
+            <PhotoGallery projects={projects} />
+          ) : fieldTab === 'subs' ? (
+            <SubReports projects={projects} />
+          ) : fieldTab === 'equip' ? (
+            <EquipmentLog projects={projects} />
+          ) : fieldTab === 'rfi' ? (
+            <RFITracking projects={projects} />
+          ) : fieldTab === 'inspect' ? (
+            <InspectionChecklists projects={projects} />
+          ) : (
+            <FieldDayLog projects={projects} isAdmin={isAdmin} />
+          )}
+        </Suspense>
       </main>
     </div>
   );

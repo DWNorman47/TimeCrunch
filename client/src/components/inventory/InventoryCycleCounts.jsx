@@ -4,6 +4,7 @@ import { parseBinQR } from './BinLabelModal';
 import { parseItemQR } from './ItemLabelModal';
 import UomConversionModal from './UomConversionModal';
 import { useT } from '../../hooks/useT';
+import { SkeletonList } from '../Skeleton';
 
 function useCountTypes(t) {
   return {
@@ -508,7 +509,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             </>
           )}
           {countData.status === 'completed' && (
-            <button style={{ ...d.advanceBtn, background: '#6b7280' }} onClick={reopen} disabled={reopening}>
+            <button style={{ ...d.advanceBtn, background: '#6b7280', ...(reopening ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={reopen} disabled={reopening}>
               {reopening ? t.invCycReopening : t.invCycReopenCount}
             </button>
           )}
@@ -537,7 +538,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
           <div style={d.workersPanelHeader}>
             <strong style={{ fontSize: 14 }}>{t.invCycAssignWorkers}</strong>
             {!isCompleted && (
-              <button style={d.distributeBtn} onClick={distribute} disabled={distributing || workers.filter(w => w.roles.includes('counter')).length === 0}>
+              <button style={{ ...d.distributeBtn, ...(distributing || workers.filter(w => w.roles.includes('counter')).length === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={distribute} disabled={distributing || workers.filter(w => w.roles.includes('counter')).length === 0}>
                 {distributing ? t.invCycDistributing : t.invCycDistributeLines}
               </button>
             )}
@@ -780,7 +781,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             )}
             <div style={d.modalActions}>
               <button style={d.cancelBtn} onClick={() => setConfirmOpen(false)}>{t.cancel}</button>
-              <button style={d.confirmBtn} onClick={complete} disabled={completing}>
+              <button style={{ ...d.confirmBtn, ...(completing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={complete} disabled={completing}>
                 {completing ? t.invCycCompleting : t.invCycConfirmBtn}
               </button>
             </div>
@@ -827,7 +828,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             </div>
             <div style={d.modalActions}>
               <button style={d.cancelBtn} onClick={() => setOverrideModal(null)}>{t.cancel}</button>
-              <button style={{ ...d.confirmBtn, background: '#7c3aed' }}
+              <button style={{ ...d.confirmBtn, background: '#7c3aed', ...(overriding || overrideQty === '' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                 onClick={submitOverride} disabled={overriding || overrideQty === ''}>
                 {overriding ? t.invCycOverrideSaving : t.invCycOverride}
               </button>
@@ -951,7 +952,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
               {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           )}
-          <button style={s.startBtn} onClick={startCount} disabled={creating || (needsLocation && !newLocationId)}>
+          <button style={{ ...s.startBtn, ...(creating || (needsLocation && !newLocationId) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={startCount} disabled={creating || (needsLocation && !newLocationId)}>
             {creating ? t.invCycCreating : t.invCycStartCount}
           </button>
         </div>
@@ -985,7 +986,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
       {loadDetailError && <p style={s.inlineError}>{loadDetailError}</p>}
 
       {loading ? (
-        <div style={s.empty}>{t.loading}</div>
+        <SkeletonList count={4} rows={2} />
       ) : counts.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>📋</div>
@@ -998,7 +999,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
             const sc = STATUS_COLORS[count.status] || STATUS_COLORS.draft;
             const pct = count.line_count > 0 ? Math.round((count.counted_count / count.line_count) * 100) : 0;
             return (
-              <div key={count.id} style={s.card} onClick={() => openCount(count)}>
+              <div key={count.id} style={s.card} onClick={() => openCount(count)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && openCount(count)}>
                 <div style={s.cardTop}>
                   <div>
                     <div style={s.cardTitle}>{count.location_name}</div>
@@ -1026,7 +1027,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
         </div>
         {counts.length < countsTotal && (
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
-            <button style={s.loadMoreBtn} onClick={loadMoreCounts} disabled={loadingMore}>
+            <button style={{ ...s.loadMoreBtn, ...(loadingMore ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={loadMoreCounts} disabled={loadingMore}>
               {loadingMore ? t.loading : t.loadMore}
             </button>
             <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>{counts.length} / {countsTotal}</span>

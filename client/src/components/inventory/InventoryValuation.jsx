@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
+import { useAuth } from '../../contexts/AuthContext';
+import { langToLocale } from '../../utils';
+import { SkeletonList } from '../Skeleton';
 
 const VAL_PAGE = 200;
 
 export default function InventoryValuation({ locations }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [data, setData] = useState(null);
   const [valTotal, setValTotal] = useState(0);
   const [valOffset, setValOffset] = useState(0);
@@ -77,7 +82,7 @@ export default function InventoryValuation({ locations }) {
 
   const fmt = (n) => {
     const v = parseFloat(n || 0);
-    return v.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+    return v.toLocaleString(locale, { style: 'currency', currency: 'USD' });
   };
 
   const fmtQty = (n) => {
@@ -97,7 +102,7 @@ export default function InventoryValuation({ locations }) {
           <input type="checkbox" checked={showZero} onChange={e => setShowZero(e.target.checked)} />
           {t.invValIncludeZero}
         </label>
-        <button style={s.csvBtn} onClick={downloadCSV} disabled={!data || visibleItems.length === 0}>
+        <button style={{ ...s.csvBtn, ...(!data || visibleItems.length === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadCSV} disabled={!data || visibleItems.length === 0}>
           {t.invValDownloadCSV}
         </button>
       </div>
@@ -105,7 +110,7 @@ export default function InventoryValuation({ locations }) {
       {error && <div style={s.error}>{error}</div>}
 
       {loading ? (
-        <div style={s.empty}>{t.loading}</div>
+        <SkeletonList count={4} rows={2} />
       ) : !data || visibleItems.length === 0 ? (
         <div style={s.empty}>
           <div style={s.emptyIcon}>💰</div>
@@ -161,7 +166,7 @@ export default function InventoryValuation({ locations }) {
           </div>
           {(data?.items?.length || 0) < valTotal && (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
-              <button style={s.csvBtn} onClick={loadMoreVal} disabled={loadingMore}>
+              <button style={{ ...s.csvBtn, ...(loadingMore ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={loadMoreVal} disabled={loadingMore}>
                 {loadingMore ? t.loading : t.loadMore}
               </button>
               <span style={{ marginLeft: 10, fontSize: 13, color: '#6b7280' }}>

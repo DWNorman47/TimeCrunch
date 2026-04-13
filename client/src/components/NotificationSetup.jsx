@@ -53,7 +53,7 @@ export default function NotificationSetup() {
       if (Notification.permission === 'denied') {
         setState('denied');
       } else {
-        const msg = err.response?.data?.error || err.message || 'Failed to enable notifications.';
+        const msg = err.response?.data?.error || err.message || t.failedEnableNotifications;
         setErrorMsg(msg);
         setState('error');
       }
@@ -89,7 +89,7 @@ export default function NotificationSetup() {
       ) : state === 'denied' ? (
         <span style={styles.denied}>{t.blockedInBrowser}</span>
       ) : (
-        <button style={styles.onBtn} onClick={subscribe} disabled={state === 'loading'}>
+        <button style={{ ...styles.onBtn, ...(state === 'loading' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={subscribe} disabled={state === 'loading'}>
           {state === 'loading' ? t.enabling : t.enable}
         </button>
       )}

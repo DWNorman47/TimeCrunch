@@ -6,8 +6,10 @@ const { sendPushToUser } = require('../push');
 // GET /punchlist
 router.get('/', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
-  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
   const { project_id, status, priority, phase } = req.query;
+  const page  = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
 
   try {
     const conditions = ['pi.company_id = $1'];
@@ -18,25 +20,31 @@ router.get('/', requireAuth, async (req, res) => {
     if (priority) { params.push(priority); conditions.push(`pi.priority = $${params.length}`); }
     if (phase) { params.push(phase); conditions.push(`pi.phase = $${params.length}`); }
 
-    const result = await pool.query(
-      `SELECT pi.*, p.name as project_name,
-              creator.full_name as created_by_name,
-              assignee.full_name as assigned_to_name,
-              COUNT(ci.id) AS checklist_total,
-              COUNT(ci.id) FILTER (WHERE ci.checked = true) AS checked_count
-       FROM punchlist_items pi
-       LEFT JOIN projects p ON pi.project_id = p.id
-       LEFT JOIN users creator ON pi.created_by = creator.id
-       LEFT JOIN users assignee ON pi.assigned_to = assignee.id
-       LEFT JOIN punchlist_checklist_items ci ON ci.punchlist_id = pi.id
-       WHERE ${conditions.join(' AND ')}
-       GROUP BY pi.id, p.name, creator.full_name, assignee.full_name
-       ORDER BY
-         CASE pi.priority WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END,
-         pi.created_at DESC LIMIT 500`,
-      params
-    );
-    res.json(result.rows);
+    const where = conditions.join(' AND ');
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(`SELECT COUNT(DISTINCT pi.id) FROM punchlist_items pi WHERE ${where}`, params),
+      pool.query(
+        `SELECT pi.*, p.name as project_name,
+                creator.full_name as created_by_name,
+                assignee.full_name as assigned_to_name,
+                COUNT(ci.id) AS checklist_total,
+                COUNT(ci.id) FILTER (WHERE ci.checked = true) AS checked_count
+         FROM punchlist_items pi
+         LEFT JOIN projects p ON pi.project_id = p.id
+         LEFT JOIN users creator ON pi.created_by = creator.id
+         LEFT JOIN users assignee ON pi.assigned_to = assignee.id
+         LEFT JOIN punchlist_checklist_items ci ON ci.punchlist_id = pi.id
+         WHERE ${where}
+         GROUP BY pi.id, p.name, creator.full_name, assignee.full_name
+         ORDER BY
+           CASE pi.priority WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END,
+           pi.created_at DESC
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+    ]);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -46,10 +54,12 @@ router.post('/', requireAuth, async (req, res) => {
   const title = req.body.title?.trim();
   const description = req.body.description?.trim() || null;
   const location = req.body.location?.trim() || null;
+  const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
   if (!title) return res.status(400).json({ error: 'title required' });
   if (title.length > 255) return res.status(400).json({ error: 'title too long (max 255 characters)' });
   if (description && description.length > 1000) return res.status(400).json({ error: 'description too long (max 1000 characters)' });
   if (location && location.length > 255) return res.status(400).json({ error: 'location too long (max 255 characters)' });
+  if (priority !== undefined && !VALID_PRIORITIES.includes(priority)) return res.status(400).json({ error: 'Invalid priority value' });
   const companyId = req.user.company_id;
 
   try {
@@ -97,11 +107,16 @@ router.patch('/:id', requireAuth, async (req, res) => {
   if (status   !== undefined && !VALID_STATUSES.includes(status))   return res.status(400).json({ error: 'Invalid status value' });
   if (priority !== undefined && !VALID_PRIORITIES.includes(priority)) return res.status(400).json({ error: 'Invalid priority value' });
 
+  const clientUpdatedAt = req.body.updated_at || null;
   try {
     const existing = await pool.query(
       'SELECT * FROM punchlist_items WHERE id=$1 AND company_id=$2', [req.params.id, companyId]
     );
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+
+    if (clientUpdatedAt && new Date(existing.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+      return res.status(409).json({ error: 'conflict' });
+    }
 
     const resolvedAt = status === 'verified' && existing.rows[0].status !== 'verified'
       ? new Date() : existing.rows[0].resolved_at;

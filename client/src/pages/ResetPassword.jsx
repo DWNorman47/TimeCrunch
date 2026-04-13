@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useT } from '../hooks/useT';
 import api from '../api';
 import PasswordInput from '../components/PasswordInput';
 
 export default function ResetPassword() {
+  const t = useT();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const token = params.get('token');
@@ -14,14 +16,14 @@ export default function ResetPassword() {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (password !== confirm) { setError('Passwords do not match'); return; }
+    if (password !== confirm) { setError(t.resetPasswordsDontMatch); return; }
     setError('');
     setLoading(true);
     try {
       await api.post('/auth/reset-password', { token, password });
       navigate('/login?reset=1');
     } catch (err) {
-      setError(err.response?.data?.error || 'Reset failed. The link may have expired.');
+      setError(err.response?.data?.error || t.resetFailed);
     } finally {
       setLoading(false);
     }
@@ -32,7 +34,7 @@ export default function ResetPassword() {
       <div style={styles.page}>
         <div style={styles.card}>
           <h1 style={styles.logo}>OpsFloa</h1>
-          <p style={styles.body}>Invalid reset link. <Link to="/forgot-password" style={styles.link}>Request a new one</Link>.</p>
+          <p style={styles.body}>{t.resetInvalidLink} <Link to="/forgot-password" style={styles.link}>{t.resetRequestNew}</Link>.</p>
         </div>
       </div>
     );
@@ -42,29 +44,31 @@ export default function ResetPassword() {
     <div style={styles.page}>
       <div style={styles.card}>
         <h1 style={styles.logo}>OpsFloa</h1>
-        <h2 style={styles.title}>Set a new password</h2>
+        <h2 style={styles.title}>{t.resetTitle}</h2>
         <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>New password</label>
+          <label htmlFor="reset-password" style={styles.label}>{t.resetNewPasswordLabel}</label>
           <PasswordInput
+            id="reset-password"
             style={styles.input}
-            placeholder="At least 6 characters"
+            placeholder={t.loginAtLeastChars}
             value={password}
             onChange={e => setPassword(e.target.value)}
             required
             minLength={6}
             autoFocus
           />
-          <label style={styles.label}>Confirm password</label>
+          <label htmlFor="reset-confirm" style={styles.label}>{t.resetConfirmPasswordLabel}</label>
           <PasswordInput
+            id="reset-confirm"
             style={styles.input}
-            placeholder="Repeat password"
+            placeholder={t.loginRepeatPasswordPh}
             value={confirm}
             onChange={e => setConfirm(e.target.value)}
             required
           />
           {error && <p style={styles.error}>{error}</p>}
           <button style={styles.btn} type="submit" disabled={loading}>
-            {loading ? 'Saving...' : 'Set password'}
+            {loading ? t.saving : t.resetSetPasswordBtn}
           </button>
         </form>
       </div>

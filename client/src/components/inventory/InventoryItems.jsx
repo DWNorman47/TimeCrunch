@@ -74,11 +74,11 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
       {error && <div style={f.error}>{error}</div>}
       <div style={f.row}>
         <div style={f.field}>
-          <label style={f.label}>{t.itemNameLabel}</label>
-          <input style={f.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="2x4 Lumber, 3/4 Plywood…" required />
+          <label htmlFor="ii-name" style={f.label}>{t.itemNameLabel}</label>
+          <input id="ii-name" style={f.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.invItemNamePlaceholder} required />
         </div>
         <div style={f.field}>
-          <label style={f.label}>{t.itemSkuLabel}</label>
+          <label htmlFor="ii-sku" style={f.label}>{t.itemSkuLabel}</label>
           <div style={f.skuWrap}>
             <input
               ref={skuRef}
@@ -108,12 +108,12 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
       </div>
       <div style={f.row}>
         <div style={f.field}>
-          <label style={f.label}>{t.itemCategoryLabel}</label>
-          <input style={f.input} maxLength={100} value={form.category} onChange={e => set('category', e.target.value)} placeholder="Lumber, Electrical, Concrete…" />
+          <label htmlFor="ii-category" style={f.label}>{t.itemCategoryLabel}</label>
+          <input id="ii-category" style={f.input} maxLength={100} value={form.category} onChange={e => set('category', e.target.value)} placeholder={t.invCategoryPlaceholder} />
         </div>
         <div style={f.field}>
-          <label style={f.label}>{t.itemUnitLabel}</label>
-          <select style={f.input} value={form.useCustomUnit ? 'other' : form.unit} onChange={handleUnitChange}>
+          <label htmlFor="ii-unit" style={f.label}>{t.itemUnitLabel}</label>
+          <select id="ii-unit" style={f.input} value={form.useCustomUnit ? 'other' : form.unit} onChange={handleUnitChange}>
             {activeUnits.map(u => <option key={u} value={u}>{u}</option>)}
           </select>
           {form.useCustomUnit && (
@@ -121,31 +121,32 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
           )}
         </div>
         <div style={f.field}>
-          <label style={f.label}>{t.itemUnitSpecLabel} <span style={{ fontWeight: 400, color: '#9ca3af' }}>(e.g. "50 ct", "10×50")</span></label>
-          <input style={f.input} value={form.unit_spec} onChange={e => set('unit_spec', e.target.value)} placeholder={t.optional} />
+          <label htmlFor="ii-unit-spec" style={f.label}>{t.itemUnitSpecLabel} <span style={{ fontWeight: 400, color: '#9ca3af' }}>(e.g. "50 ct", "10×50")</span></label>
+          <input id="ii-unit-spec" style={f.input} value={form.unit_spec} onChange={e => set('unit_spec', e.target.value)} placeholder={t.optional} />
         </div>
       </div>
       <div style={f.row}>
         <div style={f.field}>
-          <label style={f.label}>{t.itemUnitCostLabel}</label>
-          <input style={f.input} type="number" min="0" step="0.01" value={form.unit_cost} onChange={e => set('unit_cost', e.target.value)} placeholder="0.00" />
+          <label htmlFor="ii-unit-cost" style={f.label}>{t.itemUnitCostLabel}</label>
+          <input id="ii-unit-cost" style={f.input} type="number" min="0" step="0.01" value={form.unit_cost} onChange={e => set('unit_cost', e.target.value)} placeholder="0.00" />
         </div>
         <div style={f.field}>
-          <label style={f.label}>{t.itemReorderPoint}</label>
-          <input style={f.input} type="number" min="0" step="1" value={form.reorder_point} onChange={e => set('reorder_point', e.target.value)} />
+          <label htmlFor="ii-reorder-point" style={f.label}>{t.itemReorderPoint}</label>
+          <input id="ii-reorder-point" style={f.input} type="number" min="0" step="1" value={form.reorder_point} onChange={e => set('reorder_point', e.target.value)} />
         </div>
         <div style={f.field}>
-          <label style={f.label}>{t.itemReorderQty}</label>
-          <input style={f.input} type="number" min="0" step="1" value={form.reorder_qty} onChange={e => set('reorder_qty', e.target.value)} />
+          <label htmlFor="ii-reorder-qty" style={f.label}>{t.itemReorderQty}</label>
+          <input id="ii-reorder-qty" style={f.input} type="number" min="0" step="1" value={form.reorder_qty} onChange={e => set('reorder_qty', e.target.value)} />
         </div>
       </div>
       <div style={f.field}>
-        <label style={f.label}>{t.itemDescriptionLabel}</label>
-        <textarea style={{ ...f.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
+        <label htmlFor="ii-description" style={f.label}>{t.itemDescriptionLabel}</label>
+        <textarea id="ii-description" style={{ ...f.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
+        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.description || '').length}/1000</div>
       </div>
       <div style={f.actions}>
         <button type="button" style={f.cancelBtn} onClick={onCancel}>{t.cancel}</button>
-        <button type="submit" style={f.saveBtn} disabled={saving}>{saving ? t.saving : item ? t.saveChanges : t.addItem}</button>
+        <button type="submit" style={{ ...f.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={saving}>{saving ? t.saving : item ? t.saveChanges : t.addItem}</button>
       </div>
     </form>
   );
@@ -230,22 +231,22 @@ function ItemUOMPanel({ item }) {
         <div style={u.addForm}>
           <div style={u.formRow}>
             <div style={u.field}>
-              <label style={u.label}>{t.uomUnit}</label>
-              <input style={u.input} value={newForm.unit} onChange={e => setN('unit', e.target.value)} placeholder="box, bag, each…" />
+              <label htmlFor="ii-uom-unit" style={u.label}>{t.uomUnit}</label>
+              <input id="ii-uom-unit" style={u.input} value={newForm.unit} onChange={e => setN('unit', e.target.value)} placeholder={t.invUnitPlaceholder} />
             </div>
             <div style={u.field}>
-              <label style={u.label}>{t.uomSpec}</label>
-              <input style={u.input} value={newForm.unit_spec} onChange={e => setN('unit_spec', e.target.value)} placeholder="50 ct, 10×50…" />
+              <label htmlFor="ii-uom-spec" style={u.label}>{t.uomSpec}</label>
+              <input id="ii-uom-spec" style={u.input} value={newForm.unit_spec} onChange={e => setN('unit_spec', e.target.value)} placeholder={t.invUnitSpecPlaceholder} />
             </div>
             <div style={u.field}>
-              <label style={u.label}>{t.uomFactor}</label>
-              <input style={u.input} type="number" min="0.0001" step="any" value={newForm.factor} onChange={e => setN('factor', e.target.value)} />
+              <label htmlFor="ii-uom-factor" style={u.label}>{t.uomFactor}</label>
+              <input id="ii-uom-factor" style={u.input} type="number" min="0.0001" step="any" value={newForm.factor} onChange={e => setN('factor', e.target.value)} />
             </div>
             <div style={u.field}>
-              <label style={u.label}>{t.uomBase}</label>
-              <input type="checkbox" checked={newForm.is_base} onChange={e => setN('is_base', e.target.checked)} style={{ marginTop: 10 }} />
+              <label htmlFor="ii-uom-base" style={u.label}>{t.uomBase}</label>
+              <input id="ii-uom-base" type="checkbox" checked={newForm.is_base} onChange={e => setN('is_base', e.target.checked)} style={{ marginTop: 10 }} />
             </div>
-            <button style={u.saveBtn} onClick={add} disabled={saving}>{t.save}</button>
+            <button style={{ ...u.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={add} disabled={saving}>{t.save}</button>
           </div>
           <p style={u.factorNote}>{t.uomFactorNote}</p>
         </div>
@@ -276,7 +277,7 @@ function ItemUOMPanel({ item }) {
                     <td style={u.td}><input style={{ ...u.input, width: 70, textAlign: 'right' }} type="number" min="0.0001" step="any" value={editForm.factor} onChange={e => setE('factor', e.target.value)} /></td>
                     <td style={u.td}><input type="checkbox" checked={!!editForm.is_base} onChange={e => setE('is_base', e.target.checked)} /></td>
                     <td style={{ ...u.td, whiteSpace: 'nowrap' }}>
-                      <button style={u.saveBtn} onClick={() => save(row.id)} disabled={saving}>{t.save}</button>
+                      <button style={{ ...u.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => save(row.id)} disabled={saving}>{t.save}</button>
                       <button style={u.cancelBtn} onClick={() => setEditingId(null)}>{t.cancel}</button>
                     </td>
                   </>
@@ -287,14 +288,14 @@ function ItemUOMPanel({ item }) {
                     <td style={{ ...u.td, textAlign: 'right' }}>{parseFloat(row.factor)}</td>
                     <td style={u.td}>{row.is_base ? <span style={u.baseBadge}>{t.uomBaseBadge}</span> : ''}</td>
                     <td style={{ ...u.td, whiteSpace: 'nowrap' }}>
-                      <button style={u.iconBtn} onClick={() => { setEditingId(row.id); setEditForm({ unit: row.unit, unit_spec: row.unit_spec || '', factor: String(row.factor), is_base: row.is_base }); }}>✏️</button>
+                      <button style={u.iconBtn} aria-label={t.editUnit} onClick={() => { setEditingId(row.id); setEditForm({ unit: row.unit, unit_spec: row.unit_spec || '', factor: String(row.factor), is_base: row.is_base }); }}>✏️</button>
                       {!row.is_base && (pendingRemoveUomId === row.id ? (
                         <>
                           <button style={u.confirmRemoveBtn} onClick={() => remove(row.id)}>{t.confirm}</button>
-                          <button style={u.iconBtn} onClick={() => setPendingRemoveUomId(null)}>✕</button>
+                          <button style={u.iconBtn} aria-label={t.cancelRemove} onClick={() => setPendingRemoveUomId(null)}>✕</button>
                         </>
                       ) : (
-                        <button style={u.iconBtn} onClick={() => setPendingRemoveUomId(row.id)}>🗑️</button>
+                        <button style={u.iconBtn} aria-label={t.removeUnit} onClick={() => setPendingRemoveUomId(row.id)}>🗑️</button>
                       ))}
                     </td>
                   </>
@@ -492,19 +493,19 @@ export default function InventoryItems({ onItemChange }) {
                       <td style={{ ...s.td, whiteSpace: 'nowrap' }}>
                         {item.active ? (
                           <>
-                            <button style={s.iconBtn} onClick={() => setLabelItem(item)} title="Print label">🏷️</button>
-                            <button style={s.iconBtn} onClick={() => setEditingItem(item)} title="Edit">✏️</button>
+                            <button style={s.iconBtn} onClick={() => setLabelItem(item)} aria-label={t.printLabel}>🏷️</button>
+                            <button style={s.iconBtn} onClick={() => setEditingItem(item)} aria-label={t.editItem}>✏️</button>
                             {pendingArchiveItemId === item.id ? (
                               <>
-                                <button style={s.confirmArchiveBtn} onClick={() => archive(item)} disabled={archiving === item.id}>{t.confirm}</button>
-                                <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(null)}>✕</button>
+                                <button style={{ ...s.confirmArchiveBtn, ...(archiving === item.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => archive(item)} disabled={archiving === item.id}>{t.confirm}</button>
+                                <button style={s.iconBtn} aria-label={t.cancelArchive} onClick={() => setPendingArchiveItemId(null)}>✕</button>
                               </>
                             ) : (
-                              <button style={{ ...s.iconBtn, opacity: archiving === item.id ? 0.5 : 1 }} onClick={() => setPendingArchiveItemId(item.id)} title="Archive">🗄️</button>
+                              <button style={{ ...s.iconBtn, opacity: archiving === item.id ? 0.5 : 1 }} onClick={() => setPendingArchiveItemId(item.id)} title={t.archive}>🗄️</button>
                             )}
                           </>
                         ) : (
-                          <button style={s.iconBtn} onClick={() => restore(item)} title="Restore">↩️</button>
+                          <button style={s.iconBtn} onClick={() => restore(item)} title={t.restore}>↩️</button>
                         )}
                       </td>
                     </tr>
@@ -516,8 +517,8 @@ export default function InventoryItems({ onItemChange }) {
                   <span style={s.pageInfo}>
                     {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
                   </span>
-                  <button style={s.pageBtn} disabled={page === 0} onClick={() => { const p = page - 1; setPage(p); load(p); }}>← Prev</button>
-                  <button style={s.pageBtn} disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => { const p = page + 1; setPage(p); load(p); }}>Next →</button>
+                  <button style={{ ...s.pageBtn, ...(page === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={page === 0} onClick={() => { const p = page - 1; setPage(p); load(p); }}>← Prev</button>
+                  <button style={{ ...s.pageBtn, ...((page + 1) * PAGE_SIZE >= total ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => { const p = page + 1; setPage(p); load(p); }}>Next →</button>
                 </div>
               )}
             </div>

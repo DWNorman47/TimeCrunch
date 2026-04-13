@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
-import { PDFButton } from './DailyReportPDF';
 import { useT } from '../hooks/useT';
+import { langToLocale } from '../utils';
+import { SkeletonList } from './Skeleton';
+import Pagination from './Pagination';
 
 const WEATHER_KEYS = [
   { value: 'sunny', key: 'weatherSunny', emoji: '☀️' },
@@ -15,8 +17,8 @@ const WEATHER_KEYS = [
   { value: 'windy', key: 'weatherWindy', emoji: '🌬️' },
 ];
 
-function fmtDate(str) {
-  return new Date(str + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDate(str, locale = 'en-US') {
+  return new Date(str + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function emptyRow(type) {
@@ -42,10 +44,12 @@ function RowInput({ value, onChange, type = 'text', placeholder, style, min, max
 
 function ReportEditor({ report: initial, projects, onSaved, onCancel, companyName, fieldPhotos }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const isNew = !initial?.id;
   const today = new Date().toLocaleDateString('en-CA');
-  const WEATHER_OPTIONS = WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` }));
-  const WEATHER_LABELS = Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label]));
+  const WEATHER_OPTIONS = useMemo(() => WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` })), [t]);
+  const WEATHER_LABELS = useMemo(() => Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label])), [WEATHER_OPTIONS]);
 
   const [form, setForm] = useState({
     project_id: initial?.project_id || '',
@@ -67,6 +71,22 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
   const [suggesting, setSuggesting] = useState(false);
   const [gettingWeather, setGettingWeather] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+
+  const downloadPDF = async (reportData) => {
+    setPdfGenerating(true);
+    try {
+      const [{ pdf }, { DailyReportDocument }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./DailyReportPDF'),
+      ]);
+      const blob = await pdf(React.createElement(DailyReportDocument, { report: reportData, companyName, fieldPhotos: fieldPhotos || [], language: user?.language })).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `daily-report-${reportData.report_date || 'report'}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
 
   useEffect(() => {
     if (!dirty) return;
@@ -150,12 +170,15 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
           return;
         }
       } else {
-        r = await api.patch(`/daily-reports/${initial.id}`, payload);
+        r = await api.patch(`/daily-reports/${initial.id}`, { ...payload, updated_at: initial.updated_at });
       }
       setDirty(false);
       onSaved(r.data);
     } catch (err) {
-      setError(err.response?.data?.error || t.failedToSave);
+      const msg = err.response?.status === 409
+        ? t.concurrentModification
+        : err.response?.data?.error || t.failedToSave;
+      setError(msg);
     } finally { setSaving(false); setSubmitting(false); }
   };
 
@@ -164,12 +187,9 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       <div style={styles.editorHeader}>
         <h3 style={styles.editorTitle}>{isNew ? t.newDailyReport : t.editDailyReport}</h3>
         {!isNew && initial.status === 'submitted' && (
-          <PDFButton
-            report={{ ...initial, ...form, manpower, equipment, materials }}
-            companyName={companyName}
-            fieldPhotos={fieldPhotos}
-            style={styles.pdfBtn}
-          />
+          <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => downloadPDF({ ...initial, ...form, manpower, equipment, materials })} disabled={pdfGenerating}>
+            {pdfGenerating ? t.preparing : t.exportPDF}
+          </button>
         )}
       </div>
 
@@ -177,7 +197,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       <div style={styles.fieldGrid}>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.date}</label>
-          <input style={styles.input} type="date" value={form.report_date} onChange={e => set('report_date', e.target.value)} />
+          <input style={styles.input} type="date" value={form.report_date} onChange={e => set('report_date', e.target.value)} max={new Date().toLocaleDateString('en-CA')} />
         </div>
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.project}</label>
@@ -193,8 +213,8 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
         <div style={styles.fieldGroup}>
           <label style={styles.label}>
             {t.weather}
-            <button type="button" style={styles.weatherBtn} onClick={autoFillWeather} disabled={gettingWeather} title="Auto-fill from current location">
-              {gettingWeather ? '...' : '🌤 Auto'}
+            <button type="button" style={{ ...styles.weatherBtn, ...(gettingWeather ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={autoFillWeather} disabled={gettingWeather} title={t.autoFillLocation}>
+              {gettingWeather ? t.loading : '🌤 Auto'}
             </button>
           </label>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -211,8 +231,8 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       <div style={styles.section}>
         <div style={styles.sectionHead}>
           <span style={styles.sectionTitle}>{t.manpowerSection}</span>
-          <button style={styles.autofillBtn} onClick={autoFillManpower} disabled={suggesting}>
-            {suggesting ? '...' : `⚡ ${t.autoFillEntries}`}
+          <button style={{ ...styles.autofillBtn, ...(suggesting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={autoFillManpower} disabled={suggesting}>
+            {suggesting ? t.loading : `⚡ ${t.autoFillEntries}`}
           </button>
         </div>
         <table style={styles.table}>
@@ -228,11 +248,11 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
           <tbody>
             {manpower.map((m, i) => (
               <tr key={i}>
-                <td style={styles.td}><RowInput value={m.trade} onChange={v => updateRow(manpower, setManpower, i, 'trade', v)} placeholder="e.g. Carpenters" maxLength={255} /></td>
+                <td style={styles.td}><RowInput value={m.trade} onChange={v => updateRow(manpower, setManpower, i, 'trade', v)} placeholder={t.crewTypePlaceholder} maxLength={255} /></td>
                 <td style={styles.td}><RowInput value={m.worker_count} onChange={v => updateRow(manpower, setManpower, i, 'worker_count', v)} type="number" min="1" style={{ width: 55 }} /></td>
                 <td style={styles.td}><RowInput value={m.hours} onChange={v => updateRow(manpower, setManpower, i, 'hours', v)} type="number" min="0" placeholder="0" style={{ width: 55 }} /></td>
                 <td style={styles.td}><RowInput value={m.notes} onChange={v => updateRow(manpower, setManpower, i, 'notes', v)} placeholder={t.optional} maxLength={500} /></td>
-                <td style={styles.td}><button style={styles.removeRowBtn} aria-label="Remove row" onClick={() => removeRow(manpower, setManpower, i)}>✕</button></td>
+                <td style={styles.td}><button style={styles.removeRowBtn} aria-label={t.removeRow} onClick={() => removeRow(manpower, setManpower, i)}>✕</button></td>
               </tr>
             ))}
           </tbody>
@@ -242,7 +262,10 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
 
       {/* Work Performed */}
       <div style={styles.section}>
-        <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.workPerformed}</span></div>
+        <div style={styles.sectionHead}>
+          <span style={styles.sectionTitle}>{t.workPerformed}</span>
+          <span style={styles.charCount}>{(form.work_performed || '').length}/2000</span>
+        </div>
         <textarea style={styles.textarea} rows={4} placeholder={t.workPerformedPlaceholder} maxLength={2000} value={form.work_performed} onChange={e => set('work_performed', e.target.value)} />
       </div>
 
@@ -268,7 +291,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
                   <td style={styles.td}><RowInput value={e.name} onChange={v => updateRow(equipment, setEquipment, i, 'name', v)} placeholder={t.equipmentNamePlaceholder} maxLength={255} /></td>
                   <td style={styles.td}><RowInput value={e.quantity} onChange={v => updateRow(equipment, setEquipment, i, 'quantity', v)} type="number" min="1" style={{ width: 55 }} /></td>
                   <td style={styles.td}><RowInput value={e.hours} onChange={v => updateRow(equipment, setEquipment, i, 'hours', v)} type="number" min="0" placeholder="0" style={{ width: 55 }} /></td>
-                  <td style={styles.td}><button style={styles.removeRowBtn} aria-label="Remove row" onClick={() => removeRow(equipment, setEquipment, i)}>✕</button></td>
+                  <td style={styles.td}><button style={styles.removeRowBtn} aria-label={t.removeRow} onClick={() => removeRow(equipment, setEquipment, i)}>✕</button></td>
                 </tr>
               ))}
             </tbody>
@@ -294,9 +317,9 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
             <tbody>
               {materials.map((m, i) => (
                 <tr key={i}>
-                  <td style={styles.td}><RowInput value={m.description} onChange={v => updateRow(materials, setMaterials, i, 'description', v)} placeholder="e.g. Lumber 2x4" maxLength={500} /></td>
-                  <td style={styles.td}><RowInput value={m.quantity} onChange={v => updateRow(materials, setMaterials, i, 'quantity', v)} placeholder="e.g. 200 boards" /></td>
-                  <td style={styles.td}><button style={styles.removeRowBtn} aria-label="Remove row" onClick={() => removeRow(materials, setMaterials, i)}>✕</button></td>
+                  <td style={styles.td}><RowInput value={m.description} onChange={v => updateRow(materials, setMaterials, i, 'description', v)} placeholder={t.materialDescPlaceholder} maxLength={500} /></td>
+                  <td style={styles.td}><RowInput value={m.quantity} onChange={v => updateRow(materials, setMaterials, i, 'quantity', v)} placeholder={t.materialQtyPlaceholder} /></td>
+                  <td style={styles.td}><button style={styles.removeRowBtn} aria-label={t.removeRow} onClick={() => removeRow(materials, setMaterials, i)}>✕</button></td>
                 </tr>
               ))}
             </tbody>
@@ -306,13 +329,19 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
 
       {/* Delays */}
       <div style={styles.section}>
-        <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.delaysIssues}</span></div>
+        <div style={styles.sectionHead}>
+          <span style={styles.sectionTitle}>{t.delaysIssues}</span>
+          <span style={styles.charCount}>{(form.delays_issues || '').length}/2000</span>
+        </div>
         <textarea style={styles.textarea} rows={3} placeholder={t.delaysIssuesPlaceholder} maxLength={2000} value={form.delays_issues} onChange={e => set('delays_issues', e.target.value)} />
       </div>
 
       {/* Visitor log */}
       <div style={styles.section}>
-        <div style={styles.sectionHead}><span style={styles.sectionTitle}>{t.visitorLog}</span></div>
+        <div style={styles.sectionHead}>
+          <span style={styles.sectionTitle}>{t.visitorLog}</span>
+          <span style={styles.charCount}>{(form.visitor_log || '').length}/2000</span>
+        </div>
         <textarea style={styles.textarea} rows={2} placeholder={t.visitorLogPlaceholder} maxLength={2000} value={form.visitor_log} onChange={e => set('visitor_log', e.target.value)} />
       </div>
 
@@ -321,7 +350,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
           <div style={styles.sectionHead}><span style={styles.sectionTitle}>📷 {fieldPhotos.length} {t.photosFromFieldReports}</span></div>
           <div style={styles.photoStrip}>
             {fieldPhotos.map((p, i) => (
-              <img key={i} src={p.url} style={styles.photoThumb} alt={p.caption || `photo ${i + 1}`} title={p.caption} />
+              <img key={i} src={p.url} style={styles.photoThumb} alt={p.caption || `photo ${i + 1}`} title={p.caption} loading="lazy" />
             ))}
           </div>
           <p style={styles.photoNote}>{t.photosPulledNote}</p>
@@ -331,10 +360,10 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
       {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.editorActions}>
-        <button style={styles.saveDraftBtn} onClick={() => save('draft')} disabled={saving || submitting}>
+        <button style={{ ...styles.saveDraftBtn, ...((saving || submitting) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => save('draft')} disabled={saving || submitting}>
           {saving ? t.saving : t.saveDraft}
         </button>
-        <button style={styles.submitBtn} onClick={() => save('submitted')} disabled={saving || submitting}>
+        <button style={{ ...styles.submitBtn, ...((saving || submitting) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => save('submitted')} disabled={saving || submitting}>
           {submitting ? t.submitting : t.submitReport}
         </button>
         <button style={styles.cancelBtn} onClick={onCancel}>{t.cancel}</button>
@@ -347,14 +376,31 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
 
 function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyName, fieldPhotos }) {
   const t = useT();
+  const { user } = useAuth();
   const [report, setReport] = useState(initialReport);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [approving, setApproving] = useState(false);
   const [approveError, setApproveError] = useState('');
-  const WEATHER_OPTIONS = WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` }));
-  const WEATHER_LABELS = Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label]));
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const [{ pdf }, { DailyReportDocument }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./DailyReportPDF'),
+      ]);
+      const blob = await pdf(React.createElement(DailyReportDocument, { report, companyName, fieldPhotos: fieldPhotos || [], language: user?.language })).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `daily-report-${report.report_date || 'report'}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
+  const WEATHER_OPTIONS = useMemo(() => WEATHER_KEYS.map(w => ({ value: w.value, label: `${w.emoji} ${t[w.key]}` })), [t]);
+  const WEATHER_LABELS = useMemo(() => Object.fromEntries(WEATHER_OPTIONS.map(o => [o.value, o.label])), [WEATHER_OPTIONS]);
   const weather = report.weather_condition ? WEATHER_LABELS[report.weather_condition] : null;
 
   const handleDelete = async () => {
@@ -380,15 +426,15 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
 
   return (
     <div style={styles.reportRow}>
-      <div style={styles.rowLeft} onClick={() => !report.pending && onEdit(report)}>
-        <div style={styles.rowDate}>{fmtDate(report.report_date)}{report.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
+      <div style={styles.rowLeft} onClick={() => !report.pending && onEdit(report)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && !report.pending && onEdit(report)}>
+        <div style={styles.rowDate}>{fmtDate(report.report_date, locale)}{report.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
         <div style={styles.rowProject}>{report.project_name || t.noProjectOpt}</div>
         {weather && <div style={styles.rowMeta}>{weather}{report.weather_temp != null ? ` · ${report.weather_temp}°F` : ''}</div>}
         {report.manpower_count > 0 && <div style={styles.rowMeta}>{report.manpower_count} {report.manpower_count !== 1 ? t.crewEntries : t.crewEntry}</div>}
         {isReviewed && report.reviewed_by && (
           <div style={styles.reviewedMeta}>
             ✓ {t.reviewedBy} {report.reviewed_by}
-            {report.reviewed_at && ` · ${new Date(report.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+            {report.reviewed_at && ` · ${new Date(report.reviewed_at).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}`}
           </div>
         )}
       </div>
@@ -397,17 +443,14 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
           {isReviewed ? t.statusReviewed : isSubmitted ? t.statusSubmitted : t.statusDraft}
         </span>
         {(isSubmitted || isReviewed) && (
-          <PDFButton
-            report={report}
-            companyName={companyName}
-            fieldPhotos={fieldPhotos}
-            style={styles.pdfBtnSmall}
-          />
+          <button style={{ ...styles.pdfBtnSmall, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>
+            {pdfGenerating ? t.preparing : 'PDF'}
+          </button>
         )}
         {isAdmin && isSubmitted && (
           <>
-            <button style={styles.approveBtn} onClick={handleApprove} disabled={approving}>
-              {approving ? '...' : t.approve}
+            <button style={{ ...styles.approveBtn, ...(approving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleApprove} disabled={approving}>
+              {approving ? t.saving : t.approve}
             </button>
             {approveError && <span style={styles.inlineError}>{approveError}</span>}
           </>
@@ -415,12 +458,12 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
         {!report.pending && <button style={styles.editRowBtn} onClick={() => onEdit(report)}>{t.edit}</button>}
         {!report.pending && (confirmingDelete ? (
           <>
-            <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '...' : t.confirm}</button>
+            <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? t.saving : t.confirm}</button>
             <button style={styles.cancelRowBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
             {deleteError && <span style={styles.inlineError}>{deleteError}</span>}
           </>
         ) : (
-          <button style={styles.deleteRowBtn} onClick={() => setConfirmingDelete(true)}>✕</button>
+          <button style={styles.deleteRowBtn} aria-label={t.deleteReport} onClick={() => setConfirmingDelete(true)}>✕</button>
         ))}
       </div>
     </div>
@@ -432,22 +475,25 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
 export default function DailyReports({ projects }) {
   const { user } = useAuth();
   const t = useT();
+  const locale = langToLocale(user?.language);
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
   const [reports, setReports] = useState([]);
-  const [truncated, setTruncated] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // null=list, 'new'=new form, report=edit form
   const [filterProject, setFilterProject] = useState('');
   const [fieldPhotos, setFieldPhotos] = useState({});
 
-  const loadReports = async () => {
+  const loadReports = async (p = 1) => {
+    setPage(p);
     try {
-      const params = {};
+      const params = { page: p, limit: 50 };
       if (filterProject) params.project_id = filterProject;
       const r = await api.get('/daily-reports', { params });
-      setReports(r.data);
-      setTruncated(r.data.length === 500);
+      setReports(r.data.items);
+      setTotalPages(r.data.pages);
     } finally { setLoading(false); }
   };
 
@@ -459,14 +505,14 @@ export default function DailyReports({ projects }) {
       const params = { from: date, to: date };
       if (projectId) params.project_id = projectId;
       const r = await api.get('/field-reports', { params });
-      const photos = r.data.flatMap(fr => fr.photos || []);
+      const photos = r.data.items.flatMap(fr => fr.photos || []);
       setFieldPhotos(prev => ({ ...prev, [key]: photos }));
       return photos;
     } catch { return []; }
   };
 
-  useEffect(() => { loadReports(); }, [filterProject]);
-  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadReports(); }); }, [onSync]);
+  useEffect(() => { loadReports(1); }, [filterProject]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadReports(page); }); }, [onSync]);
 
   const handleSaved = report => {
     setReports(prev => {
@@ -509,7 +555,7 @@ export default function DailyReports({ projects }) {
 
   return (
     <div>
-      <div style={styles.listHeader}>
+      <div className="filter-row" style={styles.listHeader}>
         <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
           <option value="">{t.allProjects}</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -517,27 +563,29 @@ export default function DailyReports({ projects }) {
         <button style={styles.newBtn} onClick={() => setEditing('new')}>{t.newReport}</button>
       </div>
 
-      {loading ? <p style={styles.hint}>{t.loading}</p> :
+      {loading ? <SkeletonList count={3} rows={2} /> :
         reports.length === 0 ? (
           <div style={styles.empty}>
             <div style={styles.emptyIcon}>📋</div>
             <p style={styles.emptyText}>{t.noDailyReports}</p>
           </div>
         ) : (
-          <div style={styles.reportList}>
-            {truncated && <div style={styles.truncatedBanner}>{t.resultsTruncated || 'Showing the 500 most recent reports. Use filters to narrow results.'}</div>}
-            {reports.map(r => (
-              <ReportRow
-                key={r.id}
-                report={r}
-                onEdit={handleEdit}
-                onDelete={id => setReports(prev => prev.filter(r => r.id !== id))}
-                isAdmin={isAdmin}
-                companyName={user?.company_name}
-                fieldPhotos={getPhotos(r)}
-              />
-            ))}
-          </div>
+          <>
+            <div style={styles.reportList}>
+              {reports.map(r => (
+                <ReportRow
+                  key={r.id}
+                  report={r}
+                  onEdit={handleEdit}
+                  onDelete={id => setReports(prev => prev.filter(r => r.id !== id))}
+                  isAdmin={isAdmin}
+                  companyName={user?.company_name}
+                  fieldPhotos={getPhotos(r)}
+                />
+              ))}
+            </div>
+            <Pagination page={page} pages={totalPages} onChange={p => loadReports(p)} />
+          </>
         )
       }
     </div>
@@ -552,7 +600,6 @@ const styles = {
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', flex: 1, maxWidth: 220 },
   newBtn: { background: '#059669', color: '#fff', border: 'none', padding: '9px 16px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0 },
   reportList: { display: 'flex', flexDirection: 'column', gap: 8 },
-  truncatedBanner: { background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 7, padding: '8px 12px', fontSize: 13, color: '#92400e', marginBottom: 8 },
   reportRow: { background: '#fff', borderRadius: 10, padding: '12px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   rowLeft: { flex: 1, cursor: 'pointer', minWidth: 0 },
   rowDate: { fontWeight: 700, fontSize: 14, color: '#111827', marginBottom: 2 },
@@ -587,6 +634,7 @@ const styles = {
   input: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, width: '100%' },
   section: { marginBottom: 20 },
   sectionHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 },
+  charCount: { fontSize: 11, color: '#9ca3af', flexShrink: 0 },
   sectionTitle: { fontWeight: 700, fontSize: 13, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.04em' },
   autofillBtn: { fontSize: 12, color: '#1a56db', background: '#eff6ff', border: 'none', padding: '5px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600, flexShrink: 0 },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 6 },

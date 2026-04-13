@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -12,8 +14,8 @@ function fmtH(h) {
   return wm > 0 ? `${wh}h ${wm}m` : `${wh}h`;
 }
 
-function fmtDate(d) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDate(d, locale = 'en-US') {
+  return new Date(d + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function lastSunday() {
@@ -24,6 +26,8 @@ function lastSunday() {
 
 export default function CertifiedPayroll({ projects }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [weekEnd, setWeekEnd] = useState(lastSunday());
   const [projectId, setProjectId] = useState('');
   const [data, setData] = useState(null);
@@ -96,15 +100,15 @@ export default function CertifiedPayroll({ projects }) {
       <h1>Payroll Report</h1>
       <div class="meta">
         <div><strong>Contractor:</strong> ${data.contractor}</div>
-        <div><strong>Week ending:</strong> ${fmtDate(data.week_end)}</div>
-        <div><strong>Project:</strong> ${data.project || 'All projects'}</div>
-        <div><strong>Week starting:</strong> ${fmtDate(data.week_start)}</div>
+        <div><strong>Week ending:</strong> ${fmtDate(data.week_end, locale)}</div>
+        <div><strong>Project:</strong> ${data.project || t.allProjectsOpt}</div>
+        <div><strong>Week starting:</strong> ${fmtDate(data.week_start, locale)}</div>
       </div>
       <table>
         <thead>${headerRow}</thead>
         <tbody>${workerRows || '<tr><td colspan="12" style="text-align:center;color:#9ca3af;padding:16px">No entries for this period</td></tr>'}</tbody>
       </table>
-      <p class="footer">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <p class="footer">${new Date().toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' })}</p>
     </body></html>`);
     win.document.close();
     win.print();
@@ -119,17 +123,17 @@ export default function CertifiedPayroll({ projects }) {
 
       <div style={styles.controls}>
         <div style={styles.field}>
-          <label style={styles.label}>{t.weekEnding}</label>
-          <input style={styles.input} type="date" value={weekEnd} onChange={e => { setWeekEnd(e.target.value); setData(null); }} />
+          <label htmlFor="cp-week-end" style={styles.label}>{t.weekEnding}</label>
+          <input id="cp-week-end" style={styles.input} type="date" value={weekEnd} onChange={e => { setWeekEnd(e.target.value); setData(null); }} />
         </div>
         <div style={styles.field}>
-          <label style={styles.label}>{t.projectOptional}</label>
-          <select style={styles.input} value={projectId} onChange={e => { setProjectId(e.target.value); setData(null); }}>
+          <label htmlFor="cp-project" style={styles.label}>{t.projectOptional}</label>
+          <select id="cp-project" style={styles.input} value={projectId} onChange={e => { setProjectId(e.target.value); setData(null); }}>
             <option value="">{t.allProjectsOpt}</option>
             {(projects || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
-        <button style={styles.generateBtn} onClick={generate} disabled={loading || !weekEnd}>
+        <button style={{ ...styles.generateBtn, ...((loading || !weekEnd) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={generate} disabled={loading || !weekEnd}>
           {loading ? t.loading : t.generate}
         </button>
       </div>
@@ -142,7 +146,7 @@ export default function CertifiedPayroll({ projects }) {
             <div>
               <div style={styles.metaLine}><strong>{t.contractorLabel}</strong> {data.contractor}</div>
               <div style={styles.metaLine}><strong>{t.project}:</strong> {data.project || t.allProjectsOpt}</div>
-              <div style={styles.metaLine}><strong>Period:</strong> {fmtDate(data.week_start)} – {fmtDate(data.week_end)}</div>
+              <div style={styles.metaLine}><strong>Period:</strong> {fmtDate(data.week_start, locale)} – {fmtDate(data.week_end, locale)}</div>
             </div>
             <button style={styles.printBtn} onClick={printReport}>{t.printSavePDF}</button>
           </div>

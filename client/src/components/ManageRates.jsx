@@ -241,7 +241,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       {saved === section && <span style={styles.savedMsg}>{t.ratesSettingsSaved}</span>}
       {error && saving === null && <span style={styles.errorMsg}>{error}</span>}
       <button
-        style={styles.saveBtn}
+        style={{ ...styles.saveBtn, ...(saving === section ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
         type="button"
         disabled={saving === section}
         onClick={() => saveSection(section)}
@@ -257,7 +257,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
 
       {/* ── Wages ── */}
       <div style={styles.section}>
-        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('wages')}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('wages')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('wages')}>
           <span style={styles.sectionIcon}>💰</span>
           <div style={{ flex: 1 }}>
             <div style={styles.sectionTitle}>{t.ratesWages}</div>
@@ -318,7 +318,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
 
       {/* ── Overtime ── */}
       {form.feature_overtime && <div style={styles.section}>
-        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('overtime')}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('overtime')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('overtime')}>
           <span style={styles.sectionIcon}>⏱️</span>
           <div style={{ flex: 1 }}>
             <div style={styles.sectionTitle}>{t.ratesOvertime}</div>
@@ -356,7 +356,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
 
       {/* ── Notifications ── */}
       <div style={styles.section}>
-        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('notifications')}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('notifications')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('notifications')}>
           <span style={styles.sectionIcon}>🔔</span>
           <div style={{ flex: 1 }}>
             <div style={styles.sectionTitle}>{t.ratesNotifications}</div>
@@ -484,7 +484,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
 
       {/* ── Scheduled Reports ── */}
       <div style={styles.section}>
-        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('reports')}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('reports')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('reports')}>
           <span style={styles.sectionIcon}>📧</span>
           <div style={{ flex: 1 }}>
             <div style={styles.sectionTitle}>Scheduled Email Reports</div>
@@ -529,7 +529,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
 
       {/* ── Worker Access ── */}
       <div style={styles.section}>
-        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('access')}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('access')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('access')}>
           <span style={styles.sectionIcon}>👁️</span>
           <div style={{ flex: 1 }}>
             <div style={styles.sectionTitle}>{t.ratesWorkerAccess}</div>
@@ -556,7 +556,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <input
               style={{ ...styles.input, width: 180, textAlign: 'right' }}
               type="text"
-              placeholder="e.g. Welcome1!"
+              placeholder={t.tempPasswordPlaceholder}
               value={form.default_temp_password}
               onChange={e => set('default_temp_password', e.target.value)}
             />
@@ -582,7 +582,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
 
       {/* ── Modules ── */}
       <div style={styles.section}>
-        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('modules')}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('modules')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('modules')}>
           <span style={styles.sectionIcon}>📦</span>
           <div style={{ flex: 1 }}>
             <div style={styles.sectionTitle}>Modules</div>
@@ -683,7 +683,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
 
       {/* ── Features ── */}
       <div style={styles.section}>
-        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('features')}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('features')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('features')}>
           <span style={styles.sectionIcon}>🧩</span>
           <div style={{ flex: 1 }}>
             <div style={styles.sectionTitle}>{t.featuresTitle}</div>
@@ -791,7 +791,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         const atLimit = pct >= 100;
         return (
           <div style={styles.section}>
-            <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('storage')}>
+            <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('storage')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('storage')}>
               <span style={styles.sectionIcon}>💾</span>
               <div style={{ flex: 1 }}>
                 <div style={styles.sectionTitle}>Storage</div>

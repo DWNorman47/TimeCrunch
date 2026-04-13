@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
-import ProjectBillPDF from './ProjectBillPDF';
 import { fmtHours, formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { SkeletonList } from './Skeleton';
 
 function downloadCSV(rows, filename) {
   const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -28,6 +28,7 @@ function defaultDates() {
 
 export default function ProjectReports({ currency = 'USD' }) {
   const t = useT();
+  const { user } = useAuth();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,7 +38,7 @@ export default function ProjectReports({ currency = 'USD' }) {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p>{t.loading}</p>;
+  if (loading) return <SkeletonList count={4} rows={3} />;
   if (projects.length === 0) return <p style={{ color: '#666' }}>{t.noProjectsMsg}</p>;
 
   return (
@@ -55,6 +56,8 @@ function ProjectCard({ project: p, currency = 'USD' }) {
   const [billData, setBillData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
 
   const fetchBill = async () => {
     setLoading(true);
@@ -69,9 +72,45 @@ function ProjectCard({ project: p, currency = 'USD' }) {
     }
   };
 
+  const makeBillElement = async () => {
+    const [{ pdf }, { default: ProjectBillPDF }] = await Promise.all([
+      import('@react-pdf/renderer'),
+      import('./ProjectBillPDF'),
+    ]);
+    const el = React.createElement(ProjectBillPDF, { data: billData, currency, t, language: user?.language });
+    return { pdf, el };
+  };
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const { pdf, el } = await makeBillElement();
+      const blob = await pdf(el).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `bill-${p.name.replace(/\s+/g, '-')}-${from || 'all'}-to-${to || 'all'}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
+
+  const togglePreview = async () => {
+    if (showPreview) {
+      setShowPreview(false);
+      return;
+    }
+    setPdfGenerating(true);
+    try {
+      const { pdf, el } = await makeBillElement();
+      const blob = await pdf(el).toBlob();
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+      setShowPreview(true);
+    } finally { setPdfGenerating(false); }
+  };
+
   return (
     <div style={styles.card}>
-      <div style={styles.cardTop} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.cardTop} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={styles.cardHeader}>
           <span style={styles.name}>{p.name}</span>
           <div style={styles.headerRight}>
@@ -109,7 +148,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
               <label style={styles.label}>{t.qboTo}</label>
               <input style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
             </div>
-            <button style={styles.fetchBtn} onClick={fetchBill} disabled={loading}>
+            <button style={{ ...styles.fetchBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={fetchBill} disabled={loading}>
               {loading ? t.loading : t.loadEntries}
             </button>
           </div>
@@ -125,8 +164,8 @@ function ProjectCard({ project: p, currency = 'USD' }) {
                 <span style={{ fontWeight: 700 }}>{t.totalCostLabel}: <b>{formatCurrency(billData.summary.total_cost, currency)}</b></span>
               </div>
               <div style={styles.btnRow}>
-                <button style={styles.previewBtn} onClick={() => setShowPreview(s => !s)}>
-                  {showPreview ? t.hidePreview : t.previewBill}
+                <button style={{ ...styles.previewBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={togglePreview} disabled={pdfGenerating}>
+                  {pdfGenerating ? t.preparing : showPreview ? t.hidePreview : t.previewBill}
                 </button>
                 <button style={styles.csvBtn} onClick={() => {
                   const headers = ['Date', 'Worker', 'Wage Type', 'Start', 'End', 'Hours'];
@@ -136,18 +175,12 @@ function ProjectCard({ project: p, currency = 'USD' }) {
                   });
                   downloadCSV([headers, ...rows], `${p.name.replace(/\s+/g,'-')}-${from||'all'}-to-${to||'all'}.csv`);
                 }}>{t.exportCSV}</button>
-                <PDFDownloadLink
-                  document={<ProjectBillPDF data={billData} currency={currency} />}
-                  fileName={`bill-${p.name.replace(/\s+/g, '-')}-${from || 'all'}-to-${to || 'all'}.pdf`}
-                  style={styles.pdfBtn}
-                >
-                  {({ loading: l }) => l ? t.preparingPDF : t.downloadPDF}
-                </PDFDownloadLink>
+                <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>
+                  {pdfGenerating ? t.preparingPDF : t.downloadPDF}
+                </button>
               </div>
-              {showPreview && (
-                <PDFViewer style={styles.pdfViewer}>
-                  <ProjectBillPDF data={billData} currency={currency} />
-                </PDFViewer>
+              {showPreview && previewUrl && (
+                <iframe src={previewUrl} style={styles.pdfViewer} title="Bill Preview" />
               )}
             </div>
           )}

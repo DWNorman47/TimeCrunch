@@ -2,10 +2,12 @@ import PasswordInput from '../components/PasswordInput';
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
 import api from '../api';
 
 export default function Register() {
   const { loginWithToken } = useAuth();
+  const t = useT();
   const navigate = useNavigate();
   const [form, setForm] = useState({ company_name: '', first_name: '', middle_name: '', last_name: '', email: '', username: '', password: '' });
   const [usernameEdited, setUsernameEdited] = useState(false);
@@ -42,7 +44,7 @@ export default function Register() {
       try { const saved = JSON.parse(localStorage.getItem('tc_companies') || '[]'); localStorage.setItem('tc_companies', JSON.stringify([form.company_name.trim(), ...saved.filter(c => c.toLowerCase() !== form.company_name.trim().toLowerCase())])); } catch {}
       navigate('/timeclock');
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed');
+      setError(err.response?.data?.error || t.registerFailed);
     } finally {
       setSaving(false);
     }
@@ -53,12 +55,12 @@ export default function Register() {
       <div style={styles.card}>
         <h1 style={styles.logo}>OpsFloa</h1>
         <div style={{ fontSize: 48, textAlign: 'center', marginBottom: 12 }}>📧</div>
-        <h2 style={styles.title}>Check your email</h2>
+        <h2 style={styles.title}>{t.registerCheckEmailTitle}</h2>
         <p style={{ color: '#666', fontSize: 14, textAlign: 'center', marginBottom: 16 }}>
-          We sent a confirmation link to <strong>{confirming}</strong>. Click it to activate your account.
+          {t.registerCheckEmailDesc.split('{email}')[0]}<strong>{confirming}</strong>{t.registerCheckEmailDesc.split('{email}')[1]}
         </p>
         <p style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center' }}>
-          Didn't get it? Check your spam folder or{' '}
+          {t.registerDidntGetIt}{' '}
           <button style={{ background: 'none', border: 'none', color: resendState === 'sent' ? '#059669' : '#1a56db', fontWeight: 600, cursor: resendState === 'idle' ? 'pointer' : 'default', fontSize: 13, padding: 0 }}
             disabled={resendState !== 'idle'}
             onClick={async () => {
@@ -67,7 +69,7 @@ export default function Register() {
               setResendState('sent');
               setTimeout(() => setResendState('idle'), 4000);
             }}>
-            {resendState === 'sending' ? 'Sending…' : resendState === 'sent' ? 'Sent!' : 'resend'}
+            {resendState === 'sending' ? t.sending : resendState === 'sent' ? t.registerSent : t.registerResend}
           </button>.
         </p>
       </div>
@@ -78,55 +80,61 @@ export default function Register() {
     <div style={styles.page}>
       <div style={styles.card}>
         <h1 style={styles.logo}>OpsFloa</h1>
-        <h2 style={styles.title}>Create your account</h2>
+        <h2 style={styles.title}>{t.registerTitle}</h2>
         <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>Company name</label>
+          <label htmlFor="reg-company" style={styles.label}>{t.companyName}</label>
           <input
+            id="reg-company"
             style={styles.input}
-            placeholder="Acme Construction"
+            placeholder={t.registerCompanyPh}
             maxLength={100}
             value={form.company_name}
             onChange={e => set('company_name', e.target.value)}
             onBlur={e => set('company_name', e.target.value.trim())}
             required
           />
-          <label style={styles.label}>First name</label>
+          <label htmlFor="reg-first-name" style={styles.label}>{t.firstName}</label>
           <input
+            id="reg-first-name"
             style={styles.input}
-            placeholder="Jane"
+            placeholder={t.registerFirstNamePh}
             value={form.first_name}
             onChange={e => handleNameChange('first_name', e.target.value)}
             required
           />
-          <label style={styles.label}>Middle name <span style={styles.hint}>(optional)</span></label>
+          <label htmlFor="reg-middle-name" style={styles.label}>{t.registerMiddleName} <span style={styles.hint}>{t.optionalHint}</span></label>
           <input
+            id="reg-middle-name"
             style={styles.input}
-            placeholder="Lee"
+            placeholder={t.registerMiddleNamePh}
             value={form.middle_name}
             onChange={e => set('middle_name', e.target.value)}
           />
-          <label style={styles.label}>Last name</label>
+          <label htmlFor="reg-last-name" style={styles.label}>{t.lastName}</label>
           <input
+            id="reg-last-name"
             style={styles.input}
-            placeholder="Smith"
+            placeholder={t.registerLastNamePh}
             value={form.last_name}
             onChange={e => handleNameChange('last_name', e.target.value)}
             required
           />
-          <label style={styles.label}>Email</label>
+          <label htmlFor="reg-email" style={styles.label}>{t.email}</label>
           <input
+            id="reg-email"
             style={styles.input}
             type="email"
-            placeholder="you@example.com"
+            placeholder={t.registerEmailPh}
             value={form.email}
             onChange={e => set('email', e.target.value)}
             onBlur={e => set('email', e.target.value.trim())}
             required
           />
-          <label style={styles.label}>Username</label>
+          <label htmlFor="reg-username" style={styles.label}>{t.username}</label>
           <input
+            id="reg-username"
             style={styles.input}
-            placeholder="jsmith"
+            placeholder={t.registerUsernamePh}
             maxLength={50}
             value={form.username}
             autoComplete="off"
@@ -134,10 +142,11 @@ export default function Register() {
             onBlur={e => set('username', e.target.value.trim())}
             required
           />
-          <label style={styles.label}>Password</label>
+          <label htmlFor="reg-password" style={styles.label}>{t.loginPasswordLabel}</label>
           <PasswordInput
+            id="reg-password"
             style={styles.input}
-            placeholder="At least 6 characters"
+            placeholder={t.registerPasswordPh}
             value={form.password}
             onChange={e => set('password', e.target.value)}
             required
@@ -145,11 +154,11 @@ export default function Register() {
           />
           {error && <p style={styles.error}>{error}</p>}
           <button style={styles.btn} type="submit" disabled={saving}>
-            {saving ? 'Creating account...' : 'Create account'}
+            {saving ? t.registerCreating : t.registerCreateBtn}
           </button>
         </form>
         <p style={styles.loginLink}>
-          Already have an account? <Link to="/login" style={styles.link}>Log in</Link>
+          {t.registerAlreadyHaveAccount} <Link to="/login" style={styles.link}>{t.registerLogIn}</Link>
         </p>
       </div>
     </div>

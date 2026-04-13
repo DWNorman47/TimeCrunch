@@ -43,12 +43,20 @@ export function currencySymbol(currency = 'USD') {
  * Format a UTC ISO timestamp in a given IANA timezone (falls back to browser locale).
  * opts: Intl.DateTimeFormat options (default: time only, 12-hour)
  */
-export function formatInTz(isoStr, tz, opts = { hour: 'numeric', minute: '2-digit' }) {
+export function formatInTz(isoStr, tz, opts = { hour: 'numeric', minute: '2-digit' }, locale = 'en-US') {
   try {
-    return new Date(isoStr).toLocaleString('en-US', { ...opts, ...(tz ? { timeZone: tz } : {}) });
+    return new Date(isoStr).toLocaleString(locale, { ...opts, ...(tz ? { timeZone: tz } : {}) });
   } catch {
-    return new Date(isoStr).toLocaleString('en-US', opts);
+    return new Date(isoStr).toLocaleString(locale, opts);
   }
+}
+
+/**
+ * Maps OpsFloa language name to a BCP 47 locale string for Intl APIs.
+ * Use this instead of hard-coding 'en-US' so Spanish users see localised dates.
+ */
+export function langToLocale(language) {
+  return language === 'Spanish' ? 'es-MX' : 'en-US';
 }
 
 /**

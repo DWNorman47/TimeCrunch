@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
+import { getOrFetch } from '../offlineDb';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
 import InventoryStock from '../components/inventory/InventoryStock';
@@ -41,12 +42,12 @@ export default function InventoryPage() {
     const init = async () => {
       try {
         const [s, p, l] = await Promise.all([
-          api.get('/settings'),
-          api.get('/projects'),
+          getOrFetch('settings', () => api.get('/settings').then(r => r.data)),
+          getOrFetch('projects', () => api.get('/projects').then(r => r.data)),
           api.get('/inventory/locations'),
         ]);
-        setFeatures(s.data);
-        setProjects(p.data);
+        setFeatures(s);
+        setProjects(p);
         setLocations(l.data);
         if (isAdmin) {
           api.get('/inventory/stock/low').then(r => setLowStockCount(r.data.length)).catch(() => {});

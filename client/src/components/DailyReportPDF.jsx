@@ -2,11 +2,9 @@ import React from 'react';
 import {
   Document, Page, Text, View, StyleSheet, PDFDownloadLink, Image,
 } from '@react-pdf/renderer';
-
-const WEATHER_LABELS = {
-  sunny: 'Sunny', partly_cloudy: 'Partly Cloudy', cloudy: 'Cloudy',
-  rainy: 'Rainy', stormy: 'Stormy', snow: 'Snow', windy: 'Windy',
-};
+import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
 const pdf = StyleSheet.create({
   page: { fontFamily: 'Helvetica', fontSize: 9, color: '#1a1a1a', padding: '40 48 48 48' },
@@ -66,17 +64,22 @@ function SectionHeader({ title }) {
   );
 }
 
-function TextBlock({ text }) {
-  if (!text?.trim()) return <Text style={{ ...pdf.textBlock, color: '#9ca3af', fontStyle: 'italic' }}>None reported</Text>;
+function TextBlock({ text, noneLabel }) {
+  if (!text?.trim()) return <Text style={{ ...pdf.textBlock, color: '#9ca3af', fontStyle: 'italic' }}>{noneLabel}</Text>;
   return <Text style={pdf.textBlock}>{text}</Text>;
 }
 
-export function DailyReportDocument({ report, companyName, fieldPhotos = [] }) {
+export function DailyReportDocument({ report, companyName, fieldPhotos = [], t, language }) {
+  const locale = langToLocale(language);
+  const WEATHER_LABELS = {
+    sunny: t.weatherSunny, partly_cloudy: t.weatherPartlyCloudy, cloudy: t.weatherCloudy,
+    rainy: t.weatherRainy, stormy: t.weatherStormy, snow: t.weatherSnow, windy: t.weatherWindy,
+  };
   const totalWorkers = report.manpower?.reduce((s, m) => s + (parseInt(m.worker_count) || 0), 0) || 0;
   const totalHours = report.manpower?.reduce((s, m) => s + (parseFloat(m.hours) || 0), 0) || 0;
   const weather = report.weather_condition ? WEATHER_LABELS[report.weather_condition] || report.weather_condition : null;
   const weatherStr = [weather, report.weather_temp != null ? `${report.weather_temp}°F` : null].filter(Boolean).join(', ');
-  const dateStr = new Date(report.report_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const dateStr = new Date(report.report_date + 'T00:00:00').toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const isSubmitted = report.status === 'submitted';
   const isReviewed = report.status === 'reviewed';
 
@@ -86,24 +89,24 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [] }) {
         {/* Header */}
         <View style={pdf.headerRow} fixed>
           <View style={pdf.headerLeft}>
-            <Text style={pdf.companyName}>{companyName || 'Daily Report'}</Text>
-            <Text style={pdf.reportTitle}>Daily Site Report</Text>
+            <Text style={pdf.companyName}>{companyName || t.pdfDailySiteReport}</Text>
+            <Text style={pdf.reportTitle}>{t.pdfDailySiteReport}</Text>
           </View>
           <View style={pdf.headerRight}>
-            <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>Date: </Text>{dateStr}</Text>
-            {report.project_name && <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>Project: </Text>{report.project_name}</Text>}
-            {report.superintendent && <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>Superintendent: </Text>{report.superintendent}</Text>}
-            {weatherStr && <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>Weather: </Text>{weatherStr}</Text>}
+            <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>{t.date}: </Text>{dateStr}</Text>
+            {report.project_name && <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>{t.project}: </Text>{report.project_name}</Text>}
+            {report.superintendent && <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>{t.superintendent}: </Text>{report.superintendent}</Text>}
+            {weatherStr && <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>{t.weather}: </Text>{weatherStr}</Text>}
             <View style={{ ...pdf.statusBadge, backgroundColor: isReviewed ? '#1a56db' : isSubmitted ? '#d1fae5' : '#fef3c7' }}>
               <Text style={{ ...pdf.statusText, color: isReviewed ? '#fff' : isSubmitted ? '#065f46' : '#92400e' }}>
-                {isReviewed ? 'REVIEWED' : isSubmitted ? 'SUBMITTED' : 'DRAFT'}
+                {isReviewed ? t.statusReviewed.toUpperCase() : isSubmitted ? t.statusSubmitted.toUpperCase() : t.statusDraft.toUpperCase()}
               </Text>
             </View>
             {isReviewed && report.reviewed_by && (
               <Text style={{ ...pdf.headerMeta, marginTop: 4, color: '#1a56db' }}>
-                <Text style={pdf.headerMetaBold}>Reviewed by: </Text>
+                <Text style={pdf.headerMetaBold}>{t.reviewedBy}: </Text>
                 {report.reviewed_by}
-                {report.reviewed_at ? ` · ${new Date(report.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+                {report.reviewed_at ? ` · ${new Date(report.reviewed_at).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
               </Text>
             )}
           </View>
@@ -113,19 +116,19 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [] }) {
         {(totalWorkers > 0 || report.manpower?.length > 0) && (
           <View style={pdf.summaryBar}>
             <View style={pdf.summaryCard}>
-              <Text style={pdf.summaryLabel}>Total Workers</Text>
+              <Text style={pdf.summaryLabel}>{t.pdfTotalWorkers}</Text>
               <Text style={pdf.summaryValue}>{totalWorkers}</Text>
             </View>
             <View style={pdf.summaryCard}>
-              <Text style={pdf.summaryLabel}>Total Hours</Text>
+              <Text style={pdf.summaryLabel}>{t.totalHours}</Text>
               <Text style={pdf.summaryValue}>{totalHours.toFixed(1)}</Text>
             </View>
             <View style={pdf.summaryCard}>
-              <Text style={pdf.summaryLabel}>Equipment Items</Text>
+              <Text style={pdf.summaryLabel}>{t.pdfEquipmentItems}</Text>
               <Text style={pdf.summaryValue}>{report.equipment?.length || 0}</Text>
             </View>
             <View style={pdf.summaryCard}>
-              <Text style={pdf.summaryLabel}>Photos</Text>
+              <Text style={pdf.summaryLabel}>{t.photosSection}</Text>
               <Text style={pdf.summaryValue}>{fieldPhotos.length}</Text>
             </View>
           </View>
@@ -134,13 +137,13 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [] }) {
         {/* Manpower */}
         {report.manpower?.length > 0 && (
           <View style={pdf.section}>
-            <SectionHeader title="Manpower" />
+            <SectionHeader title={t.manpowerSection} />
             <View style={pdf.table}>
               <View style={pdf.tableHeader}>
-                <Text style={{ ...pdf.thText, ...pdf.colTrade }}>Trade / Name</Text>
-                <Text style={{ ...pdf.thText, ...pdf.colCount }}>Workers</Text>
-                <Text style={{ ...pdf.thText, ...pdf.colHours }}>Hours</Text>
-                <Text style={{ ...pdf.thText, ...pdf.colNotes }}>Notes</Text>
+                <Text style={{ ...pdf.thText, ...pdf.colTrade }}>{t.tradeOrName}</Text>
+                <Text style={{ ...pdf.thText, ...pdf.colCount }}>{t.workers}</Text>
+                <Text style={{ ...pdf.thText, ...pdf.colHours }}>{t.pdfHoursCol}</Text>
+                <Text style={{ ...pdf.thText, ...pdf.colNotes }}>{t.notesSection}</Text>
               </View>
               {report.manpower.map((m, i) => (
                 <View key={i} style={i % 2 === 0 ? pdf.tableRow : pdf.tableRowAlt}>
@@ -156,19 +159,19 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [] }) {
 
         {/* Work Performed */}
         <View style={pdf.section}>
-          <SectionHeader title="Work Performed" />
-          <TextBlock text={report.work_performed} />
+          <SectionHeader title={t.workPerformed} />
+          <TextBlock text={report.work_performed} noneLabel={t.pdfNoneReported} />
         </View>
 
         {/* Equipment */}
         {report.equipment?.length > 0 && (
           <View style={pdf.section}>
-            <SectionHeader title="Equipment on Site" />
+            <SectionHeader title={t.equipmentOnSite} />
             <View style={pdf.table}>
               <View style={pdf.tableHeader}>
-                <Text style={{ ...pdf.thText, ...pdf.colName }}>Equipment</Text>
-                <Text style={{ ...pdf.thText, ...pdf.colQty }}>Qty</Text>
-                <Text style={{ ...pdf.thText, ...pdf.colHours }}>Hours</Text>
+                <Text style={{ ...pdf.thText, ...pdf.colName }}>{t.equipmentField}</Text>
+                <Text style={{ ...pdf.thText, ...pdf.colQty }}>{t.qty}</Text>
+                <Text style={{ ...pdf.thText, ...pdf.colHours }}>{t.pdfHoursCol}</Text>
               </View>
               {report.equipment.map((e, i) => (
                 <View key={i} style={i % 2 === 0 ? pdf.tableRow : pdf.tableRowAlt}>
@@ -184,11 +187,11 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [] }) {
         {/* Materials */}
         {report.materials?.length > 0 && (
           <View style={pdf.section}>
-            <SectionHeader title="Materials Delivered" />
+            <SectionHeader title={t.materialsDelivered} />
             <View style={pdf.table}>
               <View style={pdf.tableHeader}>
-                <Text style={{ ...pdf.thText, ...pdf.colDesc }}>Description</Text>
-                <Text style={{ ...pdf.thText, ...pdf.colQty }}>Quantity</Text>
+                <Text style={{ ...pdf.thText, ...pdf.colDesc }}>{t.descriptionLabel}</Text>
+                <Text style={{ ...pdf.thText, ...pdf.colQty }}>{t.quantity}</Text>
               </View>
               {report.materials.map((m, i) => (
                 <View key={i} style={i % 2 === 0 ? pdf.tableRow : pdf.tableRowAlt}>
@@ -202,22 +205,22 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [] }) {
 
         {/* Delays / Issues */}
         <View style={pdf.section}>
-          <SectionHeader title="Delays / Issues" />
-          <TextBlock text={report.delays_issues} />
+          <SectionHeader title={t.delaysIssues} />
+          <TextBlock text={report.delays_issues} noneLabel={t.pdfNoneReported} />
         </View>
 
         {/* Visitor Log */}
         {report.visitor_log && (
           <View style={pdf.section}>
-            <SectionHeader title="Visitor Log" />
-            <TextBlock text={report.visitor_log} />
+            <SectionHeader title={t.visitorLog} />
+            <TextBlock text={report.visitor_log} noneLabel={t.pdfNoneReported} />
           </View>
         )}
 
         {/* Photos */}
         {fieldPhotos.length > 0 && (
           <View style={pdf.section}>
-            <SectionHeader title={`Site Photos (${fieldPhotos.length})`} />
+            <SectionHeader title={t.pdfSitePhotos.replace('{n}', fieldPhotos.length)} />
             <View style={pdf.photoGrid}>
               {fieldPhotos.map((p, i) => (
                 <View key={i} style={pdf.photoWrap}>
@@ -231,7 +234,7 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [] }) {
 
         {/* Footer */}
         <View style={pdf.footer} fixed>
-          <Text style={pdf.footerText}>{companyName} — Daily Site Report — {dateStr}</Text>
+          <Text style={pdf.footerText}>{companyName} — {t.pdfDailySiteReport} — {dateStr}</Text>
           <Text style={pdf.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>
@@ -240,14 +243,16 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [] }) {
 }
 
 export function PDFButton({ report, companyName, fieldPhotos, style }) {
+  const t = useT();
+  const { user } = useAuth();
   const fileName = `daily-report-${report.report_date}-${(report.project_name || 'site').toLowerCase().replace(/\s+/g, '-')}.pdf`;
   return (
     <PDFDownloadLink
-      document={<DailyReportDocument report={report} companyName={companyName} fieldPhotos={fieldPhotos} />}
+      document={<DailyReportDocument report={report} companyName={companyName} fieldPhotos={fieldPhotos} t={t} language={user?.language} />}
       fileName={fileName}
       style={style}
     >
-      {({ loading }) => loading ? 'Preparing PDF...' : '⬇ Download PDF'}
+      {({ loading }) => loading ? t.pdfPreparingBtn : t.pdfDownloadBtn}
     </PDFDownloadLink>
   );
 }

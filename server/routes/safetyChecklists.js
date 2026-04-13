@@ -67,23 +67,31 @@ router.delete('/templates/:id', requireAdmin, async (req, res) => {
 // GET /safety-checklists
 router.get('/', requireAuth, async (req, res) => {
   const { project_id, from, to, template_id } = req.query;
+  const page  = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
   const conditions = ['s.company_id = $1'];
   const params = [req.user.company_id];
   if (project_id) { params.push(project_id); conditions.push(`s.project_id = $${params.length}`); }
   if (template_id) { params.push(template_id); conditions.push(`s.template_id = $${params.length}`); }
   if (from) { params.push(from); conditions.push(`s.check_date >= $${params.length}`); }
   if (to) { params.push(to); conditions.push(`s.check_date <= $${params.length}`); }
+  const where = conditions.join(' AND ');
   try {
-    const result = await pool.query(
-      `SELECT s.*, p.name AS project_name
-       FROM safety_checklist_submissions s
-       LEFT JOIN projects p ON s.project_id = p.id
-       WHERE ${conditions.join(' AND ')}
-       ORDER BY s.check_date DESC, s.created_at DESC
-       LIMIT 500`,
-      params
-    );
-    res.json(result.rows);
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(`SELECT COUNT(*) FROM safety_checklist_submissions s WHERE ${where}`, params),
+      pool.query(
+        `SELECT s.*, p.name AS project_name
+         FROM safety_checklist_submissions s
+         LEFT JOIN projects p ON s.project_id = p.id
+         WHERE ${where}
+         ORDER BY s.check_date DESC, s.created_at DESC
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+    ]);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

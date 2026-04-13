@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { SkeletonList } from './Skeleton';
+import { langToLocale } from '../utils';
 
-function fmtDate(d, t) {
+function fmtDate(d, t, locale = 'en-US') {
   const date = new Date(d + 'T00:00:00');
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -11,7 +14,7 @@ function fmtDate(d, t) {
 
   if (date.getTime() === today.getTime()) return t.wsToday;
   if (date.getTime() === tomorrow.getTime()) return t.wsTomorrow;
-  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(locale, { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
 function fmtTime(ts) {
@@ -29,6 +32,8 @@ function isToday(dateStr) {
 
 export default function WorkerSchedule() {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,7 +43,7 @@ export default function WorkerSchedule() {
   useEffect(() => {
     api.get('/shifts/mine')
       .then(r => setShifts(r.data))
-      .catch(() => setError('Could not load schedule.'))
+      .catch(() => setError(t.couldNotLoadSchedule))
       .finally(() => setLoading(false));
   }, []);
 
@@ -51,7 +56,7 @@ export default function WorkerSchedule() {
       const r = await api.patch(`/shifts/${id}/cant-make-it`, { cant_make_it: true, note: note || '' });
       setShifts(prev => prev.map(s => s.id === id ? { ...s, cant_make_it: r.data.cant_make_it, cant_make_it_note: r.data.cant_make_it_note } : s));
     } catch {
-      // silently ignore
+      setError(t.failedSave || 'Failed to update. Please try again.');
     } finally {
       setFlagging(null);
     }
@@ -63,13 +68,13 @@ export default function WorkerSchedule() {
       const r = await api.patch(`/shifts/${shift.id}/cant-make-it`, { cant_make_it: false });
       setShifts(prev => prev.map(s => s.id === shift.id ? { ...s, cant_make_it: r.data.cant_make_it, cant_make_it_note: null } : s));
     } catch {
-      // silently ignore
+      setError(t.failedSave || 'Failed to update. Please try again.');
     } finally {
       setFlagging(null);
     }
   };
 
-  if (loading) return <p style={styles.empty}>Loading…</p>;
+  if (loading) return <SkeletonList count={4} rows={2} />;
   if (error) return <p style={styles.empty}>{error}</p>;
   if (shifts.length === 0) return (
     <div style={styles.emptyBox}>
@@ -93,7 +98,7 @@ export default function WorkerSchedule() {
           <div key={date} style={styles.dayGroup}>
             <div style={styles.dateLabel}>
               <span style={{ ...styles.dateName, color: isToday(date) ? '#1a56db' : '#374151' }}>
-                {fmtDate(date, t)}
+                {fmtDate(date, t, locale)}
               </span>
               {isToday(date) && <span style={styles.todayBadge}>{t.wsToday}</span>}
             </div>
@@ -118,7 +123,7 @@ export default function WorkerSchedule() {
                   )}
                   {s.cant_make_it ? (
                     <button
-                      style={styles.undoBtn}
+                      style={{ ...styles.undoBtn, ...(flagging === s.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                       onClick={() => undoCantMakeIt(s)}
                       disabled={flagging === s.id}
                     >
@@ -126,7 +131,7 @@ export default function WorkerSchedule() {
                     </button>
                   ) : pendingFlag?.id === s.id ? null : (
                     <button
-                      style={styles.cantBtn}
+                      style={{ ...styles.cantBtn, ...(flagging === s.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                       onClick={() => setPendingFlag({ id: s.id, note: '' })}
                       disabled={flagging === s.id}
                     >
@@ -144,6 +149,7 @@ export default function WorkerSchedule() {
                       maxLength={200}
                       autoFocus
                     />
+                    <div style={styles.charCount}>{(pendingFlag.note || '').length}/200</div>
                     <div style={styles.noteActions}>
                       <button style={styles.confirmBtn} onClick={confirmCantMakeIt}>{t.wsConfirm}</button>
                       <button style={styles.cancelNoteBtn} onClick={() => setPendingFlag(null)}>{t.cancel || 'Cancel'}</button>
@@ -180,6 +186,7 @@ const styles = {
   undoBtn: { marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: '#6b7280', background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' },
   noteBox: { marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 },
   noteInput: { fontSize: 12, padding: '6px 10px', border: '1px solid #fca5a5', borderRadius: 6, outline: 'none', color: '#374151' },
+  charCount: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
   noteActions: { display: 'flex', gap: 6 },
   confirmBtn: { fontSize: 12, fontWeight: 700, background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' },
   cancelNoteBtn: { fontSize: 12, fontWeight: 600, background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#6b7280' },

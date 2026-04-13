@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
-import { RFIDownloadLink } from './RFIPdf';
 import { useT } from '../hooks/useT';
+import Pagination from './Pagination';
+import { SkeletonList } from './Skeleton';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
@@ -17,7 +18,7 @@ const STATUS_STYLES = {
 
 function RFIForm({ initial, projects, onSaved, onCancel }) {
   const t = useT();
-  const STATUS_LABELS = { open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed };
+  const STATUS_LABELS = useMemo(() => ({ open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed }), [t]);
   const isEdit = !!initial?.id;
   const [form, setForm] = useState({
     project_id: initial?.project_id ?? '',
@@ -40,7 +41,7 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
     setSaving(true); setError('');
     try {
       const r = isEdit
-        ? await api.patch(`/rfis/${initial.id}`, form)
+        ? await api.patch(`/rfis/${initial.id}`, { ...form, updated_at: initial.updated_at })
         : await api.post('/rfis', form);
       if (!isEdit && r.data?.offline) {
         onSaved({ id: 'pending-' + Date.now(), pending: true, ...form, rfi_number: '?', status: 'open' }, false);
@@ -48,7 +49,10 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       }
       onSaved(r.data, isEdit);
     } catch (err) {
-      setError(err.response?.data?.error || t.failedToSave);
+      const msg = err.response?.status === 409
+        ? t.concurrentModification
+        : err.response?.data?.error || t.failedToSave;
+      setError(msg);
     } finally { setSaving(false); }
   };
 
@@ -59,48 +63,49 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       <div style={styles.row}>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.project}</label>
-            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+            <label htmlFor="rfi-project" style={styles.label}>{t.project}</label>
+            <select id="rfi-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
               <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
         )}
         <div style={{ ...styles.fieldGroup, flex: 3 }}>
-          <label style={styles.label}>{t.subjectField} *</label>
-          <input style={styles.input} type="text" placeholder="Brief description of the question or request" maxLength={255} value={form.subject} onChange={e => set('subject', e.target.value)} required />
+          <label htmlFor="rfi-subject" style={styles.label}>{t.subjectField} *</label>
+          <input id="rfi-subject" style={styles.input} type="text" placeholder={t.rfiSubjectPlaceholder} maxLength={255} value={form.subject} onChange={e => set('subject', e.target.value)} required />
         </div>
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>{t.descriptionField} <span style={styles.optional}>({t.optional})</span></label>
-        <textarea style={styles.textarea} rows={3} placeholder="Detailed description, background, or relevant context…" maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} />
+        <label htmlFor="rfi-description" style={styles.label}>{t.descriptionField} <span style={styles.optional}>({t.optional})</span></label>
+        <textarea id="rfi-description" style={styles.textarea} rows={3} placeholder={t.rfiDescriptionPlaceholder} maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} />
+        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{form.description.length}/2000</div>
       </div>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.directedTo}</label>
-          <input style={styles.input} type="text" placeholder="e.g. Architect, Structural Engineer, Owner" maxLength={255} value={form.directed_to} onChange={e => set('directed_to', e.target.value)} />
+          <label htmlFor="rfi-directed-to" style={styles.label}>{t.directedTo}</label>
+          <input id="rfi-directed-to" style={styles.input} type="text" placeholder={t.rfiDirectedToPlaceholder} maxLength={255} value={form.directed_to} onChange={e => set('directed_to', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.submittedBy}</label>
-          <input style={styles.input} type="text" placeholder="Name or company" maxLength={255} value={form.submitted_by} onChange={e => set('submitted_by', e.target.value)} />
+          <label htmlFor="rfi-submitted-by" style={styles.label}>{t.submittedBy}</label>
+          <input id="rfi-submitted-by" style={styles.input} type="text" placeholder={t.rfiSubmittedByPlaceholder} maxLength={255} value={form.submitted_by} onChange={e => set('submitted_by', e.target.value)} />
         </div>
       </div>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.dateSubmitted}</label>
-          <input style={styles.input} type="date" value={form.date_submitted} onChange={e => set('date_submitted', e.target.value)} />
+          <label htmlFor="rfi-date-submitted" style={styles.label}>{t.dateSubmitted}</label>
+          <input id="rfi-date-submitted" style={styles.input} type="date" value={form.date_submitted} onChange={e => set('date_submitted', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.responseDue} <span style={styles.optional}>({t.optional})</span></label>
-          <input style={styles.input} type="date" value={form.date_due} onChange={e => set('date_due', e.target.value)} />
+          <label htmlFor="rfi-date-due" style={styles.label}>{t.responseDue} <span style={styles.optional}>({t.optional})</span></label>
+          <input id="rfi-date-due" style={styles.input} type="date" value={form.date_due} onChange={e => set('date_due', e.target.value)} />
         </div>
         {isEdit && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.statusLabel}</label>
-            <select style={styles.input} value={form.status} onChange={e => set('status', e.target.value)}>
+            <label htmlFor="rfi-status" style={styles.label}>{t.statusLabel}</label>
+            <select id="rfi-status" style={styles.input} value={form.status} onChange={e => set('status', e.target.value)}>
               {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
@@ -109,15 +114,16 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
 
       {isEdit && (
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.rfiResponse}</label>
-          <textarea style={styles.textarea} rows={3} placeholder="Enter the response or answer received…" maxLength={2000} value={form.response} onChange={e => set('response', e.target.value)} />
+          <label htmlFor="rfi-response" style={styles.label}>{t.rfiResponse}</label>
+          <textarea id="rfi-response" style={styles.textarea} rows={3} placeholder={t.rfiResponsePlaceholder} maxLength={2000} value={form.response} onChange={e => set('response', e.target.value)} />
+          <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{form.response.length}/2000</div>
         </div>
       )}
 
       {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.createRFI}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.createRFI}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -128,11 +134,29 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
 
 function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
   const t = useT();
-  const STATUS_LABELS = { open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed };
+  const STATUS_LABELS = useMemo(() => ({ open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed }), [t]);
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const [{ pdf }, { RFIDocument }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./RFIPdf'),
+      ]);
+      const blob = await pdf(React.createElement(RFIDocument, { rfi, companyName })).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `RFI-${rfi.rfi_number}-${(rfi.subject || 'rfi').replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -147,7 +171,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
 
   return (
     <div style={{ ...styles.card, ...(isOverdue ? styles.cardOverdue : {}) }}>
-      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={styles.rfiNumber}>#{rfi.rfi_number}</div>
         <div style={styles.cardMiddle}>
           <div style={styles.subject}>
@@ -197,7 +221,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
 
           {!rfi.pending && (
             <div style={styles.cardActions}>
-              <RFIDownloadLink rfi={rfi} companyName={companyName} />
+              <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? t.preparing : t.exportPDF}</button>
               {isAdmin && (
                 <>
                   <button style={styles.editBtn} onClick={() => onEdit(rfi)}>
@@ -205,7 +229,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
                   </button>
                   {confirmingDelete ? (
                     <>
-                      <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                      <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
                       <button style={styles.smallCancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
                     </>
                   ) : (
@@ -231,6 +255,8 @@ export default function RFITracking({ projects }) {
   const { onSync } = useOffline() || {};
 
   const [rfis, setRfis] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -239,20 +265,22 @@ export default function RFITracking({ projects }) {
 
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
-  const loadRFIs = async (f = filters) => {
+  const loadRFIs = async (f = filters, p = 1) => {
+    setPage(p);
     try {
-      const params = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
+      const params = { ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), page: p, limit: 50 };
       const r = await api.get('/rfis', { params });
-      setRfis(r.data);
+      setRfis(r.data.items);
+      setTotalPages(r.data.pages);
     } catch {}
   };
 
   useEffect(() => {
-    loadRFIs().finally(() => setLoading(false));
+    loadRFIs(filters, 1).finally(() => setLoading(false));
     api.get('/company-info').then(r => setCompanyName(r.data.name || '')).catch(() => {});
   }, []);
-  useEffect(() => { if (!loading) loadRFIs(filters); }, [filters]);
-  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadRFIs(); }); }, [onSync]);
+  useEffect(() => { if (!loading) loadRFIs(filters, 1); }, [filters]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadRFIs(filters, page); }); }, [onSync]);
 
   const handleSaved = (rfi, isEdit) => {
     if (isEdit) {
@@ -293,7 +321,7 @@ export default function RFITracking({ projects }) {
         </div>
       )}
 
-      <div style={styles.filterBar}>
+      <div className="filter-row" style={styles.filterBar}>
         <select style={styles.filterSelect} value={filters.status || ''} onChange={e => setFilter('status', e.target.value)}>
           <option value="">{t.allStatuses}</option>
           <option value="open">{t.statusOpen}</option>
@@ -311,25 +339,28 @@ export default function RFITracking({ projects }) {
       </div>
 
       {loading ? (
-        <p style={styles.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : rfis.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>📋</div>
           <p style={styles.emptyText}>{isAdmin ? t.noRFIsAdmin : t.noRFIsWorker}</p>
         </div>
       ) : (
-        <div style={styles.list}>
-          {rfis.map(r => (
-            <RFICard
-              key={r.id}
-              rfi={r}
-              isAdmin={isAdmin}
-              companyName={companyName}
-              onEdit={r => { setEditing(r); setShowForm(false); }}
-              onDeleted={id => setRfis(prev => prev.filter(r => r.id !== id))}
-            />
-          ))}
-        </div>
+        <>
+          <div style={styles.list}>
+            {rfis.map(r => (
+              <RFICard
+                key={r.id}
+                rfi={r}
+                isAdmin={isAdmin}
+                companyName={companyName}
+                onEdit={r => { setEditing(r); setShowForm(false); }}
+                onDeleted={id => setRfis(prev => prev.filter(r => r.id !== id))}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pages={totalPages} onChange={p => loadRFIs(filters, p)} />
+        </>
       )}
     </div>
   );
@@ -377,6 +408,7 @@ const styles = {
   responseText: { fontSize: 13, color: '#374151', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' },
   noResponse: { fontSize: 13, color: '#9ca3af', fontStyle: 'italic', marginTop: 10 },
   cardActions: { display: 'flex', gap: 8, marginTop: 14 },
+  pdfBtn: { display: 'inline-block', background: '#eff6ff', color: '#1a56db', border: '1px solid #bfdbfe', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   editBtn: { background: '#f3f4f6', border: 'none', color: '#374151', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },

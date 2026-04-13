@@ -1,20 +1,8 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink } from '@react-pdf/renderer';
-
-const TYPE_LABELS = {
-  'injury': 'Injury',
-  'near-miss': 'Near-Miss',
-  'property-damage': 'Property Damage',
-  'environmental': 'Environmental',
-  'other': 'Other',
-};
-
-const TREATMENT_LABELS = {
-  'none': 'No treatment needed',
-  'first-aid': 'First aid on-site',
-  'medical-attention': 'Medical attention (off-site)',
-  'hospitalization': 'Hospitalization',
-};
+import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
 const pdf = StyleSheet.create({
   page: { fontFamily: 'Helvetica', fontSize: 9, color: '#1a1a1a', padding: '40 48 48 48' },
@@ -47,11 +35,25 @@ const pdf = StyleSheet.create({
   footerText: { fontSize: 7, color: '#9ca3af' },
 });
 
-export function IncidentReportDocument({ incidents, companyName }) {
+export function IncidentReportDocument({ incidents, companyName, t, language }) {
+  const locale = langToLocale(language);
+  const TYPE_LABELS = {
+    'injury': t.typeInjury,
+    'near-miss': t.typeNearMiss,
+    'property-damage': t.typePropertyDamage,
+    'environmental': t.typeEnvironmental,
+    'other': t.typeOther,
+  };
+  const TREATMENT_LABELS = {
+    'none': t.treatmentNone,
+    'first-aid': t.treatmentFirstAid,
+    'medical-attention': t.treatmentMedicalFull,
+    'hospitalization': t.treatmentHospitalization,
+  };
   const openCount = incidents.filter(i => i.status === 'open').length;
   const closedCount = incidents.filter(i => i.status === 'closed').length;
   const injuryCount = incidents.filter(i => i.type === 'injury').length;
-  const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const dateStr = new Date().toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
     <Document>
@@ -59,31 +61,31 @@ export function IncidentReportDocument({ incidents, companyName }) {
         {/* Header */}
         <View style={pdf.headerRow} fixed>
           <View>
-            <Text style={pdf.companyName}>{companyName || 'Incident Reports'}</Text>
-            <Text style={pdf.reportTitle}>Incident Report Log</Text>
+            <Text style={pdf.companyName}>{companyName || t.pdfIncidentReportLog}</Text>
+            <Text style={pdf.reportTitle}>{t.pdfIncidentReportLog}</Text>
           </View>
           <View>
-            <Text style={pdf.headerMeta}>Generated: {dateStr}</Text>
-            <Text style={pdf.headerMeta}>{incidents.length} report{incidents.length !== 1 ? 's' : ''}</Text>
+            <Text style={pdf.headerMeta}>{t.pdfGenerated}{dateStr}</Text>
+            <Text style={pdf.headerMeta}>{incidents.length !== 1 ? t.pdfIncidentCountPlural.replace('{n}', incidents.length) : t.pdfIncidentCount.replace('{n}', incidents.length)}</Text>
           </View>
         </View>
 
         {/* Summary */}
         <View style={pdf.summaryBar}>
           <View style={pdf.summaryCard}>
-            <Text style={pdf.summaryLabel}>Open</Text>
+            <Text style={pdf.summaryLabel}>{t.incidentOpen}</Text>
             <Text style={pdf.summaryValue}>{openCount}</Text>
           </View>
           <View style={pdf.summaryCard}>
-            <Text style={pdf.summaryLabel}>Closed</Text>
+            <Text style={pdf.summaryLabel}>{t.incidentClosed}</Text>
             <Text style={pdf.summaryValue}>{closedCount}</Text>
           </View>
           <View style={pdf.summaryCard}>
-            <Text style={pdf.summaryLabel}>Injuries</Text>
+            <Text style={pdf.summaryLabel}>{t.pdfInjuries}</Text>
             <Text style={pdf.summaryValue}>{injuryCount}</Text>
           </View>
           <View style={pdf.summaryCard}>
-            <Text style={pdf.summaryLabel}>Total</Text>
+            <Text style={pdf.summaryLabel}>{t.totalLabel}</Text>
             <Text style={pdf.summaryValue}>{incidents.length}</Text>
           </View>
         </View>
@@ -108,39 +110,39 @@ export function IncidentReportDocument({ incidents, companyName }) {
                   <Text style={pdf.incidentType}>{TYPE_LABELS[incident.type] || incident.type}</Text>
                   <Text style={pdf.incidentMeta}>{metaParts}</Text>
                   {incident.work_stopped && (
-                    <View style={pdf.stoppedTag}><Text>Work Stopped</Text></View>
+                    <View style={pdf.stoppedTag}><Text>{t.workStoppedTag}</Text></View>
                   )}
                 </View>
                 <View style={incident.status === 'closed' ? pdf.badgeClosed : pdf.badgeOpen}>
-                  <Text>{incident.status === 'closed' ? 'Closed' : 'Open'}</Text>
+                  <Text>{incident.status === 'closed' ? t.incidentClosed : t.incidentOpen}</Text>
                 </View>
               </View>
 
               {isInjury && (incident.injured_name || incident.body_part || incident.treatment) && (
                 <View style={pdf.injuryBox}>
-                  {incident.injured_name && <Text style={pdf.injuryText}>Injured: {incident.injured_name}</Text>}
-                  {incident.body_part && <Text style={pdf.injuryText}>Body part: {incident.body_part}</Text>}
-                  {incident.treatment && <Text style={pdf.injuryText}>Treatment: {TREATMENT_LABELS[incident.treatment] || incident.treatment}</Text>}
+                  {incident.injured_name && <Text style={pdf.injuryText}>{t.injuredLabel} {incident.injured_name}</Text>}
+                  {incident.body_part && <Text style={pdf.injuryText}>{t.bodyPartLabel} {incident.body_part}</Text>}
+                  {incident.treatment && <Text style={pdf.injuryText}>{t.treatmentDetailLabel} {TREATMENT_LABELS[incident.treatment] || incident.treatment}</Text>}
                 </View>
               )}
 
               {incident.description && (
                 <>
-                  <Text style={pdf.sectionLabel}>Description</Text>
+                  <Text style={pdf.sectionLabel}>{t.descriptionSection}</Text>
                   <Text style={pdf.sectionText}>{incident.description}</Text>
                 </>
               )}
 
               {incident.witnesses && (
                 <>
-                  <Text style={pdf.sectionLabel}>Witnesses</Text>
+                  <Text style={pdf.sectionLabel}>{t.witnessesSection}</Text>
                   <Text style={pdf.sectionText}>{incident.witnesses}</Text>
                 </>
               )}
 
               {incident.corrective_action && (
                 <>
-                  <Text style={pdf.sectionLabel}>Corrective Action</Text>
+                  <Text style={pdf.sectionLabel}>{t.correctiveActionSection}</Text>
                   <Text style={pdf.sectionText}>{incident.corrective_action}</Text>
                 </>
               )}
@@ -150,7 +152,7 @@ export function IncidentReportDocument({ incidents, companyName }) {
 
         {/* Footer */}
         <View style={pdf.footer} fixed>
-          <Text style={pdf.footerText}>{companyName} — Incident Report Log — {dateStr}</Text>
+          <Text style={pdf.footerText}>{companyName} — {t.pdfIncidentReportLog} — {dateStr}</Text>
           <Text style={pdf.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>
@@ -159,14 +161,16 @@ export function IncidentReportDocument({ incidents, companyName }) {
 }
 
 export function IncidentReportPDFButton({ incidents, companyName, style }) {
+  const t = useT();
+  const { user } = useAuth();
   const fileName = `incident-reports-${new Date().toLocaleDateString('en-CA')}.pdf`;
   return (
     <PDFDownloadLink
-      document={<IncidentReportDocument incidents={incidents} companyName={companyName} />}
+      document={<IncidentReportDocument incidents={incidents} companyName={companyName} t={t} language={user?.language} />}
       fileName={fileName}
       style={style}
     >
-      {({ loading }) => loading ? 'Preparing PDF...' : '⬇ Export PDF'}
+      {({ loading }) => loading ? t.pdfPreparingBtn : t.pdfExportBtn}
     </PDFDownloadLink>
   );
 }

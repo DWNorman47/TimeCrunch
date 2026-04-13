@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import { SkeletonList, SkeletonBlock } from './Skeleton';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
@@ -28,11 +29,14 @@ function ItemForm({ initial, onSaved, onCancel }) {
     setSaving(true); setError('');
     try {
       const r = isEdit
-        ? await api.patch(`/equipment/${initial.id}`, form)
+        ? await api.patch(`/equipment/${initial.id}`, { ...form, updated_at: initial.updated_at })
         : await api.post('/equipment', form);
       onSaved(r.data, isEdit);
     } catch (err) {
-      setError(err.response?.data?.error || t.failedToSave);
+      const msg = err.response?.status === 409
+        ? t.concurrentModification
+        : err.response?.data?.error || t.failedToSave;
+      setError(msg);
     } finally { setSaving(false); }
   };
 
@@ -41,31 +45,31 @@ function ItemForm({ initial, onSaved, onCancel }) {
       <h3 style={styles.formTitle}>{isEdit ? t.editEquipment : t.addEquipmentTitle}</h3>
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.name} *</label>
-          <input style={styles.input} type="text" placeholder="e.g. Excavator CAT 320" value={form.name} onChange={e => set('name', e.target.value)} required maxLength={255} />
+          <label htmlFor="eq-name" style={styles.label}>{t.name} *</label>
+          <input id="eq-name" style={styles.input} type="text" placeholder={t.equipmentNamePlaceholder} value={form.name} onChange={e => set('name', e.target.value)} required maxLength={255} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.equipmentType}</label>
-          <input style={styles.input} type="text" placeholder="e.g. Excavator, Skid Steer, Generator" value={form.type} onChange={e => set('type', e.target.value)} maxLength={100} />
+          <label htmlFor="eq-type" style={styles.label}>{t.equipmentType}</label>
+          <input id="eq-type" style={styles.input} type="text" placeholder={t.equipmentTypePlaceholder} value={form.type} onChange={e => set('type', e.target.value)} maxLength={100} />
         </div>
       </div>
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.unitSerial}</label>
-          <input style={styles.input} type="text" placeholder="e.g. Unit 4, SN-12345" value={form.unit_number} onChange={e => set('unit_number', e.target.value)} maxLength={100} />
+          <label htmlFor="eq-unit" style={styles.label}>{t.unitSerial}</label>
+          <input id="eq-unit" style={styles.input} type="text" placeholder={t.equipmentUnitPlaceholder} value={form.unit_number} onChange={e => set('unit_number', e.target.value)} maxLength={100} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.maintenanceEvery} <span style={styles.optional}>({t.optional})</span></label>
-          <input style={styles.input} type="number" min="0" placeholder="e.g. 250" value={form.maintenance_interval_hours} onChange={e => set('maintenance_interval_hours', e.target.value)} />
+          <label htmlFor="eq-maintenance" style={styles.label}>{t.maintenanceEvery} <span style={styles.optional}>({t.optional})</span></label>
+          <input id="eq-maintenance" style={styles.input} type="number" min="0" placeholder={t.equipmentIntervalPlaceholder} value={form.maintenance_interval_hours} onChange={e => set('maintenance_interval_hours', e.target.value)} />
         </div>
       </div>
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>{t.notes}</label>
-        <input style={styles.input} type="text" placeholder={t.optionalNotes} value={form.notes} onChange={e => set('notes', e.target.value)} maxLength={1000} />
+        <label htmlFor="eq-notes" style={styles.label}>{t.notes}</label>
+        <input id="eq-notes" style={styles.input} type="text" placeholder={t.optionalNotes} value={form.notes} onChange={e => set('notes', e.target.value)} maxLength={1000} />
       </div>
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.addEquipmentTitle}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.addEquipmentTitle}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -109,36 +113,36 @@ function LogHoursForm({ item, projects, onLogged, onCancel }) {
       <h3 style={styles.formTitle}>{t.logHoursTitle} — {item.name}</h3>
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.date} *</label>
-          <input style={styles.input} type="date" value={form.log_date} onChange={e => set('log_date', e.target.value)} required />
+          <label htmlFor="eq-log-date" style={styles.label}>{t.date} *</label>
+          <input id="eq-log-date" style={styles.input} type="date" value={form.log_date} onChange={e => set('log_date', e.target.value)} required max={new Date().toLocaleDateString('en-CA')} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.hours} *</label>
-          <input style={{ ...styles.input, maxWidth: 110 }} type="number" min="0.5" step="0.5" placeholder="0.0" value={form.hours} onChange={e => set('hours', e.target.value)} required />
+          <label htmlFor="eq-hours" style={styles.label}>{t.hours} *</label>
+          <input id="eq-hours" style={{ ...styles.input, maxWidth: 110 }} type="number" min="0.5" step="0.5" placeholder="0.0" value={form.hours} onChange={e => set('hours', e.target.value)} required />
         </div>
       </div>
       <div style={styles.row}>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.project}</label>
-            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+            <label htmlFor="eq-project" style={styles.label}>{t.project}</label>
+            <select id="eq-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
               <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
         )}
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.operatorField}</label>
-          <input style={styles.input} type="text" placeholder={t.operatorField} value={form.operator_name} onChange={e => set('operator_name', e.target.value)} maxLength={255} />
+          <label htmlFor="eq-operator" style={styles.label}>{t.operatorField}</label>
+          <input id="eq-operator" style={styles.input} type="text" placeholder={t.operatorField} value={form.operator_name} onChange={e => set('operator_name', e.target.value)} maxLength={255} />
         </div>
       </div>
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>{t.notes} <span style={styles.optional}>({t.optional})</span></label>
-        <input style={styles.input} type="text" placeholder={t.optionalNotes} value={form.notes} onChange={e => set('notes', e.target.value)} maxLength={1000} />
+        <label htmlFor="eq-log-notes" style={styles.label}>{t.notes} <span style={styles.optional}>({t.optional})</span></label>
+        <input id="eq-log-notes" style={styles.input} type="text" placeholder={t.optionalNotes} value={form.notes} onChange={e => set('notes', e.target.value)} maxLength={1000} />
       </div>
       {error && <p style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : t.logHoursBtn}</button>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.logHoursBtn}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
       </div>
     </form>
@@ -199,7 +203,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
 
   return (
     <div style={{ ...styles.card, ...(overMaintenance ? styles.cardOverdue : nearMaintenance ? styles.cardWarning : {}) }}>
-      <div style={styles.cardHeader} onClick={handleExpand}>
+      <div style={styles.cardHeader} onClick={handleExpand} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleExpand()}>
         <div style={styles.cardLeft}>
           <div style={styles.itemName}>{item.name}</div>
           <div style={styles.itemMeta}>
@@ -250,7 +254,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
                   <button style={styles.editBtn} onClick={() => onEdit(item)}>{t.edit}</button>
                   {confirmingDelete ? (
                     <>
-                      <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                      <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
                       <button style={styles.cancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
                       {deleteError && <span style={styles.inlineError}>{deleteError}</span>}
                     </>
@@ -266,7 +270,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
             <div style={styles.hoursHistory}>
               <div style={styles.historyTitle}>{t.hoursHistory}</div>
               {loadingHours ? (
-                <p style={styles.hint}>{t.loading}</p>
+                <SkeletonBlock width="100%" height={48} style={{ marginTop: 8 }} />
               ) : hours.length === 0 ? (
                 <p style={styles.hint}>{t.noHoursLogged}</p>
               ) : (
@@ -299,7 +303,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
                               <button style={styles.cancelEntryBtn} onClick={() => setPendingDeleteEntryId(null)}>{t.cancel}</button>
                             </>
                           ) : (
-                            <button style={styles.delEntryBtn} onClick={() => setPendingDeleteEntryId(h.id)}>✕</button>
+                            <button style={styles.delEntryBtn} aria-label={t.deleteEntry} onClick={() => setPendingDeleteEntryId(h.id)}>✕</button>
                           ))}
                         </td>
                       </tr>
@@ -352,8 +356,8 @@ export default function EquipmentLog({ projects }) {
     ));
   };
 
-  const totalHrs = items.reduce((s, i) => s + parseFloat(i.total_hours || 0), 0);
-  const overdueCount = items.filter(i => i.maintenance_interval_hours && parseFloat(i.total_hours) >= i.maintenance_interval_hours).length;
+  const totalHrs = useMemo(() => items.reduce((s, i) => s + parseFloat(i.total_hours || 0), 0), [items]);
+  const overdueCount = useMemo(() => items.filter(i => i.maintenance_interval_hours && parseFloat(i.total_hours) >= i.maintenance_interval_hours).length, [items]);
 
   return (
     <div>
@@ -381,7 +385,7 @@ export default function EquipmentLog({ projects }) {
       )}
 
       {loading ? (
-        <p style={styles.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : items.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>🚜</div>

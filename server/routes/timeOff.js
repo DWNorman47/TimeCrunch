@@ -80,7 +80,8 @@ router.get('/', requireAdmin, async (req, res) => {
        JOIN users u ON r.user_id = u.id
        LEFT JOIN users rv ON r.reviewed_by = rv.id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY r.status = 'pending' DESC, r.start_date ASC`,
+       ORDER BY r.status = 'pending' DESC, r.start_date ASC
+       LIMIT 500`,
       params
     );
     res.json(result.rows);

@@ -1,26 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePlan } from '../hooks/usePlan';
 import { useT } from '../hooks/useT';
 import NotificationBell from '../components/NotificationBell';
-import WorkerMetrics from '../components/WorkerMetrics';
-import ProjectReports from '../components/ProjectReports';
-import LiveWorkers from '../components/LiveWorkers';
-import ApprovalQueue from '../components/ApprovalQueue';
-import ManagePayPeriods from '../components/ManagePayPeriods';
-import ManageSchedule from '../components/ManageSchedule';
-import ExportPanel from '../components/ExportPanel';
-import OvertimeReport from '../components/OvertimeReport';
-import CertifiedPayroll from '../components/CertifiedPayroll';
 import CompanyChat from '../components/CompanyChat';
 import LiveKPIs from '../components/LiveKPIs';
+import { SkeletonStatRow, SkeletonList } from '../components/Skeleton';
 import BroadcastMessage from '../components/BroadcastMessage';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
-import AdminTimeOff from '../components/AdminTimeOff';
 import OnboardingChecklist from '../components/OnboardingChecklist';
-import ReimbursementsAdmin from '../components/ReimbursementsAdmin';
 import api from '../api';
+
+// Heavy components — lazy-loaded on first render to reduce initial bundle size
+// LiveWorkers pulls in leaflet + react-leaflet (~200 kB), so lazy-load it
+const LiveWorkers = lazy(() => import('../components/LiveWorkers'));
+const WorkerMetrics = lazy(() => import('../components/WorkerMetrics'));
+const ProjectReports = lazy(() => import('../components/ProjectReports'));
+const ApprovalQueue = lazy(() => import('../components/ApprovalQueue'));
+const ManagePayPeriods = lazy(() => import('../components/ManagePayPeriods'));
+const ManageSchedule = lazy(() => import('../components/ManageSchedule'));
+const ExportPanel = lazy(() => import('../components/ExportPanel'));
+const OvertimeReport = lazy(() => import('../components/OvertimeReport'));
+const CertifiedPayroll = lazy(() => import('../components/CertifiedPayroll'));
+const AdminTimeOff = lazy(() => import('../components/AdminTimeOff'));
+const ReimbursementsAdmin = lazy(() => import('../components/ReimbursementsAdmin'));
+
+function TabLoader() {
+  return <SkeletonList count={4} rows={2} />;
+}
 
 
 function UpgradePrompt({ requiredPlan, feature }) {
@@ -77,7 +85,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchPending = () => {
       api.get('/admin/kpis').then(r => setPendingCount(r.data.pending_approvals ?? 0)).catch(() => {});
-      api.get('/reimbursements/admin?status=pending').then(r => setPendingReimbursements(r.data.length)).catch(() => {});
+      api.get('/reimbursements/admin?status=pending').then(r => setPendingReimbursements((r.data.items ?? r.data).length)).catch(() => {});
     };
     fetchPending();
     const interval = setInterval(fetchPending, 60000);
@@ -176,7 +184,12 @@ export default function AdminDashboard() {
           ]}
         />
 
-        {loading ? <p>{t.loading}</p> : loadError ? (
+        {loading ? (
+          <>
+            <SkeletonStatRow count={4} style={{ marginBottom: 20 }} />
+            <SkeletonList count={4} />
+          </>
+        ) : loadError ? (
           <div style={styles.errorBanner}>
             <strong>{t.failedLoadDashboard}</strong> Check your connection and{' '}
             <button style={styles.retryBtn} onClick={() => window.location.reload()}>{t.tryAgain}</button>.
@@ -190,21 +203,27 @@ export default function AdminDashboard() {
             {plan.isBusiness && settings?.feature_broadcast !== false ? <BroadcastMessage /> : null}
             {settings?.feature_chat !== false ? (
               <div style={styles.liveLayout} className="live-layout">
-                <div style={styles.liveMain}><LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} /></div>
+                <div style={styles.liveMain}>
+                  <Suspense fallback={<TabLoader />}>
+                    <LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} />
+                  </Suspense>
+                </div>
                 <div style={styles.liveChat}><CompanyChat workers={workers} /></div>
               </div>
             ) : (
-              <LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} />
+              <Suspense fallback={<TabLoader />}>
+                <LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} />
+              </Suspense>
             )}
           </>
         ) : tab === 'approvals' ? (
-          <>
+          <Suspense fallback={<TabLoader />}>
             <h2 style={styles.heading}>{t.tabApprovals}</h2>
             <ApprovalQueue onCountChange={setPendingCount} />
             {canDo('approve_entries') && <ManagePayPeriods />}
-          </>
+          </Suspense>
         ) : tab === 'reports' ? (
-          <>
+          <Suspense fallback={<TabLoader />}>
             <h2 style={styles.heading}>{t.tabReports}</h2>
             <button style={styles.sectionToggle} onClick={() => toggleSection('workers')}>
               <span>{t.workerReports}</span>
@@ -229,24 +248,28 @@ export default function AdminDashboard() {
               {!collapsedSections.overtime && (plan.isStarter ? <OvertimeReport currency={settings?.currency ?? 'USD'} /> : <UpgradePrompt requiredPlan="starter" feature={t.overtimeReport} />)}
             </>}
             <button style={styles.sectionToggle} onClick={() => toggleSection('payroll')}>
-              <span>Payroll</span>
+              <span>{t.payrollLabel}</span>
               <span style={styles.chevron}>{collapsedSections.payroll ? '▶' : '▼'}</span>
             </button>
-            {!collapsedSections.payroll && (plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature="Payroll" />)}
+            {!collapsedSections.payroll && (plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature={t.payrollLabel} />)}
             <button style={styles.sectionToggle} onClick={() => toggleSection('export')}>
               <span>{t.export}</span>
               <span style={styles.chevron}>{collapsedSections.export ? '▶' : '▼'}</span>
             </button>
             {!collapsedSections.export && (plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />)}
-          </>
+          </Suspense>
         ) : tab === 'timeoff' ? (
-          <AdminTimeOff settings={settings} />
+          <Suspense fallback={<TabLoader />}>
+            <AdminTimeOff settings={settings} />
+          </Suspense>
         ) : tab === 'expenses' ? (
-          <ReimbursementsAdmin />
+          <Suspense fallback={<TabLoader />}>
+            <ReimbursementsAdmin />
+          </Suspense>
         ) : tab === 'manage' ? (
-          <>
+          <Suspense fallback={<TabLoader />}>
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
-          </>
+          </Suspense>
         ) : null}
       </main>
     </div>

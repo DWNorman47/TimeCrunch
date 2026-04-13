@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api';
 import BinLabelModal from './BinLabelModal';
 import { useT } from '../../hooks/useT';
+import { SkeletonList } from '../Skeleton';
 
 function isHttpUrl(url) {
   try { return ['http:', 'https:'].includes(new URL(url).protocol); } catch { return false; }
@@ -57,6 +58,7 @@ const LEVELS = [
 // ── Photo Thumbnail component ─────────────────────────────────────────────────
 
 function PhotoGrid({ photos, onRemove, onAdd, readOnly }) {
+  const t = useT();
   const inputRef = useRef(null);
 
   const handleFileChange = e => {
@@ -80,12 +82,12 @@ function PhotoGrid({ photos, onRemove, onAdd, readOnly }) {
             onClick={() => window.open(url, '_blank')}
           />
           {!readOnly && (
-            <button style={pg.removeBtn} onClick={() => onRemove(i)} title="Remove photo">×</button>
+            <button style={pg.removeBtn} aria-label={t.removePhoto} onClick={() => onRemove(i)} title={t.removePhoto}>×</button>
           )}
         </div>
       ))}
       {!readOnly && (
-        <button style={pg.addBtn} onClick={() => inputRef.current?.click()} title="Add photo">
+        <button style={pg.addBtn} onClick={() => inputRef.current?.click()} title={t.addPhoto}>
           <span style={pg.addIcon}>+</span>
           <span style={pg.addLabel}>Photo</span>
         </button>
@@ -179,8 +181,9 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       {/* Parent selector (only for new items on non-location levels) */}
       {!isLocation && !item && (
         <div style={ef.field}>
-          <label style={ef.label}>{LEVEL_SGl[level.parentLevel] || level.parentLabel} *</label>
+          <label htmlFor="isu-parent" style={ef.label}>{LEVEL_SGl[level.parentLevel] || level.parentLabel} *</label>
           <select
+            id="isu-parent"
             style={ef.input}
             value={form[level.parentKey]}
             onChange={e => set(level.parentKey, e.target.value)}
@@ -195,8 +198,9 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       )}
 
       <div style={ef.field}>
-        <label style={ef.label}>{t.invSetupNameField}</label>
+        <label htmlFor="isu-name" style={ef.label}>{t.invSetupNameField}</label>
         <input
+          id="isu-name"
           style={ef.input}
           value={form.name}
           onChange={e => set('name', e.target.value)}
@@ -208,18 +212,19 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       {isLocation && (
         <>
           <div style={ef.field}>
-            <label style={ef.label}>{t.invSetupTypeField}</label>
-            <select style={ef.input} value={form.type} onChange={e => set('type', e.target.value)}>
+            <label htmlFor="isu-type" style={ef.label}>{t.invSetupTypeField}</label>
+            <select id="isu-type" style={ef.input} value={form.type} onChange={e => set('type', e.target.value)}>
               {level.typeOptions.map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
             </select>
           </div>
           <div style={ef.field}>
-            <label style={ef.label}>{t.invSetupAddressField} <span style={ef.labelHint}>({t.optional})</span></label>
+            <label htmlFor="isu-address" style={ef.label}>{t.invSetupAddressField} <span style={ef.labelHint}>({t.optional})</span></label>
             <textarea
+              id="isu-address"
               style={{ ...ef.input, minHeight: 56, resize: 'vertical' }}
               value={form.address}
               onChange={e => set('address', e.target.value)}
-              placeholder="123 Main St, City, State 12345"
+              placeholder={t.invWarehouseAddressPlaceholder}
               maxLength={500}
             />
           </div>
@@ -227,12 +232,13 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       )}
 
       <div style={ef.field}>
-        <label style={ef.label}>{t.notes}</label>
+        <label htmlFor="isu-notes" style={ef.label}>{t.notes}</label>
         <textarea
+          id="isu-notes"
           style={{ ...ef.input, minHeight: 56, resize: 'vertical' }}
           value={form.notes}
           onChange={e => set('notes', e.target.value)}
-          placeholder="Optional description or map reference…"
+          placeholder={t.invWarehouseDescPlaceholder}
           maxLength={1000}
         />
       </div>
@@ -244,7 +250,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
 
       <div style={ef.actions}>
         <button type="button" style={ef.cancelBtn} onClick={onCancel}>{t.cancel}</button>
-        <button type="submit" style={ef.saveBtn} disabled={saving}>
+        <button type="submit" style={{ ...ef.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={saving}>
           {saving ? t.saving : item ? t.saveChanges : `${t.addOption} ${levelSingular}`}
         </button>
       </div>
@@ -353,35 +359,36 @@ function SupplierPanel() {
         {formErr && <div style={sp.error}>{formErr}</div>}
         <div style={sp.row}>
           <div style={sp.field}>
-            <label style={sp.label}>{t.invSetupNameField}</label>
-            <input style={sp.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Supply Co." />
+            <label htmlFor="isu-sup-name" style={sp.label}>{t.invSetupNameField}</label>
+            <input id="isu-sup-name" style={sp.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.invSupplierNamePlaceholder} />
           </div>
           <div style={sp.field}>
-            <label style={sp.label}>{t.invSetupContactName}</label>
-            <input style={sp.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" />
+            <label htmlFor="isu-sup-contact-name" style={sp.label}>{t.invSetupContactName}</label>
+            <input id="isu-sup-contact-name" style={sp.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder={t.contactNamePlaceholder} />
           </div>
         </div>
         <div style={sp.row}>
           <div style={sp.field}>
-            <label style={sp.label}>{t.invSetupPhone}</label>
-            <input style={sp.input} maxLength={50} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 555-5555" />
+            <label htmlFor="isu-sup-phone" style={sp.label}>{t.invSetupPhone}</label>
+            <input id="isu-sup-phone" style={sp.input} maxLength={50} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder={t.contactPhonePlaceholder} />
           </div>
           <div style={sp.field}>
-            <label style={sp.label}>{t.invSetupEmail}</label>
-            <input style={sp.input} type="email" maxLength={255} value={form.email} onChange={e => set('email', e.target.value)} placeholder="orders@supplier.com" />
+            <label htmlFor="isu-sup-email" style={sp.label}>{t.invSetupEmail}</label>
+            <input id="isu-sup-email" style={sp.input} type="email" maxLength={255} value={form.email} onChange={e => set('email', e.target.value)} placeholder={t.invSupplierEmailPlaceholder} />
           </div>
           <div style={sp.field}>
-            <label style={sp.label}>{t.invSetupWebsite}</label>
-            <input style={sp.input} value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://supplier.com" />
+            <label htmlFor="isu-sup-website" style={sp.label}>{t.invSetupWebsite}</label>
+            <input id="isu-sup-website" style={sp.input} value={form.website} onChange={e => set('website', e.target.value)} placeholder={t.invSupplierWebsitePlaceholder} />
           </div>
         </div>
         <div style={sp.field}>
-          <label style={sp.label}>{t.notes}</label>
-          <textarea style={{ ...sp.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
+          <label htmlFor="isu-sup-notes" style={sp.label}>{t.notes}</label>
+          <textarea id="isu-sup-notes" style={{ ...sp.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
+          <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
         </div>
         <div style={sp.actions}>
           <button style={sp.cancelBtn} onClick={() => setEditing(null)}>{t.cancel}</button>
-          <button style={sp.saveBtn} onClick={save} disabled={saving}>{saving ? t.saving : editing ? t.saveChanges : t.invSetupAddSupplierTitle}</button>
+          <button style={{ ...sp.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={save} disabled={saving}>{saving ? t.saving : editing ? t.saveChanges : t.invSetupAddSupplierTitle}</button>
         </div>
       </div>
     );
@@ -398,7 +405,7 @@ function SupplierPanel() {
       </div>
       {error && <div style={sp.error}>{error}</div>}
       {loading ? (
-        <div style={sp.empty}>{t.loading}</div>
+        <SkeletonList count={3} rows={2} />
       ) : suppliers.length === 0 ? (
         <div style={sp.empty}>
           <div style={sp.emptyIcon}>🏭</div>
@@ -423,20 +430,20 @@ function SupplierPanel() {
                   {sup.active ? (
                     <>
                       <span style={{ ...sp.badge, color: '#059669', background: '#d1fae5' }}>{t.invSetupActiveStatus}</span>
-                      <button style={sp.iconBtn} onClick={() => openEdit(sup)} title="Edit">✏️</button>
+                      <button style={sp.iconBtn} onClick={() => openEdit(sup)} title={t.edit}>✏️</button>
                       {pendingArchiveSupId === sup.id ? (
                         <>
                           <button style={sp.confirmArchiveBtn} onClick={() => archive(sup)}>{t.confirm}</button>
-                          <button style={sp.iconBtn} onClick={() => setPendingArchiveSupId(null)}>✕</button>
+                          <button style={sp.iconBtn} aria-label={t.cancelArchive} onClick={() => setPendingArchiveSupId(null)}>✕</button>
                         </>
                       ) : (
-                        <button style={sp.iconBtn} onClick={() => setPendingArchiveSupId(sup.id)} title="Archive">🗄️</button>
+                        <button style={sp.iconBtn} onClick={() => setPendingArchiveSupId(sup.id)} title={t.archive}>🗄️</button>
                       )}
                     </>
                   ) : (
                     <>
                       <span style={{ ...sp.badge, color: '#9ca3af', background: '#f3f4f6' }}>{t.invSetupArchivedStatus}</span>
-                      <button style={sp.iconBtn} onClick={() => restore(sup)} title="Restore">↩️</button>
+                      <button style={sp.iconBtn} onClick={() => restore(sup)} title={t.restore}>↩️</button>
                     </>
                   )}
                 </div>
@@ -725,7 +732,7 @@ export default function InventorySetup({ projects }) {
           {error && <div style={s.error}>{error}</div>}
 
           {loading ? (
-            <div style={s.empty}>{t.loading}</div>
+            <SkeletonList count={3} rows={1} />
           ) : items.length === 0 ? (
             <div style={s.empty}>
               <div style={s.emptyIcon}>📍</div>
@@ -769,20 +776,20 @@ export default function InventorySetup({ projects }) {
                         {item.active ? (
                           <>
                             {level.key !== 'locations' && (
-                              <button style={s.iconBtn} onClick={() => setPrintItem(item)} title="Print QR Label">🏷</button>
+                              <button style={s.iconBtn} onClick={() => setPrintItem(item)} title={t.printQRLabel}>🏷</button>
                             )}
-                            <button style={s.iconBtn} onClick={() => setEditing(item)} title="Edit">✏️</button>
+                            <button style={s.iconBtn} onClick={() => setEditing(item)} title={t.edit}>✏️</button>
                             {pendingArchiveItemId === item.id ? (
                               <>
                                 <button style={s.confirmArchiveBtn} onClick={() => archive(item)}>{t.confirm}</button>
-                                <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(null)}>✕</button>
+                                <button style={s.iconBtn} aria-label={t.cancelArchive} onClick={() => setPendingArchiveItemId(null)}>✕</button>
                               </>
                             ) : (
-                              <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(item.id)} title="Archive">🗄️</button>
+                              <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(item.id)} title={t.archive}>🗄️</button>
                             )}
                           </>
                         ) : (
-                          <button style={s.iconBtn} onClick={() => restore(item)} title="Restore">↩️</button>
+                          <button style={s.iconBtn} onClick={() => restore(item)} title={t.restore}>↩️</button>
                         )}
                       </div>
                     </div>

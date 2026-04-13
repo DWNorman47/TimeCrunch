@@ -1,29 +1,38 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Landing from './pages/Landing';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import AcceptInvite from './pages/AcceptInvite';
-import ConfirmEmail from './pages/ConfirmEmail';
-import Dashboard from './pages/Dashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import FieldPage from './pages/FieldPage';
-import ProjectsPage from './pages/ProjectsPage';
-import AdministrationPage from './pages/AdministrationPage';
-import AnalyticsPage from './pages/AnalyticsPage';
-import SuperAdmin from './pages/SuperAdmin';
-import InventoryPage from './pages/InventoryPage';
-import AccountPage from './pages/AccountPage';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import EULA from './pages/EULA';
 import InstallPrompt from './components/InstallPrompt';
 import WelcomeModal from './components/WelcomeModal';
-import Tests from './pages/Tests';
 import { ToastProvider } from './contexts/ToastContext';
 import { OfflineProvider } from './contexts/OfflineContext';
+
+const Login             = lazy(() => import('./pages/Login'));
+const Register          = lazy(() => import('./pages/Register'));
+const Landing           = lazy(() => import('./pages/Landing'));
+const ForgotPassword    = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword     = lazy(() => import('./pages/ResetPassword'));
+const AcceptInvite      = lazy(() => import('./pages/AcceptInvite'));
+const ConfirmEmail      = lazy(() => import('./pages/ConfirmEmail'));
+const Dashboard         = lazy(() => import('./pages/Dashboard'));
+const AdminDashboard    = lazy(() => import('./pages/AdminDashboard'));
+const FieldPage         = lazy(() => import('./pages/FieldPage'));
+const ProjectsPage      = lazy(() => import('./pages/ProjectsPage'));
+const AdministrationPage = lazy(() => import('./pages/AdministrationPage'));
+const AnalyticsPage     = lazy(() => import('./pages/AnalyticsPage'));
+const SuperAdmin        = lazy(() => import('./pages/SuperAdmin'));
+const InventoryPage     = lazy(() => import('./pages/InventoryPage'));
+const AccountPage       = lazy(() => import('./pages/AccountPage'));
+const PrivacyPolicy     = lazy(() => import('./pages/PrivacyPolicy'));
+const EULA              = lazy(() => import('./pages/EULA'));
+const Tests             = lazy(() => import('./pages/Tests'));
+
+function PageLoader() {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f6f9', color: '#9ca3af', fontSize: 15 }}>
+      Loading…
+    </div>
+  );
+}
 
 const BLOCKED_STATUSES = ['trial_expired', 'canceled'];
 
@@ -77,6 +86,7 @@ function AppRoutes() {
   const { user, loading } = useAuth();
   if (loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f6f9', color: '#9ca3af', fontSize: 15 }}>Loading…</div>;
   return (
+    <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route path="/login" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Login />} />
       <Route path="/register" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Register />} />
@@ -100,6 +110,7 @@ function AppRoutes() {
       <Route path="/" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Landing />} />
       <Route path="*" element={<Navigate to={user ? (user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard') : '/'} replace />} />
     </Routes>
+    </Suspense>
   );
 }
 

@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import AppSwitcher from '../components/AppSwitcher';
-import { PDFDownloadLink } from '@react-pdf/renderer';
-import ProjectBillPDF from '../components/ProjectBillPDF';
 import ManageClients from '../components/ManageClients';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from '../components/Skeleton';
+import { langToLocale } from '../utils';
 
 function punchColor(status) {
   return { open: '#f59e0b', in_progress: '#3b82f6', resolved: '#059669', closed: '#9ca3af' }[status] || '#9ca3af';
@@ -14,6 +14,8 @@ function punchColor(status) {
 // ── Project Card ──────────────────────────────────────────────────────────────
 
 function ProjectCard({ project, metrics, settings, onClick }) {
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const m = metrics || {};
   const totalHours = parseFloat(m.total_hours || 0);
   const budgetHours = parseFloat(project.budget_hours || 0);
@@ -33,7 +35,7 @@ function ProjectCard({ project, metrics, settings, onClick }) {
   const fmtMoney = v => {
     const n = parseFloat(v);
     if (isNaN(n) || n === 0) return null;
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: settings?.currency || 'USD', maximumFractionDigits: 0 }).format(n);
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: settings?.currency || 'USD', maximumFractionDigits: 0 }).format(n);
   };
 
   const statusColors = { planning: '#dbeafe|#1d4ed8', in_progress: '#d1fae5|#065f46', on_hold: '#fef3c7|#92400e', completed: '#e5e7eb|#374151' };
@@ -41,7 +43,7 @@ function ProjectCard({ project, metrics, settings, onClick }) {
   const statusLabel = { planning: 'Planning', in_progress: 'In Progress', on_hold: 'On Hold', completed: 'Completed' }[project.status];
 
   return (
-    <div style={{ ...styles.card, opacity: project.active === false ? 0.6 : 1 }} onClick={onClick}>
+    <div style={{ ...styles.card, opacity: project.active === false ? 0.6 : 1 }} onClick={onClick} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onClick()}>
       {project.active === false && (
         <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Archived</div>
       )}
@@ -106,6 +108,9 @@ function ProjectCard({ project, metrics, settings, onClick }) {
 // ── Project Detail Panel ──────────────────────────────────────────────────────
 
 function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, onProjectUpdated }) {
+  const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [tab, setTab] = useState('overview');
   const [editForm, setEditForm] = useState({
     name: project.name,
@@ -125,6 +130,14 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [billData, setBillData] = useState(null);
   const [billLoading, setBillLoading] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [qboStatus, setQboStatus] = useState(null);
+  const [qboItems, setQboItems] = useState(null);
+  const [qboItemId, setQboItemId] = useState('');
+  const [qboLoading, setQboLoading] = useState(false);
+  const [qboPushing, setQboPushing] = useState(false);
+  const [qboPushResult, setQboPushResult] = useState(null);
+  const [showQboPicker, setShowQboPicker] = useState(false);
   const [billFrom, setBillFrom] = useState('');
   const [billTo, setBillTo] = useState('');
   const [workers, setWorkers] = useState([]);
@@ -149,11 +162,14 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const [punchFormOpen, setPunchFormOpen] = useState(false);
   const [punchForm, setPunchForm] = useState({ title: '', description: '', location: '', priority: 'normal' });
   const [punchSaving, setPunchSaving] = useState(false);
+  const [punchError, setPunchError] = useState('');
   const [docs, setDocs] = useState([]);
   const [docsOpen, setDocsOpen] = useState(false);
   const [docsLoaded, setDocsLoaded] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [pendingDocDelete, setPendingDocDelete] = useState(null);
+  const [invoiceHistory, setInvoiceHistory] = useState(null);
+  const [checkingInvoice, setCheckingInvoice] = useState(new Set());
 
   const m = metrics || {};
   const fmtHours = h => {
@@ -164,7 +180,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const fmtMoney = v => {
     const n = parseFloat(v);
     if (isNaN(n) || n === 0) return '—';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: settings?.currency || 'USD', maximumFractionDigits: 0 }).format(n);
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: settings?.currency || 'USD', maximumFractionDigits: 0 }).format(n);
   };
 
   useEffect(() => {
@@ -224,21 +240,24 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const loadPunch = () => {
     if (punchLoaded) return;
     setPunchLoaded(true);
-    api.get('/punchlist', { params: { project_id: project.id } })
-      .then(r => setPunch(r.data))
+    api.get('/punchlist', { params: { project_id: project.id, limit: 100 } })
+      .then(r => setPunch(r.data.items))
       .catch(() => {});
   };
 
   const submitPunch = async (e) => {
     e.preventDefault();
-    if (!punchForm.title.trim()) return;
+    if (!punchForm.title.trim()) { setPunchError(t.titleRequired || 'Title is required.'); return; }
     setPunchSaving(true);
+    setPunchError('');
     try {
       const { data: item } = await api.post('/punchlist', { ...punchForm, project_id: project.id });
       setPunch(prev => [item, ...prev]);
       setPunchForm({ title: '', description: '', location: '', priority: 'normal' });
       setPunchFormOpen(false);
-    } catch {}
+    } catch {
+      setPunchError(t.failedSave);
+    }
     setPunchSaving(false);
   };
 
@@ -283,7 +302,92 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 
   useEffect(() => {
     if (tab === 'billing' && !billData) loadBilling();
+    if (tab === 'billing' && invoiceHistory === null && project.qbo_customer_id) {
+      api.get(`/qbo/invoices/project/${project.id}`)
+        .then(r => setInvoiceHistory(r.data))
+        .catch(() => setInvoiceHistory([]));
+    }
   }, [tab]);
+
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const [{ pdf }, { default: ProjectBillPDF }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('../components/ProjectBillPDF'),
+      ]);
+      const el = React.createElement(ProjectBillPDF, { data: billData, currency: settings?.currency || 'USD', companyInfo, project, t, language: user?.language });
+      const blob = await pdf(el).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `invoice-${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
+
+  const openQBOPicker = async () => {
+    setQboPushResult(null);
+    setQboLoading(true);
+    try {
+      if (!qboStatus) {
+        const r = await api.get('/qbo/status');
+        setQboStatus(r.data);
+        if (!r.data.connected) return;
+      }
+      if (qboItems === null) {
+        const r = await api.get('/qbo/items');
+        setQboItems(r.data);
+        if (r.data.length === 1) setQboItemId(r.data[0].Id);
+      }
+      setShowQboPicker(true);
+    } catch {
+      // silently skip — QBO not connected or API error
+    } finally {
+      setQboLoading(false);
+    }
+  };
+
+  const pushInvoiceToQBO = async () => {
+    if (!qboItemId) return;
+    setQboPushing(true);
+    setQboPushResult(null);
+    try {
+      const total = parseFloat(billData.summary.total_cost);
+      const periodStr = [billFrom, billTo].filter(Boolean).join(' – ') || 'all dates';
+      const description = `Labor — ${project.name} (${periodStr})`;
+      const r = await api.post('/qbo/invoices', {
+        customer_id: project.qbo_customer_id,
+        item_id: qboItemId,
+        amount: total,
+        description,
+        txn_date: billTo || new Date().toLocaleDateString('en-CA'),
+        project_id: project.id,
+      });
+      setQboPushResult({ success: true, invoiceId: r.data.Id, docNumber: r.data.DocNumber });
+      setShowQboPicker(false);
+      // Refresh invoice history
+      api.get(`/qbo/invoices/project/${project.id}`)
+        .then(res => setInvoiceHistory(res.data))
+        .catch(() => {});
+    } catch (err) {
+      setQboPushResult({ success: false, error: err.response?.data?.error || 'Push failed' });
+    } finally { setQboPushing(false); }
+  };
+
+  const checkInvoicePayment = async (qboInvoiceId) => {
+    setCheckingInvoice(prev => new Set(prev).add(qboInvoiceId));
+    try {
+      const r = await api.post(`/qbo/invoices/${qboInvoiceId}/check-payment`);
+      setInvoiceHistory(prev => prev.map(inv =>
+        inv.qbo_invoice_id === qboInvoiceId
+          ? { ...inv, balance: r.data.balance, payment_status: r.data.payment_status, last_checked_at: new Date().toISOString() }
+          : inv
+      ));
+    } catch { /* non-fatal */ }
+    finally {
+      setCheckingInvoice(prev => { const n = new Set(prev); n.delete(qboInvoiceId); return n; });
+    }
+  };
 
   const handleEditSave = async () => {
     if (!editForm.name.trim()) return;
@@ -300,12 +404,13 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
         description: editForm.description || null,
         progress_pct: editForm.progress_pct !== '' ? parseInt(editForm.progress_pct, 10) : null,
         wage_type: editForm.wage_type,
+        updated_at: project.updated_at,
       });
       onProjectUpdated?.(r.data);
       setEditMsg('Saved');
       setTimeout(() => setEditMsg(''), 2000);
-    } catch {
-      setEditMsg('Failed to save');
+    } catch (err) {
+      setEditMsg(err.response?.status === 409 ? 'Modified by someone else — refresh first' : 'Failed to save');
     } finally { setEditSaving(false); }
   };
 
@@ -362,7 +467,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
               {parseInt(m.worker_count || 0)} workers · {parseInt(m.total_entries || 0)} entries
             </p>
           </div>
-          <button style={styles.closeBtn} onClick={onClose}>✕</button>
+          <button style={styles.closeBtn} onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         <div style={styles.detailTabs}>
@@ -389,8 +494,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   {project.client_name && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Client</span><span style={styles.budgetValue}>{project.client_name}</span></div>}
                   {project.job_number && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Job #</span><span style={styles.budgetValue}>{project.job_number}</span></div>}
                   {project.address && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Address</span><span style={{ ...styles.budgetValue, textAlign: 'right', maxWidth: 220 }}>{project.address}</span></div>}
-                  {project.start_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Start</span><span style={styles.budgetValue}>{new Date(project.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
-                  {project.end_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Target End</span><span style={styles.budgetValue}>{new Date(project.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
+                  {project.start_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Start</span><span style={styles.budgetValue}>{new Date(project.start_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
+                  {project.end_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Target End</span><span style={styles.budgetValue}>{new Date(project.end_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
                   {project.description && <p style={{ fontSize: 13, color: '#374151', margin: '8px 0 0', lineHeight: 1.5 }}>{project.description}</p>}
                 </div>
               )}
@@ -446,7 +551,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   style={styles.activityToggle}
                   onClick={() => { setPunchOpen(o => !o); if (!punchOpen) loadPunch(); }}
                 >
-                  <span>Punchlist</span>
+                  <span>{t.punchlistTitle}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {punch.filter(p => p.status === 'open').length > 0 && (
                       <span style={{ ...styles.activityCount, background: '#f59e0b' }}>
@@ -482,7 +587,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                                 <div style={styles.activityMeta}>
                                   {item.location && <span>{item.location} · </span>}
                                   {item.assigned_to_name && <span>→ {item.assigned_to_name} · </span>}
-                                  <span>{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                  <span>{new Date(item.created_at).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}</span>
                                 </div>
                               </div>
                             </div>
@@ -512,9 +617,9 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                           value={punchForm.priority}
                           onChange={e => setPunchForm(f => ({ ...f, priority: e.target.value }))}
                         >
-                          <option value="low">Low priority</option>
-                          <option value="normal">Normal priority</option>
-                          <option value="high">High priority</option>
+                          <option value="low">{t.optLowPriority}</option>
+                          <option value="normal">{t.optNormalPriority}</option>
+                          <option value="high">{t.optHighPriority}</option>
                         </select>
                         <textarea
                           style={{ ...styles.rfiInput, resize: 'vertical', minHeight: 56, fontFamily: 'inherit' }}
@@ -522,12 +627,13 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                           value={punchForm.description}
                           onChange={e => setPunchForm(f => ({ ...f, description: e.target.value }))}
                         />
+                        {punchError && <p style={{ color: '#dc2626', fontSize: 12, margin: 0 }}>{punchError}</p>}
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button type="submit" style={styles.rfiSubmitBtn} disabled={punchSaving}>
-                            {punchSaving ? 'Saving…' : 'Add Item'}
+                            {punchSaving ? t.saving : t.punchlistAddItem}
                           </button>
-                          <button type="button" style={styles.rfiCancelBtn} onClick={() => setPunchFormOpen(false)}>
-                            Cancel
+                          <button type="button" style={styles.rfiCancelBtn} onClick={() => { setPunchFormOpen(false); setPunchError(''); }}>
+                            {t.cancel}
                           </button>
                         </div>
                       </form>
@@ -554,7 +660,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                               {parseFloat(w.total_hours).toFixed(1)}h
                             </span>
                             <span style={{ fontSize: 11, color: '#9ca3af' }}>
-                              {new Date(w.last_worked).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              {new Date(w.last_worked).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
                             </span>
                           </div>
                         </div>
@@ -629,7 +735,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                     style={styles.activityToggle}
                     onClick={() => setActivityOpen(o => !o)}
                   >
-                    <span>Recent Activity</span>
+                    <span>{t.recentActivity}</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {activity.length > 0 && <span style={styles.activityCount}>{activity.length}</span>}
                       <span style={{ fontSize: 12, color: '#9ca3af' }}>{activityOpen ? '▴' : '▾'}</span>
@@ -659,7 +765,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                               <div style={styles.activityMeta}>
                                 {item.type === 'note' ? '📝' : '✅'}
                                 {item.worker_name && <span>{item.worker_name} · </span>}
-                                <span>{new Date(item.event_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {new Date(item.event_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+                                <span>{new Date(item.event_at).toLocaleDateString(locale, { month: 'short', day: 'numeric' })} {new Date(item.event_at).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}</span>
                               </div>
                             </div>
                           </div>
@@ -676,7 +782,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   style={styles.activityToggle}
                   onClick={() => { setPhotosOpen(o => !o); if (!photosOpen) loadPhotos(); }}
                 >
-                  <span>Photos</span>
+                  <span>{t.photosLabel}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {photos.length > 0 && <span style={styles.activityCount}>{photos.length}</span>}
                     <span style={{ fontSize: 12, color: '#9ca3af' }}>{photosOpen ? '▴' : '▾'}</span>
@@ -685,12 +791,12 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 
                 {photosOpen && (
                   photosLoaded && photos.length === 0 ? (
-                    <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0' }}>No photos yet.</p>
+                    <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0' }}>{t.noPhotosYet}</p>
                   ) : (
                     <div style={styles.photoGrid}>
                       {photos.map((ph, i) => (
                         <button key={i} style={styles.photoThumb} onClick={() => setLightboxPhoto(ph)}>
-                          <img src={ph.url} alt={ph.caption || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 6 }} />
+                          <img src={ph.url} alt={ph.caption || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 6 }} loading="lazy" />
                         </button>
                       ))}
                     </div>
@@ -704,7 +810,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   style={styles.activityToggle}
                   onClick={() => { setDocsOpen(o => !o); if (!docsOpen) loadDocs(); }}
                 >
-                  <span>Documents</span>
+                  <span>{t.documentsLabel}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {docs.length > 0 && <span style={styles.activityCount}>{docs.length}</span>}
                     <span style={{ fontSize: 12, color: '#9ca3af' }}>{docsOpen ? '▴' : '▾'}</span>
@@ -774,8 +880,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                                 </div>
                                 <div style={styles.activityMeta}>
                                   {r.directed_to && <span>{r.directed_to} · </span>}
-                                  <span>{new Date(r.date_submitted).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                                  {r.date_due && <span> · Due {new Date(r.date_due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                                  <span>{new Date(r.date_submitted).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                  {r.date_due && <span> · Due {new Date(r.date_due).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}</span>}
                                 </div>
                               </div>
                             </div>
@@ -905,13 +1011,74 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                     </div>
                   </div>
 
-                  <PDFDownloadLink
-                    document={<ProjectBillPDF data={billData} currency={settings?.currency || 'USD'} companyInfo={companyInfo} project={project} />}
-                    fileName={`invoice-${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`}
-                    style={styles.pdfLink}
-                  >
-                    {({ loading }) => (loading ? 'Preparing PDF…' : '⬇ Download Invoice')}
-                  </PDFDownloadLink>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    <button style={styles.pdfLink} onClick={downloadPDF} disabled={pdfGenerating}>
+                      {pdfGenerating ? 'Preparing PDF…' : '⬇ Download Invoice'}
+                    </button>
+                    {project.qbo_customer_id && (
+                      <button style={{ ...styles.qboBtn, ...(qboLoading ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }} onClick={openQBOPicker} disabled={qboPushing || qboLoading}>
+                        {qboLoading ? 'Loading…' : 'Push to QuickBooks'}
+                      </button>
+                    )}
+                  </div>
+
+                  {showQboPicker && qboItems !== null && (
+                    <div style={styles.qboPicker}>
+                      <div style={styles.qboPickerLabel}>Select QuickBooks service item:</div>
+                      {qboItems.length === 0 ? (
+                        <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>{t.noQboServiceItems}</p>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <select style={styles.qboSelect} value={qboItemId} onChange={e => setQboItemId(e.target.value)}>
+                            <option value="">{t.selectItemPh}</option>
+                            {qboItems.map(item => (
+                              <option key={item.Id} value={item.Id}>{item.Name}</option>
+                            ))}
+                          </select>
+                          <button style={styles.qboConfirmBtn} onClick={pushInvoiceToQBO} disabled={!qboItemId || qboPushing}>
+                            {qboPushing ? 'Pushing…' : 'Create Invoice'}
+                          </button>
+                          <button style={styles.qboCancelBtn} onClick={() => setShowQboPicker(false)}>Cancel</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {qboPushResult && (
+                    <div style={{ ...styles.qboResult, background: qboPushResult.success ? '#f0fdf4' : '#fef2f2', borderColor: qboPushResult.success ? '#bbf7d0' : '#fecaca' }}>
+                      {qboPushResult.success
+                        ? `Invoice #${qboPushResult.docNumber || qboPushResult.invoiceId} created in QuickBooks.`
+                        : `Error: ${qboPushResult.error}`}
+                    </div>
+                  )}
+
+                  {invoiceHistory && invoiceHistory.length > 0 && (
+                    <div style={styles.invoiceHistory}>
+                      <div style={styles.invoiceHistoryTitle}>QuickBooks Invoice History</div>
+                      {invoiceHistory.map(inv => {
+                        const statusColor = inv.payment_status === 'paid' ? '#059669' : inv.payment_status === 'partial' ? '#d97706' : '#dc2626';
+                        const statusLabel = inv.payment_status === 'paid' ? 'Paid' : inv.payment_status === 'partial' ? 'Partial' : inv.payment_status === 'unknown' ? 'Unknown' : 'Unpaid';
+                        return (
+                          <div key={inv.id} style={styles.invoiceRow}>
+                            <span style={styles.invoiceNum}>#{inv.doc_number || inv.qbo_invoice_id}</span>
+                            <span style={styles.invoiceAmt}>{fmtMoney(inv.amount)}</span>
+                            <span style={styles.invoiceDate}>{inv.txn_date ? String(inv.txn_date).substring(0, 10) : '—'}</span>
+                            <span style={{ ...styles.invoiceStatus, color: statusColor }}>
+                              {statusLabel}
+                              {inv.balance != null && inv.payment_status !== 'paid' && ` (${fmtMoney(inv.balance)} remaining)`}
+                            </span>
+                            <button
+                              style={styles.checkPaymentBtn}
+                              onClick={() => checkInvoicePayment(inv.qbo_invoice_id)}
+                              disabled={checkingInvoice.has(inv.qbo_invoice_id)}
+                            >
+                              {checkingInvoice.has(inv.qbo_invoice_id) ? '…' : 'Check Status'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -937,13 +1104,13 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 if (hrs < 0) hrs += 24;
                 return (
                   <div key={e.id} style={styles.tableRow}>
-                    <span style={styles.tdDate}>{new Date(e.work_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    <span style={styles.tdDate}>{new Date(e.work_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                     <span style={styles.tdWorker}>{e.worker_name}</span>
                     <span style={styles.tdHours}>{hrs.toFixed(1)}h</span>
                   </div>
                 );
               })}
-              {entries.length > 200 && <p style={styles.moreText}>Showing first 200 of {entries.length} entries</p>}
+              {entries.length > 200 && <p style={styles.moreText}>{t.showingFirst200.replace('{n}', entries.length)}</p>}
             </div>
           )}
 
@@ -955,66 +1122,66 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   onClick={handleMarkComplete}
                   disabled={editSaving}
                 >
-                  Mark as Complete
+                  {t.markAsComplete}
                 </button>
               )}
               {editForm.status === 'completed' && (
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#059669', background: '#d1fae5', borderRadius: 8, padding: '10px 14px' }}>
-                  This project is marked as complete.
+                  {t.projectIsComplete}
                 </div>
               )}
 
               <div style={pf.field}>
-                <label style={pf.label}>Project Name</label>
+                <label style={pf.label}>{t.projectNameLabel}</label>
                 <input style={pf.input} value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
               </div>
 
               <div style={pf.row}>
                 <div style={pf.field}>
-                  <label style={pf.label}>Status</label>
+                  <label style={pf.label}>{t.status}</label>
                   <select style={pf.input} value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}>
-                    <option value="planning">Planning</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="on_hold">On Hold</option>
-                    <option value="completed">Completed</option>
+                    <option value="planning">{t.statusPlanning}</option>
+                    <option value="in_progress">{t.statusInProgress}</option>
+                    <option value="on_hold">{t.statusOnHold}</option>
+                    <option value="completed">{t.statusCompleted}</option>
                   </select>
                 </div>
                 <div style={pf.field}>
-                  <label style={pf.label}>Progress %</label>
+                  <label style={pf.label}>{t.progressPctLabel}</label>
                   <input style={pf.input} type="number" min="0" max="100" placeholder="0–100" value={editForm.progress_pct} onChange={e => setEditForm(f => ({ ...f, progress_pct: e.target.value }))} />
                 </div>
               </div>
 
               <div style={pf.row}>
                 <div style={pf.field}>
-                  <label style={pf.label}>Client Name</label>
-                  <input style={pf.input} value={editForm.client_name} onChange={e => setEditForm(f => ({ ...f, client_name: e.target.value }))} placeholder="Acme Corp" />
+                  <label style={pf.label}>{t.clientNameLabel}</label>
+                  <input style={pf.input} value={editForm.client_name} onChange={e => setEditForm(f => ({ ...f, client_name: e.target.value }))} placeholder={t.clientNameShortPlaceholder} />
                 </div>
                 <div style={pf.field}>
-                  <label style={pf.label}>Job Number</label>
-                  <input style={pf.input} value={editForm.job_number} onChange={e => setEditForm(f => ({ ...f, job_number: e.target.value }))} placeholder="JOB-2025-001" />
+                  <label style={pf.label}>{t.jobNumberLabel}</label>
+                  <input style={pf.input} value={editForm.job_number} onChange={e => setEditForm(f => ({ ...f, job_number: e.target.value }))} placeholder={t.jobNumberPlaceholder} />
                 </div>
               </div>
 
               <div style={pf.field}>
-                <label style={pf.label}>Address</label>
-                <input style={pf.input} value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, City, State" />
+                <label style={pf.label}>{t.address}</label>
+                <input style={pf.input} value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder={t.adminAddressPh} />
               </div>
 
               <div style={pf.row}>
                 <div style={pf.field}>
-                  <label style={pf.label}>Start Date</label>
+                  <label style={pf.label}>{t.startDate}</label>
                   <input style={pf.input} type="date" value={editForm.start_date} onChange={e => setEditForm(f => ({ ...f, start_date: e.target.value }))} />
                 </div>
                 <div style={pf.field}>
-                  <label style={pf.label}>End Date</label>
+                  <label style={pf.label}>{t.endDate}</label>
                   <input style={pf.input} type="date" value={editForm.end_date} onChange={e => setEditForm(f => ({ ...f, end_date: e.target.value }))} />
                 </div>
               </div>
 
               <div style={pf.field}>
-                <label style={pf.label}>Description</label>
-                <textarea style={pf.textarea} rows={3} value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder="Scope of work, notes…" />
+                <label style={pf.label}>{t.descriptionLabel}</label>
+                <textarea style={pf.textarea} rows={3} value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder={t.scopeOfWorkPh} />
               </div>
 
               {editMsg && (
@@ -1023,7 +1190,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 
               <div style={pf.actions}>
                 <button style={pf.saveBtn} onClick={handleEditSave} disabled={editSaving || !editForm.name.trim()}>
-                  {editSaving ? 'Saving…' : 'Save Changes'}
+                  {editSaving ? t.saving : t.saveChanges}
                 </button>
               </div>
             </div>
@@ -1037,18 +1204,19 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 // ── Project Row (list view) ───────────────────────────────────────────────────
 
 function ProjectRow({ project, metrics, settings, onClick }) {
+  const t = useT();
   const m = metrics || {};
   const totalHours = parseFloat(m.total_hours || 0);
   const fmtHours = h => { const n = parseFloat(h); return isNaN(n) || n === 0 ? '0h' : n % 1 === 0 ? `${n}h` : `${n.toFixed(1)}h`; };
   const statusColors = { planning: '#dbeafe|#1d4ed8', in_progress: '#d1fae5|#065f46', on_hold: '#fef3c7|#92400e', completed: '#e5e7eb|#374151' };
   const [statusBg, statusFg] = (statusColors[project.status] || '#f3f4f6|#6b7280').split('|');
-  const statusLabel = { planning: 'Planning', in_progress: 'In Progress', on_hold: 'On Hold', completed: 'Completed' }[project.status];
+  const statusLabel = { planning: t.statusPlanning, in_progress: t.statusInProgress, on_hold: t.statusOnHold, completed: t.statusCompleted }[project.status];
   const budgetHours = parseFloat(project.budget_hours || 0);
   const hoursUsedPct = budgetHours > 0 ? Math.min(100, (totalHours / budgetHours) * 100) : 0;
   const hourColor = hoursUsedPct >= 100 ? '#ef4444' : hoursUsedPct >= 85 ? '#f59e0b' : '#059669';
 
   return (
-    <div style={styles.row} onClick={onClick}>
+    <div style={styles.row} onClick={onClick} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onClick()}>
       <div style={styles.rowLeft}>
         <span style={styles.rowName}>{project.name}</span>
         {project.client_name && <span style={styles.rowClient}>{project.client_name}{project.job_number ? ` · ${project.job_number}` : ''}</span>}
@@ -1065,7 +1233,7 @@ function ProjectRow({ project, metrics, settings, onClick }) {
         )}
         {budgetHours === 0 && totalHours > 0 && <span style={{ fontSize: 12, color: '#6b7280', flexShrink: 0 }}>{fmtHours(totalHours)}</span>}
         <span style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>{parseInt(m.worker_count || 0)} worker{parseInt(m.worker_count || 0) !== 1 ? 's' : ''}</span>
-        {project.active === false && <span style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Archived</span>}
+        {project.active === false && <span style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>{t.archivedLabel}</span>}
       </div>
     </div>
   );
@@ -1076,6 +1244,7 @@ function ProjectRow({ project, metrics, settings, onClick }) {
 const BLANK_PROJECT = { name: '', client_id: '', job_number: '', address: '', start_date: '', end_date: '', status: 'in_progress', description: '', wage_type: 'regular' };
 
 function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
+  const t = useT();
   const [form, setForm] = useState(BLANK_PROJECT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -1084,7 +1253,7 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!form.name.trim()) { setError('Project name is required.'); return; }
+    if (!form.name.trim()) { setError(t.projectNameRequired); return; }
     setSaving(true); setError('');
     try {
       const r = await api.post('/admin/projects', {
@@ -1094,79 +1263,79 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
       });
       onSaved(r.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create project.');
+      setError(err.response?.data?.error || t.failedCreateProject);
     } finally { setSaving(false); }
   };
 
   return (
     <div style={pf.card}>
-      <h3 style={pf.title}>New Project</h3>
+      <h3 style={pf.title}>{t.newProject}</h3>
       <form onSubmit={handleSubmit} style={pf.form}>
         <div style={pf.row}>
           <div style={pf.field}>
-            <label style={pf.label}>Project Name *</label>
-            <input style={pf.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Downtown Office Renovation" required autoFocus />
+            <label style={pf.label}>{t.projectNameLabel} *</label>
+            <input style={pf.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.projectNamePlaceholder} required autoFocus />
           </div>
           <div style={pf.field}>
-            <label style={pf.label}>Job Number</label>
-            <input style={pf.input} value={form.job_number} onChange={e => set('job_number', e.target.value)} placeholder="JOB-2025-001" />
+            <label style={pf.label}>{t.jobNumberLabel}</label>
+            <input style={pf.input} value={form.job_number} onChange={e => set('job_number', e.target.value)} placeholder={t.jobNumberPlaceholder} />
           </div>
         </div>
 
         <div style={pf.row}>
           <div style={pf.field}>
-            <label style={pf.label}>Client</label>
+            <label style={pf.label}>{t.client}</label>
             <select style={pf.input} value={form.client_id} onChange={e => set('client_id', e.target.value)}>
-              <option value="">— No client —</option>
+              <option value="">{t.noClient}</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div style={pf.field}>
-            <label style={pf.label}>Status</label>
+            <label style={pf.label}>{t.status}</label>
             <select style={pf.input} value={form.status} onChange={e => set('status', e.target.value)}>
-              <option value="planning">Planning</option>
-              <option value="in_progress">In Progress</option>
-              <option value="on_hold">On Hold</option>
-              <option value="completed">Completed</option>
+              <option value="planning">{t.statusPlanning}</option>
+              <option value="in_progress">{t.statusInProgress}</option>
+              <option value="on_hold">{t.statusOnHold}</option>
+              <option value="completed">{t.statusCompleted}</option>
             </select>
           </div>
         </div>
 
         <div style={pf.field}>
-          <label style={pf.label}>Address / Location</label>
-          <input style={pf.input} value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, State" />
+          <label style={pf.label}>{t.addressLocation}</label>
+          <input style={pf.input} value={form.address} onChange={e => set('address', e.target.value)} placeholder={t.adminAddressPh} />
         </div>
 
         <div style={pf.row}>
           <div style={pf.field}>
-            <label style={pf.label}>Start Date</label>
+            <label style={pf.label}>{t.startDate}</label>
             <input style={pf.input} type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} />
           </div>
           <div style={pf.field}>
-            <label style={pf.label}>End Date</label>
+            <label style={pf.label}>{t.endDate}</label>
             <input style={pf.input} type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)} />
           </div>
           {showPrevailing && (
             <div style={pf.field}>
-              <label style={pf.label}>Wage Type</label>
+              <label style={pf.label}>{t.wageType}</label>
               <select style={pf.input} value={form.wage_type} onChange={e => set('wage_type', e.target.value)}>
-                <option value="regular">Regular</option>
-                <option value="prevailing">Prevailing</option>
+                <option value="regular">{t.regular}</option>
+                <option value="prevailing">{t.prevailing}</option>
               </select>
             </div>
           )}
         </div>
 
         <div style={pf.field}>
-          <label style={pf.label}>Description <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span></label>
-          <textarea style={pf.textarea} rows={2} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Scope of work, notes…" />
+          <label style={pf.label}>{t.descriptionLabel} <span style={{ fontWeight: 400, color: '#9ca3af' }}>{t.optionalHint}</span></label>
+          <textarea style={pf.textarea} rows={2} value={form.description} onChange={e => set('description', e.target.value)} placeholder={t.scopeOfWorkPh} />
         </div>
 
         {error && <p style={pf.error}>{error}</p>}
 
         <div style={pf.actions}>
-          <button style={pf.saveBtn} type="submit" disabled={saving}>{saving ? 'Creating…' : 'Create Project'}</button>
-          <button style={pf.cancelBtn} type="button" onClick={onCancel}>Cancel</button>
+          <button style={pf.saveBtn} type="submit" disabled={saving}>{saving ? t.creating : t.createProjectBtn}</button>
+          <button style={pf.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
         </div>
       </form>
     </div>
@@ -1181,6 +1350,7 @@ export default function ProjectsPage() {
   const [metrics, setMetrics] = useState({});
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selected, setSelected] = useState(null);
   const [features, setFeatures] = useState({});
   const [showArchived, setShowArchived] = useState(false);
@@ -1204,7 +1374,7 @@ export default function ProjectsPage() {
       setSettings(sRes.data);
       setFeatures(sRes.data);
       setCompanyInfo(ciRes.data || {});
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(() => setLoadError(true)).finally(() => setLoading(false));
   };
 
   useEffect(() => { loadProjects(showArchived); }, [showArchived]);
@@ -1305,7 +1475,12 @@ export default function ProjectsPage() {
               </div>
             )}
             {loading ? (
-              <p style={styles.loadingText}>Loading…</p>
+              <SkeletonList count={5} rows={3} />
+            ) : loadError ? (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '16px 20px', color: '#991b1b', fontSize: 14 }}>
+                Failed to load projects.{' '}
+                <button style={{ background: 'none', border: 'none', color: '#1a56db', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: 0 }} onClick={() => { setLoadError(false); loadProjects(showArchived); }}>Try again</button>
+              </div>
             ) : projects.length === 0 ? (
               <div style={styles.empty}>
                 <div style={styles.emptyIcon}>📁</div>
@@ -1424,7 +1599,22 @@ const styles = {
   filterLabel: { fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' },
   filterInput: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff' },
   generateBtn: { background: '#8b5cf6', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-end' },
-  pdfLink: { display: 'inline-block', marginTop: 16, background: '#eff6ff', color: '#1a56db', border: '1px solid #bfdbfe', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none' },
+  pdfLink: { display: 'inline-block', marginTop: 16, background: '#eff6ff', color: '#1a56db', border: '1px solid #bfdbfe', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none', cursor: 'pointer' },
+  qboBtn: { display: 'inline-block', marginTop: 16, background: '#2CA01C', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  qboPicker: { marginTop: 12, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 14px' },
+  qboPickerLabel: { fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 },
+  qboSelect: { padding: '7px 10px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13, minWidth: 200 },
+  qboConfirmBtn: { background: '#2CA01C', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  qboCancelBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer', color: '#6b7280' },
+  qboResult: { marginTop: 10, fontSize: 13, padding: '10px 14px', borderRadius: 8, border: '1px solid', color: '#374151' },
+  invoiceHistory: { marginTop: 16, borderTop: '1px solid #e5e7eb', paddingTop: 14 },
+  invoiceHistoryTitle: { fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 },
+  invoiceRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid #f3f4f6', flexWrap: 'wrap' },
+  invoiceNum: { fontSize: 13, fontWeight: 600, color: '#111827', minWidth: 70 },
+  invoiceAmt: { fontSize: 13, fontWeight: 700, color: '#111827', minWidth: 80 },
+  invoiceDate: { fontSize: 12, color: '#6b7280', minWidth: 80 },
+  invoiceStatus: { fontSize: 12, fontWeight: 600, flex: 1 },
+  checkPaymentBtn: { padding: '4px 12px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12, fontWeight: 600, color: '#374151', cursor: 'pointer' },
   // Entries table
   entriesTable: { display: 'flex', flexDirection: 'column', gap: 2 },
   tableHeader: { display: 'flex', gap: 8, padding: '6px 10px', background: '#f9fafb', borderRadius: 6, marginBottom: 4 },

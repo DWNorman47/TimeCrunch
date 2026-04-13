@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useToast } from '../contexts/ToastContext';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 function isEditable(dateStr) {
@@ -16,6 +17,7 @@ function midTime(start, end) {
 
 export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted, onClose }) {
   const t = useT();
+  const toast = useToast();
   const editable = !entry.locked && isEditable(entry.work_date);
   const mid = midTime(entry.start_time, entry.end_time);
 
@@ -44,6 +46,7 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
     try {
       await api.patch(`/time-entries/${entry.id}`, editForm);
       await onRefresh();
+      toast(t.entryUpdated, 'success');
       onClose?.();
     } catch (err) { setEditError(err.response?.data?.error || t.entryPanelFailedSave); }
     finally { setEditSaving(false); }
@@ -111,15 +114,15 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
           {editable ? (
             <>
               <div style={s.row}>
-                <div style={s.field}><label style={s.label}>{t.entryPanelStart}</label><input style={s.input} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} /></div>
-                <div style={s.field}><label style={s.label}>{t.entryPanelEnd}</label><input style={s.input} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} /></div>
-                <div style={s.field}><label style={s.label}>{t.entryPanelBreakMin}</label><input style={s.input} type="number" min="0" max="480" value={editForm.break_minutes} onChange={ev => setEditForm(f => ({ ...f, break_minutes: ev.target.value }))} /></div>
-                <div style={s.field}><label style={s.label}>{t.entryPanelMileage}</label><input style={s.input} type="number" min="0" step="0.1" value={editForm.mileage} onChange={ev => setEditForm(f => ({ ...f, mileage: ev.target.value }))} placeholder="optional" /></div>
-                <div style={{ ...s.field, flex: 2 }}><label style={s.label}>{t.notes}</label><input style={s.input} type="text" maxLength={500} value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder="optional" /></div>
+                <div style={s.field}><label htmlFor="ep-start" style={s.label}>{t.entryPanelStart}</label><input id="ep-start" style={s.input} type="time" value={editForm.start_time} onChange={ev => setEditForm(f => ({ ...f, start_time: ev.target.value }))} disabled={editSaving} /></div>
+                <div style={s.field}><label htmlFor="ep-end" style={s.label}>{t.entryPanelEnd}</label><input id="ep-end" style={s.input} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} disabled={editSaving} /></div>
+                <div style={s.field}><label htmlFor="ep-break" style={s.label}>{t.entryPanelBreakMin}</label><input id="ep-break" style={s.input} type="number" min="0" max="480" value={editForm.break_minutes} onChange={ev => setEditForm(f => ({ ...f, break_minutes: ev.target.value }))} disabled={editSaving} /></div>
+                <div style={s.field}><label htmlFor="ep-mileage" style={s.label}>{t.entryPanelMileage}</label><input id="ep-mileage" style={s.input} type="number" min="0" step="0.1" value={editForm.mileage} onChange={ev => setEditForm(f => ({ ...f, mileage: ev.target.value }))} placeholder={t.optional} disabled={editSaving} /></div>
+                <div style={{ ...s.field, flex: 2 }}><label htmlFor="ep-notes" style={s.label}>{t.notes}</label><input id="ep-notes" style={s.input} type="text" maxLength={500} value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder={t.optional} disabled={editSaving} /></div>
               </div>
               {editError && <p style={s.error}>{editError}</p>}
               <div style={s.actions}>
-                <button style={s.saveBtn} onClick={handleSaveEdit} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
+                <button style={{ ...s.saveBtn, ...(editSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleSaveEdit} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>
                 <button style={s.cancelBtn} onClick={onClose}>{t.cancel}</button>
               </div>
             </>
@@ -133,12 +136,12 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
         <div>
           <p style={s.hint}>{t.entryPanelBreakHint}</p>
           <div style={s.row}>
-            <div style={s.field}><label style={s.label}>{t.entryPanelBreakStart}</label><input type="time" style={s.input} value={breakForm.breakStart} onChange={e => setBreakForm(f => ({ ...f, breakStart: e.target.value }))} /></div>
-            <div style={s.field}><label style={s.label}>{t.entryPanelBreakEnd}</label><input type="time" style={s.input} value={breakForm.breakEnd} onChange={e => setBreakForm(f => ({ ...f, breakEnd: e.target.value }))} /></div>
+            <div style={s.field}><label htmlFor="ep-break-start" style={s.label}>{t.entryPanelBreakStart}</label><input id="ep-break-start" type="time" style={s.input} value={breakForm.breakStart} onChange={e => setBreakForm(f => ({ ...f, breakStart: e.target.value }))} /></div>
+            <div style={s.field}><label htmlFor="ep-break-end" style={s.label}>{t.entryPanelBreakEnd}</label><input id="ep-break-end" type="time" style={s.input} value={breakForm.breakEnd} onChange={e => setBreakForm(f => ({ ...f, breakEnd: e.target.value }))} /></div>
           </div>
           {splitError && <p style={s.error}>{splitError}</p>}
           <div style={s.actions}>
-            <button style={s.saveBtn} onClick={doSplitBreak} disabled={splitSaving}>{splitSaving ? t.saving : t.entryPanelInsertBreakBtn}</button>
+            <button style={{ ...s.saveBtn, ...(splitSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={doSplitBreak} disabled={splitSaving}>{splitSaving ? t.saving : t.entryPanelInsertBreakBtn}</button>
             <button style={s.cancelBtn} onClick={onClose}>{t.cancel}</button>
           </div>
         </div>
@@ -148,10 +151,10 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
         <div>
           <p style={s.hint}>{t.entryPanelSwitchHint}</p>
           <div style={s.row}>
-            <div style={s.field}><label style={s.label}>{t.entryPanelSwitchAt}</label><input type="time" style={s.input} value={switchForm.at} onChange={e => setSwitchForm(f => ({ ...f, at: e.target.value }))} /></div>
+            <div style={s.field}><label htmlFor="ep-switch-at" style={s.label}>{t.entryPanelSwitchAt}</label><input id="ep-switch-at" type="time" style={s.input} value={switchForm.at} onChange={e => setSwitchForm(f => ({ ...f, at: e.target.value }))} /></div>
             <div style={{ ...s.field, flex: 2 }}>
-              <label style={s.label}>{t.entryPanelSwitchToProject}</label>
-              <select style={s.input} value={switchForm.project_id} onChange={e => setSwitchForm(f => ({ ...f, project_id: e.target.value }))}>
+              <label htmlFor="ep-switch-project" style={s.label}>{t.entryPanelSwitchToProject}</label>
+              <select id="ep-switch-project" style={s.input} value={switchForm.project_id} onChange={e => setSwitchForm(f => ({ ...f, project_id: e.target.value }))}>
                 <option value="">{t.selectPlaceholder}…</option>
                 {projects.filter(p => p.active !== false).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
@@ -159,7 +162,7 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
           </div>
           {splitError && <p style={s.error}>{splitError}</p>}
           <div style={s.actions}>
-            <button style={s.saveBtn} onClick={doSplitSwitch} disabled={splitSaving}>{splitSaving ? t.saving : t.entryPanelInsertSwitchBtn}</button>
+            <button style={{ ...s.saveBtn, ...(splitSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={doSplitSwitch} disabled={splitSaving}>{splitSaving ? t.saving : t.entryPanelInsertSwitchBtn}</button>
             <button style={s.cancelBtn} onClick={onClose}>{t.cancel}</button>
           </div>
         </div>
@@ -170,7 +173,7 @@ export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted,
           {confirmingDelete ? (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 13, color: '#374151' }}>{t.entryPanelDeleteConfirm}</span>
-              <button style={s.deleteConfirmBtn} onClick={handleDelete} disabled={deleting}>{deleting ? t.entryPanelDeleting : t.confirm}</button>
+              <button style={{ ...s.deleteConfirmBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? t.entryPanelDeleting : t.confirm}</button>
               <button style={s.cancelBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
             </div>
           ) : (

@@ -1,15 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
-
-function fmtDate(str) {
-  const d = new Date(str.substring(0, 10) + 'T00:00:00');
-  const today = new Date(); today.setHours(0,0,0,0);
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-  if (d.getTime() === today.getTime()) return 'Today';
-  if (d.getTime() === tomorrow.getTime()) return 'Tomorrow';
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
+import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 
 function fmtTime(t) {
   const [h, m] = t.split(':');
@@ -17,7 +11,19 @@ function fmtTime(t) {
   return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`;
 }
 
+function fmtDate(str, t, locale = 'en-US') {
+  const d = new Date(str.substring(0, 10) + 'T00:00:00');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  if (d.getTime() === today.getTime()) return t.shiftToday;
+  if (d.getTime() === tomorrow.getTime()) return t.shiftTomorrow;
+  return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 export default function UpcomingShifts({ onFillEntry }) {
+  const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,16 +38,16 @@ export default function UpcomingShifts({ onFillEntry }) {
 
   return (
     <div style={styles.card}>
-      <h2 style={styles.heading}>Upcoming Shifts</h2>
+      <h2 style={styles.heading}>{t.upcomingShifts}</h2>
       <div style={styles.list}>
         {shifts.map(s => (
           <div key={s.id} style={styles.row}>
             <div style={styles.dateBadge}>
-              <div style={styles.dateDay}>{new Date(s.shift_date.substring(0,10)+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'})}</div>
+              <div style={styles.dateDay}>{new Date(s.shift_date.substring(0,10)+'T00:00:00').toLocaleDateString(locale,{weekday:'short'})}</div>
               <div style={styles.dateNum}>{new Date(s.shift_date.substring(0,10)+'T00:00:00').getDate()}</div>
             </div>
             <div style={styles.info}>
-              <div style={styles.label}>{fmtDate(s.shift_date)}</div>
+              <div style={styles.label}>{fmtDate(s.shift_date, t, locale)}</div>
               <div style={styles.times}>{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</div>
               {s.project_name && <div style={styles.project}>{s.project_name}</div>}
               {s.notes && <div style={styles.notes}>{s.notes}</div>}

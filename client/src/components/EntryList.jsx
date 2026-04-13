@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import api from '../api';
 import MessageThread from './MessageThread';
 import EntryPanel from './EntryPanel';
-import { fmtHours } from '../utils';
+import { fmtHours, langToLocale } from '../utils';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 function isEditable(dateStr) {
@@ -10,8 +10,7 @@ function isEditable(dateStr) {
 }
 function formatDate(dateStr, language) {
   const d = new Date(dateStr.substring(0, 10) + 'T00:00:00');
-  const locale = language === 'Spanish' ? 'es-MX' : 'en-US';
-  return d.toLocaleDateString(locale, { weekday: 'long', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(langToLocale(language), { weekday: 'long', month: 'short', day: 'numeric' });
 }
 function formatTime(t) {
   const [h, m] = t.split(':');
@@ -68,7 +67,13 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
     return groups;
   }, [entries]);
 
-  if (entries.length === 0) return <div style={styles.empty}>{t.noEntries}</div>;
+  if (entries.length === 0) return (
+    <div style={styles.emptyState}>
+      <div style={styles.emptyIcon}>📋</div>
+      <p style={styles.emptyTitle}>{t.noEntries}</p>
+      <p style={styles.emptySubtitle}>{t.logFirstEntryHint}</p>
+    </div>
+  );
 
   const toggleExpand = id => {
     setExpandedId(prev => prev === id ? null : id);
@@ -82,13 +87,13 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
         {selectedIds.size > 0 && (
           confirmingBulkDelete ? (
             <>
-              <button style={styles.confirmBulkDeleteBtn} onClick={handleBulkDelete} disabled={bulkDeleting}>
+              <button style={{ ...styles.confirmBulkDeleteBtn, ...(bulkDeleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleBulkDelete} disabled={bulkDeleting}>
                 {bulkDeleting ? t.elDeleting : `${t.elConfirmDelete} ${selectedIds.size}`}
               </button>
               <button style={styles.cancelBulkDeleteBtn} onClick={() => setConfirmingBulkDelete(false)}>{t.cancel}</button>
             </>
           ) : (
-            <button style={styles.bulkDeleteBtn} onClick={() => { setBulkDeleteError(''); setConfirmingBulkDelete(true); }} disabled={bulkDeleting}>
+            <button style={{ ...styles.bulkDeleteBtn, ...(bulkDeleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => { setBulkDeleteError(''); setConfirmingBulkDelete(true); }} disabled={bulkDeleting}>
               {`${t.elDeleteSelected} ${selectedIds.size}`}
             </button>
           )
@@ -123,7 +128,7 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                       />
                     )}
                     <div style={styles.entryInfo}>
-                      <span style={styles.project}>{e.project_name || '—'}</span>
+                      <span style={styles.project} title={e.project_name || ''}>{e.project_name || '—'}</span>
                       <span style={styles.times}>
                         {formatTime(e.start_time)} – {formatTime(e.end_time)}
                         {crosses && <span style={styles.plus1}>+1</span>}
@@ -208,5 +213,8 @@ const styles = {
   metaTag: { fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
   notes: { fontSize: 11, color: '#9ca3af', fontStyle: 'italic' },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 8, display: 'block' },
-  empty: { textAlign: 'center', color: '#888', padding: 32 },
+  emptyState: { textAlign: 'center', padding: '48px 20px', background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' },
+  emptyIcon: { fontSize: 36, marginBottom: 10 },
+  emptyTitle: { fontSize: 15, fontWeight: 600, color: '#374151', margin: '0 0 4px' },
+  emptySubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
 };

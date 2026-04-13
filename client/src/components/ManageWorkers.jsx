@@ -3,13 +3,16 @@ import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
+import { SkeletonList } from './Skeleton';
 
 function WorkerDocuments({ workerId }) {
   const t = useT();
+  const toast = useToast();
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [pendingDeleteDocId, setPendingDeleteDocId] = useState(null);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -36,8 +39,13 @@ function WorkerDocuments({ workerId }) {
   };
 
   const handleDelete = async (docId) => {
-    await api.delete(`/admin/workers/${workerId}/documents/${docId}`).catch(() => {});
-    setDocs(prev => prev.filter(d => d.id !== docId));
+    try {
+      await api.delete(`/admin/workers/${workerId}/documents/${docId}`);
+      setDocs(prev => prev.filter(d => d.id !== docId));
+      toast(t.docsDeleted, 'success');
+    } catch {
+      toast(t.docsDeleteFailed, 'error');
+    } finally { setPendingDeleteDocId(null); }
   };
 
   const fmtSize = (b) => b ? (b < 1024 * 1024 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`) : '';
@@ -58,9 +66,16 @@ function WorkerDocuments({ workerId }) {
         <div style={ds.list}>
           {docs.map(d => (
             <div key={d.id} style={ds.docRow}>
-              <a href={d.url} target="_blank" rel="noopener noreferrer" style={ds.docName}>{d.name}</a>
+              <a href={d.url} target="_blank" rel="noopener noreferrer" style={ds.docName} title={d.name}>{d.name}</a>
               <span style={ds.docMeta}>{fmtSize(d.size_bytes)}{d.uploaded_by_name ? ` · ${d.uploaded_by_name}` : ''}</span>
-              <button style={ds.deleteBtn} onClick={() => handleDelete(d.id)}>✕</button>
+              {pendingDeleteDocId === d.id ? (
+                <>
+                  <button style={ds.confirmDeleteBtn} onClick={() => handleDelete(d.id)}>{t.confirm}</button>
+                  <button style={ds.cancelDeleteBtn} onClick={() => setPendingDeleteDocId(null)}>{t.cancel}</button>
+                </>
+              ) : (
+                <button style={ds.deleteBtn} aria-label={`Delete ${d.name}`} onClick={() => setPendingDeleteDocId(d.id)}>✕</button>
+              )}
             </div>
           ))}
         </div>
@@ -79,6 +94,8 @@ const ds = {
   docName: { flex: 1, fontSize: 13, color: '#1a56db', textDecoration: 'none', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   docMeta: { fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' },
   deleteBtn: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 12, padding: '0 2px', lineHeight: 1 },
+  confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  cancelDeleteBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', borderRadius: 5, padding: '3px 8px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   error: { fontSize: 12, color: '#ef4444', margin: '4px 0' },
   empty: { fontSize: 12, color: '#9ca3af', margin: '4px 0' },
 };
@@ -116,7 +133,7 @@ function RoleBadge({ role }) {
   );
 }
 
-export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, defaultTempPassword = '', showRate = true, identityEditable = true, currency = 'USD', currentUser = null }) {
+export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, defaultTempPassword = '', showRate = true, identityEditable = true, currency = 'USD', currentUser = null, qboConnected = false }) {
   const toast = useToast();
   const t = useT();
   const rateTypes = [
@@ -144,6 +161,9 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const [usernameTaken, setUsernameTaken] = useState(false);
   const [usernameChecking, setUsernameChecking] = useState(false);
   const [archivedConflict, setArchivedConflict] = useState(null);
+  const [qboVendorPrompt, setQboVendorPrompt] = useState(null); // { user_id, display_name }
+  const [qboVendorCreating, setQboVendorCreating] = useState(false);
+  const [qboVendorResult, setQboVendorResult] = useState(null); // 'ok' | 'error'
 
   // Expand / edit state
   const [expandedId, setExpandedId] = useState(null);
@@ -163,6 +183,8 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
   const [editPermForm, setEditPermForm] = useState({ full_access: true, keys: {} });
   const [editPermSaving, setEditPermSaving] = useState(false);
+
+  const [editWorkerUpdatedAt, setEditWorkerUpdatedAt] = useState(null);
 
   const [editWorkerAccessForm, setEditWorkerAccessForm] = useState({ all_workers: true, ids: new Set() });
   const [editWorkerAccessSaving, setEditWorkerAccessSaving] = useState(false);
@@ -215,8 +237,15 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const full_name = [form.first_name, form.last_name].filter(Boolean).join(' ');
       const r = await api.post('/admin/workers', { ...form, full_name });
       onWorkerAdded(r.data);
+      toast(t.workerCreated, 'success');
+      const workerType = form.worker_type;
       setForm({ first_name: '', last_name: '', username: '', password: defaultTempPassword, email: '', role: 'worker', worker_type: 'employee', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
       setUsernameEdited(false); setUsernameTaken(false); setShowForm(false);
+      // Offer to create as QBO Vendor if connected and worker is contractor/subcontractor
+      if (qboConnected && (workerType === 'contractor' || workerType === 'subcontractor')) {
+        setQboVendorPrompt({ user_id: r.data.id, display_name: r.data.full_name });
+        setQboVendorResult(null);
+      }
     } catch (err) {
       const data = err.response?.data;
       if (data?.archived_id) { setArchivedConflict({ id: data.archived_id, name: data.archived_name }); setError(data.error); }
@@ -232,10 +261,11 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const r = await api.post('/admin/workers/invite', { ...inviteForm, full_name: inv_full_name });
       onWorkerAdded(r.data);
       if (r.data.email_sent === false) {
-        setInviteError('Worker created, but the invite email failed to send.');
+        setInviteError(t.workerInviteEmailFailed);
         setInviteForm({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
       } else {
         setInviteSent(inviteForm.email);
+        setTimeout(() => setInviteSent(''), 6000);
         setInviteForm({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
       }
     } catch (err) {
@@ -249,6 +279,20 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     setArchivedConflict(null); setError(''); setShowForm(false);
   };
 
+  const createQboVendor = async () => {
+    if (!qboVendorPrompt) return;
+    setQboVendorCreating(true);
+    try {
+      await api.post('/qbo/workers/create-vendor', {
+        user_id: qboVendorPrompt.user_id,
+        display_name: qboVendorPrompt.display_name,
+      });
+      setQboVendorResult('ok');
+    } catch {
+      setQboVendorResult('error');
+    } finally { setQboVendorCreating(false); }
+  };
+
   // ── Expand / panel edit helpers ─────────────────────────────────────────────
   const cancelEdit = () => { setEditingId(null); setEditSection(null); setEditUsernameTaken(false); };
 
@@ -259,16 +303,19 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
   const startEditInfo = w => {
     setEditingId(w.id); setEditSection('info');
+    setEditWorkerUpdatedAt(w.updated_at || null);
     setEditInfoForm({ full_name: w.full_name, invoice_name: w.invoice_name || '', email: w.email || '', role: w.role, language: w.language || 'English', worker_type: w.worker_type || 'employee' });
   };
 
   const startEditUsername = w => {
     setEditingId(w.id); setEditSection('username');
+    setEditWorkerUpdatedAt(w.updated_at || null);
     setEditUsernameVal(w.username); setEditUsernameTaken(false);
   };
 
   const startEditRate = w => {
     setEditingId(w.id); setEditSection('rate');
+    setEditWorkerUpdatedAt(w.updated_at || null);
     const gwh = w.guaranteed_weekly_hours != null ? parseFloat(w.guaranteed_weekly_hours) : null;
     setEditRateForm({
       rate: String(w.hourly_rate ?? 0),
@@ -292,21 +339,25 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const saveInfo = async id => {
     setEditInfoSaving(true);
     try {
-      const r = await api.patch(`/admin/workers/${id}`, editInfoForm);
+      const r = await api.patch(`/admin/workers/${id}`, { ...editInfoForm, updated_at: editWorkerUpdatedAt });
       onWorkerUpdated(r.data);
       cancelEdit();
-    } catch (err) { toast(err.response?.data?.error || 'Failed to update', 'error'); }
-    finally { setEditInfoSaving(false); }
+    } catch (err) {
+      const msg = err.response?.status === 409 ? t.concurrentModification : err.response?.data?.error || 'Failed to update';
+      toast(msg, 'error');
+    } finally { setEditInfoSaving(false); }
   };
 
   const saveUsername = async id => {
     setEditUsernameSaving(true);
     try {
-      const r = await api.patch(`/admin/workers/${id}`, { username: editUsernameVal });
+      const r = await api.patch(`/admin/workers/${id}`, { username: editUsernameVal, updated_at: editWorkerUpdatedAt });
       onWorkerUpdated(r.data);
       cancelEdit();
-    } catch (err) { toast(err.response?.data?.error || 'Username already taken', 'error'); }
-    finally { setEditUsernameSaving(false); }
+    } catch (err) {
+      const msg = err.response?.status === 409 ? t.concurrentModification : err.response?.data?.error || 'Username already taken';
+      toast(msg, 'error');
+    } finally { setEditUsernameSaving(false); }
   };
 
   const saveRate = async id => {
@@ -319,11 +370,14 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
         guaranteed_weekly_hours: editRateForm.guarantee_enabled
           ? (parseFloat(editRateForm.guaranteed_weekly_hours) || 40)
           : null,
+        updated_at: editWorkerUpdatedAt,
       });
       onWorkerUpdated(r.data);
       cancelEdit();
-    } catch (err) { toast(err.response?.data?.error || 'Failed to update', 'error'); }
-    finally { setEditRateSaving(false); }
+    } catch (err) {
+      const msg = err.response?.status === 409 ? t.concurrentModification : err.response?.data?.error || 'Failed to update';
+      toast(msg, 'error');
+    } finally { setEditRateSaving(false); }
   };
 
   const startEditPermissions = w => {
@@ -340,7 +394,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const r = await api.patch(`/admin/workers/${id}/permissions`, { admin_permissions: perms });
       onWorkerUpdated(r.data);
       cancelEdit();
-    } catch (err) { toast(err.response?.data?.error || 'Failed to update permissions', 'error'); }
+    } catch (err) { toast(err.response?.data?.error || t.failedUpdatePermissions, 'error'); }
     finally { setEditPermSaving(false); }
   };
 
@@ -357,7 +411,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const r = await api.patch(`/admin/workers/${id}/worker-access`, { worker_access_ids: ids });
       onWorkerUpdated(r.data);
       cancelEdit();
-    } catch (err) { toast(err.response?.data?.error || 'Failed to update worker access', 'error'); }
+    } catch (err) { toast(err.response?.data?.error || t.failedUpdateWorkerAccess, 'error'); }
     finally { setEditWorkerAccessSaving(false); }
   };
 
@@ -369,10 +423,10 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       if (r.data.email_sent) {
         setInvitedIds(s => new Set(s).add(id));
       } else {
-        toast('Worker created, but the invite email failed to send.', 'error');
+        toast(t.workerInviteEmailFailed, 'error');
       }
     } catch (err) {
-      toast(err.response?.data?.error || 'Failed to send invite', 'error');
+      toast(err.response?.data?.error || t.failedSendInvite, 'error');
     } finally {
       setInviteSending(s => { const n = new Set(s); n.delete(id); return n; });
     }
@@ -395,7 +449,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       onWorkerDeleted(id);
       setArchivedFetched(false);
       if (expandedId === id) setExpandedId(null);
-    } catch { toast('Failed to remove user', 'error'); }
+    } catch { toast(t.failedRemoveUser, 'error'); }
   };
 
   const handleRestore = async id => {
@@ -403,14 +457,14 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       const r = await api.patch(`/admin/workers/${id}/restore`);
       onWorkerRestored({ ...r.data, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 });
       setArchived(prev => prev.filter(w => w.id !== id));
-    } catch { toast('Failed to restore user', 'error'); }
+    } catch { toast(t.failedRestoreUser, 'error'); }
   };
 
   return (
     <div style={s.card}>
       <div style={s.cardHeader}>
         <h3 style={s.cardTitle}>{t.users}</h3>
-        <button style={s.addBtn} onClick={() => { setShowForm(v => !v); setError(''); setArchivedConflict(null); setInviteError(''); setInviteSent(''); }}>
+        <button style={s.addBtn} onClick={() => { setShowForm(v => !v); setError(''); setArchivedConflict(null); setInviteError(''); setInviteSent(''); setForm({ first_name: '', last_name: '', username: '', password: defaultTempPassword, email: '', role: 'worker', worker_type: 'employee', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' }); setInviteForm({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) }); setUsernameEdited(false); setAddMode('manual'); }}>
           {showForm ? t.cancel : t.addUser}
         </button>
       </div>
@@ -426,16 +480,17 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
             <form onSubmit={handleAdd} style={s.addForm}>
               <div style={s.formGrid}>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.firstName}</label>
-                  <input style={s.input} value={form.first_name} onChange={e => handleFirstNameChange(e.target.value)} required />
+                  <label htmlFor="mw-first-name" style={s.label}>{t.firstName}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
+                  <input id="mw-first-name" style={s.input} value={form.first_name} onChange={e => handleFirstNameChange(e.target.value)} required />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.lastName}</label>
-                  <input style={s.input} value={form.last_name} onChange={e => handleLastNameChange(e.target.value)} required />
+                  <label htmlFor="mw-last-name" style={s.label}>{t.lastName}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
+                  <input id="mw-last-name" style={s.input} value={form.last_name} onChange={e => handleLastNameChange(e.target.value)} required />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>Username{usernameChecking ? ' (checking...)' : usernameTaken ? ' ⚠ taken' : ''}</label>
+                  <label htmlFor="mw-username" style={s.label}>Username<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>{usernameChecking ? ' (checking...)' : usernameTaken ? ' ⚠ taken' : ''}</label>
                   <input
+                    id="mw-username"
                     style={{ ...s.input, borderColor: usernameTaken ? '#fca5a5' : undefined }}
                     value={form.username}
                     onChange={e => { setUsernameEdited(!!e.target.value); set('username', e.target.value); setUsernameTaken(false); }}
@@ -444,26 +499,26 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.temporaryPassword}</label>
+                  <label htmlFor="mw-password" style={s.label}>{t.temporaryPassword}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
                   <div style={{ position: 'relative' }}>
-                    <input style={{ ...s.input, width: '100%', paddingRight: 36, boxSizing: 'border-box' }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
+                    <input id="mw-password" style={{ ...s.input, width: '100%', paddingRight: 36, boxSizing: 'border-box' }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
                     <button type="button" onClick={() => setShowPassword(v => !v)} style={s.eyeBtn} tabIndex={-1}>{showPassword ? '🙈' : '👁'}</button>
                   </div>
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.emailOptional}</label>
-                  <input style={s.input} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+                  <label htmlFor="mw-email" style={s.label}>{t.emailOptional}</label>
+                  <input id="mw-email" style={s.input} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.role}</label>
-                  <select style={s.input} value={form.role} onChange={e => set('role', e.target.value)}>
+                  <label htmlFor="mw-role" style={s.label}>{t.role}</label>
+                  <select id="mw-role" style={s.input} value={form.role} onChange={e => set('role', e.target.value)}>
                     <option value="worker">{t.workerRole}</option>
                     <option value="admin">{t.adminRole}</option>
                   </select>
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>Worker Type</label>
-                  <select style={s.input} value={form.worker_type} onChange={e => set('worker_type', e.target.value)}>
+                  <label htmlFor="mw-worker-type" style={s.label}>Worker Type</label>
+                  <select id="mw-worker-type" style={s.input} value={form.worker_type} onChange={e => set('worker_type', e.target.value)}>
                     <option value="employee">Employee (W-2)</option>
                     <option value="contractor">Independent Contractor (1099-NEC)</option>
                     <option value="subcontractor">Subcontractor (1099-NEC)</option>
@@ -471,26 +526,26 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   </select>
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.language}</label>
-                  <select style={s.input} value={form.language} onChange={e => set('language', e.target.value)}>
+                  <label htmlFor="mw-language" style={s.label}>{t.language}</label>
+                  <select id="mw-language" style={s.input} value={form.language} onChange={e => set('language', e.target.value)}>
                     {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                   </select>
                 </div>
                 {showRate && (
                   <>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.payRate}</label>
-                      <input style={s.input} type="number" min="0" step="0.01" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />
+                      <label htmlFor="mw-hourly-rate" style={s.label}>{t.payRate}</label>
+                      <input id="mw-hourly-rate" style={s.input} type="number" min="0" step="0.01" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.rateType}</label>
-                      <select style={s.input} value={form.rate_type} onChange={e => set('rate_type', e.target.value)}>
+                      <label htmlFor="mw-rate-type" style={s.label}>{t.rateType}</label>
+                      <select id="mw-rate-type" style={s.input} value={form.rate_type} onChange={e => set('rate_type', e.target.value)}>
                         {rateTypes.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.overtimeRule}</label>
-                      <select style={s.input} value={form.overtime_rule} onChange={e => set('overtime_rule', e.target.value)}>
+                      <label htmlFor="mw-overtime-rule" style={s.label}>{t.overtimeRule}</label>
+                      <select id="mw-overtime-rule" style={s.input} value={form.overtime_rule} onChange={e => set('overtime_rule', e.target.value)}>
                         {overtimeRules.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                     </div>
@@ -503,52 +558,52 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   {archivedConflict && <button type="button" style={s.restoreInlineBtn} onClick={handleRestoreConflict}>Restore {archivedConflict.name}</button>}
                 </div>
               )}
-              <button style={s.saveBtn} type="submit" disabled={saving || usernameTaken}>{saving ? t.creating : t.createUser}</button>
+              <button style={{ ...s.saveBtn, ...((saving || usernameTaken) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving || usernameTaken}>{saving ? t.creating : t.createUser}</button>
             </form>
           ) : (
             <form onSubmit={handleInvite} style={s.addForm}>
               {inviteSent ? (
                 <div style={s.inviteSuccess}>
-                  Invite sent to <strong>{inviteSent}</strong>.{' '}
-                  <button type="button" style={s.restoreInlineBtn} onClick={() => setInviteSent('')}>Send another</button>
+                  {t.inviteSentPrefix} <strong>{inviteSent}</strong>.{' '}
+                  <button type="button" style={s.restoreInlineBtn} onClick={() => setInviteSent('')}>{t.sendAnother}</button>
                 </div>
               ) : (
                 <>
                   <div style={s.formGrid}>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.firstName}</label>
-                      <input style={s.input} value={inviteForm.first_name} onChange={e => setInvite('first_name', e.target.value)} required />
+                      <label htmlFor="mw-inv-first-name" style={s.label}>{t.firstName}</label>
+                      <input id="mw-inv-first-name" style={s.input} value={inviteForm.first_name} onChange={e => setInvite('first_name', e.target.value)} required />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.lastName}</label>
-                      <input style={s.input} value={inviteForm.last_name} onChange={e => setInvite('last_name', e.target.value)} required />
+                      <label htmlFor="mw-inv-last-name" style={s.label}>{t.lastName}</label>
+                      <input id="mw-inv-last-name" style={s.input} value={inviteForm.last_name} onChange={e => setInvite('last_name', e.target.value)} required />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.email}</label>
-                      <input style={s.input} type="email" value={inviteForm.email} onChange={e => setInvite('email', e.target.value)} required />
+                      <label htmlFor="mw-inv-email" style={s.label}>{t.email}</label>
+                      <input id="mw-inv-email" style={s.input} type="email" value={inviteForm.email} onChange={e => setInvite('email', e.target.value)} required />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.role}</label>
-                      <select style={s.input} value={inviteForm.role} onChange={e => setInvite('role', e.target.value)}>
+                      <label htmlFor="mw-inv-role" style={s.label}>{t.role}</label>
+                      <select id="mw-inv-role" style={s.input} value={inviteForm.role} onChange={e => setInvite('role', e.target.value)}>
                         <option value="worker">{t.workerRole}</option>
                         <option value="admin">{t.adminRole}</option>
                       </select>
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.language}</label>
-                      <select style={s.input} value={inviteForm.language} onChange={e => setInvite('language', e.target.value)}>
+                      <label htmlFor="mw-inv-language" style={s.label}>{t.language}</label>
+                      <select id="mw-inv-language" style={s.input} value={inviteForm.language} onChange={e => setInvite('language', e.target.value)}>
                         {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                       </select>
                     </div>
                     {showRate && (
                       <div style={s.fieldGroup}>
-                        <label style={s.label}>{t.payRate}</label>
-                        <input style={s.input} type="number" min="0" step="0.01" value={inviteForm.hourly_rate} onChange={e => setInvite('hourly_rate', e.target.value)} />
+                        <label htmlFor="mw-inv-rate" style={s.label}>{t.payRate}</label>
+                        <input id="mw-inv-rate" style={s.input} type="number" min="0" step="0.01" value={inviteForm.hourly_rate} onChange={e => setInvite('hourly_rate', e.target.value)} />
                       </div>
                     )}
                   </div>
                   {inviteError && <p style={s.errorText}>{inviteError}</p>}
-                  <button style={s.saveBtn} type="submit" disabled={inviteSaving}>{inviteSaving ? t.sendingInvite : t.sendInvite}</button>
+                  <button style={{ ...s.saveBtn, ...(inviteSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={inviteSaving}>{inviteSaving ? t.sendingInvite : t.sendInvite}</button>
                 </>
               )}
             </form>
@@ -557,7 +612,11 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       )}
 
       {workers.length === 0 ? (
-        <p style={s.empty}>{t.noUsers}</p>
+        <div style={s.emptyState}>
+          <div style={s.emptyStateIcon}>👷</div>
+          <p style={s.emptyStateTitle}>{t.noUsers}</p>
+          <p style={s.emptyStateSubtitle}>Add your first worker using the form above.</p>
+        </div>
       ) : (
         <div style={s.list}>
           {workers.map(w => {
@@ -590,27 +649,27 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                           <div style={s.editBlock}>
                             <div style={s.formGrid}>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.fullName}</label>
-                                <input style={s.input} value={editInfoForm.full_name} onChange={e => setEditInfoForm(f => ({ ...f, full_name: e.target.value }))} />
+                                <label htmlFor="mw-edit-full-name" style={s.label}>{t.fullName}</label>
+                                <input id="mw-edit-full-name" style={s.input} value={editInfoForm.full_name} onChange={e => setEditInfoForm(f => ({ ...f, full_name: e.target.value }))} />
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>Invoice Name <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
-                                <input style={s.input} value={editInfoForm.invoice_name} onChange={e => setEditInfoForm(f => ({ ...f, invoice_name: e.target.value }))} placeholder="e.g. Acme Contracting LLC" />
+                                <label htmlFor="mw-edit-invoice-name" style={s.label}>Invoice Name <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
+                                <input id="mw-edit-invoice-name" style={s.input} value={editInfoForm.invoice_name} onChange={e => setEditInfoForm(f => ({ ...f, invoice_name: e.target.value }))} placeholder={t.invoiceNamePlaceholder} />
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.email}</label>
-                                <input style={s.input} type="email" value={editInfoForm.email} onChange={e => setEditInfoForm(f => ({ ...f, email: e.target.value }))} />
+                                <label htmlFor="mw-edit-email" style={s.label}>{t.email}</label>
+                                <input id="mw-edit-email" style={s.input} type="email" value={editInfoForm.email} onChange={e => setEditInfoForm(f => ({ ...f, email: e.target.value }))} />
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.role}</label>
-                                <select style={s.input} value={editInfoForm.role} onChange={e => setEditInfoForm(f => ({ ...f, role: e.target.value }))}>
+                                <label htmlFor="mw-edit-role" style={s.label}>{t.role}</label>
+                                <select id="mw-edit-role" style={s.input} value={editInfoForm.role} onChange={e => setEditInfoForm(f => ({ ...f, role: e.target.value }))}>
                                   <option value="worker">{t.workerRole}</option>
                                   <option value="admin">{t.adminRole}</option>
                                 </select>
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>Worker Type</label>
-                                <select style={s.input} value={editInfoForm.worker_type || 'employee'} onChange={e => setEditInfoForm(f => ({ ...f, worker_type: e.target.value }))}>
+                                <label htmlFor="mw-edit-worker-type" style={s.label}>Worker Type</label>
+                                <select id="mw-edit-worker-type" style={s.input} value={editInfoForm.worker_type || 'employee'} onChange={e => setEditInfoForm(f => ({ ...f, worker_type: e.target.value }))}>
                                   <option value="employee">Employee (W-2)</option>
                                   <option value="contractor">Independent Contractor (1099-NEC)</option>
                                   <option value="subcontractor">Subcontractor (1099-NEC)</option>
@@ -618,14 +677,14 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 </select>
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.language}</label>
-                                <select style={s.input} value={editInfoForm.language} onChange={e => setEditInfoForm(f => ({ ...f, language: e.target.value }))}>
+                                <label htmlFor="mw-edit-language" style={s.label}>{t.language}</label>
+                                <select id="mw-edit-language" style={s.input} value={editInfoForm.language} onChange={e => setEditInfoForm(f => ({ ...f, language: e.target.value }))}>
                                   {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                                 </select>
                               </div>
                             </div>
                             <div style={s.editActions}>
-                              <button style={s.saveBtn} onClick={() => saveInfo(w.id)} disabled={editInfoSaving}>{editInfoSaving ? t.loading : t.save}</button>
+                              <button style={{ ...s.saveBtn, ...(editInfoSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveInfo(w.id)} disabled={editInfoSaving}>{editInfoSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
                           </div>
@@ -653,7 +712,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 {invitedIds.has(w.id) ? (
                                   <span style={s.inviteSentLabel}>Invite sent ✓</span>
                                 ) : (
-                                  <button style={s.inviteBtn} onClick={() => sendInvite(w.id)} disabled={inviteSending.has(w.id)}>
+                                  <button style={{ ...s.inviteBtn, ...(inviteSending.has(w.id) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => sendInvite(w.id)} disabled={inviteSending.has(w.id)}>
                                     {inviteSending.has(w.id) ? 'Sending...' : 'Send invite email'}
                                   </button>
                                 )}
@@ -676,8 +735,9 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                         {isEditing && editSection === 'username' ? (
                           <div style={s.editBlock}>
                             <div style={s.fieldGroup}>
-                              <label style={s.label}>{t.newUsername}{editUsernameChecking ? ' (checking...)' : editUsernameTaken ? ' ⚠ taken' : ''}</label>
+                              <label htmlFor="mw-edit-username" style={s.label}>{t.newUsername}{editUsernameChecking ? ' (checking...)' : editUsernameTaken ? ' ⚠ taken' : ''}</label>
                               <input
+                                id="mw-edit-username"
                                 style={{ ...s.input, borderColor: editUsernameTaken ? '#fca5a5' : undefined, maxWidth: 240 }}
                                 value={editUsernameVal}
                                 onChange={e => { setEditUsernameVal(e.target.value); setEditUsernameTaken(false); }}
@@ -685,7 +745,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               />
                             </div>
                             <div style={s.editActions}>
-                              <button style={s.saveBtn} onClick={() => saveUsername(w.id)} disabled={editUsernameSaving || editUsernameTaken}>{editUsernameSaving ? t.loading : t.save}</button>
+                              <button style={{ ...s.saveBtn, ...((editUsernameSaving || editUsernameTaken) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveUsername(w.id)} disabled={editUsernameSaving || editUsernameTaken}>{editUsernameSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
                           </div>
@@ -708,18 +768,18 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                           <div style={s.editBlock}>
                             <div style={s.formGrid}>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.amount}</label>
-                                <input style={{ ...s.input, maxWidth: 120 }} type="number" min="0" step="0.01" value={editRateForm.rate} onChange={e => setEditRateForm(f => ({ ...f, rate: e.target.value }))} />
+                                <label htmlFor="mw-edit-rate" style={s.label}>{t.amount}</label>
+                                <input id="mw-edit-rate" style={{ ...s.input, maxWidth: 120 }} type="number" min="0" step="0.01" value={editRateForm.rate} onChange={e => setEditRateForm(f => ({ ...f, rate: e.target.value }))} />
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.rateType}</label>
-                                <select style={s.input} value={editRateForm.rate_type} onChange={e => setEditRateForm(f => ({ ...f, rate_type: e.target.value }))}>
+                                <label htmlFor="mw-edit-rate-type" style={s.label}>{t.rateType}</label>
+                                <select id="mw-edit-rate-type" style={s.input} value={editRateForm.rate_type} onChange={e => setEditRateForm(f => ({ ...f, rate_type: e.target.value }))}>
                                   {rateTypes.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                                 </select>
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.overtimeRule}</label>
-                                <select style={s.input} value={editRateForm.overtime_rule} onChange={e => setEditRateForm(f => ({ ...f, overtime_rule: e.target.value }))}>
+                                <label htmlFor="mw-edit-overtime-rule" style={s.label}>{t.overtimeRule}</label>
+                                <select id="mw-edit-overtime-rule" style={s.input} value={editRateForm.overtime_rule} onChange={e => setEditRateForm(f => ({ ...f, overtime_rule: e.target.value }))}>
                                   {overtimeRules.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                                 </select>
                               </div>
@@ -748,7 +808,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               )}
                             </div>
                             <div style={s.editActions}>
-                              <button style={s.saveBtn} onClick={() => saveRate(w.id)} disabled={editRateSaving}>{editRateSaving ? t.loading : t.save}</button>
+                              <button style={{ ...s.saveBtn, ...(editRateSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveRate(w.id)} disabled={editRateSaving}>{editRateSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
                           </div>
@@ -802,7 +862,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               </div>
                             )}
                             <div style={s.editActions}>
-                              <button style={s.saveBtn} onClick={() => savePermissions(w.id)} disabled={editPermSaving}>{editPermSaving ? t.loading : t.save}</button>
+                              <button style={{ ...s.saveBtn, ...(editPermSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => savePermissions(w.id)} disabled={editPermSaving}>{editPermSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
                           </div>
@@ -866,7 +926,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               </div>
                             )}
                             <div style={s.editActions}>
-                              <button style={s.saveBtn} onClick={() => saveWorkerAccess(w.id)} disabled={editWorkerAccessSaving}>{editWorkerAccessSaving ? t.loading : t.save}</button>
+                              <button style={{ ...s.saveBtn, ...(editWorkerAccessSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveWorkerAccess(w.id)} disabled={editWorkerAccessSaving}>{editWorkerAccessSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
                           </div>
@@ -920,8 +980,14 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
         </button>
         {showHistory && (
           <div style={s.historyList}>
-            {loadingArchived ? <p style={s.empty}>{t.loading}</p>
-              : archived.length === 0 ? <p style={s.empty}>{t.noRemovedUsers}</p>
+            {loadingArchived ? <SkeletonList count={3} rows={1} />
+              : archived.length === 0 ? (
+                <div style={s.emptyState}>
+                  <div style={s.emptyStateIcon}>🗑️</div>
+                  <p style={s.emptyStateTitle}>{t.noRemovedUsers}</p>
+                  <p style={s.emptyStateSubtitle}>Removed workers will appear here.</p>
+                </div>
+              )
               : archived.map(w => (
                 <div key={w.id} style={s.historyItem}>
                   <div style={s.itemLeft}>
@@ -936,6 +1002,35 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
           </div>
         )}
       </div>
+
+      {/* QBO Vendor creation prompt */}
+      {qboVendorPrompt && (
+        <div style={s.qboPromptOverlay}>
+          <div style={s.qboPromptModal}>
+            <div style={s.qboPromptTitle}>Create QuickBooks Vendor?</div>
+            <p style={s.qboPromptBody}>
+              <strong>{qboVendorPrompt.display_name}</strong> was added as a contractor.
+              Would you like to create them as a Vendor in QuickBooks Online so they can be mapped for expense tracking?
+            </p>
+            {qboVendorResult === 'ok' && (
+              <div style={s.qboPromptSuccess}>Vendor created successfully in QuickBooks.</div>
+            )}
+            {qboVendorResult === 'error' && (
+              <div style={s.qboPromptError}>Failed to create vendor in QuickBooks. You can set the mapping manually in QBO settings.</div>
+            )}
+            <div style={s.qboPromptActions}>
+              {!qboVendorResult && (
+                <button style={{ ...s.saveBtn, ...(qboVendorCreating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={createQboVendor} disabled={qboVendorCreating}>
+                  {qboVendorCreating ? 'Creating…' : 'Yes, Create Vendor'}
+                </button>
+              )}
+              <button style={s.cancelBtn} onClick={() => { setQboVendorPrompt(null); setQboVendorResult(null); }}>
+                {qboVendorResult ? 'Close' : 'Skip'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -962,6 +1057,10 @@ const s = {
   saveBtn: { padding: '8px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer', width: 'fit-content' },
   cancelBtn: { padding: '8px 14px', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
   empty: { color: '#9ca3af', fontSize: 14, margin: 0 },
+  emptyState: { textAlign: 'center', padding: '40px 0 24px' },
+  emptyStateIcon: { fontSize: 40, marginBottom: 10 },
+  emptyStateTitle: { fontSize: 16, fontWeight: 700, color: '#374151', margin: '0 0 4px' },
+  emptyStateSubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
   list: { display: 'flex', flexDirection: 'column', gap: 2 },
   item: { border: '1px solid #f3f4f6', borderRadius: 8, overflow: 'hidden' },
   itemBar: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 10 },
@@ -992,4 +1091,11 @@ const s = {
   historyList: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 },
   historyItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#f9fafb', borderRadius: 7 },
   restoreBtn: { padding: '4px 12px', background: 'none', border: '1px solid #6ee7b7', color: '#059669', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  qboPromptOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  qboPromptModal: { background: '#fff', borderRadius: 12, padding: 28, maxWidth: 440, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 12 },
+  qboPromptTitle: { fontSize: 17, fontWeight: 700, color: '#111827' },
+  qboPromptBody: { fontSize: 14, color: '#374151', margin: 0, lineHeight: 1.5 },
+  qboPromptActions: { display: 'flex', gap: 10, marginTop: 4 },
+  qboPromptSuccess: { fontSize: 13, color: '#059669', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 7, padding: '8px 12px' },
+  qboPromptError: { fontSize: 13, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 7, padding: '8px 12px' },
 };

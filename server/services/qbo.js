@@ -1,6 +1,7 @@
 const axios = require('axios');
 const pool = require('../db');
 const { encrypt, decrypt } = require('./encryption');
+const { sendEmail } = require('../email');
 
 const IS_PRODUCTION = process.env.QBO_ENVIRONMENT === 'production';
 const QBO_BASE = IS_PRODUCTION
@@ -23,6 +24,24 @@ function getAuthUrl(state) {
 
 function basicAuthHeader() {
   return 'Basic ' + Buffer.from(`${process.env.QBO_CLIENT_ID}:${process.env.QBO_CLIENT_SECRET}`).toString('base64');
+}
+
+async function notifyDisconnect(companyId) {
+  try {
+    const setting = await pool.query(
+      `SELECT value FROM settings WHERE company_id = $1 AND key = 'notify_qbo_disconnect'`,
+      [companyId]
+    );
+    if (setting.rows[0]?.value !== '1') return;
+    const admins = await pool.query(
+      `SELECT email, full_name FROM users WHERE company_id = $1 AND role IN ('admin','superadmin') AND active = true AND email IS NOT NULL`,
+      [companyId]
+    );
+    for (const admin of admins.rows) {
+      sendEmail(admin.email, 'QuickBooks disconnected — action required',
+        `<p>Hi ${admin.full_name},</p><p>Your QuickBooks Online connection for OpsFloa has expired or been revoked. Auto-sync of time entries and expenses has <b>paused</b> until you reconnect.</p><p>To restore the connection, go to <b>Administration → QuickBooks</b> and click Reconnect.</p><p>— OpsFloa</p>`);
+    }
+  } catch (e) { /* non-fatal */ }
 }
 
 async function exchangeCode(code) {
@@ -65,6 +84,7 @@ async function refreshAccessToken(companyId) {
          WHERE id = $1`,
         [companyId]
       );
+      notifyDisconnect(companyId);
       const authErr = new Error('QuickBooks authorization expired. Please reconnect your QuickBooks account.');
       authErr.code = 'qbo_auth_expired';
       throw authErr;
@@ -105,6 +125,7 @@ async function qboGet(companyId, path) {
          qbo_token_expires_at = NULL, qbo_disconnected = true WHERE id = $1`,
         [companyId]
       );
+      notifyDisconnect(companyId);
       const authErr = new Error('QuickBooks authorization expired. Please reconnect your QuickBooks account.');
       authErr.code = 'qbo_auth_expired';
       throw authErr;
@@ -164,7 +185,60 @@ async function listVendors(companyId) {
   return data.QueryResponse?.Vendor || [];
 }
 
-async function pushTimeActivity(companyId, { employeeId, vendorId, customerId, workDate, hours, description }) {
+async function listItems(companyId) {
+  const data = await qboGet(companyId, "/query?query=SELECT * FROM Item WHERE Active = true AND Type IN ('Service', 'NonInventory') MAXRESULTS 1000&minorversion=65");
+  return data.QueryResponse?.Item || [];
+}
+
+async function createInvoice(companyId, { customerId, itemId, amount, description, docNumber, txnDate }) {
+  const body = {
+    CustomerRef: { value: String(customerId) },
+    TxnDate: txnDate || new Date().toLocaleDateString('en-CA'),
+    ...(docNumber ? { DocNumber: String(docNumber) } : {}),
+    Line: [
+      {
+        Amount: parseFloat(amount.toFixed(2)),
+        DetailType: 'SalesItemLineDetail',
+        Description: description || '',
+        SalesItemLineDetail: {
+          ItemRef: { value: String(itemId) },
+          Qty: 1,
+          UnitPrice: parseFloat(amount.toFixed(2)),
+        },
+      },
+    ],
+  };
+  const data = await qboPost(companyId, '/invoice?minorversion=65', body);
+  return data.Invoice;
+}
+
+async function listAccounts(companyId) {
+  const data = await qboGet(companyId, '/query?query=SELECT * FROM Account WHERE Active = true MAXRESULTS 1000&minorversion=65');
+  return data.QueryResponse?.Account || [];
+}
+
+async function createPurchase(companyId, { bankAccountId, expenseAccountId, vendorId, amount, description, txnDate }) {
+  const body = {
+    PaymentType: 'Cash',
+    AccountRef: { value: String(bankAccountId) },
+    TxnDate: txnDate || new Date().toLocaleDateString('en-CA'),
+    Line: [
+      {
+        Amount: parseFloat(amount.toFixed(2)),
+        DetailType: 'AccountBasedExpenseLineDetail',
+        Description: description || '',
+        AccountBasedExpenseLineDetail: {
+          AccountRef: { value: String(expenseAccountId) },
+        },
+      },
+    ],
+  };
+  if (vendorId) body.EntityRef = { value: String(vendorId), type: 'Vendor' };
+  const data = await qboPost(companyId, '/purchase?minorversion=65', body);
+  return data.Purchase;
+}
+
+async function pushTimeActivity(companyId, { employeeId, vendorId, customerId, classId, workDate, hours, description }) {
   const useVendor = !!vendorId;
   const body = {
     NameOf: useVendor ? 'Vendor' : 'Employee',
@@ -172,6 +246,7 @@ async function pushTimeActivity(companyId, { employeeId, vendorId, customerId, w
       ? { VendorRef: { value: String(vendorId) } }
       : { EmployeeRef: { value: String(employeeId) } }),
     CustomerRef: { value: String(customerId) },
+    ...(classId ? { ClassRef: { value: String(classId) } } : {}),
     TxnDate: workDate,
     Hours: Math.floor(hours),
     Minutes: Math.round((hours % 1) * 60),
@@ -181,4 +256,64 @@ async function pushTimeActivity(companyId, { employeeId, vendorId, customerId, w
   return data.TimeActivity;
 }
 
-module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getCompanyInfo, listEmployees, listCustomers, listVendors, pushTimeActivity };
+async function deleteTimeActivity(companyId, activityId) {
+  // QBO delete via POST with operation=delete (soft delete)
+  const token = await getAccessToken(companyId);
+  const realmResult = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
+  const realmId = decrypt(realmResult.rows[0].qbo_realm_id);
+  const current = await axios.get(`${QBO_BASE}/v3/company/${realmId}/timeactivity/${activityId}?minorversion=65`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  const activity = current.data.TimeActivity;
+  const body = { ...activity, SyncToken: activity.SyncToken, sparse: true };
+  await axios.post(`${QBO_BASE}/v3/company/${realmId}/timeactivity?operation=delete&minorversion=65`, body, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+  });
+}
+
+async function listClasses(companyId) {
+  const data = await qboGet(companyId, '/query?query=SELECT * FROM Class WHERE Active = true MAXRESULTS 1000&minorversion=65');
+  return data.QueryResponse?.Class || [];
+}
+
+async function getInvoice(companyId, invoiceId) {
+  const data = await qboGet(companyId, `/invoice/${invoiceId}?minorversion=65`);
+  return data.Invoice || null;
+}
+
+async function createVendor(companyId, { displayName }) {
+  const body = { DisplayName: displayName };
+  const data = await qboPost(companyId, '/vendor?minorversion=65', body);
+  return data.Vendor;
+}
+
+async function createCustomer(companyId, { displayName }) {
+  const body = { DisplayName: displayName };
+  const data = await qboPost(companyId, '/customer?minorversion=65', body);
+  return data.Customer;
+}
+
+async function createJournalEntry(companyId, { txnDate, description, debitAccountId, creditAccountId, amount }) {
+  const body = {
+    TxnDate: txnDate || new Date().toLocaleDateString('en-CA'),
+    PrivateNote: description || '',
+    Line: [
+      {
+        JournalEntryLineDetail: { PostingType: 'Debit', AccountRef: { value: String(debitAccountId) } },
+        DetailType: 'JournalEntryLineDetail',
+        Amount: parseFloat(amount.toFixed(2)),
+        Description: description || '',
+      },
+      {
+        JournalEntryLineDetail: { PostingType: 'Credit', AccountRef: { value: String(creditAccountId) } },
+        DetailType: 'JournalEntryLineDetail',
+        Amount: parseFloat(amount.toFixed(2)),
+        Description: description || '',
+      },
+    ],
+  };
+  const data = await qboPost(companyId, '/journalentry?minorversion=65', body);
+  return data.JournalEntry;
+}
+
+module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getCompanyInfo, listEmployees, listCustomers, listVendors, listItems, listAccounts, listClasses, createInvoice, getInvoice, createPurchase, createCustomer, createVendor, createJournalEntry, deleteTimeActivity, pushTimeActivity };

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
@@ -17,12 +17,18 @@ export default function WelcomeModal() {
     if (isAdmin) navigate('/administration');
   };
 
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') handleStart(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
-    <div style={styles.overlay}>
+    <div style={styles.overlay} onClick={e => { if (e.target === e.currentTarget) handleStart(); }}>
       <div style={styles.modal}>
         <div style={styles.brand}>{t.welcomeBrand}</div>
         <div style={styles.emoji}>{isAdmin ? '🏗️' : '👷'}</div>
-        <h2 style={styles.title}>Welcome, {firstName}!</h2>
+        <h2 style={styles.title}>{t.welcome}, {firstName}!</h2>
         {isAdmin ? (
           <>
             <p style={styles.body}><strong>Ops Flow Assist</strong> {t.welcomeAdminBody1}</p>

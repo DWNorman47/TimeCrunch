@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
-import { IncidentReportPDFButton } from './IncidentReportPDF';
 import { useT } from '../hooks/useT';
+import Pagination from './Pagination';
+import { SkeletonList } from './Skeleton';
 
 function today() {
   return new Date().toLocaleDateString('en-CA');
@@ -13,19 +14,19 @@ function today() {
 
 function IncidentForm({ projects, onSubmitted, onCancel }) {
   const t = useT();
-  const TYPE_LABELS = {
+  const TYPE_LABELS = useMemo(() => ({
     'injury': `🤕 ${t.typeInjury}`,
     'near-miss': `⚠️ ${t.typeNearMiss}`,
     'property-damage': `🔧 ${t.typePropertyDamage}`,
     'environmental': `🌿 ${t.typeEnvironmental}`,
     'other': `📝 ${t.typeOther}`,
-  };
-  const TREATMENT_LABELS = {
+  }), [t]);
+  const TREATMENT_LABELS = useMemo(() => ({
     'none': t.treatmentNone,
     'first-aid': t.treatmentFirstAid,
     'medical-attention': t.treatmentMedicalFull,
     'hospitalization': t.treatmentHospitalization,
-  };
+  }), [t]);
   const [form, setForm] = useState({
     incident_date: today(),
     incident_time: '',
@@ -42,7 +43,7 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
   const isInjury = form.type === 'injury';
 
   const handleSubmit = async e => {
@@ -71,26 +72,26 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.date} *</label>
-          <input style={styles.input} type="date" value={form.incident_date} onChange={e => set('incident_date', e.target.value)} required />
+          <label htmlFor="ir-date" style={styles.label}>{t.date} *</label>
+          <input id="ir-date" style={styles.input} type="date" value={form.incident_date} onChange={e => set('incident_date', e.target.value)} required max={new Date().toLocaleDateString('en-CA')} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.timeLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
-          <input style={styles.input} type="time" value={form.incident_time} onChange={e => set('incident_time', e.target.value)} />
+          <label htmlFor="ir-time" style={styles.label}>{t.timeLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
+          <input id="ir-time" style={styles.input} type="time" value={form.incident_time} onChange={e => set('incident_time', e.target.value)} />
         </div>
       </div>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.incidentType}</label>
-          <select style={styles.input} value={form.type} onChange={e => set('type', e.target.value)}>
+          <label htmlFor="ir-type" style={styles.label}>{t.incidentType}</label>
+          <select id="ir-type" style={styles.input} value={form.type} onChange={e => set('type', e.target.value)}>
             {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.project} <span style={styles.optional}>{t.quizOptional}</span></label>
-            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+            <label htmlFor="ir-project" style={styles.label}>{t.project} <span style={styles.optional}>{t.quizOptional}</span></label>
+            <select id="ir-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
               <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
@@ -102,17 +103,17 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
         <>
           <div style={styles.row}>
             <div style={styles.fieldGroup}>
-              <label style={styles.label}>{t.injuredName}</label>
-              <input style={styles.input} type="text" placeholder={t.fullNamePlaceholder} maxLength={255} value={form.injured_name} onChange={e => set('injured_name', e.target.value)} />
+              <label htmlFor="ir-injured-name" style={styles.label}>{t.injuredName}</label>
+              <input id="ir-injured-name" style={styles.input} type="text" placeholder={t.fullNamePlaceholder} maxLength={255} value={form.injured_name} onChange={e => set('injured_name', e.target.value)} />
             </div>
             <div style={styles.fieldGroup}>
-              <label style={styles.label}>{t.bodyPartAffected}</label>
-              <input style={styles.input} type="text" maxLength={255} placeholder={t.bodyPartPlaceholder} value={form.body_part} onChange={e => set('body_part', e.target.value)} />
+              <label htmlFor="ir-body-part" style={styles.label}>{t.bodyPartAffected}</label>
+              <input id="ir-body-part" style={styles.input} type="text" maxLength={255} placeholder={t.bodyPartPlaceholder} value={form.body_part} onChange={e => set('body_part', e.target.value)} />
             </div>
           </div>
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.treatmentField}</label>
-            <select style={styles.input} value={form.treatment} onChange={e => set('treatment', e.target.value)}>
+            <label htmlFor="ir-treatment" style={styles.label}>{t.treatmentField}</label>
+            <select id="ir-treatment" style={styles.input} value={form.treatment} onChange={e => set('treatment', e.target.value)}>
               {Object.entries(TREATMENT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
@@ -120,18 +121,27 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
       )}
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>{t.descriptionField} *</label>
-        <textarea style={styles.textarea} rows={4} placeholder={t.describeWhatHappened} maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} required />
+        <div style={styles.labelRow}>
+          <label htmlFor="ir-description" style={styles.label}>{t.descriptionField} *</label>
+          <span style={styles.charCount}>{form.description.length}/2000</span>
+        </div>
+        <textarea id="ir-description" style={styles.textarea} rows={4} placeholder={t.describeWhatHappened} maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} required />
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>{t.witnessesLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
-        <input style={styles.input} type="text" placeholder={t.witnessesPlaceholder} maxLength={500} value={form.witnesses} onChange={e => set('witnesses', e.target.value)} />
+        <div style={styles.labelRow}>
+          <label htmlFor="ir-witnesses" style={styles.label}>{t.witnessesLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
+          <span style={styles.charCount}>{form.witnesses.length}/500</span>
+        </div>
+        <input id="ir-witnesses" style={styles.input} type="text" placeholder={t.witnessesPlaceholder} maxLength={500} value={form.witnesses} onChange={e => set('witnesses', e.target.value)} />
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>{t.correctiveActionLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
-        <textarea style={styles.textarea} rows={3} placeholder={t.correctiveActionPlaceholder} maxLength={2000} value={form.corrective_action} onChange={e => set('corrective_action', e.target.value)} />
+        <div style={styles.labelRow}>
+          <label htmlFor="ir-corrective-action" style={styles.label}>{t.correctiveActionLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
+          <span style={styles.charCount}>{form.corrective_action.length}/2000</span>
+        </div>
+        <textarea id="ir-corrective-action" style={styles.textarea} rows={3} placeholder={t.correctiveActionPlaceholder} maxLength={2000} value={form.corrective_action} onChange={e => set('corrective_action', e.target.value)} />
       </div>
 
       <label style={styles.checkRow}>
@@ -142,7 +152,7 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
       {error && <p style={styles.error}>{error}</p>}
 
       <div style={styles.formActions}>
-        <button style={styles.submitBtn} type="submit" disabled={saving}>
+        <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>
           {saving ? t.submitting : t.submitReport}
         </button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
@@ -155,19 +165,19 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
 
 function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
   const t = useT();
-  const TYPE_LABELS = {
+  const TYPE_LABELS = useMemo(() => ({
     'injury': `🤕 ${t.typeInjury}`,
     'near-miss': `⚠️ ${t.typeNearMiss}`,
     'property-damage': `🔧 ${t.typePropertyDamage}`,
     'environmental': `🌿 ${t.typeEnvironmental}`,
     'other': `📝 ${t.typeOther}`,
-  };
-  const TREATMENT_LABELS = {
+  }), [t]);
+  const TREATMENT_LABELS = useMemo(() => ({
     'none': t.treatmentNone,
     'first-aid': t.treatmentFirstAid,
     'medical-attention': t.treatmentMedicalFull,
     'hospitalization': t.treatmentHospitalization,
-  };
+  }), [t]);
   const [expanded, setExpanded] = useState(false);
   const [closing, setClosing] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -194,7 +204,7 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
 
   return (
     <div style={styles.card}>
-      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={styles.cardLeft}>
           {isAdmin && <div style={styles.workerName}>{incident.reporter_name}</div>}
           <div style={styles.cardTitle}>{typeLabel}{incident.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
@@ -243,14 +253,14 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
 
           <div style={styles.cardActions}>
             {isAdmin && incident.status !== 'closed' && (
-              <button style={styles.closeBtn} onClick={handleClose} disabled={closing}>
-                {closing ? '…' : t.closeIncident}
+              <button style={{ ...styles.closeBtn, ...(closing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleClose} disabled={closing}>
+                {closing ? t.saving : t.closeIncident}
               </button>
             )}
             {(!isAdmin || incident.status !== 'closed') && (
               confirmingDelete ? (
                 <>
-                  <button style={styles.confirmDeleteBtn} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
+                  <button style={{ ...styles.confirmDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleDelete} disabled={deleting}>{deleting ? '…' : t.confirm}</button>
                   <button style={styles.cancelDeleteBtn} onClick={() => setConfirmingDelete(false)}>{t.cancel}</button>
                 </>
               ) : (
@@ -271,32 +281,50 @@ export default function IncidentReports({ projects }) {
   const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
-  const TYPE_LABELS = {
+  const TYPE_LABELS = useMemo(() => ({
     'injury': `🤕 ${t.typeInjury}`,
     'near-miss': `⚠️ ${t.typeNearMiss}`,
     'property-damage': `🔧 ${t.typePropertyDamage}`,
     'environmental': `🌿 ${t.typeEnvironmental}`,
     'other': `📝 ${t.typeOther}`,
-  };
+  }), [t]);
 
   const [incidents, setIncidents] = useState([]);
-  const [truncated, setTruncated] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState({});
+  const [pdfGenerating, setPdfGenerating] = useState(false);
 
-  const loadIncidents = async (f = filters) => {
+  const downloadPDF = async () => {
+    setPdfGenerating(true);
     try {
-      const params = Object.fromEntries(Object.entries(f).filter(([, v]) => v));
+      const [{ pdf }, { IncidentReportDocument }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./IncidentReportPDF'),
+      ]);
+      const blob = await pdf(React.createElement(IncidentReportDocument, { incidents, companyName: user?.company_name, language: user?.language })).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'incident-reports.pdf'; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setPdfGenerating(false); }
+  };
+
+  const loadIncidents = async (f = filters, p = 1) => {
+    setPage(p);
+    try {
+      const params = { ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), page: p, limit: 50 };
       const r = await api.get('/incidents', { params });
-      setIncidents(r.data);
-      setTruncated(r.data.length === 500);
+      setIncidents(r.data.items);
+      setTotalPages(r.data.pages);
     } catch {}
   };
 
-  useEffect(() => { loadIncidents().finally(() => setLoading(false)); }, []);
-  useEffect(() => { if (!loading) loadIncidents(filters); }, [filters]);
-  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadIncidents(); }); }, [onSync]);
+  useEffect(() => { loadIncidents(filters, 1).finally(() => setLoading(false)); }, []);
+  useEffect(() => { if (!loading) loadIncidents(filters, 1); }, [filters]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadIncidents(filters, page); }); }, [onSync]);
 
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
@@ -312,7 +340,7 @@ export default function IncidentReports({ projects }) {
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {incidents.length > 0 && <IncidentReportPDFButton incidents={incidents} companyName={user?.company_name} style={styles.pdfBtn} />}
+          {incidents.length > 0 && <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? t.preparing : t.exportPDF}</button>}
           {!showForm && <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ {t.newIncident}</button>}
         </div>
       </div>
@@ -328,7 +356,7 @@ export default function IncidentReports({ projects }) {
       )}
 
       {isAdmin && (
-        <div style={styles.filterBar}>
+        <div className="filter-row" style={styles.filterBar}>
           <select style={styles.filterSelect} value={filters.type || ''} onChange={e => setFilter('type', e.target.value)}>
             <option value="">{t.allTypes}</option>
             {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -344,25 +372,27 @@ export default function IncidentReports({ projects }) {
       )}
 
       {loading ? (
-        <p style={styles.hint}>{t.loading}</p>
+        <SkeletonList count={4} rows={2} />
       ) : incidents.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>🦺</div>
           <p style={styles.emptyText}>{isAdmin ? t.noIncidents : t.noIncidentsWorker}</p>
         </div>
       ) : (
-        <div style={styles.list}>
-          {truncated && <div style={styles.truncatedBanner}>{t.resultsTruncated || 'Showing the 500 most recent incidents. Use filters to narrow results.'}</div>}
-          {incidents.map(i => (
-            <IncidentCard
-              key={i.id}
-              incident={i}
-              isAdmin={isAdmin}
-              onClosed={id => setIncidents(prev => prev.map(r => r.id === id ? { ...r, status: 'closed' } : r))}
-              onDeleted={id => setIncidents(prev => prev.filter(r => r.id !== id))}
-            />
-          ))}
-        </div>
+        <>
+          <div style={styles.list}>
+            {incidents.map(i => (
+              <IncidentCard
+                key={i.id}
+                incident={i}
+                isAdmin={isAdmin}
+                onClosed={id => setIncidents(prev => prev.map(r => r.id === id ? { ...r, status: 'closed' } : r))}
+                onDeleted={id => setIncidents(prev => prev.filter(r => r.id !== id))}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pages={totalPages} onChange={p => loadIncidents(filters, p)} />
+        </>
       )}
     </div>
   );
@@ -381,7 +411,6 @@ const styles = {
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151', flex: 1, minWidth: 120 },
   filterInput: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151' },
   list: { display: 'flex', flexDirection: 'column', gap: 10 },
-  truncatedBanner: { background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 7, padding: '8px 12px', fontSize: 13, color: '#92400e', marginBottom: 4 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { color: '#9ca3af', fontSize: 15 },
@@ -415,7 +444,9 @@ const styles = {
   formTitle: { fontSize: 17, fontWeight: 700, margin: 0 },
   row: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 5, flex: 1, minWidth: 180 },
+  labelRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
   label: { fontSize: 13, fontWeight: 600, color: '#374151' },
+  charCount: { fontSize: 11, color: '#9ca3af' },
   optional: { fontWeight: 400, color: '#9ca3af' },
   input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, background: '#fff' },
   textarea: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 },

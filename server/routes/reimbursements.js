@@ -3,9 +3,10 @@ const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { uploadBase64 } = require('../r2');
+const { uploadBase64, deleteByUrl } = require('../r2');
 const { incrementStorage, decrementStorage, checkStorageLimit } = require('../storage');
 const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
+const qbo = require('../services/qbo');
 
 // GET /api/reimbursements/categories
 // Returns:
@@ -31,16 +32,21 @@ router.get('/categories', async (req, res) => {
 // GET /api/reimbursements — worker: list own reimbursements
 router.get('/', async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT r.id, r.amount, r.description, r.category, r.expense_date, r.receipt_url,
-              r.status, r.admin_notes, r.created_at, r.project_id, p.name AS project_name
-       FROM reimbursements r
-       LEFT JOIN projects p ON p.id = r.project_id
-       WHERE r.company_id = $1 AND r.user_id = $2
-       ORDER BY r.expense_date DESC, r.created_at DESC`,
-      [req.user.company_id, req.user.id]
-    );
-    res.json(rows);
+    const [reimb, settings] = await Promise.all([
+      pool.query(
+        `SELECT r.id, r.amount, r.description, r.category, r.expense_date, r.receipt_url,
+                r.status, r.admin_notes, r.created_at, r.project_id, r.miles, r.mileage_rate,
+                p.name AS project_name
+         FROM reimbursements r
+         LEFT JOIN projects p ON p.id = r.project_id
+         WHERE r.company_id = $1 AND r.user_id = $2
+         ORDER BY r.expense_date DESC, r.created_at DESC
+         LIMIT 500`,
+        [req.user.company_id, req.user.id]
+      ),
+      getAdvancedSettings(req.user.company_id),
+    ]);
+    res.json({ items: reimb.rows, mileage_rate: settings.mileage_rate.rate });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to load reimbursements' });
@@ -56,22 +62,33 @@ const reimbLimiter = rateLimit({
   legacyHeaders: false,
 });
 router.post('/', reimbLimiter, async (req, res) => {
-  const { amount, expense_date, receipt, project_id } = req.body;
+  const { expense_date, receipt, project_id } = req.body;
   const description = req.body.description?.trim() || null;
   const category    = req.body.category?.trim() || null;
-  if (!amount || !expense_date) {
-    return res.status(400).json({ error: 'amount and expense_date are required' });
-  }
+  if (!expense_date) return res.status(400).json({ error: 'expense_date is required' });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(expense_date) || isNaN(Date.parse(expense_date))) {
     return res.status(400).json({ error: 'expense_date must be a valid date (YYYY-MM-DD)' });
   }
-  const amt = parseFloat(amount);
-  if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
+
+  // Mileage path: miles provided, amount auto-calculated
+  let amt, milesVal = null, mileageRateVal = null;
+  if (req.body.miles != null && req.body.miles !== '') {
+    milesVal = parseFloat(req.body.miles);
+    if (isNaN(milesVal) || milesVal <= 0) return res.status(400).json({ error: 'miles must be a positive number' });
+    const settings = await getAdvancedSettings(req.user.company_id);
+    mileageRateVal = settings.mileage_rate.rate;
+    amt = parseFloat((milesVal * mileageRateVal).toFixed(2));
+  } else {
+    const amount = req.body.amount;
+    if (!amount) return res.status(400).json({ error: 'amount or miles is required' });
+    amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
+  }
+
+  let receiptUrl = null;
+  let receiptSizeBytes = null;
 
   try {
-    let receiptUrl = null;
-    let receiptSizeBytes = null;
-
     if (receipt) {
       const { allowed } = await checkStorageLimit(req.user.company_id, 5 * 1024 * 1024);
       if (!allowed) return res.status(400).json({ error: 'Storage limit reached. Upgrade your plan to upload more files.' });
@@ -83,14 +100,20 @@ router.post('/', reimbLimiter, async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO reimbursements (company_id, user_id, amount, description, category, expense_date, receipt_url, receipt_size_bytes, project_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, amount, description, category, expense_date, receipt_url, status, admin_notes, created_at, project_id`,
-      [req.user.company_id, req.user.id, amt, description || null, category || null, expense_date, receiptUrl, receiptSizeBytes, project_id || null]
+      `INSERT INTO reimbursements
+         (company_id, user_id, amount, description, category, expense_date, receipt_url, receipt_size_bytes, project_id, miles, mileage_rate)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id, amount, description, category, expense_date, receipt_url, status, admin_notes, created_at, project_id, miles, mileage_rate`,
+      [req.user.company_id, req.user.id, amt, description || null, category || null, expense_date, receiptUrl, receiptSizeBytes, project_id || null, milesVal, mileageRateVal]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error(err);
+    // If the DB insert failed after a successful R2 upload, clean up the orphaned file
+    if (receiptUrl) {
+      deleteByUrl(receiptUrl).catch(e => console.error('R2 cleanup failed:', e));
+      decrementStorage(req.user.company_id, receiptSizeBytes).catch(() => {});
+    }
     res.status(500).json({ error: 'Failed to submit reimbursement' });
   }
 });
@@ -118,23 +141,38 @@ router.delete('/:id', async (req, res) => {
 
 // POST /api/reimbursements/admin — admin: submit a reimbursement for any worker (or self)
 router.post('/admin', requireAdmin, async (req, res) => {
-  const { user_id, amount, description, category, expense_date, receipt, project_id, status = 'approved' } = req.body;
-  if (!user_id || !amount || !expense_date) {
-    return res.status(400).json({ error: 'user_id, amount, and expense_date are required' });
+  const { user_id, expense_date, receipt, project_id, status = 'approved' } = req.body;
+  const description = req.body.description?.trim() || null;
+  const category    = req.body.category?.trim() || null;
+  if (!user_id || !expense_date) {
+    return res.status(400).json({ error: 'user_id and expense_date are required' });
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(expense_date) || isNaN(Date.parse(expense_date))) {
     return res.status(400).json({ error: 'expense_date must be a valid date (YYYY-MM-DD)' });
   }
-  const amt = parseFloat(amount);
-  if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
   if (!['pending', 'approved'].includes(status)) return res.status(400).json({ error: 'status must be pending or approved' });
 
-  try {
-    const worker = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [user_id, req.user.company_id]);
-    if (!worker.rows.length) return res.status(404).json({ error: 'Worker not found' });
+  let amt, milesVal = null, mileageRateVal = null;
+  if (req.body.miles != null && req.body.miles !== '') {
+    milesVal = parseFloat(req.body.miles);
+    if (isNaN(milesVal) || milesVal <= 0) return res.status(400).json({ error: 'miles must be a positive number' });
+    const settings = await getAdvancedSettings(req.user.company_id);
+    mileageRateVal = settings.mileage_rate.rate;
+    amt = parseFloat((milesVal * mileageRateVal).toFixed(2));
+  } else {
+    const amount = req.body.amount;
+    if (!amount) return res.status(400).json({ error: 'amount or miles is required' });
+    amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
+  }
 
-    let receiptUrl = null;
-    let receiptSizeBytes = null;
+  const worker = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [user_id, req.user.company_id]).catch(() => null);
+  if (!worker?.rows.length) return res.status(404).json({ error: 'Worker not found' });
+
+  let receiptUrl = null;
+  let receiptSizeBytes = null;
+
+  try {
     if (receipt) {
       const { allowed } = await checkStorageLimit(req.user.company_id, 5 * 1024 * 1024);
       if (!allowed) return res.status(400).json({ error: 'Storage limit reached.' });
@@ -145,14 +183,20 @@ router.post('/admin', requireAdmin, async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO reimbursements (company_id, user_id, amount, description, category, expense_date, receipt_url, receipt_size_bytes, status, project_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING id, amount, description, category, expense_date, receipt_url, status, admin_notes, created_at, project_id`,
-      [req.user.company_id, user_id, amt, description || null, category || null, expense_date, receiptUrl, receiptSizeBytes, status, project_id || null]
+      `INSERT INTO reimbursements
+         (company_id, user_id, amount, description, category, expense_date, receipt_url, receipt_size_bytes, status, project_id, miles, mileage_rate)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING id, amount, description, category, expense_date, receipt_url, status, admin_notes, created_at, project_id, miles, mileage_rate`,
+      [req.user.company_id, user_id, amt, description || null, category || null, expense_date, receiptUrl, receiptSizeBytes, status, project_id || null, milesVal, mileageRateVal]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error(err);
+    // If the DB insert failed after a successful R2 upload, clean up the orphaned file
+    if (receiptUrl) {
+      deleteByUrl(receiptUrl).catch(e => console.error('R2 cleanup failed:', e));
+      decrementStorage(req.user.company_id, receiptSizeBytes).catch(() => {});
+    }
     res.status(500).json({ error: 'Failed to submit reimbursement' });
   }
 });
@@ -166,18 +210,23 @@ router.get('/admin', requireAdmin, async (req, res) => {
   if (user_id) { params.push(user_id); conditions.push(`r.user_id = $${params.length}`); }
 
   try {
-    const { rows } = await pool.query(
-      `SELECT r.id, r.amount, r.description, r.category, r.expense_date, r.receipt_url,
-              r.status, r.admin_notes, r.created_at, r.project_id, p.name AS project_name,
-              u.full_name, u.username
-       FROM reimbursements r
-       JOIN users u ON u.id = r.user_id
-       LEFT JOIN projects p ON p.id = r.project_id
-       WHERE ${conditions.join(' AND ')}
-       ORDER BY r.expense_date DESC, r.created_at DESC`,
-      params
-    );
-    res.json(rows);
+    const [reimb, settings] = await Promise.all([
+      pool.query(
+        `SELECT r.id, r.amount, r.description, r.category, r.expense_date, r.receipt_url,
+                r.status, r.admin_notes, r.created_at, r.updated_at, r.project_id, r.miles, r.mileage_rate,
+                r.qbo_purchase_id, r.qbo_synced_at,
+                p.name AS project_name, u.full_name, u.username
+         FROM reimbursements r
+         JOIN users u ON u.id = r.user_id
+         LEFT JOIN projects p ON p.id = r.project_id
+         WHERE ${conditions.join(' AND ')}
+         ORDER BY r.expense_date DESC, r.created_at DESC
+         LIMIT 1000`,
+        params
+      ),
+      getAdvancedSettings(req.user.company_id),
+    ]);
+    res.json({ items: reimb.rows, mileage_rate: settings.mileage_rate.rate });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to load reimbursements' });
@@ -188,21 +237,79 @@ router.get('/admin', requireAdmin, async (req, res) => {
 router.patch('/admin/:id', requireAdmin, async (req, res) => {
   const { status } = req.body;
   const admin_notes = req.body.admin_notes?.trim() || null;
+  const clientUpdatedAt = req.body.updated_at || null;
   if (!['approved', 'rejected', 'pending'].includes(status)) {
     return res.status(400).json({ error: 'status must be approved, rejected, or pending' });
   }
   if (admin_notes && admin_notes.length > 1000) return res.status(400).json({ error: 'admin_notes too long (max 1000 characters)' });
   try {
+    const existing = await pool.query(
+      'SELECT updated_at FROM reimbursements WHERE id=$1 AND company_id=$2',
+      [req.params.id, req.user.company_id]
+    );
+    if (!existing.rows.length) return res.status(404).json({ error: 'Not found' });
+    if (clientUpdatedAt && new Date(existing.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+      return res.status(409).json({ error: 'conflict' });
+    }
+
     const { rows } = await pool.query(
       `UPDATE reimbursements
        SET status = $1, admin_notes = $2, updated_at = NOW()
        WHERE id = $3 AND company_id = $4
        RETURNING id, amount, description, category, expense_date, receipt_url,
-                 status, admin_notes, created_at, project_id`,
+                 status, admin_notes, created_at, updated_at, project_id, user_id`,
       [status, admin_notes, req.params.id, req.user.company_id]
     );
-    if (!rows.length) return res.status(404).json({ error: 'Not found' });
-    res.json(rows[0]);
+    const reimb = rows[0];
+    res.json(reimb);
+
+    // QBO expense auto-sync — fire-and-forget, only on approval
+    if (status === 'approved') {
+      setImmediate(async () => {
+        try {
+          const [autopush, accounts] = await Promise.all([
+            pool.query("SELECT value FROM settings WHERE company_id = $1 AND key = 'qbo_auto_push_expenses'", [req.user.company_id]),
+            pool.query("SELECT key, value FROM settings WHERE company_id = $1 AND key IN ('qbo_expense_account_id', 'qbo_bank_account_id')", [req.user.company_id]),
+          ]);
+          if (autopush.rows[0]?.value !== '1') return;
+          const expenseAccountId = accounts.rows.find(r => r.key === 'qbo_expense_account_id')?.value;
+          const bankAccountId = accounts.rows.find(r => r.key === 'qbo_bank_account_id')?.value;
+          if (!expenseAccountId || !bankAccountId) return;
+
+          const company = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [req.user.company_id]);
+          if (!company.rows[0]?.qbo_realm_id) return;
+
+          // Optional: get vendor ID if worker is a contractor/subcontractor
+          let vendorId = null;
+          if (reimb.user_id) {
+            const worker = await pool.query('SELECT qbo_vendor_id, worker_type FROM users WHERE id = $1', [reimb.user_id]);
+            const w = worker.rows[0];
+            if (w && (w.worker_type === 'contractor' || w.worker_type === 'subcontractor') && w.qbo_vendor_id) {
+              vendorId = w.qbo_vendor_id;
+            }
+          }
+
+          const txnDate = reimb.expense_date ? reimb.expense_date.toISOString?.().substring(0, 10) || String(reimb.expense_date).substring(0, 10) : null;
+          const purchase = await qbo.createPurchase(req.user.company_id, {
+            bankAccountId,
+            expenseAccountId,
+            vendorId,
+            amount: parseFloat(reimb.amount),
+            description: reimb.description || reimb.category || 'Expense reimbursement',
+            txnDate,
+          });
+          if (purchase?.Id) {
+            await pool.query('UPDATE reimbursements SET qbo_purchase_id = $1, qbo_synced_at = NOW() WHERE id = $2', [purchase.Id, reimb.id]);
+          }
+        } catch (err) {
+          console.error('[QBO expense auto-sync]', err.message);
+          pool.query(
+            'INSERT INTO qbo_sync_errors (company_id, entity_type, entity_id, error_message) VALUES ($1, $2, $3, $4)',
+            [req.user.company_id, 'reimbursement', reimb.id, err.message]
+          ).catch(() => {});
+        }
+      });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update reimbursement' });

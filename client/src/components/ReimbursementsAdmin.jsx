@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
+import { langToLocale } from '../utils';
 
-function fmtDate(str) {
+function fmtDate(str, locale = 'en-US') {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function fmtMoney(v) {
@@ -38,11 +39,18 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
   const act = async status => {
     setSaving(true); setError('');
     try {
-      const r = await api.patch(`/reimbursements/admin/${item.id}`, { status, admin_notes: notes || null });
+      const r = await api.patch(`/reimbursements/admin/${item.id}`, {
+        status,
+        admin_notes: notes || null,
+        updated_at: item.updated_at,
+      });
       onUpdate(r.data);
       setExpanded(false);
     } catch (err) {
-      setError(err.response?.data?.error || t.failedSave);
+      const msg = err.response?.status === 409
+        ? t.concurrentModification
+        : err.response?.data?.error || t.failedSave;
+      setError(msg);
     } finally {
       setSaving(false);
     }
@@ -50,15 +58,18 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
 
   return (
     <div style={s.card}>
-      <div style={s.row} onClick={() => setExpanded(e => !e)}>
+      <div style={s.row} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={s.workerName}>{item.full_name} <span style={s.username}>@{item.username}</span></div>
         <div style={s.rowMid}>
           <span style={s.amount}>{fmtMoney(item.amount)}</span>
           {item.category && <span style={s.cat}>{resolveCategory(item.category)}</span>}
           {item.project_name && <span style={s.projectTag}>{item.project_name}</span>}
-          <span style={s.date}>{fmtDate(item.expense_date)}</span>
+          <span style={s.date}>{fmtDate(item.expense_date, locale)}</span>
         </div>
         <div style={s.rowRight}>
+          {item.qbo_purchase_id && (
+            <span style={s.qboBadge}>QB ✓</span>
+          )}
           <StatusBadge status={item.status} />
           <span style={s.chevron}>{expanded ? '▾' : '▸'}</span>
         </div>
@@ -67,6 +78,11 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
       {expanded && (
         <div style={s.detail}>
           <div style={s.desc}>{item.description}</div>
+          {item.miles && (
+            <div style={s.milesMeta}>
+              🚗 {parseFloat(item.miles).toFixed(1)} miles × ${parseFloat(item.mileage_rate).toFixed(4)}/mi = {fmtMoney(item.amount)}
+            </div>
+          )}
           {item.receipt_url && (
             <div style={{ marginBottom: 10 }}>
               <a href={item.receipt_url} target="_blank" rel="noopener noreferrer" style={s.receiptLink}>
@@ -84,21 +100,22 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
               rows={2}
               maxLength={1000}
             />
+            <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{notes.length}/1000</div>
           </div>
           {error && <div style={s.error}>{error}</div>}
           <div style={s.actions}>
             {item.status !== 'approved' && (
-              <button style={s.approveBtn} onClick={() => act('approved')} disabled={saving}>
-                {saving ? '…' : t.approveBtn}
+              <button style={{ ...s.approveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => act('approved')} disabled={saving}>
+                {saving ? t.saving : t.approveBtn}
               </button>
             )}
             {item.status !== 'rejected' && (
-              <button style={s.rejectBtn} onClick={() => act('rejected')} disabled={saving}>
-                {saving ? '…' : t.rejectBtn}
+              <button style={{ ...s.rejectBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => act('rejected')} disabled={saving}>
+                {saving ? t.saving : t.rejectBtn}
               </button>
             )}
             {item.status !== 'pending' && (
-              <button style={s.resetBtn} onClick={() => act('pending')} disabled={saving}>
+              <button style={{ ...s.resetBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => act('pending')} disabled={saving}>
                 {t.resetPending}
               </button>
             )}
@@ -112,21 +129,25 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
 export default function ReimbursementsAdmin() {
   const t = useT();
   const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [items, setItems] = useState([]);
+  const [mileageRate, setMileageRate] = useState(0.67);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('pending');
   const [workers, setWorkers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [categories, setCategories] = useState({ active: [], known: [] });
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ user_id: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved', project_id: '' });
+  const [form, setForm] = useState({ user_id: '', miles: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved', project_id: '' });
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptPreview, setReceiptPreview] = useState(null);
   const [noReceipt, setNoReceipt] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const fileRef = useRef();
+  const isMileage = form.category === 'Mileage';
 
   const filterLabels = {
     pending:  t.filterPending || t.statusPendingLabel,
@@ -136,10 +157,11 @@ export default function ReimbursementsAdmin() {
   };
 
   const load = useCallback(() => {
+    setLoadError('');
     const params = filter !== 'all' ? `?status=${filter}` : '';
     api.get(`/reimbursements/admin${params}`)
-      .then(r => setItems(r.data))
-      .catch(() => {})
+      .then(r => { setItems(r.data.items); setMileageRate(r.data.mileage_rate); })
+      .catch(() => setLoadError(t.failedLoad || 'Failed to load reimbursements.'))
       .finally(() => setLoading(false));
   }, [filter]);
 
@@ -154,6 +176,7 @@ export default function ReimbursementsAdmin() {
   const handleFileChange = e => {
     const file = e.target.files[0];
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { setFormError(t.fileTooLarge || 'File must be under 10 MB'); return; }
     const reader = new FileReader();
     reader.onload = ev => { setReceiptFile(ev.target.result); setReceiptPreview(ev.target.result); };
     reader.readAsDataURL(file);
@@ -161,22 +184,27 @@ export default function ReimbursementsAdmin() {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!noReceipt && !receiptFile) { setFormError(t.receiptRequired); return; }
+    if (!isMileage && !noReceipt && !receiptFile) { setFormError(t.receiptRequired); return; }
     setSaving(true); setFormError(''); setFormSuccess('');
     try {
-      await api.post('/reimbursements/admin', {
+      const payload = {
         user_id: form.user_id,
-        amount: form.amount,
         description: form.description || null,
         category: form.category || null,
         expense_date: form.expense_date,
         project_id: form.project_id || null,
         status: form.status,
         receipt: receiptFile || null,
-      });
+      };
+      if (isMileage) {
+        payload.miles = form.miles;
+      } else {
+        payload.amount = form.amount;
+      }
+      await api.post('/reimbursements/admin', payload);
       setFormSuccess(t.expenseAdded);
       setShowForm(false);
-      setForm({ user_id: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved', project_id: '' });
+      setForm({ user_id: '', miles: '', amount: '', description: '', category: '', expense_date: new Date().toLocaleDateString('en-CA'), status: 'approved', project_id: '' });
       setReceiptFile(null); setReceiptPreview(null); setNoReceipt(false);
       load();
     } catch (err) {
@@ -199,6 +227,7 @@ export default function ReimbursementsAdmin() {
 
   return (
     <div style={s.wrap}>
+      {loadError && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 12 }}>{loadError}</p>}
       <div style={s.header}>
         <div style={s.title}>{t.expenseReimbursements}</div>
         <div style={s.headerRight}>
@@ -232,16 +261,28 @@ export default function ReimbursementsAdmin() {
               <input style={s.input} type="date" value={form.expense_date} onChange={e => setForm(f => ({ ...f, expense_date: e.target.value }))} required />
             </div>
             <div style={s.field}>
-              <label style={s.fieldLabel}>{t.amountLabel}</label>
-              <input style={{ ...s.input, width: 100 }} type="number" min="0.01" step="0.01" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required />
-            </div>
-            <div style={s.field}>
               <label style={s.fieldLabel}>{t.categoryLabel}</label>
-              <select style={s.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+              <select style={s.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value, miles: '', amount: '' }))}>
                 <option value="">{t.selectPlaceholder}</option>
                 {categories.active.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
+            {isMileage ? (
+              <div style={s.field}>
+                <label style={s.fieldLabel}>{t.milesLabel} *</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input style={{ ...s.input, width: 90 }} type="number" min="0.1" step="0.1" placeholder="0.0" value={form.miles} onChange={e => setForm(f => ({ ...f, miles: e.target.value }))} required />
+                  {form.miles > 0 && (
+                    <span style={s.mileageCalc}>= ${(parseFloat(form.miles) * mileageRate).toFixed(2)}</span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={s.field}>
+                <label style={s.fieldLabel}>{t.amountLabel}</label>
+                <input style={{ ...s.input, width: 100 }} type="number" min="0.01" step="0.01" placeholder="0.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required={!isMileage} />
+              </div>
+            )}
             <div style={s.field}>
               <label style={s.fieldLabel}>{t.statusLabel}</label>
               <select style={s.input} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
@@ -263,24 +304,26 @@ export default function ReimbursementsAdmin() {
             <label style={s.fieldLabel}>{t.descriptionLabel}</label>
             <input style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder={t.descriptionPlaceholder} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
-          <div style={s.field}>
-            <label style={s.fieldLabel}>{t.receiptLabel}</label>
-            <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => { handleFileChange(e); setNoReceipt(false); }} />
-            {!noReceipt && (
-              <button type="button" style={s.uploadBtn} onClick={() => fileRef.current.click()}>
-                {receiptFile ? t.receiptAttached : t.attachReceipt}
-              </button>
-            )}
-            {receiptPreview && !noReceipt && receiptPreview.startsWith('data:image') && (
-              <img src={receiptPreview} alt="Receipt" style={s.preview} />
-            )}
-            <label style={s.checkLabel}>
-              <input type="checkbox" checked={noReceipt} onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setReceiptFile(null); setReceiptPreview(null); } }} />
-              {' '}{t.noReceiptAvailable}
-            </label>
-          </div>
+          {!isMileage && (
+            <div style={s.field}>
+              <label style={s.fieldLabel}>{t.receiptLabel}</label>
+              <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => { handleFileChange(e); setNoReceipt(false); }} />
+              {!noReceipt && (
+                <button type="button" style={s.uploadBtn} onClick={() => fileRef.current.click()}>
+                  {receiptFile ? t.receiptAttached : t.attachReceipt}
+                </button>
+              )}
+              {receiptPreview && !noReceipt && receiptPreview.startsWith('data:image') && (
+                <img src={receiptPreview} alt="Receipt" style={s.preview} />
+              )}
+              <label style={s.checkLabel}>
+                <input type="checkbox" checked={noReceipt} onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setReceiptFile(null); setReceiptPreview(null); } }} />
+                {' '}{t.noReceiptAvailable}
+              </label>
+            </div>
+          )}
           {formError && <div style={s.errorMsg}>{formError}</div>}
-          <button style={s.submitBtn} type="submit" disabled={saving}>{saving ? t.saving : t.addExpenseBtn}</button>
+          <button style={{ ...s.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.addExpenseBtn}</button>
         </form>
       )}
 
@@ -350,4 +393,7 @@ const s = {
   approveBtn: { padding: '8px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
   rejectBtn: { padding: '8px 18px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
   resetBtn: { padding: '8px 18px', background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  milesMeta: { fontSize: 13, color: '#059669', fontWeight: 600, background: '#f0fdf4', borderRadius: 6, padding: '5px 10px' },
+  mileageCalc: { fontSize: 12, color: '#059669', fontWeight: 600, whiteSpace: 'nowrap' },
+  qboBadge: { fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 8, background: '#d1fae5', color: '#065f46', border: '1px solid #6ee7b7' },
 };
