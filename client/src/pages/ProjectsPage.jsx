@@ -5,6 +5,7 @@ import AppSwitcher from '../components/AppSwitcher';
 import ManageClients from '../components/ManageClients';
 import { useT } from '../hooks/useT';
 import { SkeletonList } from '../components/Skeleton';
+import { langToLocale } from '../utils';
 
 function punchColor(status) {
   return { open: '#f59e0b', in_progress: '#3b82f6', resolved: '#059669', closed: '#9ca3af' }[status] || '#9ca3af';
@@ -106,6 +107,8 @@ function ProjectCard({ project, metrics, settings, onClick }) {
 
 function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, onProjectUpdated }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [tab, setTab] = useState('overview');
   const [editForm, setEditForm] = useState({
     name: project.name,
@@ -156,6 +159,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const [punchFormOpen, setPunchFormOpen] = useState(false);
   const [punchForm, setPunchForm] = useState({ title: '', description: '', location: '', priority: 'normal' });
   const [punchSaving, setPunchSaving] = useState(false);
+  const [punchError, setPunchError] = useState('');
   const [docs, setDocs] = useState([]);
   const [docsOpen, setDocsOpen] = useState(false);
   const [docsLoaded, setDocsLoaded] = useState(false);
@@ -242,12 +246,15 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     e.preventDefault();
     if (!punchForm.title.trim()) return;
     setPunchSaving(true);
+    setPunchError('');
     try {
       const { data: item } = await api.post('/punchlist', { ...punchForm, project_id: project.id });
       setPunch(prev => [item, ...prev]);
       setPunchForm({ title: '', description: '', location: '', priority: 'normal' });
       setPunchFormOpen(false);
-    } catch {}
+    } catch {
+      setPunchError(t.failedSave);
+    }
     setPunchSaving(false);
   };
 
@@ -614,12 +621,13 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                           value={punchForm.description}
                           onChange={e => setPunchForm(f => ({ ...f, description: e.target.value }))}
                         />
+                        {punchError && <p style={{ color: '#dc2626', fontSize: 12, margin: 0 }}>{punchError}</p>}
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button type="submit" style={styles.rfiSubmitBtn} disabled={punchSaving}>
-                            {punchSaving ? 'Saving…' : 'Add Item'}
+                            {punchSaving ? t.saving : t.punchlistAddItem}
                           </button>
-                          <button type="button" style={styles.rfiCancelBtn} onClick={() => setPunchFormOpen(false)}>
-                            Cancel
+                          <button type="button" style={styles.rfiCancelBtn} onClick={() => { setPunchFormOpen(false); setPunchError(''); }}>
+                            {t.cancel}
                           </button>
                         </div>
                       </form>
@@ -646,7 +654,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                               {parseFloat(w.total_hours).toFixed(1)}h
                             </span>
                             <span style={{ fontSize: 11, color: '#9ca3af' }}>
-                              {new Date(w.last_worked).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              {new Date(w.last_worked).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
                             </span>
                           </div>
                         </div>

@@ -38,6 +38,8 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
   const handleSubmit = async e => {
     e.preventDefault();
     setError('');
+    if (projectsEnabled && !form.project_id) { setError(t.selectProjectFirst); return; }
+    if (!form.start_time || !form.end_time) { setError(t.startEndRequired); return; }
     if (form.start_time >= form.end_time) {
       setError(t.endAfterStart);
       return;

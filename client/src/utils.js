@@ -52,6 +52,14 @@ export function formatInTz(isoStr, tz, opts = { hour: 'numeric', minute: '2-digi
 }
 
 /**
+ * Maps OpsFloa language name to a BCP 47 locale string for Intl APIs.
+ * Use this instead of hard-coding 'en-US' so Spanish users see localised dates.
+ */
+export function langToLocale(language) {
+  return language === 'Spanish' ? 'es-MX' : 'en-US';
+}
+
+/**
  * Format decimal hours as "Xh Ym" (e.g. 1.5 → "1h 30m", 0.25 → "15m", 8 → "8h")
  */
 export function fmtHours(h) {

@@ -3,6 +3,7 @@ import { fmtHours } from '../utils';
 import EntryPanel from './EntryPanel';
 import api from '../api';
 import { getT } from '../i18n';
+import { langToLocale } from '../utils';
 
 function startOfWeek(date) {
   const d = new Date(date);
@@ -22,12 +23,12 @@ function toDateKey(date) {
   return date.toLocaleDateString('en-CA');
 }
 
-function formatMonthDay(date) {
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+function formatMonthDay(date, locale) {
+  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
-function formatWeekDay(date) {
-  return date.toLocaleDateString('en-US', { weekday: 'short' });
+function formatWeekDay(date, locale) {
+  return date.toLocaleDateString(locale, { weekday: 'short' });
 }
 
 function formatTime(t) {
@@ -47,6 +48,7 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function TimesheetView({ entries, language, projects = [], onRefresh }) {
   const t = getT(language);
+  const locale = langToLocale(language);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [copying, setCopying] = useState(false);
@@ -86,7 +88,7 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
     return map;
   }, [entries]);
 
-  const weekLabel = `${formatMonthDay(days[0])} \u2013 ${formatMonthDay(days[6])}, ${days[6].getFullYear()}`;
+  const weekLabel = `${formatMonthDay(days[0], locale)} \u2013 ${formatMonthDay(days[6], locale)}, ${days[6].getFullYear()}`;
 
   const weekTotalHours = useMemo(() => days.reduce((sum, d) => {
     const key = toDateKey(d);
@@ -137,7 +139,7 @@ export default function TimesheetView({ entries, language, projects = [], onRefr
             >
               <div style={styles.dayHeader}>
                 <span style={{ ...styles.dayName, color: isToday ? '#1a56db' : '#6b7280' }}>
-                  {formatWeekDay(day)}
+                  {formatWeekDay(day, locale)}
                 </span>
                 <span style={{ ...styles.dayNum, fontWeight: isToday ? 700 : 400, color: isToday ? '#1a56db' : '#374151' }}>
                   {day.getDate()}

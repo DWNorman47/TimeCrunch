@@ -38,6 +38,7 @@ const translations = {
     notesOptional: 'Notes (optional)',
     notesPlaceholder: 'Any notes...',
     endAfterStart: 'End time must be after start time',
+    startEndRequired: 'Start and end times are required',
     failedSaveEntry: 'Failed to save entry',
     entryUpdated: 'Entry updated',
     entryAddedSuccess: 'Entry added successfully.',
@@ -791,6 +792,7 @@ const translations = {
 
     // ── Punchlist ─────────────────────────────────────────────────────────────
     punchlistTitle: 'Punchlist',
+    punchlistAddItem: 'Add Item',
     newPunchlistItem: '+ New Item',
     titleField: 'Title',
     priorityField: 'Priority',
@@ -2422,6 +2424,7 @@ const translations = {
     notesOptional: 'Notas (opcional)',
     notesPlaceholder: 'Cualquier nota...',
     endAfterStart: 'La hora de fin debe ser después de la hora de inicio',
+    startEndRequired: 'Se requieren la hora de inicio y fin',
     failedSaveEntry: 'Error al guardar la entrada',
     entryUpdated: 'Entrada actualizada',
     entryAddedSuccess: 'Entrada agregada correctamente.',
@@ -3165,6 +3168,7 @@ const translations = {
 
     // ── Punchlist ─────────────────────────────────────────────────────────────
     punchlistTitle: 'Lista de Pendientes',
+    punchlistAddItem: 'Agregar Elemento',
     newPunchlistItem: '+ Nuevo Elemento',
     titleField: 'Título',
     priorityField: 'Prioridad',

@@ -8,6 +8,7 @@ import CompanyChat from '../components/CompanyChat';
 import AppSwitcher from '../components/AppSwitcher';
 import NotificationBell from '../components/NotificationBell';
 import { getT } from '../i18n';
+import { langToLocale } from '../utils';
 import api from '../api';
 import { getOrFetch, setCached } from '../offlineDb';
 import { useOffline } from '../contexts/OfflineContext';
@@ -39,6 +40,7 @@ export default function Dashboard() {
   const [companyInfo, setCompanyInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [refreshError, setRefreshError] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [headerClock, setHeaderClock] = useState(null); // null=loading, false=not clocked in, {clock_in_time}=clocked in
   const [headerElapsed, setHeaderElapsed] = useState(0);
@@ -81,7 +83,10 @@ export default function Dashboard() {
       const data = await api.get('/time-entries').then(r => r.data);
       await setCached('entries', data);
       setEntries(data);
-    } catch {}
+      setRefreshError(false);
+    } catch {
+      setRefreshError(true);
+    }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -164,8 +169,9 @@ export default function Dashboard() {
     }
 
     const fmtTime = s => { const [h, m] = s.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr < 12 ? 'AM' : 'PM'}`; };
-    const fmtDate = d => new Date(d.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-    const fmtDateShort = d => new Date(d.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const locale = langToLocale(user?.language);
+    const fmtDate = d => new Date(d.substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    const fmtDateShort = d => new Date(d.substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
     const fmtH = h => { const wh = Math.floor(h); const wm = Math.round((h - wh) * 60); return wm > 0 ? `${wh}h ${wm}m` : `${wh}h`; };
     const fmtMoney = v => `$${v.toFixed(2)}`;
 
@@ -178,7 +184,7 @@ export default function Dashboard() {
     const now = new Date();
     const pad2 = n => String(n).padStart(2, '0');
     const invoiceNo = `INV-${now.getFullYear()}${pad2(now.getMonth()+1)}${pad2(now.getDate())}-${String(Date.now()).slice(-5)}`;
-    const invoiceDate = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const invoiceDate = now.toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' });
 
     // Company info (Bill To)
     const ci = companyInfo || {};
@@ -473,6 +479,7 @@ ${signatureDataUrl ? `
                 }}>⬇ {t.exportPDF}</button>
               )}
             </div>
+            {refreshError && <p style={{ color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 12px', fontSize: 13, margin: '0 0 8px' }}>{t.loadError} <button onClick={() => { setRefreshError(false); refreshEntries(); }} style={{ textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: '#b45309' }}>{t.retry}</button></p>}
             {loadError ? <p style={{ color: '#dc2626', padding: '12px' }}>{t.loadError} <button onClick={fetchData} style={{ textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}>{t.retry}</button></p> : loading ? <p>{t.loadingEntries}</p> : entryView === 'timesheet' ? (
               <TimesheetView entries={entries} language={user?.language} projects={projects} onRefresh={refreshEntries} />
             ) : (
