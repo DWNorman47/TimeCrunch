@@ -35,7 +35,7 @@ ALTER TABLE users
   ADD CONSTRAINT chk_users_worker_type
   CHECK (worker_type IN ('employee', 'contractor', 'subcontractor', 'owner'));
 
--- active_clock.clock_source
+-- active_clock.clock_source (only 'worker' and 'admin' are written here — active sessions only)
 ALTER TABLE active_clock DROP CONSTRAINT IF EXISTS chk_active_clock_source;
 UPDATE active_clock SET clock_source = 'worker' WHERE clock_source NOT IN ('worker', 'admin');
 ALTER TABLE active_clock
@@ -43,11 +43,12 @@ ALTER TABLE active_clock
   CHECK (clock_source IN ('worker', 'admin'));
 
 -- time_entries.clock_source
+-- Three valid values: 'worker' (time-clock), 'admin' (admin clock-in/split), 'log_entry' (manual entry by worker or admin)
 ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS chk_time_entries_clock_source;
-UPDATE time_entries SET clock_source = 'worker' WHERE clock_source NOT IN ('worker', 'admin');
+UPDATE time_entries SET clock_source = 'worker' WHERE clock_source NOT IN ('worker', 'admin', 'log_entry');
 ALTER TABLE time_entries
   ADD CONSTRAINT chk_time_entries_clock_source
-  CHECK (clock_source IN ('worker', 'admin'));
+  CHECK (clock_source IN ('worker', 'admin', 'log_entry'));
 
 -- field_reports.status
 ALTER TABLE field_reports DROP CONSTRAINT IF EXISTS chk_field_reports_status;
