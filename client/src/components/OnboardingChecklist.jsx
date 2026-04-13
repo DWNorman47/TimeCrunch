@@ -12,6 +12,15 @@ export default function OnboardingChecklist({ workers, projects, settings }) {
   const hasWorkers = workers.some(w => w.role === 'worker');
   const hasProjects = projects.length > 0;
   const projectsEnabled = settings?.feature_project_integration !== false;
+  // Detect whether an admin has actually touched the rates / timezone vs
+  // just accepting defaults. 30 and '' are the factory defaults in
+  // settingsDefaults.js — anything else indicates explicit configuration.
+  const ratesConfigured = settings && settings.default_hourly_rate != null && Number(settings.default_hourly_rate) !== 30;
+  const timezoneConfigured = !!(settings?.company_timezone);
+  const overtimeEnabled = settings?.feature_overtime !== false;
+  // Overtime step is done if either the feature is off (not relevant) or
+  // the admin has explicitly set an overtime rule.
+  const overtimeConfigured = !overtimeEnabled || (settings?.overtime_rule && settings?.overtime_threshold);
 
   const steps = [
     {
@@ -29,12 +38,26 @@ export default function OnboardingChecklist({ workers, projects, settings }) {
       cta: t.onboardingAddProjectCta,
     }] : []),
     {
-      done: false,
+      done: ratesConfigured,
       label: t.onboardingRates,
       sub: t.onboardingRatesSub,
       href: '/administration#rates',
       cta: t.onboardingRatesCta,
     },
+    {
+      done: timezoneConfigured,
+      label: t.onboardingTimezone,
+      sub: t.onboardingTimezoneSub,
+      href: '/administration#company',
+      cta: t.onboardingTimezoneCta,
+    },
+    ...(overtimeEnabled ? [{
+      done: overtimeConfigured,
+      label: t.onboardingOvertime,
+      sub: t.onboardingOvertimeSub,
+      href: '/administration#rates',
+      cta: t.onboardingOvertimeCta,
+    }] : []),
   ];
 
   const doneCount = steps.filter(s => s.done).length;
