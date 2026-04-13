@@ -72,26 +72,26 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.date} *</label>
-          <input style={styles.input} type="date" value={form.incident_date} onChange={e => set('incident_date', e.target.value)} required max={new Date().toLocaleDateString('en-CA')} />
+          <label htmlFor="ir-date" style={styles.label}>{t.date} *</label>
+          <input id="ir-date" style={styles.input} type="date" value={form.incident_date} onChange={e => set('incident_date', e.target.value)} required max={new Date().toLocaleDateString('en-CA')} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.timeLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
-          <input style={styles.input} type="time" value={form.incident_time} onChange={e => set('incident_time', e.target.value)} />
+          <label htmlFor="ir-time" style={styles.label}>{t.timeLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
+          <input id="ir-time" style={styles.input} type="time" value={form.incident_time} onChange={e => set('incident_time', e.target.value)} />
         </div>
       </div>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.incidentType}</label>
-          <select style={styles.input} value={form.type} onChange={e => set('type', e.target.value)}>
+          <label htmlFor="ir-type" style={styles.label}>{t.incidentType}</label>
+          <select id="ir-type" style={styles.input} value={form.type} onChange={e => set('type', e.target.value)}>
             {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.project} <span style={styles.optional}>{t.quizOptional}</span></label>
-            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+            <label htmlFor="ir-project" style={styles.label}>{t.project} <span style={styles.optional}>{t.quizOptional}</span></label>
+            <select id="ir-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
               <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
@@ -103,17 +103,17 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
         <>
           <div style={styles.row}>
             <div style={styles.fieldGroup}>
-              <label style={styles.label}>{t.injuredName}</label>
-              <input style={styles.input} type="text" placeholder={t.fullNamePlaceholder} maxLength={255} value={form.injured_name} onChange={e => set('injured_name', e.target.value)} />
+              <label htmlFor="ir-injured-name" style={styles.label}>{t.injuredName}</label>
+              <input id="ir-injured-name" style={styles.input} type="text" placeholder={t.fullNamePlaceholder} maxLength={255} value={form.injured_name} onChange={e => set('injured_name', e.target.value)} />
             </div>
             <div style={styles.fieldGroup}>
-              <label style={styles.label}>{t.bodyPartAffected}</label>
-              <input style={styles.input} type="text" maxLength={255} placeholder={t.bodyPartPlaceholder} value={form.body_part} onChange={e => set('body_part', e.target.value)} />
+              <label htmlFor="ir-body-part" style={styles.label}>{t.bodyPartAffected}</label>
+              <input id="ir-body-part" style={styles.input} type="text" maxLength={255} placeholder={t.bodyPartPlaceholder} value={form.body_part} onChange={e => set('body_part', e.target.value)} />
             </div>
           </div>
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.treatmentField}</label>
-            <select style={styles.input} value={form.treatment} onChange={e => set('treatment', e.target.value)}>
+            <label htmlFor="ir-treatment" style={styles.label}>{t.treatmentField}</label>
+            <select id="ir-treatment" style={styles.input} value={form.treatment} onChange={e => set('treatment', e.target.value)}>
               {Object.entries(TREATMENT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
@@ -122,26 +122,26 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
 
       <div style={styles.fieldGroup}>
         <div style={styles.labelRow}>
-          <label style={styles.label}>{t.descriptionField} *</label>
+          <label htmlFor="ir-description" style={styles.label}>{t.descriptionField} *</label>
           <span style={styles.charCount}>{form.description.length}/2000</span>
         </div>
-        <textarea style={styles.textarea} rows={4} placeholder={t.describeWhatHappened} maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} required />
+        <textarea id="ir-description" style={styles.textarea} rows={4} placeholder={t.describeWhatHappened} maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} required />
       </div>
 
       <div style={styles.fieldGroup}>
         <div style={styles.labelRow}>
-          <label style={styles.label}>{t.witnessesLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
+          <label htmlFor="ir-witnesses" style={styles.label}>{t.witnessesLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
           <span style={styles.charCount}>{form.witnesses.length}/500</span>
         </div>
-        <input style={styles.input} type="text" placeholder={t.witnessesPlaceholder} maxLength={500} value={form.witnesses} onChange={e => set('witnesses', e.target.value)} />
+        <input id="ir-witnesses" style={styles.input} type="text" placeholder={t.witnessesPlaceholder} maxLength={500} value={form.witnesses} onChange={e => set('witnesses', e.target.value)} />
       </div>
 
       <div style={styles.fieldGroup}>
         <div style={styles.labelRow}>
-          <label style={styles.label}>{t.correctiveActionLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
+          <label htmlFor="ir-corrective-action" style={styles.label}>{t.correctiveActionLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
           <span style={styles.charCount}>{form.corrective_action.length}/2000</span>
         </div>
-        <textarea style={styles.textarea} rows={3} placeholder={t.correctiveActionPlaceholder} maxLength={2000} value={form.corrective_action} onChange={e => set('corrective_action', e.target.value)} />
+        <textarea id="ir-corrective-action" style={styles.textarea} rows={3} placeholder={t.correctiveActionPlaceholder} maxLength={2000} value={form.corrective_action} onChange={e => set('corrective_action', e.target.value)} />
       </div>
 
       <label style={styles.checkRow}>

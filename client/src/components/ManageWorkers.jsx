@@ -480,16 +480,17 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
             <form onSubmit={handleAdd} style={s.addForm}>
               <div style={s.formGrid}>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.firstName}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-                  <input style={s.input} value={form.first_name} onChange={e => handleFirstNameChange(e.target.value)} required />
+                  <label htmlFor="mw-first-name" style={s.label}>{t.firstName}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
+                  <input id="mw-first-name" style={s.input} value={form.first_name} onChange={e => handleFirstNameChange(e.target.value)} required />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.lastName}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-                  <input style={s.input} value={form.last_name} onChange={e => handleLastNameChange(e.target.value)} required />
+                  <label htmlFor="mw-last-name" style={s.label}>{t.lastName}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
+                  <input id="mw-last-name" style={s.input} value={form.last_name} onChange={e => handleLastNameChange(e.target.value)} required />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>Username<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>{usernameChecking ? ' (checking...)' : usernameTaken ? ' ⚠ taken' : ''}</label>
+                  <label htmlFor="mw-username" style={s.label}>Username<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>{usernameChecking ? ' (checking...)' : usernameTaken ? ' ⚠ taken' : ''}</label>
                   <input
+                    id="mw-username"
                     style={{ ...s.input, borderColor: usernameTaken ? '#fca5a5' : undefined }}
                     value={form.username}
                     onChange={e => { setUsernameEdited(!!e.target.value); set('username', e.target.value); setUsernameTaken(false); }}
@@ -498,26 +499,26 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.temporaryPassword}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
+                  <label htmlFor="mw-password" style={s.label}>{t.temporaryPassword}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
                   <div style={{ position: 'relative' }}>
-                    <input style={{ ...s.input, width: '100%', paddingRight: 36, boxSizing: 'border-box' }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
+                    <input id="mw-password" style={{ ...s.input, width: '100%', paddingRight: 36, boxSizing: 'border-box' }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
                     <button type="button" onClick={() => setShowPassword(v => !v)} style={s.eyeBtn} tabIndex={-1}>{showPassword ? '🙈' : '👁'}</button>
                   </div>
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.emailOptional}</label>
-                  <input style={s.input} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+                  <label htmlFor="mw-email" style={s.label}>{t.emailOptional}</label>
+                  <input id="mw-email" style={s.input} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.role}</label>
-                  <select style={s.input} value={form.role} onChange={e => set('role', e.target.value)}>
+                  <label htmlFor="mw-role" style={s.label}>{t.role}</label>
+                  <select id="mw-role" style={s.input} value={form.role} onChange={e => set('role', e.target.value)}>
                     <option value="worker">{t.workerRole}</option>
                     <option value="admin">{t.adminRole}</option>
                   </select>
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>Worker Type</label>
-                  <select style={s.input} value={form.worker_type} onChange={e => set('worker_type', e.target.value)}>
+                  <label htmlFor="mw-worker-type" style={s.label}>Worker Type</label>
+                  <select id="mw-worker-type" style={s.input} value={form.worker_type} onChange={e => set('worker_type', e.target.value)}>
                     <option value="employee">Employee (W-2)</option>
                     <option value="contractor">Independent Contractor (1099-NEC)</option>
                     <option value="subcontractor">Subcontractor (1099-NEC)</option>
@@ -525,26 +526,26 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   </select>
                 </div>
                 <div style={s.fieldGroup}>
-                  <label style={s.label}>{t.language}</label>
-                  <select style={s.input} value={form.language} onChange={e => set('language', e.target.value)}>
+                  <label htmlFor="mw-language" style={s.label}>{t.language}</label>
+                  <select id="mw-language" style={s.input} value={form.language} onChange={e => set('language', e.target.value)}>
                     {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                   </select>
                 </div>
                 {showRate && (
                   <>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.payRate}</label>
-                      <input style={s.input} type="number" min="0" step="0.01" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />
+                      <label htmlFor="mw-hourly-rate" style={s.label}>{t.payRate}</label>
+                      <input id="mw-hourly-rate" style={s.input} type="number" min="0" step="0.01" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.rateType}</label>
-                      <select style={s.input} value={form.rate_type} onChange={e => set('rate_type', e.target.value)}>
+                      <label htmlFor="mw-rate-type" style={s.label}>{t.rateType}</label>
+                      <select id="mw-rate-type" style={s.input} value={form.rate_type} onChange={e => set('rate_type', e.target.value)}>
                         {rateTypes.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.overtimeRule}</label>
-                      <select style={s.input} value={form.overtime_rule} onChange={e => set('overtime_rule', e.target.value)}>
+                      <label htmlFor="mw-overtime-rule" style={s.label}>{t.overtimeRule}</label>
+                      <select id="mw-overtime-rule" style={s.input} value={form.overtime_rule} onChange={e => set('overtime_rule', e.target.value)}>
                         {overtimeRules.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                     </div>
@@ -570,34 +571,34 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 <>
                   <div style={s.formGrid}>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.firstName}</label>
-                      <input style={s.input} value={inviteForm.first_name} onChange={e => setInvite('first_name', e.target.value)} required />
+                      <label htmlFor="mw-inv-first-name" style={s.label}>{t.firstName}</label>
+                      <input id="mw-inv-first-name" style={s.input} value={inviteForm.first_name} onChange={e => setInvite('first_name', e.target.value)} required />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.lastName}</label>
-                      <input style={s.input} value={inviteForm.last_name} onChange={e => setInvite('last_name', e.target.value)} required />
+                      <label htmlFor="mw-inv-last-name" style={s.label}>{t.lastName}</label>
+                      <input id="mw-inv-last-name" style={s.input} value={inviteForm.last_name} onChange={e => setInvite('last_name', e.target.value)} required />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.email}</label>
-                      <input style={s.input} type="email" value={inviteForm.email} onChange={e => setInvite('email', e.target.value)} required />
+                      <label htmlFor="mw-inv-email" style={s.label}>{t.email}</label>
+                      <input id="mw-inv-email" style={s.input} type="email" value={inviteForm.email} onChange={e => setInvite('email', e.target.value)} required />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.role}</label>
-                      <select style={s.input} value={inviteForm.role} onChange={e => setInvite('role', e.target.value)}>
+                      <label htmlFor="mw-inv-role" style={s.label}>{t.role}</label>
+                      <select id="mw-inv-role" style={s.input} value={inviteForm.role} onChange={e => setInvite('role', e.target.value)}>
                         <option value="worker">{t.workerRole}</option>
                         <option value="admin">{t.adminRole}</option>
                       </select>
                     </div>
                     <div style={s.fieldGroup}>
-                      <label style={s.label}>{t.language}</label>
-                      <select style={s.input} value={inviteForm.language} onChange={e => setInvite('language', e.target.value)}>
+                      <label htmlFor="mw-inv-language" style={s.label}>{t.language}</label>
+                      <select id="mw-inv-language" style={s.input} value={inviteForm.language} onChange={e => setInvite('language', e.target.value)}>
                         {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                       </select>
                     </div>
                     {showRate && (
                       <div style={s.fieldGroup}>
-                        <label style={s.label}>{t.payRate}</label>
-                        <input style={s.input} type="number" min="0" step="0.01" value={inviteForm.hourly_rate} onChange={e => setInvite('hourly_rate', e.target.value)} />
+                        <label htmlFor="mw-inv-rate" style={s.label}>{t.payRate}</label>
+                        <input id="mw-inv-rate" style={s.input} type="number" min="0" step="0.01" value={inviteForm.hourly_rate} onChange={e => setInvite('hourly_rate', e.target.value)} />
                       </div>
                     )}
                   </div>
@@ -648,27 +649,27 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                           <div style={s.editBlock}>
                             <div style={s.formGrid}>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.fullName}</label>
-                                <input style={s.input} value={editInfoForm.full_name} onChange={e => setEditInfoForm(f => ({ ...f, full_name: e.target.value }))} />
+                                <label htmlFor="mw-edit-full-name" style={s.label}>{t.fullName}</label>
+                                <input id="mw-edit-full-name" style={s.input} value={editInfoForm.full_name} onChange={e => setEditInfoForm(f => ({ ...f, full_name: e.target.value }))} />
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>Invoice Name <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
-                                <input style={s.input} value={editInfoForm.invoice_name} onChange={e => setEditInfoForm(f => ({ ...f, invoice_name: e.target.value }))} placeholder={t.invoiceNamePlaceholder} />
+                                <label htmlFor="mw-edit-invoice-name" style={s.label}>Invoice Name <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
+                                <input id="mw-edit-invoice-name" style={s.input} value={editInfoForm.invoice_name} onChange={e => setEditInfoForm(f => ({ ...f, invoice_name: e.target.value }))} placeholder={t.invoiceNamePlaceholder} />
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.email}</label>
-                                <input style={s.input} type="email" value={editInfoForm.email} onChange={e => setEditInfoForm(f => ({ ...f, email: e.target.value }))} />
+                                <label htmlFor="mw-edit-email" style={s.label}>{t.email}</label>
+                                <input id="mw-edit-email" style={s.input} type="email" value={editInfoForm.email} onChange={e => setEditInfoForm(f => ({ ...f, email: e.target.value }))} />
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.role}</label>
-                                <select style={s.input} value={editInfoForm.role} onChange={e => setEditInfoForm(f => ({ ...f, role: e.target.value }))}>
+                                <label htmlFor="mw-edit-role" style={s.label}>{t.role}</label>
+                                <select id="mw-edit-role" style={s.input} value={editInfoForm.role} onChange={e => setEditInfoForm(f => ({ ...f, role: e.target.value }))}>
                                   <option value="worker">{t.workerRole}</option>
                                   <option value="admin">{t.adminRole}</option>
                                 </select>
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>Worker Type</label>
-                                <select style={s.input} value={editInfoForm.worker_type || 'employee'} onChange={e => setEditInfoForm(f => ({ ...f, worker_type: e.target.value }))}>
+                                <label htmlFor="mw-edit-worker-type" style={s.label}>Worker Type</label>
+                                <select id="mw-edit-worker-type" style={s.input} value={editInfoForm.worker_type || 'employee'} onChange={e => setEditInfoForm(f => ({ ...f, worker_type: e.target.value }))}>
                                   <option value="employee">Employee (W-2)</option>
                                   <option value="contractor">Independent Contractor (1099-NEC)</option>
                                   <option value="subcontractor">Subcontractor (1099-NEC)</option>
@@ -676,8 +677,8 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 </select>
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.language}</label>
-                                <select style={s.input} value={editInfoForm.language} onChange={e => setEditInfoForm(f => ({ ...f, language: e.target.value }))}>
+                                <label htmlFor="mw-edit-language" style={s.label}>{t.language}</label>
+                                <select id="mw-edit-language" style={s.input} value={editInfoForm.language} onChange={e => setEditInfoForm(f => ({ ...f, language: e.target.value }))}>
                                   {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                                 </select>
                               </div>
@@ -734,8 +735,9 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                         {isEditing && editSection === 'username' ? (
                           <div style={s.editBlock}>
                             <div style={s.fieldGroup}>
-                              <label style={s.label}>{t.newUsername}{editUsernameChecking ? ' (checking...)' : editUsernameTaken ? ' ⚠ taken' : ''}</label>
+                              <label htmlFor="mw-edit-username" style={s.label}>{t.newUsername}{editUsernameChecking ? ' (checking...)' : editUsernameTaken ? ' ⚠ taken' : ''}</label>
                               <input
+                                id="mw-edit-username"
                                 style={{ ...s.input, borderColor: editUsernameTaken ? '#fca5a5' : undefined, maxWidth: 240 }}
                                 value={editUsernameVal}
                                 onChange={e => { setEditUsernameVal(e.target.value); setEditUsernameTaken(false); }}
@@ -766,18 +768,18 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                           <div style={s.editBlock}>
                             <div style={s.formGrid}>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.amount}</label>
-                                <input style={{ ...s.input, maxWidth: 120 }} type="number" min="0" step="0.01" value={editRateForm.rate} onChange={e => setEditRateForm(f => ({ ...f, rate: e.target.value }))} />
+                                <label htmlFor="mw-edit-rate" style={s.label}>{t.amount}</label>
+                                <input id="mw-edit-rate" style={{ ...s.input, maxWidth: 120 }} type="number" min="0" step="0.01" value={editRateForm.rate} onChange={e => setEditRateForm(f => ({ ...f, rate: e.target.value }))} />
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.rateType}</label>
-                                <select style={s.input} value={editRateForm.rate_type} onChange={e => setEditRateForm(f => ({ ...f, rate_type: e.target.value }))}>
+                                <label htmlFor="mw-edit-rate-type" style={s.label}>{t.rateType}</label>
+                                <select id="mw-edit-rate-type" style={s.input} value={editRateForm.rate_type} onChange={e => setEditRateForm(f => ({ ...f, rate_type: e.target.value }))}>
                                   {rateTypes.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                                 </select>
                               </div>
                               <div style={s.fieldGroup}>
-                                <label style={s.label}>{t.overtimeRule}</label>
-                                <select style={s.input} value={editRateForm.overtime_rule} onChange={e => setEditRateForm(f => ({ ...f, overtime_rule: e.target.value }))}>
+                                <label htmlFor="mw-edit-overtime-rule" style={s.label}>{t.overtimeRule}</label>
+                                <select id="mw-edit-overtime-rule" style={s.input} value={editRateForm.overtime_rule} onChange={e => setEditRateForm(f => ({ ...f, overtime_rule: e.target.value }))}>
                                   {overtimeRules.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                                 </select>
                               </div>

@@ -63,49 +63,49 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       <div style={styles.row}>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.project}</label>
-            <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
+            <label htmlFor="rfi-project" style={styles.label}>{t.project}</label>
+            <select id="rfi-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
               <option value="">{t.noProjectOpt}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
         )}
         <div style={{ ...styles.fieldGroup, flex: 3 }}>
-          <label style={styles.label}>{t.subjectField} *</label>
-          <input style={styles.input} type="text" placeholder={t.rfiSubjectPlaceholder} maxLength={255} value={form.subject} onChange={e => set('subject', e.target.value)} required />
+          <label htmlFor="rfi-subject" style={styles.label}>{t.subjectField} *</label>
+          <input id="rfi-subject" style={styles.input} type="text" placeholder={t.rfiSubjectPlaceholder} maxLength={255} value={form.subject} onChange={e => set('subject', e.target.value)} required />
         </div>
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>{t.descriptionField} <span style={styles.optional}>({t.optional})</span></label>
-        <textarea style={styles.textarea} rows={3} placeholder={t.rfiDescriptionPlaceholder} maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} />
+        <label htmlFor="rfi-description" style={styles.label}>{t.descriptionField} <span style={styles.optional}>({t.optional})</span></label>
+        <textarea id="rfi-description" style={styles.textarea} rows={3} placeholder={t.rfiDescriptionPlaceholder} maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} />
         <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{form.description.length}/2000</div>
       </div>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.directedTo}</label>
-          <input style={styles.input} type="text" placeholder={t.rfiDirectedToPlaceholder} maxLength={255} value={form.directed_to} onChange={e => set('directed_to', e.target.value)} />
+          <label htmlFor="rfi-directed-to" style={styles.label}>{t.directedTo}</label>
+          <input id="rfi-directed-to" style={styles.input} type="text" placeholder={t.rfiDirectedToPlaceholder} maxLength={255} value={form.directed_to} onChange={e => set('directed_to', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.submittedBy}</label>
-          <input style={styles.input} type="text" placeholder={t.rfiSubmittedByPlaceholder} maxLength={255} value={form.submitted_by} onChange={e => set('submitted_by', e.target.value)} />
+          <label htmlFor="rfi-submitted-by" style={styles.label}>{t.submittedBy}</label>
+          <input id="rfi-submitted-by" style={styles.input} type="text" placeholder={t.rfiSubmittedByPlaceholder} maxLength={255} value={form.submitted_by} onChange={e => set('submitted_by', e.target.value)} />
         </div>
       </div>
 
       <div style={styles.row}>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.dateSubmitted}</label>
-          <input style={styles.input} type="date" value={form.date_submitted} onChange={e => set('date_submitted', e.target.value)} />
+          <label htmlFor="rfi-date-submitted" style={styles.label}>{t.dateSubmitted}</label>
+          <input id="rfi-date-submitted" style={styles.input} type="date" value={form.date_submitted} onChange={e => set('date_submitted', e.target.value)} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.responseDue} <span style={styles.optional}>({t.optional})</span></label>
-          <input style={styles.input} type="date" value={form.date_due} onChange={e => set('date_due', e.target.value)} />
+          <label htmlFor="rfi-date-due" style={styles.label}>{t.responseDue} <span style={styles.optional}>({t.optional})</span></label>
+          <input id="rfi-date-due" style={styles.input} type="date" value={form.date_due} onChange={e => set('date_due', e.target.value)} />
         </div>
         {isEdit && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.statusLabel}</label>
-            <select style={styles.input} value={form.status} onChange={e => set('status', e.target.value)}>
+            <label htmlFor="rfi-status" style={styles.label}>{t.statusLabel}</label>
+            <select id="rfi-status" style={styles.input} value={form.status} onChange={e => set('status', e.target.value)}>
               {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
@@ -114,8 +114,8 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
 
       {isEdit && (
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.rfiResponse}</label>
-          <textarea style={styles.textarea} rows={3} placeholder={t.rfiResponsePlaceholder} maxLength={2000} value={form.response} onChange={e => set('response', e.target.value)} />
+          <label htmlFor="rfi-response" style={styles.label}>{t.rfiResponse}</label>
+          <textarea id="rfi-response" style={styles.textarea} rows={3} placeholder={t.rfiResponsePlaceholder} maxLength={2000} value={form.response} onChange={e => set('response', e.target.value)} />
           <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{form.response.length}/2000</div>
         </div>
       )}

@@ -777,9 +777,10 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             {settings?.qbo_auto_push_expenses && (
               <div style={{ marginTop: 20, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 220 }}>
-                  <label style={styles.label}>Payment / Bank Account</label>
+                  <label htmlFor="qbo-payment-account" style={styles.label}>Payment / Bank Account</label>
                   <p style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 6px' }}>The account used to pay expenses (e.g. Checking, Petty Cash)</p>
                   <select
+                    id="qbo-payment-account"
                     style={styles.select}
                     value={settings?.qbo_bank_account_id || ''}
                     onChange={e => saveAutoSyncSetting('qbo_bank_account_id', e.target.value)}
@@ -792,9 +793,10 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                   </select>
                 </div>
                 <div style={{ flex: 1, minWidth: 220 }}>
-                  <label style={styles.label}>Expense Category Account</label>
+                  <label htmlFor="qbo-expense-account" style={styles.label}>Expense Category Account</label>
                   <p style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 6px' }}>The expense account for the line item (e.g. Job Materials, Travel)</p>
                   <select
+                    id="qbo-expense-account"
                     style={styles.select}
                     value={settings?.qbo_expense_account_id || ''}
                     onChange={e => saveAutoSyncSetting('qbo_expense_account_id', e.target.value)}
@@ -816,12 +818,12 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             <p style={styles.hint}>Manually push approved reimbursements to QuickBooks as Purchase records for a date range.</p>
             <div style={styles.pushRow}>
               <div>
-                <label style={styles.label}>From</label>
-                <input style={styles.dateInput} type="date" value={expFrom} onChange={e => setExpFrom(e.target.value)} />
+                <label htmlFor="qbo-exp-from" style={styles.label}>From</label>
+                <input id="qbo-exp-from" style={styles.dateInput} type="date" value={expFrom} onChange={e => setExpFrom(e.target.value)} />
               </div>
               <div>
-                <label style={styles.label}>To</label>
-                <input style={styles.dateInput} type="date" value={expTo} onChange={e => setExpTo(e.target.value)} />
+                <label htmlFor="qbo-exp-to" style={styles.label}>To</label>
+                <input id="qbo-exp-to" style={styles.dateInput} type="date" value={expTo} onChange={e => setExpTo(e.target.value)} />
               </div>
               <button style={{ ...styles.pushBtn, ...(expPushing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={pushExpenses} disabled={expPushing}>
                 {expPushing ? 'Pushing…' : 'Push Expenses'}
@@ -857,18 +859,18 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             <p style={styles.hint}>Creates a journal entry in QuickBooks for the total labor cost of approved time entries in a date range. Select the wage expense account to debit and the liability or bank account to credit.</p>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
               <div>
-                <label style={styles.label}>From</label>
-                <input style={styles.dateInput} type="date" value={payFrom} onChange={e => setPayFrom(e.target.value)} />
+                <label htmlFor="qbo-pay-from" style={styles.label}>From</label>
+                <input id="qbo-pay-from" style={styles.dateInput} type="date" value={payFrom} onChange={e => setPayFrom(e.target.value)} />
               </div>
               <div>
-                <label style={styles.label}>To</label>
-                <input style={styles.dateInput} type="date" value={payTo} onChange={e => setPayTo(e.target.value)} />
+                <label htmlFor="qbo-pay-to" style={styles.label}>To</label>
+                <input id="qbo-pay-to" style={styles.dateInput} type="date" value={payTo} onChange={e => setPayTo(e.target.value)} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
               <div style={{ flex: 1, minWidth: 200 }}>
-                <label style={styles.label}>Debit — Wages Expense Account</label>
-                <select style={styles.select} value={payDebitId} onChange={e => setPayDebitId(e.target.value)} disabled={loadingAccounts}>
+                <label htmlFor="qbo-debit" style={styles.label}>Debit — Wages Expense Account</label>
+                <select id="qbo-debit" style={styles.select} value={payDebitId} onChange={e => setPayDebitId(e.target.value)} disabled={loadingAccounts}>
                   <option value="">— Select account —</option>
                   {qboAccounts.filter(a => ['Expense', 'OtherExpense', 'CostOfGoodsSold'].includes(a.AccountType)).map(a => (
                     <option key={a.Id} value={a.Id}>{a.Name}</option>
@@ -876,8 +878,8 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 </select>
               </div>
               <div style={{ flex: 1, minWidth: 200 }}>
-                <label style={styles.label}>Credit — Payroll Liability / Bank Account</label>
-                <select style={styles.select} value={payCreditId} onChange={e => setPayCreditId(e.target.value)} disabled={loadingAccounts}>
+                <label htmlFor="qbo-credit" style={styles.label}>Credit — Payroll Liability / Bank Account</label>
+                <select id="qbo-credit" style={styles.select} value={payCreditId} onChange={e => setPayCreditId(e.target.value)} disabled={loadingAccounts}>
                   <option value="">— Select account —</option>
                   {qboAccounts.filter(a => ['Bank', 'CreditCard', 'OtherCurrentLiability', 'LongTermLiability'].includes(a.AccountType)).map(a => (
                     <option key={a.Id} value={a.Id}>{a.Name}</option>
@@ -908,12 +910,12 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             <p style={styles.hint}>{t.qboPushHint}</p>
             <div style={styles.pushRow}>
               <div>
-                <label style={styles.label}>{t.qboFrom}</label>
-                <input style={styles.dateInput} type="date" value={pushFrom} onChange={e => setPushFrom(e.target.value)} />
+                <label htmlFor="qbo-push-from" style={styles.label}>{t.qboFrom}</label>
+                <input id="qbo-push-from" style={styles.dateInput} type="date" value={pushFrom} onChange={e => setPushFrom(e.target.value)} />
               </div>
               <div>
-                <label style={styles.label}>{t.qboTo}</label>
-                <input style={styles.dateInput} type="date" value={pushTo} onChange={e => setPushTo(e.target.value)} />
+                <label htmlFor="qbo-push-to" style={styles.label}>{t.qboTo}</label>
+                <input id="qbo-push-to" style={styles.dateInput} type="date" value={pushTo} onChange={e => setPushTo(e.target.value)} />
               </div>
               <button style={{ ...styles.pushBtn, ...(pushing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handlePush} disabled={pushing}>
                 {pushing ? t.qboPushing : t.qboPush}
