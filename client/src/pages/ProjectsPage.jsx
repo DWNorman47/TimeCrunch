@@ -6,6 +6,8 @@ import ManageClients from '../components/ManageClients';
 import { useT } from '../hooks/useT';
 import { SkeletonList } from '../components/Skeleton';
 import { langToLocale } from '../utils';
+import { silentError, reportClientError } from '../errorReporter';
+import RetryBanner from '../components/RetryBanner';
 
 function punchColor(status) {
   return { open: '#f59e0b', in_progress: '#3b82f6', resolved: '#059669', closed: '#9ca3af' }[status] || '#9ca3af';
@@ -128,6 +130,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const [editMsg, setEditMsg] = useState('');
   const [entries, setEntries] = useState([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
+  const [entriesError, setEntriesError] = useState(null);
   const [billData, setBillData] = useState(null);
   const [billLoading, setBillLoading] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
@@ -156,6 +159,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const [rfiFormOpen, setRfiFormOpen] = useState(false);
   const [rfiForm, setRfiForm] = useState({ subject: '', directed_to: '', description: '', date_due: '' });
   const [rfiSaving, setRfiSaving] = useState(false);
+  const [rfiError, setRfiError] = useState('');
   const [punch, setPunch] = useState([]);
   const [punchOpen, setPunchOpen] = useState(false);
   const [punchLoaded, setPunchLoaded] = useState(false);
@@ -187,24 +191,24 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     if (tab === 'entries') {
       setEntriesLoading(true);
       api.get(`/admin/projects/${project.id}/entries`)
-        .then(r => setEntries(r.data.entries || []))
-        .catch(() => {})
+        .then(r => { setEntries(r.data.entries || []); setEntriesError(null); })
+        .catch(err => { setEntriesError(t.failedLoadEntries || 'Failed to load entries'); silentError('project entries')(err); })
         .finally(() => setEntriesLoading(false));
     }
     if (tab === 'overview' && workers.length === 0) {
       setWorkersLoading(true);
       api.get(`/admin/projects/${project.id}/workers`)
         .then(r => setWorkers(r.data))
-        .catch(() => {})
+        .catch(silentError('project workers'))
         .finally(() => setWorkersLoading(false));
       setActivityLoading(true);
       api.get(`/admin/projects/${project.id}/activity`)
         .then(r => setActivity(r.data))
-        .catch(() => {})
+        .catch(silentError('project activity'))
         .finally(() => setActivityLoading(false));
       api.get(`/admin/projects/${project.id}/health`)
         .then(r => setHealth(r.data))
-        .catch(() => {});
+        .catch(silentError('project health'));
     }
   }, [tab, project.id]);
 
@@ -213,7 +217,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     setPhotosLoaded(true);
     api.get(`/admin/projects/${project.id}/photos`)
       .then(r => setPhotos(r.data))
-      .catch(() => {});
+      .catch(silentError('project photos'));
   };
 
   const loadRfis = () => {
@@ -221,19 +225,23 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     setRfisLoaded(true);
     api.get(`/admin/projects/${project.id}/rfis`)
       .then(r => setRfis(r.data))
-      .catch(() => {});
+      .catch(silentError('project rfis'));
   };
 
   const submitRfi = async (e) => {
     e.preventDefault();
     if (!rfiForm.subject.trim()) return;
     setRfiSaving(true);
+    setRfiError('');
     try {
       const { data: newRfi } = await api.post(`/admin/projects/${project.id}/rfis`, rfiForm);
       setRfis(prev => [newRfi, ...prev]);
       setRfiForm({ subject: '', directed_to: '', description: '', date_due: '' });
       setRfiFormOpen(false);
-    } catch {}
+    } catch (err) {
+      setRfiError(t.failedSave || 'Failed to save RFI');
+      reportClientError({ kind: 'unhandled', message: `submit RFI: ${err?.message || err}`, stack: err?.stack });
+    }
     setRfiSaving(false);
   };
 
@@ -242,7 +250,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     setPunchLoaded(true);
     api.get('/punchlist', { params: { project_id: project.id, limit: 100 } })
       .then(r => setPunch(r.data.items))
-      .catch(() => {});
+      .catch(silentError('project punchlist'));
   };
 
   const submitPunch = async (e) => {
@@ -266,12 +274,14 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     setDocsLoaded(true);
     api.get(`/admin/projects/${project.id}/documents`)
       .then(r => setDocs(r.data))
-      .catch(() => {});
+      .catch(silentError('project documents'));
   };
 
+  const [uploadError, setUploadError] = React.useState('');
   const uploadDoc = async (file) => {
     if (!file) return;
     setUploading(true);
+    setUploadError('');
     try {
       const { data: { uploadUrl, fileUrl } } = await api.get(
         `/admin/projects/${project.id}/documents/upload-url`,
@@ -283,7 +293,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
       });
       setDocs(d => [...d, doc]);
     } catch (err) {
-      console.error('Upload failed', err);
+      setUploadError(t.uploadFailed || 'Upload failed');
+      reportClientError({ kind: 'unhandled', message: `document upload: ${err?.message || err}`, stack: err?.stack });
     } finally {
       setUploading(false);
     }
@@ -296,7 +307,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     if (billTo) params.to = billTo;
     api.get(`/admin/projects/${project.id}/entries`, { params })
       .then(r => setBillData(r.data))
-      .catch(() => {})
+      .catch(silentError('project billing'))
       .finally(() => setBillLoading(false));
   };
 
@@ -305,7 +316,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     if (tab === 'billing' && invoiceHistory === null && project.qbo_customer_id) {
       api.get(`/qbo/invoices/project/${project.id}`)
         .then(r => setInvoiceHistory(r.data))
-        .catch(() => setInvoiceHistory([]));
+        .catch(err => { setInvoiceHistory([]); silentError('project invoice history')(err); });
     }
   }, [tab]);
 
@@ -340,8 +351,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
         if (r.data.length === 1) setQboItemId(r.data[0].Id);
       }
       setShowQboPicker(true);
-    } catch {
-      // silently skip — QBO not connected or API error
+    } catch (err) {
+      silentError('QBO picker')(err);
     } finally {
       setQboLoading(false);
     }
@@ -368,7 +379,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
       // Refresh invoice history
       api.get(`/qbo/invoices/project/${project.id}`)
         .then(res => setInvoiceHistory(res.data))
-        .catch(() => {});
+        .catch(silentError('project invoice history refresh'));
     } catch (err) {
       setQboPushResult({ success: false, error: err.response?.data?.error || 'Push failed' });
     } finally { setQboPushing(false); }
@@ -843,6 +854,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                       {uploading ? 'Uploading…' : '+ Attach File'}
                       <input type="file" style={{ display: 'none' }} disabled={uploading} onChange={e => { uploadDoc(e.target.files[0]); e.target.value = ''; }} />
                     </label>
+                    {uploadError && <p role="alert" style={{ color: '#dc2626', fontSize: 12, margin: '6px 0 0' }}>{uploadError}</p>}
                   </div>
                 )}
               </div>
@@ -919,6 +931,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                           value={rfiForm.description}
                           onChange={e => setRfiForm(f => ({ ...f, description: e.target.value }))}
                         />
+                        {rfiError && <p role="alert" style={{ color: '#dc2626', fontSize: 12, margin: 0 }}>{rfiError}</p>}
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button type="submit" style={styles.rfiSubmitBtn} disabled={rfiSaving}>
                             {rfiSaving ? 'Saving…' : 'Create RFI'}
@@ -1089,7 +1102,9 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
           )}
 
           {tab === 'entries' && (
-            entriesLoading ? <p style={styles.loadingText}>Loading…</p> :
+            <>
+            <RetryBanner message={entriesError} onRetry={() => { setEntriesError(null); setEntriesLoading(true); api.get(`/admin/projects/${project.id}/entries`).then(r => setEntries(r.data.entries || [])).catch(err => { setEntriesError(t.failedLoadEntries || 'Failed to load entries'); silentError('project entries retry')(err); }).finally(() => setEntriesLoading(false)); }} />
+            {entriesLoading ? <p style={styles.loadingText}>Loading…</p> :
             entries.length === 0 ? <p style={styles.emptyText}>No time entries for this project.</p> :
             <div style={styles.entriesTable}>
               <div style={styles.tableHeader}>
@@ -1111,7 +1126,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 );
               })}
               {entries.length > 200 && <p style={styles.moreText}>{t.showingFirst200.replace('{n}', entries.length)}</p>}
-            </div>
+            </div>}
+            </>
           )}
 
           {tab === 'edit' && (
@@ -1381,7 +1397,7 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     if (mainTab === 'clients' || showCreateForm) {
-      api.get('/admin/clients').then(r => setClients(r.data)).catch(() => {});
+      api.get('/admin/clients').then(r => setClients(r.data)).catch(silentError('clients list'));
     }
   }, [mainTab, showCreateForm]);
 
