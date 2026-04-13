@@ -1,4 +1,6 @@
 const sgMail = require('@sendgrid/mail');
+const pool = require('./db');
+const logger = require('./logger');
 
 if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -6,6 +8,21 @@ if (process.env.SENDGRID_API_KEY) {
 
 const FROM = process.env.EMAIL_FROM || 'info@opsfloa.com';
 const REDIRECT_TO = process.env.EMAIL_REDIRECT_TO || 'info@opsfloa.com';
+
+// Skip addresses we know bounce — avoids burning SendGrid reputation on
+// a recipient who's already hard-bounced. Returns true if the email is flagged.
+async function isBounced(email) {
+  if (!email) return false;
+  try {
+    const { rows } = await pool.query(
+      'SELECT email_bounced_at FROM users WHERE LOWER(email) = LOWER($1) AND email_bounced_at IS NOT NULL LIMIT 1',
+      [email]
+    );
+    return rows.length > 0;
+  } catch {
+    return false; // DB hiccup — err on the side of attempting send
+  }
+}
 
 // EMAIL_MODE controls non-production behaviour:
 //   real     — send to the real recipient (used in production automatically)
@@ -21,14 +38,21 @@ const emailMode = isProd ? 'real' : (process.env.EMAIL_MODE || 'redirect');
 async function sendEmail(to, subject, html) {
   if (!to) return;
 
+  // Short-circuit if this recipient is already known-bad from SendGrid's
+  // event webhook. Prevents re-sending to invalid addresses.
+  if (await isBounced(to)) {
+    logger.debug({ to, subject }, 'email skipped — recipient previously bounced');
+    return;
+  }
+
   if (emailMode === 'suppress') {
-    console.log(`[EMAIL suppress] To: ${to} | Subject: ${subject}`);
+    logger.debug({ to, subject }, 'email suppressed (dev mode)');
     return;
   }
 
   if (emailMode === 'redirect') {
     const env = process.env.NODE_ENV || 'development';
-    console.log(`[EMAIL redirect] ${env} → Would send to: ${to} | Subject: ${subject}`);
+    logger.debug({ to, subject, env }, 'email redirect (dev)');
     if (!process.env.SENDGRID_API_KEY) return;
     try {
       await sgMail.send({
@@ -47,7 +71,7 @@ async function sendEmail(to, subject, html) {
           ${html}`,
       });
     } catch (err) {
-      console.error('Email redirect error:', err?.response?.body || err.message);
+      logger.error({ err: { message: err.message, body: err?.response?.body } }, 'email redirect failed');
     }
     return;
   }
@@ -57,7 +81,7 @@ async function sendEmail(to, subject, html) {
   try {
     await sgMail.send({ to, from: FROM, subject, html });
   } catch (err) {
-    console.error('Email send error:', err?.response?.body || err.message);
+    logger.error({ err: { message: err.message, body: err?.response?.body }, to, subject }, 'email send failed');
   }
 }
 

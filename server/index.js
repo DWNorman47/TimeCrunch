@@ -124,6 +124,8 @@ app.use('/api/availability', requireAuth, require('./routes/availability'));
 // Unauthenticated: browsers report errors here. The route itself extracts
 // user identity from the auth header when present.
 app.use('/api/client-errors', require('./routes/clientErrors'));
+// Unauthenticated SendGrid event webhook — uses shared-secret header auth.
+app.use('/api/sendgrid-events', require('./routes/sendgridEvents'));
 
 // Read-only company settings — available to all authenticated users
 const { SETTINGS_DEFAULTS, applySettingsRows } = require('./settingsDefaults');

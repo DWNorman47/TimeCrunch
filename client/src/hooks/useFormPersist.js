@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { reportClientError } from '../errorReporter';
 
 /**
  * Persists form state to localStorage so it survives the browser killing
@@ -7,9 +8,14 @@ import { useEffect } from 'react';
  * Usage:
  *   const { clearPersisted } = useFormPersist('my-form-key', form, setForm);
  *   // Call clearPersisted() on successful submit.
+ *
+ * Quota errors (iOS Safari private mode, storage-restricted contexts) are
+ * reported to Sentry once per session/key so we hear about it without
+ * spamming on every keystroke.
  */
 export function useFormPersist(key, form, setForm) {
   const storageKey = `opsfloa_form_${key}`;
+  const quotaReportedRef = useRef(false);
 
   // Restore on mount
   useEffect(() => {
@@ -20,7 +26,7 @@ export function useFormPersist(key, form, setForm) {
         setForm(f => ({ ...f, ...parsed }));
       }
     } catch {
-      // ignore corrupt data
+      // Corrupt JSON in localStorage — recoverable, we just ignore.
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -29,10 +35,20 @@ export function useFormPersist(key, form, setForm) {
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(form));
-    } catch {
-      // ignore quota errors
+    } catch (err) {
+      // QuotaExceededError / SecurityError (Safari private mode) / disabled
+      // storage. Users silently lose draft persistence. Report once per
+      // session/key so it's visible without burning quota on repeat writes.
+      if (!quotaReportedRef.current) {
+        quotaReportedRef.current = true;
+        reportClientError({
+          kind: 'unhandled',
+          message: `localStorage write failed (useFormPersist:${key}): ${err?.name || 'error'}`,
+          stack: err?.stack,
+        });
+      }
     }
-  }, [storageKey, form]);
+  }, [storageKey, form, key]);
 
   const clearPersisted = () => {
     try { localStorage.removeItem(storageKey); } catch {}
