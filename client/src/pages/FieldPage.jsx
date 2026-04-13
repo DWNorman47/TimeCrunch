@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
 import AppSwitcher from '../components/AppSwitcher';
@@ -26,6 +27,7 @@ function TabLoader() {
 
 export default function FieldPage() {
   const { user, logout } = useAuth();
+  const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const [projects, setProjects] = useState([]);
@@ -59,7 +61,7 @@ export default function FieldPage() {
           </div>
           <div style={styles.headerRight}>
             {!isAdmin && <span style={styles.userName}>{user?.full_name}</span>}
-            <button style={styles.headerBtn} onClick={logout}>Logout</button>
+            <button style={styles.headerBtn} onClick={logout}>{t.logout}</button>
           </div>
         </div>
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
@@ -71,18 +73,18 @@ export default function FieldPage() {
           active={fieldTab}
           onChange={switchTab}
           tabs={[
-            { id: 'notes', label: '📷 Field Notes' },
-            { id: 'punchlist', label: '✅ Punch' },
-            { id: 'safety', label: '🦺 Safety' },
-            { id: 'checklists', label: '☑️ Checklists' },
-            { id: 'incident', label: '🚨 Incidents' },
-            { id: 'equip', label: '🚜 Equipment' },
+            { id: 'notes', label: t.fieldTabNotes },
+            { id: 'punchlist', label: t.fieldTabPunch },
+            { id: 'safety', label: t.fieldTabSafety },
+            { id: 'checklists', label: t.fieldTabChecklists },
+            { id: 'incident', label: t.fieldTabIncidents },
+            { id: 'equip', label: t.fieldTabEquip },
             ...(isAdmin ? [
-              { id: 'daily', label: '📋 Daily Reports' },
-              { id: 'rfi', label: '📝 RFIs' },
-              { id: 'inspect', label: '✅ Inspect' },
-              { id: 'subs', label: '🏗️ Subs' },
-              ...(features.feature_media_gallery ? [{ id: 'gallery', label: '🎬 Media' }] : []),
+              { id: 'daily', label: t.fieldTabDaily },
+              { id: 'rfi', label: t.fieldTabRFI },
+              { id: 'inspect', label: t.fieldTabInspect },
+              { id: 'subs', label: t.fieldTabSubs },
+              ...(features.feature_media_gallery ? [{ id: 'gallery', label: t.fieldTabMedia }] : []),
             ] : []),
           ]}
         />

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useT } from '../hooks/useT';
 import api from '../api';
 
 export default function ForgotPassword() {
+  const t = useT();
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState('');
   const [sent, setSent] = useState(false);
@@ -17,7 +19,7 @@ export default function ForgotPassword() {
       await api.post('/auth/forgot-password', { email, company });
       setSent(true);
     } catch {
-      setError('Something went wrong. Please try again.');
+      setError(t.forgotError);
     } finally {
       setLoading(false);
     }
@@ -29,42 +31,42 @@ export default function ForgotPassword() {
         <h1 style={styles.logo}>OpsFloa</h1>
         {sent ? (
           <>
-            <h2 style={styles.title}>Check your email</h2>
-            <p style={styles.body}>If an account with that email exists, we sent a password reset link. It expires in 1 hour.</p>
-            <Link to="/login" style={styles.backLink}>Back to login</Link>
+            <h2 style={styles.title}>{t.forgotCheckEmailTitle}</h2>
+            <p style={styles.body}>{t.forgotCheckEmailDesc}</p>
+            <Link to="/login" style={styles.backLink}>{t.forgotBackToLogin}</Link>
           </>
         ) : (
           <>
-            <h2 style={styles.title}>Forgot your password?</h2>
-            <p style={styles.body}>Enter your email and we'll send you a reset link.</p>
+            <h2 style={styles.title}>{t.forgotTitle}</h2>
+            <p style={styles.body}>{t.forgotSubtitle}</p>
             <form onSubmit={handleSubmit} style={styles.form}>
-              <label style={styles.label}>Email</label>
+              <label style={styles.label}>{t.email}</label>
               <input
                 style={styles.input}
                 type="email"
-                placeholder="you@example.com"
+                placeholder={t.forgotEmailPh}
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
                 autoFocus
               />
               <label style={styles.label}>
-                Company <span style={styles.optional}>(optional — if you have multiple accounts)</span>
+                {t.forgotCompanyLabel} <span style={styles.optional}>{t.forgotCompanyOptional}</span>
               </label>
               <input
                 style={styles.input}
                 type="text"
-                placeholder="Your company name"
+                placeholder={t.forgotCompanyPh}
                 value={company}
                 onChange={e => setCompany(e.target.value)}
               />
               {error && <p style={styles.error}>{error}</p>}
               <button style={styles.btn} type="submit" disabled={loading}>
-                {loading ? 'Sending...' : 'Send reset link'}
+                {loading ? t.forgotSending : t.forgotSendLinkBtn}
               </button>
             </form>
             <p style={styles.footer}>
-              <Link to="/login" style={styles.link}>Back to login</Link>
+              <Link to="/login" style={styles.link}>{t.forgotBackToLogin}</Link>
             </p>
           </>
         )}
