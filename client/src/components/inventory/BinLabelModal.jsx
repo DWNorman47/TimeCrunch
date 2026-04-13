@@ -85,7 +85,7 @@ export default function BinLabelModal({ item, binType, onClose }) {
       <div style={s.modal}>
         <div style={s.header}>
           <h3 style={s.title}>{t.labelModalTitle} — {typeName}</h3>
-          <button style={s.closeBtn} aria-label="Close" onClick={onClose}>✕</button>
+          <button style={s.closeBtn} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
 
         <div style={s.preview}>

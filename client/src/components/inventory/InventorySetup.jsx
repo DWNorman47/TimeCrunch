@@ -81,12 +81,12 @@ function PhotoGrid({ photos, onRemove, onAdd, readOnly }) {
             onClick={() => window.open(url, '_blank')}
           />
           {!readOnly && (
-            <button style={pg.removeBtn} aria-label="Remove photo" onClick={() => onRemove(i)} title="Remove photo">×</button>
+            <button style={pg.removeBtn} aria-label={t.removePhoto} onClick={() => onRemove(i)} title={t.removePhoto}>×</button>
           )}
         </div>
       ))}
       {!readOnly && (
-        <button style={pg.addBtn} onClick={() => inputRef.current?.click()} title="Add photo">
+        <button style={pg.addBtn} onClick={() => inputRef.current?.click()} title={t.addPhoto}>
           <span style={pg.addIcon}>+</span>
           <span style={pg.addLabel}>Photo</span>
         </button>
@@ -220,7 +220,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
               style={{ ...ef.input, minHeight: 56, resize: 'vertical' }}
               value={form.address}
               onChange={e => set('address', e.target.value)}
-              placeholder="123 Main St, City, State 12345"
+              placeholder={t.invWarehouseAddressPlaceholder}
               maxLength={500}
             />
           </div>
@@ -233,7 +233,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
           style={{ ...ef.input, minHeight: 56, resize: 'vertical' }}
           value={form.notes}
           onChange={e => set('notes', e.target.value)}
-          placeholder="Optional description or map reference…"
+          placeholder={t.invWarehouseDescPlaceholder}
           maxLength={1000}
         />
       </div>
@@ -355,25 +355,25 @@ function SupplierPanel() {
         <div style={sp.row}>
           <div style={sp.field}>
             <label style={sp.label}>{t.invSetupNameField}</label>
-            <input style={sp.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="ABC Supply Co." />
+            <input style={sp.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.invSupplierNamePlaceholder} />
           </div>
           <div style={sp.field}>
             <label style={sp.label}>{t.invSetupContactName}</label>
-            <input style={sp.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Jane Smith" />
+            <input style={sp.input} maxLength={255} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder={t.contactNamePlaceholder} />
           </div>
         </div>
         <div style={sp.row}>
           <div style={sp.field}>
             <label style={sp.label}>{t.invSetupPhone}</label>
-            <input style={sp.input} maxLength={50} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 555-5555" />
+            <input style={sp.input} maxLength={50} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder={t.contactPhonePlaceholder} />
           </div>
           <div style={sp.field}>
             <label style={sp.label}>{t.invSetupEmail}</label>
-            <input style={sp.input} type="email" maxLength={255} value={form.email} onChange={e => set('email', e.target.value)} placeholder="orders@supplier.com" />
+            <input style={sp.input} type="email" maxLength={255} value={form.email} onChange={e => set('email', e.target.value)} placeholder={t.invSupplierEmailPlaceholder} />
           </div>
           <div style={sp.field}>
             <label style={sp.label}>{t.invSetupWebsite}</label>
-            <input style={sp.input} value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://supplier.com" />
+            <input style={sp.input} value={form.website} onChange={e => set('website', e.target.value)} placeholder={t.invSupplierWebsitePlaceholder} />
           </div>
         </div>
         <div style={sp.field}>
@@ -425,20 +425,20 @@ function SupplierPanel() {
                   {sup.active ? (
                     <>
                       <span style={{ ...sp.badge, color: '#059669', background: '#d1fae5' }}>{t.invSetupActiveStatus}</span>
-                      <button style={sp.iconBtn} onClick={() => openEdit(sup)} title="Edit">✏️</button>
+                      <button style={sp.iconBtn} onClick={() => openEdit(sup)} title={t.edit}>✏️</button>
                       {pendingArchiveSupId === sup.id ? (
                         <>
                           <button style={sp.confirmArchiveBtn} onClick={() => archive(sup)}>{t.confirm}</button>
-                          <button style={sp.iconBtn} aria-label="Cancel archive" onClick={() => setPendingArchiveSupId(null)}>✕</button>
+                          <button style={sp.iconBtn} aria-label={t.cancelArchive} onClick={() => setPendingArchiveSupId(null)}>✕</button>
                         </>
                       ) : (
-                        <button style={sp.iconBtn} onClick={() => setPendingArchiveSupId(sup.id)} title="Archive">🗄️</button>
+                        <button style={sp.iconBtn} onClick={() => setPendingArchiveSupId(sup.id)} title={t.archive}>🗄️</button>
                       )}
                     </>
                   ) : (
                     <>
                       <span style={{ ...sp.badge, color: '#9ca3af', background: '#f3f4f6' }}>{t.invSetupArchivedStatus}</span>
-                      <button style={sp.iconBtn} onClick={() => restore(sup)} title="Restore">↩️</button>
+                      <button style={sp.iconBtn} onClick={() => restore(sup)} title={t.restore}>↩️</button>
                     </>
                   )}
                 </div>
@@ -771,20 +771,20 @@ export default function InventorySetup({ projects }) {
                         {item.active ? (
                           <>
                             {level.key !== 'locations' && (
-                              <button style={s.iconBtn} onClick={() => setPrintItem(item)} title="Print QR Label">🏷</button>
+                              <button style={s.iconBtn} onClick={() => setPrintItem(item)} title={t.printQRLabel}>🏷</button>
                             )}
-                            <button style={s.iconBtn} onClick={() => setEditing(item)} title="Edit">✏️</button>
+                            <button style={s.iconBtn} onClick={() => setEditing(item)} title={t.edit}>✏️</button>
                             {pendingArchiveItemId === item.id ? (
                               <>
                                 <button style={s.confirmArchiveBtn} onClick={() => archive(item)}>{t.confirm}</button>
-                                <button style={s.iconBtn} aria-label="Cancel archive" onClick={() => setPendingArchiveItemId(null)}>✕</button>
+                                <button style={s.iconBtn} aria-label={t.cancelArchive} onClick={() => setPendingArchiveItemId(null)}>✕</button>
                               </>
                             ) : (
-                              <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(item.id)} title="Archive">🗄️</button>
+                              <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(item.id)} title={t.archive}>🗄️</button>
                             )}
                           </>
                         ) : (
-                          <button style={s.iconBtn} onClick={() => restore(item)} title="Restore">↩️</button>
+                          <button style={s.iconBtn} onClick={() => restore(item)} title={t.restore}>↩️</button>
                         )}
                       </div>
                     </div>

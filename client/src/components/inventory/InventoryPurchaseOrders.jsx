@@ -70,7 +70,7 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
       <div style={m.modal}>
         <div style={m.header}>
           <h3 style={m.title}>{t.invPOReceiveTitle} — {po.po_number}</h3>
-          <button style={m.closeBtn} aria-label="Close" onClick={onClose}>✕</button>
+          <button style={m.closeBtn} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
 
         {error && <div style={m.error}>{error}</div>}
@@ -455,10 +455,10 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
                         {pendingRemoveLineId === line.id ? (
                           <>
                             <button style={d.confirmLineRemoveBtn} onClick={() => removeLine(line.id)}>{t.confirm}</button>
-                            <button style={d.removeBtn} aria-label="Cancel remove line" onClick={() => setPendingRemoveLineId(null)}>✕</button>
+                            <button style={d.removeBtn} aria-label={t.cancelRemoveLine} onClick={() => setPendingRemoveLineId(null)}>✕</button>
                           </>
                         ) : (
-                          <button style={d.removeBtn} aria-label="Remove line" onClick={() => setPendingRemoveLineId(line.id)}>🗑️</button>
+                          <button style={d.removeBtn} aria-label={t.removeLine} onClick={() => setPendingRemoveLineId(line.id)}>🗑️</button>
                         )}
                       </td>
                     )}
@@ -711,7 +711,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
                       onChange={e => updateLine(line.key, 'notes', e.target.value)} placeholder={t.optional} maxLength={500} />
                   </td>
                   <td style={c.td}>
-                    <button style={c.removeBtn} aria-label="Remove line" onClick={() => removeLine(line.key)}>✕</button>
+                    <button style={c.removeBtn} aria-label={t.removeLine} onClick={() => removeLine(line.key)}>✕</button>
                   </td>
                 </tr>
               ))}

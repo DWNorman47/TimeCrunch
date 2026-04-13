@@ -51,7 +51,7 @@ function HistoryPanel({ item, onClose }) {
             <div style={h.title}>{item.item_name}</div>
             <div style={h.sub}>{t.invStockRecentMovements}</div>
           </div>
-          <button style={h.close} aria-label="Close" onClick={onClose}>✕</button>
+          <button style={h.close} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
         {error && <div style={h.error}>{error} <button style={h.retryBtn} onClick={load}>{t.tryAgain || 'Try again'}</button></div>}
         {loading ? (
@@ -171,7 +171,7 @@ function AdjustModal({ item, locations, onClose, onDone }) {
       <div style={a.modal} onClick={e => e.stopPropagation()}>
         <div style={a.header}>
           <div style={a.title}>{t.invStockCurrentStock} — {item.item_name}</div>
-          <button style={a.close} aria-label="Close" onClick={onClose}>✕</button>
+          <button style={a.close} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
         <div style={a.body}>
           <div style={a.currentRow}>
@@ -184,7 +184,7 @@ function AdjustModal({ item, locations, onClose, onDone }) {
           <input
             type="number"
             step="any"
-            placeholder="e.g. -5 or +10"
+            placeholder={t.invAdjustPlaceholder}
             value={qty}
             onChange={e => setQty(e.target.value)}
             style={a.input}
@@ -315,7 +315,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
       <div style={a.modal} onClick={e => e.stopPropagation()}>
         <div style={a.header}>
           <div style={a.title}>{t.invTxTypeIssue} — {item.item_name}</div>
-          <button style={a.close} aria-label="Close" onClick={onClose}>✕</button>
+          <button style={a.close} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
         <div style={a.body}>
           <div style={a.currentRow}>

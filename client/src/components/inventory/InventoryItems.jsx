@@ -75,7 +75,7 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
       <div style={f.row}>
         <div style={f.field}>
           <label style={f.label}>{t.itemNameLabel}</label>
-          <input style={f.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder="2x4 Lumber, 3/4 Plywood…" required />
+          <input style={f.input} maxLength={255} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.invItemNamePlaceholder} required />
         </div>
         <div style={f.field}>
           <label style={f.label}>{t.itemSkuLabel}</label>
@@ -109,7 +109,7 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
       <div style={f.row}>
         <div style={f.field}>
           <label style={f.label}>{t.itemCategoryLabel}</label>
-          <input style={f.input} maxLength={100} value={form.category} onChange={e => set('category', e.target.value)} placeholder="Lumber, Electrical, Concrete…" />
+          <input style={f.input} maxLength={100} value={form.category} onChange={e => set('category', e.target.value)} placeholder={t.invCategoryPlaceholder} />
         </div>
         <div style={f.field}>
           <label style={f.label}>{t.itemUnitLabel}</label>
@@ -232,11 +232,11 @@ function ItemUOMPanel({ item }) {
           <div style={u.formRow}>
             <div style={u.field}>
               <label style={u.label}>{t.uomUnit}</label>
-              <input style={u.input} value={newForm.unit} onChange={e => setN('unit', e.target.value)} placeholder="box, bag, each…" />
+              <input style={u.input} value={newForm.unit} onChange={e => setN('unit', e.target.value)} placeholder={t.invUnitPlaceholder} />
             </div>
             <div style={u.field}>
               <label style={u.label}>{t.uomSpec}</label>
-              <input style={u.input} value={newForm.unit_spec} onChange={e => setN('unit_spec', e.target.value)} placeholder="50 ct, 10×50…" />
+              <input style={u.input} value={newForm.unit_spec} onChange={e => setN('unit_spec', e.target.value)} placeholder={t.invUnitSpecPlaceholder} />
             </div>
             <div style={u.field}>
               <label style={u.label}>{t.uomFactor}</label>
@@ -288,14 +288,14 @@ function ItemUOMPanel({ item }) {
                     <td style={{ ...u.td, textAlign: 'right' }}>{parseFloat(row.factor)}</td>
                     <td style={u.td}>{row.is_base ? <span style={u.baseBadge}>{t.uomBaseBadge}</span> : ''}</td>
                     <td style={{ ...u.td, whiteSpace: 'nowrap' }}>
-                      <button style={u.iconBtn} aria-label="Edit unit" onClick={() => { setEditingId(row.id); setEditForm({ unit: row.unit, unit_spec: row.unit_spec || '', factor: String(row.factor), is_base: row.is_base }); }}>✏️</button>
+                      <button style={u.iconBtn} aria-label={t.editUnit} onClick={() => { setEditingId(row.id); setEditForm({ unit: row.unit, unit_spec: row.unit_spec || '', factor: String(row.factor), is_base: row.is_base }); }}>✏️</button>
                       {!row.is_base && (pendingRemoveUomId === row.id ? (
                         <>
                           <button style={u.confirmRemoveBtn} onClick={() => remove(row.id)}>{t.confirm}</button>
-                          <button style={u.iconBtn} aria-label="Cancel remove" onClick={() => setPendingRemoveUomId(null)}>✕</button>
+                          <button style={u.iconBtn} aria-label={t.cancelRemove} onClick={() => setPendingRemoveUomId(null)}>✕</button>
                         </>
                       ) : (
-                        <button style={u.iconBtn} aria-label="Remove unit" onClick={() => setPendingRemoveUomId(row.id)}>🗑️</button>
+                        <button style={u.iconBtn} aria-label={t.removeUnit} onClick={() => setPendingRemoveUomId(row.id)}>🗑️</button>
                       ))}
                     </td>
                   </>
@@ -493,19 +493,19 @@ export default function InventoryItems({ onItemChange }) {
                       <td style={{ ...s.td, whiteSpace: 'nowrap' }}>
                         {item.active ? (
                           <>
-                            <button style={s.iconBtn} onClick={() => setLabelItem(item)} aria-label="Print label">🏷️</button>
-                            <button style={s.iconBtn} onClick={() => setEditingItem(item)} aria-label="Edit item">✏️</button>
+                            <button style={s.iconBtn} onClick={() => setLabelItem(item)} aria-label={t.printLabel}>🏷️</button>
+                            <button style={s.iconBtn} onClick={() => setEditingItem(item)} aria-label={t.editItem}>✏️</button>
                             {pendingArchiveItemId === item.id ? (
                               <>
                                 <button style={{ ...s.confirmArchiveBtn, ...(archiving === item.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => archive(item)} disabled={archiving === item.id}>{t.confirm}</button>
-                                <button style={s.iconBtn} aria-label="Cancel archive" onClick={() => setPendingArchiveItemId(null)}>✕</button>
+                                <button style={s.iconBtn} aria-label={t.cancelArchive} onClick={() => setPendingArchiveItemId(null)}>✕</button>
                               </>
                             ) : (
-                              <button style={{ ...s.iconBtn, opacity: archiving === item.id ? 0.5 : 1 }} onClick={() => setPendingArchiveItemId(item.id)} title="Archive">🗄️</button>
+                              <button style={{ ...s.iconBtn, opacity: archiving === item.id ? 0.5 : 1 }} onClick={() => setPendingArchiveItemId(item.id)} title={t.archive}>🗄️</button>
                             )}
                           </>
                         ) : (
-                          <button style={s.iconBtn} onClick={() => restore(item)} title="Restore">↩️</button>
+                          <button style={s.iconBtn} onClick={() => restore(item)} title={t.restore}>↩️</button>
                         )}
                       </td>
                     </tr>

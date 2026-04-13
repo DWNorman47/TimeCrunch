@@ -45,7 +45,7 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
       <div style={m.modal} onClick={e => e.stopPropagation()}>
         <div style={m.header}>
           <div style={m.title}>{t.uomConvTitle}</div>
-          <button style={m.close} aria-label="Close" onClick={onDismiss}>✕</button>
+          <button style={m.close} aria-label={t.labelModalClose} onClick={onDismiss}>✕</button>
         </div>
         <div style={m.body}>
           <p style={m.desc}>
