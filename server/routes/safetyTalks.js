@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const { sendPushToAllWorkers } = require('../push');
 const { getPresignedUploadUrl } = require('../r2');
 const { checkStorageLimit, incrementStorage, decrementStorage } = require('../storage');
+const { logAudit } = require('../auditLog');
 
 // GET /safety-talks
 router.get('/', requireAuth, async (req, res) => {
@@ -137,6 +138,9 @@ router.post('/', requireAuth, async (req, res) => {
       [id]
     );
 
+    logAudit(companyId, req.user.id, req.user.full_name, 'safety_talk.created', 'safety_talk', id, title,
+      { talk_date, project_id: project_id || null, question_count: validQuestions.length });
+
     sendPushToAllWorkers(companyId, {
       title: 'New safety talk: ' + title,
       body: validQuestions.length > 0 ? 'Open the app to take the quiz and sign off.' : 'Open the app to read and sign off.',
@@ -259,6 +263,8 @@ router.post('/:id/signoff', requireAuth, async (req, res) => {
     );
 
     if (inserted.rowCount === 0) return res.json({ already_signed: true });
+    logAudit(companyId, req.user.id, req.user.full_name, 'safety_talk.signed_off', 'safety_talk', req.params.id, null,
+      { quiz_score: quizScore, quiz_passed: quizPassed });
     res.json({ signed: true, quiz_score: quizScore, quiz_passed: quizPassed });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -275,6 +281,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
       [req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    logAudit(companyId, req.user.id, req.user.full_name, 'safety_talk.deleted', 'safety_talk', req.params.id, null, null);
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });

@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { logAudit } = require('../auditLog');
 
 // GET /equipment — list all active equipment items with total hours
 router.get('/', requireAuth, async (req, res) => {
@@ -43,6 +44,8 @@ router.post('/', requireAdmin, async (req, res) => {
       [companyId, name, type, unit_number,
        maintenance_interval_hours ? parseInt(maintenance_interval_hours) : null, notes]
     );
+    logAudit(companyId, req.user.id, req.user.full_name, 'equipment.created', 'equipment', result.rows[0].id, name,
+      { type, unit_number });
     res.status(201).json({ ...result.rows[0], total_hours: 0, log_count: 0, last_logged: null });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -77,6 +80,7 @@ router.patch('/:id', requireAdmin, async (req, res) => {
        notes, req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Equipment not found' });
+    logAudit(companyId, req.user.id, req.user.full_name, 'equipment.edited', 'equipment', req.params.id, name, null);
     res.json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -89,6 +93,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
       [req.params.id, req.user.company_id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Equipment not found' });
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'equipment.archived', 'equipment', req.params.id, null, null);
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -145,6 +150,8 @@ router.post('/:id/hours', requireAuth, async (req, res) => {
       [req.params.id, companyId, project_id || null, log_date, parseFloat(hours),
        operator_name, notes, req.user.id]
     );
+    logAudit(companyId, req.user.id, req.user.full_name, 'equipment.hours_logged', 'equipment', req.params.id, null,
+      { log_date, hours: parseFloat(hours), project_id: project_id || null });
     res.status(201).json(full.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });

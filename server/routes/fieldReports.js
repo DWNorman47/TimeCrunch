@@ -4,6 +4,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToCompanyAdmins } = require('../push');
 const { uploadBase64, getPresignedUploadUrl } = require('../r2');
 const { checkStorageLimit, incrementStorage, decrementStorage } = require('../storage');
+const { logAudit } = require('../auditLog');
 
 // GET /field-reports — worker gets own; admin gets full company feed
 router.get('/', requireAuth, async (req, res) => {
@@ -125,6 +126,9 @@ router.post('/', requireAuth, async (req, res) => {
       if (totalBytes > 0) incrementStorage(companyId, totalBytes).catch(() => {});
     }
 
+    logAudit(companyId, req.user.id, req.user.full_name, 'field_report.submitted', 'field_report', report.id, title || null,
+      { project_id: project_id || null, photo_count: photos.length });
+
     // Notify admins of new field report
     sendPushToCompanyAdmins(companyId, {
       title: `Field report from ${req.user.full_name}`,
@@ -183,6 +187,7 @@ router.patch('/:id/review', requireAdmin, async (req, res) => {
       [req.params.id, req.user.company_id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Report not found' });
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'field_report.reviewed', 'field_report', req.params.id, null, null);
     res.json(result.rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -211,6 +216,9 @@ router.delete('/:id', requireAuth, async (req, res) => {
     await pool.query('DELETE FROM field_reports WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
 
     if (totalBytes > 0) decrementStorage(companyId, totalBytes).catch(() => {});
+
+    logAudit(companyId, req.user.id, req.user.full_name, 'field_report.deleted', 'field_report', req.params.id, null,
+      { project_id: report.project_id, was_reviewed: report.status === 'reviewed' });
 
     res.json({ deleted: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
