@@ -2,11 +2,11 @@ const cron = require('node-cron');
 const pool = require('../db');
 const { sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem } = require('../routes/inbox');
+const { runJob } = require('./runJob');
 
 async function checkEquipmentMaintenance() {
-  try {
-    // Get all active companies
-    const companies = await pool.query(`
+  // Get all active companies
+  const companies = await pool.query(`
       SELECT id, name FROM companies
       WHERE subscription_status IN ('trial', 'active')
     `);
@@ -46,15 +46,11 @@ async function checkEquipmentMaintenance() {
         createInboxItem(a.id, companyId, 'equipment_maintenance', alertTitle, alertBody, '/field#equip');
       }
     }
-  } catch (err) {
-    console.error('Equipment maintenance check error:', err);
-  }
 }
 
 function startEquipmentMaintenanceJob() {
   // Run at 8 AM server time every day
-  cron.schedule('0 8 * * *', checkEquipmentMaintenance);
-  console.log('Equipment maintenance alert job scheduled (daily at 8 AM)');
+  cron.schedule('0 8 * * *', () => runJob('equipmentMaintenance', checkEquipmentMaintenance));
 }
 
 module.exports = { startEquipmentMaintenanceJob };

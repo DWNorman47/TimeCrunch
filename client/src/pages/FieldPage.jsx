@@ -8,6 +8,7 @@ import TabBar from '../components/TabBar';
 import FieldDayLog from '../components/FieldDayLog';
 import { reportClientError } from '../errorReporter';
 import RetryBanner from '../components/RetryBanner';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 // Tab components — lazy-loaded on first visit since only one tab is visible at a time
 const DailyReports        = lazy(() => import('../components/DailyReports'));
@@ -102,31 +103,36 @@ export default function FieldPage() {
           ]}
         />
 
-        <Suspense fallback={<TabLoader />}>
-          {fieldTab === 'daily' ? (
-            <DailyReports projects={projects} />
-          ) : fieldTab === 'punchlist' ? (
-            <Punchlist projects={projects} />
-          ) : fieldTab === 'safety' ? (
-            <SafetyTalks projects={projects} />
-          ) : fieldTab === 'checklists' ? (
-            <SafetyChecklists projects={projects} />
-          ) : fieldTab === 'incident' ? (
-            <IncidentReports projects={projects} />
-          ) : fieldTab === 'gallery' ? (
-            <PhotoGallery projects={projects} />
-          ) : fieldTab === 'subs' ? (
-            <SubReports projects={projects} />
-          ) : fieldTab === 'equip' ? (
-            <EquipmentLog projects={projects} />
-          ) : fieldTab === 'rfi' ? (
-            <RFITracking projects={projects} />
-          ) : fieldTab === 'inspect' ? (
-            <InspectionChecklists projects={projects} />
-          ) : (
-            <FieldDayLog projects={projects} isAdmin={isAdmin} />
-          )}
-        </Suspense>
+        {/* Per-tab error boundary — a crash in one tab doesn't take down the page.
+            Keyed on fieldTab so switching tabs resets the boundary if the user
+            recovered by navigating away from the broken tab. */}
+        <ErrorBoundary key={fieldTab} mode="inline" label={fieldTab}>
+          <Suspense fallback={<TabLoader />}>
+            {fieldTab === 'daily' ? (
+              <DailyReports projects={projects} />
+            ) : fieldTab === 'punchlist' ? (
+              <Punchlist projects={projects} />
+            ) : fieldTab === 'safety' ? (
+              <SafetyTalks projects={projects} />
+            ) : fieldTab === 'checklists' ? (
+              <SafetyChecklists projects={projects} />
+            ) : fieldTab === 'incident' ? (
+              <IncidentReports projects={projects} />
+            ) : fieldTab === 'gallery' ? (
+              <PhotoGallery projects={projects} />
+            ) : fieldTab === 'subs' ? (
+              <SubReports projects={projects} />
+            ) : fieldTab === 'equip' ? (
+              <EquipmentLog projects={projects} />
+            ) : fieldTab === 'rfi' ? (
+              <RFITracking projects={projects} />
+            ) : fieldTab === 'inspect' ? (
+              <InspectionChecklists projects={projects} />
+            ) : (
+              <FieldDayLog projects={projects} isAdmin={isAdmin} />
+            )}
+          </Suspense>
+        </ErrorBoundary>
       </main>
     </div>
   );

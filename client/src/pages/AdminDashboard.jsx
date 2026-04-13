@@ -1,4 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
 import { usePlan } from '../hooks/usePlan';
 import { useT } from '../hooks/useT';
@@ -195,7 +196,9 @@ export default function AdminDashboard() {
             <strong>{t.failedLoadDashboard}</strong> Check your connection and{' '}
             <button style={styles.retryBtn} onClick={() => window.location.reload()}>{t.tryAgain}</button>.
           </div>
-        ) : tab === 'live' ? (
+        ) : (
+          <ErrorBoundary key={tab} mode="inline" label={tab}>
+          {tab === 'live' ? (
           <>
             {workers.filter(w => w.role === 'worker').length === 0 && (
               <OnboardingChecklist workers={workers} projects={projects} settings={settings} />
@@ -272,6 +275,8 @@ export default function AdminDashboard() {
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
           </Suspense>
         ) : null}
+          </ErrorBoundary>
+        )}
       </main>
     </div>
   );

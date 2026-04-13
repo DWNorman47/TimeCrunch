@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { setApiToastHandler } from '../api';
 
 const ToastContext = createContext(null);
 
@@ -10,6 +11,13 @@ export function ToastProvider({ children }) {
     setToasts(prev => [...prev.slice(-4), { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4500);
   }, []);
+
+  // Expose the toast function to the axios interceptor so it can surface
+  // 429 / 503 / network errors without needing React context.
+  useEffect(() => {
+    setApiToastHandler(toast);
+    return () => setApiToastHandler(null);
+  }, [toast]);
 
   const dismiss = id => setToasts(prev => prev.filter(t => t.id !== id));
 

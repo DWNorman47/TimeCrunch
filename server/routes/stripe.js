@@ -142,7 +142,7 @@ router.post('/webhook', async (req, res) => {
     const stripe = getStripe();
     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
-    console.error('Webhook signature error:', err.message);
+    req.log.warn({ err: { message: err.message } }, 'stripe webhook signature invalid');
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
@@ -196,7 +196,19 @@ router.post('/webhook', async (req, res) => {
       }
     }
   } catch (err) {
-    console.error('Webhook handler error:', err);
+    // Webhook processing failed after signature verification succeeded.
+    // Log + Sentry so we hear about chronically failing subscription events
+    // (Stripe retries for up to 3 days before giving up). Still return 200
+    // so Stripe doesn't retry a deterministic failure, unless the failure
+    // was transient (5xx from our DB) — we can tune this later.
+    req.log.error({ err, eventType: event?.type, eventId: event?.id }, 'stripe webhook handler failed');
+    if (process.env.SENTRY_DSN) {
+      const Sentry = require('@sentry/node');
+      Sentry.captureException(err, {
+        tags: { source: 'stripe_webhook', event_type: event?.type },
+        extra: { event_id: event?.id },
+      });
+    }
   }
 
   res.json({ received: true });

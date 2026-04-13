@@ -1,4 +1,5 @@
 import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
 import ClockInOut from '../components/ClockInOut';
 import TimeEntryForm from '../components/TimeEntryForm';
@@ -464,6 +465,7 @@ ${signatureDataUrl ? `
         )}
 
         {tab === 'timesheet' && (
+          <ErrorBoundary key="timesheet" mode="inline" label="Timesheet">
           <Suspense fallback={<TabLoader />}>
             <UpcomingShifts onFillEntry={handleFillFromShift} />
             {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} rateType={user?.rate_type ?? 'hourly'} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 0} overtimeEnabled={settings?.feature_overtime ?? true} overtimeRule={settings?.overtime_rule ?? 'daily'} overtimeThreshold={settings?.overtime_threshold ?? 8} showWages={settings?.show_worker_wages ?? false} currency={settings?.currency ?? 'USD'} />}
@@ -487,11 +489,12 @@ ${signatureDataUrl ? `
               <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} currentUserId={user?.id} projects={projects} onRefresh={refreshEntries} />
             )}
           </Suspense>
+          </ErrorBoundary>
         )}
 
-        {tab === 'timeoff' && <Suspense fallback={<TabLoader />}><TimeOffTab /></Suspense>}
+        {tab === 'timeoff' && <ErrorBoundary key="timeoff" mode="inline" label="Time Off"><Suspense fallback={<TabLoader />}><TimeOffTab /></Suspense></ErrorBoundary>}
 
-        {tab === 'availability' && <Suspense fallback={<TabLoader />}><AvailabilityTab /></Suspense>}
+        {tab === 'availability' && <ErrorBoundary key="availability" mode="inline" label="Availability"><Suspense fallback={<TabLoader />}><AvailabilityTab /></Suspense></ErrorBoundary>}
 
         {tab === 'schedule' && <Suspense fallback={<TabLoader />}><WorkerSchedule /></Suspense>}
 

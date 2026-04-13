@@ -1,12 +1,13 @@
 const cron = require('node-cron');
 const pool = require('../db');
+const logger = require('../logger');
 const { sendEmail } = require('../email');
 const { createInboxItem } = require('../routes/inbox');
+const { runJob } = require('./runJob');
 
 async function expireTrials() {
-  try {
-    // Find companies whose trial has ended and haven't yet been marked expired
-    const expired = await pool.query(`
+  // Find companies whose trial has ended and haven't yet been marked expired
+  const expired = await pool.query(`
       UPDATE companies
       SET subscription_status = 'trial_expired'
       WHERE subscription_status = 'trial'
@@ -62,19 +63,15 @@ async function expireTrials() {
         }
       }
 
-      console.log(`Trial expired: company ${companyId} (${companyName})`);
+      logger.info({ companyId, companyName }, 'trial expired');
     }
-  } catch (err) {
-    console.error('expireTrials error:', err);
-  }
 }
 
 function startExpireTrialsJob() {
   // Check every hour — trials expire within 60 minutes of their end time
-  cron.schedule('0 * * * *', expireTrials);
+  cron.schedule('0 * * * *', () => runJob('expireTrials', expireTrials));
   // Also run immediately on startup to catch any that expired while server was down
-  expireTrials();
-  console.log('Trial expiry job scheduled (hourly)');
+  runJob('expireTrials', expireTrials);
 }
 
 module.exports = { startExpireTrialsJob };
