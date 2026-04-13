@@ -175,7 +175,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
 
   return (
     <form onSubmit={submit} style={ef.form}>
-      <h3 style={ef.title}>{item ? `${t.edit} ${levelSingular}` : `${t.addOption} ${levelSingular}`}</h3>
+      <h3 style={ef.title}>{item ? `${t.edit} ${levelSingular}` : `${t.add} ${levelSingular}`}</h3>
       {error && <div role="alert" style={ef.error}>{error}</div>}
 
       {/* Parent selector (only for new items on non-location levels) */}
@@ -251,7 +251,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
       <div style={ef.actions}>
         <button type="button" style={ef.cancelBtn} onClick={onCancel}>{t.cancel}</button>
         <button type="submit" style={{ ...ef.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={saving}>
-          {saving ? t.saving : item ? t.saveChanges : `${t.addOption} ${levelSingular}`}
+          {saving ? t.saving : item ? t.saveChanges : `${t.add} ${levelSingular}`}
         </button>
       </div>
     </form>
@@ -725,7 +725,7 @@ export default function InventorySetup({ projects }) {
           <div style={s.toolbar}>
             <span style={s.count}>{items.length} {(LEVEL_LABELS[level.key] || level.label).toLowerCase()}</span>
             <button style={s.addBtn} onClick={() => setEditing(false)}>
-              + {t.addOption} {LEVEL_LABELS_SGl[level.key] || level.label}
+              + {t.add} {LEVEL_LABELS_SGl[level.key] || level.label}
             </button>
           </div>
 

@@ -83,7 +83,7 @@ function CategorySection({ cfg, onSave, saving }) {
           onKeyDown={e => e.key === 'Enter' && addCustom()}
           maxLength={60}
         />
-        <button style={{ ...s.addBtn, ...(!newCat.trim() ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={addCustom} disabled={!newCat.trim()}>{t.addOption}</button>
+        <button style={{ ...s.addBtn, ...(!newCat.trim() ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={addCustom} disabled={!newCat.trim()}>{t.add}</button>
       </div>
 
       {dirty && (
