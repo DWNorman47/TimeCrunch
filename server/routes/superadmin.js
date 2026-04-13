@@ -3,6 +3,37 @@ const pool = require('../db');
 const jwt = require('jsonwebtoken');
 const { requireSuperAdmin } = require('../middleware/auth');
 
+// GET /superadmin/client-errors — browser-reported errors, newest first
+router.get('/client-errors', requireSuperAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+    const since = req.query.since; // ISO date string, optional
+    const params = [];
+    let where = '';
+    if (since) {
+      params.push(since);
+      where = `WHERE ce.created_at >= $${params.length}`;
+    }
+    params.push(limit);
+    const { rows } = await pool.query(
+      `SELECT ce.id, ce.created_at, ce.company_id, ce.user_id, ce.kind, ce.message,
+              ce.stack, ce.url, ce.user_agent, ce.app_version, ce.ip,
+              u.full_name AS user_name, c.name AS company_name
+       FROM client_errors ce
+       LEFT JOIN users u ON u.id = ce.user_id
+       LEFT JOIN companies c ON c.id = ce.company_id
+       ${where}
+       ORDER BY ce.created_at DESC
+       LIMIT $${params.length}`,
+      params
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET /superadmin/companies — all companies with usage stats
 router.get('/companies', requireSuperAdmin, async (req, res) => {
   try {

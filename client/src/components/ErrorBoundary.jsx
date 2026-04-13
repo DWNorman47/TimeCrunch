@@ -1,4 +1,5 @@
 import React from 'react';
+import { reportClientError } from '../errorReporter';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -12,6 +13,16 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error('Unhandled render error:', error, info?.componentStack);
+    // Combine the React component stack with the raw error stack so the
+    // server can see which component subtree crashed.
+    const stack = [error?.stack, info?.componentStack && `\nComponent stack:${info.componentStack}`]
+      .filter(Boolean)
+      .join('');
+    reportClientError({
+      kind: 'render',
+      message: error?.message || 'Render crash',
+      stack,
+    });
   }
 
   render() {
