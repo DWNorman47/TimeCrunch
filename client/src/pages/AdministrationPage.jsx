@@ -14,6 +14,7 @@ import QuickBooks from '../components/QuickBooks';
 import MFASetup from '../components/MFASetup';
 import { usePlan } from '../hooks/usePlan';
 
+import { silentError } from '../errorReporter';
 function RoleBadge({ role }) {
   const t = useT();
   const isAdmin = role === 'admin' || role === 'super_admin';
@@ -47,7 +48,7 @@ function CompanyTab() {
       setAddress(r.data.address || '');
       setPhone(r.data.phone || '');
       setContactEmail(r.data.contact_email || '');
-    }).catch(() => {});
+    }).catch(silentError('administrationpage'));
   }, []);
 
   const save = async () => {
@@ -340,7 +341,7 @@ export default function AdministrationPage() {
       setProjects(p.data);
       setSettings(s.data);
       setQboConnected(qbo.data?.connected && !qbo.data?.disconnected);
-    }).catch(() => {});
+    }).catch(silentError('administrationpage'));
   }, []);
 
   const handleWorkerAdded    = w  => setWorkers(prev => [...prev, { ...w, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 }]);

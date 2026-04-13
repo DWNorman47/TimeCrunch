@@ -4,6 +4,7 @@ import { useT } from '../../hooks/useT';
 import { SkeletonList } from '../Skeleton';
 import ModalShell from '../ModalShell';
 
+import { silentError } from '../../errorReporter';
 function useStatus(t) {
   return {
     draft:      { label: t.invPODraft,      color: '#6b7280', bg: '#f3f4f6' },
@@ -169,7 +170,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
 
   useEffect(() => {
     if (addingLine) {
-      api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(() => {});
+      api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(silentError('inventorypurchaseorders'));
     }
   }, [addingLine]);
 
@@ -575,7 +576,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
   const [error, setError]   = useState('');
 
   useEffect(() => {
-    api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(() => {});
+    api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(silentError('inventorypurchaseorders'));
   }, []);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -754,7 +755,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
   // Load suppliers if not provided
   useEffect(() => {
     if (!suppliersProp || suppliersProp.length === 0) {
-      api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(() => {});
+      api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(silentError('inventorypurchaseorders'));
     }
   }, []);
 

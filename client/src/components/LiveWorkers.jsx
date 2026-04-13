@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { formatInTz, langToLocale } from '../utils';
 import ModalShell from './ModalShell';
 
+import { silentError } from '../errorReporter';
 // SVG divIcon — avoids all CDN/bundler PNG loading issues
 function makePinIcon(color) {
   return L.divIcon({
@@ -68,7 +69,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   const fetchActive = (isInitial = false) => {
     api.get('/admin/active-clocks')
       .then(r => { setWorkers(r.data); setLastUpdated(new Date()); })
-      .catch(() => {})
+      .catch(silentError('liveworkers'))
       .finally(() => { if (isInitial) setInitialLoading(false); });
   };
 
@@ -76,13 +77,13 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
     const today = new Date().toLocaleDateString('en-CA');
     api.get('/shifts/admin', { params: { from: today, to: today } })
       .then(r => setTodayShifts(r.data))
-      .catch(() => {});
+      .catch(silentError('liveworkers'));
   };
 
   const fetchInactive = () => {
     api.get('/admin/notifications')
       .then(r => { setInactiveWorkers(r.data); setDismissedInactive(false); })
-      .catch(() => {});
+      .catch(silentError('liveworkers'));
   };
 
   useEffect(() => {
@@ -100,7 +101,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   useEffect(() => {
     api.get('/admin/workers')
       .then(r => setAllWorkers(r.data))
-      .catch(() => {});
+      .catch(silentError('liveworkers'));
   }, []);
 
   const [actionError, setActionError] = useState('');

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import { langToLocale } from '../utils';
 
+import { silentError } from '../errorReporter';
 function fmtDate(str, locale = 'en-US') {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
   return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -168,9 +169,9 @@ export default function ReimbursementsAdmin() {
   useEffect(() => { setLoading(true); load(); }, [load]);
 
   useEffect(() => {
-    api.get('/admin/workers').then(r => setWorkers(r.data)).catch(() => {});
-    api.get('/projects').then(r => setProjects(r.data)).catch(() => {});
-    api.get('/reimbursements/categories').then(r => setCategories(r.data)).catch(() => {});
+    api.get('/admin/workers').then(r => setWorkers(r.data)).catch(silentError('reimbursementsadmin'));
+    api.get('/projects').then(r => setProjects(r.data)).catch(silentError('reimbursementsadmin'));
+    api.get('/reimbursements/categories').then(r => setCategories(r.data)).catch(silentError('reimbursementsadmin'));
   }, []);
 
   const handleFileChange = e => {

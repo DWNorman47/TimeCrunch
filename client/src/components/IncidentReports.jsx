@@ -6,6 +6,7 @@ import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
 
+import { silentError } from '../errorReporter';
 function today() {
   return new Date().toLocaleDateString('en-CA');
 }
@@ -319,7 +320,7 @@ export default function IncidentReports({ projects }) {
       const r = await api.get('/incidents', { params });
       setIncidents(r.data.items);
       setTotalPages(r.data.pages);
-    } catch {}
+    } catch (err) { silentError('incident-reports fetch')(err); }
   };
 
   useEffect(() => { loadIncidents(filters, 1).finally(() => setLoading(false)); }, []);

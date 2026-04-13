@@ -3,6 +3,7 @@ import api from '../api';
 import { useT } from '../hooks/useT';
 import { langToLocale } from '../utils';
 
+import { silentError } from '../errorReporter';
 function fmtDate(str, locale = 'en-US') {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
   return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -232,7 +233,7 @@ export default function PayStubView({ user, settings, companyInfo }) {
   useEffect(() => {
     api.get('/time-entries/pay-stubs')
       .then(r => setStubs(r.data))
-      .catch(() => {})
+      .catch(silentError('paystubview'))
       .finally(() => setLoading(false));
   }, []);
 

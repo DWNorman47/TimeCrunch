@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import { langToLocale } from '../utils';
 
+import { silentError } from '../errorReporter';
 function formatTime(str, locale = 'en-US') {
   return new Date(str).toLocaleString(locale, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
@@ -24,7 +25,7 @@ function WorkerChat({ onRead }) {
     api.get('/chat').then(r => {
       setMessages(r.data);
       onRead?.();
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(silentError('companychat')).finally(() => setLoading(false));
 
   useEffect(() => {
     load();
@@ -94,7 +95,7 @@ function AdminChat({ workers }) {
         }
       });
       setUnreadByWorker(unread);
-    }).catch(() => {});
+    }).catch(silentError('companychat'));
 
   useEffect(() => {
     loadThreads();
@@ -112,7 +113,7 @@ function AdminChat({ workers }) {
       // Mark as read
       localStorage.setItem(`chatLastRead_admin_${selectedId}`, new Date().toISOString());
       setUnreadByWorker(prev => { const n = { ...prev }; delete n[selectedId]; return n; });
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(silentError('companychat')).finally(() => setLoading(false));
     fetch();
     pollRef.current = setInterval(fetch, 30000);
     return () => clearInterval(pollRef.current);

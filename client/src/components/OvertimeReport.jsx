@@ -3,6 +3,7 @@ import api from '../api';
 import { fmtHours, formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
 
+import { silentError } from '../errorReporter';
 function monthStart() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
@@ -58,7 +59,7 @@ export default function OvertimeReport({ currency = 'USD' }) {
       const a = document.createElement('a');
       a.href = url; a.download = `payroll-${from}-to-${to}.csv`; a.click();
       URL.revokeObjectURL(url);
-    } catch {}
+    } catch (err) { silentError('overtime-csv')(err); }
   };
 
   const Col = ({ k, label }) => (

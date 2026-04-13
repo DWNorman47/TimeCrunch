@@ -6,6 +6,7 @@ import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
 
+import { silentError } from '../errorReporter';
 function today() {
   return new Date().toLocaleDateString('en-CA');
 }
@@ -190,7 +191,7 @@ export default function SubReports({ projects }) {
       const r = await api.get('/sub-reports', { params });
       setReports(r.data.items);
       setTotalPages(r.data.pages);
-    } catch {}
+    } catch (err) { silentError('sub-reports fetch')(err); }
   };
 
   useEffect(() => { loadReports(filters, 1).finally(() => setLoading(false)); }, []);

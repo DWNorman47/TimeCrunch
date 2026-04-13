@@ -4,6 +4,7 @@ import { langToLocale } from '../utils';
 import api from '../api';
 import ModalShell from '../components/ModalShell';
 
+import { silentError } from '../errorReporter';
 function formatDate(str, locale = 'en-US') {
   return new Date(str).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -88,14 +89,14 @@ export default function SuperAdmin() {
     ]).then(([cr, ar]) => {
       setCompanies(cr.data);
       setAffiliates(ar.data);
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(silentError('superadmin')).finally(() => setLoading(false));
   }, []);
 
   const loadAffiliates = () => {
     setAfLoading(true);
     api.get('/superadmin/affiliates')
       .then(r => setAfList(r.data))
-      .catch(() => {})
+      .catch(silentError('superadmin'))
       .finally(() => setAfLoading(false));
   };
 
@@ -137,7 +138,7 @@ export default function SuperAdmin() {
         const af = affiliates.find(a => String(a.id) === String(affiliateId));
         return { ...c, ...r.data, affiliate_name: af?.name || null };
       }));
-    } catch {}
+    } catch (err) { silentError('superadmin company detail')(err); }
   };
 
   const startRename = (company) => {
@@ -186,7 +187,7 @@ export default function SuperAdmin() {
       try {
         const r = await api.get(`/superadmin/companies/${id}/users`);
         setCompanyUsers(prev => ({ ...prev, [id]: r.data }));
-      } catch {}
+      } catch (err) { silentError('superadmin company users')(err); }
     }
   };
 

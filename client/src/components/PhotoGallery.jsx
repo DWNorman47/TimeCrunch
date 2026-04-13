@@ -6,6 +6,7 @@ import { langToLocale } from '../utils';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
 
+import { silentError } from '../errorReporter';
 function fmtDate(str, locale = 'en-US') {
   return new Date(str).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -109,7 +110,7 @@ export default function PhotoGallery({ projects }) {
       const r = await api.get('/field-reports/photos', { params });
       setMedia(r.data.items);
       setPages(r.data.pages || 1);
-    } catch {}
+    } catch (err) { silentError('photo-gallery fetch')(err); }
   };
 
   useEffect(() => { loadMedia(filters, page).finally(() => setLoading(false)); }, []);

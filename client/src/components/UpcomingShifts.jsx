@@ -5,6 +5,7 @@ import { useT } from '../hooks/useT';
 import { useAuth } from '../contexts/AuthContext';
 import { langToLocale } from '../utils';
 
+import { silentError } from '../errorReporter';
 function fmtTime(t) {
   const [h, m] = t.split(':');
   const hr = parseInt(h);
@@ -30,7 +31,7 @@ export default function UpcomingShifts({ onFillEntry }) {
   useEffect(() => {
     getOrFetch('shifts', () => api.get('/shifts/mine').then(r => r.data))
       .then(data => setShifts(data))
-      .catch(() => {})
+      .catch(silentError('upcomingshifts'))
       .finally(() => setLoading(false));
   }, []);
 

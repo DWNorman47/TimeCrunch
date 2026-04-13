@@ -6,6 +6,7 @@ import { useT } from '../hooks/useT';
 import { SkeletonList } from './Skeleton';
 import ModalShell from './ModalShell';
 
+import { silentError } from '../errorReporter';
 function WorkerDocuments({ workerId }) {
   const t = useT();
   const toast = useToast();
@@ -19,7 +20,7 @@ function WorkerDocuments({ workerId }) {
   useEffect(() => {
     api.get(`/admin/workers/${workerId}/documents`)
       .then(r => setDocs(r.data))
-      .catch(() => {})
+      .catch(silentError('manageworkers'))
       .finally(() => setLoading(false));
   }, [workerId]);
 
@@ -227,7 +228,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     try {
       const r = await api.get('/admin/workers/check-username', { params: { username } });
       setUsernameTaken(r.data.taken);
-    } catch {}
+    } catch (err) { silentError('check-username')(err); }
     finally { setUsernameChecking(false); }
   };
 
@@ -333,7 +334,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
     try {
       const r = await api.get('/admin/workers/check-username', { params: { username, exclude_id: workerId } });
       setEditUsernameTaken(r.data.taken);
-    } catch {}
+    } catch (err) { silentError('check-username-edit')(err); }
     finally { setEditUsernameChecking(false); }
   };
 

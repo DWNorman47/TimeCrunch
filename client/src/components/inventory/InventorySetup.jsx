@@ -4,6 +4,7 @@ import BinLabelModal from './BinLabelModal';
 import { useT } from '../../hooks/useT';
 import { SkeletonList } from '../Skeleton';
 
+import { silentError } from '../../errorReporter';
 function isHttpUrl(url) {
   try { return ['http:', 'https:'].includes(new URL(url).protocol); } catch { return false; }
 }
@@ -557,7 +558,7 @@ export default function InventorySetup({ projects }) {
     }
     api.get(`/inventory/setup/areas?active=all&location_id=${parentSels.location_id}`)
       .then(r => setParentOpts(p => ({ ...p, areas: r.data })))
-      .catch(() => {});
+      .catch(silentError('inventorysetup'));
     setParentSels(s => ({ ...s, area_id: '', rack_id: '', bay_id: '' }));
   }, [parentSels.location_id]);
 
@@ -569,7 +570,7 @@ export default function InventorySetup({ projects }) {
     }
     api.get(`/inventory/setup/racks?active=all&area_id=${parentSels.area_id}`)
       .then(r => setParentOpts(p => ({ ...p, racks: r.data })))
-      .catch(() => {});
+      .catch(silentError('inventorysetup'));
     setParentSels(s => ({ ...s, rack_id: '', bay_id: '' }));
   }, [parentSels.area_id]);
 
@@ -581,7 +582,7 @@ export default function InventorySetup({ projects }) {
     }
     api.get(`/inventory/setup/bays?active=all&rack_id=${parentSels.rack_id}`)
       .then(r => setParentOpts(p => ({ ...p, bays: r.data })))
-      .catch(() => {});
+      .catch(silentError('inventorysetup'));
     setParentSels(s => ({ ...s, bay_id: '' }));
   }, [parentSels.rack_id]);
 

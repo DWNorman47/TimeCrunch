@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
 
+import { silentError } from '../errorReporter';
 export default function NotificationBell() {
   const t = useT();
   const [items, setItems] = useState([]);
@@ -9,7 +10,7 @@ export default function NotificationBell() {
   const ref = useRef(null);
 
   const load = useCallback(() => {
-    api.get('/inbox').then(r => setItems(r.data)).catch(() => {});
+    api.get('/inbox').then(r => setItems(r.data)).catch(silentError('notificationbell'));
   }, []);
 
   useEffect(() => {
@@ -28,12 +29,12 @@ export default function NotificationBell() {
   const unread = items.filter(i => !i.read_at).length;
 
   const markRead = async (id) => {
-    await api.patch(`/inbox/${id}/read`).catch(() => {});
+    await api.patch(`/inbox/${id}/read`).catch(silentError('notificationbell'));
     setItems(prev => prev.map(i => i.id === id ? { ...i, read_at: new Date().toISOString() } : i));
   };
 
   const markAllRead = async () => {
-    await api.patch('/inbox/read-all').catch(() => {});
+    await api.patch('/inbox/read-all').catch(silentError('notificationbell'));
     setItems(prev => prev.map(i => ({ ...i, read_at: i.read_at || new Date().toISOString() })));
   };
 

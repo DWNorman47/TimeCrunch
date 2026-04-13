@@ -6,6 +6,7 @@ import { langToLocale } from '../../utils';
 import { SkeletonList } from '../Skeleton';
 import ModalShell from '../ModalShell';
 
+import { silentError } from '../../errorReporter';
 function formatBin(area_name, rack_name, bay_name, compartment_name) {
   return [area_name, rack_name, bay_name, compartment_name]
     .filter(Boolean).join(' › ') || null;
@@ -258,7 +259,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
   useEffect(() => {
     api.get(`/inventory/items/${item.item_id}/uoms`)
       .then(r => setItemUoms(r.data.filter(u => u.active)))
-      .catch(() => {});
+      .catch(silentError('inventorystock'));
   }, [item.item_id]);
 
   useEffect(() => {

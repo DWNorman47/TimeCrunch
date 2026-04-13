@@ -4,6 +4,7 @@ import UomConversionModal from './UomConversionModal';
 import { useT } from '../../hooks/useT';
 import { SkeletonList } from '../Skeleton';
 import ModalShell from '../ModalShell';
+import { silentError } from '../../errorReporter';
 const TYPE_COLORS = {
   receive:  { color: '#059669', bg: '#d1fae5' },
   issue:    { color: '#d97706', bg: '#fef3c7' },
@@ -53,8 +54,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
   const [warning, setWarning] = useState('');
 
   useEffect(() => {
-    api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(() => {});
-    if (isAdmin) api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(() => {});
+    api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(silentError('inventory-transactions fetch'));
+    if (isAdmin) api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(silentError('inventory-transactions fetch'));
   }, [isAdmin]);
 
   // Load UOMs when item changes
@@ -65,7 +66,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
     if (!form.item_id) return;
     api.get(`/inventory/items/${form.item_id}/uoms`)
       .then(r => setItemUoms(r.data.filter(u => u.active)))
-      .catch(() => {});
+      .catch(silentError('inventory-transactions fetch'));
   }, [form.item_id]);
 
   // Prompt for conversion factor when admin selects a non-base UOM with factor=1
@@ -94,7 +95,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
         const row = (r.data.stock || r.data).find(s => String(s.item_id) === String(form.item_id));
         setLocationStock(row || null);
       })
-      .catch(() => {});
+      .catch(silentError('inventory-transactions fetch'));
   }, [form.item_id, form.from_location_id, form.type]);
 
   // Cascade bin options when destination location changes
@@ -105,7 +106,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
     if (!locId) return;
     api.get(`/inventory/setup/areas?location_id=${locId}&active=true`)
       .then(r => setBinOpts(b => ({ ...b, areas: r.data })))
-      .catch(() => {});
+      .catch(silentError('inventory-transactions fetch'));
   }, [form.to_location_id]);
 
   useEffect(() => {
@@ -114,7 +115,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
     if (!form.area_id) return;
     api.get(`/inventory/setup/racks?area_id=${form.area_id}&active=true`)
       .then(r => setBinOpts(b => ({ ...b, racks: r.data })))
-      .catch(() => {});
+      .catch(silentError('inventory-transactions fetch'));
   }, [form.area_id]);
 
   useEffect(() => {
@@ -123,7 +124,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
     if (!form.rack_id) return;
     api.get(`/inventory/setup/bays?rack_id=${form.rack_id}&active=true`)
       .then(r => setBinOpts(b => ({ ...b, bays: r.data })))
-      .catch(() => {});
+      .catch(silentError('inventory-transactions fetch'));
   }, [form.rack_id]);
 
   useEffect(() => {
@@ -132,7 +133,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
     if (!form.bay_id) return;
     api.get(`/inventory/setup/compartments?bay_id=${form.bay_id}&active=true`)
       .then(r => setBinOpts(b => ({ ...b, compartments: r.data })))
-      .catch(() => {});
+      .catch(silentError('inventory-transactions fetch'));
   }, [form.bay_id]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -447,7 +448,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
   const [suppliers, setSuppliers] = useState([]);
 
   useEffect(() => {
-    if (isAdmin) api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(() => {});
+    if (isAdmin) api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(silentError('inventory-transactions fetch'));
   }, [isAdmin]);
   const [offset, setOffset] = useState(0);
   const LIMIT = 50;

@@ -7,6 +7,7 @@ import { useT } from '../../hooks/useT';
 import { SkeletonList } from '../Skeleton';
 import ModalShell from '../ModalShell';
 
+import { silentError } from '../../errorReporter';
 function useCountTypes(t) {
   return {
     cycle:     { label: t.invCycCycleCount,     color: '#2563eb', bg: '#dbeafe',   desc: t.invCycCycleDesc },
@@ -80,7 +81,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     try {
       const r = await api.get(`/inventory/items/${itemId}/uoms`);
       setItemUomCache(prev => ({ ...prev, [itemId]: r.data.filter(u => u.active) }));
-    } catch {}
+    } catch (err) { silentError('cycle-count-misc')(err); }
   };
 
   const loadAllWorkers = async () => {
@@ -89,7 +90,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       const r = await api.get('/admin/workers');
       setAllWorkers(r.data || []);
       setWorkersLoaded(true);
-    } catch {}
+    } catch (err) { silentError('cycle-count-misc')(err); }
   };
 
   const saveWorker = async (userId, roles) => {

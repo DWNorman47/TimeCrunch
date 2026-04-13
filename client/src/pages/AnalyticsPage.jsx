@@ -8,6 +8,7 @@ import AppSwitcher from '../components/AppSwitcher';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import { SkeletonStatRow, SkeletonList } from '../components/Skeleton';
 
+import { silentError } from '../errorReporter';
 function UpgradePrompt() {
   const t = useT();
   return (
@@ -35,7 +36,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     getOrFetch('settings', () => api.get('/settings').then(r => r.data))
       .then(s => setFeatures(s))
-      .catch(() => {})
+      .catch(silentError('analyticspage'))
       .finally(() => setLoading(false));
   }, []);
 

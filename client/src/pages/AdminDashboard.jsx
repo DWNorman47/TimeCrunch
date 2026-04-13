@@ -12,6 +12,7 @@ import TabBar from '../components/TabBar';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import api from '../api';
 
+import { silentError } from '../errorReporter';
 // Heavy components — lazy-loaded on first render to reduce initial bundle size
 // LiveWorkers pulls in leaflet + react-leaflet (~200 kB), so lazy-load it
 const LiveWorkers = lazy(() => import('../components/LiveWorkers'));
@@ -79,13 +80,13 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    api.get('/stripe/status').then(r => setBilling(r.data)).catch(() => {});
+    api.get('/stripe/status').then(r => setBilling(r.data)).catch(silentError('admindashboard'));
   }, []);
 
   useEffect(() => {
     const fetchPending = () => {
-      api.get('/admin/kpis').then(r => setPendingCount(r.data.pending_approvals ?? 0)).catch(() => {});
-      api.get('/reimbursements/admin?status=pending').then(r => setPendingReimbursements((r.data.items ?? r.data).length)).catch(() => {});
+      api.get('/admin/kpis').then(r => setPendingCount(r.data.pending_approvals ?? 0)).catch(silentError('admindashboard'));
+      api.get('/reimbursements/admin?status=pending').then(r => setPendingReimbursements((r.data.items ?? r.data).length)).catch(silentError('admindashboard'));
     };
     fetchPending();
     const interval = setInterval(fetchPending, 60000);
@@ -103,7 +104,7 @@ export default function AdminDashboard() {
           return !lastRead || new Date(thread.last_at) > new Date(lastRead);
         });
         setChatUnread(hasUnread);
-      }).catch(() => {});
+      }).catch(silentError('admindashboard'));
     };
     check();
     const iv = setInterval(check, 60000);

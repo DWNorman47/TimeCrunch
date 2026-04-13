@@ -5,6 +5,7 @@ import { useT } from '../hooks/useT';
 import { SkeletonList } from './Skeleton';
 import ModalShell from './ModalShell';
 
+import { silentError } from '../errorReporter';
 export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true, showGeofenceBudget = true, defaultPrevailingRate = '', currency = 'USD', settings = null }) {
   const toast = useToast();
   const t = useT();
@@ -58,7 +59,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
 
   useEffect(() => {
     loadArchived();
-    api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(() => {});
+    api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(silentError('manageprojects'));
   }, []);
 
   const handleAdd = async e => {

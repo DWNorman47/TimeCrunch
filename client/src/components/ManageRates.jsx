@@ -3,6 +3,7 @@ import api from '../api';
 import { currencySymbol } from '../utils';
 import { useT } from '../hooks/useT';
 
+import { silentError } from '../errorReporter';
 const TIMEZONES = [
   { value: 'America/New_York',    label: 'Eastern Time (ET)' },
   { value: 'America/Chicago',     label: 'Central Time (CT)' },
@@ -111,7 +112,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
   const [prevailingEnabled, setPrevailingEnabled] = useState(() => (settings?.prevailing_wage_rate ?? 0) > 0);
   const [checklistTemplates, setChecklistTemplates] = useState([]);
   useEffect(() => {
-    api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(() => {});
+    api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(silentError('managerates'));
   }, []);
   const DEFAULT_COLLAPSED = { wages: true, overtime: true, notifications: true, reports: true, access: true, modules: true, features: true, storage: true };
   const [collapsed, setCollapsed] = useState(() => {

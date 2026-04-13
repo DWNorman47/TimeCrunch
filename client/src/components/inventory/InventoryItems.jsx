@@ -3,6 +3,7 @@ import api from '../../api';
 import ItemLabelModal from './ItemLabelModal';
 import { useT } from '../../hooks/useT';
 
+import { silentError } from '../../errorReporter';
 const DEFAULT_UNITS = ['each', 'box', 'bag', 'bundle', 'pallet', 'lb', 'kg', 'ft', 'm', 'sq ft', 'gal', 'L', 'roll', 'sheet', 'piece', 'other'];
 
 function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUnits = DEFAULT_UNITS }) {
@@ -169,7 +170,7 @@ function ItemUOMPanel({ item }) {
   const load = () => {
     api.get(`/inventory/items/${item.id}/uoms`)
       .then(r => setUOMs(r.data))
-      .catch(() => {})
+      .catch(silentError('inventoryitems'))
       .finally(() => setLoading(false));
   };
   React.useEffect(() => { load(); }, [item.id]);

@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { langToLocale } from '../utils';
 import { SkeletonStatRow, SkeletonList } from './Skeleton';
 
+import { silentError } from '../errorReporter';
 const BLUE = '#1a56db';
 const GREEN = '#059669';
 const ORANGE = '#d97706';
@@ -92,7 +93,7 @@ export default function AnalyticsDashboard() {
     if (to) params.set('to', to);
     api.get(`/admin/analytics?${params}`)
       .then(r => setData(r.data))
-      .catch(() => {})
+      .catch(silentError('analyticsdashboard'))
       .finally(() => setLoading(false));
   }, [from, to]);
 

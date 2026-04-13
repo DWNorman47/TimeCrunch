@@ -5,7 +5,7 @@ import App from './App';
 import './index.css';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import ErrorBoundary from './components/ErrorBoundary';
-import { installGlobalErrorHandlers } from './errorReporter';
+import { installGlobalErrorHandlers, silentError } from './errorReporter';
 
 // Absent DSN = Sentry is a no-op.
 if (import.meta.env.VITE_SENTRY_DSN) {
@@ -34,6 +34,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/sw.js').catch(silentError('main'));
   });
 }

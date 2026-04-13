@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
 import { langToLocale } from '../utils';
 
+import { silentError } from '../errorReporter';
 function fmt(dateStr, locale = 'en-US') {
   return new Date(dateStr.substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -36,7 +37,7 @@ export default function ManagePayPeriods() {
   useEffect(() => {
     api.get('/admin/pay-periods')
       .then(r => setPeriods(r.data))
-      .catch(() => {})
+      .catch(silentError('managepayperiods'))
       .finally(() => setLoading(false));
   }, []);
 

@@ -10,6 +10,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+import { silentError } from '../errorReporter';
 // Use SVG divIcons — avoids all CDN/bundler PNG loading issues
 function makePinIcon(color) {
   return L.divIcon({
@@ -126,14 +127,14 @@ export default function ApprovalQueue({ onCountChange }) {
     if (dateTo) params.to = dateTo;
     api.get('/admin/entries/pending', { params })
       .then(r => { setEntries(prev => [...prev, ...r.data.entries]); setHasMore(r.data.has_more); })
-      .catch(() => {})
+      .catch(silentError('approvalqueue'))
       .finally(() => setLoadingMore(false));
   };
 
   const fetchRecentApproved = () => {
     api.get('/admin/entries/recently-approved')
       .then(r => setRecentApproved(r.data))
-      .catch(() => {});
+      .catch(silentError('approvalqueue'));
   };
 
   useEffect(() => {

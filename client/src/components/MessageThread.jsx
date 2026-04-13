@@ -4,6 +4,7 @@ import { useT } from '../hooks/useT';
 import { useAuth } from '../contexts/AuthContext';
 import { langToLocale } from '../utils';
 
+import { silentError } from '../errorReporter';
 export default function MessageThread({ entryId, currentUserId, onUnreadChange }) {
   const t = useT();
   const { user } = useAuth();
@@ -17,7 +18,7 @@ export default function MessageThread({ entryId, currentUserId, onUnreadChange }
   useEffect(() => {
     api.get(`/time-entries/${entryId}/messages`)
       .then(r => { setMessages(r.data); if (onUnreadChange) onUnreadChange(); })
-      .catch(() => {})
+      .catch(silentError('messagethread'))
       .finally(() => setLoading(false));
   }, [entryId]);
 

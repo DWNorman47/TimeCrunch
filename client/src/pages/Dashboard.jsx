@@ -15,6 +15,7 @@ import { useOffline } from '../contexts/OfflineContext';
 import OfflineBanner from '../components/OfflineBanner';
 import SignatureModal from '../components/SignatureModal';
 
+import { silentError } from '../errorReporter';
 // Secondary tabs — lazy-loaded on first visit
 const TimesheetView    = lazy(() => import('../components/TimesheetView'));
 const WorkerSummary    = lazy(() => import('../components/WorkerSummary'));
@@ -133,7 +134,7 @@ export default function Dashboard() {
           m => m.sender_id !== user?.id && (!lastRead || new Date(m.created_at) > new Date(lastRead))
         );
         setChatUnread(hasUnread);
-      }).catch(() => {});
+      }).catch(silentError('dashboard'));
     };
     check();
     const iv = setInterval(check, 60000);
@@ -390,7 +391,7 @@ ${signatureDataUrl ? `
     try {
       await api.post('/auth/update-language', { language: lang });
       updateUser({ language: lang });
-    } catch {}
+    } catch (err) { silentError('update-language')(err); }
   };
 
   return (

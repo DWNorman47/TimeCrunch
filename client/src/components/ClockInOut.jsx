@@ -3,6 +3,7 @@ import api from '../api';
 import { useOffline } from '../contexts/OfflineContext';
 import { useFormPersist } from '../hooks/useFormPersist';
 
+import { silentError } from '../errorReporter';
 function getLocation() {
   return new Promise(resolve => {
     if (!navigator.geolocation) return resolve({ lat: null, lng: null });
@@ -67,7 +68,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     if (!onSync) return;
     return onSync(count => {
       if (count > 0) {
-        api.get('/clock/status').then(r => setStatus(r.data || false)).catch(() => {});
+        api.get('/clock/status').then(r => setStatus(r.data || false)).catch(silentError('clockinout'));
       }
     });
   }, [onSync]);
@@ -92,7 +93,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     if (!status || !status.clock_in_time || !geolocationEnabled || !navigator.geolocation) return;
 
     const pushLocation = (pos) => {
-      api.post('/clock/location', { lat: pos.coords.latitude, lng: pos.coords.longitude }).catch(() => {});
+      api.post('/clock/location', { lat: pos.coords.latitude, lng: pos.coords.longitude }).catch(silentError('clockinout'));
     };
 
     // watchPosition runs continuously while screen is on; fires on movement too

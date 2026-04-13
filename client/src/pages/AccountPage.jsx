@@ -10,6 +10,7 @@ import { getT } from '../i18n';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
 
+import { silentError } from '../errorReporter';
 export default function AccountPage() {
   const { user, logout, updateUser } = useAuth();
   const t = getT(user?.language);
@@ -26,7 +27,7 @@ export default function AccountPage() {
     ]).then(([s, ci]) => {
       setSettings(s);
       setCompanyInfo(ci);
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(silentError('accountpage')).finally(() => setLoading(false));
   }, []);
 
   const handleLanguageChange = async lang => {

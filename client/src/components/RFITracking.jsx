@@ -6,6 +6,7 @@ import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
 
+import { silentError } from '../errorReporter';
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
 const STATUS_STYLES = {
@@ -272,12 +273,12 @@ export default function RFITracking({ projects }) {
       const r = await api.get('/rfis', { params });
       setRfis(r.data.items);
       setTotalPages(r.data.pages);
-    } catch {}
+    } catch (err) { silentError('rfi fetch')(err); }
   };
 
   useEffect(() => {
     loadRFIs(filters, 1).finally(() => setLoading(false));
-    api.get('/company-info').then(r => setCompanyName(r.data.name || '')).catch(() => {});
+    api.get('/company-info').then(r => setCompanyName(r.data.name || '')).catch(silentError('rfitracking'));
   }, []);
   useEffect(() => { if (!loading) loadRFIs(filters, 1); }, [filters]);
   useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadRFIs(filters, page); }); }, [onSync]);

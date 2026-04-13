@@ -4,6 +4,7 @@ import { useT } from '../hooks/useT';
 import { useAuth } from '../contexts/AuthContext';
 import { langToLocale } from '../utils';
 
+import { silentError } from '../errorReporter';
 function fmtDate(str, locale = 'en-US') {
   const d = new Date(String(str).substring(0, 10) + 'T00:00:00');
   return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -60,8 +61,8 @@ export default function ReimbursementsView() {
   };
 
   useEffect(() => { load(); }, []);
-  useEffect(() => { api.get('/projects').then(r => setProjects(r.data)).catch(() => {}); }, []);
-  useEffect(() => { api.get('/reimbursements/categories').then(r => setCategories(r.data)).catch(() => {}); }, []);
+  useEffect(() => { api.get('/projects').then(r => setProjects(r.data)).catch(silentError('reimbursementsview')); }, []);
+  useEffect(() => { api.get('/reimbursements/categories').then(r => setCategories(r.data)).catch(silentError('reimbursementsview')); }, []);
 
   const handleFileChange = e => {
     const file = e.target.files[0];

@@ -4,6 +4,7 @@ import { useT } from '../hooks/useT';
 import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
 
+import { silentError } from '../errorReporter';
 const VENDOR_TYPES = ['contractor', 'subcontractor'];
 const EMPLOYEE_TYPES = ['employee', 'owner'];
 const IMPORT_PAGE_SIZE = 15;
@@ -90,7 +91,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   }, [importSearch]);
 
   useEffect(() => {
-    api.get('/qbo/status').then(r => setStatus(r.data)).catch(() => {});
+    api.get('/qbo/status').then(r => setStatus(r.data)).catch(silentError('quickbooks'));
   }, []);
 
   useEffect(() => {
@@ -102,7 +103,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
         setQboClasses(cls.data);
         setSyncErrors(errs.data);
       })
-      .catch(() => {})
+      .catch(silentError('quickbooks'))
       .finally(() => setLoadingAccounts(false));
   }, [status?.connected]);
 

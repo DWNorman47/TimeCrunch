@@ -3,6 +3,7 @@ import api from '../api';
 import { useT } from '../hooks/useT';
 import { SkeletonList } from './Skeleton';
 
+import { silentError } from '../errorReporter';
 function daysLeft(dateStr) {
   if (!dateStr) return 0;
   return Math.max(0, Math.ceil((new Date(dateStr) - new Date()) / 86400000));
@@ -75,7 +76,7 @@ export default function BillingPanel() {
   useEffect(() => {
     Promise.all([api.get('/stripe/status'), api.get('/stripe/plans')])
       .then(([s, p]) => { setStatus(s.data); setPlans(p.data); })
-      .catch(() => {})
+      .catch(silentError('billingpanel'))
       .finally(() => setLoading(false));
   }, []);
 

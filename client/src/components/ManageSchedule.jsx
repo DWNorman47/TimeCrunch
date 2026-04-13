@@ -10,6 +10,7 @@ import {
   useSensor, useSensors, useDroppable, useDraggable,
 } from '@dnd-kit/core';
 
+import { silentError } from '../errorReporter';
 function startOfWeek(date) {
   const d = new Date(date);
   d.setDate(d.getDate() - d.getDay());
@@ -265,12 +266,12 @@ export default function ManageSchedule({ workers, projects }) {
     setLoading(true);
     api.get('/shifts/admin', { params: { from, to } })
       .then(r => setShifts(r.data))
-      .catch(() => {})
+      .catch(silentError('manageschedule'))
       .finally(() => setLoading(false));
   }, [from, to]);
 
   useEffect(() => {
-    api.get('/availability/admin').then(r => setAvailability(r.data)).catch(() => {});
+    api.get('/availability/admin').then(r => setAvailability(r.data)).catch(silentError('manageschedule'));
   }, []);
 
   useEffect(() => {
