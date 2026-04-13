@@ -54,11 +54,12 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
         break_minutes: parseInt(addForm.break_minutes) || 0,
       });
       setAddSuccess(true);
+      setTimeout(() => setAddSuccess(false), 3000);
       setShowAddEntry(false);
       setAddForm({ work_date: defaultDates().to, start_time: '08:00', end_time: '17:00', project_id: '', notes: '', break_minutes: '0' });
       if (billData) fetchBill();
     } catch (err) {
-      setAddError(err.response?.data?.error || 'Failed to add entry');
+      setAddError(err.response?.data?.error || t.failedAddEntry);
     } finally {
       setAddSaving(false);
     }
@@ -135,45 +136,45 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
           <div style={styles.sectionHeader}>
             <h4 style={styles.billHeading}>{t.generateBill}</h4>
             <button style={styles.addEntryBtn} onClick={() => { setShowAddEntry(v => !v); setAddError(''); setAddSuccess(false); }}>
-              {showAddEntry ? '✕ Cancel' : '+ Add Entry'}
+              {showAddEntry ? `✕ ${t.cancel}` : `+ ${t.addEntry}`}
             </button>
           </div>
-          {addSuccess && <div style={styles.addSuccess}>Entry added successfully.</div>}
+          {addSuccess && <div style={styles.addSuccess}>{t.entryAddedSuccess}</div>}
           {showAddEntry && (
             <form onSubmit={handleAddEntry} style={styles.addForm}>
               <div style={styles.addRow}>
                 <div style={styles.addField}>
-                  <label style={styles.label}>Date</label>
-                  <input style={styles.input} type="date" value={addForm.work_date} onChange={e => setAddForm(f => ({ ...f, work_date: e.target.value }))} required />
+                  <label style={styles.label}>{t.date}</label>
+                  <input style={styles.input} type="date" value={addForm.work_date} onChange={e => setAddForm(f => ({ ...f, work_date: e.target.value }))} required disabled={addSaving} />
                 </div>
                 <div style={styles.addField}>
-                  <label style={styles.label}>Start</label>
-                  <input style={styles.input} type="time" value={addForm.start_time} onChange={e => setAddForm(f => ({ ...f, start_time: e.target.value }))} required />
+                  <label style={styles.label}>{t.startTime}</label>
+                  <input style={styles.input} type="time" value={addForm.start_time} onChange={e => setAddForm(f => ({ ...f, start_time: e.target.value }))} required disabled={addSaving} />
                 </div>
                 <div style={styles.addField}>
-                  <label style={styles.label}>End</label>
-                  <input style={styles.input} type="time" value={addForm.end_time} onChange={e => setAddForm(f => ({ ...f, end_time: e.target.value }))} required />
+                  <label style={styles.label}>{t.endTime}</label>
+                  <input style={styles.input} type="time" value={addForm.end_time} onChange={e => setAddForm(f => ({ ...f, end_time: e.target.value }))} required disabled={addSaving} />
                 </div>
                 <div style={styles.addField}>
-                  <label style={styles.label}>Break (min)</label>
-                  <input style={{ ...styles.input, width: 70 }} type="number" min="0" value={addForm.break_minutes} onChange={e => setAddForm(f => ({ ...f, break_minutes: e.target.value }))} />
+                  <label style={styles.label}>{t.breakMin}</label>
+                  <input style={{ ...styles.input, width: 70 }} type="number" min="0" value={addForm.break_minutes} onChange={e => setAddForm(f => ({ ...f, break_minutes: e.target.value }))} disabled={addSaving} />
                 </div>
               </div>
               {projectsEnabled && projects.length > 0 && (
                 <div style={styles.addField}>
-                  <label style={styles.label}>Project</label>
-                  <select style={styles.input} value={addForm.project_id} onChange={e => setAddForm(f => ({ ...f, project_id: e.target.value }))}>
-                    <option value="">No project</option>
+                  <label style={styles.label}>{t.project}</label>
+                  <select style={styles.input} value={addForm.project_id} onChange={e => setAddForm(f => ({ ...f, project_id: e.target.value }))} disabled={addSaving}>
+                    <option value="">{t.noProject}</option>
                     {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
               )}
               <div style={styles.addField}>
-                <label style={styles.label}>Notes</label>
-                <input style={{ ...styles.input, width: '100%' }} type="text" maxLength={500} value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
+                <label style={styles.label}>{t.notes}</label>
+                <input style={{ ...styles.input, width: '100%' }} type="text" maxLength={500} value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} placeholder={t.optional} disabled={addSaving} />
               </div>
               {addError && <div style={styles.addError}>{addError}</div>}
-              <button style={{ ...styles.fetchBtn, ...(addSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={addSaving}>{addSaving ? 'Saving…' : 'Add Entry'}</button>
+              <button style={{ ...styles.fetchBtn, ...(addSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={addSaving}>{addSaving ? t.saving : t.addEntry}</button>
             </form>
           )}
           <div style={styles.dateRow}>

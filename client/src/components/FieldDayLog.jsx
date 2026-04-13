@@ -88,9 +88,9 @@ function Lightbox({ photos, startIndex, onClose }) {
       )}
       {item.caption && <div style={s.lbCaption}>{item.caption}</div>}
       <div style={s.lbNav} onClick={e => e.stopPropagation()}>
-        <button style={{ ...s.lbBtn, ...(idx === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Previous photo" onClick={() => setIdx(i => i - 1)} disabled={idx === 0}>‹</button>
+        <button style={{ ...s.lbBtn, ...(idx === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.prevPhoto} onClick={() => setIdx(i => i - 1)} disabled={idx === 0}>‹</button>
         <span style={s.lbCount}>{idx + 1} / {photos.length}</span>
-        <button style={{ ...s.lbBtn, ...(idx === photos.length - 1 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label="Next photo" onClick={() => setIdx(i => i + 1)} disabled={idx === photos.length - 1}>›</button>
+        <button style={{ ...s.lbBtn, ...(idx === photos.length - 1 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.nextPhoto} onClick={() => setIdx(i => i + 1)} disabled={idx === photos.length - 1}>›</button>
       </div>
     </div>
   );
@@ -285,9 +285,9 @@ export default function FieldDayLog({ projects, isAdmin }) {
         </select>
 
         <div style={s.dateNav}>
-          <button style={s.dateArrow} aria-label="Previous day" onClick={prevDay}>‹</button>
+          <button style={s.dateArrow} aria-label={t.prevDay} onClick={prevDay}>‹</button>
           <span style={s.dateLabel}>{dayLabel(date, t)}</span>
-          <button style={{ ...s.dateArrow, opacity: isToday ? 0.3 : 1, ...(isToday ? { cursor: 'not-allowed' } : {}) }} aria-label="Next day" onClick={nextDay} disabled={isToday}>›</button>
+          <button style={{ ...s.dateArrow, opacity: isToday ? 0.3 : 1, ...(isToday ? { cursor: 'not-allowed' } : {}) }} aria-label={t.nextDay} onClick={nextDay} disabled={isToday}>›</button>
         </div>
       </div>
 
@@ -351,7 +351,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
           {captureVideo ? (
             <div style={s.videoPreviewWrap}>
               <video src={captureVideo.previewUrl} style={s.videoPreview} controls playsInline />
-              <button style={s.removeBtnSm} onClick={() => { URL.revokeObjectURL(captureVideo.previewUrl); setCaptureVideo(null); }}>✕ Remove</button>
+              <button style={s.removeBtnSm} onClick={() => { URL.revokeObjectURL(captureVideo.previewUrl); setCaptureVideo(null); }}>{t.removeVideo}</button>
             </div>
           ) : (
             <label style={s.videoPickerLabel}>

@@ -494,7 +494,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
         {error && <p style={styles.error}>{error}</p>}
         {pendingChecklist && (
           <div style={styles.checklistGate}>
-            <div style={styles.checklistGateTitle}>☑ Required: {pendingChecklist.name}</div>
+            <div style={styles.checklistGateTitle}>{t.checklistRequiredTitle} {pendingChecklist.name}</div>
             <div style={styles.checklistGateSub}>{t.checklistCompleteToClock}</div>
             {(pendingChecklist.items || []).map((item, i) => (
               <div key={i} style={styles.checklistGateItem}>

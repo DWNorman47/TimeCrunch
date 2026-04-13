@@ -226,7 +226,7 @@ export default function ReimbursementsView() {
                         <button style={s.deleteCancelBtn} onClick={() => setPendingDeleteId(null)}>{t.cancel}</button>
                       </>
                     ) : (
-                      <button style={s.deleteBtn} aria-label="Delete reimbursement" onClick={() => setPendingDeleteId(item.id)}>✕</button>
+                      <button style={s.deleteBtn} aria-label={t.deleteReimbursement} onClick={() => setPendingDeleteId(item.id)}>✕</button>
                     )
                   )}
                 </div>
