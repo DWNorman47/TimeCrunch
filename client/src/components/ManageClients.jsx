@@ -277,7 +277,7 @@ function ClientCard({ client, onEdit, onDeleted }) {
 
   return (
     <div style={s.card}>
-      <div style={s.cardHeader} onClick={handleExpand}>
+      <div style={s.cardHeader} onClick={handleExpand} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleExpand()}>
         <div style={s.cardLeft}>
           <div style={s.clientName}>
             {client.name}

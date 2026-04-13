@@ -241,16 +241,16 @@ function AccountTab() {
         {showPasswordForm && (
           <form onSubmit={changePassword} style={styles.accordionBody}>
             <div style={styles.fieldGroup}>
-              <label style={styles.label}>{t.currentPassword}</label>
-              <PasswordInput style={styles.input} value={form.current_password} onChange={e => set('current_password', e.target.value)} autoFocus />
+              <label htmlFor="current-password" style={styles.label}>{t.currentPassword}</label>
+              <PasswordInput id="current-password" style={styles.input} value={form.current_password} onChange={e => set('current_password', e.target.value)} autoFocus />
             </div>
             <div style={styles.fieldGroup}>
-              <label style={styles.label}>{t.newPassword}</label>
-              <PasswordInput style={styles.input} value={form.new_password} onChange={e => set('new_password', e.target.value)} />
+              <label htmlFor="new-password" style={styles.label}>{t.newPassword}</label>
+              <PasswordInput id="new-password" style={styles.input} value={form.new_password} onChange={e => set('new_password', e.target.value)} />
             </div>
             <div style={styles.fieldGroup}>
-              <label style={styles.label}>{t.confirmNewPassword}</label>
-              <PasswordInput style={styles.input} value={form.confirm} onChange={e => set('confirm', e.target.value)} />
+              <label htmlFor="confirm-password" style={styles.label}>{t.confirmNewPassword}</label>
+              <PasswordInput id="confirm-password" style={styles.input} value={form.confirm} onChange={e => set('confirm', e.target.value)} />
             </div>
             {msg && (
               <p style={{ ...styles.feedback, color: msg.includes('success') || msg.includes('exitosamente') ? '#059669' : '#dc2626' }}>{msg}</p>

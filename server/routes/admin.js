@@ -2030,12 +2030,13 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
   }
 });
 
-// GET /admin/entries/pending — pending time entries for this company (max 200; has_more signals overflow)
+// GET /admin/entries/pending — pending time entries for this company (max 200 per page; has_more signals more available)
 router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const LIMIT = 200;
   const accessIds = req.user.worker_access_ids;
-  const { from, to } = req.query;
+  const { from, to, offset: offsetParam } = req.query;
+  const offset = parseInt(offsetParam) || 0;
   try {
     const conditions = [`te.company_id = $1`, `te.status = 'pending'`];
     const params = [companyId];
@@ -2044,6 +2045,8 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
     if (to) { params.push(to); conditions.push(`te.work_date <= $${params.length}`); }
     params.push(LIMIT + 1);
     const limitIdx = params.length;
+    params.push(offset);
+    const offsetIdx = params.length;
     const result = await pool.query(
       `SELECT te.*, COALESCE(u.invoice_name, u.full_name) as worker_name, u.email as worker_email, p.name as project_name,
               te.clock_source, te.clocked_in_by, admin_u.full_name AS clocked_in_by_name
@@ -2053,7 +2056,7 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
        LEFT JOIN users admin_u ON te.clocked_in_by = admin_u.id
        WHERE ${conditions.join(' AND ')}
        ORDER BY te.worker_signed_at DESC NULLS LAST, te.work_date DESC, te.start_time DESC
-       LIMIT $${limitIdx}`,
+       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
       params
     );
     const has_more = result.rows.length > LIMIT;

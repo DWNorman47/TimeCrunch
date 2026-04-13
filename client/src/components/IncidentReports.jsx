@@ -204,7 +204,7 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
 
   return (
     <div style={styles.card}>
-      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={styles.cardLeft}>
           {isAdmin && <div style={styles.workerName}>{incident.reporter_name}</div>}
           <div style={styles.cardTitle}>{typeLabel}{incident.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>

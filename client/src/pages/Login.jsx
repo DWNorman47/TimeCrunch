@@ -123,8 +123,9 @@ export default function Login() {
             {t.loginTempPasswordNote}
           </p>
           <form onSubmit={handleSetup} style={styles.form}>
-            <label style={styles.label}>{t.loginNewPasswordLabel}</label>
+            <label htmlFor="setup-password" style={styles.label}>{t.loginNewPasswordLabel}</label>
             <PasswordInput
+              id="setup-password"
               style={styles.input}
               placeholder={t.loginAtLeastChars}
               value={setupForm.password}
@@ -133,8 +134,9 @@ export default function Login() {
               minLength={6}
               autoFocus
             />
-            <label style={styles.label}>{t.loginConfirmPasswordLabel}</label>
+            <label htmlFor="setup-confirm" style={styles.label}>{t.loginConfirmPasswordLabel}</label>
             <PasswordInput
+              id="setup-confirm"
               style={styles.input}
               placeholder={t.loginRepeatPasswordPh}
               value={setupForm.confirm}
@@ -158,8 +160,9 @@ export default function Login() {
           <h1 style={styles.title}>OpsFloa</h1>
           <p style={styles.subtitle}>{t.loginMfaTitle}</p>
           <form onSubmit={handleMfaSubmit} style={styles.form}>
-            <label style={styles.label}>{t.loginMfaCodeLabel}</label>
+            <label htmlFor="mfa-code" style={styles.label}>{t.loginMfaCodeLabel}</label>
             <input
+              id="mfa-code"
               ref={mfaInputRef}
               style={{ ...styles.input, textAlign: 'center', fontSize: 22, letterSpacing: 8, fontWeight: 700 }}
               type="text"
@@ -192,10 +195,11 @@ export default function Login() {
           <p style={styles.sessionMsg}>{t.loginSessionExpired}</p>
         )}
         <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>{t.loginCompanyLabel}</label>
+          <label htmlFor="company" style={styles.label}>{t.loginCompanyLabel}</label>
           {savedCompanies.length > 0 ? (
             <>
               <select
+                id="company"
                 style={styles.input}
                 value={selected}
                 onChange={e => setSelected(e.target.value)}
@@ -218,6 +222,7 @@ export default function Login() {
             </>
           ) : (
             <input
+              id="company"
               style={styles.input}
               type="text"
               value={otherText}
@@ -227,8 +232,9 @@ export default function Login() {
               required
             />
           )}
-          <label style={styles.label}>{t.username}</label>
+          <label htmlFor="username" style={styles.label}>{t.username}</label>
           <input
+            id="username"
             style={styles.input}
             type="text"
             value={form.username}
@@ -236,8 +242,9 @@ export default function Login() {
             onBlur={e => setForm(f => ({ ...f, username: e.target.value.trim() }))}
             required
           />
-          <label style={styles.label}>{t.loginPasswordLabel}</label>
+          <label htmlFor="login-password" style={styles.label}>{t.loginPasswordLabel}</label>
           <PasswordInput
+            id="login-password"
             style={styles.input}
             value={form.password}
             onChange={e => setForm(f => ({ ...f, password: e.target.value }))}

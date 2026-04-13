@@ -58,7 +58,7 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
 
   return (
     <div style={s.card}>
-      <div style={s.row} onClick={() => setExpanded(e => !e)}>
+      <div style={s.row} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={s.workerName}>{item.full_name} <span style={s.username}>@{item.username}</span></div>
         <div style={s.rowMid}>
           <span style={s.amount}>{fmtMoney(item.amount)}</span>

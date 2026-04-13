@@ -206,7 +206,7 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
 
   return (
     <div style={{ ...styles.item, opacity: item.status === 'verified' ? 0.65 : 1 }}>
-      <div style={styles.itemRow} onClick={handleExpand}>
+      <div style={styles.itemRow} onClick={handleExpand} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleExpand()}>
         <span style={styles.priorityDot} title={`Priority: ${item.priority}`}>{priorityDot}</span>
         <div style={styles.itemMain}>
           <span style={{ ...styles.itemTitle, textDecoration: item.status === 'verified' ? 'line-through' : 'none' }}>

@@ -78,6 +78,7 @@ export default function ApprovalQueue({ onCountChange }) {
   const [openMapId, setOpenMapId] = useState(null);
   const [fetchError, setFetchError] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [workerFilter, setWorkerFilter] = useState('');
   // Edit state
   const [editingId, setEditingId] = useState(null);
@@ -116,6 +117,17 @@ export default function ApprovalQueue({ onCountChange }) {
       .then(([r, p]) => { setEntries(r.data.entries); setHasMore(r.data.has_more); setProjects(p); })
       .catch(() => setFetchError(true))
       .finally(() => setLoading(false));
+  };
+
+  const loadMore = () => {
+    setLoadingMore(true);
+    const params = { offset: entries.length };
+    if (dateFrom) params.from = dateFrom;
+    if (dateTo) params.to = dateTo;
+    api.get('/admin/entries/pending', { params })
+      .then(r => { setEntries(prev => [...prev, ...r.data.entries]); setHasMore(r.data.has_more); })
+      .catch(() => {})
+      .finally(() => setLoadingMore(false));
   };
 
   const fetchRecentApproved = () => {
@@ -384,9 +396,15 @@ export default function ApprovalQueue({ onCountChange }) {
       ) : (
         <div style={styles.list}>
           {hasMore && (
-            <p style={{ color: '#b45309', fontSize: 13, marginBottom: 8 }}>
-              {t.showingOldest200}
-            </p>
+            <div style={{ textAlign: 'center', padding: '12px 0 4px' }}>
+              <button
+                style={{ fontSize: 13, fontWeight: 600, color: '#1a56db', background: 'none', border: '1px solid #bfdbfe', borderRadius: 7, padding: '7px 20px', cursor: loadingMore ? 'not-allowed' : 'pointer', opacity: loadingMore ? 0.6 : 1 }}
+                onClick={loadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? '…' : t.loadMore || 'Load More'}
+              </button>
+            </div>
           )}
           {visibleEntries.length === 0 && workerFilter && (
             <p style={styles.empty}>{t.aqNoPendingFor} {workerFilter}.</p>

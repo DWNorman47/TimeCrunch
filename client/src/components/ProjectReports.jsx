@@ -110,7 +110,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
 
   return (
     <div style={styles.card}>
-      <div style={styles.cardTop} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.cardTop} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={styles.cardHeader}>
           <span style={styles.name}>{p.name}</span>
           <div style={styles.headerRight}>

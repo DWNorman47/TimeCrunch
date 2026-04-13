@@ -306,7 +306,7 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
 
   return (
     <div style={styles.card}>
-      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={styles.cardLeft}>
           <div style={styles.cardTitle}>{sub.template_name}</div>
           <div style={styles.cardMeta}>

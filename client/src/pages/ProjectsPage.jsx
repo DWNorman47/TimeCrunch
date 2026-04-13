@@ -43,7 +43,7 @@ function ProjectCard({ project, metrics, settings, onClick }) {
   const statusLabel = { planning: 'Planning', in_progress: 'In Progress', on_hold: 'On Hold', completed: 'Completed' }[project.status];
 
   return (
-    <div style={{ ...styles.card, opacity: project.active === false ? 0.6 : 1 }} onClick={onClick}>
+    <div style={{ ...styles.card, opacity: project.active === false ? 0.6 : 1 }} onClick={onClick} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onClick()}>
       {project.active === false && (
         <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Archived</div>
       )}
@@ -467,7 +467,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
               {parseInt(m.worker_count || 0)} workers · {parseInt(m.total_entries || 0)} entries
             </p>
           </div>
-          <button style={styles.closeBtn} onClick={onClose}>✕</button>
+          <button style={styles.closeBtn} onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         <div style={styles.detailTabs}>

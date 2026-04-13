@@ -203,7 +203,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
 
   return (
     <div style={{ ...styles.card, ...(overMaintenance ? styles.cardOverdue : nearMaintenance ? styles.cardWarning : {}) }}>
-      <div style={styles.cardHeader} onClick={handleExpand}>
+      <div style={styles.cardHeader} onClick={handleExpand} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleExpand()}>
         <div style={styles.cardLeft}>
           <div style={styles.itemName}>{item.name}</div>
           <div style={styles.itemMeta}>

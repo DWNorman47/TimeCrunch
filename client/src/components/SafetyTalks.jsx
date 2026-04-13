@@ -330,7 +330,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
 
   return (
     <div style={styles.card}>
-      <div style={styles.cardHeader} onClick={handleExpand}>
+      <div style={styles.cardHeader} onClick={handleExpand} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleExpand()}>
         <div style={styles.cardLeft}>
           <div style={styles.talkIcon}>🦺</div>
           <div>

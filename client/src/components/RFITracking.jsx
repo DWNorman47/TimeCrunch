@@ -171,7 +171,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
 
   return (
     <div style={{ ...styles.card, ...(isOverdue ? styles.cardOverdue : {}) }}>
-      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={styles.rfiNumber}>#{rfi.rfi_number}</div>
         <div style={styles.cardMiddle}>
           <div style={styles.subject}>

@@ -399,7 +399,7 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
 
   return (
     <div style={{ ...styles.card, ...(ins.status === 'fail' ? styles.cardFail : {}) }}>
-      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={styles.cardMiddle}>
           <div style={styles.cardName}>
             {ins.name}

@@ -426,7 +426,7 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
 
   return (
     <div style={styles.reportRow}>
-      <div style={styles.rowLeft} onClick={() => !report.pending && onEdit(report)}>
+      <div style={styles.rowLeft} onClick={() => !report.pending && onEdit(report)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && !report.pending && onEdit(report)}>
         <div style={styles.rowDate}>{fmtDate(report.report_date, locale)}{report.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
         <div style={styles.rowProject}>{report.project_name || t.noProjectOpt}</div>
         {weather && <div style={styles.rowMeta}>{weather}{report.weather_temp != null ? ` · ${report.weather_temp}°F` : ''}</div>}

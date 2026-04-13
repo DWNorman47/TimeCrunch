@@ -118,7 +118,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
 
   return (
     <div style={styles.card}>
-      <div style={styles.summary} onClick={() => setExpanded(e => !e)}>
+      <div style={styles.summary} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div>
           <span style={styles.name}>{worker.full_name}</span>
           <span style={styles.username}>@{worker.username}</span>
