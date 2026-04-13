@@ -1515,7 +1515,8 @@ const translations = {
     reimbursementCategoriesSection: 'Reimbursement Categories',
     itemUnitsSection: 'Item Units',
     mileageRateSection: 'Per-mile reimbursement rate (USD)',
-    mileageRateHint: 'per mile · IRS standard rate for 2025 is $0.670',
+    mileageRateSub: 'IRS standard rate for 2025 is $0.670',
+    mileageRateHint: 'per mile',
     saveRate: 'Save Rate',
 
     // ── Reimbursements (worker) ───────────────────────────────────────────────
@@ -3904,7 +3905,8 @@ const translations = {
     reimbursementCategoriesSection: 'Categorías de Reembolso',
     itemUnitsSection: 'Unidades de Artículo',
     mileageRateSection: 'Tarifa de reembolso por milla (USD)',
-    mileageRateHint: 'por milla · Tarifa estándar IRS para 2025 es $0.670',
+    mileageRateSub: 'La tarifa estándar del IRS para 2025 es $0.670',
+    mileageRateHint: 'por milla',
     saveRate: 'Guardar Tarifa',
 
     // ── Reimbursements (worker) ───────────────────────────────────────────────

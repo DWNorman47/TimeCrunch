@@ -52,7 +52,10 @@ export default function MileageRateEditor() {
   return (
     <>
       <div style={styles.row}>
-        <label htmlFor="mileage-rate" style={styles.label}>{t.mileageRateSection || 'Mileage reimbursement rate'}</label>
+        <div>
+          <label htmlFor="mileage-rate" style={styles.label}>{t.mileageRateSection || 'Mileage reimbursement rate'}</label>
+          {t.mileageRateSub && <div style={styles.sub}>{t.mileageRateSub}</div>}
+        </div>
         <div style={styles.inputGroup}>
           <span style={styles.prefix}>$</span>
           <input
@@ -65,7 +68,7 @@ export default function MileageRateEditor() {
             value={rate}
             onChange={e => { setRate(e.target.value); setDirty(true); }}
           />
-          <span style={styles.suffix}>{t.mileageRateHint || '/ mile'}</span>
+          <span style={styles.suffix}>{t.mileageRateHint || 'per mile'}</span>
         </div>
       </div>
       {(error || success || dirty) && (
@@ -92,7 +95,8 @@ export default function MileageRateEditor() {
 // so the editor slots in seamlessly under a sectionBody.
 const styles = {
   row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 20px', borderBottom: '1px solid #f9fafb' },
-  label: { fontSize: 13, fontWeight: 500, color: '#374151' },
+  label: { fontSize: 13, fontWeight: 500, color: '#374151', display: 'block' },
+  sub: { fontSize: 12, color: '#6b7280', marginTop: 2 },
   inputGroup: { display: 'flex', alignItems: 'center', gap: 6 },
   input: { width: 90, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, textAlign: 'right' },
   prefix: { fontSize: 14, color: '#6b7280' },
