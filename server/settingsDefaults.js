@@ -9,6 +9,7 @@ const SETTINGS_DEFAULTS = {
   show_worker_wages: false, notification_use_work_hours: true, media_delete_on_project_archive: false,
   notify_timeoff_requests: false, notify_budget_alerts: false, notify_entry_submitted: false,
   report_weekly_payroll: false, report_weekly_low_stock: false, report_monthly_valuation: false,
+  qbo_auto_push: false, qbo_auto_push_expenses: false, qbo_auto_create_customers: false, notify_qbo_disconnect: false,
   media_retention_days: 0,
   currency: 'USD', invoice_signature: 'optional', default_temp_password: '', global_required_checklist_template_id: '',
 };
