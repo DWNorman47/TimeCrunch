@@ -138,7 +138,7 @@ export default function CertifiedPayroll({ projects }) {
         </button>
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
 
       {data && (
         <>

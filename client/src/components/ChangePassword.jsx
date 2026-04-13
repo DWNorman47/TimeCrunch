@@ -45,7 +45,7 @@ export default function ChangePassword({ onClose, t }) {
           <PasswordInput id="cp-new" style={styles.input} value={form.new_password} onChange={e => set('new_password', e.target.value)} required minLength={6} />
           <label htmlFor="cp-confirm" style={styles.label}>{t.confirmNewPassword}</label>
           <PasswordInput id="cp-confirm" style={styles.input} value={form.confirm_password} onChange={e => set('confirm_password', e.target.value)} required />
-          {error && <p style={styles.error}>{error}</p>}
+          {error && <p role="alert" style={styles.error}>{error}</p>}
           {success && <p style={styles.success}>{t.passwordChanged}</p>}
           <div style={styles.buttons}>
             <button type="button" style={styles.cancelBtn} onClick={onClose}>{t.cancel}</button>

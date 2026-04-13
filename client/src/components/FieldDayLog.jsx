@@ -314,7 +314,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
       {photoOpen && (
         <div style={s.capturePanel}>
           <PhotoCapture photos={capturePhotos} onChange={setCapturePhotos} />
-          {error && <p style={s.error}>{error}</p>}
+          {error && <p role="alert" style={s.error}>{error}</p>}
           <div style={s.captureActions}>
             <button style={{ ...s.submitBtn, ...(saving || capturePhotos.length === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitPhotos} disabled={saving || capturePhotos.length === 0}>
               {saving ? t.submitting : capturePhotos.length > 0
@@ -339,7 +339,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
             autoFocus
           />
           <div style={s.charCount}>{captureNote.length}/2000</div>
-          {error && <p style={s.error}>{error}</p>}
+          {error && <p role="alert" style={s.error}>{error}</p>}
           <div style={s.captureActions}>
             <button style={{ ...s.submitBtn, ...(saving || !captureNote.trim() ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitNote} disabled={saving || !captureNote.trim()}>
               {saving ? t.submitting : t.submitNote}
@@ -385,7 +385,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
               <span style={s.progressLabel}>{uploadProgress}%</span>
             </div>
           )}
-          {error && <p style={s.error}>{error}</p>}
+          {error && <p role="alert" style={s.error}>{error}</p>}
           <div style={s.captureActions}>
             <button style={{ ...s.submitBtn, ...(saving || !captureVideo ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitVideo} disabled={saving || !captureVideo}>
               {saving ? (uploadProgress > 0 ? `${t.uploading} ${uploadProgress}%` : t.submitting) : t.submitVideo}

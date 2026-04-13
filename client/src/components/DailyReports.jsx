@@ -357,7 +357,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
         </div>
       )}
 
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
 
       <div style={styles.editorActions}>
         <button style={{ ...styles.saveDraftBtn, ...((saving || submitting) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => save('draft')} disabled={saving || submitting}>

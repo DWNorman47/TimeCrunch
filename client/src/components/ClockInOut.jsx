@@ -365,7 +365,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
               </div>
             )}
 
-            {error && <p style={styles.errorDark}>{error}</p>}
+            {error && <p role="alert" style={styles.errorDark}>{error}</p>}
 
             {switchingProject ? (
               <div style={styles.switchBox}>
@@ -493,7 +493,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
             <p style={styles.locationDeniedText}>{t.locationAfterUpdate}</p>
           </div>
         )}
-        {error && <p style={styles.error}>{error}</p>}
+        {error && <p role="alert" style={styles.error}>{error}</p>}
         {pendingChecklist && (
           <div style={styles.checklistGate}>
             <div style={styles.checklistGateTitle}>{t.checklistRequiredTitle} {pendingChecklist.name}</div>
