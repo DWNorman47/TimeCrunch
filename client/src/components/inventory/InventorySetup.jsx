@@ -58,6 +58,7 @@ const LEVELS = [
 // ── Photo Thumbnail component ─────────────────────────────────────────────────
 
 function PhotoGrid({ photos, onRemove, onAdd, readOnly }) {
+  const t = useT();
   const inputRef = useRef(null);
 
   const handleFileChange = e => {
