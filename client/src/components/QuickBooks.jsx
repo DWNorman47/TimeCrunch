@@ -733,19 +733,21 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
               </span>
             </label>
 
-            <label style={{ ...styles.syncToggle, marginTop: 12 }}>
-              <input
-                type="checkbox"
-                checked={!!settings?.qbo_auto_push_expenses}
-                onChange={e => saveAutoSyncSetting('qbo_auto_push_expenses', e.target.checked)}
-                disabled={savingAutoSync}
-                style={{ marginRight: 8 }}
-              />
-              <span>
-                <span style={{ fontWeight: 600, color: '#1a202c', fontSize: 14 }}>Auto-push expense reimbursements</span>
-                <span style={{ display: 'block', fontSize: 12, color: '#6b7280', marginTop: 1 }}>When a reimbursement is approved, create a Purchase record in QuickBooks.</span>
-              </span>
-            </label>
+            {settings?.feature_reimbursements !== false && (
+              <label style={{ ...styles.syncToggle, marginTop: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={!!settings?.qbo_auto_push_expenses}
+                  onChange={e => saveAutoSyncSetting('qbo_auto_push_expenses', e.target.checked)}
+                  disabled={savingAutoSync}
+                  style={{ marginRight: 8 }}
+                />
+                <span>
+                  <span style={{ fontWeight: 600, color: '#1a202c', fontSize: 14 }}>Auto-push expense reimbursements</span>
+                  <span style={{ display: 'block', fontSize: 12, color: '#6b7280', marginTop: 1 }}>When a reimbursement is approved, create a Purchase record in QuickBooks.</span>
+                </span>
+              </label>
+            )}
 
             <label style={{ ...styles.syncToggle, marginTop: 12 }}>
               <input
@@ -813,7 +815,8 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             )}
           </div>
 
-          {/* ── Push expense reimbursements ── */}
+          {/* ── Push expense reimbursements — only when the reimbursements feature is on ── */}
+          {settings?.feature_reimbursements !== false && (
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Push Expense Reimbursements</h3>
             <p style={styles.hint}>Manually push approved reimbursements to QuickBooks as Purchase records for a date range.</p>
@@ -853,6 +856,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
               </div>
             )}
           </div>
+          )}
 
           {/* ── Payroll journal entry ── */}
           <div style={styles.section}>

@@ -373,7 +373,7 @@ export default function AdministrationPage() {
             <CompanyTab />
             <h3 style={{ ...styles.sectionTitle, marginTop: 8 }}>{t.settings}</h3>
             <ManageRates settings={settings} onSettingsUpdated={setSettings} />
-            <AdvancedSettings />
+            <AdvancedSettings settings={settings} />
           </div>
         )}
         {tab === 'team'     && (

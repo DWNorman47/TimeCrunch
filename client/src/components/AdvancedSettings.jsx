@@ -116,7 +116,7 @@ function CollapsibleCategory({ title, children }) {
 // and now lives in Company > Settings > Reimbursements. The storage backend
 // is still /admin/advanced-settings/mileage_rate — only the UI relocated.
 
-export default function AdvancedSettings() {
+export default function AdvancedSettings({ settings }) {
   const t = useT();
   const [open, setOpen]           = useState(false);
   const [config, setConfig]       = useState(null);
@@ -161,7 +161,7 @@ export default function AdvancedSettings() {
             <div style={s.loading}>{t.advSettingsLoading}</div>
           ) : config ? (
             <>
-              {config.reimbursement_categories && (
+              {config.reimbursement_categories && settings?.feature_reimbursements !== false && (
                 <CollapsibleCategory title={t.reimbursementCategoriesSection}>
                   <CategorySection
                     cfg={config.reimbursement_categories}
