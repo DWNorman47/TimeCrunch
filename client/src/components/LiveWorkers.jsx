@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api from '../api';
+import { SkeletonList } from './Skeleton';
 import { useT } from '../hooks/useT';
 import { useAuth } from '../contexts/AuthContext';
 import { formatInTz, langToLocale } from '../utils';
@@ -48,6 +49,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   const [workers, setWorkers] = useState([]);
   const [inactiveWorkers, setInactiveWorkers] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedWorker, setSelectedWorker] = useState('');
   const [dismissedInactive, setDismissedInactive] = useState(false);
@@ -62,10 +64,11 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   const [allWorkers, setAllWorkers] = useState([]);
   const [todayShifts, setTodayShifts] = useState([]);
 
-  const fetchActive = () => {
+  const fetchActive = (isInitial = false) => {
     api.get('/admin/active-clocks')
       .then(r => { setWorkers(r.data); setLastUpdated(new Date()); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (isInitial) setInitialLoading(false); });
   };
 
   const fetchTodayShifts = () => {
@@ -82,7 +85,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   };
 
   useEffect(() => {
-    fetchActive();
+    fetchActive(true);
     fetchInactive();
     fetchTodayShifts();
     intervalRef.current = setInterval(() => { fetchActive(); fetchTodayShifts(); }, 90000);
@@ -202,6 +205,8 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
     if (mins < 60) return `${mins}m ago`;
     return `${Math.floor(mins / 60)}h ago`;
   };
+
+  if (initialLoading) return <SkeletonList count={3} rows={2} />;
 
   return (
     <div style={styles.wrap}>

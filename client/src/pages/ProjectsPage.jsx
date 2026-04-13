@@ -134,6 +134,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const [qboStatus, setQboStatus] = useState(null);
   const [qboItems, setQboItems] = useState(null);
   const [qboItemId, setQboItemId] = useState('');
+  const [qboLoading, setQboLoading] = useState(false);
   const [qboPushing, setQboPushing] = useState(false);
   const [qboPushResult, setQboPushResult] = useState(null);
   const [showQboPicker, setShowQboPicker] = useState(false);
@@ -246,7 +247,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 
   const submitPunch = async (e) => {
     e.preventDefault();
-    if (!punchForm.title.trim()) return;
+    if (!punchForm.title.trim()) { setPunchError(t.titleRequired || 'Title is required.'); return; }
     setPunchSaving(true);
     setPunchError('');
     try {
@@ -326,21 +327,24 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 
   const openQBOPicker = async () => {
     setQboPushResult(null);
-    if (!qboStatus) {
-      try {
+    setQboLoading(true);
+    try {
+      if (!qboStatus) {
         const r = await api.get('/qbo/status');
         setQboStatus(r.data);
         if (!r.data.connected) return;
-      } catch { return; }
-    }
-    if (qboItems === null) {
-      try {
+      }
+      if (qboItems === null) {
         const r = await api.get('/qbo/items');
         setQboItems(r.data);
         if (r.data.length === 1) setQboItemId(r.data[0].Id);
-      } catch { return; }
+      }
+      setShowQboPicker(true);
+    } catch {
+      // silently skip — QBO not connected or API error
+    } finally {
+      setQboLoading(false);
     }
-    setShowQboPicker(true);
   };
 
   const pushInvoiceToQBO = async () => {
@@ -1012,8 +1016,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                       {pdfGenerating ? 'Preparing PDF…' : '⬇ Download Invoice'}
                     </button>
                     {project.qbo_customer_id && (
-                      <button style={styles.qboBtn} onClick={openQBOPicker} disabled={qboPushing}>
-                        Push to QuickBooks
+                      <button style={{ ...styles.qboBtn, ...(qboLoading ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }} onClick={openQBOPicker} disabled={qboPushing || qboLoading}>
+                        {qboLoading ? 'Loading…' : 'Push to QuickBooks'}
                       </button>
                     )}
                   </div>
