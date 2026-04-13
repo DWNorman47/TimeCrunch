@@ -21,10 +21,16 @@ export default function ChangePassword({ onClose, t }) {
     }
     setSaving(true);
     try {
-      await api.post('/auth/change-password', {
+      const r = await api.post('/auth/change-password', {
         current_password: form.current_password,
         new_password: form.new_password,
       });
+      // Server bumps token_version on password change, which invalidates
+      // every outstanding token. It returns a fresh one for the current
+      // device so the user doesn't get kicked out here.
+      if (r.data?.token) {
+        try { localStorage.setItem('tc_token', r.data.token); } catch { /* quota */ }
+      }
       setSuccess(true);
       setTimeout(() => { setSuccess(false); onClose(); }, 1500);
     } catch (err) {
@@ -40,9 +46,9 @@ export default function ChangePassword({ onClose, t }) {
         <h3 id="change-password-title" style={styles.title}>{t.changePasswordTitle}</h3>
         <form onSubmit={handleSubmit} style={styles.form}>
           <label htmlFor="cp-current" style={styles.label}>{t.currentPassword}</label>
-          <PasswordInput id="cp-current" style={styles.input} value={form.current_password} onChange={e => set('current_password', e.target.value)} required minLength={6} autoFocus />
+          <PasswordInput id="cp-current" style={styles.input} value={form.current_password} onChange={e => set('current_password', e.target.value)} required minLength={8} autoFocus />
           <label htmlFor="cp-new" style={styles.label}>{t.newPassword}</label>
-          <PasswordInput id="cp-new" style={styles.input} value={form.new_password} onChange={e => set('new_password', e.target.value)} required minLength={6} />
+          <PasswordInput id="cp-new" style={styles.input} value={form.new_password} onChange={e => set('new_password', e.target.value)} required minLength={8} />
           <label htmlFor="cp-confirm" style={styles.label}>{t.confirmNewPassword}</label>
           <PasswordInput id="cp-confirm" style={styles.input} value={form.confirm_password} onChange={e => set('confirm_password', e.target.value)} required />
           {error && <p role="alert" style={styles.error}>{error}</p>}

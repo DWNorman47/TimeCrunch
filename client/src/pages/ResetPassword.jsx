@@ -54,7 +54,7 @@ export default function ResetPassword() {
             value={password}
             onChange={e => setPassword(e.target.value)}
             required
-            minLength={6}
+            minLength={8}
             autoFocus
           />
           <label htmlFor="reset-confirm" style={styles.label}>{t.resetConfirmPasswordLabel}</label>

@@ -503,7 +503,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 <div style={s.fieldGroup}>
                   <label htmlFor="mw-password" style={s.label}>{t.temporaryPassword}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
                   <div style={{ position: 'relative' }}>
-                    <input id="mw-password" style={{ ...s.input, width: '100%', paddingRight: 36, boxSizing: 'border-box' }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} required minLength={6} />
+                    <input id="mw-password" style={{ ...s.input, width: '100%', paddingRight: 36, boxSizing: 'border-box' }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} required minLength={8} />
                     <button type="button" onClick={() => setShowPassword(v => !v)} style={s.eyeBtn} tabIndex={-1}>{showPassword ? '🙈' : '👁'}</button>
                   </div>
                 </div>

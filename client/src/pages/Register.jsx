@@ -150,7 +150,7 @@ export default function Register() {
             value={form.password}
             onChange={e => set('password', e.target.value)}
             required
-            minLength={6}
+            minLength={8}
           />
           {error && <p style={styles.error}>{error}</p>}
           <button style={styles.btn} type="submit" disabled={saving}>

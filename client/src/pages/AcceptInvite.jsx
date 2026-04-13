@@ -59,7 +59,7 @@ export default function AcceptInvite() {
         <h2 style={styles.title}>{t.inviteTitle}</h2>
         <p style={styles.sub}>{t.inviteWelcome}</p>
         <form onSubmit={handleSubmit} style={styles.form}>
-          <PasswordInput style={styles.input} placeholder={t.inviteNewPasswordPh} value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+          <PasswordInput style={styles.input} placeholder={t.inviteNewPasswordPh} value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
           <PasswordInput style={styles.input} placeholder={t.inviteConfirmPasswordPh} value={confirm} onChange={e => setConfirm(e.target.value)} required />
           {error && <p style={styles.error}>{error}</p>}
           <button style={styles.btn} type="submit" disabled={loading}>{loading ? t.saving : t.inviteSetPasswordBtn}</button>
