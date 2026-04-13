@@ -27,12 +27,12 @@ const pdf = StyleSheet.create({
   stoppedTag: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#dc2626', backgroundColor: '#fee2e2', padding: '2 6', borderRadius: 4, marginTop: 3 },
   injuryBox: { backgroundColor: '#fef2f2', border: '1 solid #fecaca', borderRadius: 4, padding: '6 8', marginBottom: 6 },
   injuryText: { fontSize: 8, color: '#374151', lineHeight: 1.6 },
-  sectionLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2, marginTop: 6 },
+  sectionLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2, marginTop: 6 },
   sectionText: { fontSize: 9, color: '#374151', lineHeight: 1.6 },
   reporterLabel: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#059669', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
   // Footer
   footer: { position: 'absolute', bottom: 24, left: 48, right: 48, flexDirection: 'row', justifyContent: 'space-between', borderTop: '1 solid #e5e7eb', paddingTop: 6 },
-  footerText: { fontSize: 7, color: '#9ca3af' },
+  footerText: { fontSize: 7, color: '#6b7280' },
 });
 
 export function IncidentReportDocument({ incidents, companyName, t, language }) {

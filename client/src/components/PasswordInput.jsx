@@ -34,7 +34,7 @@ export default function PasswordInput({ style, ...props }) {
         style={{
           position: 'absolute', right: 0, top: 0, bottom: 0,
           width: 38, background: 'none', border: 'none',
-          cursor: 'pointer', color: '#9ca3af',
+          cursor: 'pointer', color: '#6b7280',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
         }}
       >

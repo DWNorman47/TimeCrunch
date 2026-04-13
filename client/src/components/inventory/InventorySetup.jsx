@@ -110,8 +110,8 @@ const pg = {
   img:       { width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' },
   removeBtn: { position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, fontSize: 14, lineHeight: '18px', textAlign: 'center', cursor: 'pointer', padding: 0 },
   addBtn:    { width: 80, height: 80, borderRadius: 8, border: '2px dashed #d1d5db', background: '#f9fafb', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 },
-  addIcon:   { fontSize: 20, color: '#9ca3af', lineHeight: 1 },
-  addLabel:  { fontSize: 11, color: '#9ca3af', fontWeight: 600 },
+  addIcon:   { fontSize: 20, color: '#6b7280', lineHeight: 1 },
+  addLabel:  { fontSize: 11, color: '#6b7280', fontWeight: 600 },
 };
 
 // ── Entity Edit Form ──────────────────────────────────────────────────────────
@@ -264,7 +264,7 @@ const ef = {
   error:     { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 14 },
   field:     { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 },
   label:     { fontSize: 12, fontWeight: 600, color: '#374151' },
-  labelHint: { fontWeight: 400, color: '#9ca3af' },
+  labelHint: { fontWeight: 400, color: '#6b7280' },
   input:     { padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#111827', background: '#fff', width: '100%', boxSizing: 'border-box' },
   actions:   { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 },
   cancelBtn: { padding: '8px 16px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#374151' },
@@ -384,7 +384,7 @@ function SupplierPanel() {
         <div style={sp.field}>
           <label htmlFor="isu-sup-notes" style={sp.label}>{t.notes}</label>
           <textarea id="isu-sup-notes" style={{ ...sp.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
-          <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
+          <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
         </div>
         <div style={sp.actions}>
           <button style={sp.cancelBtn} onClick={() => setEditing(null)}>{t.cancel}</button>
@@ -442,7 +442,7 @@ function SupplierPanel() {
                     </>
                   ) : (
                     <>
-                      <span style={{ ...sp.badge, color: '#9ca3af', background: '#f3f4f6' }}>{t.invSetupArchivedStatus}</span>
+                      <span style={{ ...sp.badge, color: '#6b7280', background: '#f3f4f6' }}>{t.invSetupArchivedStatus}</span>
                       <button style={sp.iconBtn} onClick={() => restore(sup)} title={t.restore}>↩️</button>
                     </>
                   )}
@@ -474,7 +474,7 @@ const sp = {
   cardContacts:{ display: 'flex', flexWrap: 'wrap', gap: '2px 12px', marginTop: 4 },
   contact:     { fontSize: 13, color: '#374151' },
   contactLink: { fontSize: 13, color: '#2563eb', textDecoration: 'none' },
-  cardNotes:   { fontSize: 13, color: '#9ca3af', marginTop: 4, fontStyle: 'italic' },
+  cardNotes:   { fontSize: 13, color: '#6b7280', marginTop: 4, fontStyle: 'italic' },
   cardActions: { display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 },
   badge:       { display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, marginRight: 4 },
   iconBtn:     { background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 3px' },
@@ -770,7 +770,7 @@ export default function InventorySetup({ projects }) {
                       )}
                       <div style={s.cardActions}>
                         {!item.active
-                          ? <span style={{ ...s.badge, color: '#9ca3af', background: '#f3f4f6' }}>{t.invSetupArchivedStatus}</span>
+                          ? <span style={{ ...s.badge, color: '#6b7280', background: '#f3f4f6' }}>{t.invSetupArchivedStatus}</span>
                           : <span style={{ ...s.badge, color: '#059669', background: '#d1fae5' }}>{t.invSetupActiveStatus}</span>
                         }
                         {item.active ? (
@@ -835,7 +835,7 @@ const s = {
   cardMain:      { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
   cardInfo:      { flex: 1, minWidth: 0 },
   cardName:      { fontSize: 15, fontWeight: 700, color: '#111827' },
-  cardParent:    { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  cardParent:    { fontSize: 12, color: '#6b7280', marginTop: 2 },
   cardAddress:   { fontSize: 12, color: '#6b7280', marginTop: 3, fontStyle: 'italic' },
   cardNotes:     { fontSize: 13, color: '#6b7280', marginTop: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
   cardRight:     { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 },

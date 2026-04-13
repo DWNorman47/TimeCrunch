@@ -84,7 +84,7 @@ function CompanyTab() {
     <div style={styles.card}>
         {/* Company name row */}
         <div style={{ padding: '20px 20px 0' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t.companyName}</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t.companyName}</div>
           {editing ? (
             <div style={{ display: 'flex', gap: 8 }}>
               <input style={{ ...styles.input, flex: 1, fontSize: 18, fontWeight: 700, padding: '8px 12px' }} value={name} onChange={e => setName(e.target.value)} autoFocus />
@@ -270,7 +270,7 @@ function AccountTab() {
       <div style={styles.card}>
         <div style={{ padding: '16px 20px 0' }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 2 }}>{t.supportTitle}</div>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 14 }}>{t.supportSubtitle}</div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 14 }}>{t.supportSubtitle}</div>
         </div>
         <form onSubmit={sendSupport} style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input
@@ -453,7 +453,7 @@ const styles = {
   // Account
   accordionTrigger: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '16px 20px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' },
   accordionLabel: { fontSize: 14, fontWeight: 600, color: '#374151' },
-  accordionChevron: { fontSize: 16, color: '#9ca3af', transition: 'transform 0.2s', display: 'inline-block' },
+  accordionChevron: { fontSize: 16, color: '#6b7280', transition: 'transform 0.2s', display: 'inline-block' },
   accordionBody: { display: 'flex', flexDirection: 'column', gap: 12, padding: '0 20px 20px', borderTop: '1px solid #f3f4f6' },
   // Shared form
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 4 },
@@ -463,5 +463,5 @@ const styles = {
   saveBtn: { background: '#64748b', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0 },
   ghostBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '9px 14px', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
   error: { color: '#ef4444', fontSize: 13, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', margin: 0 },
-  hint: { color: '#9ca3af', fontSize: 14, padding: '16px 0' },
+  hint: { color: '#6b7280', fontSize: 14, padding: '16px 0' },
 };

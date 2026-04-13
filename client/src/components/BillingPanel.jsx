@@ -361,7 +361,7 @@ export default function BillingPanel() {
                 <input type="range" min={INCLUDED_WORKERS} max={500} value={workerCount}
                   onChange={e => setWorkerCount(Number(e.target.value))}
                   style={{ width: '100%', accentColor: '#8b5cf6' }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6b7280' }}>
                   <span>{t.billingIncludedCount.replace('{n}', INCLUDED_WORKERS)}</span><span>500+</span>
                 </div>
               </>
@@ -403,7 +403,7 @@ export default function BillingPanel() {
               <span style={s.addonTitle}>
                 {t.billingQBOAddonTitle} &nbsp;
                 <span style={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}>${plans?.qbo.monthly ?? 25}</span>
-                <span style={{ fontSize: 13, color: '#9ca3af' }}>/mo</span>
+                <span style={{ fontSize: 13, color: '#6b7280' }}>/mo</span>
               </span>
             </label>
             <div style={{ paddingLeft: 26, fontSize: 12, color: '#6b7280', lineHeight: 1.5, marginTop: 6 }}>

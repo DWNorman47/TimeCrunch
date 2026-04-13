@@ -59,7 +59,7 @@ export default function Register() {
         <p style={{ color: '#666', fontSize: 14, textAlign: 'center', marginBottom: 16 }}>
           {t.registerCheckEmailDesc.split('{email}')[0]}<strong>{confirming}</strong>{t.registerCheckEmailDesc.split('{email}')[1]}
         </p>
-        <p style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center' }}>
+        <p style={{ color: '#6b7280', fontSize: 13, textAlign: 'center' }}>
           {t.registerDidntGetIt}{' '}
           <button style={{ background: 'none', border: 'none', color: resendState === 'sent' ? '#059669' : '#1a56db', fontWeight: 600, cursor: resendState === 'idle' ? 'pointer' : 'default', fontSize: 13, padding: 0 }}
             disabled={resendState !== 'idle'}
@@ -177,5 +177,5 @@ const styles = {
   btn: { marginTop: 16, padding: '11px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 9, fontWeight: 700, fontSize: 15, cursor: 'pointer' },
   loginLink: { marginTop: 20, textAlign: 'center', fontSize: 13, color: '#666' },
   link: { color: '#1a56db', fontWeight: 600, textDecoration: 'none' },
-  hint: { fontWeight: 400, color: '#9ca3af', fontSize: 12 },
+  hint: { fontWeight: 400, color: '#6b7280', fontSize: 12 },
 };

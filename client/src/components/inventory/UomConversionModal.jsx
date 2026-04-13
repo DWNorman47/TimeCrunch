@@ -85,7 +85,7 @@ const m = {
   close:    { background: 'none', border: 'none', fontSize: 18, color: '#6b7280', cursor: 'pointer' },
   body:     { padding: '20px 20px 24px', display: 'flex', flexDirection: 'column', gap: 12 },
   desc:     { fontSize: 14, color: '#374151', margin: 0, lineHeight: 1.5 },
-  sub:      { fontSize: 12, color: '#9ca3af', margin: 0 },
+  sub:      { fontSize: 12, color: '#6b7280', margin: 0 },
   error:    { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '8px 12px', fontSize: 13 },
   inputRow: { display: 'flex', alignItems: 'center', gap: 8 },
   eq:       { fontSize: 14, color: '#374151', whiteSpace: 'nowrap', fontWeight: 600 },

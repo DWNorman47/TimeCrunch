@@ -349,7 +349,7 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
       <div style={styles.fieldGroup}>
         <label style={styles.label}>{t.notes} <span style={styles.optional}>{t.inspOptional}</span></label>
         <textarea style={styles.textarea} rows={3} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.inspNotesPh} />
-        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
+        <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 
       {error && <p role="alert" style={styles.error}>{error}</p>}
@@ -677,10 +677,10 @@ const styles = {
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151', flex: 1, minWidth: 120 },
   filterInput: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151' },
   list: { display: 'flex', flexDirection: 'column', gap: 8 },
-  hint: { color: '#9ca3af', fontSize: 14 },
+  hint: { color: '#6b7280', fontSize: 14 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { color: '#9ca3af', fontSize: 15 },
+  emptyText: { color: '#6b7280', fontSize: 15 },
   // Card
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
   cardFail: { boxShadow: '0 1px 6px rgba(0,0,0,0.07), inset 3px 0 0 #ef4444' },
@@ -692,10 +692,10 @@ const styles = {
   scoreChip: { background: '#f3f4f6', color: '#374151', padding: '1px 7px', borderRadius: 10, fontWeight: 600, fontSize: 11 },
   cardRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
   statusBadge: { fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
-  chevron: { fontSize: 10, color: '#9ca3af' },
+  chevron: { fontSize: 10, color: '#6b7280' },
   cardBody: { padding: '0 16px 14px', borderTop: '1px solid #f3f4f6' },
   notesBlock: { marginTop: 12, fontSize: 13, color: '#374151', lineHeight: 1.6, whiteSpace: 'pre-wrap' },
-  sectionLabel: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 8 },
+  sectionLabel: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280', marginBottom: 8 },
   resultsGrid: { display: 'flex', flexDirection: 'column', gap: 4 },
   resultRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 6, fontSize: 13 },
   resultRowFail: { background: '#fef2f2' },
@@ -714,14 +714,14 @@ const styles = {
   templateInfo: { flex: 1 },
   templateName: { fontWeight: 700, fontSize: 14, color: '#111827' },
   templateDesc: { fontSize: 13, color: '#6b7280', marginTop: 2 },
-  templateCount: { fontSize: 12, color: '#9ca3af', marginTop: 4 },
+  templateCount: { fontSize: 12, color: '#6b7280', marginTop: 4 },
   // Form
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   formTitle: { fontSize: 17, fontWeight: 700, margin: 0 },
   row: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 5, flex: 1, minWidth: 180 },
   label: { fontSize: 13, fontWeight: 600, color: '#374151' },
-  optional: { fontWeight: 400, color: '#9ca3af' },
+  optional: { fontWeight: 400, color: '#6b7280' },
   input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, background: '#fff' },
   textarea: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 },
   typeSelect: { padding: '9px 8px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, background: '#fff' },
@@ -734,11 +734,11 @@ const styles = {
   presetGrid: { display: 'flex', gap: 8, flexWrap: 'wrap', background: '#f9fafb', borderRadius: 8, padding: 12 },
   presetCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px', cursor: 'pointer', textAlign: 'left', minWidth: 140 },
   presetName: { fontSize: 13, fontWeight: 700, color: '#111827' },
-  presetCount: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  presetCount: { fontSize: 11, color: '#6b7280', marginTop: 2 },
   addItemBtn: { background: '#f3f4f6', border: 'none', color: '#374151', padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   itemRow: { display: 'flex', gap: 8, alignItems: 'center' },
-  itemNum: { fontSize: 12, color: '#9ca3af', width: 20, flexShrink: 0, textAlign: 'right' },
-  removeItemBtn: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '0 4px' },
+  itemNum: { fontSize: 12, color: '#6b7280', width: 20, flexShrink: 0, textAlign: 'right' },
+  removeItemBtn: { background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14, padding: '0 4px' },
   pendingBadge: { fontSize: 10, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 6, marginLeft: 8, verticalAlign: 'middle' },
   // Checklist
   checklistGrid: { display: 'flex', flexDirection: 'column', gap: 8, background: '#f9fafb', borderRadius: 8, padding: 12 },

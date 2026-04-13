@@ -126,7 +126,7 @@ export default function TimeOffTab() {
           <div style={s.fieldGroup}>
             <label style={s.label}>{t.noteOptionalLabel}</label>
             <textarea style={{ ...s.input, resize: 'vertical', minHeight: 56 }} maxLength={500} value={form.note} onChange={e => set('note', e.target.value)} placeholder={t.noteDetailsPlaceholder} disabled={saving} />
-            <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.note || '').length}/500</div>
+            <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(form.note || '').length}/500</div>
           </div>
           {error && <p style={s.error}>{error}</p>}
           <button style={{ ...s.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>
@@ -201,17 +201,17 @@ const s = {
   typeBadge: { fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em' },
   statusBadge: { fontSize: 12, fontWeight: 700 },
   dates: { fontSize: 15, fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: 8 },
-  dayCount: { fontSize: 12, color: '#9ca3af', fontWeight: 400 },
+  dayCount: { fontSize: 12, color: '#6b7280', fontWeight: 400 },
   note: { fontSize: 13, color: '#6b7280', margin: '6px 0 0' },
-  meta: { fontSize: 12, color: '#9ca3af', marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  meta: { fontSize: 12, color: '#6b7280', marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   cancelBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   confirmCancelBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   cancelError: { fontSize: 11, color: '#ef4444', marginLeft: 8 },
-  empty: { color: '#9ca3af', fontSize: 14, textAlign: 'center', padding: '32px 0' },
+  empty: { color: '#6b7280', fontSize: 14, textAlign: 'center', padding: '32px 0' },
   balanceBar: { display: 'flex', alignItems: 'center', gap: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 14px', marginBottom: 14, flexWrap: 'wrap' },
   balanceLabel: { fontSize: 13, fontWeight: 700, color: '#166534' },
   balanceUsed: { fontSize: 13, color: '#374151', fontWeight: 600 },
-  balanceSep: { fontSize: 12, color: '#9ca3af' },
+  balanceSep: { fontSize: 12, color: '#6b7280' },
   balanceRemaining: { fontSize: 13, color: '#059669', fontWeight: 700 },
   balanceBar2: { flex: '1 1 100%', height: 4, background: '#d1fae5', borderRadius: 4, marginTop: 4, overflow: 'hidden' },
   balanceFill: { height: '100%', background: '#059669', borderRadius: 4, transition: 'width 0.3s' },

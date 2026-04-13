@@ -417,7 +417,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                 placeholder={t.lwAddNotePlaceholder}
                 maxLength={500}
               />
-              <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{clockInNotes.length}/500</div>
+              <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{clockInNotes.length}/500</div>
             </div>
             <div style={styles.modalActions}>
               <button
@@ -448,11 +448,11 @@ const styles = {
   liveIndicator: { display: 'flex', alignItems: 'center', gap: 8 },
   liveDot: { width: 10, height: 10, borderRadius: '50%', background: '#16a34a', animation: 'pulse 2s infinite' },
   liveText: { fontWeight: 700, color: '#16a34a', fontSize: 14 },
-  updated: { fontSize: 12, color: '#9ca3af' },
+  updated: { fontSize: 12, color: '#6b7280' },
   refreshBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: '#6b7280', cursor: 'pointer' },
   filters: { display: 'flex', gap: 10, flexWrap: 'wrap' },
   filterSelect: { padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#374151', background: '#fff', cursor: 'pointer', minWidth: 200 },
-  empty: { background: '#fff', borderRadius: 12, padding: 32, textAlign: 'center', color: '#888', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
+  empty: { background: '#fff', borderRadius: 12, padding: 32, textAlign: 'center', color: '#6b7280', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
   workerList: { display: 'flex', flexDirection: 'column', gap: 12 },
   workerCard: { background: '#fff', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', borderLeft: '4px solid #1a56db' },
   workerTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
@@ -460,9 +460,9 @@ const styles = {
   workerProject: { fontSize: 13, color: '#6b7280', marginTop: 2 },
   elapsed: { fontSize: 22, fontWeight: 800, color: '#1a56db', fontVariantNumeric: 'tabular-nums' },
   workerNotes: { fontSize: 13, color: '#555', fontStyle: 'italic', marginBottom: 6 },
-  workerMeta: { display: 'flex', gap: 16, fontSize: 12, color: '#9ca3af', flexWrap: 'wrap' },
+  workerMeta: { display: 'flex', gap: 16, fontSize: 12, color: '#6b7280', flexWrap: 'wrap' },
   locationTag: { color: '#16a34a' },
-  locationTagStale: { color: '#9ca3af' },
+  locationTagStale: { color: '#6b7280' },
   noLocation: { color: '#d1d5db' },
   mapWrap: { background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
   mapTitle: { fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#374151' },
@@ -474,7 +474,7 @@ const styles = {
   inactiveBannerList: { display: 'flex', flexWrap: 'wrap', gap: 6 },
   inactivePill: { background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 13, color: '#78350f', fontWeight: 500 },
   inactiveDays: { color: '#b45309', fontWeight: 700 },
-  dismissBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 16, cursor: 'pointer', padding: '0 4px', lineHeight: 1 },
+  dismissBtn: { background: 'none', border: 'none', color: '#6b7280', fontSize: 16, cursor: 'pointer', padding: '0 4px', lineHeight: 1 },
   clockInWorkerBtn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   expectedSection: { background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '12px 16px' },
   expectedTitle: { fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 8 },

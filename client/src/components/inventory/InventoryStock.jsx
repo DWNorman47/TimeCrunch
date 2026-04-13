@@ -199,7 +199,7 @@ function AdjustModal({ item, locations, onClose, onDone }) {
           </select>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <label htmlFor="is-adj-notes" style={a.label}>{t.invStockAdjNotesLabel}</label>
-            <span style={{ fontSize: 11, color: '#9ca3af' }}>{notes.length}/1000</span>
+            <span style={{ fontSize: 11, color: '#6b7280' }}>{notes.length}/1000</span>
           </div>
           <input
             id="is-adj-notes"
@@ -567,7 +567,7 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
                     </td>
                     <td style={{ ...s.td, color: '#6b7280' }}>
                       {row.unit}
-                      {row.unit_spec && <span style={{ fontSize: 11, color: '#9ca3af' }}> ({row.unit_spec})</span>}
+                      {row.unit_spec && <span style={{ fontSize: 11, color: '#6b7280' }}> ({row.unit_spec})</span>}
                     </td>
                     {isAdmin && (
                       <td style={{ ...s.td, textAlign: 'right', color: '#6b7280' }}>
@@ -655,7 +655,7 @@ const s = {
   error:       { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },
   empty:       { textAlign: 'center', padding: '60px 24px', color: '#6b7280', fontSize: 15 },
   emptyIcon:   { fontSize: 40, marginBottom: 12 },
-  emptyHint:   { fontSize: 13, color: '#9ca3af', marginTop: 4 },
+  emptyHint:   { fontSize: 13, color: '#6b7280', marginTop: 4 },
   tableWrap:   { overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb' },
   table:       { width: '100%', borderCollapse: 'collapse', minWidth: 600 },
   thead:       { background: '#f9fafb' },

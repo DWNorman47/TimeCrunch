@@ -88,7 +88,7 @@ const styles = {
   input: { padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 },
   error: { color: '#e53e3e', fontSize: 13 },
   btn: { marginTop: 8, padding: '11px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 9, fontWeight: 700, fontSize: 15, cursor: 'pointer' },
-  optional: { fontWeight: 400, color: '#9ca3af', fontSize: 11 },
+  optional: { fontWeight: 400, color: '#6b7280', fontSize: 11 },
   footer: { marginTop: 20, textAlign: 'center', fontSize: 13 },
   link: { color: '#1a56db', fontWeight: 600, textDecoration: 'none' },
   backLink: { display: 'block', marginTop: 20, textAlign: 'center', fontSize: 13, color: '#1a56db', fontWeight: 600, textDecoration: 'none' },

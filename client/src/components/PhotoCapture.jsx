@@ -122,6 +122,6 @@ const styles = {
     background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: 4,
   },
   addLabel: { fontSize: 10, fontWeight: 600 },
-  compressingText: { fontSize: 12, color: '#9ca3af' },
-  hint: { fontSize: 11, color: '#9ca3af', margin: 0 },
+  compressingText: { fontSize: 12, color: '#6b7280' },
+  hint: { fontSize: 11, color: '#6b7280', margin: 0 },
 };

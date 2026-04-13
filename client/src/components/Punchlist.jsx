@@ -93,7 +93,7 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
         <div style={{ ...styles.fieldGroup, gridColumn: '1 / -1' }}>
           <label htmlFor="pl-description" style={styles.label}>{t.descriptionField}</label>
           <textarea id="pl-description" style={styles.textarea} rows={3} placeholder={t.punchlistDetailPlaceholder} maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
-          <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.description || '').length}/1000</div>
+          <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(form.description || '').length}/1000</div>
         </div>
       </div>
       {error && <p style={styles.error}>{error}</p>}
@@ -464,7 +464,7 @@ export default function Punchlist({ projects }) {
             <div key={phase || '__none__'} style={{ marginBottom: hasPhases ? 20 : 0 }}>
               {hasPhases && (
                 <div style={styles.phaseGroupHeader}>
-                  {phase || <span style={{ fontStyle: 'italic', color: '#9ca3af' }}>{t.noPhase}</span>}
+                  {phase || <span style={{ fontStyle: 'italic', color: '#6b7280' }}>{t.noPhase}</span>}
                   <span style={styles.phaseGroupCount}>{groupItems.length}</span>
                 </div>
               )}
@@ -512,7 +512,7 @@ const styles = {
   metaAssign: { fontSize: 12, color: '#6b7280' },
   itemRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
   statusBadge: { fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 10 },
-  chevron: { fontSize: 10, color: '#9ca3af' },
+  chevron: { fontSize: 10, color: '#6b7280' },
   itemBody: { padding: '0 14px 14px', borderTop: '1px solid #f3f4f6' },
   desc: { fontSize: 13, color: '#374151', lineHeight: 1.6, margin: '10px 0', whiteSpace: 'pre-wrap' },
   resolvedNote: { fontSize: 12, color: '#059669', margin: '0 0 10px', fontWeight: 600 },
@@ -544,7 +544,7 @@ const styles = {
   checkProgress: { fontSize: 11, fontWeight: 600, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
   checkProgressDone: { color: '#065f46', background: '#d1fae5' },
   checklistSection: { marginBottom: 12 },
-  checklistLoading: { fontSize: 12, color: '#9ca3af', margin: '8px 0' },
+  checklistLoading: { fontSize: 12, color: '#6b7280', margin: '8px 0' },
   checklistItems: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 },
   checkRow: { display: 'flex', alignItems: 'center', gap: 8 },
   checkbox: { width: 16, height: 16, cursor: 'pointer', flexShrink: 0, accentColor: '#059669' },
@@ -556,6 +556,6 @@ const styles = {
   // Empty / misc
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { color: '#9ca3af', fontSize: 15 },
-  hint: { color: '#9ca3af', fontSize: 14 },
+  emptyText: { color: '#6b7280', fontSize: 15 },
+  hint: { color: '#6b7280', fontSize: 14 },
 };

@@ -100,7 +100,7 @@ function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES
               rows={2}
               maxLength={1000}
             />
-            <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{notes.length}/1000</div>
+            <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{notes.length}/1000</div>
           </div>
           {error && <div style={s.error}>{error}</div>}
           <div style={s.actions}>
@@ -368,12 +368,12 @@ const s = {
   filter: { padding: '6px 14px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#6b7280', cursor: 'pointer' },
   filterActive: { padding: '6px 14px', background: '#1a56db', border: '1px solid #1a56db', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer' },
   summary: { display: 'flex', gap: 16, fontSize: 13, color: '#6b7280' },
-  empty: { color: '#9ca3af', fontSize: 14, textAlign: 'center', padding: '24px 0' },
+  empty: { color: '#6b7280', fontSize: 14, textAlign: 'center', padding: '24px 0' },
   list: { display: 'flex', flexDirection: 'column', gap: 8 },
   card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' },
   row: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', flexWrap: 'wrap' },
   workerName: { fontSize: 14, fontWeight: 700, color: '#111827', minWidth: 130 },
-  username: { fontWeight: 400, color: '#9ca3af', fontSize: 12 },
+  username: { fontWeight: 400, color: '#6b7280', fontSize: 12 },
   rowMid: { display: 'flex', gap: 10, alignItems: 'center', flex: 1, flexWrap: 'wrap' },
   rowRight: { display: 'flex', gap: 10, alignItems: 'center', marginLeft: 'auto' },
   amount: { fontSize: 16, fontWeight: 700, color: '#111827' },

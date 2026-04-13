@@ -181,7 +181,7 @@ export default function AnalyticsDashboard() {
         {showCustom && (
           <div style={styles.customRange}>
             <input type="date" style={styles.dateInput} value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
-            <span style={{ fontSize: 12, color: '#9ca3af' }}>–</span>
+            <span style={{ fontSize: 12, color: '#6b7280' }}>–</span>
             <input type="date" style={styles.dateInput} value={customTo} onChange={e => setCustomTo(e.target.value)} />
           </div>
         )}
@@ -317,16 +317,16 @@ const styles = {
   presetBtnActive: { background: '#1a56db', color: '#fff', borderColor: '#1a56db' },
   customRange: { display: 'flex', alignItems: 'center', gap: 6 },
   dateInput: { fontSize: 12, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, color: '#374151' },
-  rangeTag: { fontSize: 11, fontWeight: 400, color: '#9ca3af', marginLeft: 6 },
+  rangeTag: { fontSize: 11, fontWeight: 400, color: '#6b7280', marginLeft: 6 },
   statRow: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 },
   statCard: { background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
   statValue: { fontSize: 32, fontWeight: 800, lineHeight: 1, marginBottom: 6 },
   statLabel: { fontSize: 13, fontWeight: 600, color: '#374151' },
-  statSub: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  statSub: { fontSize: 12, color: '#6b7280', marginTop: 2 },
   card: { background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 },
   sectionTitle: { fontSize: 14, fontWeight: 700, color: '#374151', marginBottom: 16, margin: '0 0 16px', display: 'flex', alignItems: 'baseline' },
-  empty: { color: '#9ca3af', fontSize: 13 },
+  empty: { color: '#6b7280', fontSize: 13 },
   hBarList: { display: 'flex', flexDirection: 'column', gap: 10 },
   hBarRow: { display: 'flex', alignItems: 'center', gap: 10 },
   hBarLabel: { width: 120, fontSize: 13, color: '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 0 },

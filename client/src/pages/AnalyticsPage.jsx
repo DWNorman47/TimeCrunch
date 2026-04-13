@@ -87,5 +87,5 @@ const styles = {
   main: { maxWidth: 1100, margin: '32px auto', padding: '0 20px' },
   pageHeader: { marginBottom: 24 },
   pageTitle: { fontSize: 28, fontWeight: 800, color: '#111827', margin: 0 },
-  loadingText: { color: '#9ca3af', fontSize: 14 },
+  loadingText: { color: '#6b7280', fontSize: 14 },
 };

@@ -404,7 +404,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
       <div style={f.field}>
         <label htmlFor="itx-notes" style={f.label}>{t.notes}</label>
         <textarea id="itx-notes" style={{ ...f.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
-        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
+        <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 
       <div style={f.actions}>
@@ -628,7 +628,7 @@ const f = {
   row:       { display: 'flex', gap: 12, flexWrap: 'wrap' },
   field:     { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 160, marginBottom: 14 },
   label:     { fontSize: 12, fontWeight: 600, color: '#374151' },
-  hint:      { fontSize: 11, color: '#9ca3af', fontWeight: 400 },
+  hint:      { fontSize: 11, color: '#6b7280', fontWeight: 400 },
   input:     { padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#111827', background: '#fff', width: '100%', boxSizing: 'border-box' },
   binRow:    { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 },
   binField:  { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 100 },
@@ -662,5 +662,5 @@ const s = {
   badge:       { display: 'inline-block', padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700 },
   loadMore:    { textAlign: 'center', padding: '16px 0' },
   loadMoreBtn: { padding: '8px 20px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
-  count:       { textAlign: 'center', fontSize: 13, color: '#9ca3af', marginTop: 8 },
+  count:       { textAlign: 'center', fontSize: 13, color: '#6b7280', marginTop: 8 },
 };

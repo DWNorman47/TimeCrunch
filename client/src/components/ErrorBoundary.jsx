@@ -43,6 +43,6 @@ const styles = {
   msg: { fontSize: 14, color: '#6b7280', marginBottom: 24 },
   btn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer', marginBottom: 20 },
   details: { textAlign: 'left', marginTop: 8 },
-  summary: { fontSize: 12, color: '#9ca3af', cursor: 'pointer' },
+  summary: { fontSize: 12, color: '#6b7280', cursor: 'pointer' },
   pre: { fontSize: 11, color: '#ef4444', background: '#fef2f2', borderRadius: 6, padding: 10, overflowX: 'auto', marginTop: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
 };

@@ -149,7 +149,7 @@ const styles = {
   card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' },
   toggleHeader: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' },
   heading: { margin: 0, fontSize: 18, fontWeight: 700 },
-  chevron: { fontSize: 16, color: '#9ca3af', transition: 'transform 0.2s', display: 'inline-block', marginBottom: 0 },
+  chevron: { fontSize: 16, color: '#6b7280', transition: 'transform 0.2s', display: 'inline-block', marginBottom: 0 },
   form: { display: 'flex', flexDirection: 'column', gap: 14, marginTop: 20 },
   row: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   field: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1 },
@@ -159,5 +159,5 @@ const styles = {
   error: { color: '#e53e3e', fontSize: 13 },
   success: { color: '#38a169', fontSize: 13 },
   button: { padding: '11px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600 },
-  charCount: { fontSize: 11, color: '#9ca3af' },
+  charCount: { fontSize: 11, color: '#6b7280' },
 };

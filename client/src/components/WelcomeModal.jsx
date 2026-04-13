@@ -61,7 +61,7 @@ export default function WelcomeModal() {
 const styles = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 },
   modal: { background: '#fff', borderRadius: 16, padding: '36px 32px', maxWidth: 440, width: '100%', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'center' },
-  brand: { fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9ca3af' },
+  brand: { fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b7280' },
   emoji: { fontSize: 48, lineHeight: 1 },
   title: { fontSize: 24, fontWeight: 800, color: '#111827', margin: 0 },
   body: { fontSize: 14, color: '#4b5563', lineHeight: 1.7, margin: 0, textAlign: 'left' },

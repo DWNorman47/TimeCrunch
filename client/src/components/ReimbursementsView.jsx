@@ -175,7 +175,7 @@ export default function ReimbursementsView() {
           <div style={s.field}>
             <label htmlFor="rv-description" style={s.label}>{t.descriptionLabel}</label>
             <input id="rv-description" style={{ ...s.input, width: '100%' }} type="text" maxLength={500} placeholder={isMileage ? t.mileageDescPlaceholder : t.descriptionPlaceholder} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} disabled={saving} />
-            <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{form.description.length}/500</div>
+            <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{form.description.length}/500</div>
           </div>
           {!isMileage && (
             <div style={s.field}>
@@ -278,7 +278,7 @@ const s = {
   emptyState: { textAlign: 'center', padding: '48px 20px' },
   emptyIcon: { fontSize: 36, marginBottom: 10 },
   emptyTitle: { fontSize: 15, fontWeight: 600, color: '#374151', margin: '0 0 4px' },
-  emptySubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
+  emptySubtitle: { fontSize: 13, color: '#6b7280', margin: 0 },
   list: { display: 'flex', flexDirection: 'column', gap: 10 },
   card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 },
   cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
@@ -288,7 +288,7 @@ const s = {
   category: { fontSize: 11, fontWeight: 600, background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: 8 },
   projectTag: { fontSize: 11, fontWeight: 600, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: 8 },
   badge: { fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8 },
-  deleteBtn: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '2px 4px' },
+  deleteBtn: { background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14, padding: '2px 4px' },
   deleteConfirmBtn: { background: '#dc2626', color: '#fff', border: 'none', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
   deleteCancelBtn: { background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
   desc: { fontSize: 14, color: '#374151' },

@@ -93,12 +93,12 @@ const ds = {
   list: { display: 'flex', flexDirection: 'column', gap: 6 },
   docRow: { display: 'flex', alignItems: 'center', gap: 10, background: '#f9fafb', borderRadius: 6, padding: '6px 10px' },
   docName: { flex: 1, fontSize: 13, color: '#1a56db', textDecoration: 'none', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  docMeta: { fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' },
-  deleteBtn: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 12, padding: '0 2px', lineHeight: 1 },
+  docMeta: { fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' },
+  deleteBtn: { background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 12, padding: '0 2px', lineHeight: 1 },
   confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   cancelDeleteBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', borderRadius: 5, padding: '3px 8px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   error: { fontSize: 12, color: '#ef4444', margin: '4px 0' },
-  empty: { fontSize: 12, color: '#9ca3af', margin: '4px 0' },
+  empty: { fontSize: 12, color: '#6b7280', margin: '4px 0' },
 };
 
 const LANGUAGES = ['English', 'Spanish'];
@@ -654,7 +654,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 <input id="mw-edit-full-name" style={s.input} value={editInfoForm.full_name} onChange={e => setEditInfoForm(f => ({ ...f, full_name: e.target.value }))} />
                               </div>
                               <div style={s.fieldGroup}>
-                                <label htmlFor="mw-edit-invoice-name" style={s.label}>Invoice Name <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
+                                <label htmlFor="mw-edit-invoice-name" style={s.label}>Invoice Name <span style={{ color: '#6b7280', fontWeight: 400 }}>(optional)</span></label>
                                 <input id="mw-edit-invoice-name" style={s.input} value={editInfoForm.invoice_name} onChange={e => setEditInfoForm(f => ({ ...f, invoice_name: e.target.value }))} placeholder={t.invoiceNamePlaceholder} />
                               </div>
                               <div style={s.fieldGroup}>
@@ -699,7 +699,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 <span style={s.infoValue}>{w.invoice_name}</span>
                               </>}
                               <span style={s.infoLabel}>Email</span>
-                              <span style={s.infoValue}>{w.email || <em style={{ color: '#9ca3af' }}>{t.notSet}</em>}</span>
+                              <span style={s.infoValue}>{w.email || <em style={{ color: '#6b7280' }}>{t.notSet}</em>}</span>
                               <span style={s.infoLabel}>Language</span>
                               <span style={s.infoValue}>{w.language || 'English'}</span>
                               <span style={s.infoLabel}>Role</span>
@@ -816,7 +816,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                         ) : (
                           <div>
                             <span style={s.infoValue}>{fmtRate(w, currency)}</span>
-                            <span style={{ ...s.infoValue, marginLeft: 10, fontSize: 12, color: '#9ca3af' }}>
+                            <span style={{ ...s.infoValue, marginLeft: 10, fontSize: 12, color: '#6b7280' }}>
                               {overtimeRules.find(r => r.value === (w.overtime_rule || 'daily'))?.label}
                             </span>
                             {w.guaranteed_weekly_hours != null && parseFloat(w.guaranteed_weekly_hours) > 0 && (
@@ -877,7 +877,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                     <span key={key} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: '#dbeafe', color: '#1e40af' }}>{label}</span>
                                   ))}
                                   {PERM_LABELS.every(({ key }) => !w.admin_permissions[key]) && (
-                                    <span style={{ fontSize: 13, color: '#9ca3af' }}>No permissions</span>
+                                    <span style={{ fontSize: 13, color: '#6b7280' }}>No permissions</span>
                                   )}
                                 </div>
                               )
@@ -921,7 +921,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                         });
                                       }}
                                     />
-                                    {wk.full_name} <span style={{ color: '#9ca3af', fontSize: 12 }}>@{wk.username}</span>
+                                    {wk.full_name} <span style={{ color: '#6b7280', fontSize: 12 }}>@{wk.username}</span>
                                   </label>
                                 ))}
                               </div>
@@ -992,7 +992,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
               : archived.map(w => (
                 <div key={w.id} style={s.historyItem}>
                   <div style={s.itemLeft}>
-                    <span style={{ ...s.itemName, color: '#9ca3af' }}>{w.full_name}</span>
+                    <span style={{ ...s.itemName, color: '#6b7280' }}>{w.full_name}</span>
                     <span style={{ ...s.itemUsername, color: '#d1d5db' }}>@{w.username}</span>
                     <RoleBadge role={w.role} />
                   </div>
@@ -1061,22 +1061,22 @@ const s = {
   inviteSuccess: { background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: '#166534' },
   saveBtn: { padding: '8px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer', width: 'fit-content' },
   cancelBtn: { padding: '8px 14px', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
-  empty: { color: '#9ca3af', fontSize: 14, margin: 0 },
+  empty: { color: '#6b7280', fontSize: 14, margin: 0 },
   emptyState: { textAlign: 'center', padding: '40px 0 24px' },
   emptyStateIcon: { fontSize: 40, marginBottom: 10 },
   emptyStateTitle: { fontSize: 16, fontWeight: 700, color: '#374151', margin: '0 0 4px' },
-  emptyStateSubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
+  emptyStateSubtitle: { fontSize: 13, color: '#6b7280', margin: 0 },
   list: { display: 'flex', flexDirection: 'column', gap: 2 },
   item: { border: '1px solid #f3f4f6', borderRadius: 8, overflow: 'hidden' },
   itemBar: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 10 },
   itemLeft: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   itemName: { fontSize: 14, fontWeight: 600, color: '#111827' },
   itemUsername: { fontSize: 13, color: '#6b7280' },
-  chevron: { fontSize: 14, color: '#9ca3af', transition: 'transform 0.2s', flexShrink: 0, display: 'inline-block' },
+  chevron: { fontSize: 14, color: '#6b7280', transition: 'transform 0.2s', flexShrink: 0, display: 'inline-block' },
   panel: { padding: '4px 16px 16px', borderTop: '1px solid #f3f4f6', background: '#f9fafb', display: 'flex', flexDirection: 'column', gap: 0 },
   section: { borderBottom: '1px solid #eeeeee', paddingBottom: 12, paddingTop: 12 },
   sectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  sectionTitle: { fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 },
   sectionBtn: { padding: '3px 12px', background: 'none', border: '1px solid #d1d5db', color: '#374151', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   infoGrid: { display: 'grid', gridTemplateColumns: '90px 1fr', gap: '5px 12px', alignItems: 'center' },
   infoLabel: { fontSize: 12, color: '#6b7280', fontWeight: 500 },

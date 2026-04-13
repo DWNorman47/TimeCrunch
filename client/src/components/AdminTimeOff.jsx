@@ -163,7 +163,7 @@ export default function AdminTimeOff({ settings }) {
                       value={reviewNote[r.id] || ''}
                       onChange={e => setReviewNote(prev => ({ ...prev, [r.id]: e.target.value }))}
                     />
-                    <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(reviewNote[r.id] || '').length}/500</div>
+                    <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(reviewNote[r.id] || '').length}/500</div>
                   </div>
                   <button
                     style={{ ...s.approveBtn, ...(acting === r.id + 'approve' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
@@ -214,18 +214,18 @@ const s = {
   typeBadge: { fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em' },
   statusBadge: { fontSize: 12, fontWeight: 700 },
   dates: { fontSize: 15, fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: 8 },
-  dayCount: { fontSize: 12, color: '#9ca3af', fontWeight: 400 },
+  dayCount: { fontSize: 12, color: '#6b7280', fontWeight: 400 },
   note: { fontSize: 13, color: '#6b7280', margin: '6px 0 0' },
   actionRow: { display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' },
   noteInput: { flex: 1, minWidth: 160, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13 },
   approveBtn: { background: '#059669', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' },
   denyBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' },
   actError: { fontSize: 12, color: '#ef4444' },
-  meta: { fontSize: 12, color: '#9ca3af', marginTop: 8 },
+  meta: { fontSize: 12, color: '#6b7280', marginTop: 8 },
   loadError: { background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: 8, padding: '12px 16px', fontSize: 14 },
   retryBtn: { background: 'none', border: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: 0 },
   emptyState: { textAlign: 'center', padding: '48px 20px' },
   emptyIcon: { fontSize: 36, marginBottom: 10 },
   emptyTitle: { fontSize: 15, fontWeight: 600, color: '#374151', margin: '0 0 4px' },
-  emptySubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
+  emptySubtitle: { fontSize: 13, color: '#6b7280', margin: 0 },
 };

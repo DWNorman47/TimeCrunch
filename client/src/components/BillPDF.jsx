@@ -39,15 +39,15 @@ const s = StyleSheet.create({
 
   invHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
   brand: { fontSize: 18, fontWeight: 'bold', color: '#1a56db' },
-  brandSub: { fontSize: 9, color: '#888', marginTop: 2 },
+  brandSub: { fontSize: 9, color: '#6b7280', marginTop: 2 },
   invRight: { alignItems: 'flex-end' },
   invTitle: { fontSize: 22, fontWeight: 'bold', color: '#111' },
-  metaLabel: { fontSize: 8, fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },
+  metaLabel: { fontSize: 8, fontWeight: 'bold', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },
   metaVal: { fontSize: 10, color: '#374151' },
 
   parties: { flexDirection: 'row', marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1.5, borderBottomColor: '#e5e7eb', borderBottomStyle: 'solid' },
   partyBlock: { flex: 1 },
-  partyLabel: { fontSize: 8, fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  partyLabel: { fontSize: 8, fontWeight: 'bold', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   partyName: { fontSize: 12, fontWeight: 'bold', color: '#111', marginBottom: 2 },
   partyDetail: { fontSize: 9, color: '#6b7280', lineHeight: 1.5 },
 
@@ -57,7 +57,7 @@ const s = StyleSheet.create({
   td: { fontSize: 9, color: '#374151' },
 
   summaryWrap: { flexDirection: 'row', marginTop: 20 },
-  thankYou: { flex: 1, fontSize: 9, color: '#9ca3af', lineHeight: 1.8, marginRight: 20 },
+  thankYou: { flex: 1, fontSize: 9, color: '#6b7280', lineHeight: 1.8, marginRight: 20 },
   sumTable: { width: 230, borderWidth: 1, borderColor: '#e5e7eb', borderStyle: 'solid', borderRadius: 6, overflow: 'hidden' },
   sumRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 0.5, borderBottomColor: '#f3f4f6', borderBottomStyle: 'solid' },
   sumLabel: { fontSize: 10, color: '#374151' },

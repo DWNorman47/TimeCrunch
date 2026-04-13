@@ -147,7 +147,7 @@ const styles = {
   },
   closeBtn: {
     position: 'absolute', top: 10, right: 12, background: 'none', border: 'none',
-    color: '#9ca3af', fontSize: 16, cursor: 'pointer', lineHeight: 1, padding: 2,
+    color: '#6b7280', fontSize: 16, cursor: 'pointer', lineHeight: 1, padding: 2,
   },
   icon: { fontSize: 22, lineHeight: 1 },
   heading: { fontWeight: 700, fontSize: 15, color: '#1e3a8a' },

@@ -30,7 +30,7 @@ const pdf = StyleSheet.create({
   colAssigned: { flex: 2 },
   // Footer
   footer: { position: 'absolute', bottom: 24, left: 48, right: 48, flexDirection: 'row', justifyContent: 'space-between', borderTop: '1 solid #e5e7eb', paddingTop: 6 },
-  footerText: { fontSize: 7, color: '#9ca3af' },
+  footerText: { fontSize: 7, color: '#6b7280' },
 });
 
 export function PunchlistDocument({ items, companyName, t, language }) {

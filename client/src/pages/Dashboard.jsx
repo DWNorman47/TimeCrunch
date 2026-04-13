@@ -25,7 +25,7 @@ const WorkerSchedule   = lazy(() => import('../components/WorkerSchedule'));
 const ReimbursementsView = lazy(() => import('../components/ReimbursementsView'));
 
 function TabLoader() {
-  return <div style={{ padding: '32px 0', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>Loading…</div>;
+  return <div style={{ padding: '32px 0', textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading…</div>;
 }
 
 const isPwa = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;

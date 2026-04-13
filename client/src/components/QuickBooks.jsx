@@ -778,7 +778,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
               <div style={{ marginTop: 20, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <label htmlFor="qbo-payment-account" style={styles.label}>Payment / Bank Account</label>
-                  <p style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 6px' }}>The account used to pay expenses (e.g. Checking, Petty Cash)</p>
+                  <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>The account used to pay expenses (e.g. Checking, Petty Cash)</p>
                   <select
                     id="qbo-payment-account"
                     style={styles.select}
@@ -794,7 +794,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 </div>
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <label htmlFor="qbo-expense-account" style={styles.label}>Expense Category Account</label>
-                  <p style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 6px' }}>The expense account for the line item (e.g. Job Materials, Travel)</p>
+                  <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>The expense account for the line item (e.g. Job Materials, Travel)</p>
                   <select
                     id="qbo-expense-account"
                     style={styles.select}
@@ -989,7 +989,7 @@ const styles = {
   selectAllBtn: { background: 'none', border: 'none', color: '#1a56db', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0, marginLeft: 'auto' },
   importRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid #f9fafb', cursor: 'pointer', fontSize: 14 },
   importName: { flex: 1, fontWeight: 500, color: '#111827' },
-  importEmail: { fontSize: 12, color: '#9ca3af' },
+  importEmail: { fontSize: 12, color: '#6b7280' },
   importTypeSelect: { padding: '4px 8px', border: '1px solid #ddd', borderRadius: 6, fontSize: 12, minHeight: 'unset' },
   paginator: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, justifyContent: 'flex-end' },
   pageBtn: { background: '#f3f4f6', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 16, cursor: 'pointer', color: '#374151', minHeight: 'unset', lineHeight: 1 },
@@ -1002,7 +1002,7 @@ const styles = {
   errorType: { background: '#fef3c7', color: '#92400e', borderRadius: 4, padding: '1px 7px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', flexShrink: 0 },
   errorEntityId: { color: '#6b7280', fontSize: 12, flexShrink: 0 },
   errorMsg: { flex: 1, color: '#374151', minWidth: 120 },
-  errorTime: { color: '#9ca3af', fontSize: 11, flexShrink: 0 },
-  errorDismiss: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px', flexShrink: 0 },
+  errorTime: { color: '#6b7280', fontSize: 11, flexShrink: 0 },
+  errorDismiss: { background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px', flexShrink: 0 },
   errorRetry: { padding: '2px 10px', background: '#eff6ff', color: '#1a56db', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
 };

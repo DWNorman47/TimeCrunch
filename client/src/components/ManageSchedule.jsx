@@ -117,7 +117,7 @@ function SummaryView({ shifts, days }) {
     return cantOnly ? sorted.filter(row => Object.values(row.byDay).some(arr => arr.some(s => s.cant_make_it))) : sorted;
   }, [workerMap, cantOnly]);
 
-  if (Object.values(workerMap).length === 0) return <p style={{ color: '#9ca3af', fontSize: 13, padding: '16px 0' }}>{t.msNoShiftsWeek}</p>;
+  if (Object.values(workerMap).length === 0) return <p style={{ color: '#6b7280', fontSize: 13, padding: '16px 0' }}>{t.msNoShiftsWeek}</p>;
 
   return (
     <div style={styles.summaryWrap}>
@@ -128,7 +128,7 @@ function SummaryView({ shifts, days }) {
         </label>
       )}
       {cantOnly && rows.length === 0 && (
-        <p style={{ color: '#9ca3af', fontSize: 13, padding: '8px 0' }}>{t.msCantOnlyNoFlags}</p>
+        <p style={{ color: '#6b7280', fontSize: 13, padding: '8px 0' }}>{t.msCantOnlyNoFlags}</p>
       )}
       <table style={styles.summaryTable}>
         <thead>
@@ -677,7 +677,7 @@ const styles = {
   pillCantNote: { fontSize: 9, color: '#dc2626', fontStyle: 'italic', marginTop: 1 },
   pillProject: { color: '#6b7280', fontSize: 10 },
   pillTime: { fontWeight: 600, color: '#1a56db', marginTop: 2 },
-  pillNotes: { color: '#9ca3af', fontSize: 10, fontStyle: 'italic' },
+  pillNotes: { color: '#6b7280', fontSize: 10, fontStyle: 'italic' },
   shiftPillActive: { background: '#dbeafe', borderLeftColor: '#1d4ed8' },
   shiftPillCant: { background: '#fff5f5', borderLeftColor: '#ef4444' },
   pillActions: { display: 'flex', gap: 4, marginTop: 6 },

@@ -138,7 +138,7 @@ const styles = {
     fontWeight: 600, cursor: 'pointer', padding: 0,
   },
   list: { maxHeight: 380, overflowY: 'auto' },
-  empty: { padding: '24px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 13 },
+  empty: { padding: '24px 16px', textAlign: 'center', color: '#6b7280', fontSize: 13 },
   item: {
     display: 'flex', gap: 10, padding: '12px 16px', cursor: 'pointer',
     borderBottom: '1px solid #f9fafb', transition: 'background 0.1s',
@@ -149,5 +149,5 @@ const styles = {
   itemBody: { flex: 1, minWidth: 0 },
   itemTitle: { fontSize: 13, fontWeight: 600, color: '#111827', marginBottom: 2 },
   itemText: { fontSize: 12, color: '#6b7280', marginBottom: 3, whiteSpace: 'pre-line' },
-  itemTime: { fontSize: 11, color: '#9ca3af' },
+  itemTime: { fontSize: 11, color: '#6b7280' },
 };

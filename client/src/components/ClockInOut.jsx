@@ -303,7 +303,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   if (status === null) return (
     <div style={styles.card}>
       {offlineBanner}
-      <p style={{ color: '#9ca3af', fontSize: 14, margin: 0 }}>{t.clockingStatus}</p>
+      <p style={{ color: '#6b7280', fontSize: 14, margin: 0 }}>{t.clockingStatus}</p>
     </div>
   );
 
@@ -565,7 +565,7 @@ const styles = {
   heading: { marginBottom: 16, fontSize: 18, fontWeight: 700 },
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   label: { fontSize: 13, fontWeight: 600, color: '#555', display: 'block', marginBottom: 4 },
-  charCount: { fontSize: 11, color: '#9ca3af' },
+  charCount: { fontSize: 11, color: '#6b7280' },
   input: { padding: '9px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, width: '100%' },
   locationDenied: { background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 },
   locationDeniedTitle: { fontSize: 14, fontWeight: 700, color: '#854d0e' },
@@ -596,7 +596,7 @@ const styles = {
   noProjects: { textAlign: 'center', padding: '24px 16px' },
   noProjectsIcon: { fontSize: 36, marginBottom: 10 },
   noProjectsTitle: { fontWeight: 700, fontSize: 16, color: '#374151', marginBottom: 6 },
-  noProjectsText: { fontSize: 13, color: '#9ca3af', lineHeight: 1.5 },
+  noProjectsText: { fontSize: 13, color: '#6b7280', lineHeight: 1.5 },
   offlineBanner: { background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 7, padding: '8px 12px', fontSize: 13, fontWeight: 500, marginBottom: 12, display: 'flex', alignItems: 'center' },
   offlineBannerDark: { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', borderRadius: 7, padding: '8px 12px', fontSize: 12, fontWeight: 500 },
   syncRetryBtn: { background: '#92400e', color: '#fff', border: 'none', borderRadius: 5, padding: '2px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
@@ -607,5 +607,5 @@ const styles = {
   clockOutSummaryTitle: { fontSize: 15, fontWeight: 700, color: '#15803d' },
   clockOutSummaryProject: { fontSize: 13, color: '#374151', marginTop: 2 },
   clockOutSummaryDuration: { fontSize: 13, color: '#6b7280', marginTop: 2 },
-  clockOutSummaryDismiss: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 18, cursor: 'pointer', padding: '0 4px', lineHeight: 1, flexShrink: 0 },
+  clockOutSummaryDismiss: { background: 'none', border: 'none', color: '#6b7280', fontSize: 18, cursor: 'pointer', padding: '0 4px', lineHeight: 1, flexShrink: 0 },
 };

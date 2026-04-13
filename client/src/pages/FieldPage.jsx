@@ -20,7 +20,7 @@ const RFITracking         = lazy(() => import('../components/RFITracking'));
 const InspectionChecklists = lazy(() => import('../components/InspectionChecklists'));
 
 function TabLoader() {
-  return <div style={{ padding: '40px 0', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>Loading…</div>;
+  return <div style={{ padding: '40px 0', textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading…</div>;
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────

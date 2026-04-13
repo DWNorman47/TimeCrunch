@@ -631,8 +631,8 @@ function CycleCountDetail({ count, onBack, onComplete }) {
           <div style={d.scanBinRow}>
             <span style={d.scanBinLabel}>
               {currentBin
-                ? <>📍 <strong>{currentBin.name}</strong> <span style={{ color: '#9ca3af', fontSize: 12 }}>({currentBin.type})</span></>
-                : <span style={{ color: '#9ca3af' }}>📍 {t.invCycNoBinScanned}</span>
+                ? <>📍 <strong>{currentBin.name}</strong> <span style={{ color: '#6b7280', fontSize: 12 }}>({currentBin.type})</span></>
+                : <span style={{ color: '#6b7280' }}>📍 {t.invCycNoBinScanned}</span>
               }
             </span>
             {currentBin && (
@@ -735,11 +735,11 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                           return (
                             <tr key={l.id} style={{ background: isVar ? '#fff7ed' : (i % 2 === 0 ? '#fafafa' : '#fff') }}>
                               <td style={{ ...d.rtd, fontWeight: isVar ? 700 : 400 }}>
-                                {isFull && l.location_name ? <span style={{ color: '#9ca3af', marginRight: 4 }}>{l.location_name} —</span> : ''}
+                                {isFull && l.location_name ? <span style={{ color: '#6b7280', marginRight: 4 }}>{l.location_name} —</span> : ''}
                                 {l.item_name}
                               </td>
                               <td style={{ ...d.rtd, textAlign: 'right', color: '#6b7280' }}>{expected} {l.unit}</td>
-                              <td style={{ ...d.rtd, textAlign: 'right' }}>{counted != null ? `${counted} ${l.unit}` : <em style={{ color: '#9ca3af' }}>{t.invCycNotCounted}</em>}</td>
+                              <td style={{ ...d.rtd, textAlign: 'right' }}>{counted != null ? `${counted} ${l.unit}` : <em style={{ color: '#6b7280' }}>{t.invCycNotCounted}</em>}</td>
                               <td style={{ ...d.rtd, textAlign: 'right', fontWeight: 700,
                                 color: variance === null ? '#9ca3af' : variance > 0 ? '#059669' : variance < 0 ? '#dc2626' : '#374151' }}>
                                 {variance === null ? '—' : variance > 0 ? `+${variance}` : variance}

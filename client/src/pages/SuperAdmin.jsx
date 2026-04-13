@@ -262,9 +262,9 @@ export default function SuperAdmin() {
         {tab === 'companies' && (
           <>
             {loading ? (
-              <p style={{ color: '#888' }}>Loading...</p>
+              <p style={{ color: '#6b7280' }}>Loading...</p>
             ) : companies.length === 0 ? (
-              <p style={{ color: '#888' }}>No companies yet.</p>
+              <p style={{ color: '#6b7280' }}>No companies yet.</p>
             ) : (
               <div style={styles.list}>
                 {companies.map(c => (
@@ -401,9 +401,9 @@ export default function SuperAdmin() {
                     {expandedId === c.id && (
                       <div style={styles.userTable}>
                         {!companyUsers[c.id] ? (
-                          <p style={{ color: '#888', fontSize: 13 }}>Loading...</p>
+                          <p style={{ color: '#6b7280', fontSize: 13 }}>Loading...</p>
                         ) : companyUsers[c.id].length === 0 ? (
-                          <p style={{ color: '#888', fontSize: 13 }}>No users.</p>
+                          <p style={{ color: '#6b7280', fontSize: 13 }}>No users.</p>
                         ) : (
                           <table style={styles.table}>
                             <thead>
@@ -484,8 +484,8 @@ export default function SuperAdmin() {
               </div>
             )}
 
-            {afLoading ? <p style={{ color: '#888' }}>Loading...</p> : afList.length === 0 ? (
-              <p style={{ color: '#888' }}>No affiliates yet. Add one to start tracking commissions.</p>
+            {afLoading ? <p style={{ color: '#6b7280' }}>Loading...</p> : afList.length === 0 ? (
+              <p style={{ color: '#6b7280' }}>No affiliates yet. Add one to start tracking commissions.</p>
             ) : (
               <div style={styles.list}>
                 {afList.map(a => {
@@ -501,7 +501,7 @@ export default function SuperAdmin() {
                             {a.email && a.phone && <span style={styles.sep}>·</span>}
                             {a.phone && <span>{a.phone}</span>}
                           </div>
-                          {a.notes && <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{a.notes}</div>}
+                          {a.notes && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{a.notes}</div>}
                           <div style={styles.afSummary}>
                             <div style={styles.afStat}>
                               <div style={styles.afStatLabel}>Companies</div>
@@ -538,7 +538,7 @@ export default function SuperAdmin() {
                       {afExpanded === a.id && (
                         <div style={styles.userTable}>
                           {!a.companies || a.companies.length === 0 ? (
-                            <p style={{ color: '#888', fontSize: 13 }}>No companies assigned yet.</p>
+                            <p style={{ color: '#6b7280', fontSize: 13 }}>No companies assigned yet.</p>
                           ) : (
                             <table style={styles.table}>
                               <thead>
@@ -612,14 +612,14 @@ const styles = {
   companyName: { fontWeight: 700, fontSize: 17, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   inactiveTag: { background: '#fee2e2', color: '#dc2626', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
   affiliateTag: { background: '#f0fdf4', color: '#15803d', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10 },
-  meta: { fontSize: 13, color: '#9ca3af', display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' },
+  meta: { fontSize: 13, color: '#6b7280', display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' },
   slug: { fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 4px', borderRadius: 4, fontSize: 12 },
   sep: { color: '#d1d5db' },
   stats: { display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10 },
   stat: { fontSize: 13, color: '#555' },
   controlsRow: { display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 4 },
   controlGroup: { display: 'flex', flexDirection: 'column', gap: 3 },
-  controlLabel: { fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  controlLabel: { fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' },
   controlSelect: { fontSize: 12, padding: '4px 7px', border: '1px solid #d1d5db', borderRadius: 6, color: '#374151', background: '#fff' },
   cardActions: { display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch', minWidth: 110 },
   expandBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer', textAlign: 'center' },
@@ -654,6 +654,6 @@ const styles = {
   afCancelBtn: { padding: '8px 16px', background: 'none', border: '1px solid #d1d5db', color: '#374151', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
   afSummary: { display: 'flex', gap: 24, marginTop: 10, flexWrap: 'wrap' },
   afStat: { display: 'flex', flexDirection: 'column', gap: 2 },
-  afStatLabel: { fontSize: 11, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' },
+  afStatLabel: { fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' },
   afStatVal: { fontSize: 20, fontWeight: 700, color: '#111827' },
 };

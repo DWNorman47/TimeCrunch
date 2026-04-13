@@ -270,7 +270,7 @@ const s = {
   list: { display: 'flex', flexDirection: 'column', gap: 12 },
   empty: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' },
   emptyTitle: { fontSize: 17, fontWeight: 700, marginBottom: 8 },
-  emptyMsg: { color: '#9ca3af', fontSize: 14, textAlign: 'center', padding: '12px 0' },
+  emptyMsg: { color: '#6b7280', fontSize: 14, textAlign: 'center', padding: '12px 0' },
 
   // Card shell
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', overflow: 'hidden' },
@@ -289,12 +289,12 @@ const s = {
   invRight: { textAlign: 'right' },
   invTitle: { fontSize: 26, fontWeight: 800, color: '#111827' },
   invMeta: { display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 },
-  metaLabel: { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' },
+  metaLabel: { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280' },
   metaVal: { fontSize: 13, fontWeight: 600, color: '#374151' },
 
   // Parties
   parties: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 20, paddingBottom: 20, borderBottom: '2px solid #e5e7eb' },
-  partyLabel: { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', marginBottom: 6 },
+  partyLabel: { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6b7280', marginBottom: 6 },
   partyName: { fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 3 },
   partyDetail: { fontSize: 12, color: '#6b7280', lineHeight: 1.6 },
 
@@ -308,7 +308,7 @@ const s = {
 
   // Summary
   summaryWrap: { display: 'flex', gap: 24, justifyContent: 'flex-end', alignItems: 'flex-start', flexWrap: 'wrap' },
-  thankYou: { fontSize: 12, color: '#9ca3af', lineHeight: 1.8, flex: 1, minWidth: 180 },
+  thankYou: { fontSize: 12, color: '#6b7280', lineHeight: 1.8, flex: 1, minWidth: 180 },
   sumTable: { border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', minWidth: 280 },
   sumRow: { display: 'flex', justifyContent: 'space-between', padding: '8px 14px', fontSize: 13, color: '#374151', borderBottom: '1px solid #f3f4f6' },
   sumTotal: { display: 'flex', justifyContent: 'space-between', padding: '10px 14px', fontSize: 14, fontWeight: 700, background: '#1a56db', color: '#fff' },

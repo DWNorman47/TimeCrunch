@@ -105,5 +105,5 @@ const styles = {
   error: { color: '#ef4444', fontSize: 13, marginBottom: 10 },
   actions: { display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' },
   downloadBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
-  hint: { fontSize: 12, color: '#9ca3af' },
+  hint: { fontSize: 12, color: '#6b7280' },
 };

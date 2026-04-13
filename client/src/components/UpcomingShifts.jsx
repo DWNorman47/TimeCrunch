@@ -71,6 +71,6 @@ const styles = {
   label: { fontWeight: 700, fontSize: 14, color: '#111827' },
   times: { fontSize: 13, color: '#6b7280', marginTop: 2 },
   project: { fontSize: 12, color: '#2563eb', fontWeight: 600, marginTop: 2 },
-  notes: { fontSize: 12, color: '#9ca3af', fontStyle: 'italic', marginTop: 2 },
+  notes: { fontSize: 12, color: '#6b7280', fontStyle: 'italic', marginTop: 2 },
   fillBtn: { background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1a56db', padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0, alignSelf: 'center' },
 };

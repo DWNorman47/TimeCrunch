@@ -431,7 +431,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
                         <label htmlFor="mp-description" style={s.fieldLabel}>Description</label>
                         <textarea id="mp-description" style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder={t.projectDescPlaceholder} />
-                        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(editDescription || '').length}/1000</div>
+                        <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(editDescription || '').length}/1000</div>
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
                         <label htmlFor="mp-progress" style={s.fieldLabel}>Progress % (0–100)</label>
@@ -608,7 +608,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
               archived.map(p => (
                 <div key={p.id} style={s.historyItem}>
                   <div style={s.itemLeft}>
-                    <span style={{ ...s.itemName, color: '#9ca3af' }}>{p.name}</span>
+                    <span style={{ ...s.itemName, color: '#6b7280' }}>{p.name}</span>
                     {showWageType && <span style={{ fontSize: 12, color: '#d1d5db' }}>{p.wage_type === 'prevailing' ? t.prevailingWages : t.regularWages}</span>}
                   </div>
                   <button style={s.restoreBtn} onClick={() => handleRestore(p.id)}>{t.restore}</button>
@@ -632,16 +632,16 @@ const s = {
   errorBox: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 },
   errorText: { color: '#e53e3e', fontSize: 13, margin: 0 },
   restoreInlineBtn: { background: '#059669', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-  empty: { color: '#9ca3af', fontSize: 14, margin: 0 },
+  empty: { color: '#6b7280', fontSize: 14, margin: 0 },
   list: { display: 'flex', flexDirection: 'column', gap: 2 },
   item: { border: '1px solid #f3f4f6', borderRadius: 8, overflow: 'hidden' },
   itemBar: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 10 },
   itemLeft: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   itemName: { fontSize: 14, fontWeight: 600, color: '#111827' },
-  chevron: { fontSize: 14, color: '#9ca3af', transition: 'transform 0.2s', flexShrink: 0, display: 'inline-block' },
+  chevron: { fontSize: 14, color: '#6b7280', transition: 'transform 0.2s', flexShrink: 0, display: 'inline-block' },
   panel: { padding: '4px 16px 16px', borderTop: '1px solid #f3f4f6', background: '#f9fafb', display: 'flex', flexDirection: 'column', gap: 0 },
   section: { borderBottom: '1px solid #eeeeee', paddingBottom: 12, paddingTop: 12 },
-  sectionTitle: { fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  sectionTitle: { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   fieldsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 3 },
   fieldLabel: { fontSize: 11, fontWeight: 600, color: '#6b7280' },
@@ -652,7 +652,7 @@ const s = {
   geoFields: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
   geoInput: { padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, width: 120 },
   geoLocBtn: { padding: '5px 10px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
-  clearBtn: { padding: '5px 10px', background: 'none', border: '1px solid #e5e7eb', color: '#9ca3af', borderRadius: 6, fontSize: 11, cursor: 'pointer', flexShrink: 0 },
+  clearBtn: { padding: '5px 10px', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 6, fontSize: 11, cursor: 'pointer', flexShrink: 0 },
   confirmClearBtn: { padding: '5px 10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
   cancelClearBtn: { padding: '5px 10px', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 6, fontSize: 11, cursor: 'pointer', flexShrink: 0 },
   geoErrorText: { fontSize: 11, color: '#dc2626', margin: '4px 0 0', fontWeight: 600 },
