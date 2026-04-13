@@ -174,7 +174,7 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
               )}
               {guarantee_shortfall_hours > 0 && (
                 <div style={{ ...s.sumRow, color: '#2563eb' }}>
-                  <span>Minimum Guarantee ({fmtH(guarantee_min_hours)}/period shortfall)</span>
+                  <span>{t.minimumGuaranteeShortfall.replace('{hours}', fmtH(guarantee_min_hours))}</span>
                   <span>+{fmtH(guarantee_shortfall_hours)}</span>
                 </div>
               )}
@@ -204,7 +204,7 @@ function InvoiceCard({ stub, user, settings, companyInfo, defaultOpen, t }) {
                   )}
                   {guarantee_shortfall_hours > 0 && workerRate > 0 && (
                     <div style={{ ...s.sumRow, color: '#2563eb' }}>
-                      <span>Minimum Guarantee ({fmtH(guarantee_shortfall_hours)} @ {fmtMoney(workerRate)}/hr)</span>
+                      <span>{t.minimumGuaranteePay.replace('{hours}', fmtH(guarantee_shortfall_hours)).replace('{rate}', `${fmtMoney(workerRate)}/hr`)}</span>
                       <span>{fmtMoney(guaranteePay)}</span>
                     </div>
                   )}

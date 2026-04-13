@@ -463,6 +463,30 @@ const translations = {
     chatNoMessages: 'No messages yet.',
     chatPlaceholder: 'Type a message...',
     chatSend: 'Send',
+    chatYou: 'You',
+    chatAdminBadge: 'Admin',
+    chatWriteMsg: 'Write a message...',
+    chatNoMsgYet: 'No messages yet. Send one to flag an issue or ask a question.',
+    broadcastPlaceholder: 'e.g. Site closed tomorrow — no work',
+
+    // ── Timesheet Sign-Off ────────────────────────────────────────────────────
+    signTimesheetTitle: 'Sign Timesheet',
+    signTimesheetSub: "Review your entries and sign off to notify your manager they're ready for approval.",
+    weekFrom: 'Week from',
+    load: 'Load',
+    noPendingForPeriod: 'No pending entries for this period.',
+    signedBadge: '✓ Signed',
+    unsignedBadge: 'Unsigned',
+    confirmSignHint: 'Your manager will be notified to review.',
+    signingLabel: 'Signing...',
+    allSignedMsg: '✓ All entries signed — your manager has been notified.',
+    signAndSubmit: '✍ Sign & Submit',
+    entry: 'entry',
+    entries: 'entries',
+
+    // ── Pay Stub ──────────────────────────────────────────────────────────────
+    minimumGuaranteeShortfall: 'Minimum Guarantee ({hours}/period shortfall)',
+    minimumGuaranteePay: 'Minimum Guarantee ({hours} @ {rate}/hr)',
 
     // ── Manage Rates ─────────────────────────────────────────────────────────
     ratesWages: 'Wages',
@@ -2326,6 +2350,30 @@ const translations = {
     chatNoMessages: 'No hay mensajes aún.',
     chatPlaceholder: 'Escribe un mensaje...',
     chatSend: 'Enviar',
+    chatYou: 'Tú',
+    chatAdminBadge: 'Admin',
+    chatWriteMsg: 'Escribe un mensaje...',
+    chatNoMsgYet: 'No hay mensajes aún. Envía uno para reportar un problema o hacer una pregunta.',
+    broadcastPlaceholder: 'p.ej. Sitio cerrado mañana — sin trabajo',
+
+    // ── Timesheet Sign-Off ────────────────────────────────────────────────────
+    signTimesheetTitle: 'Firmar Parte de Horas',
+    signTimesheetSub: 'Revisa tus entradas y firma para notificar a tu supervisor que están listas para aprobación.',
+    weekFrom: 'Semana desde',
+    load: 'Cargar',
+    noPendingForPeriod: 'No hay entradas pendientes para este período.',
+    signedBadge: '✓ Firmado',
+    unsignedBadge: 'Sin firmar',
+    confirmSignHint: 'Tu supervisor será notificado para revisión.',
+    signingLabel: 'Firmando...',
+    allSignedMsg: '✓ Todas las entradas firmadas — tu supervisor ha sido notificado.',
+    signAndSubmit: '✍ Firmar y Enviar',
+    entry: 'entrada',
+    entries: 'entradas',
+
+    // ── Pay Stub ──────────────────────────────────────────────────────────────
+    minimumGuaranteeShortfall: 'Garantía Mínima ({hours}/período faltante)',
+    minimumGuaranteePay: 'Garantía Mínima ({hours} @ {rate}/hr)',
 
     // ── Manage Rates ─────────────────────────────────────────────────────────
     ratesWages: 'Salarios',

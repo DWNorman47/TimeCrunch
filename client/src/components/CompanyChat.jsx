@@ -179,8 +179,8 @@ function Thread({ messages, loading, currentUserId, bottomRef, t }) {
               <div style={{ ...styles.bubble, ...(isMine ? styles.bubbleMine : styles.bubbleTheirs) }}>
                 <div style={styles.meta}>
                   <span style={styles.sender}>
-                    {isMine ? 'You' : m.sender_name}
-                    {m.sender_role === 'admin' && !isMine && <span style={styles.adminBadge}> Admin</span>}
+                    {isMine ? t.chatYou : m.sender_name}
+                    {m.sender_role === 'admin' && !isMine && <span style={styles.adminBadge}> {t.chatAdminBadge}</span>}
                   </span>
                   <span style={styles.time}>{formatTime(m.created_at)}</span>
                 </div>

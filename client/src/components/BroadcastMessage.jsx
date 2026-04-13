@@ -29,7 +29,7 @@ export default function BroadcastMessage() {
         <input
           style={styles.input}
           type="text"
-          placeholder="e.g. Site closed tomorrow — no work"
+          placeholder={t.broadcastPlaceholder}
           value={message}
           maxLength={200}
           onChange={e => setMessage(e.target.value)}

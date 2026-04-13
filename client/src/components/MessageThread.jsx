@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 
 export default function MessageThread({ entryId, currentUserId, onUnreadChange }) {
+  const t = useT();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [body, setBody] = useState('');
@@ -35,9 +37,9 @@ export default function MessageThread({ entryId, currentUserId, onUnreadChange }
   return (
     <div style={styles.wrap}>
       {loading ? (
-        <p style={styles.loading}>Loading...</p>
+        <p style={styles.loading}>{t.loading}</p>
       ) : messages.length === 0 ? (
-        <p style={styles.empty}>No messages yet. Send one to flag an issue or ask a question.</p>
+        <p style={styles.empty}>{t.chatNoMsgYet}</p>
       ) : (
         <div style={styles.thread}>
           {messages.map(m => {
@@ -45,7 +47,7 @@ export default function MessageThread({ entryId, currentUserId, onUnreadChange }
             return (
               <div key={m.id} style={{ ...styles.bubble, ...(isMine ? styles.bubbleMine : styles.bubbleTheirs) }}>
                 <div style={styles.bubbleMeta}>
-                  <span style={styles.sender}>{isMine ? 'You' : m.sender_name}</span>
+                  <span style={styles.sender}>{isMine ? t.chatYou : m.sender_name}</span>
                   <span style={styles.time}>{formatTime(m.created_at)}</span>
                 </div>
                 <div style={styles.bubbleBody}>{m.body}</div>
@@ -60,11 +62,11 @@ export default function MessageThread({ entryId, currentUserId, onUnreadChange }
           style={styles.input}
           value={body}
           onChange={e => setBody(e.target.value)}
-          placeholder="Write a message..."
+          placeholder={t.chatWriteMsg}
           disabled={sending}
         />
         <button style={{ ...styles.sendBtn, ...((sending || !body.trim()) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={sending || !body.trim()}>
-          {sending ? t.sending : 'Send'}
+          {sending ? t.sending : t.chatSend}
         </button>
       </form>
     </div>
