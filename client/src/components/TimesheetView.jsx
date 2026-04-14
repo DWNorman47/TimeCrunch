@@ -4,14 +4,9 @@ import EntryPanel from './EntryPanel';
 import api from '../api';
 import { getT } from '../i18n';
 import { langToLocale } from '../utils';
+import { startOfWeek as computeStartOfWeek } from '../utils/weekBounds';
 
-function startOfWeek(date) {
-  const d = new Date(date);
-  const day = d.getDay(); // 0=Sun
-  d.setDate(d.getDate() - day);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+function startOfWeekFor(date, ws) { return computeStartOfWeek(date, ws ?? 1); }
 
 function addDays(date, n) {
   const d = new Date(date);
@@ -46,17 +41,17 @@ function netHours(start, end, breakMinutes) {
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export default function TimesheetView({ entries, language, projects = [], onRefresh }) {
+export default function TimesheetView({ entries, language, projects = [], onRefresh, weekStart: companyWeekStart = 1 }) {
   const t = getT(language);
   const locale = langToLocale(language);
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [weekStart, setWeekStart] = useState(() => startOfWeekFor(new Date(), companyWeekStart));
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [copying, setCopying] = useState(false);
   const [copyMsg, setCopyMsg] = useState('');
 
   const prevWeek = () => setWeekStart(d => addDays(d, -7));
   const nextWeek = () => setWeekStart(d => addDays(d, 7));
-  const goToday = () => setWeekStart(startOfWeek(new Date()));
+  const goToday = () => setWeekStart(startOfWeekFor(new Date(), companyWeekStart));
 
   const copyLastWeek = async () => {
     setCopying(true);

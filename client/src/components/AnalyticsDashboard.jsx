@@ -69,7 +69,7 @@ function presetLabel(days, t) {
   return `${days}d`;
 }
 
-export default function AnalyticsDashboard() {
+export default function AnalyticsDashboard({ weekStart = 1 }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
@@ -139,9 +139,11 @@ export default function AnalyticsDashboard() {
       (weekly_hours || []).forEach(w => result.push({ week_start: w.week_start, hours: parseFloat(w.hours) }));
     } else {
       const weekCount = Math.ceil(preset / 7);
+      const ws = ((Number(weekStart) % 7) + 7) % 7;
       for (let i = weekCount - 1; i >= 0; i--) {
         const d = new Date();
-        d.setDate(d.getDate() - d.getDay() - i * 7);
+        const daysSinceStart = (d.getDay() - ws + 7) % 7;
+        d.setDate(d.getDate() - daysSinceStart - i * 7);
         const key = toLocalDate(d);
         result.push({ week_start: key, hours: weeklyMap[key] || 0 });
       }

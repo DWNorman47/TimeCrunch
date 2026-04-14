@@ -162,6 +162,31 @@ describe('computeOT — weekly rule', () => {
     expect(regularHours).toBeCloseTo(80); // 40 + 40
     expect(overtimeHours).toBeCloseTo(9); // 5 + 4
   });
+
+  test('Sunday-start week: the Sunday belongs to the NEW week, not the old one', () => {
+    // 2024-01-06 is Saturday, 2024-01-07 is Sunday.
+    // With weekStart=0 (Sunday), Jan 7 starts a new week.
+    // Week A (Sun Dec 31–Sat Jan 6): 6 × 9 = 54h → 14h OT
+    // Week B (Sun Jan 7 alone): 9h → 0h OT
+    const wA = ['2023-12-31', '2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05']
+      .map(d => makeEntry(d, 9)); // 54h
+    const wB = [makeEntry('2024-01-07', 9)]; // Sunday Jan 7 — starts new week
+    const { regularHours, overtimeHours } = computeOT([...wA, ...wB], 'weekly', 40, 0);
+    expect(regularHours).toBeCloseTo(49); // 40 + 9
+    expect(overtimeHours).toBeCloseTo(14); // from week A only
+  });
+
+  test('Monday-start default: OT bucketing unchanged when weekStart omitted', () => {
+    // Same input as above, but omit weekStart → Monday default → Jan 1 (Mon)
+    // starts a new week, so the Dec 31 Sunday lands in the prior week bucket.
+    const entries = ['2023-12-31', '2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05', '2024-01-07']
+      .map(d => makeEntry(d, 9));
+    const { regularHours, overtimeHours } = computeOT(entries, 'weekly', 40);
+    // Prior week (Dec 25–31): Dec 31 alone = 9h → 0 OT
+    // Jan 1–7: Mon–Sun = 6 days × 9h = 54h → 14h OT
+    expect(regularHours).toBeCloseTo(49);
+    expect(overtimeHours).toBeCloseTo(14);
+  });
 });
 
 // ───────────────────────────────────────────────────────────────────────────

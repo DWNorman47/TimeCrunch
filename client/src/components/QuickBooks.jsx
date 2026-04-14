@@ -3,6 +3,7 @@ import api from '../api';
 import { useT } from '../hooks/useT';
 import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
+import { weekRange } from '../utils/weekBounds';
 
 import { silentError } from '../errorReporter';
 const VENDOR_TYPES = ['contractor', 'subcontractor'];
@@ -10,18 +11,9 @@ const EMPLOYEE_TYPES = ['employee', 'owner'];
 const IMPORT_PAGE_SIZE = 15;
 const MAP_PAGE_SIZE = 20;
 
-// Returns the ISO date strings for the previous full week, where the week
-// starts on `weekStart` (0=Sun, 1=Mon, …, 6=Sat). Defaults to Monday.
+// Wrapper for the shared helper: previous full week honoring weekStart (0-6).
 function previousWeekRange(weekStart = 1) {
-  const ws = ((Number(weekStart) % 7) + 7) % 7; // normalize to 0-6
-  const now = new Date();
-  const daysSinceStart = (now.getDay() - ws + 7) % 7;
-  const lastStart = new Date(now);
-  lastStart.setDate(now.getDate() - daysSinceStart - 7);
-  const lastEnd = new Date(lastStart);
-  lastEnd.setDate(lastStart.getDate() + 6);
-  const iso = (d) => d.toLocaleDateString('en-CA'); // YYYY-MM-DD in local tz
-  return { from: iso(lastStart), to: iso(lastEnd) };
+  return weekRange(weekStart, -1);
 }
 
 function CollapsibleSection({ title, badge, defaultOpen = false, storageKey, children }) {
@@ -99,14 +91,14 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [clearingErrors, setClearingErrors] = useState(false);
   const [retryingErrors, setRetryingErrors] = useState(new Set());
   // Bulk expense push
-  const [expFrom, setExpFrom] = useState('');
-  const [expTo, setExpTo] = useState('');
+  const [expFrom, setExpFrom] = useState(() => previousWeekRange(settings?.week_start).from);
+  const [expTo, setExpTo] = useState(() => previousWeekRange(settings?.week_start).to);
   const [expForce, setExpForce] = useState(false);
   const [expPushing, setExpPushing] = useState(false);
   const [expResult, setExpResult] = useState(null);
   // Payroll journal entry
-  const [payFrom, setPayFrom] = useState('');
-  const [payTo, setPayTo] = useState('');
+  const [payFrom, setPayFrom] = useState(() => previousWeekRange(settings?.week_start).from);
+  const [payTo, setPayTo] = useState(() => previousWeekRange(settings?.week_start).to);
   const [payDebitId, setPayDebitId] = useState('');
   const [payCreditId, setPayCreditId] = useState('');
   const [payPushing, setPayPushing] = useState(false);
@@ -115,8 +107,8 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [vendorMappings, setVendorMappings] = useState({});
   const [projectMappings, setProjectMappings] = useState({});
   const [classMappings, setClassMappings] = useState({});
-  const [pushFrom, setPushFrom] = useState('');
-  const [pushTo, setPushTo] = useState('');
+  const [pushFrom, setPushFrom] = useState(() => previousWeekRange(settings?.week_start).from);
+  const [pushTo, setPushTo] = useState(() => previousWeekRange(settings?.week_start).to);
   const [pushResult, setPushResult] = useState(null);
   const [pushing, setPushing] = useState(false);
   const [forcePush, setForcePush] = useState(false);
@@ -124,14 +116,16 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   // Default date range = previous full week, using the company's week_start setting
   const [billFrom, setBillFrom] = useState(() => previousWeekRange(settings?.week_start).from);
   const [billTo, setBillTo] = useState(() => previousWeekRange(settings?.week_start).to);
-  // If settings arrive after mount, recompute defaults against the real week_start
-  const syncedBillDefaultsRef = React.useRef(settings?.week_start != null);
+  // If settings arrive after mount, recompute all push-section defaults against the real week_start
+  const syncedWeekDefaultsRef = React.useRef(settings?.week_start != null);
   useEffect(() => {
-    if (settings?.week_start != null && !syncedBillDefaultsRef.current) {
+    if (settings?.week_start != null && !syncedWeekDefaultsRef.current) {
       const r = previousWeekRange(settings.week_start);
-      setBillFrom(r.from);
-      setBillTo(r.to);
-      syncedBillDefaultsRef.current = true;
+      setBillFrom(r.from); setBillTo(r.to);
+      setExpFrom(r.from);  setExpTo(r.to);
+      setPayFrom(r.from);  setPayTo(r.to);
+      setPushFrom(r.from); setPushTo(r.to);
+      syncedWeekDefaultsRef.current = true;
     }
   }, [settings?.week_start]);
   const [billForce, setBillForce] = useState(false);

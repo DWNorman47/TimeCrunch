@@ -12,6 +12,7 @@ const { requireAdmin, requirePlan, requireProAddon, requirePermission } = requir
 const { sendPushToUser, sendPushToAllWorkers } = require('../push');
 const { sendEmail } = require('../email');
 const { hoursWorked, computeOT, computeDailyPayCosts } = require('../utils/payCalculations');
+const { weekRange, weekBucketKey } = require('../utils/weekBounds');
 const { createInboxItem, createInboxItemBatch } = require('./inbox');
 const qbo = require('../services/qbo');
 
@@ -51,7 +52,9 @@ async function getSettings(companyId) {
 router.get('/kpis', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
-    const [pending, clockedIn, weekHours, settings] = await Promise.all([
+    const settings = await getSettings(companyId);
+    const weekStartDateStr = weekRange(settings.week_start, 0).from; // ISO start-of-current-week
+    const [pending, clockedIn, weekHours] = await Promise.all([
       pool.query(`SELECT COUNT(*) FROM time_entries WHERE company_id = $1 AND status = 'pending'`, [companyId]),
       pool.query(`SELECT COUNT(*) FROM active_clock WHERE company_id = $1`, [companyId]),
       pool.query(
@@ -65,12 +68,11 @@ router.get('/kpis', requireAdmin, async (req, res) => {
          ), 0) as hours
          FROM time_entries
          WHERE company_id = $1
-           AND work_date >= date_trunc('week', CURRENT_DATE)
+           AND work_date >= $2::date
            AND work_date <= CURRENT_DATE
            AND status != 'rejected'`,
-        [companyId]
+        [companyId, weekStartDateStr]
       ),
-      getSettings(companyId),
     ]);
 
     // Workers who've exceeded the OT threshold this week
@@ -85,7 +87,7 @@ router.get('/kpis', requireAdmin, async (req, res) => {
              )) / 3600 - (break_minutes::float / 60)
            ) as total_hours
            FROM time_entries
-           WHERE company_id = $1 AND work_date >= date_trunc('week', CURRENT_DATE)
+           WHERE company_id = $1 AND work_date >= $3::date
              AND wage_type = 'regular' AND status != 'rejected'
            GROUP BY user_id
            HAVING SUM(
@@ -94,7 +96,7 @@ router.get('/kpis', requireAdmin, async (req, res) => {
              )) / 3600 - (break_minutes::float / 60)
            ) > $2
          ) sub`,
-        [companyId, overtime_threshold]
+        [companyId, overtime_threshold, weekStartDateStr]
       );
       otWorkers = parseInt(r.rows[0].count);
     } else {
@@ -107,7 +109,7 @@ router.get('/kpis', requireAdmin, async (req, res) => {
              )) / 3600 - (break_minutes::float / 60)
            ) as day_hours
            FROM time_entries
-           WHERE company_id = $1 AND work_date >= date_trunc('week', CURRENT_DATE)
+           WHERE company_id = $1 AND work_date >= $3::date
              AND wage_type = 'regular' AND status != 'rejected'
            GROUP BY user_id, work_date
            HAVING SUM(
@@ -116,7 +118,7 @@ router.get('/kpis', requireAdmin, async (req, res) => {
              )) / 3600 - (break_minutes::float / 60)
            ) > $2
          ) sub`,
-        [companyId, overtime_threshold]
+        [companyId, overtime_threshold, weekStartDateStr]
       );
       otWorkers = parseInt(r.rows[0].count);
     }
@@ -592,7 +594,12 @@ router.get('/workers', requireAdmin, async (req, res) => {
   try {
     const settings = await getSettings(companyId);
     const threshold = parseFloat(settings.overtime_threshold) || 8;
-    const queryParams = accessIds && accessIds.length ? [companyId, threshold, accessIds] : [companyId, threshold];
+    const weekStart = parseInt(settings.week_start ?? 1, 10);
+    // Week-start-aware bucket: start-of-week date for any given work_date. Postgres's
+    // EXTRACT(DOW) is 0..6 (Sun..Sat); we offset by (weekStart) and mod 7 to get
+    // the number of days to subtract to reach the week's first day.
+    const queryParams = accessIds && accessIds.length ? [companyId, threshold, accessIds, weekStart] : [companyId, threshold, null, weekStart];
+    const wsIdx = queryParams.length; // bind index for week_start
     const result = await pool.query(
       `WITH daily_regular AS (
         SELECT user_id, work_date,
@@ -604,10 +611,10 @@ router.get('/workers', requireAdmin, async (req, res) => {
       ),
       weekly_regular AS (
         SELECT user_id,
-          date_trunc('week', work_date) as week_start,
+          (work_date - ((EXTRACT(DOW FROM work_date)::int - $${wsIdx} + 7) % 7))::date as week_start,
           SUM(day_hours) as week_hours
         FROM daily_regular
-        GROUP BY user_id, date_trunc('week', work_date)
+        GROUP BY user_id, (work_date - ((EXTRACT(DOW FROM work_date)::int - $${wsIdx} + 7) % 7))::date
       )
       SELECT u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id,
         COUNT(te.id) as total_entries,
@@ -762,7 +769,7 @@ router.get('/workers/:id/entries', requireAdmin, async (req, res) => {
     const settings = await getSettings(companyId);
     const worker = userResult.rows[0];
     const workerOTRule = worker.overtime_rule || 'daily';
-    const { regularHours, overtimeHours } = computeOT(entries, workerOTRule, settings.overtime_threshold);
+    const { regularHours, overtimeHours } = computeOT(entries, workerOTRule, settings.overtime_threshold, settings.week_start);
     const prevailingHours = entries.filter(e => e.wage_type === 'prevailing').reduce((sum, e) => {
       const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
       return sum + h;
@@ -1244,7 +1251,7 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
     });
     let regularHours = 0, overtimeHours = 0, regularCost = 0, overtimeCost = 0;
     Object.values(workerEntries).forEach(({ items, rate, rate_type, overtime_rule }) => {
-      const { regularHours: reg, overtimeHours: ot } = computeOT(items, overtime_rule, settings.overtime_threshold);
+      const { regularHours: reg, overtimeHours: ot } = computeOT(items, overtime_rule, settings.overtime_threshold, settings.week_start);
       regularHours += reg; overtimeHours += ot;
       if (rate_type === 'daily') {
         const dc = computeDailyPayCosts(items, overtime_rule, settings.overtime_threshold, rate, settings.overtime_multiplier);
@@ -1925,6 +1932,12 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
   const toDate = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : null;
   const hoursExpr = `EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600`;
   try {
+    const settings = await getSettings(companyId);
+    const ws = parseInt(settings.week_start ?? 1, 10);
+    const weekStartDate = weekRange(ws, 0).from; // Monday-of-this-week, respecting setting
+    // SQL fragment that computes the start-of-week date for any `work_date`, honoring week_start.
+    // (EXTRACT DOW is 0-6 Sun..Sat; subtract (dow - ws) mod 7 days to land on the week's first day.)
+    const weekBucketSql = `(work_date - ((EXTRACT(DOW FROM work_date)::int - ${ws} + 7) % 7))::date`;
     const [daily, weekly, projects, workers, summary] = await Promise.all([
       // Hours per day — custom range or last 14 days
       fromDate || toDate
@@ -1949,7 +1962,7 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
       // Hours per week — custom range or last 12 weeks
       fromDate || toDate
         ? pool.query(
-            `SELECT to_char(date_trunc('week', work_date), 'YYYY-MM-DD') as week_start,
+            `SELECT to_char(${weekBucketSql}, 'YYYY-MM-DD') as week_start,
                     ROUND(SUM(${hoursExpr})::numeric, 1) as hours
              FROM time_entries
              WHERE company_id = $1
@@ -1959,7 +1972,7 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
             [companyId, fromDate, toDate]
           )
         : pool.query(
-            `SELECT to_char(date_trunc('week', work_date), 'YYYY-MM-DD') as week_start,
+            `SELECT to_char(${weekBucketSql}, 'YYYY-MM-DD') as week_start,
                     ROUND(SUM(${hoursExpr})::numeric, 1) as hours
              FROM time_entries
              WHERE company_id = $1 AND work_date >= CURRENT_DATE - 83
@@ -1995,19 +2008,19 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
       // Summary stats — always current (this week / this month)
       pool.query(
         `SELECT
-           ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('week', CURRENT_DATE)
+           ROUND(COALESCE(SUM(CASE WHEN work_date >= $2::date
              THEN ${hoursExpr} END), 0)::numeric, 1) as hours_this_week,
-           COUNT(DISTINCT CASE WHEN work_date >= date_trunc('week', CURRENT_DATE) THEN user_id END) as active_workers_this_week,
+           COUNT(DISTINCT CASE WHEN work_date >= $2::date THEN user_id END) as active_workers_this_week,
            COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN user_id END) as active_workers_this_month,
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE)
              THEN ${hoursExpr} END), 0)::numeric, 1) as hours_this_month,
            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_approvals,
-           ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('week', CURRENT_DATE) THEN mileage END), 0)::numeric, 1) as mileage_this_week,
+           ROUND(COALESCE(SUM(CASE WHEN work_date >= $2::date THEN mileage END), 0)::numeric, 1) as mileage_this_week,
            ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN mileage END), 0)::numeric, 1) as mileage_this_month
          FROM time_entries WHERE company_id = $1
            AND (work_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
                 OR status = 'pending')`,
-        [companyId]
+        [companyId, weekStartDate]
       ),
     ]);
 
@@ -2511,7 +2524,7 @@ router.get('/overtime-report', requireAdmin, requirePermission('view_reports'), 
     const rows = workers.rows.map(w => {
       const wEntries = byWorker[w.id] || [];
       const workerOTRule = w.overtime_rule || 'daily';
-      const { regularHours, overtimeHours } = computeOT(wEntries, workerOTRule, threshold);
+      const { regularHours, overtimeHours } = computeOT(wEntries, workerOTRule, threshold, s.week_start);
       let prevHours = 0, prevailingCost = 0;
       wEntries.filter(e => e.wage_type === 'prevailing').forEach(e => {
         const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
@@ -2592,7 +2605,7 @@ router.get('/payroll-export', requireAdmin, requirePermission('view_reports'), r
     workers.rows.forEach(w => {
       const wEntries = byWorker[w.id] || [];
       const workerOTRule = w.overtime_rule || 'daily';
-      const { regularHours, overtimeHours } = computeOT(wEntries, workerOTRule, threshold);
+      const { regularHours, overtimeHours } = computeOT(wEntries, workerOTRule, threshold, s.week_start);
       let prevHours = 0, prevailingCost = 0;
       wEntries.filter(e => e.wage_type === 'prevailing').forEach(e => {
         const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
@@ -2805,6 +2818,9 @@ router.get('/analytics', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   const hoursExpr = `EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END))/3600`;
   try {
+    const settings2 = await getSettings(companyId);
+    const ws2 = parseInt(settings2.week_start ?? 1, 10);
+    const weekBucketSql2 = `(work_date - ((EXTRACT(DOW FROM work_date)::int - ${ws2} + 7) % 7))::date`;
     const [summaryRes, weeklyRes, byProjectRes, topWorkersRes, statusRes] = await Promise.all([
       pool.query(`
         SELECT
@@ -2823,7 +2839,7 @@ router.get('/analytics', requireAdmin, async (req, res) => {
 
       pool.query(`
         SELECT
-          date_trunc('week', work_date::timestamp)::date AS week_start,
+          ${weekBucketSql2} AS week_start,
           ROUND(COALESCE(SUM(${hoursExpr}), 0)::numeric, 1) AS hours,
           COUNT(DISTINCT user_id) AS workers,
           COUNT(*) AS entries
