@@ -5,6 +5,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem, createInboxItemBatch } = require('./inbox');
 const { logAudit } = require('../auditLog');
+const { weekRange } = require('../utils/weekBounds');
 
 // Cap shift writes per user. Admins legitimately create shifts in bursts
 // (weekly scheduling), so the ceiling is higher than chat but still prevents
@@ -205,10 +206,16 @@ router.get('/mine', requireAuth, async (req, res) => {
     const { plan, subscription_status, trial_ends_at } = co.rows[0] || {};
     const trialActive = subscription_status === 'trial' && (!trial_ends_at || new Date(trial_ends_at) >= new Date());
     const isFree = plan === 'free' && !trialActive;
-    // Free plan: current week only (Mon–Sun). Starter+: any future shift.
-    const dateClause = isFree
-      ? `AND s.shift_date >= date_trunc('week', CURRENT_DATE) AND s.shift_date < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'`
-      : `AND s.shift_date >= CURRENT_DATE`;
+    // Free plan: current week only. Starter+: any future shift.
+    let params = [req.user.id];
+    let dateClause = `AND s.shift_date >= CURRENT_DATE`;
+    if (isFree) {
+      const wsRow = await pool.query("SELECT value FROM settings WHERE company_id = $1 AND key = 'week_start'", [req.user.company_id]);
+      const ws = parseInt(wsRow.rows[0]?.value ?? '1', 10);
+      const weekStartDate = weekRange(ws, 0).from;
+      params.push(weekStartDate);
+      dateClause = `AND s.shift_date >= $${params.length}::date AND s.shift_date < ($${params.length}::date + INTERVAL '7 days')`;
+    }
 
     const result = await pool.query(
       `SELECT s.*, p.name as project_name
@@ -216,7 +223,7 @@ router.get('/mine', requireAuth, async (req, res) => {
        WHERE s.user_id = $1 ${dateClause}
        ORDER BY s.shift_date ASC, s.start_time ASC
        LIMIT 14`,
-      [req.user.id]
+      params
     );
     res.json(result.rows);
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }

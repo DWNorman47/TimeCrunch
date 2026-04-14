@@ -275,7 +275,7 @@ export default function AdminDashboard() {
           </Suspense>
         ) : tab === 'manage' ? (
           <Suspense fallback={<TabLoader />}>
-            {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
+            {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} weekStart={settings?.week_start ?? 1} />}
           </Suspense>
         ) : null}
           </ErrorBoundary>

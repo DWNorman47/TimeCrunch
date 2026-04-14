@@ -61,7 +61,7 @@ export default function AnalyticsPage() {
         {loading ? (
           <><SkeletonStatRow count={4} style={{ marginBottom: 16 }} /><SkeletonList count={4} /></>
         ) : plan.isBusiness ? (
-          <AnalyticsDashboard />
+          <AnalyticsDashboard weekStart={features?.week_start ?? 1} />
         ) : (
           <UpgradePrompt />
         )}

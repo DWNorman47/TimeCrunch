@@ -695,14 +695,15 @@ function isoDate(d) {
  */
 async function getOvertimeSettings(companyId) {
   const { rows } = await pool.query(
-    "SELECT key, value FROM settings WHERE company_id = $1 AND key IN ('overtime_rule','overtime_threshold','overtime_multiplier')",
+    "SELECT key, value FROM settings WHERE company_id = $1 AND key IN ('overtime_rule','overtime_threshold','overtime_multiplier','week_start')",
     [companyId]
   );
   const pick = k => rows.find(r => r.key === k)?.value;
   const rule = pick('overtime_rule') || 'daily';
   const threshold = parseFloat(pick('overtime_threshold')) || (rule === 'weekly' ? 40 : 8);
   const multiplier = parseFloat(pick('overtime_multiplier')) || 1.5;
-  return { rule, threshold, multiplier };
+  const weekStart = parseInt(pick('week_start') ?? '1', 10);
+  return { rule, threshold, multiplier, weekStart };
 }
 
 /**
@@ -711,7 +712,7 @@ async function getOvertimeSettings(companyId) {
  * Premium = ot_hours × base_rate × (multiplier - 1), which is what needs to
  * be added on top of the straight hours × base_rate already billed per entry.
  */
-function computeGroupOvertime(group, companyRule, threshold, multiplier) {
+function computeGroupOvertime(group, companyRule, threshold, multiplier, weekStart = 1) {
   const rule = group.overtimeRule || companyRule;
   if (rule === 'none' || !group.timeEntries.length) {
     return { overtimeHours: 0, overtimePremium: 0, rule };
@@ -723,7 +724,7 @@ function computeGroupOvertime(group, companyRule, threshold, multiplier) {
     wage_type:     te.wageType,
     break_minutes: te.breakMinutes,
   }));
-  const { overtimeHours } = computeOT(entries, rule, threshold);
+  const { overtimeHours } = computeOT(entries, rule, threshold, weekStart);
   const premium = overtimeHours * group.hourlyRate * (multiplier - 1);
   return { overtimeHours, overtimePremium: premium, rule };
 }
@@ -741,7 +742,7 @@ router.post('/push-bills-preview', requireAdmin, async (req, res) => {
       const laborHours = g.timeEntries.reduce((s, t) => s + t.hours, 0);
       const laborAmount = laborHours * g.hourlyRate;
       const reimbAmount = g.reimbursements.reduce((s, r) => s + r.amount, 0);
-      const { overtimeHours, overtimePremium } = computeGroupOvertime(g, ot.rule, ot.threshold, ot.multiplier);
+      const { overtimeHours, overtimePremium } = computeGroupOvertime(g, ot.rule, ot.threshold, ot.multiplier, ot.weekStart);
       return {
         user_id: g.userId,
         full_name: g.fullName,
@@ -792,8 +793,7 @@ router.post('/push-bills', requireAdmin, async (req, res) => {
     const laborItemId      = settingRows.rows.find(r => r.key === 'qbo_labor_item_id')?.value;
     const termsDays        = parseInt(settingRows.rows.find(r => r.key === 'qbo_bill_terms_days')?.value || '0', 10);
 
-    if (!laborItemId)      return res.status(400).json({ error: 'Configure a Labor Item in QBO Settings before pushing bills.' });
-    if (!expenseAccountId) return res.status(400).json({ error: 'Configure an Expense Account in QBO Settings before pushing bills.' });
+    if (!laborItemId) return res.status(400).json({ error: 'Configure a Labor Service Item before pushing bills.' });
 
     const company = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
     if (!company.rows[0]?.qbo_realm_id) return res.status(400).json({ error: 'QuickBooks not connected' });
@@ -802,6 +802,13 @@ router.post('/push-bills', requireAdmin, async (req, res) => {
       gatherBillData(companyId, { from, to, workerIds: worker_ids, force }),
       getOvertimeSettings(companyId),
     ]);
+
+    // Only require the expense account when we actually need it (any reimbursement
+    // line in this push). Contractors paid for time only don't need it.
+    const anyReimbursements = groups.some(g => g.reimbursements.length > 0);
+    if (anyReimbursements && !expenseAccountId) {
+      return res.status(400).json({ error: 'Some contractors have reimbursements — set a Reimbursement Expense Account before pushing.' });
+    }
 
     const today = new Date().toLocaleDateString('en-CA');
     const dueDate = (() => {
@@ -840,7 +847,7 @@ router.post('/push-bills', requireAdmin, async (req, res) => {
       // Overtime premium: an extra item-based line that covers the (multiplier-1)
       // uplift on OT hours. The per-entry lines above price straight hours at
       // the base rate; this line makes the contractor whole for their OT shifts.
-      const { overtimeHours, overtimePremium } = computeGroupOvertime(g, ot.rule, ot.threshold, ot.multiplier);
+      const { overtimeHours, overtimePremium } = computeGroupOvertime(g, ot.rule, ot.threshold, ot.multiplier, ot.weekStart);
       if (overtimeHours > 0 && overtimePremium > 0) {
         lines.push({
           type: 'item',

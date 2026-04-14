@@ -3,6 +3,7 @@ import api from '../api';
 import { useT } from '../hooks/useT';
 import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
+import { weekRange } from '../utils/weekBounds';
 
 import { silentError } from '../errorReporter';
 const VENDOR_TYPES = ['contractor', 'subcontractor'];
@@ -10,13 +11,36 @@ const EMPLOYEE_TYPES = ['employee', 'owner'];
 const IMPORT_PAGE_SIZE = 15;
 const MAP_PAGE_SIZE = 20;
 
-function CollapsibleSection({ title, badge, defaultOpen = false, children }) {
-  const [open, setOpen] = useState(defaultOpen);
+// Wrapper for the shared helper: previous full week honoring weekStart (0-6).
+function previousWeekRange(weekStart = 1) {
+  return weekRange(weekStart, -1);
+}
+
+function CollapsibleSection({ title, badge, defaultOpen = false, storageKey, children }) {
+  const storageFullKey = storageKey ? `qbo-section:${storageKey}` : null;
+  const [open, setOpen] = useState(() => {
+    if (!storageFullKey) return defaultOpen;
+    try {
+      const saved = localStorage.getItem(storageFullKey);
+      if (saved === '1') return true;
+      if (saved === '0') return false;
+    } catch { /* localStorage disabled */ }
+    return defaultOpen;
+  });
+  const toggle = () => {
+    setOpen(prev => {
+      const next = !prev;
+      if (storageFullKey) {
+        try { localStorage.setItem(storageFullKey, next ? '1' : '0'); } catch { /* no-op */ }
+      }
+      return next;
+    });
+  };
   return (
     <div style={styles.section}>
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={toggle}
         aria-expanded={open}
         style={{
           display: 'flex', alignItems: 'center', gap: 8, width: '100%',
@@ -67,14 +91,14 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [clearingErrors, setClearingErrors] = useState(false);
   const [retryingErrors, setRetryingErrors] = useState(new Set());
   // Bulk expense push
-  const [expFrom, setExpFrom] = useState('');
-  const [expTo, setExpTo] = useState('');
+  const [expFrom, setExpFrom] = useState(() => previousWeekRange(settings?.week_start).from);
+  const [expTo, setExpTo] = useState(() => previousWeekRange(settings?.week_start).to);
   const [expForce, setExpForce] = useState(false);
   const [expPushing, setExpPushing] = useState(false);
   const [expResult, setExpResult] = useState(null);
   // Payroll journal entry
-  const [payFrom, setPayFrom] = useState('');
-  const [payTo, setPayTo] = useState('');
+  const [payFrom, setPayFrom] = useState(() => previousWeekRange(settings?.week_start).from);
+  const [payTo, setPayTo] = useState(() => previousWeekRange(settings?.week_start).to);
   const [payDebitId, setPayDebitId] = useState('');
   const [payCreditId, setPayCreditId] = useState('');
   const [payPushing, setPayPushing] = useState(false);
@@ -83,14 +107,27 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [vendorMappings, setVendorMappings] = useState({});
   const [projectMappings, setProjectMappings] = useState({});
   const [classMappings, setClassMappings] = useState({});
-  const [pushFrom, setPushFrom] = useState('');
-  const [pushTo, setPushTo] = useState('');
+  const [pushFrom, setPushFrom] = useState(() => previousWeekRange(settings?.week_start).from);
+  const [pushTo, setPushTo] = useState(() => previousWeekRange(settings?.week_start).to);
   const [pushResult, setPushResult] = useState(null);
   const [pushing, setPushing] = useState(false);
   const [forcePush, setForcePush] = useState(false);
   // Push contractor Bills (time + reimbursements grouped per vendor)
-  const [billFrom, setBillFrom] = useState('');
-  const [billTo, setBillTo] = useState('');
+  // Default date range = previous full week, using the company's week_start setting
+  const [billFrom, setBillFrom] = useState(() => previousWeekRange(settings?.week_start).from);
+  const [billTo, setBillTo] = useState(() => previousWeekRange(settings?.week_start).to);
+  // If settings arrive after mount, recompute all push-section defaults against the real week_start
+  const syncedWeekDefaultsRef = React.useRef(settings?.week_start != null);
+  useEffect(() => {
+    if (settings?.week_start != null && !syncedWeekDefaultsRef.current) {
+      const r = previousWeekRange(settings.week_start);
+      setBillFrom(r.from); setBillTo(r.to);
+      setExpFrom(r.from);  setExpTo(r.to);
+      setPayFrom(r.from);  setPayTo(r.to);
+      setPushFrom(r.from); setPushTo(r.to);
+      syncedWeekDefaultsRef.current = true;
+    }
+  }, [settings?.week_start]);
   const [billForce, setBillForce] = useState(false);
   const [billSelectedWorkers, setBillSelectedWorkers] = useState(new Set());
   const [billPreview, setBillPreview] = useState(null);
@@ -531,7 +568,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             const page = workerMapPages[type] || 0;
             const pagedWorkers = typeWorkers.slice(page * MAP_PAGE_SIZE, (page + 1) * MAP_PAGE_SIZE);
             return (
-              <CollapsibleSection key={type} title={TYPE_LABELS[type]} badge={typeWorkers.length}>
+              <CollapsibleSection key={type} title={TYPE_LABELS[type]} badge={typeWorkers.length} storageKey={`mappings-${type}`}>
                 {loadingMappings ? <p>{t.qboLoadingData}</p> : (
                   <>
                     <table style={styles.table}>
@@ -574,7 +611,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           })}
 
           {/* ── Project mapping table ── */}
-          <CollapsibleSection title={t.qboProjectMappings} badge={projects.length}>
+          <CollapsibleSection title={t.qboProjectMappings} badge={projects.length} storageKey="project-mappings">
             <p style={styles.hint}>{t.qboProjectMappingsHint}</p>
             {loadingMappings ? <p>{t.qboLoadingCustomers}</p> : (
               <>
@@ -635,6 +672,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             <CollapsibleSection
               title={t.qboImportFromQB}
               badge={totalSelections > 0 ? `${totalSelections} selected` : undefined}
+              storageKey="import"
             >
               <p style={styles.hint}>{t.qboImportHint}</p>
 
@@ -805,7 +843,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           )}
 
           {/* ── Auto-sync settings ── */}
-          <CollapsibleSection title="Auto-sync Settings">
+          <CollapsibleSection title="Auto-sync Settings" storageKey="auto-sync">
             <p style={styles.hint}>Automatically push records to QuickBooks when approved. Workers and projects must be mapped above for auto-sync to work.</p>
 
             <label style={styles.syncToggle}>
@@ -906,7 +944,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
 
           {/* ── Push expense reimbursements — only when the reimbursements feature is on ── */}
           {settings?.feature_reimbursements !== false && (
-          <CollapsibleSection title="Push Expense Reimbursements">
+          <CollapsibleSection title="Push Expense Reimbursements" storageKey="push-expenses">
             <p style={styles.hint}>Manually push approved reimbursements to QuickBooks as Purchase records for a date range.</p>
             <div style={styles.pushRow}>
               <div>
@@ -947,7 +985,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           )}
 
           {/* ── Payroll journal entry ── */}
-          <CollapsibleSection title="Push Payroll Journal Entry">
+          <CollapsibleSection title="Push Payroll Journal Entry" storageKey="push-payroll">
             <p style={styles.hint}>Creates a journal entry in QuickBooks for the total labor cost of approved time entries in a date range. Select the wage expense account to debit and the liability or bank account to credit.</p>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
               <div>
@@ -997,7 +1035,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           </CollapsibleSection>
 
           {/* ── Push Bills (contractor time + reimbursements per vendor) ── */}
-          <CollapsibleSection title="Push Bills (Contractors)">
+          <CollapsibleSection title="Push Bills (Contractors)" storageKey="push-bills">
             <p style={styles.hint}>
               Creates one QBO Bill per contractor, combining approved time entries (as labor lines) and approved reimbursements (as expense lines) for the selected date range. Only contractors with a mapped QBO Vendor appear.
             </p>
@@ -1005,8 +1043,8 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             {/* Required settings */}
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16 }}>
               <div style={{ flex: 1, minWidth: 240 }}>
-                <label htmlFor="qbo-labor-item" style={styles.label}>Labor Service Item</label>
-                <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>The QBO Service item used on Bill labor lines (hours × rate). Required.</p>
+                <label htmlFor="qbo-labor-item" style={styles.label}>Labor Service Item *</label>
+                <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>QBO Service item used on Bill labor lines (hours × rate).</p>
                 <select
                   id="qbo-labor-item"
                   style={styles.select}
@@ -1017,6 +1055,22 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                   <option value="">— Select item —</option>
                   {qboItems.map(it => (
                     <option key={it.Id} value={it.Id}>{it.Name}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <label htmlFor="qbo-bill-expense" style={styles.label}>Reimbursement Expense Account</label>
+                <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>Only needed if you're billing reimbursements. The QBO account where mileage / expense dollars post (e.g. "Travel" or "Subcontractor Reimbursements").</p>
+                <select
+                  id="qbo-bill-expense"
+                  style={styles.select}
+                  value={settings?.qbo_expense_account_id || ''}
+                  onChange={e => saveAutoSyncSetting('qbo_expense_account_id', e.target.value)}
+                  disabled={savingAutoSync || loadingAccounts}
+                >
+                  <option value="">— Select account —</option>
+                  {qboAccounts.filter(a => ['Expense', 'OtherExpense', 'CostOfGoodsSold'].includes(a.AccountType)).map(a => (
+                    <option key={a.Id} value={a.Id}>{a.Name}</option>
                   ))}
                 </select>
               </div>
@@ -1034,9 +1088,9 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 />
               </div>
             </div>
-            {(!settings?.qbo_labor_item_id || !settings?.qbo_expense_account_id) && (
+            {!settings?.qbo_labor_item_id && (
               <p role="alert" style={{ fontSize: 13, color: '#92400e', background: '#fef3c7', padding: '8px 12px', borderRadius: 6, marginBottom: 12 }}>
-                Set a Labor Service Item (above) and an Expense Category Account (in the Auto-Sync settings) before pushing bills.
+                Labor Service Item is required. Reimbursement Expense Account is only needed if any contractor has reimbursements in the range.
               </p>
             )}
 
@@ -1105,11 +1159,14 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
               const missingLabor = !settings?.qbo_labor_item_id;
               const missingExpense = !settings?.qbo_expense_account_id;
               const noPreview = !billPreview || billPreview.length === 0;
-              const pushDisabled = billPushing || noPreview || missingLabor || missingExpense;
+              // Expense account is only required when at least one bill includes reimbursements
+              const previewHasReimbs = billPreview?.some(g => (g.reimbursements || 0) > 0);
+              const needExpenseAcct = previewHasReimbs && missingExpense;
+              const pushDisabled = billPushing || noPreview || missingLabor || needExpenseAcct;
               const reason = missingLabor
-                ? 'Set a Labor Service Item in the settings above first.'
-                : missingExpense
-                ? 'Set an Expense Category Account in the Auto-sync settings first.'
+                ? 'Set a Labor Service Item above first.'
+                : needExpenseAcct
+                ? 'One or more contractors have reimbursements — set a Reimbursement Expense Account first.'
                 : noPreview
                 ? 'Click Preview first to see what will be billed.'
                 : null;
@@ -1319,7 +1376,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           </CollapsibleSection>
 
           {/* ── Push time entries ── */}
-          <CollapsibleSection title={t.qboPushEntries}>
+          <CollapsibleSection title={t.qboPushEntries} storageKey="push-time">
             <p style={styles.hint}>{t.qboPushHint}</p>
             <div style={styles.pushRow}>
               <div>
