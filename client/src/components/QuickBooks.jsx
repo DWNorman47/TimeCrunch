@@ -10,6 +10,32 @@ const EMPLOYEE_TYPES = ['employee', 'owner'];
 const IMPORT_PAGE_SIZE = 15;
 const MAP_PAGE_SIZE = 20;
 
+function CollapsibleSection({ title, badge, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={styles.section}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+          textAlign: 'left', minHeight: 'unset',
+          marginBottom: open ? 12 : 0,
+        }}
+      >
+        <span style={{ fontSize: 12, color: '#6b7280', width: 12, display: 'inline-block' }}>
+          {open ? '▾' : '▸'}
+        </span>
+        <h3 style={{ ...styles.sectionTitle, margin: 0 }}>{title}</h3>
+        {badge != null && <span style={styles.countBadge}>{badge}</span>}
+      </button>
+      {open && <div>{children}</div>}
+    </div>
+  );
+}
+
 function Paginator({ page, total, pageSize, onChange }) {
   const t = useT();
   if (total <= pageSize) return null;
@@ -68,6 +94,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [billForce, setBillForce] = useState(false);
   const [billSelectedWorkers, setBillSelectedWorkers] = useState(new Set());
   const [billPreview, setBillPreview] = useState(null);
+  const [billExpanded, setBillExpanded] = useState(new Set());
   const [billPreviewing, setBillPreviewing] = useState(false);
   const [billPushing, setBillPushing] = useState(false);
   const [billResult, setBillResult] = useState(null);
@@ -224,6 +251,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
         force: billForce || undefined,
       });
       setBillPreview(r.data.groups || []);
+      setBillExpanded(new Set());
     } catch (err) {
       setError(err.response?.data?.error || 'Preview failed');
     } finally {
@@ -500,11 +528,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             const page = workerMapPages[type] || 0;
             const pagedWorkers = typeWorkers.slice(page * MAP_PAGE_SIZE, (page + 1) * MAP_PAGE_SIZE);
             return (
-              <div key={type} style={styles.section}>
-                <div style={styles.sectionHeader}>
-                  <h3 style={styles.sectionTitle}>{TYPE_LABELS[type]}</h3>
-                  <span style={styles.countBadge}>{typeWorkers.length}</span>
-                </div>
+              <CollapsibleSection key={type} title={TYPE_LABELS[type]} badge={typeWorkers.length}>
                 {loadingMappings ? <p>{t.qboLoadingData}</p> : (
                   <>
                     <table style={styles.table}>
@@ -542,16 +566,12 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                     />
                   </>
                 )}
-              </div>
+              </CollapsibleSection>
             );
           })}
 
           {/* ── Project mapping table ── */}
-          <div style={styles.section}>
-            <div style={styles.sectionHeader}>
-              <h3 style={styles.sectionTitle}>{t.qboProjectMappings}</h3>
-              <span style={styles.countBadge}>{projects.length}</span>
-            </div>
+          <CollapsibleSection title={t.qboProjectMappings} badge={projects.length}>
             <p style={styles.hint}>{t.qboProjectMappingsHint}</p>
             {loadingMappings ? <p>{t.qboLoadingCustomers}</p> : (
               <>
@@ -605,17 +625,14 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 />
               </>
             )}
-          </div>
+          </CollapsibleSection>
 
           {/* ── Import from QuickBooks ── */}
           {!loadingMappings && totalUnmapped > 0 && (
-            <div style={styles.section}>
-              <div style={styles.sectionHeader}>
-                <h3 style={styles.sectionTitle}>{t.qboImportFromQB}</h3>
-                {totalSelections > 0 && (
-                  <span style={styles.selectedBadge}>{totalSelections} selected</span>
-                )}
-              </div>
+            <CollapsibleSection
+              title={t.qboImportFromQB}
+              badge={totalSelections > 0 ? `${totalSelections} selected` : undefined}
+            >
               <p style={styles.hint}>{t.qboImportHint}</p>
 
               <input
@@ -781,12 +798,11 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                   )}
                 </div>
               )}
-            </div>
+            </CollapsibleSection>
           )}
 
           {/* ── Auto-sync settings ── */}
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Auto-sync Settings</h3>
+          <CollapsibleSection title="Auto-sync Settings">
             <p style={styles.hint}>Automatically push records to QuickBooks when approved. Workers and projects must be mapped above for auto-sync to work.</p>
 
             <label style={styles.syncToggle}>
@@ -883,12 +899,11 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 </div>
               </div>
             )}
-          </div>
+          </CollapsibleSection>
 
           {/* ── Push expense reimbursements — only when the reimbursements feature is on ── */}
           {settings?.feature_reimbursements !== false && (
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Push Expense Reimbursements</h3>
+          <CollapsibleSection title="Push Expense Reimbursements">
             <p style={styles.hint}>Manually push approved reimbursements to QuickBooks as Purchase records for a date range.</p>
             <div style={styles.pushRow}>
               <div>
@@ -925,12 +940,11 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 )}
               </div>
             )}
-          </div>
+          </CollapsibleSection>
           )}
 
           {/* ── Payroll journal entry ── */}
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Push Payroll Journal Entry</h3>
+          <CollapsibleSection title="Push Payroll Journal Entry">
             <p style={styles.hint}>Creates a journal entry in QuickBooks for the total labor cost of approved time entries in a date range. Select the wage expense account to debit and the liability or bank account to credit.</p>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
               <div>
@@ -977,11 +991,10 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 <p style={{ margin: '4px 0 0', fontSize: 13, color: '#6b7280' }}>{payResult.description}</p>
               </div>
             )}
-          </div>
+          </CollapsibleSection>
 
           {/* ── Push Bills (contractor time + reimbursements per vendor) ── */}
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Push Bills (Contractors)</h3>
+          <CollapsibleSection title="Push Bills (Contractors)">
             <p style={styles.hint}>
               Creates one QBO Bill per contractor, combining approved time entries (as labor lines) and approved reimbursements (as expense lines) for the selected date range. Only contractors with a mapped QBO Vendor appear.
             </p>
@@ -1111,6 +1124,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 <table style={styles.table}>
                   <thead>
                     <tr>
+                      <th style={{ ...styles.th, width: 28 }} aria-label="Expand"></th>
                       <th style={styles.th}>Contractor</th>
                       <th style={{ ...styles.th, textAlign: 'right' }}>Hours</th>
                       <th style={{ ...styles.th, textAlign: 'right' }}>Labor $</th>
@@ -1119,16 +1133,100 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                     </tr>
                   </thead>
                   <tbody>
-                    {billPreview.map(g => (
-                      <tr key={g.user_id}>
-                        <td style={styles.td}>{g.full_name}</td>
-                        <td style={{ ...styles.td, textAlign: 'right' }}>{g.hours.toFixed(2)}</td>
-                        <td style={{ ...styles.td, textAlign: 'right' }}>${g.labor_amount.toFixed(2)}</td>
-                        <td style={{ ...styles.td, textAlign: 'right' }}>${g.reimb_amount.toFixed(2)}</td>
-                        <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>${g.total.toFixed(2)}</td>
-                      </tr>
-                    ))}
+                    {billPreview.map(g => {
+                      const open = billExpanded.has(g.user_id);
+                      const toggle = () => setBillExpanded(prev => {
+                        const next = new Set(prev);
+                        if (next.has(g.user_id)) next.delete(g.user_id); else next.add(g.user_id);
+                        return next;
+                      });
+                      return (
+                        <React.Fragment key={g.user_id}>
+                          <tr onClick={toggle} style={{ cursor: 'pointer' }}>
+                            <td style={styles.td}>
+                              <button
+                                type="button"
+                                aria-expanded={open}
+                                aria-label={open ? 'Collapse' : 'Expand'}
+                                onClick={e => { e.stopPropagation(); toggle(); }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 12, color: '#6b7280', minHeight: 'unset' }}
+                              >
+                                {open ? '▾' : '▸'}
+                              </button>
+                            </td>
+                            <td style={styles.td}>{g.full_name}</td>
+                            <td style={{ ...styles.td, textAlign: 'right' }}>{g.hours.toFixed(2)}</td>
+                            <td style={{ ...styles.td, textAlign: 'right' }}>${g.labor_amount.toFixed(2)}</td>
+                            <td style={{ ...styles.td, textAlign: 'right' }}>${g.reimb_amount.toFixed(2)}</td>
+                            <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>${g.total.toFixed(2)}</td>
+                          </tr>
+                          {open && (
+                            <tr>
+                              <td colSpan={6} style={{ ...styles.td, background: '#f9fafb', padding: '12px 16px' }}>
+                                {g.time_entry_rows?.length > 0 && (
+                                  <div style={{ marginBottom: g.reimbursement_rows?.length ? 14 : 0 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                                      Time entries ({g.time_entry_rows.length})
+                                    </div>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                      <thead>
+                                        <tr>
+                                          <th style={{ textAlign: 'left', padding: '4px 8px', color: '#6b7280', fontWeight: 600, width: 100 }}>Date</th>
+                                          <th style={{ textAlign: 'left', padding: '4px 8px', color: '#6b7280', fontWeight: 600 }}>Project</th>
+                                          <th style={{ textAlign: 'left', padding: '4px 8px', color: '#6b7280', fontWeight: 600 }}>Notes</th>
+                                          <th style={{ textAlign: 'right', padding: '4px 8px', color: '#6b7280', fontWeight: 600, width: 70 }}>Hours</th>
+                                          <th style={{ textAlign: 'right', padding: '4px 8px', color: '#6b7280', fontWeight: 600, width: 90 }}>Amount</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {g.time_entry_rows.map(te => (
+                                          <tr key={te.id}>
+                                            <td style={{ padding: '4px 8px', color: '#111827' }}>{te.work_date}</td>
+                                            <td style={{ padding: '4px 8px', color: '#111827' }}>{te.project_name || '—'}</td>
+                                            <td style={{ padding: '4px 8px', color: '#6b7280' }}>{te.description || '—'}</td>
+                                            <td style={{ padding: '4px 8px', textAlign: 'right', color: '#111827' }}>{te.hours.toFixed(2)}</td>
+                                            <td style={{ padding: '4px 8px', textAlign: 'right', color: '#111827' }}>${te.amount.toFixed(2)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                                {g.reimbursement_rows?.length > 0 && (
+                                  <div>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                                      Reimbursements ({g.reimbursement_rows.length})
+                                    </div>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                      <thead>
+                                        <tr>
+                                          <th style={{ textAlign: 'left', padding: '4px 8px', color: '#6b7280', fontWeight: 600, width: 100 }}>Date</th>
+                                          <th style={{ textAlign: 'left', padding: '4px 8px', color: '#6b7280', fontWeight: 600 }}>Project</th>
+                                          <th style={{ textAlign: 'left', padding: '4px 8px', color: '#6b7280', fontWeight: 600 }}>Description</th>
+                                          <th style={{ textAlign: 'right', padding: '4px 8px', color: '#6b7280', fontWeight: 600, width: 90 }}>Amount</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {g.reimbursement_rows.map(r => (
+                                          <tr key={r.id}>
+                                            <td style={{ padding: '4px 8px', color: '#111827' }}>{r.expense_date}</td>
+                                            <td style={{ padding: '4px 8px', color: '#111827' }}>{r.project_name || '—'}</td>
+                                            <td style={{ padding: '4px 8px', color: '#6b7280' }}>{r.description || '—'}</td>
+                                            <td style={{ padding: '4px 8px', textAlign: 'right', color: '#111827' }}>${r.amount.toFixed(2)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                     <tr>
+                      <td style={styles.td}></td>
                       <td style={{ ...styles.td, fontWeight: 700 }}>Total</td>
                       <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>
                         {billPreview.reduce((s, g) => s + g.hours, 0).toFixed(2)}
@@ -1179,11 +1277,10 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 )}
               </div>
             )}
-          </div>
+          </CollapsibleSection>
 
           {/* ── Push time entries ── */}
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>{t.qboPushEntries}</h3>
+          <CollapsibleSection title={t.qboPushEntries}>
             <p style={styles.hint}>{t.qboPushHint}</p>
             <div style={styles.pushRow}>
               <div>
@@ -1226,7 +1323,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 )}
               </div>
             )}
-          </div>
+          </CollapsibleSection>
         </>
       )}
     </div>
