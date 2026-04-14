@@ -68,6 +68,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [billForce, setBillForce] = useState(false);
   const [billSelectedWorkers, setBillSelectedWorkers] = useState(new Set());
   const [billPreview, setBillPreview] = useState(null);
+  const [billExpanded, setBillExpanded] = useState(new Set());
   const [billPreviewing, setBillPreviewing] = useState(false);
   const [billPushing, setBillPushing] = useState(false);
   const [billResult, setBillResult] = useState(null);
@@ -224,6 +225,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
         force: billForce || undefined,
       });
       setBillPreview(r.data.groups || []);
+      setBillExpanded(new Set());
     } catch (err) {
       setError(err.response?.data?.error || 'Preview failed');
     } finally {
@@ -1111,6 +1113,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 <table style={styles.table}>
                   <thead>
                     <tr>
+                      <th style={{ ...styles.th, width: 28 }} aria-label="Expand"></th>
                       <th style={styles.th}>Contractor</th>
                       <th style={{ ...styles.th, textAlign: 'right' }}>Hours</th>
                       <th style={{ ...styles.th, textAlign: 'right' }}>Labor $</th>
@@ -1119,16 +1122,100 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                     </tr>
                   </thead>
                   <tbody>
-                    {billPreview.map(g => (
-                      <tr key={g.user_id}>
-                        <td style={styles.td}>{g.full_name}</td>
-                        <td style={{ ...styles.td, textAlign: 'right' }}>{g.hours.toFixed(2)}</td>
-                        <td style={{ ...styles.td, textAlign: 'right' }}>${g.labor_amount.toFixed(2)}</td>
-                        <td style={{ ...styles.td, textAlign: 'right' }}>${g.reimb_amount.toFixed(2)}</td>
-                        <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>${g.total.toFixed(2)}</td>
-                      </tr>
-                    ))}
+                    {billPreview.map(g => {
+                      const open = billExpanded.has(g.user_id);
+                      const toggle = () => setBillExpanded(prev => {
+                        const next = new Set(prev);
+                        if (next.has(g.user_id)) next.delete(g.user_id); else next.add(g.user_id);
+                        return next;
+                      });
+                      return (
+                        <React.Fragment key={g.user_id}>
+                          <tr onClick={toggle} style={{ cursor: 'pointer' }}>
+                            <td style={styles.td}>
+                              <button
+                                type="button"
+                                aria-expanded={open}
+                                aria-label={open ? 'Collapse' : 'Expand'}
+                                onClick={e => { e.stopPropagation(); toggle(); }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 12, color: '#6b7280', minHeight: 'unset' }}
+                              >
+                                {open ? '▾' : '▸'}
+                              </button>
+                            </td>
+                            <td style={styles.td}>{g.full_name}</td>
+                            <td style={{ ...styles.td, textAlign: 'right' }}>{g.hours.toFixed(2)}</td>
+                            <td style={{ ...styles.td, textAlign: 'right' }}>${g.labor_amount.toFixed(2)}</td>
+                            <td style={{ ...styles.td, textAlign: 'right' }}>${g.reimb_amount.toFixed(2)}</td>
+                            <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>${g.total.toFixed(2)}</td>
+                          </tr>
+                          {open && (
+                            <tr>
+                              <td colSpan={6} style={{ ...styles.td, background: '#f9fafb', padding: '12px 16px' }}>
+                                {g.time_entry_rows?.length > 0 && (
+                                  <div style={{ marginBottom: g.reimbursement_rows?.length ? 14 : 0 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                                      Time entries ({g.time_entry_rows.length})
+                                    </div>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                      <thead>
+                                        <tr>
+                                          <th style={{ textAlign: 'left', padding: '4px 8px', color: '#6b7280', fontWeight: 600, width: 100 }}>Date</th>
+                                          <th style={{ textAlign: 'left', padding: '4px 8px', color: '#6b7280', fontWeight: 600 }}>Project</th>
+                                          <th style={{ textAlign: 'left', padding: '4px 8px', color: '#6b7280', fontWeight: 600 }}>Notes</th>
+                                          <th style={{ textAlign: 'right', padding: '4px 8px', color: '#6b7280', fontWeight: 600, width: 70 }}>Hours</th>
+                                          <th style={{ textAlign: 'right', padding: '4px 8px', color: '#6b7280', fontWeight: 600, width: 90 }}>Amount</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {g.time_entry_rows.map(te => (
+                                          <tr key={te.id}>
+                                            <td style={{ padding: '4px 8px', color: '#111827' }}>{te.work_date}</td>
+                                            <td style={{ padding: '4px 8px', color: '#111827' }}>{te.project_name || '—'}</td>
+                                            <td style={{ padding: '4px 8px', color: '#6b7280' }}>{te.description || '—'}</td>
+                                            <td style={{ padding: '4px 8px', textAlign: 'right', color: '#111827' }}>{te.hours.toFixed(2)}</td>
+                                            <td style={{ padding: '4px 8px', textAlign: 'right', color: '#111827' }}>${te.amount.toFixed(2)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                                {g.reimbursement_rows?.length > 0 && (
+                                  <div>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                                      Reimbursements ({g.reimbursement_rows.length})
+                                    </div>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                      <thead>
+                                        <tr>
+                                          <th style={{ textAlign: 'left', padding: '4px 8px', color: '#6b7280', fontWeight: 600, width: 100 }}>Date</th>
+                                          <th style={{ textAlign: 'left', padding: '4px 8px', color: '#6b7280', fontWeight: 600 }}>Project</th>
+                                          <th style={{ textAlign: 'left', padding: '4px 8px', color: '#6b7280', fontWeight: 600 }}>Description</th>
+                                          <th style={{ textAlign: 'right', padding: '4px 8px', color: '#6b7280', fontWeight: 600, width: 90 }}>Amount</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {g.reimbursement_rows.map(r => (
+                                          <tr key={r.id}>
+                                            <td style={{ padding: '4px 8px', color: '#111827' }}>{r.expense_date}</td>
+                                            <td style={{ padding: '4px 8px', color: '#111827' }}>{r.project_name || '—'}</td>
+                                            <td style={{ padding: '4px 8px', color: '#6b7280' }}>{r.description || '—'}</td>
+                                            <td style={{ padding: '4px 8px', textAlign: 'right', color: '#111827' }}>${r.amount.toFixed(2)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                     <tr>
+                      <td style={styles.td}></td>
                       <td style={{ ...styles.td, fontWeight: 700 }}>Total</td>
                       <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>
                         {billPreview.reduce((s, g) => s + g.hours, 0).toFixed(2)}
