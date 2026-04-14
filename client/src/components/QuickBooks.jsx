@@ -1128,6 +1128,8 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                       <th style={styles.th}>Contractor</th>
                       <th style={{ ...styles.th, textAlign: 'right' }}>Hours</th>
                       <th style={{ ...styles.th, textAlign: 'right' }}>Labor $</th>
+                      <th style={{ ...styles.th, textAlign: 'right' }}>OT hrs</th>
+                      <th style={{ ...styles.th, textAlign: 'right' }}>OT premium $</th>
                       <th style={{ ...styles.th, textAlign: 'right' }}>Reimb. $</th>
                       <th style={{ ...styles.th, textAlign: 'right' }}>Bill Total</th>
                     </tr>
@@ -1157,12 +1159,14 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                             <td style={styles.td}>{g.full_name}</td>
                             <td style={{ ...styles.td, textAlign: 'right' }}>{g.hours.toFixed(2)}</td>
                             <td style={{ ...styles.td, textAlign: 'right' }}>${g.labor_amount.toFixed(2)}</td>
+                            <td style={{ ...styles.td, textAlign: 'right', color: g.overtime_hours > 0 ? '#92400e' : '#9ca3af' }}>{(g.overtime_hours || 0).toFixed(2)}</td>
+                            <td style={{ ...styles.td, textAlign: 'right', color: g.overtime_premium > 0 ? '#92400e' : '#9ca3af' }}>${(g.overtime_premium || 0).toFixed(2)}</td>
                             <td style={{ ...styles.td, textAlign: 'right' }}>${g.reimb_amount.toFixed(2)}</td>
                             <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>${g.total.toFixed(2)}</td>
                           </tr>
                           {open && (
                             <tr>
-                              <td colSpan={6} style={{ ...styles.td, background: '#f9fafb', padding: '12px 16px' }}>
+                              <td colSpan={8} style={{ ...styles.td, background: '#f9fafb', padding: '12px 16px' }}>
                                 {g.time_entry_rows?.length > 0 && (
                                   <div style={{ marginBottom: g.reimbursement_rows?.length ? 14 : 0 }}>
                                     <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.3 }}>
@@ -1233,6 +1237,12 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                       </td>
                       <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>
                         ${billPreview.reduce((s, g) => s + g.labor_amount, 0).toFixed(2)}
+                      </td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>
+                        {billPreview.reduce((s, g) => s + (g.overtime_hours || 0), 0).toFixed(2)}
+                      </td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>
+                        ${billPreview.reduce((s, g) => s + (g.overtime_premium || 0), 0).toFixed(2)}
                       </td>
                       <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>
                         ${billPreview.reduce((s, g) => s + g.reimb_amount, 0).toFixed(2)}

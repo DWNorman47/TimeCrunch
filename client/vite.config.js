@@ -64,6 +64,9 @@ export default defineConfig({
     },
   },
   test: {
-    environment: 'node',
+    // jsdom gives the React Testing Library suite a window/document; the
+    // older non-DOM tests (utils.test.js, i18n.test.js) don't care either way.
+    environment: 'jsdom',
+    setupFiles: ['./src/test-setup.js'],
   },
 });

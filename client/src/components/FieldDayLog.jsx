@@ -66,7 +66,7 @@ function getLocation() {
 
 // ── Lightbox ──────────────────────────────────────────────────────────────────
 
-function Lightbox({ photos, startIndex, onClose }) {
+export function Lightbox({ photos, startIndex, onClose }) {
   const t = useT();
   const [idx, setIdx] = useState(startIndex);
   const item = photos[idx];

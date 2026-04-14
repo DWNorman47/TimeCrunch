@@ -7,6 +7,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const qbo = require('../services/qbo');
 const { encrypt } = require('../services/encryption');
 const { applySettingsRows, ADMIN_SETTINGS_DEFAULTS } = require('../settingsDefaults');
+const { computeOT } = require('../utils/payCalculations');
 const { logAudit } = require('../auditLog');
 
 // GET /api/qbo/status — connection status for this company
@@ -598,8 +599,8 @@ async function gatherBillData(companyId, { from, to, workerIds, force }) {
   const [timeRows, reimbRows] = await Promise.all([
     pool.query(
       `SELECT te.id, te.user_id, te.project_id, te.work_date, te.start_time, te.end_time,
-              te.notes, te.qbo_bill_id, te.qbo_activity_id,
-              u.full_name, u.qbo_vendor_id, u.hourly_rate, u.worker_type,
+              te.notes, te.qbo_bill_id, te.qbo_activity_id, te.wage_type, te.break_minutes,
+              u.full_name, u.qbo_vendor_id, u.hourly_rate, u.worker_type, u.overtime_rule,
               p.qbo_class_id, p.qbo_customer_id, p.name AS project_name
          FROM time_entries te
          JOIN users u    ON te.user_id = u.id
@@ -633,7 +634,7 @@ async function gatherBillData(companyId, { from, to, workerIds, force }) {
   // Group per worker (vendor)
   const byUser = new Map();
   const get = (uid) => {
-    if (!byUser.has(uid)) byUser.set(uid, { userId: uid, fullName: '', vendorId: '', hourlyRate: 0, timeEntries: [], reimbursements: [] });
+    if (!byUser.has(uid)) byUser.set(uid, { userId: uid, fullName: '', vendorId: '', hourlyRate: 0, overtimeRule: null, timeEntries: [], reimbursements: [] });
     return byUser.get(uid);
   };
   for (const te of timeRows.rows) {
@@ -644,8 +645,13 @@ async function gatherBillData(companyId, { from, to, workerIds, force }) {
     g.fullName = te.full_name;
     g.vendorId = te.qbo_vendor_id;
     g.hourlyRate = parseFloat(te.hourly_rate) || 0;
+    g.overtimeRule = te.overtime_rule || g.overtimeRule;
     g.timeEntries.push({
       id: te.id, workDate: te.work_date, hours,
+      wageType: te.wage_type || 'regular',
+      breakMinutes: te.break_minutes || 0,
+      startTime: te.start_time,
+      endTime: te.end_time,
       classId: te.qbo_class_id || null,
       customerId: te.qbo_customer_id || null,
       projectName: te.project_name || '',
@@ -682,16 +688,60 @@ function isoDate(d) {
   try { return d.toISOString().substring(0, 10); } catch { return String(d).substring(0, 10); }
 }
 
+/**
+ * Pull overtime settings the bill push needs. Returns company defaults; the
+ * per-entry wage_type and per-user overtime_rule override-selection happens
+ * inside computeOT / computeGroupOvertime.
+ */
+async function getOvertimeSettings(companyId) {
+  const { rows } = await pool.query(
+    "SELECT key, value FROM settings WHERE company_id = $1 AND key IN ('overtime_rule','overtime_threshold','overtime_multiplier')",
+    [companyId]
+  );
+  const pick = k => rows.find(r => r.key === k)?.value;
+  const rule = pick('overtime_rule') || 'daily';
+  const threshold = parseFloat(pick('overtime_threshold')) || (rule === 'weekly' ? 40 : 8);
+  const multiplier = parseFloat(pick('overtime_multiplier')) || 1.5;
+  return { rule, threshold, multiplier };
+}
+
+/**
+ * Compute overtime hours and premium dollars for one contractor group.
+ * Uses the worker's overtime_rule if set, else the company default.
+ * Premium = ot_hours × base_rate × (multiplier - 1), which is what needs to
+ * be added on top of the straight hours × base_rate already billed per entry.
+ */
+function computeGroupOvertime(group, companyRule, threshold, multiplier) {
+  const rule = group.overtimeRule || companyRule;
+  if (rule === 'none' || !group.timeEntries.length) {
+    return { overtimeHours: 0, overtimePremium: 0, rule };
+  }
+  const entries = group.timeEntries.map(te => ({
+    work_date:     te.workDate,
+    start_time:    te.startTime,
+    end_time:      te.endTime,
+    wage_type:     te.wageType,
+    break_minutes: te.breakMinutes,
+  }));
+  const { overtimeHours } = computeOT(entries, rule, threshold);
+  const premium = overtimeHours * group.hourlyRate * (multiplier - 1);
+  return { overtimeHours, overtimePremium: premium, rule };
+}
+
 // POST /api/qbo/push-bills-preview — dry-run summary of what would be billed
 // Body: { from, to, worker_ids, force }
 router.post('/push-bills-preview', requireAdmin, async (req, res) => {
   const { from, to, worker_ids, force } = req.body;
   try {
-    const groups = await gatherBillData(req.user.company_id, { from, to, workerIds: worker_ids, force });
+    const [groups, ot] = await Promise.all([
+      gatherBillData(req.user.company_id, { from, to, workerIds: worker_ids, force }),
+      getOvertimeSettings(req.user.company_id),
+    ]);
     const result = groups.map(g => {
       const laborHours = g.timeEntries.reduce((s, t) => s + t.hours, 0);
       const laborAmount = laborHours * g.hourlyRate;
       const reimbAmount = g.reimbursements.reduce((s, r) => s + r.amount, 0);
+      const { overtimeHours, overtimePremium } = computeGroupOvertime(g, ot.rule, ot.threshold, ot.multiplier);
       return {
         user_id: g.userId,
         full_name: g.fullName,
@@ -699,6 +749,8 @@ router.post('/push-bills-preview', requireAdmin, async (req, res) => {
         time_entries: g.timeEntries.length,
         hours: parseFloat(laborHours.toFixed(2)),
         labor_amount: parseFloat(laborAmount.toFixed(2)),
+        overtime_hours: parseFloat(overtimeHours.toFixed(2)),
+        overtime_premium: parseFloat(overtimePremium.toFixed(2)),
         reimbursements: g.reimbursements.length,
         reimb_amount: parseFloat(reimbAmount.toFixed(2)),
         time_entry_rows: g.timeEntries.map(te => ({
@@ -716,10 +768,10 @@ router.post('/push-bills-preview', requireAdmin, async (req, res) => {
           project_name: r.projectName,
           description: r.description,
         })),
-        total: parseFloat((laborAmount + reimbAmount).toFixed(2)),
+        total: parseFloat((laborAmount + overtimePremium + reimbAmount).toFixed(2)),
       };
     });
-    res.json({ groups: result });
+    res.json({ groups: result, overtime: { rule: ot.rule, threshold: ot.threshold, multiplier: ot.multiplier } });
   } catch (err) {
     logger.error({ err }, 'push-bills-preview error');
     res.status(500).json({ error: 'Server error' });
@@ -746,7 +798,10 @@ router.post('/push-bills', requireAdmin, async (req, res) => {
     const company = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
     if (!company.rows[0]?.qbo_realm_id) return res.status(400).json({ error: 'QuickBooks not connected' });
 
-    const groups = await gatherBillData(companyId, { from, to, workerIds: worker_ids, force });
+    const [groups, ot] = await Promise.all([
+      gatherBillData(companyId, { from, to, workerIds: worker_ids, force }),
+      getOvertimeSettings(companyId),
+    ]);
 
     const today = new Date().toLocaleDateString('en-CA');
     const dueDate = (() => {
@@ -781,6 +836,21 @@ router.post('/push-bills', requireAdmin, async (req, res) => {
           classId: r.classId,
         });
       }
+
+      // Overtime premium: an extra item-based line that covers the (multiplier-1)
+      // uplift on OT hours. The per-entry lines above price straight hours at
+      // the base rate; this line makes the contractor whole for their OT shifts.
+      const { overtimeHours, overtimePremium } = computeGroupOvertime(g, ot.rule, ot.threshold, ot.multiplier);
+      if (overtimeHours > 0 && overtimePremium > 0) {
+        lines.push({
+          type: 'item',
+          itemId: laborItemId,
+          qty: parseFloat(overtimeHours.toFixed(2)),
+          unitPrice: parseFloat((g.hourlyRate * (ot.multiplier - 1)).toFixed(4)),
+          description: `Overtime premium — ${ot.multiplier}× on ${overtimeHours.toFixed(2)} h (${ot.rule}, threshold ${ot.threshold} h)`,
+        });
+      }
+
       if (!lines.length) continue;
 
       try {
