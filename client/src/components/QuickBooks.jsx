@@ -98,6 +98,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [billPreviewing, setBillPreviewing] = useState(false);
   const [billPushing, setBillPushing] = useState(false);
   const [billResult, setBillResult] = useState(null);
+  const [billError, setBillError] = useState('');
   const [error, setError] = useState('');
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [savingAutoSync, setSavingAutoSync] = useState(false);
@@ -242,7 +243,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
     setBillPreviewing(true);
     setBillPreview(null);
     setBillResult(null);
-    setError('');
+    setBillError('');
     try {
       const r = await api.post('/qbo/push-bills-preview', {
         from: billFrom || undefined,
@@ -253,7 +254,8 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
       setBillPreview(r.data.groups || []);
       setBillExpanded(new Set());
     } catch (err) {
-      setError(err.response?.data?.error || 'Preview failed');
+      console.error('[push-bills-preview]', err);
+      setBillError(err.response?.data?.error || err.message || 'Preview failed');
     } finally {
       setBillPreviewing(false);
     }
@@ -262,7 +264,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const handleBillPush = async () => {
     setBillPushing(true);
     setBillResult(null);
-    setError('');
+    setBillError('');
     try {
       const r = await api.post('/qbo/push-bills', {
         from: billFrom || undefined,
@@ -273,7 +275,8 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
       setBillResult(r.data);
       setBillPreview(null);
     } catch (err) {
-      setError(err.response?.data?.error || 'Push failed');
+      console.error('[push-bills]', err);
+      setBillError(err.response?.data?.error || err.message || 'Push failed');
     } finally {
       setBillPushing(false);
     }
@@ -1098,22 +1101,48 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             </div>
 
             {/* Preview + push buttons */}
-            <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-              <button
-                style={{ ...styles.pushBtn, background: '#1f2937', ...(billPreviewing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
-                onClick={handleBillPreview}
-                disabled={billPreviewing}
-              >
-                {billPreviewing ? 'Loading…' : 'Preview'}
-              </button>
-              <button
-                style={{ ...styles.pushBtn, ...((billPushing || !billPreview || billPreview.length === 0) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
-                onClick={handleBillPush}
-                disabled={billPushing || !billPreview || billPreview.length === 0 || !settings?.qbo_labor_item_id || !settings?.qbo_expense_account_id}
-              >
-                {billPushing ? 'Pushing…' : `Push ${billPreview?.length || 0} ${billPreview?.length === 1 ? 'Bill' : 'Bills'}`}
-              </button>
-            </div>
+            {(() => {
+              const missingLabor = !settings?.qbo_labor_item_id;
+              const missingExpense = !settings?.qbo_expense_account_id;
+              const noPreview = !billPreview || billPreview.length === 0;
+              const pushDisabled = billPushing || noPreview || missingLabor || missingExpense;
+              const reason = missingLabor
+                ? 'Set a Labor Service Item in the settings above first.'
+                : missingExpense
+                ? 'Set an Expense Category Account in the Auto-sync settings first.'
+                : noPreview
+                ? 'Click Preview first to see what will be billed.'
+                : null;
+              return (
+                <>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button
+                      style={{ ...styles.pushBtn, background: '#1f2937', ...(billPreviewing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                      onClick={handleBillPreview}
+                      disabled={billPreviewing}
+                    >
+                      {billPreviewing ? 'Loading…' : 'Preview'}
+                    </button>
+                    <button
+                      style={{ ...styles.pushBtn, ...(pushDisabled ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                      onClick={handleBillPush}
+                      disabled={pushDisabled}
+                      title={reason || ''}
+                    >
+                      {billPushing ? 'Pushing…' : `Push ${billPreview?.length || 0} ${billPreview?.length === 1 ? 'Bill' : 'Bills'}`}
+                    </button>
+                    {reason && !billPushing && (
+                      <span style={{ fontSize: 13, color: '#6b7280' }}>{reason}</span>
+                    )}
+                  </div>
+                  {billError && (
+                    <p role="alert" style={{ marginTop: 10, color: '#991b1b', background: '#fee2e2', padding: '8px 12px', borderRadius: 6, fontSize: 13 }}>
+                      {billError}
+                    </p>
+                  )}
+                </>
+              );
+            })()}
 
             {/* Preview table */}
             {billPreview && billPreview.length === 0 && (
