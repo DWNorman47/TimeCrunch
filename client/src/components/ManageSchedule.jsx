@@ -11,12 +11,10 @@ import {
 } from '@dnd-kit/core';
 
 import { silentError } from '../errorReporter';
-function startOfWeek(date) {
-  const d = new Date(date);
-  d.setDate(d.getDate() - d.getDay());
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+import { startOfWeek as computeStartOfWeek } from '../utils/weekBounds';
+// Local wrapper so existing call sites don't need a weekStart arg threaded
+// through; the setting is read per-render inside the component.
+function startOfWeekFor(date, ws) { return computeStartOfWeek(date, ws ?? 1); }
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
 function toISO(d) { return d.toLocaleDateString('en-CA'); }
 function fmtDay(d, locale = 'en-US') { return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' }); }
@@ -186,12 +184,12 @@ function SummaryView({ shifts, days }) {
   );
 }
 
-export default function ManageSchedule({ workers, projects }) {
+export default function ManageSchedule({ workers, projects, weekStart: companyWeekStart = 1 }) {
   const toast = useToast();
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [weekStart, setWeekStart] = useState(() => startOfWeekFor(new Date(), companyWeekStart));
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('grid');
@@ -534,7 +532,7 @@ export default function ManageSchedule({ workers, projects }) {
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, -7))}>{t.prevWeek}</button>
         <span style={styles.weekLabel}>{fmtDay(days[0], locale)} – {fmtDay(days[6], locale)}</span>
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>{t.nextWeek}</button>
-        <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>{t.today}</button>
+        <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeekFor(new Date(), companyWeekStart))}>{t.today}</button>
         <button style={styles.exportBtn} onClick={() => exportCSV(shifts, days)} title={t.exportWeekCSV}>⬇ CSV</button>
         {shifts.length > 0 && (
           <button style={{ ...styles.copyWeekBtn, ...(copyingWeek ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={copyWeek} disabled={copyingWeek} title={t.msCopyWeek}>

@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { fmtHours, formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
+import { startOfWeek } from '../utils/weekBounds';
 
-function getDateRange(key) {
+function getDateRange(key, weekStart = 1) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (key === 'all') return { from: null, to: null };
@@ -14,15 +15,12 @@ function getDateRange(key) {
     return { from: new Date(today.getFullYear(), today.getMonth(), 1), to: today };
   }
   if (key === 'this_week') {
-    const day = today.getDay(); // 0=Sun
-    const from = new Date(today); from.setDate(from.getDate() - ((day + 6) % 7));
-    return { from, to: today };
+    return { from: startOfWeek(today, weekStart), to: today };
   }
   if (key === 'last_week') {
-    const day = today.getDay();
-    const startOfThisWeek = new Date(today); startOfThisWeek.setDate(startOfThisWeek.getDate() - ((day + 6) % 7));
-    const from = new Date(startOfThisWeek); from.setDate(from.getDate() - 7);
-    const to = new Date(startOfThisWeek); to.setDate(to.getDate() - 1);
+    const start = startOfWeek(today, weekStart);
+    const from = new Date(start); from.setDate(from.getDate() - 7);
+    const to = new Date(start);   to.setDate(to.getDate() - 1);
     return { from, to };
   }
   return { from: null, to: null };
@@ -58,7 +56,7 @@ function computeOT(entries, rule, threshold) {
   };
 }
 
-export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly', overtimeMultiplier = 1.5, prevailingRate = 0, overtimeRule = 'daily', overtimeThreshold = 8, showWages = false, currency = 'USD', overtimeEnabled = true }) {
+export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly', overtimeMultiplier = 1.5, prevailingRate = 0, overtimeRule = 'daily', overtimeThreshold = 8, weekStart = 1, showWages = false, currency = 'USD', overtimeEnabled = true }) {
   const t = useT();
   const RANGES = [
     { label: t.thisWeek, key: 'this_week' },
@@ -68,7 +66,7 @@ export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly'
     { label: t.allTime, key: 'all' },
   ];
   const [range, setRange] = useState('this_week');
-  const { from, to } = getDateRange(range);
+  const { from, to } = getDateRange(range, weekStart);
 
   const filtered = useMemo(() => {
     return entries.filter(e => {

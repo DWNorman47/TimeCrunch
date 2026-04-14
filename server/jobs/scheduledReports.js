@@ -3,6 +3,7 @@ const pool = require('../db');
 const logger = require('../logger');
 const { sendEmail } = require('../email');
 const { runJob } = require('./runJob');
+const { weekRange } = require('../utils/weekBounds');
 
 const APP_URL = process.env.APP_URL || 'https://app.opsfloa.com';
 
@@ -80,16 +81,12 @@ async function activeCompanies() {
 // ── Weekly Payroll Summary (Mondays) ─────────────────────────────────────────
 
 async function sendWeeklyPayrollReport(companyId, companyName) {
-  // Sunday–Saturday of last week
-  const now = new Date();
-  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon…
-  const lastSun = new Date(now);
-  lastSun.setDate(now.getDate() - dayOfWeek - 7);
-  const lastSat = new Date(lastSun);
-  lastSat.setDate(lastSun.getDate() + 6);
+  // Previous full week per the company's week_start setting
+  const wsRow = await pool.query("SELECT value FROM settings WHERE company_id = $1 AND key = 'week_start'", [companyId]);
+  const ws = parseInt(wsRow.rows[0]?.value ?? '1', 10);
+  const { from, to } = weekRange(ws, -1);
 
-  const fmt = d => d.toISOString().slice(0, 10);
-  const fmtDisplay = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const fmtDisplay = s => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const r = await pool.query(
     `SELECT u.full_name, u.id as user_id,
@@ -103,7 +100,7 @@ async function sendWeeklyPayrollReport(companyId, companyName) {
      WHERE u.company_id = $1 AND u.role = 'worker' AND u.active = true
      GROUP BY u.id, u.full_name
      ORDER BY total_hours DESC`,
-    [companyId, fmt(lastSun), fmt(lastSat)]
+    [companyId, from, to]
   );
 
   if (r.rowCount === 0) return;
@@ -128,10 +125,10 @@ async function sendWeeklyPayrollReport(companyId, companyName) {
 
   await sendEmail(
     admin.email,
-    `Weekly Payroll Summary — ${fmtDisplay(lastSun)} to ${fmtDisplay(lastSat)}`,
+    `Weekly Payroll Summary — ${fmtDisplay(from)} to ${fmtDisplay(to)}`,
     emailHeader(
       'Weekly Payroll Summary',
-      `${fmtDisplay(lastSun)} – ${fmtDisplay(lastSat)} · ${companyName}`
+      `${fmtDisplay(from)} – ${fmtDisplay(to)} · ${companyName}`
     ) +
     `<div style="display:flex;gap:24px;margin-bottom:20px;flex-wrap:wrap">
       <div style="background:#f0fdf4;border-radius:8px;padding:12px 18px;min-width:100px">

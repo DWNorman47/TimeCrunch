@@ -267,6 +267,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 });
 
 const { hoursWorked, computeOT } = require('../utils/payCalculations');
+const { weekRange } = require('../utils/weekBounds');
 
 // GET /time-entries/pay-stubs — worker's pay periods with aggregated hours
 router.get('/pay-stubs', requireAuth, async (req, res) => {
@@ -306,7 +307,7 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
         const entries = allEntries.rows.filter(e => e.work_date_str >= ps && e.work_date_str <= pe);
         if (entries.length === 0) continue;
 
-        const { regularHours, overtimeHours } = computeOT(entries, workerOTRule, s.overtime_threshold);
+        const { regularHours, overtimeHours } = computeOT(entries, workerOTRule, s.overtime_threshold, s.week_start);
         let prevailingHours = 0, totalMileage = 0;
         for (const e of entries) {
           if (e.wage_type === 'prevailing') {
@@ -377,40 +378,34 @@ router.post('/sign-off', requireAuth, async (req, res) => {
 });
 
 // POST /time-entries/copy-last-week
-// Copies last week's entries (Mon–Sun) to the same weekday this week. Skips days that already have entries.
+// Copies last week's entries to the same weekday this week (respecting the
+// company's week_start setting). Skips days that already have entries.
 router.post('/copy-last-week', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   try {
-    const today = new Date();
-    const dow = today.getDay();
-    const thisMon = new Date(today);
-    thisMon.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
-    thisMon.setHours(0, 0, 0, 0);
-    const lastMon = new Date(thisMon);
-    lastMon.setDate(thisMon.getDate() - 7);
-    const lastSun = new Date(lastMon);
-    lastSun.setDate(lastMon.getDate() + 6);
-    const toISO = d => d.toLocaleDateString('en-CA');
+    const wsRow = await pool.query("SELECT value FROM settings WHERE company_id = $1 AND key = 'week_start'", [companyId]);
+    const ws = parseInt(wsRow.rows[0]?.value ?? '1', 10);
+    const thisWk = weekRange(ws, 0);
+    const lastWk = weekRange(ws, -1);
 
     const lastWeek = await pool.query(
       `SELECT start_time, end_time, break_minutes, project_id, notes, wage_type, work_date
        FROM time_entries
        WHERE user_id=$1 AND company_id=$2 AND work_date BETWEEN $3 AND $4
        ORDER BY work_date`,
-      [req.user.id, companyId, toISO(lastMon), toISO(lastSun)]
+      [req.user.id, companyId, lastWk.from, lastWk.to]
     );
     if (lastWeek.rowCount === 0) return res.json({ created: 0, skipped: 0, entries: [] });
 
-    const thisSun = new Date(thisMon);
-    thisSun.setDate(thisMon.getDate() + 6);
     const existing = await pool.query(
       `SELECT DISTINCT work_date FROM time_entries
        WHERE user_id=$1 AND company_id=$2 AND work_date BETWEEN $3 AND $4`,
-      [req.user.id, companyId, toISO(thisMon), toISO(thisSun)]
+      [req.user.id, companyId, thisWk.from, thisWk.to]
     );
     const existingDates = new Set(existing.rows.map(r => r.work_date?.toString().substring(0, 10)));
 
     const created = [];
+    const toISO = d => d.toLocaleDateString('en-CA');
     for (const e of lastWeek.rows) {
       const lastDate = new Date(e.work_date.toString().substring(0, 10) + 'T00:00:00');
       const thisDate = new Date(lastDate);

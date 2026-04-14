@@ -2,6 +2,54 @@ import React from 'react';
 import { reportClientError } from '../errorReporter';
 
 /**
+ * True if the error looks like a stale-build / failed-chunk-load.
+ * These happen when the user was on the page during a deploy and the
+ * filenames they're about to fetch have already been replaced.
+ */
+function isChunkLoadError(error) {
+  if (!error) return false;
+  const msg = String(error.message || '');
+  return (
+    error.name === 'ChunkLoadError' ||
+    /Failed to fetch dynamically imported module/i.test(msg) ||
+    /Loading chunk \d+ failed/i.test(msg) ||
+    /Importing a module script failed/i.test(msg) ||
+    /error loading dynamically imported module/i.test(msg)
+  );
+}
+
+const RELOAD_FLAG = 'tc_chunk_reload_at';
+const RELOAD_COOLDOWN_MS = 30_000; // don't loop: once per 30s max
+
+/**
+ * Reload once to pick up the fresh build. Guarded by sessionStorage
+ * so a bad build can't put us in a reload loop — if we reloaded
+ * recently and still see the error, let the normal error UI render.
+ */
+function tryReloadForStaleBuild() {
+  try {
+    const last = parseInt(sessionStorage.getItem(RELOAD_FLAG) || '0', 10);
+    if (Date.now() - last < RELOAD_COOLDOWN_MS) return false;
+    sessionStorage.setItem(RELOAD_FLAG, String(Date.now()));
+  } catch { /* sessionStorage may be disabled */ }
+  window.location.reload();
+  return true;
+}
+
+// Global safety net — chunk-load errors that happen OUTSIDE the React render
+// (e.g. clicking a link that triggers a lazy route import) come through as
+// unhandledrejection, not via the ErrorBoundary. Catch them here too.
+if (typeof window !== 'undefined' && !window.__tc_chunk_listener_installed) {
+  window.__tc_chunk_listener_installed = true;
+  window.addEventListener('unhandledrejection', (e) => {
+    if (isChunkLoadError(e.reason)) tryReloadForStaleBuild();
+  });
+  window.addEventListener('error', (e) => {
+    if (isChunkLoadError(e.error || { message: e.message })) tryReloadForStaleBuild();
+  });
+}
+
+/**
  * Catches render-phase errors from descendants.
  *
  * Two modes:
@@ -26,6 +74,10 @@ export default class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
+    // Stale-build chunk fetch failure: quietly reload once instead of showing
+    // the full-screen crash card. Guarded against loops by the cooldown.
+    if (isChunkLoadError(error) && tryReloadForStaleBuild()) return;
+
     console.error('Unhandled render error:', error, info?.componentStack);
     const stack = [error?.stack, info?.componentStack && `\nComponent stack:${info.componentStack}`]
       .filter(Boolean)

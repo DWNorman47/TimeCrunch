@@ -3,6 +3,8 @@
  * Exported so they can be unit-tested without touching the database.
  */
 
+const { weekBucketKey } = require('./weekBounds');
+
 /** Decimal hours between two HH:MM[:SS] strings. Handles midnight-crossing shifts. */
 function hoursWorked(start, end) {
   let ms = new Date(`1970-01-01T${end}`) - new Date(`1970-01-01T${start}`);
@@ -14,19 +16,17 @@ function hoursWorked(start, end) {
  * Split an array of time entries into regularHours and overtimeHours.
  * Only entries with wage_type === 'regular' count toward OT.
  * @param {Array}  entries   - rows with {wage_type, start_time, end_time, work_date, break_minutes}
- * @param {string} rule      - 'daily' | 'weekly'
+ * @param {string} rule      - 'daily' | 'weekly' | 'none'
  * @param {number} threshold - hours before OT kicks in (e.g. 8 for daily, 40 for weekly)
+ * @param {number} [weekStart=1] - 0=Sun … 6=Sat (only affects the 'weekly' rule)
  */
-function computeOT(entries, rule, threshold) {
+function computeOT(entries, rule, threshold, weekStart = 1) {
   const regular = entries.filter(e => e.wage_type === 'regular');
 
   if (rule === 'weekly') {
     const weekly = {};
     regular.forEach(e => {
-      const d = new Date(e.work_date.toString().substring(0, 10) + 'T00:00:00');
-      const jan4 = new Date(d.getFullYear(), 0, 4);
-      const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7);
-      const key = `${d.getFullYear()}-W${week}`;
+      const key = weekBucketKey(e.work_date, weekStart);
       const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
       weekly[key] = (weekly[key] || 0) + h;
     });
