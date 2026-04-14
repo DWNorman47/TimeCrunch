@@ -34,6 +34,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [qboCustomers, setQboCustomers] = useState([]);
   const [qboAccounts, setQboAccounts] = useState([]);
   const [qboClasses, setQboClasses] = useState([]);
+  const [qboItems, setQboItems] = useState([]);
   const [syncErrors, setSyncErrors] = useState([]);
   const [loadingMappings, setLoadingMappings] = useState(false);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
@@ -61,6 +62,15 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [pushResult, setPushResult] = useState(null);
   const [pushing, setPushing] = useState(false);
   const [forcePush, setForcePush] = useState(false);
+  // Push contractor Bills (time + reimbursements grouped per vendor)
+  const [billFrom, setBillFrom] = useState('');
+  const [billTo, setBillTo] = useState('');
+  const [billForce, setBillForce] = useState(false);
+  const [billSelectedWorkers, setBillSelectedWorkers] = useState(new Set());
+  const [billPreview, setBillPreview] = useState(null);
+  const [billPreviewing, setBillPreviewing] = useState(false);
+  const [billPushing, setBillPushing] = useState(false);
+  const [billResult, setBillResult] = useState(null);
   const [error, setError] = useState('');
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [savingAutoSync, setSavingAutoSync] = useState(false);
@@ -97,11 +107,12 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   useEffect(() => {
     if (!status?.connected) return;
     setLoadingAccounts(true);
-    Promise.all([api.get('/qbo/accounts'), api.get('/qbo/classes'), api.get('/qbo/errors')])
-      .then(([acct, cls, errs]) => {
+    Promise.all([api.get('/qbo/accounts'), api.get('/qbo/classes'), api.get('/qbo/errors'), api.get('/qbo/items')])
+      .then(([acct, cls, errs, itms]) => {
         setQboAccounts(acct.data);
         setQboClasses(cls.data);
         setSyncErrors(errs.data);
+        setQboItems(itms.data || []);
       })
       .catch(silentError('quickbooks'))
       .finally(() => setLoadingAccounts(false));
@@ -179,6 +190,65 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
     try {
       await api.patch(`/qbo/projects/${projectId}/mapping`, { qbo_customer_id: qboCustomerId || null });
     } catch { toast(t.failedSaveProjectMapping, 'error'); }
+  };
+
+  // Contractor workers with a QBO Vendor mapping — the only ones billable
+  const billableWorkers = useMemo(
+    () => workers.filter(w => VENDOR_TYPES.includes(w.worker_type) && w.qbo_vendor_id),
+    [workers]
+  );
+
+  const toggleBillWorker = (id) => {
+    setBillSelectedWorkers(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllBillWorkers = () => {
+    if (billSelectedWorkers.size === billableWorkers.length) setBillSelectedWorkers(new Set());
+    else setBillSelectedWorkers(new Set(billableWorkers.map(w => w.id)));
+  };
+
+  const handleBillPreview = async () => {
+    setBillPreviewing(true);
+    setBillPreview(null);
+    setBillResult(null);
+    setError('');
+    try {
+      const r = await api.post('/qbo/push-bills-preview', {
+        from: billFrom || undefined,
+        to: billTo || undefined,
+        worker_ids: billSelectedWorkers.size ? Array.from(billSelectedWorkers) : undefined,
+        force: billForce || undefined,
+      });
+      setBillPreview(r.data.groups || []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Preview failed');
+    } finally {
+      setBillPreviewing(false);
+    }
+  };
+
+  const handleBillPush = async () => {
+    setBillPushing(true);
+    setBillResult(null);
+    setError('');
+    try {
+      const r = await api.post('/qbo/push-bills', {
+        from: billFrom || undefined,
+        to: billTo || undefined,
+        worker_ids: billSelectedWorkers.size ? Array.from(billSelectedWorkers) : undefined,
+        force: billForce || undefined,
+      });
+      setBillResult(r.data);
+      setBillPreview(null);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Push failed');
+    } finally {
+      setBillPushing(false);
+    }
   };
 
   const handlePush = async () => {
@@ -905,6 +975,208 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                   Journal entry created — ${payResult.amount?.toFixed(2)} across {payResult.entries} entries.
                 </p>
                 <p style={{ margin: '4px 0 0', fontSize: 13, color: '#6b7280' }}>{payResult.description}</p>
+              </div>
+            )}
+          </div>
+
+          {/* ── Push Bills (contractor time + reimbursements per vendor) ── */}
+          <div style={styles.section}>
+            <h3 style={styles.sectionTitle}>Push Bills (Contractors)</h3>
+            <p style={styles.hint}>
+              Creates one QBO Bill per contractor, combining approved time entries (as labor lines) and approved reimbursements (as expense lines) for the selected date range. Only contractors with a mapped QBO Vendor appear.
+            </p>
+
+            {/* Required settings */}
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16 }}>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <label htmlFor="qbo-labor-item" style={styles.label}>Labor Service Item</label>
+                <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>The QBO Service item used on Bill labor lines (hours × rate). Required.</p>
+                <select
+                  id="qbo-labor-item"
+                  style={styles.select}
+                  value={settings?.qbo_labor_item_id || ''}
+                  onChange={e => saveAutoSyncSetting('qbo_labor_item_id', e.target.value)}
+                  disabled={savingAutoSync || loadingAccounts}
+                >
+                  <option value="">— Select item —</option>
+                  {qboItems.map(it => (
+                    <option key={it.Id} value={it.Id}>{it.Name}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <label htmlFor="qbo-bill-terms" style={styles.label}>Bill Terms (days)</label>
+                <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>Days from bill date to due date. 0 = due on receipt.</p>
+                <input
+                  id="qbo-bill-terms"
+                  type="number"
+                  min={0}
+                  max={365}
+                  style={styles.dateInput}
+                  value={settings?.qbo_bill_terms_days ?? 0}
+                  onChange={e => saveAutoSyncSetting('qbo_bill_terms_days', e.target.value)}
+                />
+              </div>
+            </div>
+            {(!settings?.qbo_labor_item_id || !settings?.qbo_expense_account_id) && (
+              <p role="alert" style={{ fontSize: 13, color: '#92400e', background: '#fef3c7', padding: '8px 12px', borderRadius: 6, marginBottom: 12 }}>
+                Set a Labor Service Item (above) and an Expense Category Account (in the Auto-Sync settings) before pushing bills.
+              </p>
+            )}
+
+            {/* Date range + force */}
+            <div style={styles.pushRow}>
+              <div>
+                <label htmlFor="qbo-bill-from" style={styles.label}>From</label>
+                <input id="qbo-bill-from" style={styles.dateInput} type="date" value={billFrom} onChange={e => setBillFrom(e.target.value)} />
+              </div>
+              <div>
+                <label htmlFor="qbo-bill-to" style={styles.label}>To</label>
+                <input id="qbo-bill-to" style={styles.dateInput} type="date" value={billTo} onChange={e => setBillTo(e.target.value)} />
+              </div>
+            </div>
+            <label style={styles.forceLabel}>
+              <input type="checkbox" checked={billForce} onChange={e => setBillForce(e.target.checked)} style={{ marginRight: 6 }} />
+              Re-push entries/reimbursements already pushed to a bill
+            </label>
+
+            {/* Worker picker */}
+            <div style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <strong style={{ fontSize: 14, color: '#111827' }}>Contractors</strong>
+                {billableWorkers.length > 0 && (
+                  <button
+                    type="button"
+                    style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: '#374151' }}
+                    onClick={toggleAllBillWorkers}
+                  >
+                    {billSelectedWorkers.size === billableWorkers.length ? 'Clear all' : 'Select all'}
+                  </button>
+                )}
+              </div>
+              {billableWorkers.length === 0 ? (
+                <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>No contractors with QBO Vendor mappings yet. Map them in the Worker Mappings section above.</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {billableWorkers.map(w => {
+                    const selected = billSelectedWorkers.has(w.id);
+                    return (
+                      <label
+                        key={w.id}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          padding: '6px 12px', borderRadius: 20, cursor: 'pointer',
+                          background: selected ? '#dbeafe' : '#f3f4f6',
+                          border: `1px solid ${selected ? '#60a5fa' : '#e5e7eb'}`,
+                          color: selected ? '#1e40af' : '#374151',
+                          fontSize: 13, fontWeight: selected ? 600 : 500,
+                        }}
+                      >
+                        <input type="checkbox" checked={selected} onChange={() => toggleBillWorker(w.id)} style={{ margin: 0 }} />
+                        {w.full_name}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              <p style={{ fontSize: 12, color: '#6b7280', margin: '8px 0 0' }}>
+                Leave empty to include all contractors in the range.
+              </p>
+            </div>
+
+            {/* Preview + push buttons */}
+            <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+              <button
+                style={{ ...styles.pushBtn, background: '#1f2937', ...(billPreviewing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                onClick={handleBillPreview}
+                disabled={billPreviewing}
+              >
+                {billPreviewing ? 'Loading…' : 'Preview'}
+              </button>
+              <button
+                style={{ ...styles.pushBtn, ...((billPushing || !billPreview || billPreview.length === 0) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                onClick={handleBillPush}
+                disabled={billPushing || !billPreview || billPreview.length === 0 || !settings?.qbo_labor_item_id || !settings?.qbo_expense_account_id}
+              >
+                {billPushing ? 'Pushing…' : `Push ${billPreview?.length || 0} ${billPreview?.length === 1 ? 'Bill' : 'Bills'}`}
+              </button>
+            </div>
+
+            {/* Preview table */}
+            {billPreview && billPreview.length === 0 && (
+              <p style={{ marginTop: 12, fontSize: 13, color: '#6b7280' }}>Nothing to bill in that range.</p>
+            )}
+            {billPreview && billPreview.length > 0 && (
+              <div style={{ marginTop: 16, overflowX: 'auto' }}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Contractor</th>
+                      <th style={{ ...styles.th, textAlign: 'right' }}>Hours</th>
+                      <th style={{ ...styles.th, textAlign: 'right' }}>Labor $</th>
+                      <th style={{ ...styles.th, textAlign: 'right' }}>Reimb. $</th>
+                      <th style={{ ...styles.th, textAlign: 'right' }}>Bill Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {billPreview.map(g => (
+                      <tr key={g.user_id}>
+                        <td style={styles.td}>{g.full_name}</td>
+                        <td style={{ ...styles.td, textAlign: 'right' }}>{g.hours.toFixed(2)}</td>
+                        <td style={{ ...styles.td, textAlign: 'right' }}>${g.labor_amount.toFixed(2)}</td>
+                        <td style={{ ...styles.td, textAlign: 'right' }}>${g.reimb_amount.toFixed(2)}</td>
+                        <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>${g.total.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td style={{ ...styles.td, fontWeight: 700 }}>Total</td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>
+                        {billPreview.reduce((s, g) => s + g.hours, 0).toFixed(2)}
+                      </td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>
+                        ${billPreview.reduce((s, g) => s + g.labor_amount, 0).toFixed(2)}
+                      </td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>
+                        ${billPreview.reduce((s, g) => s + g.reimb_amount, 0).toFixed(2)}
+                      </td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700 }}>
+                        ${billPreview.reduce((s, g) => s + g.total, 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Result */}
+            {billResult && (
+              <div style={styles.resultBox}>
+                <p style={{ margin: 0, fontWeight: 600, color: '#166534' }}>
+                  {billResult.pushed.length} {billResult.pushed.length === 1 ? 'bill' : 'bills'} created in QuickBooks.
+                </p>
+                {billResult.pushed.length > 0 && (
+                  <ul style={{ marginTop: 8, paddingLeft: 20 }}>
+                    {billResult.pushed.map(p => (
+                      <li key={p.user_id} style={{ fontSize: 13, color: '#374151' }}>
+                        {p.full_name} — Bill #{p.bill_id} ({p.time_entries} time {p.time_entries === 1 ? 'entry' : 'entries'}, {p.reimbursements} reimb.)
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {billResult.skipped.length > 0 && (
+                  <details style={{ marginTop: 8 }}>
+                    <summary style={{ cursor: 'pointer', color: '#92400e', fontWeight: 600 }}>
+                      {billResult.skipped.length} skipped
+                    </summary>
+                    <ul style={{ marginTop: 6, paddingLeft: 20 }}>
+                      {billResult.skipped.map((s, i) => (
+                        <li key={i} style={{ fontSize: 13, color: '#666' }}>
+                          {s.full_name}: {s.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </div>
             )}
           </div>
