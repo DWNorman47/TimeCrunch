@@ -1,4 +1,4 @@
-const { hoursWorked, computeOT } = require('../utils/payCalculations');
+const { hoursWorked, computeOT, computeDailyPayCosts } = require('../utils/payCalculations');
 
 describe('hoursWorked', () => {
   test('normal same-day shift', () => {
@@ -161,5 +161,175 @@ describe('computeOT — weekly rule', () => {
     const { regularHours, overtimeHours } = computeOT([...week1, ...week2], 'weekly', 40);
     expect(regularHours).toBeCloseTo(80); // 40 + 40
     expect(overtimeHours).toBeCloseTo(9); // 5 + 4
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// Edge cases added 2026-04 — things real payroll runs have hit
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('hoursWorked — edge cases', () => {
+  test('zero-length shift (same start/end) returns 0', () => {
+    expect(hoursWorked('12:00', '12:00')).toBe(0);
+  });
+
+  test('near-full-day shift (00:00 to 23:59)', () => {
+    expect(hoursWorked('00:00', '23:59')).toBeCloseTo(23 + 59 / 60, 5);
+  });
+
+  test('full 24-hour shift (00:00 to 00:00 interpreted as next day)', () => {
+    // end < start triggers the +24h fallback; 0 - 0 is exactly zero, which
+    // means hoursWorked can't express a 24-hour shift through this input.
+    // This test pins that behavior so a future "fix" doesn't break callers.
+    expect(hoursWorked('00:00', '00:00')).toBe(0);
+  });
+
+  test('one-second shift', () => {
+    expect(hoursWorked('08:00:00', '08:00:01')).toBeCloseTo(1 / 3600, 5);
+  });
+});
+
+describe('computeOT — more edge cases', () => {
+  const daily = (date, start, end, wage = 'regular', brk = 0) => ({
+    work_date: date, start_time: start, end_time: end, wage_type: wage, break_minutes: brk,
+  });
+
+  test("rule: 'none' returns zero overtime regardless of hours", () => {
+    const entries = [daily('2024-01-01', '06:00', '20:00')]; // 14h
+    const { regularHours, overtimeHours } = computeOT(entries, 'none', 8);
+    expect(regularHours).toBeCloseTo(14);
+    expect(overtimeHours).toBe(0);
+  });
+
+  test("rule: 'none' still excludes prevailing wage entries", () => {
+    const entries = [
+      daily('2024-01-01', '08:00', '16:00', 'regular'),    // 8h regular
+      daily('2024-01-01', '16:00', '20:00', 'prevailing'), // 4h prevailing
+    ];
+    const { regularHours, overtimeHours } = computeOT(entries, 'none', 8);
+    expect(regularHours).toBeCloseTo(8);
+    expect(overtimeHours).toBe(0);
+  });
+
+  test('fractional hours just below threshold → no OT', () => {
+    const entries = [daily('2024-01-01', '08:00', '15:59')]; // 7.983h
+    const { overtimeHours } = computeOT(entries, 'daily', 8);
+    expect(overtimeHours).toBe(0);
+  });
+
+  test('fractional hours just above threshold → tiny OT', () => {
+    const entries = [daily('2024-01-01', '08:00', '16:01')]; // 8.017h
+    const { overtimeHours } = computeOT(entries, 'daily', 8);
+    expect(overtimeHours).toBeCloseTo(1 / 60, 5); // 1 minute of OT
+  });
+
+  test('missing break_minutes (null/undefined) treated as zero', () => {
+    const entries = [
+      { work_date: '2024-01-01', start_time: '08:00', end_time: '17:00', wage_type: 'regular' },
+    ];
+    const { regularHours } = computeOT(entries, 'daily', 8);
+    expect(regularHours).toBeCloseTo(8);
+  });
+
+  test('break longer than shift produces negative hours (known quirk — pins behavior)', () => {
+    // Data integrity problem, not a calc bug — but document what happens if
+    // dirty data reaches this function. h = -1h → regularHours still 0, no OT.
+    const entries = [daily('2024-01-01', '08:00', '09:00', 'regular', 120)]; // 1h shift, 2h break
+    const { regularHours, overtimeHours } = computeOT(entries, 'daily', 8);
+    expect(regularHours).toBeCloseTo(-1); // negative — flag as data-integrity bug upstream
+    expect(overtimeHours).toBe(0);
+  });
+
+  test('multiple entries on same day with mixed wage types: regular alone drives OT', () => {
+    const entries = [
+      daily('2024-01-01', '06:00', '16:00', 'regular'),       // 10h regular
+      daily('2024-01-01', '16:00', '20:00', 'prevailing'),    // 4h prevailing (ignored)
+    ];
+    const { regularHours, overtimeHours } = computeOT(entries, 'daily', 8);
+    expect(regularHours).toBeCloseTo(8);
+    expect(overtimeHours).toBeCloseTo(2);
+  });
+
+  test('weekly rule handles a single heavy day (valid if unusual)', () => {
+    const entries = [daily('2024-01-03', '00:00', '16:00')]; // 16h on one day
+    const { regularHours, overtimeHours } = computeOT(entries, 'weekly', 40);
+    expect(regularHours).toBeCloseTo(16);
+    expect(overtimeHours).toBe(0);
+  });
+
+  test('unknown rule string falls through to daily behavior', () => {
+    // Guards against a settings row ending up as 'weekl' (typo) silently
+    // disabling OT. Implementation treats anything not 'weekly'/'none' as daily.
+    const entries = [daily('2024-01-01', '08:00', '19:00')]; // 11h
+    const { overtimeHours } = computeOT(entries, 'gibberish', 8);
+    expect(overtimeHours).toBeCloseTo(3);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// computeDailyPayCosts — previously untested
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('computeDailyPayCosts', () => {
+  const entry = (date, start, end, wage = 'regular', brk = 0) => ({
+    work_date: date, start_time: start, end_time: end, wage_type: wage, break_minutes: brk,
+  });
+
+  test('5 days × $200/day, no OT = $1000', () => {
+    const entries = ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05']
+      .map(d => entry(d, '08:00', '16:00')); // 8h each
+    const { regularCost, overtimeCost } = computeDailyPayCosts(entries, 'daily', 8, 200, 1.5);
+    expect(regularCost).toBe(1000);
+    expect(overtimeCost).toBe(0);
+  });
+
+  test('10-hour day with $200 rate, 8h threshold, 1.5× = $75 OT cost', () => {
+    // 2h OT at (200/8) * 1.5 = 25 * 1.5 = 37.5/hr → 2h = $75
+    const entries = [entry('2024-01-01', '07:00', '17:00')]; // 10h
+    const { regularCost, overtimeCost } = computeDailyPayCosts(entries, 'daily', 8, 200, 1.5);
+    expect(regularCost).toBe(200);
+    expect(overtimeCost).toBeCloseTo(75, 2);
+  });
+
+  test("'none' rule returns zero OT cost even if hours exceed threshold", () => {
+    const entries = [entry('2024-01-01', '06:00', '20:00')]; // 14h
+    const { regularCost, overtimeCost } = computeDailyPayCosts(entries, 'none', 8, 200, 1.5);
+    expect(regularCost).toBe(200);
+    expect(overtimeCost).toBe(0);
+  });
+
+  test('multiple entries on the same day count as ONE day for daily rate', () => {
+    // Worker clocks in and out twice in a day — still one day's pay
+    const entries = [
+      entry('2024-01-01', '06:00', '10:00'), // 4h
+      entry('2024-01-01', '12:00', '16:00'), // 4h
+    ];
+    const { regularCost, overtimeCost } = computeDailyPayCosts(entries, 'daily', 8, 200, 1.5);
+    expect(regularCost).toBe(200);
+    expect(overtimeCost).toBe(0);
+  });
+
+  test('prevailing-wage-only day does NOT count toward daily rate', () => {
+    // Daily rate is for regular work — prevailing is separately billable.
+    const entries = [entry('2024-01-01', '08:00', '16:00', 'prevailing')];
+    const { regularCost, overtimeCost } = computeDailyPayCosts(entries, 'daily', 8, 200, 1.5);
+    expect(regularCost).toBe(0);
+    expect(overtimeCost).toBe(0);
+  });
+
+  test('no entries returns zero regular and zero OT', () => {
+    const { regularCost, overtimeCost } = computeDailyPayCosts([], 'daily', 8, 200, 1.5);
+    expect(regularCost).toBe(0);
+    expect(overtimeCost).toBe(0);
+  });
+
+  test('weekly OT with daily rate: 45h week, 5h OT at (200/40)*1.5 = $37.50', () => {
+    // On weekly rules the threshold is 40, so hourly OT rate = 200/40 = 5 × 1.5 = 7.50
+    // 5h OT × 7.50 = $37.50 OT cost. 5 days × 200 = $1000 regular.
+    const entries = ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05']
+      .map(d => entry(d, '08:00', '17:00')); // 9h each = 45h week
+    const { regularCost, overtimeCost } = computeDailyPayCosts(entries, 'weekly', 40, 200, 1.5);
+    expect(regularCost).toBe(1000);
+    expect(overtimeCost).toBeCloseTo(37.5, 2);
   });
 });
