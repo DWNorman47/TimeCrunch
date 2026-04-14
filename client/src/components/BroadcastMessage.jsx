@@ -44,7 +44,7 @@ export default function BroadcastMessage() {
           {state === 'sending' ? t.sending : state === 'sent' ? t.sent : t.send}
         </button>
       </div>
-      {state === 'error' && <p style={styles.error}>{t.failedSend}</p>}
+      {state === 'error' && <p role="alert" style={styles.error}>{t.failedSend}</p>}
       <div style={styles.charCount}>{message.length}/200</div>
     </div>
   );
@@ -59,5 +59,5 @@ const styles = {
   btn: { padding: '9px 18px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap' },
   btnSent: { padding: '9px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'default', whiteSpace: 'nowrap' },
   error: { color: '#dc2626', fontSize: 12, margin: '6px 0 0 0' },
-  charCount: { fontSize: 11, color: '#9ca3af', marginTop: 4, textAlign: 'right' },
+  charCount: { fontSize: 11, color: '#6b7280', marginTop: 4, textAlign: 'right' },
 };

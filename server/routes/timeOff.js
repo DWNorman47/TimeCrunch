@@ -4,6 +4,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendEmail } = require('../email');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem, createInboxItemBatch } = require('./inbox');
+const { logAudit } = require('../auditLog');
 
 const VALID_TYPES = ['vacation', 'sick', 'personal', 'other'];
 
@@ -22,6 +23,8 @@ router.post('/', requireAuth, async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [companyId, req.user.id, type || 'vacation', start_date, end_date, noteTrimmed]
     );
+    logAudit(companyId, req.user.id, req.user.full_name, 'timeoff.submitted', 'time_off_request', result.rows[0].id, null,
+      { type: type || 'vacation', start_date, end_date });
     // Notify admins
     setImmediate(async () => {
       try {
@@ -48,7 +51,7 @@ router.post('/', requireAuth, async (req, res) => {
       } catch (err) { console.error('Time off request notification error:', err); }
     });
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /time-off/mine — worker's own requests
@@ -63,7 +66,7 @@ router.get('/mine', requireAuth, async (req, res) => {
       [req.user.id, req.user.company_id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /time-off — admin: all requests, optionally filtered by status
@@ -85,7 +88,7 @@ router.get('/', requireAdmin, async (req, res) => {
       params
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /time-off/:id/approve
@@ -103,6 +106,8 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
     const row = result.rows[0];
     const startStr = row.start_date?.toString().substring(0, 10);
     const endStr = row.end_date?.toString().substring(0, 10);
+    logAudit(companyId, req.user.id, req.user.full_name, 'timeoff.approved', 'time_off_request', row.id, null,
+      { worker_user_id: row.user_id, start_date: startStr, end_date: endStr });
 
     setImmediate(async () => {
       try {
@@ -141,7 +146,7 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
       } catch (err) { console.error('Time off approval notification error:', err); }
     });
     res.json(row);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /time-off/:id/deny
@@ -157,10 +162,12 @@ router.patch('/:id/deny', requireAdmin, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Request not found or already reviewed' });
     const row = result.rows[0];
+    const denyStartStr = row.start_date?.toString().substring(0, 10);
+    const denyEndStr = row.end_date?.toString().substring(0, 10);
+    logAudit(companyId, req.user.id, req.user.full_name, 'timeoff.denied', 'time_off_request', row.id, null,
+      { worker_user_id: row.user_id, start_date: denyStartStr, end_date: denyEndStr, review_note });
     setImmediate(async () => {
       try {
-        const denyStartStr = row.start_date?.toString().substring(0, 10);
-        const denyEndStr = row.end_date?.toString().substring(0, 10);
         const worker = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [row.user_id]);
         if (worker.rows[0]?.email) {
           sendEmail(worker.rows[0].email, 'Time off request denied',
@@ -176,7 +183,7 @@ router.patch('/:id/deny', requireAdmin, async (req, res) => {
       } catch (err) { console.error('Time off denial notification error:', err); }
     });
     res.json(row);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /time-off/balance — worker's PTO balance for the current year
@@ -197,7 +204,7 @@ router.get('/balance', requireAuth, async (req, res) => {
     const annualDays = parseFloat(settingResult.rows[0]?.value ?? 0);
     const usedDays = parseInt(usedResult.rows[0]?.used_days ?? 0);
     res.json({ annual_days: annualDays, used_days: usedDays, remaining_days: Math.max(0, annualDays - usedDays) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /time-off/:id — worker cancels a pending request
@@ -213,8 +220,9 @@ router.delete('/:id', requireAuth, async (req, res) => {
       params
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Request not found or already reviewed' });
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'timeoff.cancelled', 'time_off_request', req.params.id, null, null);
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

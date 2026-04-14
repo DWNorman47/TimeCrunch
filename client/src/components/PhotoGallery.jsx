@@ -6,6 +6,7 @@ import { langToLocale } from '../utils';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
 
+import { silentError } from '../errorReporter';
 function fmtDate(str, locale = 'en-US') {
   return new Date(str).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -109,7 +110,7 @@ export default function PhotoGallery({ projects }) {
       const r = await api.get('/field-reports/photos', { params });
       setMedia(r.data.items);
       setPages(r.data.pages || 1);
-    } catch {}
+    } catch (err) { silentError('photo-gallery fetch')(err); }
   };
 
   useEffect(() => { loadMedia(filters, page).finally(() => setLoading(false)); }, []);
@@ -190,14 +191,14 @@ const styles = {
   filterBar: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 },
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151', flex: 1, minWidth: 140 },
   filterInput: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151' },
-  hint: { color: '#9ca3af', fontSize: 14 },
+  hint: { color: '#6b7280', fontSize: 14 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { color: '#9ca3af', fontSize: 15 },
+  emptyText: { color: '#6b7280', fontSize: 15 },
   dayGroup: { marginBottom: 28 },
   dayHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   dayLabel: { fontSize: 14, fontWeight: 700, color: '#374151' },
-  dayCount: { fontSize: 12, color: '#9ca3af' },
+  dayCount: { fontSize: 12, color: '#6b7280' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 },
   tile: { position: 'relative', borderRadius: 10, overflow: 'hidden', cursor: 'pointer', aspectRatio: '1', background: '#111827' },
   videoThumb: { width: '100%', height: '100%', position: 'relative' },

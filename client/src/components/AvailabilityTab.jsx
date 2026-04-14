@@ -122,7 +122,7 @@ const s = {
   dayName: { fontSize: 14, fontWeight: 600, color: '#111827' },
   timeRow: { display: 'flex', alignItems: 'center', gap: 8 },
   timeInput: { padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, color: '#374151', background: '#f9fafb' },
-  timeSep: { fontSize: 13, color: '#9ca3af' },
-  unavailable: { fontSize: 12, color: '#9ca3af', fontStyle: 'italic' },
-  empty: { color: '#9ca3af', textAlign: 'center', padding: 32 },
+  timeSep: { fontSize: 13, color: '#6b7280' },
+  unavailable: { fontSize: 12, color: '#6b7280', fontStyle: 'italic' },
+  empty: { color: '#6b7280', textAlign: 'center', padding: 32 },
 };

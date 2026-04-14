@@ -3,6 +3,9 @@ import api from '../api';
 import { currencySymbol } from '../utils';
 import { useT } from '../hooks/useT';
 
+import { silentError } from '../errorReporter';
+import HelpTip from './HelpTip';
+import MileageRateEditor from './MileageRateEditor';
 const TIMEZONES = [
   { value: 'America/New_York',    label: 'Eastern Time (ET)' },
   { value: 'America/Chicago',     label: 'Central Time (CT)' },
@@ -75,6 +78,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     notification_start_hour: String(settings?.notification_start_hour ?? 6),
     notification_end_hour: String(settings?.notification_end_hour ?? 20),
     chat_retention_days: String(settings?.chat_retention_days ?? 3),
+    pto_annual_days: String(settings?.pto_annual_days ?? 0),
     feature_overtime: settings?.feature_overtime ?? true,
     module_field: settings?.module_field ?? false,
     feature_scheduling: settings?.feature_scheduling ?? true,
@@ -90,6 +94,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     feature_overtime_alerts: settings?.feature_overtime_alerts ?? true,
     feature_broadcast: settings?.feature_broadcast ?? true,
     feature_media_gallery: settings?.feature_media_gallery ?? false,
+    feature_reimbursements: settings?.feature_reimbursements ?? true,
+    feature_pto: settings?.feature_pto ?? true,
     show_worker_wages: settings?.show_worker_wages ?? false,
     global_required_checklist_template_id: settings?.global_required_checklist_template_id ?? '',
     currency: settings?.currency ?? 'USD',
@@ -109,11 +115,15 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     report_monthly_valuation: settings?.report_monthly_valuation ?? false,
   });
   const [prevailingEnabled, setPrevailingEnabled] = useState(() => (settings?.prevailing_wage_rate ?? 0) > 0);
+  // PTO tracking is "enabled" when a non-zero value is stored. While editing
+  // from 0, we flip this on so the input shows; on save, it goes back to
+  // reflecting the stored value (so admin can disable by saving 0).
+  const [ptoEditing, setPtoEditing] = useState(false);
   const [checklistTemplates, setChecklistTemplates] = useState([]);
   useEffect(() => {
-    api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(() => {});
+    api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(silentError('managerates'));
   }, []);
-  const DEFAULT_COLLAPSED = { wages: true, overtime: true, notifications: true, reports: true, access: true, modules: true, features: true, storage: true };
+  const DEFAULT_COLLAPSED = { wages: true, overtime: true, pto: true, reimbursements: true, inventoryCount: true, notifications: true, reports: true, access: true, modules: true, features: true, storage: true };
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem('opsfloa_company_sections');
@@ -143,6 +153,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       notification_start_hour: String(settings.notification_start_hour ?? 6),
       notification_end_hour: String(settings.notification_end_hour ?? 20),
       chat_retention_days: String(settings.chat_retention_days ?? 3),
+      pto_annual_days: String(settings.pto_annual_days ?? 0),
       feature_overtime: settings.feature_overtime ?? true,
       module_field: settings.module_field ?? false,
       feature_scheduling: settings.feature_scheduling ?? true,
@@ -158,6 +169,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       feature_overtime_alerts: settings.feature_overtime_alerts ?? true,
       feature_broadcast: settings.feature_broadcast ?? true,
       feature_media_gallery: settings.feature_media_gallery ?? false,
+      feature_reimbursements: settings.feature_reimbursements ?? true,
+      feature_pto: settings.feature_pto ?? true,
       show_worker_wages: settings.show_worker_wages ?? false,
       global_required_checklist_template_id: settings.global_required_checklist_template_id ?? '',
       currency: settings.currency ?? 'USD',
@@ -194,6 +207,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         notification_start_hour: parseFloat(form.notification_start_hour),
         notification_end_hour: parseFloat(form.notification_end_hour),
         chat_retention_days: parseFloat(form.chat_retention_days),
+        pto_annual_days: parseFloat(form.pto_annual_days) || 0,
         feature_overtime: form.feature_overtime,
         module_field: form.module_field,
         feature_scheduling: form.feature_scheduling,
@@ -209,6 +223,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_overtime_alerts: form.feature_overtime_alerts,
         feature_broadcast: form.feature_broadcast,
         feature_media_gallery: form.feature_media_gallery,
+        feature_reimbursements: form.feature_reimbursements,
+        feature_pto: form.feature_pto,
         show_worker_wages: form.show_worker_wages,
         global_required_checklist_template_id: form.global_required_checklist_template_id,
         currency: form.currency,
@@ -229,6 +245,10 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       });
       onSettingsUpdated(r.data);
       setSaved(section);
+      // If PTO was saved at 0, collapse the input back to the "+ Enable" button.
+      if (section === 'pto' && (parseFloat(form.pto_annual_days) || 0) === 0) {
+        setPtoEditing(false);
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save settings');
     } finally {
@@ -254,6 +274,253 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
   return (
     <div style={styles.form}>
       <style>{`@media (max-width: 520px) { .invoice-sig-row { flex-wrap: wrap !important; } .invoice-sig-row select { width: 100% !important; margin-top: 6px; } }`}</style>
+
+      {/* ── Modules ── */}
+      <div style={styles.section}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('modules')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('modules')}>
+          <span style={styles.sectionIcon}>📦</span>
+          <div style={{ flex: 1 }}>
+            <div style={styles.sectionTitle}>Modules</div>
+            <div style={styles.sectionSub}>Enable or disable entire app modules for all users</div>
+          </div>
+          <span style={styles.collapseChevron}>{collapsed.modules ? '▶' : '▼'}</span>
+        </div>
+        {!collapsed.modules && <div style={styles.sectionBody}>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Time Clock</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show the Time Clock app in the app switcher</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.module_timeclock ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_timeclock} onChange={e => set('module_timeclock', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_timeclock ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featField}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.featFieldDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.module_field ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_field} onChange={e => set('module_field', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_field ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Projects</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show the Projects module in the app switcher</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.module_projects ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_projects} onChange={e => {
+                set('module_projects', e.target.checked);
+                if (!e.target.checked) set('feature_project_integration', false);
+              }} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_projects ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Inventory</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show the Inventory module in the app switcher</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.module_inventory ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_inventory} onChange={e => set('module_inventory', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_inventory ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          {/* Inventory count settings (Audit % / Reconcile Threshold) are now
+              a separate section rendered after Reimbursements — see below. */}
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Analytics</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show the Analytics module in the app switcher</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.module_analytics ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_analytics} onChange={e => {
+                set('module_analytics', e.target.checked);
+                if (!e.target.checked) set('feature_analytics', false);
+              }} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_analytics ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+        </div>}
+        {!collapsed.modules && <SectionFooter section="modules" />}
+      </div>
+
+      {/* ── Features ── */}
+      <div style={styles.section}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('features')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('features')}>
+          <span style={styles.sectionIcon}>🧩</span>
+          <div style={{ flex: 1 }}>
+            <div style={styles.sectionTitle}>{t.featuresTitle}</div>
+            <div style={styles.sectionSub}>{t.featuresSubtitle}</div>
+          </div>
+          <span style={styles.collapseChevron}>{collapsed.features ? '▶' : '▼'}</span>
+        </div>
+        {!collapsed.features && <div style={styles.sectionBody}>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Project Integration</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Require project selection on time entries and clock-in</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_project_integration ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_project_integration} onChange={e => set('feature_project_integration', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_project_integration ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featScheduling}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.featSchedulingDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_scheduling ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_scheduling} onChange={e => set('feature_scheduling', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_scheduling ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featAnalytics}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.featAnalyticsDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_analytics ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_analytics} onChange={e => set('feature_analytics', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_analytics ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featChat}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.featChatDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_chat ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_chat} onChange={e => set('feature_chat', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_chat ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featGeolocation}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.featGeolocationDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_geolocation ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_geolocation} onChange={e => set('feature_geolocation', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_geolocation ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Announce to All Workers</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show broadcast message tool on the Live tab</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_broadcast ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_broadcast} onChange={e => set('feature_broadcast', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_broadcast ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Media Gallery</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show a dedicated Media tab in Field for browsing all photos and videos</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_media_gallery ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_media_gallery} onChange={e => set('feature_media_gallery', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_media_gallery ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featReimbursements || 'Reimbursements'}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.featReimbursementsDesc || 'Workers submit mileage and expense reimbursements for admin approval'}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_reimbursements ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_reimbursements} onChange={e => set('feature_reimbursements', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_reimbursements ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.featPto || 'Paid Time Off'}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.featPtoDesc || 'Workers request time off, admins approve, optional PTO balance tracking'}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.feature_pto ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.feature_pto} onChange={e => set('feature_pto', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.feature_pto ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Global Clock-in Checklist</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Require all workers to complete a safety checklist before clocking in (any project)</div>
+            </div>
+            <select
+              style={{ ...styles.input, width: 'auto', textAlign: 'left', minWidth: 160 }}
+              value={form.global_required_checklist_template_id}
+              onChange={e => set('global_required_checklist_template_id', e.target.value)}
+            >
+              <option value="">None</option>
+              {checklistTemplates.map(t => (
+                <option key={t.id} value={String(t.id)}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>}
+        {!collapsed.features && <SectionFooter section="features" />}
+      </div>
+
+      {/* ── Worker Access ── */}
+      <div style={styles.section}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('access')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('access')}>
+          <span style={styles.sectionIcon}>👁️</span>
+          <div style={{ flex: 1 }}>
+            <div style={styles.sectionTitle}>{t.ratesWorkerAccess}</div>
+            <div style={styles.sectionSub}>{t.ratesWorkerAccessDesc}</div>
+          </div>
+          <span style={styles.collapseChevron}>{collapsed.access ? '▶' : '▼'}</span>
+        </div>
+        {!collapsed.access && <div style={styles.sectionBody}>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.ratesShowWages}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.ratesShowWagesDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.show_worker_wages ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.show_worker_wages} onChange={e => set('show_worker_wages', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.show_worker_wages ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Default Temporary Password</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Auto-filled when creating a new worker</div>
+            </div>
+            <input
+              style={{ ...styles.input, width: 180, textAlign: 'right' }}
+              type="text"
+              placeholder={t.tempPasswordPlaceholder}
+              value={form.default_temp_password}
+              onChange={e => set('default_temp_password', e.target.value)}
+            />
+          </div>
+          <div className="invoice-sig-row" style={styles.row}>
+            <div>
+              <div style={styles.label}>Invoice Digital Signature</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Whether workers must sign invoices before exporting</div>
+            </div>
+            <select
+              style={{ ...styles.input, width: 'auto', textAlign: 'left' }}
+              value={form.invoice_signature}
+              onChange={e => set('invoice_signature', e.target.value)}
+            >
+              <option value="none">None — export without prompt</option>
+              <option value="optional">Optional — worker can skip</option>
+              <option value="required">Required — must sign to export</option>
+            </select>
+          </div>
+        </div>}
+        {!collapsed.access && <SectionFooter section="access" />}
+      </div>
 
       {/* ── Wages ── */}
       <div style={styles.section}>
@@ -284,7 +551,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </div>
           </div>
           <div style={styles.row}>
-            <label style={styles.label}>{t.ratesPrevailingWage}</label>
+            <label style={styles.label}>{t.ratesPrevailingWage}<HelpTip text={t.ratesPrevailingWageHelp} /></label>
             {!prevailingEnabled
               ? <button style={styles.addPrevBtn} type="button" onClick={() => { setPrevailingEnabled(true); set('prevailing_wage_rate', '0'); }}>+ Add</button>
               : <div style={styles.inputGroup}>
@@ -305,7 +572,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Allow Overtime</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Track and display overtime hours and pay</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Track and display overtime hours and pay</div>
             </div>
             <label style={{ ...styles.toggle, background: form.feature_overtime ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_overtime} onChange={e => set('feature_overtime', e.target.checked)} style={{ display: 'none' }} />
@@ -335,7 +602,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </div>
           </div>
           <div style={styles.row}>
-            <label style={styles.label}>{t.ratesCalcMethod}</label>
+            <label style={styles.label}>{t.ratesCalcMethod}<HelpTip text={t.ratesCalcMethodHelp} /></label>
             <div style={styles.inputGroup}>
               <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.overtime_rule} onChange={e => set('overtime_rule', e.target.value)}>
                 <option value="daily">{t.ratesDailyMethod}</option>
@@ -354,6 +621,111 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         {!collapsed.overtime && <SectionFooter section="overtime" />}
       </div>}
 
+      {/* ── PTO (feature-gated) ── */}
+      {form.feature_pto && (
+      <div style={styles.section}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('pto')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('pto')}>
+          <span style={styles.sectionIcon}>🏖️</span>
+          <div style={{ flex: 1 }}>
+            <div style={styles.sectionTitle}>{t.ratesPto || 'Paid Time Off'}</div>
+            <div style={styles.sectionSub}>{t.ratesPtoDesc || 'Annual PTO balance tracking per worker'}</div>
+          </div>
+          <span style={styles.collapseChevron}>{collapsed.pto ? '▶' : '▼'}</span>
+        </div>
+        {!collapsed.pto && <div style={styles.sectionBody}>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.ratesPtoAnnualDays || 'Annual PTO days per worker'}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.ratesPtoAnnualDaysDesc || 'Applies to every worker unless overridden. Set to 0 to disable PTO balance tracking.'}</div>
+            </div>
+            {((parseFloat(form.pto_annual_days) || 0) > 0 || ptoEditing) ? (
+              <div style={styles.inputGroup}>
+                <input
+                  style={styles.input}
+                  type="number" min="0" max="365" step="1"
+                  value={form.pto_annual_days}
+                  onChange={e => set('pto_annual_days', e.target.value)}
+                  autoFocus={ptoEditing && (parseFloat(form.pto_annual_days) || 0) === 0}
+                />
+                <span style={styles.suffix}>{t.ratesDays || 'days'}</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                style={styles.enableBtn}
+                onClick={() => { setPtoEditing(true); set('pto_annual_days', '10'); }}
+              >
+                + {t.ratesPtoEnable || 'Enable PTO tracking'}
+              </button>
+            )}
+          </div>
+        </div>}
+        {!collapsed.pto && <SectionFooter section="pto" />}
+      </div>
+      )}
+
+      {/* ── Reimbursements (feature-gated) ── */}
+      {form.feature_reimbursements && (
+        <div style={styles.section}>
+          <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('reimbursements')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('reimbursements')}>
+            <span style={styles.sectionIcon}>🧾</span>
+            <div style={{ flex: 1 }}>
+              <div style={styles.sectionTitle}>{t.ratesReimbursements || 'Reimbursements'}</div>
+              <div style={styles.sectionSub}>{t.ratesReimbursementsDesc || 'Mileage rate and other reimbursement settings'}</div>
+            </div>
+            <span style={styles.collapseChevron}>{collapsed.reimbursements ? '▶' : '▼'}</span>
+          </div>
+          {!collapsed.reimbursements && (
+            <div style={styles.sectionBody}>
+              <MileageRateEditor />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Inventory Count (module-gated) ── */}
+      {form.module_inventory && (
+        <div style={styles.section}>
+          <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('inventoryCount')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('inventoryCount')}>
+            <span style={styles.sectionIcon}>📦</span>
+            <div style={{ flex: 1 }}>
+              <div style={styles.sectionTitle}>{t.ratesInventoryCount || 'Inventory Count'}</div>
+              <div style={styles.sectionSub}>{t.ratesInventoryCountDesc || 'Audit and reconciliation thresholds for full and cycle counts'}</div>
+            </div>
+            <span style={styles.collapseChevron}>{collapsed.inventoryCount ? '▶' : '▼'}</span>
+          </div>
+          {!collapsed.inventoryCount && <div style={styles.sectionBody}>
+            <div style={styles.row}>
+              <div>
+                <div style={styles.label}>Audit %</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Percentage of counted items randomly selected for audit (0–100)</div>
+              </div>
+              <input style={{ ...styles.input, width: 70 }} type="number" min="0" max="100" step="1"
+                value={form.cycle_count_audit_pct}
+                onChange={e => set('cycle_count_audit_pct', e.target.value)} />
+            </div>
+            <div style={styles.row}>
+              <div>
+                <div style={styles.label}>Reconcile Threshold</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Variance that triggers reconciliation (0 = never)</div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input style={{ ...styles.input, width: 80 }} type="number" min="0" step="any"
+                  value={form.cycle_count_reconcile_threshold}
+                  onChange={e => set('cycle_count_reconcile_threshold', e.target.value)} />
+                <select style={{ ...styles.input, width: 90 }}
+                  value={form.cycle_count_reconcile_threshold_type}
+                  onChange={e => set('cycle_count_reconcile_threshold_type', e.target.value)}>
+                  <option value="units">units</option>
+                  <option value="pct">%</option>
+                </select>
+              </div>
+            </div>
+          </div>}
+          {!collapsed.inventoryCount && <SectionFooter section="inventoryCount" />}
+        </div>
+      )}
+
       {/* ── Notifications ── */}
       <div style={styles.section}>
         <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('notifications')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('notifications')}>
@@ -368,7 +740,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Track Inactive Workers</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Send alerts when workers haven't submitted entries</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Send alerts when workers haven't submitted entries</div>
             </div>
             <label style={{ ...styles.toggle, background: form.feature_inactive_alerts ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_inactive_alerts} onChange={e => set('feature_inactive_alerts', e.target.checked)} style={{ display: 'none' }} />
@@ -385,7 +757,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           {form.feature_inactive_alerts && <div style={styles.row}>
             <div>
               <div style={styles.label}>Work hours window</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Only send inactive alerts during these hours</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Only send inactive alerts during these hours</div>
             </div>
             <label style={{ ...styles.toggle, background: form.notification_use_work_hours ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.notification_use_work_hours} onChange={e => set('notification_use_work_hours', e.target.checked)} style={{ display: 'none' }} />
@@ -413,27 +785,29 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Overtime Alerts</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Notify admins when a worker crosses the overtime threshold</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Notify admins when a worker crosses the overtime threshold</div>
             </div>
             <label style={{ ...styles.toggle, background: form.feature_overtime_alerts ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_overtime_alerts} onChange={e => set('feature_overtime_alerts', e.target.checked)} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleKnob, transform: form.feature_overtime_alerts ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>Time Off Request Notifications</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Email admins when a worker submits a time off request</div>
+          {form.feature_pto && (
+            <div style={styles.row}>
+              <div>
+                <div style={styles.label}>Time Off Request Notifications</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Email admins when a worker submits a time off request</div>
+              </div>
+              <label style={{ ...styles.toggle, background: form.notify_timeoff_requests ? '#1a56db' : '#d1d5db' }}>
+                <input type="checkbox" checked={form.notify_timeoff_requests} onChange={e => set('notify_timeoff_requests', e.target.checked)} style={{ display: 'none' }} />
+                <span style={{ ...styles.toggleKnob, transform: form.notify_timeoff_requests ? 'translateX(46px)' : 'translateX(0)' }} />
+              </label>
             </div>
-            <label style={{ ...styles.toggle, background: form.notify_timeoff_requests ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.notify_timeoff_requests} onChange={e => set('notify_timeoff_requests', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.notify_timeoff_requests ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
+          )}
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Budget Alert Notifications</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Email admins when a project reaches 90% or 100% of its hour budget</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Email admins when a project reaches 90% or 100% of its hour budget</div>
             </div>
             <label style={{ ...styles.toggle, background: form.notify_budget_alerts ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.notify_budget_alerts} onChange={e => set('notify_budget_alerts', e.target.checked)} style={{ display: 'none' }} />
@@ -443,7 +817,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Entry Submitted Notifications</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Email admins each time a worker submits a time entry</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Email admins each time a worker submits a time entry</div>
             </div>
             <label style={{ ...styles.toggle, background: form.notify_entry_submitted ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.notify_entry_submitted} onChange={e => set('notify_entry_submitted', e.target.checked)} style={{ display: 'none' }} />
@@ -453,23 +827,13 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <div style={styles.row}>
             <div>
               <div style={styles.label}>{t.ratesShiftReminderHour}</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Hour to send tomorrow's shift push notifications</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Hour to send tomorrow's shift push notifications</div>
             </div>
             <select style={styles.input} value={form.shift_reminder_hour} onChange={e => set('shift_reminder_hour', e.target.value)}>
               {Array.from({ length: 24 }, (_, h) => (
                 <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
               ))}
             </select>
-          </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>{t.ratesPtoAnnualDays}</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.ratesPtoAnnualDaysDesc}</div>
-            </div>
-            <div style={styles.inputGroup}>
-              <input style={styles.input} type="number" min="0" max="365" step="1" value={form.pto_annual_days} onChange={e => set('pto_annual_days', e.target.value)} />
-              <span style={styles.suffix}>{t.ratesDays}</span>
-            </div>
           </div>
           <div style={styles.row}>
             <label style={styles.label}>{t.ratesClearChat}</label>
@@ -496,7 +860,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Weekly Payroll Summary</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Every Monday — total hours and overtime per worker for the prior week</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Every Monday — total hours and overtime per worker for the prior week</div>
             </div>
             <label style={{ ...styles.toggle, background: form.report_weekly_payroll ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.report_weekly_payroll} onChange={e => set('report_weekly_payroll', e.target.checked)} style={{ display: 'none' }} />
@@ -506,7 +870,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Weekly Low-Stock Report</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Every Monday — items at or below their reorder point (skipped if none)</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Every Monday — items at or below their reorder point (skipped if none)</div>
             </div>
             <label style={{ ...styles.toggle, background: form.report_weekly_low_stock ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.report_weekly_low_stock} onChange={e => set('report_weekly_low_stock', e.target.checked)} style={{ display: 'none' }} />
@@ -516,7 +880,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Monthly Inventory Valuation</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>1st of each month — full inventory value breakdown by item</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>1st of each month — full inventory value breakdown by item</div>
             </div>
             <label style={{ ...styles.toggle, background: form.report_monthly_valuation ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.report_monthly_valuation} onChange={e => set('report_monthly_valuation', e.target.checked)} style={{ display: 'none' }} />
@@ -525,261 +889,6 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
         </div>}
         {!collapsed.reports && <SectionFooter section="reports" />}
-      </div>
-
-      {/* ── Worker Access ── */}
-      <div style={styles.section}>
-        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('access')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('access')}>
-          <span style={styles.sectionIcon}>👁️</span>
-          <div style={{ flex: 1 }}>
-            <div style={styles.sectionTitle}>{t.ratesWorkerAccess}</div>
-            <div style={styles.sectionSub}>{t.ratesWorkerAccessDesc}</div>
-          </div>
-          <span style={styles.collapseChevron}>{collapsed.access ? '▶' : '▼'}</span>
-        </div>
-        {!collapsed.access && <div style={styles.sectionBody}>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>{t.ratesShowWages}</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.ratesShowWagesDesc}</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.show_worker_wages ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.show_worker_wages} onChange={e => set('show_worker_wages', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.show_worker_wages ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>Default Temporary Password</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Auto-filled when creating a new worker</div>
-            </div>
-            <input
-              style={{ ...styles.input, width: 180, textAlign: 'right' }}
-              type="text"
-              placeholder={t.tempPasswordPlaceholder}
-              value={form.default_temp_password}
-              onChange={e => set('default_temp_password', e.target.value)}
-            />
-          </div>
-          <div className="invoice-sig-row" style={styles.row}>
-            <div>
-              <div style={styles.label}>Invoice Digital Signature</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Whether workers must sign invoices before exporting</div>
-            </div>
-            <select
-              style={{ ...styles.input, width: 'auto', textAlign: 'left' }}
-              value={form.invoice_signature}
-              onChange={e => set('invoice_signature', e.target.value)}
-            >
-              <option value="none">None — export without prompt</option>
-              <option value="optional">Optional — worker can skip</option>
-              <option value="required">Required — must sign to export</option>
-            </select>
-          </div>
-        </div>}
-        {!collapsed.access && <SectionFooter section="access" />}
-      </div>
-
-      {/* ── Modules ── */}
-      <div style={styles.section}>
-        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('modules')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('modules')}>
-          <span style={styles.sectionIcon}>📦</span>
-          <div style={{ flex: 1 }}>
-            <div style={styles.sectionTitle}>Modules</div>
-            <div style={styles.sectionSub}>Enable or disable entire app modules for all users</div>
-          </div>
-          <span style={styles.collapseChevron}>{collapsed.modules ? '▶' : '▼'}</span>
-        </div>
-        {!collapsed.modules && <div style={styles.sectionBody}>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>Time Clock</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show the Time Clock app in the app switcher</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.module_timeclock ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.module_timeclock} onChange={e => set('module_timeclock', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.module_timeclock ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>{t.featField}</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featFieldDesc}</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.module_field ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.module_field} onChange={e => set('module_field', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.module_field ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>Projects</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show the Projects module in the app switcher</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.module_projects ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.module_projects} onChange={e => {
-                set('module_projects', e.target.checked);
-                if (!e.target.checked) set('feature_project_integration', false);
-              }} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.module_projects ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>Inventory</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show the Inventory module in the app switcher</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.module_inventory ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.module_inventory} onChange={e => set('module_inventory', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.module_inventory ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
-          {form.module_inventory && (
-            <>
-              <div style={styles.row}>
-                <div>
-                  <div style={styles.label}>Cycle Count — Audit %</div>
-                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Percentage of counted items randomly selected for audit (0–100)</div>
-                </div>
-                <input style={{ ...styles.input, width: 70 }} type="number" min="0" max="100" step="1"
-                  value={form.cycle_count_audit_pct}
-                  onChange={e => set('cycle_count_audit_pct', e.target.value)} />
-              </div>
-              <div style={styles.row}>
-                <div>
-                  <div style={styles.label}>Cycle Count — Reconcile Threshold</div>
-                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Variance that triggers reconciliation (0 = never)</div>
-                </div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <input style={{ ...styles.input, width: 80 }} type="number" min="0" step="any"
-                    value={form.cycle_count_reconcile_threshold}
-                    onChange={e => set('cycle_count_reconcile_threshold', e.target.value)} />
-                  <select style={{ ...styles.input, width: 90 }}
-                    value={form.cycle_count_reconcile_threshold_type}
-                    onChange={e => set('cycle_count_reconcile_threshold_type', e.target.value)}>
-                    <option value="units">units</option>
-                    <option value="pct">%</option>
-                  </select>
-                </div>
-              </div>
-            </>
-          )}
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>Analytics</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show the Analytics module in the app switcher</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.module_analytics ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.module_analytics} onChange={e => {
-                set('module_analytics', e.target.checked);
-                if (!e.target.checked) set('feature_analytics', false);
-              }} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.module_analytics ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
-        </div>}
-        {!collapsed.modules && <SectionFooter section="modules" />}
-      </div>
-
-      {/* ── Features ── */}
-      <div style={styles.section}>
-        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('features')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('features')}>
-          <span style={styles.sectionIcon}>🧩</span>
-          <div style={{ flex: 1 }}>
-            <div style={styles.sectionTitle}>{t.featuresTitle}</div>
-            <div style={styles.sectionSub}>{t.featuresSubtitle}</div>
-          </div>
-          <span style={styles.collapseChevron}>{collapsed.features ? '▶' : '▼'}</span>
-        </div>
-        {!collapsed.features && <div style={styles.sectionBody}>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>Project Integration</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Require project selection on time entries and clock-in</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.feature_project_integration ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_project_integration} onChange={e => set('feature_project_integration', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_project_integration ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>{t.featScheduling}</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featSchedulingDesc}</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.feature_scheduling ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_scheduling} onChange={e => set('feature_scheduling', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_scheduling ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>{t.featAnalytics}</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featAnalyticsDesc}</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.feature_analytics ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_analytics} onChange={e => set('feature_analytics', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_analytics ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>{t.featChat}</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featChatDesc}</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.feature_chat ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_chat} onChange={e => set('feature_chat', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_chat ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>{t.featGeolocation}</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{t.featGeolocationDesc}</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.feature_geolocation ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_geolocation} onChange={e => set('feature_geolocation', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_geolocation ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>Announce to All Workers</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show broadcast message tool on the Live tab</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.feature_broadcast ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_broadcast} onChange={e => set('feature_broadcast', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_broadcast ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>Media Gallery</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Show a dedicated Media tab in Field for browsing all photos and videos</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.feature_media_gallery ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.feature_media_gallery} onChange={e => set('feature_media_gallery', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.feature_media_gallery ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>
-          <div style={styles.row}>
-            <div>
-              <div style={styles.label}>Global Clock-in Checklist</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Require all workers to complete a safety checklist before clocking in (any project)</div>
-            </div>
-            <select
-              style={{ ...styles.input, width: 'auto', textAlign: 'left', minWidth: 160 }}
-              value={form.global_required_checklist_template_id}
-              onChange={e => set('global_required_checklist_template_id', e.target.value)}
-            >
-              <option value="">None</option>
-              {checklistTemplates.map(t => (
-                <option key={t.id} value={String(t.id)}>{t.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>}
-        {!collapsed.features && <SectionFooter section="features" />}
       </div>
 
       {/* ── Storage ── */}
@@ -818,7 +927,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
                     Approaching storage limit. Consider upgrading your plan or deleting old media.
                   </div>
                 )}
-                <div style={{ fontSize: 12, color: '#9ca3af' }}>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>
                   Media includes field report photos, videos, and safety talk attachments.
                   Free plan: 500 MB · Starter: 5 GB · Business: 25 GB
                 </div>
@@ -829,7 +938,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
                 <div style={styles.row}>
                   <div>
                     <div style={styles.label}>Auto-delete media after</div>
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Automatically delete photos and attachments older than this many days</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Automatically delete photos and attachments older than this many days</div>
                   </div>
                   {parseFloat(form.media_retention_days) === 0 ? (
                     <button
@@ -856,7 +965,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
                 <div style={styles.row}>
                   <div>
                     <div style={styles.label}>Delete media on project archive</div>
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>When a project is archived, permanently delete all its photos and attachments</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>When a project is archived, permanently delete all its photos and attachments</div>
                   </div>
                   <label style={{ ...styles.toggle, background: form.media_delete_on_project_archive ? '#1a56db' : '#d1d5db' }}>
                     <input type="checkbox" checked={form.media_delete_on_project_archive} onChange={e => set('media_delete_on_project_archive', e.target.checked)} style={{ display: 'none' }} />
@@ -880,7 +989,7 @@ const styles = {
   sectionHeader: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderBottom: '1px solid #f3f4f6', background: '#fafafa' },
   sectionIcon: { fontSize: 20, lineHeight: 1 },
   sectionTitle: { fontSize: 14, fontWeight: 700, color: '#111827' },
-  sectionSub: { fontSize: 12, color: '#9ca3af', marginTop: 1 },
+  sectionSub: { fontSize: 12, color: '#6b7280', marginTop: 1 },
   sectionBody: { display: 'flex', flexDirection: 'column' },
   sectionFooter: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, padding: '12px 20px', borderTop: '1px solid #f3f4f6', background: '#fafafa' },
   row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 20px', borderBottom: '1px solid #f9fafb' },
@@ -895,5 +1004,6 @@ const styles = {
   errorMsg: { color: '#e53e3e', fontSize: 13 },
   saveBtn: { padding: '7px 18px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   addPrevBtn: { padding: '6px 14px', background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  enableBtn: { padding: '6px 14px', background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   collapseChevron: { fontSize: 11, color: '#6b7280' },
 };

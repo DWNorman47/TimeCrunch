@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 /**
  * Shown when a non-base UOM with factor=1 is selected, prompting the admin
@@ -18,14 +19,9 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
   const [factor, setFactor] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
+  const modalRef = useModalA11y(onDismiss);
 
   const uomLabel = uom.unit + (uom.unit_spec ? ` (${uom.unit_spec})` : '');
-
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') onDismiss(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
 
   const save = async () => {
     const n = parseFloat(factor);
@@ -42,9 +38,9 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
 
   return (
     <div style={m.overlay} onClick={onDismiss}>
-      <div style={m.modal} onClick={e => e.stopPropagation()}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="uom-conv-title" style={m.modal} onClick={e => e.stopPropagation()}>
         <div style={m.header}>
-          <div style={m.title}>{t.uomConvTitle}</div>
+          <div id="uom-conv-title" style={m.title}>{t.uomConvTitle}</div>
           <button style={m.close} aria-label={t.labelModalClose} onClick={onDismiss}>✕</button>
         </div>
         <div style={m.body}>
@@ -53,7 +49,7 @@ export default function UomConversionModal({ itemId, uom, baseUnit, onSaved, onD
             {t.uomConvDescHow} <strong>{baseUnit}</strong> {t.uomConvDescAreIn} <strong>{uomLabel}</strong>?
           </p>
           <p style={m.sub}>{t.uomConvExample}</p>
-          {error && <div style={m.error}>{error}</div>}
+          {error && <div role="alert" style={m.error}>{error}</div>}
           <div style={m.inputRow}>
             <span style={m.eq}>1&nbsp;{uomLabel}&nbsp;=</span>
             <input
@@ -89,7 +85,7 @@ const m = {
   close:    { background: 'none', border: 'none', fontSize: 18, color: '#6b7280', cursor: 'pointer' },
   body:     { padding: '20px 20px 24px', display: 'flex', flexDirection: 'column', gap: 12 },
   desc:     { fontSize: 14, color: '#374151', margin: 0, lineHeight: 1.5 },
-  sub:      { fontSize: 12, color: '#9ca3af', margin: 0 },
+  sub:      { fontSize: 12, color: '#6b7280', margin: 0 },
   error:    { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '8px 12px', fontSize: 13 },
   inputRow: { display: 'flex', alignItems: 'center', gap: 8 },
   eq:       { fontSize: 14, color: '#374151', whiteSpace: 'nowrap', fontWeight: 600 },

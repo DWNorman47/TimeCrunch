@@ -82,7 +82,7 @@ export default function ExportPanel({ workers, projects }) {
         </div>
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
 
       <div style={styles.actions}>
         <button style={{ ...styles.downloadBtn, ...((loading || !from || !to) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={download} disabled={loading || !from || !to}>
@@ -105,5 +105,5 @@ const styles = {
   error: { color: '#ef4444', fontSize: 13, marginBottom: 10 },
   actions: { display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' },
   downloadBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
-  hint: { fontSize: 12, color: '#9ca3af' },
+  hint: { fontSize: 12, color: '#6b7280' },
 };

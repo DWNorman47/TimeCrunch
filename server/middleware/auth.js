@@ -1,18 +1,42 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
 
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const token = header.split(' ')[1];
+  let payload;
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
+    payload = jwt.verify(token, process.env.JWT_SECRET);
   } catch {
     return res.status(401).json({ error: 'Invalid token' });
   }
+
+  // Short-lived special-purpose tokens (setup, MFA challenge, superadmin
+  // impersonation) don't carry a tv claim — they've got their own narrow
+  // scope and aren't affected by password changes. Normal auth tokens must
+  // match the user's current token_version; mismatch means the user's
+  // password was changed since this token was issued, so we reject it.
+  if (payload.tv != null) {
+    try {
+      const { rows } = await pool.query(
+        'SELECT token_version FROM users WHERE id = $1',
+        [payload.id]
+      );
+      if (rows.length === 0) return res.status(401).json({ error: 'Invalid token' });
+      if (rows[0].token_version !== payload.tv) {
+        return res.status(401).json({ error: 'Session invalidated, please log in again' });
+      }
+    } catch (err) {
+      // DB hiccup — fail closed for safety.
+      return res.status(503).json({ error: 'Auth service temporarily unavailable' });
+    }
+  }
+
+  req.user = payload;
+  next();
 }
 
 function requireAdmin(req, res, next) {

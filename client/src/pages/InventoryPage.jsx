@@ -14,6 +14,7 @@ import InventoryPurchaseOrders from '../components/inventory/InventoryPurchaseOr
 import InventoryConversions from '../components/inventory/InventoryConversions';
 import MyCount from '../components/MyCount';
 
+import { silentError } from '../errorReporter';
 export default function InventoryPage() {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
@@ -50,8 +51,8 @@ export default function InventoryPage() {
         setProjects(p);
         setLocations(l.data);
         if (isAdmin) {
-          api.get('/inventory/stock/low').then(r => setLowStockCount(r.data.length)).catch(() => {});
-          api.get('/inventory/uom-conversions').then(r => setPendingConversions(r.data.filter(u => parseFloat(u.factor) === 1).length)).catch(() => {});
+          api.get('/inventory/stock/low').then(r => setLowStockCount(r.data.length)).catch(silentError('inventorypage'));
+          api.get('/inventory/uom-conversions').then(r => setPendingConversions(r.data.filter(u => parseFloat(u.factor) === 1).length)).catch(silentError('inventorypage'));
         }
       } catch (e) {
         console.error(e);
@@ -62,9 +63,9 @@ export default function InventoryPage() {
     init();
   }, [isAdmin]);
 
-  const refreshLocations   = () => api.get('/inventory/locations').then(r => setLocations(r.data)).catch(() => {});
-  const refreshLowStock    = () => isAdmin && api.get('/inventory/stock/low').then(r => setLowStockCount(r.data.length)).catch(() => {});
-  const refreshConversions = () => isAdmin && api.get('/inventory/uom-conversions').then(r => setPendingConversions(r.data.filter(u => parseFloat(u.factor) === 1).length)).catch(() => {});
+  const refreshLocations   = () => api.get('/inventory/locations').then(r => setLocations(r.data)).catch(silentError('inventorypage'));
+  const refreshLowStock    = () => isAdmin && api.get('/inventory/stock/low').then(r => setLowStockCount(r.data.length)).catch(silentError('inventorypage'));
+  const refreshConversions = () => isAdmin && api.get('/inventory/uom-conversions').then(r => setPendingConversions(r.data.filter(u => parseFloat(u.factor) === 1).length)).catch(silentError('inventorypage'));
 
   if (loading) return <div style={styles.loading}>Loading…</div>;
 
@@ -107,7 +108,7 @@ export default function InventoryPage() {
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
-      <main style={styles.main}>
+      <main id="main-content" style={styles.main}>
         <TabBar
           active={tab}
           onChange={switchTab}

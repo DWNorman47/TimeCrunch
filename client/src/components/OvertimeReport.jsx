@@ -3,6 +3,7 @@ import api from '../api';
 import { fmtHours, formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
 
+import { silentError } from '../errorReporter';
 function monthStart() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
@@ -58,7 +59,7 @@ export default function OvertimeReport({ currency = 'USD' }) {
       const a = document.createElement('a');
       a.href = url; a.download = `payroll-${from}-to-${to}.csv`; a.click();
       URL.revokeObjectURL(url);
-    } catch {}
+    } catch (err) { silentError('overtime-csv')(err); }
   };
 
   const Col = ({ k, label }) => (
@@ -161,7 +162,7 @@ const styles = {
   input: { padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 },
   runBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   exportBtn: { background: '#059669', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  hint: { color: '#9ca3af', fontSize: 14 },
+  hint: { color: '#6b7280', fontSize: 14 },
   empty: { color: '#6b7280', fontSize: 14 },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },

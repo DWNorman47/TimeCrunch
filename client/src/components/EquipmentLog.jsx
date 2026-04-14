@@ -67,7 +67,7 @@ function ItemForm({ initial, onSaved, onCancel }) {
         <label htmlFor="eq-notes" style={styles.label}>{t.notes}</label>
         <input id="eq-notes" style={styles.input} type="text" placeholder={t.optionalNotes} value={form.notes} onChange={e => set('notes', e.target.value)} maxLength={1000} />
       </div>
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
         <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.addEquipmentTitle}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
@@ -140,7 +140,7 @@ function LogHoursForm({ item, projects, onLogged, onCancel }) {
         <label htmlFor="eq-log-notes" style={styles.label}>{t.notes} <span style={styles.optional}>({t.optional})</span></label>
         <input id="eq-log-notes" style={styles.input} type="text" placeholder={t.optionalNotes} value={form.notes} onChange={e => set('notes', e.target.value)} maxLength={1000} />
       </div>
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
         <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.logHoursBtn}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
@@ -420,10 +420,10 @@ const styles = {
   newBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
   formCard: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 20 },
   list: { display: 'flex', flexDirection: 'column', gap: 10 },
-  hint: { color: '#9ca3af', fontSize: 14 },
+  hint: { color: '#6b7280', fontSize: 14 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { color: '#9ca3af', fontSize: 15 },
+  emptyText: { color: '#6b7280', fontSize: 15 },
   // Card
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
   cardWarning: { boxShadow: '0 1px 6px rgba(0,0,0,0.07), inset 3px 0 0 #f59e0b' },
@@ -440,7 +440,7 @@ const styles = {
   maintenanceBar: { display: 'flex', flexDirection: 'column', gap: 2, width: 80 },
   maintenanceFill: { height: 4, borderRadius: 2 },
   maintenanceText: { fontSize: 10, fontWeight: 600 },
-  chevron: { fontSize: 10, color: '#9ca3af' },
+  chevron: { fontSize: 10, color: '#6b7280' },
   cardBody: { padding: '0 16px 14px', borderTop: '1px solid #f3f4f6' },
   bodyActions: { display: 'flex', gap: 8, marginTop: 12, marginBottom: 14 },
   logBtn: { background: '#059669', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
@@ -448,12 +448,12 @@ const styles = {
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '7px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   confirmEntryDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '2px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer' },
-  cancelEntryBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 11, cursor: 'pointer', padding: '2px 4px' },
+  cancelEntryBtn: { background: 'none', border: 'none', color: '#6b7280', fontSize: 11, cursor: 'pointer', padding: '2px 4px' },
   inlineError: { fontSize: 12, color: '#ef4444', margin: '4px 0 0' },
   hoursHistory: { marginTop: 4 },
-  historyTitle: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 8 },
+  historyTitle: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280', marginBottom: 8 },
   histTable: { width: '100%', borderCollapse: 'collapse', fontSize: 12 },
-  hth: { textAlign: 'left', fontWeight: 700, color: '#9ca3af', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '4px 8px', borderBottom: '1px solid #e5e7eb' },
+  hth: { textAlign: 'left', fontWeight: 700, color: '#6b7280', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '4px 8px', borderBottom: '1px solid #e5e7eb' },
   htd: { padding: '6px 8px', borderBottom: '1px solid #f9fafb', color: '#374151' },
   delEntryBtn: { background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: 12, padding: '2px 4px' },
   pendingBadge: { fontSize: 9, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 5px', borderRadius: 6, marginLeft: 6, verticalAlign: 'middle' },
@@ -463,7 +463,7 @@ const styles = {
   row: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 5, flex: 1, minWidth: 180 },
   label: { fontSize: 13, fontWeight: 600, color: '#374151' },
-  optional: { fontWeight: 400, color: '#9ca3af' },
+  optional: { fontWeight: 400, color: '#6b7280' },
   input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, background: '#fff' },
   error: { color: '#ef4444', fontSize: 13, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', margin: 0 },
   formActions: { display: 'flex', gap: 10 },

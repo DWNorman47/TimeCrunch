@@ -1,34 +1,19 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
+import { useModalA11y } from '../hooks/useModalA11y';
 
-export default function WelcomeModal() {
-  const { user, firstLogin, clearFirstLogin } = useAuth();
-  const navigate = useNavigate();
-  const t = useT();
-  if (!firstLogin || !user) return null;
-
-  const firstName = user.first_name || user.full_name?.split(' ')[0] || user.username;
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
-
-  const handleStart = () => {
-    clearFirstLogin();
-    if (isAdmin) navigate('/administration');
-  };
-
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') handleStart(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
-
+// Inner component: only rendered when we actually need the modal.
+// All hooks live here so they're called unconditionally.
+function WelcomeModalInner({ user, isAdmin, firstName, handleStart, t }) {
+  const modalRef = useModalA11y(handleStart);
   return (
     <div style={styles.overlay} onClick={e => { if (e.target === e.currentTarget) handleStart(); }}>
-      <div style={styles.modal}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="welcome-modal-title" style={styles.modal}>
         <div style={styles.brand}>{t.welcomeBrand}</div>
         <div style={styles.emoji}>{isAdmin ? '🏗️' : '👷'}</div>
-        <h2 style={styles.title}>{t.welcome}, {firstName}!</h2>
+        <h2 id="welcome-modal-title" style={styles.title}>{t.welcome}, {firstName}!</h2>
         {isAdmin ? (
           <>
             <p style={styles.body}><strong>Ops Flow Assist</strong> {t.welcomeAdminBody1}</p>
@@ -48,10 +33,35 @@ export default function WelcomeModal() {
   );
 }
 
+export default function WelcomeModal() {
+  const { user, firstLogin, clearFirstLogin } = useAuth();
+  const navigate = useNavigate();
+  const t = useT();
+  if (!firstLogin || !user) return null;
+
+  const firstName = user.first_name || user.full_name?.split(' ')[0] || user.username;
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+  const handleStart = () => {
+    clearFirstLogin();
+    if (isAdmin) navigate('/administration');
+  };
+
+  return (
+    <WelcomeModalInner
+      user={user}
+      isAdmin={isAdmin}
+      firstName={firstName}
+      handleStart={handleStart}
+      t={t}
+    />
+  );
+}
+
 const styles = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 },
   modal: { background: '#fff', borderRadius: 16, padding: '36px 32px', maxWidth: 440, width: '100%', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'center' },
-  brand: { fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9ca3af' },
+  brand: { fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b7280' },
   emoji: { fontSize: 48, lineHeight: 1 },
   title: { fontSize: 24, fontWeight: 800, color: '#111827', margin: 0 },
   body: { fontSize: 14, color: '#4b5563', lineHeight: 1.7, margin: 0, textAlign: 'left' },

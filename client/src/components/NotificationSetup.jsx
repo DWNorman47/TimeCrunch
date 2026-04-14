@@ -108,6 +108,6 @@ const styles = {
   sub: { fontSize: 12, color: '#6b7280', lineHeight: 1.4 },
   onBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 },
   offBtn: { background: 'none', border: '1px solid #d1d5db', color: '#6b7280', padding: '7px 16px', borderRadius: 7, fontSize: 13, cursor: 'pointer', flexShrink: 0 },
-  denied: { fontSize: 12, color: '#9ca3af', fontStyle: 'italic' },
+  denied: { fontSize: 12, color: '#6b7280', fontStyle: 'italic' },
   errorMsg: { width: '100%', marginTop: 6, fontSize: 12, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '6px 10px' },
 };

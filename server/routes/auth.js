@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
+const logger = require('../logger');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const speakeasy = require('speakeasy');
@@ -34,7 +35,9 @@ const authLimiter = rateLimit({
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 function validatePassword(password, username) {
-  if (password.length < 6) return 'Password must be at least 6 characters';
+  // NIST SP 800-63B modern guidance: favour length over forced complexity.
+  // 8-char minimum is the conservative floor; max stays at 128.
+  if (password.length < 8) return 'Password must be at least 8 characters';
   if (password.length > 128) return 'Password must be 128 characters or fewer';
   if (username && password.toLowerCase().includes(username.toLowerCase())) return 'Password cannot contain your username';
   return null;
@@ -42,7 +45,21 @@ function validatePassword(password, username) {
 
 function signToken(user) {
   return jwt.sign(
-    { id: user.id, username: user.username, role: user.role, full_name: user.full_name, invoice_name: user.invoice_name || null, language: user.language, company_id: user.company_id, company_name: user.company_name, admin_permissions: user.admin_permissions || null, worker_access_ids: user.worker_access_ids || null },
+    {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      full_name: user.full_name,
+      invoice_name: user.invoice_name || null,
+      language: user.language,
+      company_id: user.company_id,
+      company_name: user.company_name,
+      admin_permissions: user.admin_permissions || null,
+      worker_access_ids: user.worker_access_ids || null,
+      // tv (token version) lets us invalidate every outstanding token for
+      // this user by bumping users.token_version. See middleware/auth.js.
+      tv: user.token_version ?? 0,
+    },
     process.env.JWT_SECRET,
     { expiresIn: '8h' }
   );
@@ -136,7 +153,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     const token = signToken(user);
     res.json({ token, first_login: isFirstLogin, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -167,7 +184,7 @@ router.get('/me', requireAuth, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -295,7 +312,7 @@ router.post('/register', authLimiter, async (req, res) => {
       console.error('Confirmation email failed — account not created:', err.response.body);
       return res.status(500).json({ error: 'Failed to send confirmation email. Please check your email address and try again.' });
     }
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   } finally {
     client.release();
@@ -319,7 +336,7 @@ router.post('/confirm-email', async (req, res) => {
     );
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -347,14 +364,17 @@ router.post('/complete-setup', async (req, res) => {
     const user = userRes.rows[0];
     if (!user) return res.status(400).json({ error: 'User not found' });
     const hash = await bcrypt.hash(new_password, 10);
-    await pool.query(
-      'UPDATE users SET password_hash = $1, must_change_password = false WHERE id = $2',
+    // Bump token_version so any previously-issued tokens for this user
+    // (e.g. from before a password was forced to be changed) are rejected.
+    const upd = await pool.query(
+      'UPDATE users SET password_hash = $1, must_change_password = false, token_version = token_version + 1 WHERE id = $2 RETURNING token_version',
       [hash, user.id]
     );
+    user.token_version = upd.rows[0].token_version;
     const token = signToken(user);
     res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -396,7 +416,7 @@ router.post('/resend-confirmation', async (req, res) => {
     }
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -453,7 +473,7 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -472,13 +492,15 @@ router.post('/reset-password', authLimiter, async (req, res) => {
     if (result.rowCount === 0) return res.status(400).json({ error: 'Reset link is invalid or has expired' });
 
     const hash = await bcrypt.hash(password, 10);
+    // Bump token_version — if an attacker had stolen a token before the
+    // legitimate user reset their password, that token is now dead.
     await pool.query(
-      'UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2',
+      'UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL, token_version = token_version + 1 WHERE id = $2',
       [hash, result.rows[0].id]
     );
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -500,12 +522,12 @@ router.post('/accept-invite', authLimiter, async (req, res) => {
     const user = result.rows[0];
     const hash = await bcrypt.hash(password, 10);
     await pool.query(
-      'UPDATE users SET password_hash = $1, invite_token = NULL, invite_token_expires = NULL, invite_pending = false, email_confirmed = true, must_change_password = false WHERE id = $2',
+      'UPDATE users SET password_hash = $1, invite_token = NULL, invite_token_expires = NULL, invite_pending = false, email_confirmed = true, must_change_password = false, token_version = token_version + 1 WHERE id = $2',
       [hash, user.id]
     );
     res.json({ success: true, username: user.username, company_name: user.company_name });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -525,10 +547,18 @@ router.post('/change-password', requireAuth, authLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
     const hash = await bcrypt.hash(new_password, 10);
-    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.id]);
-    res.json({ success: true });
+    // Bump token_version: every other session (other devices, stolen tokens)
+    // is invalidated. Then re-issue a fresh token for the current device so
+    // the user stays logged in here.
+    const upd = await pool.query(
+      'UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2 RETURNING token_version',
+      [hash, req.user.id]
+    );
+    user.token_version = upd.rows[0].token_version;
+    const token = signToken(user);
+    res.json({ success: true, token });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -561,7 +591,7 @@ router.post('/mfa/confirm', loginLimiter, async (req, res) => {
     const token = signToken(user);
     res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -574,7 +604,7 @@ router.get('/mfa/setup', requireAuth, async (req, res) => {
     const qr = await qrcode.toDataURL(secret.otpauth_url);
     res.json({ qr, secret: secret.base32 });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -597,7 +627,7 @@ router.post('/mfa/enable', requireAuth, async (req, res) => {
     );
     res.json({ enabled: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -617,7 +647,7 @@ router.post('/mfa/disable', requireAuth, async (req, res) => {
     );
     res.json({ disabled: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -630,7 +660,7 @@ router.post('/update-language', requireAuth, async (req, res) => {
     await pool.query('UPDATE users SET language = $1 WHERE id = $2', [language, req.user.id]);
     res.json({ success: true, language });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });

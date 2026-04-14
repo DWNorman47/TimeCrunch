@@ -3,6 +3,8 @@ const pool = require('../db');
 const { deleteByUrl } = require('../r2');
 const { decrementStorage } = require('../storage');
 const { applySettingsRows, ADMIN_SETTINGS_DEFAULTS } = require('../settingsDefaults');
+const logger = require('../logger');
+const { runJob } = require('./runJob');
 
 async function deleteMediaForProject(companyId, projectId) {
   const photos = await pool.query(
@@ -27,8 +29,7 @@ async function deleteMediaForProject(companyId, projectId) {
 }
 
 async function runMediaRetention() {
-  try {
-    const companies = await pool.query(
+  const companies = await pool.query(
       `SELECT c.id FROM companies c WHERE c.subscription_status IN ('trial', 'active')`
     );
 
@@ -59,7 +60,7 @@ async function runMediaRetention() {
         const ids = oldPhotos.rows.map(p => p.id);
         await pool.query(`DELETE FROM field_report_photos WHERE id = ANY($1)`, [ids]);
         if (totalBytes > 0) await decrementStorage(companyId, totalBytes).catch(() => {});
-        console.log(`[mediaRetention] Company ${companyId}: deleted ${oldPhotos.rowCount} photos (${(totalBytes / (1024 * 1024)).toFixed(1)} MB)`);
+        logger.info({ companyId, photos: oldPhotos.rowCount, bytes: totalBytes }, 'mediaRetention: deleted photos');
       }
 
       // Delete safety talk attachments older than retention_days
@@ -81,17 +82,13 @@ async function runMediaRetention() {
         const ids = oldAttachments.rows.map(a => a.id);
         await pool.query(`DELETE FROM safety_talk_attachments WHERE id = ANY($1)`, [ids]);
         if (attBytes > 0) await decrementStorage(companyId, attBytes).catch(() => {});
-        console.log(`[mediaRetention] Company ${companyId}: deleted ${oldAttachments.rowCount} attachments (${(attBytes / (1024 * 1024)).toFixed(1)} MB)`);
+        logger.info({ companyId, attachments: oldAttachments.rowCount, bytes: attBytes }, 'mediaRetention: deleted attachments');
       }
     }
-  } catch (err) {
-    console.error('[mediaRetention] Error:', err.message);
-  }
 }
 
 function startMediaRetentionJob() {
-  cron.schedule('0 2 * * *', runMediaRetention); // 2 AM daily
-  console.log('[mediaRetention] Scheduled (daily 2 AM)');
+  cron.schedule('0 2 * * *', () => runJob('mediaRetention', runMediaRetention)); // 2 AM daily
 }
 
 module.exports = { startMediaRetentionJob, deleteMediaForProject };

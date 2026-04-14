@@ -148,7 +148,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
         {items.length === 0 && <p style={styles.hint}>{t.noItemsYet}</p>}
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
         <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.createTemplate}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
@@ -263,11 +263,11 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
         <div style={styles.fieldGroup}>
           <label style={styles.label}>{t.additionalNotes}</label>
           <textarea style={styles.textarea} rows={2} placeholder={t.anyObservations} maxLength={1000} value={notes} onChange={e => setNotes(e.target.value)} />
-          <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{notes.length}/1000</div>
+          <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{notes.length}/1000</div>
         </div>
       )}
 
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
         <button style={{ ...styles.submitBtn, ...((saving || !templateId) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving || !templateId}>
           {saving ? t.submitting : t.submitChecklist}
@@ -567,7 +567,7 @@ const styles = {
   cardRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
   progressBadge: { fontSize: 11, fontWeight: 700, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 10 },
   progressDone: { color: '#065f46', background: '#d1fae5' },
-  chevron: { fontSize: 10, color: '#9ca3af' },
+  chevron: { fontSize: 10, color: '#6b7280' },
   cardBody: { padding: '0 16px 16px', borderTop: '1px solid #f3f4f6' },
   answerList: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 },
   answerRow: { display: 'flex', alignItems: 'flex-start', gap: 10 },
@@ -582,7 +582,7 @@ const styles = {
   templateCardLeft: { flex: 1, minWidth: 0 },
   templateCardName: { fontWeight: 700, fontSize: 14, color: '#111827', marginBottom: 2 },
   templateCardDesc: { fontSize: 12, color: '#6b7280', marginBottom: 4 },
-  templateCardCount: { fontSize: 11, color: '#9ca3af' },
+  templateCardCount: { fontSize: 11, color: '#6b7280' },
   templateCardActions: { display: 'flex', gap: 8, flexShrink: 0 },
   editBtn: { background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb', padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
@@ -608,9 +608,9 @@ const styles = {
   itemsHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   addItemBtn: { fontSize: 12, fontWeight: 600, color: '#059669', background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '5px 12px', borderRadius: 6, cursor: 'pointer' },
   itemEditRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  itemIdx: { fontSize: 12, fontWeight: 700, color: '#9ca3af', flexShrink: 0, width: 18 },
+  itemIdx: { fontSize: 12, fontWeight: 700, color: '#6b7280', flexShrink: 0, width: 18 },
   typeSelect: { padding: '8px 6px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 12, background: '#fff', flexShrink: 0 },
-  removeItemBtn: { fontSize: 11, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, flexShrink: 0 },
+  removeItemBtn: { fontSize: 11, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, flexShrink: 0 },
   templateDesc: { fontSize: 13, color: '#6b7280', margin: '0 0 4px', fontStyle: 'italic' },
   fillItems: { display: 'flex', flexDirection: 'column', gap: 12, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: 14 },
   fillRow: { display: 'flex', alignItems: 'flex-start', gap: 10 },
@@ -622,7 +622,7 @@ const styles = {
   cancelBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '10px 20px', borderRadius: 8, fontSize: 14, cursor: 'pointer' },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { color: '#9ca3af', fontSize: 15 },
+  emptyText: { color: '#6b7280', fontSize: 15 },
   emptyCtaBtn: { marginTop: 14, background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
-  hint: { color: '#9ca3af', fontSize: 14 },
+  hint: { color: '#6b7280', fontSize: 14 },
 };

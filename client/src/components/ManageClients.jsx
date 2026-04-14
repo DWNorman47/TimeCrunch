@@ -405,7 +405,7 @@ export default function ManageClients() {
         </div>
       )}
 
-      {clients.length > 4 && (
+      {clients.length > 0 && (
         <input
           style={s.search}
           placeholder={t.searchClientsPlaceholder}
@@ -450,10 +450,10 @@ const s = {
   formCard: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 20 },
   search: { width: '100%', padding: '9px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, background: '#fff', marginBottom: 12, boxSizing: 'border-box' },
   list: { display: 'flex', flexDirection: 'column', gap: 10 },
-  hint: { color: '#9ca3af', fontSize: 14 },
+  hint: { color: '#6b7280', fontSize: 14 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { color: '#9ca3af', fontSize: 15 },
+  emptyText: { color: '#6b7280', fontSize: 15 },
   // Card
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '14px 16px', cursor: 'pointer', gap: 12 },
@@ -463,11 +463,11 @@ const s = {
   cardMeta: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#6b7280', flexWrap: 'wrap' },
   metaLink: { color: '#1d4ed8', textDecoration: 'none' },
   metaTag: { background: '#f3f4f6', color: '#374151', padding: '1px 7px', borderRadius: 10, fontWeight: 600 },
-  chevron: { fontSize: 10, color: '#9ca3af', flexShrink: 0 },
+  chevron: { fontSize: 10, color: '#6b7280', flexShrink: 0 },
   cardBody: { padding: '0 16px 16px', borderTop: '1px solid #f3f4f6' },
   addressText: { fontSize: 13, color: '#374151', marginTop: 12, marginBottom: 4 },
   notesText: { fontSize: 13, color: '#6b7280', marginBottom: 12, whiteSpace: 'pre-wrap' },
-  sectionLabel: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginTop: 14, marginBottom: 8 },
+  sectionLabel: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280', marginTop: 14, marginBottom: 8 },
   cardActions: { display: 'flex', gap: 8, marginTop: 16, borderTop: '1px solid #f3f4f6', paddingTop: 12 },
   editBtn: { background: '#f3f4f6', border: 'none', color: '#374151', padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '7px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
@@ -479,8 +479,8 @@ const s = {
   row: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   field: { display: 'flex', flexDirection: 'column', gap: 5, flex: 1, minWidth: 180 },
   label: { fontSize: 13, fontWeight: 600, color: '#374151' },
-  opt: { fontWeight: 400, color: '#9ca3af' },
-  charCount: { fontSize: 11, color: '#9ca3af' },
+  opt: { fontWeight: 400, color: '#6b7280' },
+  charCount: { fontSize: 11, color: '#6b7280' },
   input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 },
   textarea: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 },
   error: { color: '#ef4444', fontSize: 13, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', margin: 0 },
@@ -492,7 +492,7 @@ const s = {
   uploadRow: { display: 'flex', alignItems: 'flex-end', gap: 8, flexWrap: 'wrap' },
   uploadSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff' },
   expiryField: { display: 'flex', flexDirection: 'column', gap: 3 },
-  uploadLabel: { fontSize: 11, fontWeight: 600, color: '#9ca3af' },
+  uploadLabel: { fontSize: 11, fontWeight: 600, color: '#6b7280' },
   uploadInput: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13 },
   uploadFileBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
   uploadError: { color: '#ef4444', fontSize: 12, marginTop: 4 },
@@ -503,14 +503,14 @@ const s = {
   dirBadgeTheirs: { background: '#ede9fe', color: '#6d28d9' },
   dirBadgeOurs: { background: '#dbeafe', color: '#1d4ed8' },
   // Doc list
-  noDocsHint: { color: '#9ca3af', fontSize: 13 },
+  noDocsHint: { color: '#6b7280', fontSize: 13 },
   docList: { display: 'flex', flexDirection: 'column', gap: 6 },
   docRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid #f9fafb', flexWrap: 'wrap' },
   docTypeBadge: { fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, flexShrink: 0 },
   docName: { fontSize: 13, color: '#1d4ed8', textDecoration: 'none', flex: 1, minWidth: 120, '&:hover': { textDecoration: 'underline' } },
-  docSize: { fontSize: 11, color: '#9ca3af', flexShrink: 0 },
+  docSize: { fontSize: 11, color: '#6b7280', flexShrink: 0 },
   expiryBadge: { fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, flexShrink: 0 },
-  docDeleteBtn: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '0 4px', flexShrink: 0 },
+  docDeleteBtn: { background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14, padding: '0 4px', flexShrink: 0 },
   confirmDocDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '1px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
-  cancelDocDeleteBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 11, cursor: 'pointer', padding: '0 2px', flexShrink: 0 },
+  cancelDocDeleteBtn: { background: 'none', border: 'none', color: '#6b7280', fontSize: 11, cursor: 'pointer', padding: '0 2px', flexShrink: 0 },
 };

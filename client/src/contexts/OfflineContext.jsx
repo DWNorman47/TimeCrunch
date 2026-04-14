@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useToast } from './ToastContext';
 
+import { silentError } from '../errorReporter';
 const OfflineContext = createContext(null);
 
 export function OfflineProvider({ children }) {
@@ -29,7 +30,7 @@ export function OfflineProvider({ children }) {
       sendToSW({ type: 'REPLAY_QUEUE' });
       if ('serviceWorker' in navigator && 'sync' in ServiceWorkerRegistration.prototype) {
         navigator.serviceWorker.ready.then(reg => {
-          reg.sync.register('clock-queue-replay').catch(() => {});
+          reg.sync.register('clock-queue-replay').catch(silentError('offlinecontext'));
         });
       }
     };

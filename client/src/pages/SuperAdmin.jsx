@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { langToLocale } from '../utils';
 import api from '../api';
+import ModalShell from '../components/ModalShell';
 
+import { silentError } from '../errorReporter';
 function formatDate(str, locale = 'en-US') {
   return new Date(str).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -72,6 +74,14 @@ export default function SuperAdmin() {
   const [afError, setAfError]       = useState('');
   const [afDeleteError, setAfDeleteError] = useState('');
 
+  // ── Client errors state ──
+  const [errLoading, setErrLoading]     = useState(false);
+  const [errList, setErrList]           = useState([]);
+  const [errKindFilter, setErrKindFilter] = useState('all');
+  const [errSinceHours, setErrSinceHours] = useState(24);
+  const [errExpandedId, setErrExpandedId] = useState(null);
+  const [errError, setErrError]         = useState('');
+
   useEffect(() => {
     Promise.all([
       api.get('/superadmin/companies'),
@@ -79,20 +89,35 @@ export default function SuperAdmin() {
     ]).then(([cr, ar]) => {
       setCompanies(cr.data);
       setAffiliates(ar.data);
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(silentError('superadmin')).finally(() => setLoading(false));
   }, []);
 
   const loadAffiliates = () => {
     setAfLoading(true);
     api.get('/superadmin/affiliates')
       .then(r => setAfList(r.data))
-      .catch(() => {})
+      .catch(silentError('superadmin'))
       .finally(() => setAfLoading(false));
   };
 
   useEffect(() => {
     if (tab === 'affiliates' && afList.length === 0) loadAffiliates();
   }, [tab]);
+
+  const loadClientErrors = () => {
+    setErrLoading(true);
+    setErrError('');
+    const since = new Date(Date.now() - errSinceHours * 3600 * 1000).toISOString();
+    api.get('/superadmin/client-errors', { params: { since, limit: 200 } })
+      .then(r => setErrList(r.data))
+      .catch(e => setErrError(e.response?.data?.error || 'Failed to load errors'))
+      .finally(() => setErrLoading(false));
+  };
+
+  useEffect(() => {
+    if (tab === 'errors') loadClientErrors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, errSinceHours]);
 
   // ── Companies handlers ──
   const patchCompany = async (id, patch) => {
@@ -113,7 +138,7 @@ export default function SuperAdmin() {
         const af = affiliates.find(a => String(a.id) === String(affiliateId));
         return { ...c, ...r.data, affiliate_name: af?.name || null };
       }));
-    } catch {}
+    } catch (err) { silentError('superadmin company detail')(err); }
   };
 
   const startRename = (company) => {
@@ -162,7 +187,7 @@ export default function SuperAdmin() {
       try {
         const r = await api.get(`/superadmin/companies/${id}/users`);
         setCompanyUsers(prev => ({ ...prev, [id]: r.data }));
-      } catch {}
+      } catch (err) { silentError('superadmin company users')(err); }
     }
   };
 
@@ -213,8 +238,12 @@ export default function SuperAdmin() {
       {/* Delete confirm modal */}
       {deleteTarget && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <div style={styles.modalTitle}>Delete company</div>
+          <ModalShell
+            onClose={() => !deleteWorking && (setDeleteTarget(null), setDeleteConfirm(''))}
+            titleId="sa-delete-title"
+            style={styles.modal}
+          >
+            <div id="sa-delete-title" style={styles.modalTitle}>Delete company</div>
             <p style={styles.modalBody}>
               This will permanently delete <strong>{deleteTarget.name}</strong> and all of its data
               (workers, projects, time entries, reports, settings). This cannot be undone.
@@ -239,17 +268,20 @@ export default function SuperAdmin() {
                 Cancel
               </button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
 
-      <main style={styles.main}>
+      <main id="main-content" style={styles.main}>
         <div style={styles.tabs}>
-          <button style={{ ...styles.tabBtn, ...(tab === 'companies' ? styles.tabActive : {}) }} onClick={() => setTab('companies')}>
+          <button aria-current={tab === 'companies' ? 'page' : undefined} style={{ ...styles.tabBtn, ...(tab === 'companies' ? styles.tabActive : {}) }} onClick={() => setTab('companies')}>
             Companies {companies.length > 0 && <span style={styles.tabCount}>{companies.length}</span>}
           </button>
-          <button style={{ ...styles.tabBtn, ...(tab === 'affiliates' ? styles.tabActive : {}) }} onClick={() => setTab('affiliates')}>
+          <button aria-current={tab === 'affiliates' ? 'page' : undefined} style={{ ...styles.tabBtn, ...(tab === 'affiliates' ? styles.tabActive : {}) }} onClick={() => setTab('affiliates')}>
             Affiliates {afList.length > 0 && <span style={styles.tabCount}>{afList.length}</span>}
+          </button>
+          <button aria-current={tab === 'errors' ? 'page' : undefined} style={{ ...styles.tabBtn, ...(tab === 'errors' ? styles.tabActive : {}) }} onClick={() => setTab('errors')}>
+            Client Errors {errList.length > 0 && <span style={styles.tabCount}>{errList.length}</span>}
           </button>
         </div>
 
@@ -257,9 +289,9 @@ export default function SuperAdmin() {
         {tab === 'companies' && (
           <>
             {loading ? (
-              <p style={{ color: '#888' }}>Loading...</p>
+              <p style={{ color: '#6b7280' }}>Loading...</p>
             ) : companies.length === 0 ? (
-              <p style={{ color: '#888' }}>No companies yet.</p>
+              <p style={{ color: '#6b7280' }}>No companies yet.</p>
             ) : (
               <div style={styles.list}>
                 {companies.map(c => (
@@ -396,9 +428,9 @@ export default function SuperAdmin() {
                     {expandedId === c.id && (
                       <div style={styles.userTable}>
                         {!companyUsers[c.id] ? (
-                          <p style={{ color: '#888', fontSize: 13 }}>Loading...</p>
+                          <p style={{ color: '#6b7280', fontSize: 13 }}>Loading...</p>
                         ) : companyUsers[c.id].length === 0 ? (
-                          <p style={{ color: '#888', fontSize: 13 }}>No users.</p>
+                          <p style={{ color: '#6b7280', fontSize: 13 }}>No users.</p>
                         ) : (
                           <table style={styles.table}>
                             <thead>
@@ -479,8 +511,8 @@ export default function SuperAdmin() {
               </div>
             )}
 
-            {afLoading ? <p style={{ color: '#888' }}>Loading...</p> : afList.length === 0 ? (
-              <p style={{ color: '#888' }}>No affiliates yet. Add one to start tracking commissions.</p>
+            {afLoading ? <p style={{ color: '#6b7280' }}>Loading...</p> : afList.length === 0 ? (
+              <p style={{ color: '#6b7280' }}>No affiliates yet. Add one to start tracking commissions.</p>
             ) : (
               <div style={styles.list}>
                 {afList.map(a => {
@@ -496,7 +528,7 @@ export default function SuperAdmin() {
                             {a.email && a.phone && <span style={styles.sep}>·</span>}
                             {a.phone && <span>{a.phone}</span>}
                           </div>
-                          {a.notes && <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{a.notes}</div>}
+                          {a.notes && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{a.notes}</div>}
                           <div style={styles.afSummary}>
                             <div style={styles.afStat}>
                               <div style={styles.afStatLabel}>Companies</div>
@@ -533,7 +565,7 @@ export default function SuperAdmin() {
                       {afExpanded === a.id && (
                         <div style={styles.userTable}>
                           {!a.companies || a.companies.length === 0 ? (
-                            <p style={{ color: '#888', fontSize: 13 }}>No companies assigned yet.</p>
+                            <p style={{ color: '#6b7280', fontSize: 13 }}>No companies assigned yet.</p>
                           ) : (
                             <table style={styles.table}>
                               <thead>
@@ -578,6 +610,149 @@ export default function SuperAdmin() {
             )}
           </>
         )}
+
+        {/* ── Client Errors tab ── */}
+        {tab === 'errors' && (
+          <>
+            <div style={styles.titleRow}>
+              <h2 style={styles.title}>Client Errors</h2>
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <label style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
+                  Kind:&nbsp;
+                  <select
+                    style={styles.controlSelect}
+                    value={errKindFilter}
+                    onChange={e => setErrKindFilter(e.target.value)}
+                  >
+                    <option value="all">All</option>
+                    <option value="render">Render</option>
+                    <option value="unhandled">Unhandled</option>
+                    <option value="rejection">Rejection</option>
+                    <option value="console">Console</option>
+                  </select>
+                </label>
+                <label style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
+                  Window:&nbsp;
+                  <select
+                    style={styles.controlSelect}
+                    value={errSinceHours}
+                    onChange={e => setErrSinceHours(parseInt(e.target.value))}
+                  >
+                    <option value={1}>Last 1h</option>
+                    <option value={24}>Last 24h</option>
+                    <option value={168}>Last 7 days</option>
+                    <option value={720}>Last 30 days</option>
+                  </select>
+                </label>
+                <button style={styles.actionBtn} onClick={loadClientErrors} disabled={errLoading}>
+                  {errLoading ? 'Loading…' : 'Refresh'}
+                </button>
+              </div>
+            </div>
+
+            {errError && <p style={{ color: '#dc2626', fontSize: 13 }} role="alert">{errError}</p>}
+
+            {(() => {
+              const filtered = errKindFilter === 'all'
+                ? errList
+                : errList.filter(e => e.kind === errKindFilter);
+
+              // Group by (kind|message) to show each distinct bug once with an occurrence count.
+              const groupsMap = new Map();
+              for (const e of filtered) {
+                const key = `${e.kind}|${(e.message || '').slice(0, 200)}`;
+                if (!groupsMap.has(key)) {
+                  groupsMap.set(key, { key, kind: e.kind, message: e.message, count: 0, users: new Set(), latest: e, sample: e });
+                }
+                const g = groupsMap.get(key);
+                g.count++;
+                if (e.user_id) g.users.add(e.user_id);
+                if (new Date(e.created_at) > new Date(g.latest.created_at)) g.latest = e;
+              }
+              const groups = [...groupsMap.values()].sort((a, b) => new Date(b.latest.created_at) - new Date(a.latest.created_at));
+
+              if (errLoading && groups.length === 0) {
+                return <p style={{ color: '#6b7280' }}>Loading…</p>;
+              }
+              if (!errLoading && groups.length === 0) {
+                return (
+                  <div style={{ ...styles.card, textAlign: 'center', color: '#6b7280' }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
+                    <p style={{ margin: 0 }}>No errors in this window.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={styles.list}>
+                  <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 4px' }}>
+                    {groups.length} unique issue{groups.length === 1 ? '' : 's'} · {filtered.length} total occurrence{filtered.length === 1 ? '' : 's'}
+                  </p>
+                  {groups.map(g => {
+                    const isExpanded = errExpandedId === g.key;
+                    const kindBg = { render: '#fee2e2', unhandled: '#fef3c7', rejection: '#ede9fe', console: '#dbeafe' }[g.kind] || '#f3f4f6';
+                    const kindFg = { render: '#dc2626', unhandled: '#92400e', rejection: '#6b21a8', console: '#1e40af' }[g.kind] || '#374151';
+                    return (
+                      <div key={g.key} style={styles.card}>
+                        <div style={styles.cardTop}>
+                          <div style={styles.cardLeft}>
+                            <div style={{ ...styles.companyName, marginBottom: 6 }}>
+                              <span style={{ ...tag(kindBg, kindFg), textTransform: 'uppercase' }}>{g.kind}</span>
+                              <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#111827', wordBreak: 'break-word' }}>
+                                {g.message || '(no message)'}
+                              </span>
+                            </div>
+                            <div style={styles.meta}>
+                              <span><b>{g.count}</b> occurrence{g.count === 1 ? '' : 's'}</span>
+                              <span style={styles.sep}>·</span>
+                              <span>{g.users.size} user{g.users.size === 1 ? '' : 's'}</span>
+                              <span style={styles.sep}>·</span>
+                              <span>latest {formatDate(g.latest.created_at, locale)}</span>
+                              {g.latest.app_version && (
+                                <>
+                                  <span style={styles.sep}>·</span>
+                                  <span style={styles.slug}>{g.latest.app_version}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div style={styles.cardActions}>
+                            <button style={styles.expandBtn} onClick={() => setErrExpandedId(isExpanded ? null : g.key)}>
+                              {isExpanded ? 'Hide details' : 'Show details'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div style={{ marginTop: 14, borderTop: '1px solid #f0f0f0', paddingTop: 14 }}>
+                            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
+                              Latest event — {g.latest.company_name || '(no company)'} · {g.latest.user_name || 'anonymous'}
+                            </div>
+                            {g.latest.url && (
+                              <div style={{ fontSize: 12, color: '#374151', marginBottom: 6, wordBreak: 'break-all' }}>
+                                <b>URL:</b> {g.latest.url}
+                              </div>
+                            )}
+                            {g.latest.user_agent && (
+                              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6, wordBreak: 'break-all' }}>
+                                <b>UA:</b> {g.latest.user_agent}
+                              </div>
+                            )}
+                            {g.latest.stack && (
+                              <pre style={{ fontSize: 11, background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: 6, padding: 10, overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#374151', marginTop: 8 }}>
+                                {g.latest.stack}
+                              </pre>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </>
+        )}
       </main>
     </div>
   );
@@ -607,14 +782,14 @@ const styles = {
   companyName: { fontWeight: 700, fontSize: 17, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   inactiveTag: { background: '#fee2e2', color: '#dc2626', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
   affiliateTag: { background: '#f0fdf4', color: '#15803d', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10 },
-  meta: { fontSize: 13, color: '#9ca3af', display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' },
+  meta: { fontSize: 13, color: '#6b7280', display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' },
   slug: { fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 4px', borderRadius: 4, fontSize: 12 },
   sep: { color: '#d1d5db' },
   stats: { display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10 },
   stat: { fontSize: 13, color: '#555' },
   controlsRow: { display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 4 },
   controlGroup: { display: 'flex', flexDirection: 'column', gap: 3 },
-  controlLabel: { fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  controlLabel: { fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' },
   controlSelect: { fontSize: 12, padding: '4px 7px', border: '1px solid #d1d5db', borderRadius: 6, color: '#374151', background: '#fff' },
   cardActions: { display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch', minWidth: 110 },
   expandBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer', textAlign: 'center' },
@@ -649,6 +824,6 @@ const styles = {
   afCancelBtn: { padding: '8px 16px', background: 'none', border: '1px solid #d1d5db', color: '#374151', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
   afSummary: { display: 'flex', gap: 24, marginTop: 10, flexWrap: 'wrap' },
   afStat: { display: 'flex', flexDirection: 'column', gap: 2 },
-  afStatLabel: { fontSize: 11, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' },
+  afStatLabel: { fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' },
   afStatVal: { fontSize: 20, fontWeight: 700, color: '#111827' },
 };

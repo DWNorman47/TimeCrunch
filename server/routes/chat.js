@@ -1,7 +1,21 @@
 const router = require('express').Router();
 const pool = require('../db');
+const logger = require('../logger');
+const rateLimit = require('express-rate-limit');
 const { requireAuth } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
+
+// Cap chat writes per user to prevent spam / scripted flooding.
+// 60/min is generous for a human typing; anything more is almost certainly
+// automated.
+const chatWriteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: req => String(req.user?.id || req.ip),
+  message: { error: 'Too many messages. Please slow down and try again shortly.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // GET /api/chat?worker_id=X
 // Workers: always see their own thread
@@ -66,7 +80,7 @@ router.get('/', requireAuth, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -74,7 +88,7 @@ router.get('/', requireAuth, async (req, res) => {
 // POST /api/chat
 // Workers: send to their own thread (worker_id = self)
 // Admin: must provide worker_id in body
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, chatWriteLimiter, async (req, res) => {
   const { worker_id } = req.body;
   const body = req.body.body?.trim() || '';
   if (!body) return res.status(400).json({ error: 'Message body required' });
@@ -134,7 +148,7 @@ router.post('/', requireAuth, async (req, res) => {
 
     res.status(201).json(msg);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });

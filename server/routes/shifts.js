@@ -1,8 +1,22 @@
 const router = require('express').Router();
 const pool = require('../db');
+const rateLimit = require('express-rate-limit');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem, createInboxItemBatch } = require('./inbox');
+const { logAudit } = require('../auditLog');
+
+// Cap shift writes per user. Admins legitimately create shifts in bursts
+// (weekly scheduling), so the ceiling is higher than chat but still prevents
+// runaway scripts or a compromised account from flooding the table.
+const shiftWriteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyGenerator: req => String(req.user?.id || req.ip),
+  message: { error: 'Too many shift writes. Please wait a moment and try again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // GET /admin/shifts?from=&to= — all company shifts in range
 router.get('/admin', requireAdmin, async (req, res) => {
@@ -22,11 +36,11 @@ router.get('/admin', requireAdmin, async (req, res) => {
       [companyId, from || null, to || null]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /admin/shifts — create a shift
-router.post('/admin', requireAdmin, async (req, res) => {
+router.post('/admin', requireAdmin, shiftWriteLimiter, async (req, res) => {
   const { user_id, project_id, shift_date, start_time, end_time, recurrence_group_id } = req.body;
   const notes = req.body.notes?.trim() || null;
   if (!user_id || !shift_date || !start_time || !end_time) {
@@ -52,15 +66,17 @@ router.post('/admin', requireAdmin, async (req, res) => {
       [companyId, user_id, project_id || null, shift_date, start_time, end_time, notes, recurrence_group_id || null]
     );
     const shift = full.rows[0];
+    logAudit(companyId, req.user.id, req.user.full_name, 'shift.created', 'shift', shift.id, shift.worker_name,
+      { user_id, shift_date, start_time, end_time, project_id: project_id || null });
     const shiftBody = `${shift.shift_date} · ${shift.start_time.substring(0, 5)}–${shift.end_time.substring(0, 5)}${shift.project_name ? ' · ' + shift.project_name : ''}`;
     sendPushToUser(user_id, { title: 'New shift assigned', body: shiftBody, url: '/dashboard' });
     createInboxItem(user_id, companyId, 'shift_assigned', 'New shift assigned', shiftBody, '/dashboard#schedule');
     res.status(201).json(shift);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /admin/shifts/:id — edit a shift
-router.patch('/admin/:id', requireAdmin, async (req, res) => {
+router.patch('/admin/:id', requireAdmin, shiftWriteLimiter, async (req, res) => {
   const { project_id, shift_date, start_time, end_time } = req.body;
   const notes = req.body.notes?.trim() || null;
   if (!shift_date || !start_time || !end_time) {
@@ -89,15 +105,17 @@ router.patch('/admin/:id', requireAdmin, async (req, res) => {
        WHERE s.id = $1`, [req.params.id]
     );
     const shift = full.rows[0];
+    logAudit(companyId, req.user.id, req.user.full_name, 'shift.edited', 'shift', shift.id, shift.worker_name,
+      { shift_date, start_time, end_time, project_id: project_id || null });
     const updBody = `${shift.shift_date?.toString().substring(0,10)} · ${start_time.substring(0,5)}–${end_time.substring(0,5)}`;
     sendPushToUser(shift.user_id, { title: 'Shift updated', body: updBody, url: '/dashboard' });
     createInboxItem(shift.user_id, req.user.company_id, 'shift_updated', 'Shift updated', updBody, '/dashboard#schedule');
     res.json(shift);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /admin/shifts/:id
-router.delete('/admin/:id', requireAdmin, async (req, res) => {
+router.delete('/admin/:id', requireAdmin, shiftWriteLimiter, async (req, res) => {
   try {
     const full = await pool.query(
       `SELECT s.*, u.full_name as worker_name, p.name as project_name
@@ -108,15 +126,17 @@ router.delete('/admin/:id', requireAdmin, async (req, res) => {
     if (full.rowCount === 0) return res.status(404).json({ error: 'Shift not found' });
     const shift = full.rows[0];
     await pool.query('DELETE FROM shifts WHERE id = $1 AND company_id = $2', [req.params.id, req.user.company_id]);
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'shift.deleted', 'shift', req.params.id, shift.worker_name,
+      { shift_date: shift.shift_date, user_id: shift.user_id });
     const cancelBody = `${shift.shift_date?.toString().substring(0, 10)} · ${shift.start_time.substring(0, 5)}–${shift.end_time.substring(0, 5)}${shift.project_name ? ' · ' + shift.project_name : ''}`;
     sendPushToUser(shift.user_id, { title: 'Shift cancelled', body: cancelBody, url: '/dashboard' });
     createInboxItem(shift.user_id, req.user.company_id, 'shift_cancelled', 'Shift cancelled', cancelBody, '/dashboard#schedule');
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /shifts/:id/cant-make-it — worker flags they can't attend
-router.patch('/:id/cant-make-it', requireAuth, async (req, res) => {
+router.patch('/:id/cant-make-it', requireAuth, shiftWriteLimiter, async (req, res) => {
   const { cant_make_it, note } = req.body;
   try {
     const result = await pool.query(
@@ -144,11 +164,11 @@ router.patch('/:id/cant-make-it', requireAuth, async (req, res) => {
         'Worker unavailable for shift', cantBody, '/timeclock#manage');
     }
     res.json(shift);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /admin/shifts/series/:groupId — cancel all future shifts in a recurrence group
-router.delete('/admin/series/:groupId', requireAdmin, async (req, res) => {
+router.delete('/admin/series/:groupId', requireAdmin, shiftWriteLimiter, async (req, res) => {
   const companyId = req.user.company_id;
   const { groupId } = req.params;
   try {
@@ -160,6 +180,8 @@ router.delete('/admin/series/:groupId', requireAdmin, async (req, res) => {
       [groupId, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'No upcoming shifts found in this series' });
+    logAudit(companyId, req.user.id, req.user.full_name, 'shift.series_deleted', 'shift', groupId, null,
+      { deleted_count: result.rowCount });
     // Notify each affected worker once
     const notified = new Set();
     for (const shift of result.rows) {
@@ -170,7 +192,7 @@ router.delete('/admin/series/:groupId', requireAdmin, async (req, res) => {
         'A series of your scheduled shifts has been cancelled.', '/dashboard#schedule');
     }
     res.json({ deleted: result.rowCount });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /shifts/mine — worker's upcoming shifts
@@ -197,7 +219,7 @@ router.get('/mine', requireAuth, async (req, res) => {
       [req.user.id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

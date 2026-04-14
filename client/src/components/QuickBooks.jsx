@@ -4,6 +4,7 @@ import { useT } from '../hooks/useT';
 import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
 
+import { silentError } from '../errorReporter';
 const VENDOR_TYPES = ['contractor', 'subcontractor'];
 const EMPLOYEE_TYPES = ['employee', 'owner'];
 const IMPORT_PAGE_SIZE = 15;
@@ -90,7 +91,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   }, [importSearch]);
 
   useEffect(() => {
-    api.get('/qbo/status').then(r => setStatus(r.data)).catch(() => {});
+    api.get('/qbo/status').then(r => setStatus(r.data)).catch(silentError('quickbooks'));
   }, []);
 
   useEffect(() => {
@@ -102,7 +103,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
         setQboClasses(cls.data);
         setSyncErrors(errs.data);
       })
-      .catch(() => {})
+      .catch(silentError('quickbooks'))
       .finally(() => setLoadingAccounts(false));
   }, [status?.connected]);
 
@@ -385,7 +386,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             </button>
           </div>
         )}
-        {error && <p style={styles.error}>{error}</p>}
+        {error && <p role="alert" style={styles.error}>{error}</p>}
       </div>
 
       {status.connected && (
@@ -732,19 +733,21 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
               </span>
             </label>
 
-            <label style={{ ...styles.syncToggle, marginTop: 12 }}>
-              <input
-                type="checkbox"
-                checked={!!settings?.qbo_auto_push_expenses}
-                onChange={e => saveAutoSyncSetting('qbo_auto_push_expenses', e.target.checked)}
-                disabled={savingAutoSync}
-                style={{ marginRight: 8 }}
-              />
-              <span>
-                <span style={{ fontWeight: 600, color: '#1a202c', fontSize: 14 }}>Auto-push expense reimbursements</span>
-                <span style={{ display: 'block', fontSize: 12, color: '#6b7280', marginTop: 1 }}>When a reimbursement is approved, create a Purchase record in QuickBooks.</span>
-              </span>
-            </label>
+            {settings?.feature_reimbursements !== false && (
+              <label style={{ ...styles.syncToggle, marginTop: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={!!settings?.qbo_auto_push_expenses}
+                  onChange={e => saveAutoSyncSetting('qbo_auto_push_expenses', e.target.checked)}
+                  disabled={savingAutoSync}
+                  style={{ marginRight: 8 }}
+                />
+                <span>
+                  <span style={{ fontWeight: 600, color: '#1a202c', fontSize: 14 }}>Auto-push expense reimbursements</span>
+                  <span style={{ display: 'block', fontSize: 12, color: '#6b7280', marginTop: 1 }}>When a reimbursement is approved, create a Purchase record in QuickBooks.</span>
+                </span>
+              </label>
+            )}
 
             <label style={{ ...styles.syncToggle, marginTop: 12 }}>
               <input
@@ -778,7 +781,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
               <div style={{ marginTop: 20, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <label htmlFor="qbo-payment-account" style={styles.label}>Payment / Bank Account</label>
-                  <p style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 6px' }}>The account used to pay expenses (e.g. Checking, Petty Cash)</p>
+                  <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>The account used to pay expenses (e.g. Checking, Petty Cash)</p>
                   <select
                     id="qbo-payment-account"
                     style={styles.select}
@@ -794,7 +797,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 </div>
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <label htmlFor="qbo-expense-account" style={styles.label}>Expense Category Account</label>
-                  <p style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 6px' }}>The expense account for the line item (e.g. Job Materials, Travel)</p>
+                  <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>The expense account for the line item (e.g. Job Materials, Travel)</p>
                   <select
                     id="qbo-expense-account"
                     style={styles.select}
@@ -812,7 +815,8 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             )}
           </div>
 
-          {/* ── Push expense reimbursements ── */}
+          {/* ── Push expense reimbursements — only when the reimbursements feature is on ── */}
+          {settings?.feature_reimbursements !== false && (
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Push Expense Reimbursements</h3>
             <p style={styles.hint}>Manually push approved reimbursements to QuickBooks as Purchase records for a date range.</p>
@@ -852,6 +856,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
               </div>
             )}
           </div>
+          )}
 
           {/* ── Payroll journal entry ── */}
           <div style={styles.section}>
@@ -989,7 +994,7 @@ const styles = {
   selectAllBtn: { background: 'none', border: 'none', color: '#1a56db', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0, marginLeft: 'auto' },
   importRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid #f9fafb', cursor: 'pointer', fontSize: 14 },
   importName: { flex: 1, fontWeight: 500, color: '#111827' },
-  importEmail: { fontSize: 12, color: '#9ca3af' },
+  importEmail: { fontSize: 12, color: '#6b7280' },
   importTypeSelect: { padding: '4px 8px', border: '1px solid #ddd', borderRadius: 6, fontSize: 12, minHeight: 'unset' },
   paginator: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, justifyContent: 'flex-end' },
   pageBtn: { background: '#f3f4f6', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 16, cursor: 'pointer', color: '#374151', minHeight: 'unset', lineHeight: 1 },
@@ -1002,7 +1007,7 @@ const styles = {
   errorType: { background: '#fef3c7', color: '#92400e', borderRadius: 4, padding: '1px 7px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', flexShrink: 0 },
   errorEntityId: { color: '#6b7280', fontSize: 12, flexShrink: 0 },
   errorMsg: { flex: 1, color: '#374151', minWidth: 120 },
-  errorTime: { color: '#9ca3af', fontSize: 11, flexShrink: 0 },
-  errorDismiss: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px', flexShrink: 0 },
+  errorTime: { color: '#6b7280', fontSize: 11, flexShrink: 0 },
+  errorDismiss: { background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px', flexShrink: 0 },
   errorRetry: { padding: '2px 10px', background: '#eff6ff', color: '#1a56db', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
 };

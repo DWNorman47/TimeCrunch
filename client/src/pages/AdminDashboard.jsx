@@ -1,4 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
 import { usePlan } from '../hooks/usePlan';
 import { useT } from '../hooks/useT';
@@ -12,6 +13,7 @@ import TabBar from '../components/TabBar';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import api from '../api';
 
+import { silentError } from '../errorReporter';
 // Heavy components — lazy-loaded on first render to reduce initial bundle size
 // LiveWorkers pulls in leaflet + react-leaflet (~200 kB), so lazy-load it
 const LiveWorkers = lazy(() => import('../components/LiveWorkers'));
@@ -79,13 +81,16 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    api.get('/stripe/status').then(r => setBilling(r.data)).catch(() => {});
+    api.get('/stripe/status').then(r => setBilling(r.data)).catch(silentError('admindashboard'));
   }, []);
 
   useEffect(() => {
     const fetchPending = () => {
-      api.get('/admin/kpis').then(r => setPendingCount(r.data.pending_approvals ?? 0)).catch(() => {});
-      api.get('/reimbursements/admin?status=pending').then(r => setPendingReimbursements((r.data.items ?? r.data).length)).catch(() => {});
+      api.get('/admin/kpis').then(r => setPendingCount(r.data.pending_approvals ?? 0)).catch(silentError('admindashboard'));
+      // Only poll reimbursements when the feature is enabled.
+      if (settings?.feature_reimbursements !== false) {
+        api.get('/reimbursements/admin?status=pending').then(r => setPendingReimbursements((r.data.items ?? r.data).length)).catch(silentError('admindashboard'));
+      }
     };
     fetchPending();
     const interval = setInterval(fetchPending, 60000);
@@ -103,7 +108,7 @@ export default function AdminDashboard() {
           return !lastRead || new Date(thread.last_at) > new Date(lastRead);
         });
         setChatUnread(hasUnread);
-      }).catch(() => {});
+      }).catch(silentError('admindashboard'));
     };
     check();
     const iv = setInterval(check, 60000);
@@ -169,7 +174,7 @@ export default function AdminDashboard() {
         );
       })()}
 
-      <main style={styles.main} className="admin-main">
+      <main id="main-content" style={styles.main} className="admin-main">
         <TabBar
           breakpoint={720}
           active={tab}
@@ -178,8 +183,8 @@ export default function AdminDashboard() {
             { id: 'live', label: t.tabLive, dot: chatUnread && settings?.feature_chat !== false ? '#3b82f6' : null },
             ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
-            { id: 'timeoff', label: '🏖 Time Off' },
-            { id: 'expenses', label: '💳 Expenses', dot: pendingReimbursements > 0 ? '#f59e0b' : null },
+            ...(settings?.feature_pto !== false ? [{ id: 'timeoff', label: '🏖 Time Off' }] : []),
+            ...(settings?.feature_reimbursements !== false ? [{ id: 'expenses', label: '💳 Expenses', dot: pendingReimbursements > 0 ? '#f59e0b' : null }] : []),
             ...(settings?.feature_scheduling !== false ? [{ id: 'manage', label: t.tabManage }] : []),
           ]}
         />
@@ -194,7 +199,9 @@ export default function AdminDashboard() {
             <strong>{t.failedLoadDashboard}</strong> Check your connection and{' '}
             <button style={styles.retryBtn} onClick={() => window.location.reload()}>{t.tryAgain}</button>.
           </div>
-        ) : tab === 'live' ? (
+        ) : (
+          <ErrorBoundary key={tab} mode="inline" label={tab}>
+          {tab === 'live' ? (
           <>
             {workers.filter(w => w.role === 'worker').length === 0 && (
               <OnboardingChecklist workers={workers} projects={projects} settings={settings} />
@@ -258,11 +265,11 @@ export default function AdminDashboard() {
             </button>
             {!collapsedSections.export && (plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />)}
           </Suspense>
-        ) : tab === 'timeoff' ? (
+        ) : tab === 'timeoff' && settings?.feature_pto !== false ? (
           <Suspense fallback={<TabLoader />}>
             <AdminTimeOff settings={settings} />
           </Suspense>
-        ) : tab === 'expenses' ? (
+        ) : tab === 'expenses' && settings?.feature_reimbursements !== false ? (
           <Suspense fallback={<TabLoader />}>
             <ReimbursementsAdmin />
           </Suspense>
@@ -271,6 +278,8 @@ export default function AdminDashboard() {
             {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} />}
           </Suspense>
         ) : null}
+          </ErrorBoundary>
+        )}
       </main>
     </div>
   );
@@ -304,5 +313,5 @@ const styles = {
   accountLabel: { fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 2 },
   accountSub: { fontSize: 12, color: '#6b7280' },
   accountBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '7px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
-  supportNote: { fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '8px 0 4px' },
+  supportNote: { fontSize: 13, color: '#6b7280', textAlign: 'center', padding: '8px 0 4px' },
 };

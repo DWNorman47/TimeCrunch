@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
 import { langToLocale } from '../utils';
 
+import { silentError } from '../errorReporter';
 function fmt(dateStr, locale = 'en-US') {
   return new Date(dateStr.substring(0, 10) + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -36,7 +37,7 @@ export default function ManagePayPeriods() {
   useEffect(() => {
     api.get('/admin/pay-periods')
       .then(r => setPeriods(r.data))
-      .catch(() => {})
+      .catch(silentError('managepayperiods'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -93,7 +94,7 @@ export default function ManagePayPeriods() {
             </button>
           </div>
         </div>
-        {error && <p style={styles.error}>{error}</p>}
+        {error && <p role="alert" style={styles.error}>{error}</p>}
       </form>
 
       {loading ? <SkeletonList count={3} rows={1} /> : periods.length === 0 ? (
@@ -134,13 +135,13 @@ const styles = {
   input: { padding: '8px 10px', border: '1px solid #ddd', borderRadius: 7, fontSize: 14 },
   lockBtn: { padding: '8px 16px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap' },
   error: { color: '#e53e3e', fontSize: 13, marginTop: 6 },
-  empty: { color: '#9ca3af', fontSize: 13 },
+  empty: { color: '#6b7280', fontSize: 13 },
   list: { display: 'flex', flexDirection: 'column', gap: 8 },
   row: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fafafa' },
   lockIcon: { fontSize: 16 },
   periodInfo: { flex: 1 },
   periodLabel: { fontWeight: 600, fontSize: 14, color: '#111827' },
   periodDates: { fontSize: 12, color: '#6b7280' },
-  periodMeta: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  periodMeta: { fontSize: 11, color: '#6b7280', marginTop: 2 },
   unlockBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
 };

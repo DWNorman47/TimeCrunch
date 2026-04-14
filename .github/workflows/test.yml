@@ -22,6 +22,11 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - run: npm install
       - run: npm test
+      # Fail the build on high/critical prod vulns. Moderate and below don't
+      # block — fix at your cadence. --omit=dev ignores vulns in dev-only
+      # packages (jest, nodemon, etc.) that can't affect production.
+      - name: npm audit
+        run: npm audit --omit=dev --audit-level=high
 
   client-tests:
     name: Client (Vitest)
@@ -38,3 +43,9 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - run: npm install
       - run: npm test
+      # Client has two known build-time advisories (esbuild, serialize-javascript
+      # via vite-plugin-pwa) that require breaking Vite upgrades to clear.
+      # Neither is reachable at runtime, so we only fail on *critical* here
+      # until those are upgraded deliberately.
+      - name: npm audit
+        run: npm audit --omit=dev --audit-level=critical

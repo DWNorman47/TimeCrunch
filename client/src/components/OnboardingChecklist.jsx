@@ -12,6 +12,15 @@ export default function OnboardingChecklist({ workers, projects, settings }) {
   const hasWorkers = workers.some(w => w.role === 'worker');
   const hasProjects = projects.length > 0;
   const projectsEnabled = settings?.feature_project_integration !== false;
+  // Detect whether an admin has actually touched the rates / timezone vs
+  // just accepting defaults. 30 and '' are the factory defaults in
+  // settingsDefaults.js — anything else indicates explicit configuration.
+  const ratesConfigured = settings && settings.default_hourly_rate != null && Number(settings.default_hourly_rate) !== 30;
+  const timezoneConfigured = !!(settings?.company_timezone);
+  const overtimeEnabled = settings?.feature_overtime !== false;
+  // Overtime step is done if either the feature is off (not relevant) or
+  // the admin has explicitly set an overtime rule.
+  const overtimeConfigured = !overtimeEnabled || (settings?.overtime_rule && settings?.overtime_threshold);
 
   const steps = [
     {
@@ -29,12 +38,26 @@ export default function OnboardingChecklist({ workers, projects, settings }) {
       cta: t.onboardingAddProjectCta,
     }] : []),
     {
-      done: false,
+      done: ratesConfigured,
       label: t.onboardingRates,
       sub: t.onboardingRatesSub,
       href: '/administration#rates',
       cta: t.onboardingRatesCta,
     },
+    {
+      done: timezoneConfigured,
+      label: t.onboardingTimezone,
+      sub: t.onboardingTimezoneSub,
+      href: '/administration#company',
+      cta: t.onboardingTimezoneCta,
+    },
+    ...(overtimeEnabled ? [{
+      done: overtimeConfigured,
+      label: t.onboardingOvertime,
+      sub: t.onboardingOvertimeSub,
+      href: '/administration#rates',
+      cta: t.onboardingOvertimeCta,
+    }] : []),
   ];
 
   const doneCount = steps.filter(s => s.done).length;
@@ -64,7 +87,7 @@ export default function OnboardingChecklist({ workers, projects, settings }) {
         {steps.map((step, i) => (
           <div key={i} style={{ ...styles.step, opacity: step.done ? 0.6 : 1 }}>
             <div style={{ ...styles.check, background: step.done ? '#d1fae5' : '#f3f4f6', color: '#065f46' }}>
-              {step.done ? '✓' : <span style={{ color: '#9ca3af' }}>{i + 1}</span>}
+              {step.done ? '✓' : <span style={{ color: '#6b7280' }}>{i + 1}</span>}
             </div>
             <div style={styles.stepBody}>
               <div style={{ ...styles.stepLabel, textDecoration: step.done ? 'line-through' : 'none' }}>
@@ -125,7 +148,7 @@ const styles = {
     background: 'none',
     border: 'none',
     fontSize: 16,
-    color: '#9ca3af',
+    color: '#6b7280',
     cursor: 'pointer',
     padding: '0 4px',
     lineHeight: 1,

@@ -220,7 +220,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
         )}
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
         <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.createTalk}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
@@ -417,8 +417,8 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                   </>
                 )}
               </div>
-              {uploadError && <p style={styles.error}>{uploadError}</p>}
-              {attachDeleteError && <p style={styles.error}>{attachDeleteError}</p>}
+              {uploadError && <p role="alert" style={styles.error}>{uploadError}</p>}
+              {attachDeleteError && <p role="alert" style={styles.error}>{attachDeleteError}</p>}
               {attachments === null ? (
                 <SkeletonBlock width="100%" height={36} style={{ marginTop: 8 }} />
               ) : attachments.length === 0 ? (
@@ -491,7 +491,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
               ) : (
                 <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.delete}</button>
               )}
-              {deleteError && <p style={{ ...styles.error, margin: 0 }}>{deleteError}</p>}
+              {deleteError && <p role="alert" style={{ ...styles.error, margin: 0 }}>{deleteError}</p>}
             </div>
           )}
         </div>
@@ -626,7 +626,7 @@ const styles = {
   givenBy: { color: '#6b7280' },
   cardRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
   signoffBadge: { fontSize: 12, fontWeight: 700, color: '#065f46', background: '#d1fae5', padding: '3px 10px', borderRadius: 10 },
-  chevron: { fontSize: 10, color: '#9ca3af' },
+  chevron: { fontSize: 10, color: '#6b7280' },
   cardBody: { padding: '0 16px 16px', borderTop: '1px solid #f3f4f6' },
   content: { fontSize: 14, color: '#374151', lineHeight: 1.7, margin: '12px 0 16px', whiteSpace: 'pre-wrap' },
   signoffSection: { background: '#f9fafb', borderRadius: 8, padding: 12, marginBottom: 12 },
@@ -636,7 +636,7 @@ const styles = {
   signedNote: { fontSize: 12, color: '#059669', fontWeight: 600 },
   signoffList: { display: 'flex', flexWrap: 'wrap', gap: 6 },
   signoffChip: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 20, padding: '4px 10px', fontSize: 12, color: '#374151', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 },
-  signoffTime: { color: '#9ca3af', fontWeight: 400 },
+  signoffTime: { color: '#6b7280', fontWeight: 400 },
   cardActions: { display: 'flex', gap: 8 },
   deleteBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
   pendingBadge: { fontSize: 10, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 6, marginLeft: 6, verticalAlign: 'middle' },
@@ -651,7 +651,7 @@ const styles = {
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 4 },
   label: { fontSize: 12, fontWeight: 600, color: '#6b7280' },
-  charCount: { fontSize: 11, color: '#9ca3af' },
+  charCount: { fontSize: 11, color: '#6b7280' },
   input: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, width: '100%' },
   textarea: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5, width: '100%' },
   error: { color: '#ef4444', fontSize: 13, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', margin: 0 },
@@ -660,9 +660,9 @@ const styles = {
   cancelBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '10px 20px', borderRadius: 8, fontSize: 14, cursor: 'pointer' },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { color: '#9ca3af', fontSize: 15 },
-  hint: { color: '#9ca3af', fontSize: 14 },
-  optional: { fontSize: 11, fontWeight: 400, color: '#9ca3af' },
+  emptyText: { color: '#6b7280', fontSize: 15 },
+  hint: { color: '#6b7280', fontSize: 14 },
+  optional: { fontSize: 11, fontWeight: 400, color: '#6b7280' },
   // Attachments
   attachmentsSection: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px', marginBottom: 12 },
   attachmentsHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 },
@@ -672,23 +672,23 @@ const styles = {
   attachmentRow: { display: 'flex', alignItems: 'center', gap: 8 },
   attachIcon: { fontSize: 15, flexShrink: 0 },
   attachName: { flex: 1, fontSize: 13, color: '#1a56db', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  attachSize: { fontSize: 11, color: '#9ca3af', flexShrink: 0 },
+  attachSize: { fontSize: 11, color: '#6b7280', flexShrink: 0 },
   attachDeleteBtn: { background: 'none', border: 'none', color: '#d1d5db', fontSize: 12, cursor: 'pointer', padding: '0 2px', flexShrink: 0 },
-  attachCancelBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 11, cursor: 'pointer', padding: '0 2px', flexShrink: 0 },
+  attachCancelBtn: { background: 'none', border: 'none', color: '#6b7280', fontSize: 11, cursor: 'pointer', padding: '0 2px', flexShrink: 0 },
   confirmDeleteBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   // Quiz — form
   quizSection: { borderTop: '1px solid #f3f4f6', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 },
   quizSectionHead: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   quizSectionTitle: { fontSize: 13, fontWeight: 700, color: '#374151' },
-  quizSectionSub: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  quizSectionSub: { fontSize: 11, color: '#6b7280', marginTop: 2 },
   addQuestionBtn: { fontSize: 12, fontWeight: 600, color: '#059669', background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '6px 12px', borderRadius: 7, cursor: 'pointer', flexShrink: 0 },
   questionCard: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 },
   questionHeader: { display: 'flex', alignItems: 'center', gap: 8 },
   questionNum: { fontSize: 12, fontWeight: 700, color: '#6b7280', flexShrink: 0 },
-  removeQuestionBtn: { fontSize: 11, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4 },
+  removeQuestionBtn: { fontSize: 11, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4 },
   optionsList: { display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 20 },
   optionRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  removeOptionBtn: { fontSize: 11, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4 },
+  removeOptionBtn: { fontSize: 11, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4 },
   addOptionBtn: { fontSize: 12, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textAlign: 'left', textDecoration: 'underline' },
   thresholdRow: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   // Quiz — admin card preview
@@ -697,7 +697,7 @@ const styles = {
   quizPreviewTitle: { fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 8 },
   adminQuestion: { marginBottom: 8 },
   adminQuestionText: { fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 },
-  adminOption: { fontSize: 12, color: '#9ca3af', paddingLeft: 12, lineHeight: 1.6 },
+  adminOption: { fontSize: 12, color: '#6b7280', paddingLeft: 12, lineHeight: 1.6 },
   adminOptionCorrect: { color: '#059669', fontWeight: 600 },
   // Quiz — worker card
   quizBox: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '12px 14px', marginBottom: 12 },

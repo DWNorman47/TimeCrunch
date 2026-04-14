@@ -7,15 +7,53 @@ if (missing.length) {
   process.exit(1);
 }
 
+// Sentry must be initialised before any other import that you want instrumented.
+// Absent DSN = Sentry is a no-op; safe to leave in prod with empty env.
+const Sentry = require('@sentry/node');
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    release: process.env.APP_VERSION || undefined,
+    tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0'),
+  });
+}
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const pinoHttp = require('pino-http');
+const crypto = require('crypto');
 const { requireAuth, requirePlan, requireProAddon } = require('./middleware/auth');
 const pool = require('./db');
+const logger = require('./logger');
 
 const app = express();
 app.set('trust proxy', 1); // trust first proxy (Render) so req.ip is the real client IP
 app.use(helmet());
+
+// Request logging: one line per request with a reqId that's attached to
+// req.log so handlers can log more context that correlates to the request.
+// Health checks are logged at debug only to keep prod logs clean.
+app.use(pinoHttp({
+  logger,
+  genReqId: (req, res) => {
+    const existing = req.headers['x-request-id'];
+    const id = existing || crypto.randomBytes(8).toString('hex');
+    res.setHeader('x-request-id', id);
+    return id;
+  },
+  customLogLevel: (req, res, err) => {
+    if (err || res.statusCode >= 500) return 'error';
+    if (res.statusCode >= 400) return 'warn';
+    if (req.url === '/api/health' || req.url === '/api/health/live') return 'debug';
+    return 'info';
+  },
+  serializers: {
+    req: req => ({ method: req.method, url: req.url, ip: req.ip }),
+    res: res => ({ statusCode: res.statusCode }),
+  },
+}));
 
 const ALLOWED_ORIGINS = [
   'https://opsfloa.com',
@@ -83,6 +121,11 @@ app.use('/api/inbox', require('./routes/inbox'));
 app.use('/api/time-off', requireAuth, require('./routes/timeOff'));
 app.use('/api/reimbursements', requireAuth, require('./routes/reimbursements'));
 app.use('/api/availability', requireAuth, require('./routes/availability'));
+// Unauthenticated: browsers report errors here. The route itself extracts
+// user identity from the auth header when present.
+app.use('/api/client-errors', require('./routes/clientErrors'));
+// Unauthenticated SendGrid event webhook — uses shared-secret header auth.
+app.use('/api/sendgrid-events', require('./routes/sendgridEvents'));
 
 // Read-only company settings — available to all authenticated users
 const { SETTINGS_DEFAULTS, applySettingsRows } = require('./settingsDefaults');
@@ -117,7 +160,7 @@ app.get('/api/settings', requireAuth, async (req, res) => {
       storage_limit_bytes: limitForPlan(resolvedPlan),
     });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err }, 'GET /api/settings failed');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -130,14 +173,79 @@ app.get('/api/company-info', requireAuth, async (req, res) => {
       [req.user.company_id]
     );
     res.json(result.rows[0] || {});
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    req.log.error({ err }, 'GET /api/company-info failed');
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+// Liveness: is the process running? Fast, no dependencies.
+app.get('/api/health/live', (req, res) => {
+  res.json({ ok: true, uptime: process.uptime() });
+});
+
+// Readiness: can we actually serve traffic? Checks DB connectivity.
+// Render uses this to decide whether to route traffic and whether to auto-restart.
+app.get('/api/health', async (req, res) => {
+  const checks = {};
+  let healthy = true;
+
+  // DB ping with a short timeout so a hung DB doesn't hang the health check
+  try {
+    const start = Date.now();
+    await Promise.race([
+      pool.query('SELECT 1'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('db timeout')), 3000)),
+    ]);
+    checks.db = { ok: true, latency_ms: Date.now() - start };
+  } catch (err) {
+    checks.db = { ok: false, error: err.message };
+    healthy = false;
+  }
+
+  // Memory headroom — flag if we're above 90% of Node's heap limit
+  const mem = process.memoryUsage();
+  const heapPct = mem.heapUsed / mem.heapTotal;
+  checks.memory = {
+    ok: heapPct < 0.9,
+    heap_used_mb: Math.round(mem.heapUsed / 1024 / 1024),
+    heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024),
+    rss_mb: Math.round(mem.rss / 1024 / 1024),
+  };
+  if (!checks.memory.ok) healthy = false;
+
+  res.status(healthy ? 200 : 503).json({
+    ok: healthy,
+    uptime_s: Math.round(process.uptime()),
+    checks,
+  });
+});
+
+// Express error handler — bubble unhandled errors to Sentry and log them.
+// Must come after all routes. Returning a generic 500 so we don't leak internals.
+app.use((err, req, res, _next) => {
+  if (process.env.SENTRY_DSN) Sentry.captureException(err);
+  (req.log || logger).error({ err }, 'unhandled route error');
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'Server error' });
+});
+
+// Last-chance error logging. Node's default is to crash on an uncaught
+// exception — we log structured first so the cause is visible in logs,
+// then let the process exit (Render restarts it).
+process.on('uncaughtException', err => {
+  if (process.env.SENTRY_DSN) Sentry.captureException(err);
+  logger.fatal({ err }, 'uncaughtException');
+  setTimeout(() => process.exit(1), 200); // give pino time to flush
+});
+process.on('unhandledRejection', reason => {
+  if (process.env.SENTRY_DSN) Sentry.captureException(reason);
+  logger.error({ reason }, 'unhandledRejection');
+});
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info({ port: PORT }, 'server listening');
   const { startInactiveWorkerJob } = require('./jobs/inactiveWorkers');
   startInactiveWorkerJob();
   const { startExpireTrialsJob } = require('./jobs/expireTrials');

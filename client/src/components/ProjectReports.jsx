@@ -240,7 +240,7 @@ const styles = {
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   headerRight: { display: 'flex', alignItems: 'center', gap: 10 },
   name: { fontWeight: 700, fontSize: 17 },
-  sub: { color: '#888', fontSize: 13 },
+  sub: { color: '#6b7280', fontSize: 13 },
   metrics: { display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 12 },
   metric: { display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 60 },
   metricVal: { fontWeight: 700, fontSize: 20 },

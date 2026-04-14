@@ -153,7 +153,7 @@ const s = {
   hint: { fontSize: 13, color: '#6b7280', marginBottom: 14 },
   qr: { display: 'block', width: 180, height: 180, margin: '0 auto 14px' },
   manualCode: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, marginBottom: 16 },
-  manualLabel: { fontSize: 12, color: '#9ca3af' },
+  manualLabel: { fontSize: 12, color: '#6b7280' },
   secretCode: { fontSize: 12, background: '#f3f4f6', padding: '4px 10px', borderRadius: 6, letterSpacing: 2, color: '#374151', wordBreak: 'break-all', textAlign: 'center' },
   form: { display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 320, margin: '0 auto' },
   codeInput: { padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 18, textAlign: 'center', letterSpacing: 4, fontWeight: 700 },

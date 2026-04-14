@@ -28,14 +28,14 @@ const pdf = StyleSheet.create({
   talkMeta: { fontSize: 8, color: '#6b7280' },
   projectTag: { fontSize: 8, color: '#6d28d9', marginLeft: 4 },
   signoffBadge: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#065f46', backgroundColor: '#d1fae5', padding: '2 8', borderRadius: 10 },
-  sectionLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3, marginTop: 8 },
+  sectionLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3, marginTop: 8 },
   contentText: { fontSize: 9, color: '#374151', lineHeight: 1.7 },
   // Sign-off list
   signoffRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
   signoffChip: { fontSize: 8, color: '#374151', backgroundColor: '#f3f4f6', padding: '2 8', borderRadius: 10, border: '1 solid #e5e7eb' },
   // Footer
   footer: { position: 'absolute', bottom: 24, left: 48, right: 48, flexDirection: 'row', justifyContent: 'space-between', borderTop: '1 solid #e5e7eb', paddingTop: 6 },
-  footerText: { fontSize: 7, color: '#9ca3af' },
+  footerText: { fontSize: 7, color: '#6b7280' },
 });
 
 export function SafetyTalkDocument({ talks, companyName, t, language }) {

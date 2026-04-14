@@ -3,7 +3,10 @@ import api from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { useT } from '../hooks/useT';
 import { SkeletonList } from './Skeleton';
+import ModalShell from './ModalShell';
 
+import { silentError } from '../errorReporter';
+import HelpTip from './HelpTip';
 export default function ManageProjects({ projects, onProjectAdded, onProjectDeleted, onProjectUpdated, onProjectRestored, showWageType = true, nameEditable = true, showGeofenceBudget = true, defaultPrevailingRate = '', currency = 'USD', settings = null }) {
   const toast = useToast();
   const t = useT();
@@ -57,7 +60,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
 
   useEffect(() => {
     loadArchived();
-    api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(() => {});
+    api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(silentError('manageprojects'));
   }, []);
 
   const handleAdd = async e => {
@@ -315,7 +318,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
         <button style={{ ...s.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.adding : t.add}</button>
       </form>
       {error && (
-        <div style={s.errorBox}>
+        <div role="alert" style={s.errorBox}>
           <p style={s.errorText}>{error}</p>
           {archivedConflict && (
             <button type="button" style={s.restoreInlineBtn} onClick={handleRestoreConflict}>
@@ -430,7 +433,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
                         <label htmlFor="mp-description" style={s.fieldLabel}>Description</label>
                         <textarea id="mp-description" style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder={t.projectDescPlaceholder} />
-                        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(editDescription || '').length}/1000</div>
+                        <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(editDescription || '').length}/1000</div>
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
                         <label htmlFor="mp-progress" style={s.fieldLabel}>Progress % (0–100)</label>
@@ -441,7 +444,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                     {/* Geofence */}
                     {showGeofenceBudget && (
                       <div style={s.section}>
-                        <div style={s.sectionTitle}>{t.geofenceOptional}</div>
+                        <div style={s.sectionTitle}>{t.geofenceOptional}<HelpTip text={t.geofenceHelp} side="bottom" /></div>
                         <div style={s.geoFields}>
                           <input style={s.geoInput} type="number" step="0.000001" placeholder={t.latitude} value={editGeoLat} onChange={e => setEditGeoLat(e.target.value)} />
                           <input style={s.geoInput} type="number" step="0.000001" placeholder={t.longitude} value={editGeoLng} onChange={e => setEditGeoLng(e.target.value)} />
@@ -524,8 +527,12 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
 
       {mergeSource && (
         <div style={s.modalOverlay}>
-          <div style={s.modal}>
-            <div style={s.modalTitle}>Merge "{mergeSource.name}"</div>
+          <ModalShell
+            onClose={() => !mergeSaving && setMergeSource(null)}
+            titleId="mp-merge-title"
+            style={s.modal}
+          >
+            <div id="mp-merge-title" style={s.modalTitle}>Merge "{mergeSource.name}"</div>
             <p style={s.modalBody}>
               All time entries, field reports, and other data will be moved to the target project.
               "{mergeSource.name}" will be permanently deleted. This cannot be undone.
@@ -550,14 +557,18 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                 {mergeSaving ? t.saving : t.mergeAndDelete}
               </button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
 
       {archiveTarget && (
         <div style={s.modalOverlay}>
-          <div style={s.modal}>
-            <div style={s.modalTitle}>Archive "{archiveTarget.name}"?</div>
+          <ModalShell
+            onClose={() => setArchiveTarget(null)}
+            titleId="mp-archive-title"
+            style={s.modal}
+          >
+            <div id="mp-archive-title" style={s.modalTitle}>Archive "{archiveTarget.name}"?</div>
             <p style={s.modalBody}>
               Time entries will be kept and the project can be restored later from Inactive.
             </p>
@@ -581,7 +592,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
               <button style={s.cancelBtn} onClick={() => setArchiveTarget(null)}>{t.cancel}</button>
               <button style={s.archiveBtn} onClick={handleConfirmArchive}>{t.archiveProject}</button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
 
@@ -599,7 +610,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
               archived.map(p => (
                 <div key={p.id} style={s.historyItem}>
                   <div style={s.itemLeft}>
-                    <span style={{ ...s.itemName, color: '#9ca3af' }}>{p.name}</span>
+                    <span style={{ ...s.itemName, color: '#6b7280' }}>{p.name}</span>
                     {showWageType && <span style={{ fontSize: 12, color: '#d1d5db' }}>{p.wage_type === 'prevailing' ? t.prevailingWages : t.regularWages}</span>}
                   </div>
                   <button style={s.restoreBtn} onClick={() => handleRestore(p.id)}>{t.restore}</button>
@@ -623,16 +634,16 @@ const s = {
   errorBox: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 },
   errorText: { color: '#e53e3e', fontSize: 13, margin: 0 },
   restoreInlineBtn: { background: '#059669', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-  empty: { color: '#9ca3af', fontSize: 14, margin: 0 },
+  empty: { color: '#6b7280', fontSize: 14, margin: 0 },
   list: { display: 'flex', flexDirection: 'column', gap: 2 },
   item: { border: '1px solid #f3f4f6', borderRadius: 8, overflow: 'hidden' },
   itemBar: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 10 },
   itemLeft: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   itemName: { fontSize: 14, fontWeight: 600, color: '#111827' },
-  chevron: { fontSize: 14, color: '#9ca3af', transition: 'transform 0.2s', flexShrink: 0, display: 'inline-block' },
+  chevron: { fontSize: 14, color: '#6b7280', transition: 'transform 0.2s', flexShrink: 0, display: 'inline-block' },
   panel: { padding: '4px 16px 16px', borderTop: '1px solid #f3f4f6', background: '#f9fafb', display: 'flex', flexDirection: 'column', gap: 0 },
   section: { borderBottom: '1px solid #eeeeee', paddingBottom: 12, paddingTop: 12 },
-  sectionTitle: { fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  sectionTitle: { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   fieldsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 3 },
   fieldLabel: { fontSize: 11, fontWeight: 600, color: '#6b7280' },
@@ -643,7 +654,7 @@ const s = {
   geoFields: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
   geoInput: { padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, width: 120 },
   geoLocBtn: { padding: '5px 10px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
-  clearBtn: { padding: '5px 10px', background: 'none', border: '1px solid #e5e7eb', color: '#9ca3af', borderRadius: 6, fontSize: 11, cursor: 'pointer', flexShrink: 0 },
+  clearBtn: { padding: '5px 10px', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 6, fontSize: 11, cursor: 'pointer', flexShrink: 0 },
   confirmClearBtn: { padding: '5px 10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
   cancelClearBtn: { padding: '5px 10px', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', borderRadius: 6, fontSize: 11, cursor: 'pointer', flexShrink: 0 },
   geoErrorText: { fontSize: 11, color: '#dc2626', margin: '4px 0 0', fontWeight: 600 },

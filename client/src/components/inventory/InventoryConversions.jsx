@@ -235,7 +235,7 @@ export default function InventoryConversions({ onConversionChange }) {
         )}
       </div>
 
-      {error && <div style={s.errorMsg}>{error}</div>}
+      {error && <div role="alert" style={s.errorMsg}>{error}</div>}
       {loading && <SkeletonList count={3} rows={1} />}
 
       {!loading && !error && (
@@ -290,7 +290,7 @@ const s = {
   addRow:         { display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 },
   addField:       { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 160 },
   addLabel:       { fontSize: 12, fontWeight: 600, color: '#374151' },
-  optional:       { fontWeight: 400, color: '#9ca3af', fontSize: 11 },
+  optional:       { fontWeight: 400, color: '#6b7280', fontSize: 11 },
   addInput:       { padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#111827', background: '#fff', width: '100%', boxSizing: 'border-box' },
   baseUomNote:    { fontSize: 12, color: '#6b7280', marginTop: 4 },
   addActions:     { display: 'flex', gap: 10, justifyContent: 'flex-end' },
@@ -307,7 +307,7 @@ const s = {
   emptyState:     { textAlign: 'center', padding: '48px 24px', color: '#6b7280' },
   emptyIcon:      { fontSize: 40, marginBottom: 12 },
   emptyTitle:     { fontSize: 16, fontWeight: 700, color: '#374151', margin: '0 0 8px' },
-  emptySub:       { fontSize: 13, color: '#9ca3af', maxWidth: 400, margin: '0 auto', lineHeight: 1.6 },
+  emptySub:       { fontSize: 13, color: '#6b7280', maxWidth: 400, margin: '0 auto', lineHeight: 1.6 },
   tableWrap:      { overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb' },
   table:          { width: '100%', borderCollapse: 'collapse', minWidth: 580 },
   thead:          { background: '#f9fafb' },

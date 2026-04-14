@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const { sendPushToAllWorkers } = require('../push');
 const { getPresignedUploadUrl } = require('../r2');
 const { checkStorageLimit, incrementStorage, decrementStorage } = require('../storage');
+const { logAudit } = require('../auditLog');
 
 // GET /safety-talks
 router.get('/', requireAuth, async (req, res) => {
@@ -42,7 +43,7 @@ router.get('/', requireAuth, async (req, res) => {
     ]);
     const total = parseInt(countResult.rows[0].count);
     res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /safety-talks/:id — full with signoffs and questions
@@ -85,7 +86,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     ]);
     if (talk.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json({ ...talk.rows[0], signoffs: signoffs.rows, questions: questions.rows, attachments: attachments.rows });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /safety-talks
@@ -137,6 +138,9 @@ router.post('/', requireAuth, async (req, res) => {
       [id]
     );
 
+    logAudit(companyId, req.user.id, req.user.full_name, 'safety_talk.created', 'safety_talk', id, title,
+      { talk_date, project_id: project_id || null, question_count: validQuestions.length });
+
     sendPushToAllWorkers(companyId, {
       title: 'New safety talk: ' + title,
       body: validQuestions.length > 0 ? 'Open the app to take the quiz and sign off.' : 'Open the app to read and sign off.',
@@ -146,7 +150,7 @@ router.post('/', requireAuth, async (req, res) => {
     res.status(201).json({ ...full.rows[0], signoffs: [], questions: validQuestions });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error(err); res.status(500).json({ error: 'Server error' });
+    req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' });
   } finally { client.release(); }
 });
 
@@ -210,7 +214,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
     res.json(full.rows[0]);
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error(err); res.status(500).json({ error: 'Server error' });
+    req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' });
   } finally { client.release(); }
 });
 
@@ -259,8 +263,10 @@ router.post('/:id/signoff', requireAuth, async (req, res) => {
     );
 
     if (inserted.rowCount === 0) return res.json({ already_signed: true });
+    logAudit(companyId, req.user.id, req.user.full_name, 'safety_talk.signed_off', 'safety_talk', req.params.id, null,
+      { quiz_score: quizScore, quiz_passed: quizPassed });
     res.json({ signed: true, quiz_score: quizScore, quiz_passed: quizPassed });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /safety-talks/:id
@@ -275,8 +281,9 @@ router.delete('/:id', requireAuth, async (req, res) => {
       [req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    logAudit(companyId, req.user.id, req.user.full_name, 'safety_talk.deleted', 'safety_talk', req.params.id, null, null);
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /safety-talks/attachment-upload-url — presigned URL for direct R2 upload (admin)
@@ -298,7 +305,7 @@ router.get('/attachment-upload-url', requireAuth, async (req, res) => {
     }
     const result = await getPresignedUploadUrl('safety-talk-attachments', ext, type);
     res.json(result);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /safety-talks/:id/attachments — save attachment metadata after upload (admin)
@@ -318,7 +325,7 @@ router.post('/:id/attachments', requireAuth, async (req, res) => {
     );
     if (size_bytes) incrementStorage(companyId, parseInt(size_bytes)).catch(() => {});
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /safety-talks/:id/attachments/:attId (admin)
@@ -337,7 +344,7 @@ router.delete('/:id/attachments/:attId', requireAuth, async (req, res) => {
     const bytes = result.rows[0].size_bytes;
     if (bytes) decrementStorage(companyId, parseInt(bytes)).catch(() => {});
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

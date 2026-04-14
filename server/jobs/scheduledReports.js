@@ -1,6 +1,8 @@
 const cron = require('node-cron');
 const pool = require('../db');
+const logger = require('../logger');
 const { sendEmail } = require('../email');
+const { runJob } = require('./runJob');
 
 const APP_URL = process.env.APP_URL || 'https://app.opsfloa.com';
 
@@ -280,39 +282,31 @@ async function sendMonthlyValuationReport(companyId, companyName) {
 // ── Scheduler ─────────────────────────────────────────────────────────────────
 
 async function runWeeklyReports() {
-  try {
-    const companies = await activeCompanies();
-    for (const { id, name } of companies) {
-      const [payroll, lowStock] = await Promise.all([
-        settingEnabled(id, 'report_weekly_payroll'),
-        settingEnabled(id, 'report_weekly_low_stock'),
-      ]);
-      if (payroll)   await sendWeeklyPayrollReport(id, name).catch(err => console.error(`Weekly payroll report error (company ${id}):`, err));
-      if (lowStock)  await sendWeeklyLowStockReport(id, name).catch(err => console.error(`Weekly low-stock report error (company ${id}):`, err));
-    }
-  } catch (err) {
-    console.error('Weekly report job error:', err);
+  const companies = await activeCompanies();
+  for (const { id, name } of companies) {
+    const [payroll, lowStock] = await Promise.all([
+      settingEnabled(id, 'report_weekly_payroll'),
+      settingEnabled(id, 'report_weekly_low_stock'),
+    ]);
+    // Per-company catches so one company's failure doesn't skip the rest.
+    if (payroll)   await sendWeeklyPayrollReport(id, name).catch(err => logger.error({ err, companyId: id }, 'weekly payroll report failed'));
+    if (lowStock)  await sendWeeklyLowStockReport(id, name).catch(err => logger.error({ err, companyId: id }, 'weekly low-stock report failed'));
   }
 }
 
 async function runMonthlyReports() {
-  try {
-    const companies = await activeCompanies();
-    for (const { id, name } of companies) {
-      const valuation = await settingEnabled(id, 'report_monthly_valuation');
-      if (valuation) await sendMonthlyValuationReport(id, name).catch(err => console.error(`Monthly valuation report error (company ${id}):`, err));
-    }
-  } catch (err) {
-    console.error('Monthly report job error:', err);
+  const companies = await activeCompanies();
+  for (const { id, name } of companies) {
+    const valuation = await settingEnabled(id, 'report_monthly_valuation');
+    if (valuation) await sendMonthlyValuationReport(id, name).catch(err => logger.error({ err, companyId: id }, 'monthly valuation report failed'));
   }
 }
 
 function startScheduledReportsJob() {
   // Weekly reports: every Monday at 7 AM server time
-  cron.schedule('0 7 * * 1', runWeeklyReports);
+  cron.schedule('0 7 * * 1', () => runJob('weeklyReports', runWeeklyReports));
   // Monthly reports: 1st of every month at 7 AM server time
-  cron.schedule('0 7 1 * *', runMonthlyReports);
-  console.log('Scheduled email reports job started (weekly Mon 7 AM, monthly 1st 7 AM)');
+  cron.schedule('0 7 1 * *', () => runJob('monthlyReports', runMonthlyReports));
 }
 
 module.exports = { startScheduledReportsJob };

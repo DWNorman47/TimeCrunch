@@ -16,7 +16,7 @@ const s = StyleSheet.create({
   // Bill-to / project
   infoRow: { flexDirection: 'row', gap: 32, marginBottom: 28 },
   infoBlock: { flex: 1 },
-  infoLabel: { fontSize: 8, fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  infoLabel: { fontSize: 8, fontWeight: 'bold', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
   infoValue: { fontSize: 10, color: '#111827', lineHeight: 1.5 },
   // Summary
   summaryBox: { backgroundColor: '#f0f4ff', borderRadius: 4, padding: '12 16', marginBottom: 20 },
@@ -42,7 +42,7 @@ const s = StyleSheet.create({
   headerText: { fontSize: 8, fontWeight: 'bold', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.4 },
   // Footer
   footer: { marginTop: 32, borderTop: '0.5pt solid #e5e7eb', paddingTop: 10, flexDirection: 'row', justifyContent: 'space-between' },
-  footerText: { fontSize: 8, color: '#9ca3af' },
+  footerText: { fontSize: 8, color: '#6b7280' },
 });
 
 function fmtDate(d, locale = 'en-US') {

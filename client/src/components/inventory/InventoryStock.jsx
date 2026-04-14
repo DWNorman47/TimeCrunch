@@ -4,7 +4,9 @@ import { useT } from '../../hooks/useT';
 import { useAuth } from '../../contexts/AuthContext';
 import { langToLocale } from '../../utils';
 import { SkeletonList } from '../Skeleton';
+import ModalShell from '../ModalShell';
 
+import { silentError } from '../../errorReporter';
 function formatBin(area_name, rack_name, bay_name, compartment_name) {
   return [area_name, rack_name, bay_name, compartment_name]
     .filter(Boolean).join(' › ') || null;
@@ -41,23 +43,17 @@ function HistoryPanel({ item, onClose }) {
 
   useEffect(() => { load(); }, [item.item_id]);
 
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
-
   return (
     <div style={h.overlay} onClick={onClose}>
-      <div style={h.panel} onClick={e => e.stopPropagation()}>
+      <ModalShell onClose={onClose} titleId="is-history-title" style={h.panel} onClick={e => e.stopPropagation()}>
         <div style={h.header}>
           <div>
-            <div style={h.title}>{item.item_name}</div>
+            <div id="is-history-title" style={h.title}>{item.item_name}</div>
             <div style={h.sub}>{t.invStockRecentMovements}</div>
           </div>
           <button style={h.close} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
-        {error && <div style={h.error}>{error} <button style={h.retryBtn} onClick={load}>{t.tryAgain || 'Try again'}</button></div>}
+        {error && <div role="alert" style={h.error}>{error} <button style={h.retryBtn} onClick={load}>{t.tryAgain || 'Try again'}</button></div>}
         {loading ? (
           <SkeletonList count={3} rows={1} />
         ) : rows.length === 0 ? (
@@ -103,7 +99,7 @@ function HistoryPanel({ item, onClose }) {
             </table>
           </div>
         )}
-      </div>
+      </ModalShell>
     </div>
   );
 }
@@ -172,9 +168,9 @@ function AdjustModal({ item, locations, onClose, onDone }) {
 
   return (
     <div style={a.overlay} onClick={onClose}>
-      <div style={a.modal} onClick={e => e.stopPropagation()}>
+      <ModalShell onClose={onClose} titleId="is-adj-title" style={a.modal} onClick={e => e.stopPropagation()}>
         <div style={a.header}>
-          <div style={a.title}>{t.invStockCurrentStock} — {item.item_name}</div>
+          <div id="is-adj-title" style={a.title}>{t.invStockCurrentStock} — {item.item_name}</div>
           <button style={a.close} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
         <div style={a.body}>
@@ -182,7 +178,7 @@ function AdjustModal({ item, locations, onClose, onDone }) {
             <span style={a.currentLabel}>{t.invStockCurrentStock}</span>
             <span style={a.currentQty}>{parseFloat(item.quantity) % 1 === 0 ? parseFloat(item.quantity).toFixed(0) : parseFloat(item.quantity).toFixed(2)} {item.unit}</span>
           </div>
-          {error && <div style={a.error}>{error}</div>}
+          {error && <div role="alert" style={a.error}>{error}</div>}
           {warning && <div style={{ ...a.error, background: '#fef3c7', color: '#92400e' }}>{warning}</div>}
           <label htmlFor="is-adj-qty" style={a.label}>{t.invStockAdjQtyLabel}</label>
           <input
@@ -204,7 +200,7 @@ function AdjustModal({ item, locations, onClose, onDone }) {
           </select>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <label htmlFor="is-adj-notes" style={a.label}>{t.invStockAdjNotesLabel}</label>
-            <span style={{ fontSize: 11, color: '#9ca3af' }}>{notes.length}/1000</span>
+            <span style={{ fontSize: 11, color: '#6b7280' }}>{notes.length}/1000</span>
           </div>
           <input
             id="is-adj-notes"
@@ -220,7 +216,7 @@ function AdjustModal({ item, locations, onClose, onDone }) {
             {!warning && <button style={{ ...a.save, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submit} disabled={saving}>{saving ? t.saving : t.invStockSaveAdj}</button>}
           </div>
         </div>
-      </div>
+      </ModalShell>
     </div>
   );
 }
@@ -263,7 +259,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
   useEffect(() => {
     api.get(`/inventory/items/${item.item_id}/uoms`)
       .then(r => setItemUoms(r.data.filter(u => u.active)))
-      .catch(() => {});
+      .catch(silentError('inventorystock'));
   }, [item.item_id]);
 
   useEffect(() => {
@@ -318,9 +314,9 @@ function IssueModal({ item, projects, onClose, onDone }) {
 
   return (
     <div style={a.overlay} onClick={onClose}>
-      <div style={a.modal} onClick={e => e.stopPropagation()}>
+      <ModalShell onClose={onClose} titleId="is-issue-title" style={a.modal} onClick={e => e.stopPropagation()}>
         <div style={a.header}>
-          <div style={a.title}>{t.invTxTypeIssue} — {item.item_name}</div>
+          <div id="is-issue-title" style={a.title}>{t.invTxTypeIssue} — {item.item_name}</div>
           <button style={a.close} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
         <div style={a.body}>
@@ -328,7 +324,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
             <span style={a.currentLabel}>{t.invStockAvailableAt} {item.location_name}</span>
             <span style={a.currentQty}>{available % 1 === 0 ? available.toFixed(0) : available.toFixed(2)} {stockUnit}</span>
           </div>
-          {error && <div style={a.error}>{error}</div>}
+          {error && <div role="alert" style={a.error}>{error}</div>}
           {warning && <div style={{ ...a.error, background: '#fef3c7', color: '#92400e' }}>{warning}</div>}
           <label htmlFor="is-issue-qty" style={a.label}>{t.invStockQtyToIssue}</label>
           <input
@@ -384,7 +380,7 @@ function IssueModal({ item, projects, onClose, onDone }) {
             </button>}
           </div>
         </div>
-      </div>
+      </ModalShell>
     </div>
   );
 }
@@ -520,7 +516,7 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
         )}
       </div>
 
-      {error && <div style={s.error}>{error}</div>}
+      {error && <div role="alert" style={s.error}>{error}</div>}
 
       {loading ? (
         <SkeletonList count={5} rows={2} />
@@ -572,7 +568,7 @@ export default function InventoryStock({ isAdmin, locations, projects, onStockCh
                     </td>
                     <td style={{ ...s.td, color: '#6b7280' }}>
                       {row.unit}
-                      {row.unit_spec && <span style={{ fontSize: 11, color: '#9ca3af' }}> ({row.unit_spec})</span>}
+                      {row.unit_spec && <span style={{ fontSize: 11, color: '#6b7280' }}> ({row.unit_spec})</span>}
                     </td>
                     {isAdmin && (
                       <td style={{ ...s.td, textAlign: 'right', color: '#6b7280' }}>
@@ -660,7 +656,7 @@ const s = {
   error:       { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },
   empty:       { textAlign: 'center', padding: '60px 24px', color: '#6b7280', fontSize: 15 },
   emptyIcon:   { fontSize: 40, marginBottom: 12 },
-  emptyHint:   { fontSize: 13, color: '#9ca3af', marginTop: 4 },
+  emptyHint:   { fontSize: 13, color: '#6b7280', marginTop: 4 },
   tableWrap:   { overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb' },
   table:       { width: '100%', borderCollapse: 'collapse', minWidth: 600 },
   thead:       { background: '#f9fafb' },

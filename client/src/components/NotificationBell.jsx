@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
 
+import { silentError } from '../errorReporter';
 export default function NotificationBell() {
   const t = useT();
   const [items, setItems] = useState([]);
@@ -9,7 +10,7 @@ export default function NotificationBell() {
   const ref = useRef(null);
 
   const load = useCallback(() => {
-    api.get('/inbox').then(r => setItems(r.data)).catch(() => {});
+    api.get('/inbox').then(r => setItems(r.data)).catch(silentError('notificationbell'));
   }, []);
 
   useEffect(() => {
@@ -28,12 +29,12 @@ export default function NotificationBell() {
   const unread = items.filter(i => !i.read_at).length;
 
   const markRead = async (id) => {
-    await api.patch(`/inbox/${id}/read`).catch(() => {});
+    await api.patch(`/inbox/${id}/read`).catch(silentError('notificationbell'));
     setItems(prev => prev.map(i => i.id === id ? { ...i, read_at: new Date().toISOString() } : i));
   };
 
   const markAllRead = async () => {
-    await api.patch('/inbox/read-all').catch(() => {});
+    await api.patch('/inbox/read-all').catch(silentError('notificationbell'));
     setItems(prev => prev.map(i => ({ ...i, read_at: i.read_at || new Date().toISOString() })));
   };
 
@@ -138,7 +139,7 @@ const styles = {
     fontWeight: 600, cursor: 'pointer', padding: 0,
   },
   list: { maxHeight: 380, overflowY: 'auto' },
-  empty: { padding: '24px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 13 },
+  empty: { padding: '24px 16px', textAlign: 'center', color: '#6b7280', fontSize: 13 },
   item: {
     display: 'flex', gap: 10, padding: '12px 16px', cursor: 'pointer',
     borderBottom: '1px solid #f9fafb', transition: 'background 0.1s',
@@ -149,5 +150,5 @@ const styles = {
   itemBody: { flex: 1, minWidth: 0 },
   itemTitle: { fontSize: 13, fontWeight: 600, color: '#111827', marginBottom: 2 },
   itemText: { fontSize: 12, color: '#6b7280', marginBottom: 3, whiteSpace: 'pre-line' },
-  itemTime: { fontSize: 11, color: '#9ca3af' },
+  itemTime: { fontSize: 11, color: '#6b7280' },
 };

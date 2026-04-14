@@ -12,7 +12,7 @@ router.get('/templates', requireAuth, async (req, res) => {
       [req.user.company_id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /inspections/templates
@@ -26,7 +26,7 @@ router.post('/templates', requireAdmin, async (req, res) => {
       [req.user.company_id, name.trim(), description || null, JSON.stringify(items || []), req.user.id]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /inspections/templates/:id
@@ -46,7 +46,7 @@ router.patch('/templates/:id', requireAdmin, async (req, res) => {
        req.params.id, req.user.company_id]
     );
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /inspections/templates/:id
@@ -58,7 +58,7 @@ router.delete('/templates/:id', requireAdmin, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Template not found' });
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Inspections ───────────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ router.get('/', requireAuth, async (req, res) => {
     ]);
     const total = parseInt(countResult.rows[0].count);
     res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /inspections
@@ -123,7 +123,7 @@ router.post('/', requireAdmin, async (req, res) => {
        JSON.stringify(results || {}), status || 'pass', inspected_at, req.user.id]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /inspections/:id
@@ -156,7 +156,7 @@ router.patch('/:id', requireAdmin, async (req, res) => {
        inspected_at ?? ins.inspected_at, req.params.id, req.user.company_id]
     );
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /inspections/:id
@@ -168,7 +168,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Inspection not found' });
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

@@ -138,7 +138,7 @@ export default function CertifiedPayroll({ projects }) {
         </button>
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
 
       {data && (
         <>
@@ -214,7 +214,7 @@ const styles = {
   reportHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 },
   metaLine: { fontSize: 13, color: '#374151', marginBottom: 4 },
   printBtn: { background: '#059669', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
-  empty: { color: '#9ca3af', fontSize: 13 },
+  empty: { color: '#6b7280', fontSize: 13 },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 700 },
   th: { background: '#f3f4f6', padding: '8px 10px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.4px', color: '#6b7280', whiteSpace: 'nowrap' },

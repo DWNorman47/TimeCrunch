@@ -34,7 +34,7 @@ const pdf = StyleSheet.create({
   textBlock: { fontSize: 9, color: '#374151', lineHeight: 1.6, padding: '8 10', backgroundColor: '#f9fafb', borderRadius: 4, borderLeft: '3 solid #dbeafe' },
   responseBlock: { fontSize: 9, color: '#374151', lineHeight: 1.6, padding: '8 10', backgroundColor: '#f0fdf4', borderRadius: 4, borderLeft: '3 solid #86efac' },
   footer: { position: 'absolute', bottom: 24, left: 48, right: 48, flexDirection: 'row', justifyContent: 'space-between', borderTop: '1 solid #e5e7eb', paddingTop: 6 },
-  footerText: { fontSize: 7, color: '#9ca3af' },
+  footerText: { fontSize: 7, color: '#6b7280' },
   rfiNumber: { fontSize: 28, fontFamily: 'Helvetica-Bold', color: '#1a56db' },
 });
 
