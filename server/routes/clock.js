@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const pool = require('../db');
+const logger = require('../logger');
 const { requireAuth } = require('../middleware/auth');
 const { haversineDistanceFt } = require('../utils/geoUtils');
 const { sendPushToCompanyAdmins } = require('../push');
@@ -30,7 +31,7 @@ router.get('/status', requireAuth, async (req, res) => {
     );
     res.json(result.rows[0] || null);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -194,7 +195,7 @@ router.post('/in', requireAuth, clockLimiter, async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -328,7 +329,7 @@ router.post('/out', requireAuth, clockLimiter, async (req, res) => {
 
     res.json({ ...entryResult.rows[0], project_name });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -358,7 +359,7 @@ router.delete('/cancel', requireAuth, async (req, res) => {
     if (result.rowCount === 0) return res.status(400).json({ error: 'Not clocked in' });
     res.json({ cancelled: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -378,7 +379,7 @@ router.post('/location', requireAuth, async (req, res) => {
     if (result.rowCount === 0) return res.status(400).json({ error: 'Not clocked in' });
     res.json({ ok: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });

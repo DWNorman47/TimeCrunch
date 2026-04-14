@@ -8,6 +8,7 @@ import AppSwitcher from '../components/AppSwitcher';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import { SkeletonStatRow, SkeletonList } from '../components/Skeleton';
 
+import { silentError } from '../errorReporter';
 function UpgradePrompt() {
   const t = useT();
   return (
@@ -35,7 +36,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     getOrFetch('settings', () => api.get('/settings').then(r => r.data))
       .then(s => setFeatures(s))
-      .catch(() => {})
+      .catch(silentError('analyticspage'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -52,7 +53,7 @@ export default function AnalyticsPage() {
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
-      <main style={styles.main} className="admin-main">
+      <main id="main-content" style={styles.main} className="admin-main">
         <div style={styles.pageHeader}>
           <h1 style={styles.pageTitle}>{t.analyticsTitle}</h1>
         </div>
@@ -87,5 +88,5 @@ const styles = {
   main: { maxWidth: 1100, margin: '32px auto', padding: '0 20px' },
   pageHeader: { marginBottom: 24 },
   pageTitle: { fontSize: 28, fontWeight: 800, color: '#111827', margin: 0 },
-  loadingText: { color: '#9ca3af', fontSize: 14 },
+  loadingText: { color: '#6b7280', fontSize: 14 },
 };

@@ -10,6 +10,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+import { silentError } from '../errorReporter';
 // Use SVG divIcons — avoids all CDN/bundler PNG loading issues
 function makePinIcon(color) {
   return L.divIcon({
@@ -126,14 +127,14 @@ export default function ApprovalQueue({ onCountChange }) {
     if (dateTo) params.to = dateTo;
     api.get('/admin/entries/pending', { params })
       .then(r => { setEntries(prev => [...prev, ...r.data.entries]); setHasMore(r.data.has_more); })
-      .catch(() => {})
+      .catch(silentError('approvalqueue'))
       .finally(() => setLoadingMore(false));
   };
 
   const fetchRecentApproved = () => {
     api.get('/admin/entries/recently-approved')
       .then(r => setRecentApproved(r.data))
-      .catch(() => {});
+      .catch(silentError('approvalqueue'));
   };
 
   useEffect(() => {
@@ -335,7 +336,12 @@ export default function ApprovalQueue({ onCountChange }) {
             )}
             {selectedIds.size > 0 ? (
               <>
-                <button style={{ ...styles.approveSelectedBtn, ...(approvingSelected ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={approveSelected} disabled={approvingSelected}>
+                <button
+                  style={{ ...styles.approveSelectedBtn, ...(approvingSelected ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                  onClick={approveSelected}
+                  disabled={approvingSelected}
+                  title={approvingSelected ? t.aqApprovingSelected : undefined}
+                >
                   {approvingSelected ? t.aqApprovingSelected : `${t.aqApproveSelected} (${selectedIds.size})`}
                 </button>
                 <button style={styles.cancelApproveAllBtn} onClick={deselectAll}>{t.cancel}</button>
@@ -352,7 +358,12 @@ export default function ApprovalQueue({ onCountChange }) {
                 <button style={styles.selectAllBtn} onClick={selectedIds.size > 0 ? deselectAll : selectAll}>
                   {selectedIds.size > 0 ? t.aqDeselectAll : t.aqSelectAll}
                 </button>
-                <button style={{ ...styles.approveAllBtn, ...((approvingAll || visibleEntries.length === 0) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setConfirmingApproveAll(true)} disabled={approvingAll || visibleEntries.length === 0}>
+                <button
+                  style={{ ...styles.approveAllBtn, ...((approvingAll || visibleEntries.length === 0) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                  onClick={() => setConfirmingApproveAll(true)}
+                  disabled={approvingAll || visibleEntries.length === 0}
+                  title={visibleEntries.length === 0 ? t.aqNoEntriesToApprove : (approvingAll ? t.aqApprovingAll : undefined)}
+                >
                   {workerFilter ? `${t.approve} ${workerFilter.split(' ')[0]}'s` : t.aqApproveAll}
                 </button>
               </>
@@ -370,7 +381,7 @@ export default function ApprovalQueue({ onCountChange }) {
             onChange={e => setDateFrom(e.target.value)}
             title={t.fromDate}
           />
-          <span style={{ fontSize: 12, color: '#9ca3af' }}>–</span>
+          <span style={{ fontSize: 12, color: '#6b7280' }}>–</span>
           <input
             type="date"
             style={styles.dateInput}
@@ -560,7 +571,7 @@ export default function ApprovalQueue({ onCountChange }) {
                     <div style={styles.rejectForm}>
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <input style={styles.rejectInput} placeholder={t.reasonOptional} maxLength={500} value={rejectNote} onChange={ev => setRejectNote(ev.target.value)} autoFocus />
-                        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{rejectNote.length}/500</div>
+                        <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{rejectNote.length}/500</div>
                       </div>
                       <button style={{ ...styles.confirmRejectBtn, ...(working === e.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => submitReject(e.id)} disabled={working === e.id}>{working === e.id ? t.saving : t.confirmReject}</button>
                       <button style={styles.cancelBtn} onClick={() => { setRejectingId(null); setRejectNote(''); }}>{t.cancel}</button>
@@ -627,7 +638,7 @@ const styles = {
   dateFilterRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 },
   dateInput: { padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, color: '#374151', minHeight: 'unset' },
   applyDateBtn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '4px 10px', cursor: 'pointer' },
-  clearDateBtn: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 13, cursor: 'pointer', padding: '0 4px', lineHeight: 1, minHeight: 'unset' },
+  clearDateBtn: { background: 'none', border: 'none', color: '#6b7280', fontSize: 13, cursor: 'pointer', padding: '0 4px', lineHeight: 1, minHeight: 'unset' },
   title: { fontSize: 17, fontWeight: 700, margin: 0 },
   badge: { background: '#fef3c7', color: '#b45309', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 700 },
   filterSelect: { padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, color: '#374151', background: '#fff' },
@@ -635,7 +646,7 @@ const styles = {
   emptyState: { textAlign: 'center', padding: '36px 0 28px' },
   emptyIcon: { fontSize: 36, color: '#059669', marginBottom: 8 },
   emptyTitle: { fontSize: 16, fontWeight: 700, color: '#059669', margin: '0 0 4px' },
-  emptySubtitle: { fontSize: 13, color: '#9ca3af', margin: 0 },
+  emptySubtitle: { fontSize: 13, color: '#6b7280', margin: 0 },
   fetchError: { color: '#991b1b', fontSize: 14 },
   retryBtn: { background: 'none', border: 'none', color: '#1a56db', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: 14 },
   list:      { display: 'flex', flexDirection: 'column', gap: 16 },
@@ -652,7 +663,7 @@ const styles = {
   project: { fontWeight: 600, color: '#374151' },
   sep: { color: '#d1d5db' },
   wageTag: { color: '#fff', padding: '1px 7px', borderRadius: 10, fontSize: 11, fontWeight: 700 },
-  notes: { marginTop: 4, fontSize: 12, color: '#9ca3af', fontStyle: 'italic' },
+  notes: { marginTop: 4, fontSize: 12, color: '#6b7280', fontStyle: 'italic' },
   sourceBadge: { fontSize: 11, color: '#1e40af', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 8px', fontWeight: 600, display: 'inline-block', marginTop: 4 },
   actions: { display: 'flex', gap: 8, alignItems: 'center' },
   editTimesBtn: { padding: '6px 12px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
@@ -699,6 +710,6 @@ const styles = {
   mapWrap: { borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' },
   mapLegend: { display: 'flex', gap: 12, padding: '6px 10px', background: '#f9fafb', flexWrap: 'wrap' },
   mapLegendItem: { fontSize: 11, color: '#374151', display: 'flex', alignItems: 'center', gap: 4 },
-  mapLegendMissing: { fontSize: 11, color: '#9ca3af', fontStyle: 'italic' },
+  mapLegendMissing: { fontSize: 11, color: '#6b7280', fontStyle: 'italic' },
   map: { height: 280, width: '100%' },
 };

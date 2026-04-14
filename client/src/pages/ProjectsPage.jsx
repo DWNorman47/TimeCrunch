@@ -6,6 +6,8 @@ import ManageClients from '../components/ManageClients';
 import { useT } from '../hooks/useT';
 import { SkeletonList } from '../components/Skeleton';
 import { langToLocale } from '../utils';
+import { silentError, reportClientError } from '../errorReporter';
+import RetryBanner from '../components/RetryBanner';
 
 function punchColor(status) {
   return { open: '#f59e0b', in_progress: '#3b82f6', resolved: '#059669', closed: '#9ca3af' }[status] || '#9ca3af';
@@ -45,7 +47,7 @@ function ProjectCard({ project, metrics, settings, onClick }) {
   return (
     <div style={{ ...styles.card, opacity: project.active === false ? 0.6 : 1 }} onClick={onClick} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onClick()}>
       {project.active === false && (
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Archived</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Archived</div>
       )}
       <div style={styles.cardTop}>
         <div style={styles.cardName}>{project.name}</div>
@@ -128,6 +130,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const [editMsg, setEditMsg] = useState('');
   const [entries, setEntries] = useState([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
+  const [entriesError, setEntriesError] = useState(null);
   const [billData, setBillData] = useState(null);
   const [billLoading, setBillLoading] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
@@ -156,6 +159,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const [rfiFormOpen, setRfiFormOpen] = useState(false);
   const [rfiForm, setRfiForm] = useState({ subject: '', directed_to: '', description: '', date_due: '' });
   const [rfiSaving, setRfiSaving] = useState(false);
+  const [rfiError, setRfiError] = useState('');
   const [punch, setPunch] = useState([]);
   const [punchOpen, setPunchOpen] = useState(false);
   const [punchLoaded, setPunchLoaded] = useState(false);
@@ -187,24 +191,24 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     if (tab === 'entries') {
       setEntriesLoading(true);
       api.get(`/admin/projects/${project.id}/entries`)
-        .then(r => setEntries(r.data.entries || []))
-        .catch(() => {})
+        .then(r => { setEntries(r.data.entries || []); setEntriesError(null); })
+        .catch(err => { setEntriesError(t.failedLoadEntries || 'Failed to load entries'); silentError('project entries')(err); })
         .finally(() => setEntriesLoading(false));
     }
     if (tab === 'overview' && workers.length === 0) {
       setWorkersLoading(true);
       api.get(`/admin/projects/${project.id}/workers`)
         .then(r => setWorkers(r.data))
-        .catch(() => {})
+        .catch(silentError('project workers'))
         .finally(() => setWorkersLoading(false));
       setActivityLoading(true);
       api.get(`/admin/projects/${project.id}/activity`)
         .then(r => setActivity(r.data))
-        .catch(() => {})
+        .catch(silentError('project activity'))
         .finally(() => setActivityLoading(false));
       api.get(`/admin/projects/${project.id}/health`)
         .then(r => setHealth(r.data))
-        .catch(() => {});
+        .catch(silentError('project health'));
     }
   }, [tab, project.id]);
 
@@ -213,7 +217,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     setPhotosLoaded(true);
     api.get(`/admin/projects/${project.id}/photos`)
       .then(r => setPhotos(r.data))
-      .catch(() => {});
+      .catch(silentError('project photos'));
   };
 
   const loadRfis = () => {
@@ -221,19 +225,23 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     setRfisLoaded(true);
     api.get(`/admin/projects/${project.id}/rfis`)
       .then(r => setRfis(r.data))
-      .catch(() => {});
+      .catch(silentError('project rfis'));
   };
 
   const submitRfi = async (e) => {
     e.preventDefault();
     if (!rfiForm.subject.trim()) return;
     setRfiSaving(true);
+    setRfiError('');
     try {
       const { data: newRfi } = await api.post(`/admin/projects/${project.id}/rfis`, rfiForm);
       setRfis(prev => [newRfi, ...prev]);
       setRfiForm({ subject: '', directed_to: '', description: '', date_due: '' });
       setRfiFormOpen(false);
-    } catch {}
+    } catch (err) {
+      setRfiError(t.failedSave || 'Failed to save RFI');
+      reportClientError({ kind: 'unhandled', message: `submit RFI: ${err?.message || err}`, stack: err?.stack });
+    }
     setRfiSaving(false);
   };
 
@@ -242,7 +250,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     setPunchLoaded(true);
     api.get('/punchlist', { params: { project_id: project.id, limit: 100 } })
       .then(r => setPunch(r.data.items))
-      .catch(() => {});
+      .catch(silentError('project punchlist'));
   };
 
   const submitPunch = async (e) => {
@@ -266,12 +274,14 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     setDocsLoaded(true);
     api.get(`/admin/projects/${project.id}/documents`)
       .then(r => setDocs(r.data))
-      .catch(() => {});
+      .catch(silentError('project documents'));
   };
 
+  const [uploadError, setUploadError] = React.useState('');
   const uploadDoc = async (file) => {
     if (!file) return;
     setUploading(true);
+    setUploadError('');
     try {
       const { data: { uploadUrl, fileUrl } } = await api.get(
         `/admin/projects/${project.id}/documents/upload-url`,
@@ -283,7 +293,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
       });
       setDocs(d => [...d, doc]);
     } catch (err) {
-      console.error('Upload failed', err);
+      setUploadError(t.uploadFailed || 'Upload failed');
+      reportClientError({ kind: 'unhandled', message: `document upload: ${err?.message || err}`, stack: err?.stack });
     } finally {
       setUploading(false);
     }
@@ -296,7 +307,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     if (billTo) params.to = billTo;
     api.get(`/admin/projects/${project.id}/entries`, { params })
       .then(r => setBillData(r.data))
-      .catch(() => {})
+      .catch(silentError('project billing'))
       .finally(() => setBillLoading(false));
   };
 
@@ -305,7 +316,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     if (tab === 'billing' && invoiceHistory === null && project.qbo_customer_id) {
       api.get(`/qbo/invoices/project/${project.id}`)
         .then(r => setInvoiceHistory(r.data))
-        .catch(() => setInvoiceHistory([]));
+        .catch(err => { setInvoiceHistory([]); silentError('project invoice history')(err); });
     }
   }, [tab]);
 
@@ -340,8 +351,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
         if (r.data.length === 1) setQboItemId(r.data[0].Id);
       }
       setShowQboPicker(true);
-    } catch {
-      // silently skip — QBO not connected or API error
+    } catch (err) {
+      silentError('QBO picker')(err);
     } finally {
       setQboLoading(false);
     }
@@ -368,7 +379,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
       // Refresh invoice history
       api.get(`/qbo/invoices/project/${project.id}`)
         .then(res => setInvoiceHistory(res.data))
-        .catch(() => {});
+        .catch(silentError('project invoice history refresh'));
     } catch (err) {
       setQboPushResult({ success: false, error: err.response?.data?.error || 'Push failed' });
     } finally { setQboPushing(false); }
@@ -561,14 +572,14 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                     {punch.length > 0 && punch.filter(p => p.status === 'open').length === 0 && (
                       <span style={styles.activityCount}>{punch.length}</span>
                     )}
-                    <span style={{ fontSize: 12, color: '#9ca3af' }}>{punchOpen ? '▴' : '▾'}</span>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>{punchOpen ? '▴' : '▾'}</span>
                   </span>
                 </button>
 
                 {punchOpen && (
                   <div>
                     {punchLoaded && punch.length === 0 && !punchFormOpen && (
-                      <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 6px' }}>No punchlist items.</p>
+                      <p style={{ fontSize: 12, color: '#6b7280', margin: '8px 0 6px' }}>No punchlist items.</p>
                     )}
                     {punch.length > 0 && (
                       <div style={{ ...styles.activityList, marginBottom: 8 }}>
@@ -649,7 +660,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 <div style={{ ...styles.budgetSection, marginBottom: 16 }}>
                   <div style={styles.sectionTitle}>Workers ({workers.length})</div>
                   {workersLoading ? (
-                    <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>Loading…</p>
+                    <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>Loading…</p>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {workers.map(w => (
@@ -659,7 +670,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                             <span style={{ fontSize: 12, color: '#6b7280' }}>
                               {parseFloat(w.total_hours).toFixed(1)}h
                             </span>
-                            <span style={{ fontSize: 11, color: '#9ca3af' }}>
+                            <span style={{ fontSize: 11, color: '#6b7280' }}>
                               {new Date(w.last_worked).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
                             </span>
                           </div>
@@ -738,13 +749,13 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                     <span>{t.recentActivity}</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {activity.length > 0 && <span style={styles.activityCount}>{activity.length}</span>}
-                      <span style={{ fontSize: 12, color: '#9ca3af' }}>{activityOpen ? '▴' : '▾'}</span>
+                      <span style={{ fontSize: 12, color: '#6b7280' }}>{activityOpen ? '▴' : '▾'}</span>
                     </span>
                   </button>
 
                   {activityOpen && (
                     activityLoading ? (
-                      <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0' }}>Loading…</p>
+                      <p style={{ fontSize: 12, color: '#6b7280', margin: '8px 0 0' }}>Loading…</p>
                     ) : (
                       <div style={styles.activityList}>
                         {activity.map(item => (
@@ -785,13 +796,13 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   <span>{t.photosLabel}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {photos.length > 0 && <span style={styles.activityCount}>{photos.length}</span>}
-                    <span style={{ fontSize: 12, color: '#9ca3af' }}>{photosOpen ? '▴' : '▾'}</span>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>{photosOpen ? '▴' : '▾'}</span>
                   </span>
                 </button>
 
                 {photosOpen && (
                   photosLoaded && photos.length === 0 ? (
-                    <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0' }}>{t.noPhotosYet}</p>
+                    <p style={{ fontSize: 12, color: '#6b7280', margin: '8px 0 0' }}>{t.noPhotosYet}</p>
                   ) : (
                     <div style={styles.photoGrid}>
                       {photos.map((ph, i) => (
@@ -813,14 +824,14 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   <span>{t.documentsLabel}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {docs.length > 0 && <span style={styles.activityCount}>{docs.length}</span>}
-                    <span style={{ fontSize: 12, color: '#9ca3af' }}>{docsOpen ? '▴' : '▾'}</span>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>{docsOpen ? '▴' : '▾'}</span>
                   </span>
                 </button>
 
                 {docsOpen && (
                   <div style={{ marginTop: 6 }}>
                     {docsLoaded && docs.length === 0 && !uploading && (
-                      <p style={{ fontSize: 12, color: '#9ca3af', margin: '0 0 8px' }}>No documents yet.</p>
+                      <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 8px' }}>No documents yet.</p>
                     )}
                     {docs.map(doc => (
                       <div key={doc.id} style={styles.docRow}>
@@ -843,6 +854,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                       {uploading ? 'Uploading…' : '+ Attach File'}
                       <input type="file" style={{ display: 'none' }} disabled={uploading} onChange={e => { uploadDoc(e.target.files[0]); e.target.value = ''; }} />
                     </label>
+                    {uploadError && <p role="alert" style={{ color: '#dc2626', fontSize: 12, margin: '6px 0 0' }}>{uploadError}</p>}
                   </div>
                 )}
               </div>
@@ -856,14 +868,14 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   <span>RFIs</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {rfis.length > 0 && <span style={styles.activityCount}>{rfis.length}</span>}
-                    <span style={{ fontSize: 12, color: '#9ca3af' }}>{rfisOpen ? '▴' : '▾'}</span>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>{rfisOpen ? '▴' : '▾'}</span>
                   </span>
                 </button>
 
                 {rfisOpen && (
                   <div>
                     {rfisLoaded && rfis.length === 0 && !rfiFormOpen && (
-                      <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 6px' }}>No RFIs for this project.</p>
+                      <p style={{ fontSize: 12, color: '#6b7280', margin: '8px 0 6px' }}>No RFIs for this project.</p>
                     )}
                     {rfis.length > 0 && (
                       <div style={{ ...styles.activityList, marginBottom: 8 }}>
@@ -875,7 +887,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={styles.activityTitle}>
                                   <span style={{ ...styles.activityTag, background: statusColor + '22', color: statusColor }}>{r.status}</span>
-                                  <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>RFI #{r.rfi_number}</span>
+                                  <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>RFI #{r.rfi_number}</span>
                                   <span style={styles.activityText}>{r.subject}</span>
                                 </div>
                                 <div style={styles.activityMeta}>
@@ -919,6 +931,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                           value={rfiForm.description}
                           onChange={e => setRfiForm(f => ({ ...f, description: e.target.value }))}
                         />
+                        {rfiError && <p role="alert" style={{ color: '#dc2626', fontSize: 12, margin: 0 }}>{rfiError}</p>}
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button type="submit" style={styles.rfiSubmitBtn} disabled={rfiSaving}>
                             {rfiSaving ? 'Saving…' : 'Create RFI'}
@@ -943,8 +956,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
               <div style={styles.lightboxContent} onClick={e => e.stopPropagation()}>
                 <img src={lightboxPhoto.url} alt={lightboxPhoto.caption || ''} style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: 8 }} />
                 {lightboxPhoto.caption && <p style={{ color: '#f3f4f6', marginTop: 8, fontSize: 14 }}>{lightboxPhoto.caption}</p>}
-                {lightboxPhoto.worker_name && <p style={{ color: '#9ca3af', fontSize: 12, margin: '2px 0 0' }}>{lightboxPhoto.worker_name} · {lightboxPhoto.report_date}</p>}
-                <button style={styles.lightboxClose} onClick={() => setLightboxPhoto(null)}>✕</button>
+                {lightboxPhoto.worker_name && <p style={{ color: '#6b7280', fontSize: 12, margin: '2px 0 0' }}>{lightboxPhoto.worker_name} · {lightboxPhoto.report_date}</p>}
+                <button style={styles.lightboxClose} aria-label={t.close || 'Close'} onClick={() => setLightboxPhoto(null)}>✕</button>
               </div>
             </div>
           )}
@@ -1089,7 +1102,9 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
           )}
 
           {tab === 'entries' && (
-            entriesLoading ? <p style={styles.loadingText}>Loading…</p> :
+            <>
+            <RetryBanner message={entriesError} onRetry={() => { setEntriesError(null); setEntriesLoading(true); api.get(`/admin/projects/${project.id}/entries`).then(r => setEntries(r.data.entries || [])).catch(err => { setEntriesError(t.failedLoadEntries || 'Failed to load entries'); silentError('project entries retry')(err); }).finally(() => setEntriesLoading(false)); }} />
+            {entriesLoading ? <p style={styles.loadingText}>Loading…</p> :
             entries.length === 0 ? <p style={styles.emptyText}>No time entries for this project.</p> :
             <div style={styles.entriesTable}>
               <div style={styles.tableHeader}>
@@ -1111,7 +1126,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 );
               })}
               {entries.length > 200 && <p style={styles.moreText}>{t.showingFirst200.replace('{n}', entries.length)}</p>}
-            </div>
+            </div>}
+            </>
           )}
 
           {tab === 'edit' && (
@@ -1232,8 +1248,8 @@ function ProjectRow({ project, metrics, settings, onClick }) {
           </div>
         )}
         {budgetHours === 0 && totalHours > 0 && <span style={{ fontSize: 12, color: '#6b7280', flexShrink: 0 }}>{fmtHours(totalHours)}</span>}
-        <span style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>{parseInt(m.worker_count || 0)} worker{parseInt(m.worker_count || 0) !== 1 ? 's' : ''}</span>
-        {project.active === false && <span style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>{t.archivedLabel}</span>}
+        <span style={{ fontSize: 12, color: '#6b7280', flexShrink: 0 }}>{parseInt(m.worker_count || 0)} worker{parseInt(m.worker_count || 0) !== 1 ? 's' : ''}</span>
+        {project.active === false && <span style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>{t.archivedLabel}</span>}
       </div>
     </div>
   );
@@ -1327,7 +1343,7 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
         </div>
 
         <div style={pf.field}>
-          <label style={pf.label}>{t.descriptionLabel} <span style={{ fontWeight: 400, color: '#9ca3af' }}>{t.optionalHint}</span></label>
+          <label style={pf.label}>{t.descriptionLabel} <span style={{ fontWeight: 400, color: '#6b7280' }}>{t.optionalHint}</span></label>
           <textarea style={pf.textarea} rows={2} value={form.description} onChange={e => set('description', e.target.value)} placeholder={t.scopeOfWorkPh} />
         </div>
 
@@ -1381,7 +1397,7 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     if (mainTab === 'clients' || showCreateForm) {
-      api.get('/admin/clients').then(r => setClients(r.data)).catch(() => {});
+      api.get('/admin/clients').then(r => setClients(r.data)).catch(silentError('clients list'));
     }
   }, [mainTab, showCreateForm]);
 
@@ -1403,16 +1419,18 @@ export default function ProjectsPage() {
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
-      <main style={styles.main}>
+      <main id="main-content" style={styles.main}>
         {/* Top-level tab bar */}
         <div style={styles.tabBar}>
           <button
+            aria-current={mainTab === 'projects' ? 'page' : undefined}
             style={{ ...styles.tabBtn, ...(mainTab === 'projects' ? styles.tabBtnActive : {}) }}
             onClick={() => setMainTab('projects')}
           >
             {t.projectsTabLabel}
           </button>
           <button
+            aria-current={mainTab === 'clients' ? 'page' : undefined}
             style={{ ...styles.tabBtn, ...(mainTab === 'clients' ? styles.tabBtnActive : {}) }}
             onClick={() => setMainTab('clients')}
           >
@@ -1561,16 +1579,16 @@ const styles = {
   statsRow: { display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12 },
   statItem: {},
   statValue: { fontSize: 20, fontWeight: 800, color: '#111827' },
-  statLabel: { fontSize: 11, color: '#9ca3af', marginTop: 1 },
+  statLabel: { fontSize: 11, color: '#6b7280', marginTop: 1 },
   progressWrap: { marginTop: 8 },
   progressBar: { height: 6, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden', marginBottom: 4 },
   progressFill: { height: '100%', borderRadius: 3, transition: 'width 0.3s' },
   progressLabel: { fontSize: 11, fontWeight: 600 },
   // Loading / empty
-  loadingText: { color: '#9ca3af', fontSize: 14, marginTop: 20 },
+  loadingText: { color: '#6b7280', fontSize: 14, marginTop: 20 },
   empty: { textAlign: 'center', padding: '80px 20px' },
   emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyText: { color: '#9ca3af', fontSize: 15 },
+  emptyText: { color: '#6b7280', fontSize: 15 },
   // Detail panel
   detailOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 500, display: 'flex', justifyContent: 'flex-end' },
   detailPanel: { width: '100%', maxWidth: 480, background: '#fff', height: '100%', display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)' },
@@ -1585,9 +1603,9 @@ const styles = {
   metricsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 },
   metricCard: { background: '#f9fafb', borderRadius: 10, padding: '12px 14px' },
   metricValue: { fontSize: 22, fontWeight: 800, color: '#111827' },
-  metricLabel: { fontSize: 11, color: '#9ca3af', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' },
+  metricLabel: { fontSize: 11, color: '#6b7280', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' },
   budgetSection: { background: '#f9fafb', borderRadius: 10, padding: '14px 16px', marginBottom: 16 },
-  sectionTitle: { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 10 },
+  sectionTitle: { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280', marginBottom: 10 },
   budgetRow: { display: 'flex', justifyContent: 'space-between', marginBottom: 6 },
   budgetLabel: { fontSize: 13, color: '#6b7280' },
   budgetValue: { fontSize: 13, fontWeight: 700, color: '#111827' },
@@ -1619,13 +1637,13 @@ const styles = {
   entriesTable: { display: 'flex', flexDirection: 'column', gap: 2 },
   tableHeader: { display: 'flex', gap: 8, padding: '6px 10px', background: '#f9fafb', borderRadius: 6, marginBottom: 4 },
   tableRow: { display: 'flex', gap: 8, padding: '8px 10px', borderRadius: 6, fontSize: 13 },
-  thDate: { flex: 1.2, fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' },
-  thWorker: { flex: 2, fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' },
-  thHours: { width: 50, textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' },
+  thDate: { flex: 1.2, fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' },
+  thWorker: { flex: 2, fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' },
+  thHours: { width: 50, textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' },
   tdDate: { flex: 1.2, color: '#6b7280' },
   tdWorker: { flex: 2, fontWeight: 600, color: '#111827' },
   tdHours: { width: 50, textAlign: 'right', fontWeight: 700, color: '#374151' },
-  moreText: { fontSize: 12, color: '#9ca3af', textAlign: 'center', marginTop: 8 },
+  moreText: { fontSize: 12, color: '#6b7280', textAlign: 'center', marginTop: 8 },
   // Health
   healthRow: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 },
   healthChip: { display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: '#374151', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 20, padding: '4px 10px' },
@@ -1639,11 +1657,11 @@ const styles = {
   activityTitle: { display: 'flex', gap: 4, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 2 },
   activityTag: { fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 },
   activityText: { fontSize: 13, color: '#111827', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' },
-  activityMeta: { display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, color: '#9ca3af', flexWrap: 'wrap' },
+  activityMeta: { display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, color: '#6b7280', flexWrap: 'wrap' },
   docRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', borderRadius: 7, background: '#fafafa', border: '1px solid #f3f4f6', marginBottom: 4 },
   docName: { fontSize: 13, color: '#1a56db', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0, textDecoration: 'none' },
-  docSize: { fontSize: 11, color: '#9ca3af' },
-  docDelete: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, padding: '2px 4px', lineHeight: 1 },
+  docSize: { fontSize: 11, color: '#6b7280' },
+  docDelete: { background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14, padding: '2px 4px', lineHeight: 1 },
   docDeleteConfirm: { background: '#dc2626', color: '#fff', border: 'none', borderRadius: 5, padding: '2px 8px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   docDeleteCancel: { background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 5, padding: '2px 8px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   uploadBtn: { display: 'inline-block', marginTop: 6, background: '#f3f4f6', border: '1px dashed #d1d5db', borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, color: '#6b7280' },
@@ -1664,14 +1682,14 @@ const styles = {
   newProjectBtn: { background: '#8b5cf6', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
   // View toggle
   viewToggle: { display: 'flex', border: '1px solid #e5e7eb', borderRadius: 7, overflow: 'hidden' },
-  viewToggleBtn: { background: '#fff', border: 'none', padding: '6px 10px', fontSize: 16, cursor: 'pointer', color: '#9ca3af', lineHeight: 1 },
+  viewToggleBtn: { background: '#fff', border: 'none', padding: '6px 10px', fontSize: 16, cursor: 'pointer', color: '#6b7280', lineHeight: 1 },
   viewToggleBtnActive: { background: '#ede9fe', color: '#8b5cf6' },
   // List view
   rowList: { display: 'flex', flexDirection: 'column', gap: 2 },
   row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#fff', borderRadius: 8, padding: '11px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', cursor: 'pointer', borderLeft: '3px solid #8b5cf6', transition: 'box-shadow 0.15s' },
   rowLeft: { display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0, flex: 1 },
   rowName: { fontSize: 14, fontWeight: 700, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  rowClient: { fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  rowClient: { fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   rowRight: { display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 },
   finishBtn: { background: '#059669', color: '#fff', border: 'none', padding: '11px 20px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', width: '100%' },
 };

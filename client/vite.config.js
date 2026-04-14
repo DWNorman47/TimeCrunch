@@ -1,10 +1,36 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
+import { readFileSync } from 'fs';
+import { execSync } from 'child_process';
+
+const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
+let gitSha = 'dev';
+try {
+  gitSha = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+} catch { /* not a git checkout or git missing — keep 'dev' */ }
+const APP_VERSION = `${pkg.version || '0.0.0'}+${gitSha}`;
+
+// Source maps to Sentry only when all three env vars are present (prod CI).
+// Local dev builds skip the upload and the plugin is a no-op.
+const sentryPlugins = (process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT)
+  ? [sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      release: { name: APP_VERSION },
+      sourcemaps: { assets: './dist/**' },
+    })]
+  : [];
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
+  },
   plugins: [
     react(),
+    ...sentryPlugins,
     VitePWA({
       strategies: 'injectManifest',
       srcDir: 'src',
@@ -18,6 +44,9 @@ export default defineConfig({
     }),
   ],
   build: {
+    // Required so Sentry can symbolicate — the plugin strips these from the
+    // final bundle after upload, so they don't ship to users.
+    sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: {

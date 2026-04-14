@@ -6,6 +6,7 @@ import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
 
+import { silentError } from '../errorReporter';
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
 const STATUS_STYLES = {
@@ -79,7 +80,7 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       <div style={styles.fieldGroup}>
         <label htmlFor="rfi-description" style={styles.label}>{t.descriptionField} <span style={styles.optional}>({t.optional})</span></label>
         <textarea id="rfi-description" style={styles.textarea} rows={3} placeholder={t.rfiDescriptionPlaceholder} maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} />
-        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{form.description.length}/2000</div>
+        <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{form.description.length}/2000</div>
       </div>
 
       <div style={styles.row}>
@@ -116,11 +117,11 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
         <div style={styles.fieldGroup}>
           <label htmlFor="rfi-response" style={styles.label}>{t.rfiResponse}</label>
           <textarea id="rfi-response" style={styles.textarea} rows={3} placeholder={t.rfiResponsePlaceholder} maxLength={2000} value={form.response} onChange={e => set('response', e.target.value)} />
-          <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{form.response.length}/2000</div>
+          <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{form.response.length}/2000</div>
         </div>
       )}
 
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
 
       <div style={styles.formActions}>
         <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.createRFI}</button>
@@ -272,12 +273,12 @@ export default function RFITracking({ projects }) {
       const r = await api.get('/rfis', { params });
       setRfis(r.data.items);
       setTotalPages(r.data.pages);
-    } catch {}
+    } catch (err) { silentError('rfi fetch')(err); }
   };
 
   useEffect(() => {
     loadRFIs(filters, 1).finally(() => setLoading(false));
-    api.get('/company-info').then(r => setCompanyName(r.data.name || '')).catch(() => {});
+    api.get('/company-info').then(r => setCompanyName(r.data.name || '')).catch(silentError('rfitracking'));
   }, []);
   useEffect(() => { if (!loading) loadRFIs(filters, 1); }, [filters]);
   useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) loadRFIs(filters, page); }); }, [onSync]);
@@ -379,10 +380,10 @@ const styles = {
   filterSelect: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151', flex: 1, minWidth: 120 },
   filterInput: { padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, background: '#fff', color: '#374151' },
   list: { display: 'flex', flexDirection: 'column', gap: 8 },
-  hint: { color: '#9ca3af', fontSize: 14 },
+  hint: { color: '#6b7280', fontSize: 14 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { color: '#9ca3af', fontSize: 15 },
+  emptyText: { color: '#6b7280', fontSize: 15 },
   // Card
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
   cardOverdue: { boxShadow: '0 1px 6px rgba(0,0,0,0.07), inset 3px 0 0 #ef4444' },
@@ -396,17 +397,17 @@ const styles = {
   overdueDate: { color: '#ef4444', fontWeight: 700 },
   cardRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
   statusBadge: { fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
-  chevron: { fontSize: 10, color: '#9ca3af' },
+  chevron: { fontSize: 10, color: '#6b7280' },
   cardBody: { padding: '0 16px 14px', borderTop: '1px solid #f3f4f6' },
   section: { marginTop: 12 },
-  sectionLabel: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 4 },
+  sectionLabel: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280', marginBottom: 4 },
   sectionText: { fontSize: 14, color: '#374151', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' },
   inlineMeta: { fontSize: 13, color: '#374151', marginTop: 10 },
   metaKey: { fontWeight: 600, color: '#6b7280' },
   responseBox: { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', marginTop: 12 },
   responseLabel: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#059669', marginBottom: 6 },
   responseText: { fontSize: 13, color: '#374151', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' },
-  noResponse: { fontSize: 13, color: '#9ca3af', fontStyle: 'italic', marginTop: 10 },
+  noResponse: { fontSize: 13, color: '#6b7280', fontStyle: 'italic', marginTop: 10 },
   cardActions: { display: 'flex', gap: 8, marginTop: 14 },
   pdfBtn: { display: 'inline-block', background: '#eff6ff', color: '#1a56db', border: '1px solid #bfdbfe', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   editBtn: { background: '#f3f4f6', border: 'none', color: '#374151', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
@@ -420,7 +421,7 @@ const styles = {
   row: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 5, flex: 1, minWidth: 180 },
   label: { fontSize: 13, fontWeight: 600, color: '#374151' },
-  optional: { fontWeight: 400, color: '#9ca3af' },
+  optional: { fontWeight: 400, color: '#6b7280' },
   input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, background: '#fff' },
   textarea: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 },
   error: { color: '#ef4444', fontSize: 13, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', margin: 0 },

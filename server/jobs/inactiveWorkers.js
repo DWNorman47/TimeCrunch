@@ -3,6 +3,7 @@ const pool = require('../db');
 const { sendPushToCompanyAdmins } = require('../push');
 const { sendEmail } = require('../email');
 const { createInboxItemBatch } = require('../routes/inbox');
+const { runJob } = require('./runJob');
 
 function escHtml(str) {
   return String(str)
@@ -13,9 +14,8 @@ function escHtml(str) {
 }
 
 async function checkInactiveWorkers() {
-  try {
-    // Get all active companies with their inactive_days threshold and alert toggle
-    const companies = await pool.query(`
+  // Get all active companies with their inactive_days threshold and alert toggle
+  const companies = await pool.query(`
       SELECT c.id, c.name,
              COALESCE(
                (SELECT value::int FROM settings WHERE company_id = c.id AND key = 'notification_inactive_days'),
@@ -113,15 +113,11 @@ async function checkInactiveWorkers() {
         );
       }
     }
-  } catch (err) {
-    console.error('Inactive worker check error:', err);
-  }
 }
 
 function startInactiveWorkerJob() {
-  // Run at 8 AM server time every day
-  cron.schedule('0 8 * * *', checkInactiveWorkers);
-  console.log('Inactive worker alert job scheduled (daily at 8 AM)');
+  // Run at 8 AM server time every day. runJob wraps errors → logger + Sentry.
+  cron.schedule('0 8 * * *', () => runJob('inactiveWorkers', checkInactiveWorkers));
 }
 
 module.exports = { startInactiveWorkerJob };

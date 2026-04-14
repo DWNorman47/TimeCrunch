@@ -998,7 +998,7 @@ const s = {
   page:      { maxWidth: 760, margin: '40px auto', padding: '0 20px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
   header:    { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 },
   title:     { fontSize: 24, fontWeight: 700, color: '#111827', margin: 0 },
-  subtitle:  { fontSize: 13, color: '#9ca3af', margin: '4px 0 0' },
+  subtitle:  { fontSize: 13, color: '#6b7280', margin: '4px 0 0' },
   runBtn:    { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
   outlineBtn:{ background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
   summary:   { display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid', borderRadius: 10, padding: '14px 18px', marginBottom: 24 },
@@ -1012,6 +1012,6 @@ const s = {
   testRow:   { display: 'flex', alignItems: 'baseline', gap: 8, padding: '7px 16px', flexWrap: 'wrap' },
   dot:       { fontSize: 14, fontWeight: 700, width: 16, flexShrink: 0 },
   testName:  { fontSize: 13, color: '#374151', flex: 1 },
-  ms:        { fontSize: 11, color: '#9ca3af' },
+  ms:        { fontSize: 11, color: '#6b7280' },
   errMsg:    { width: '100%', fontSize: 12, color: '#dc2626', background: '#fef2f2', borderRadius: 6, padding: '4px 10px', marginTop: 2, fontFamily: 'monospace' },
 };

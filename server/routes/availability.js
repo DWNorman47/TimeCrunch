@@ -1,6 +1,18 @@
 const router = require('express').Router();
 const pool = require('../db');
+const rateLimit = require('express-rate-limit');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+
+// Availability changes rarely — 30/hour is orders of magnitude above any
+// legitimate user pattern. Mostly guards against scripted churn of the table.
+const availWriteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  keyGenerator: req => String(req.user?.id || req.ip),
+  message: { error: 'Too many availability updates. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // GET /availability/mine — worker's own availability
 router.get('/mine', requireAuth, async (req, res) => {
@@ -11,11 +23,11 @@ router.get('/mine', requireAuth, async (req, res) => {
       [req.user.id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PUT /availability — worker replaces their full availability
-router.put('/', requireAuth, async (req, res) => {
+router.put('/', requireAuth, availWriteLimiter, async (req, res) => {
   const { availability } = req.body; // [{ day_of_week, start_time, end_time }]
   if (!Array.isArray(availability)) return res.status(400).json({ error: 'availability must be an array' });
   if (availability.length > 7) return res.status(400).json({ error: 'Maximum 7 availability entries (one per day)' });
@@ -53,7 +65,7 @@ router.put('/', requireAuth, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error(err);
+    req.log.error({ err }, 'route error');
     res.status(500).json({ error: 'Server error' });
   } finally { client.release(); }
 });
@@ -67,7 +79,7 @@ router.get('/admin', requireAdmin, async (req, res) => {
       [req.user.company_id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

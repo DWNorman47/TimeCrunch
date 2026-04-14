@@ -28,19 +28,25 @@ export default function TabBar({ tabs, active, onChange, breakpoint = 600 }) {
   }
 
   return (
-    <div style={styles.bar}>
-      {tabs.map(t => (
-        <button
-          key={t.id}
-          style={t.id === active ? styles.tabActive : styles.tab}
-          onClick={() => onChange(t.id)}
-        >
-          {t.dot && (
-            <span style={{ ...styles.dot, background: t.dot }} />
-          )}
-          {t.label}
-        </button>
-      ))}
+    <div role="tablist" style={styles.bar}>
+      {tabs.map(t => {
+        const isActive = t.id === active;
+        return (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={isActive}
+            aria-current={isActive ? 'page' : undefined}
+            style={isActive ? styles.tabActive : styles.tab}
+            onClick={() => onChange(t.id)}
+          >
+            {t.dot && (
+              <span style={{ ...styles.dot, background: t.dot }} aria-hidden="true" />
+            )}
+            {t.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

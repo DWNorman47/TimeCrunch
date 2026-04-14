@@ -10,6 +10,7 @@ import { getT } from '../i18n';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
 
+import { silentError } from '../errorReporter';
 export default function AccountPage() {
   const { user, logout, updateUser } = useAuth();
   const t = getT(user?.language);
@@ -26,7 +27,7 @@ export default function AccountPage() {
     ]).then(([s, ci]) => {
       setSettings(s);
       setCompanyInfo(ci);
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(silentError('accountpage')).finally(() => setLoading(false));
   }, []);
 
   const handleLanguageChange = async lang => {
@@ -63,7 +64,7 @@ export default function AccountPage() {
       {langError && <p style={{ color: '#dc2626', fontSize: 13, margin: '8px 24px 0' }}>{langError}</p>}
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
 
-      <main style={styles.main} className="mobile-main">
+      <main id="main-content" style={styles.main} className="mobile-main">
         <NotificationSetup />
         <div style={styles.accountCard} className="mobile-card">
           <div style={styles.accountRow}>
@@ -112,5 +113,5 @@ const styles = {
   accountLabel: { fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 2 },
   accountSub: { fontSize: 12, color: '#6b7280' },
   accountBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '7px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
-  helpText: { fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '4px 0' },
+  helpText: { fontSize: 13, color: '#6b7280', textAlign: 'center', padding: '4px 0' },
 };

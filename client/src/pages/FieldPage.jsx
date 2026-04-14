@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import api from '../api';
@@ -6,6 +6,9 @@ import { getOrFetch } from '../offlineDb';
 import AppSwitcher from '../components/AppSwitcher';
 import TabBar from '../components/TabBar';
 import FieldDayLog from '../components/FieldDayLog';
+import { reportClientError } from '../errorReporter';
+import RetryBanner from '../components/RetryBanner';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 // Tab components — lazy-loaded on first visit since only one tab is visible at a time
 const DailyReports        = lazy(() => import('../components/DailyReports'));
@@ -20,7 +23,7 @@ const RFITracking         = lazy(() => import('../components/RFITracking'));
 const InspectionChecklists = lazy(() => import('../components/InspectionChecklists'));
 
 function TabLoader() {
-  return <div style={{ padding: '40px 0', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>Loading…</div>;
+  return <div style={{ padding: '40px 0', textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading…</div>;
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -33,23 +36,32 @@ export default function FieldPage() {
   const [projects, setProjects] = useState([]);
   const [features, setFeatures] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const FIELD_TABS = ['notes', 'daily', 'punchlist', 'safety', 'checklists', 'incident', 'gallery', 'subs', 'equip', 'rfi', 'inspect'];
   const hashTab = window.location.hash.replace('#', '');
   const [fieldTab, setFieldTab] = useState(FIELD_TABS.includes(hashTab) ? hashTab : 'notes');
   const switchTab = t => { setFieldTab(t); history.replaceState(null, '', '#' + t); };
 
-  useEffect(() => {
-    const init = async () => {
+  const init = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
       const [p, s] = await Promise.all([
         getOrFetch('projects', () => api.get('/projects').then(r => r.data)),
         getOrFetch('settings', () => api.get('/settings').then(r => r.data)),
       ]);
       setFeatures(s);
       setProjects(p);
+    } catch (err) {
+      // Surface to the user AND to Sentry — the page is unusable without these.
+      setLoadError(err?.message || 'Failed to load page data');
+      reportClientError({ kind: 'unhandled', message: `FieldPage init: ${err?.message || err}`, stack: err?.stack });
+    } finally {
       setLoading(false);
-    };
-    init();
+    }
   }, []);
+
+  useEffect(() => { init(); }, [init]);
 
   return (
     <div style={styles.page}>
@@ -67,7 +79,9 @@ export default function FieldPage() {
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
-      <main style={styles.main}>
+      <main id="main-content" style={styles.main}>
+        <RetryBanner message={loadError} onRetry={init} />
+
         {/* Module tabs */}
         <TabBar
           active={fieldTab}
@@ -89,31 +103,36 @@ export default function FieldPage() {
           ]}
         />
 
-        <Suspense fallback={<TabLoader />}>
-          {fieldTab === 'daily' ? (
-            <DailyReports projects={projects} />
-          ) : fieldTab === 'punchlist' ? (
-            <Punchlist projects={projects} />
-          ) : fieldTab === 'safety' ? (
-            <SafetyTalks projects={projects} />
-          ) : fieldTab === 'checklists' ? (
-            <SafetyChecklists projects={projects} />
-          ) : fieldTab === 'incident' ? (
-            <IncidentReports projects={projects} />
-          ) : fieldTab === 'gallery' ? (
-            <PhotoGallery projects={projects} />
-          ) : fieldTab === 'subs' ? (
-            <SubReports projects={projects} />
-          ) : fieldTab === 'equip' ? (
-            <EquipmentLog projects={projects} />
-          ) : fieldTab === 'rfi' ? (
-            <RFITracking projects={projects} />
-          ) : fieldTab === 'inspect' ? (
-            <InspectionChecklists projects={projects} />
-          ) : (
-            <FieldDayLog projects={projects} isAdmin={isAdmin} />
-          )}
-        </Suspense>
+        {/* Per-tab error boundary — a crash in one tab doesn't take down the page.
+            Keyed on fieldTab so switching tabs resets the boundary if the user
+            recovered by navigating away from the broken tab. */}
+        <ErrorBoundary key={fieldTab} mode="inline" label={fieldTab}>
+          <Suspense fallback={<TabLoader />}>
+            {fieldTab === 'daily' ? (
+              <DailyReports projects={projects} />
+            ) : fieldTab === 'punchlist' ? (
+              <Punchlist projects={projects} />
+            ) : fieldTab === 'safety' ? (
+              <SafetyTalks projects={projects} />
+            ) : fieldTab === 'checklists' ? (
+              <SafetyChecklists projects={projects} />
+            ) : fieldTab === 'incident' ? (
+              <IncidentReports projects={projects} />
+            ) : fieldTab === 'gallery' ? (
+              <PhotoGallery projects={projects} />
+            ) : fieldTab === 'subs' ? (
+              <SubReports projects={projects} />
+            ) : fieldTab === 'equip' ? (
+              <EquipmentLog projects={projects} />
+            ) : fieldTab === 'rfi' ? (
+              <RFITracking projects={projects} />
+            ) : fieldTab === 'inspect' ? (
+              <InspectionChecklists projects={projects} />
+            ) : (
+              <FieldDayLog projects={projects} isAdmin={isAdmin} />
+            )}
+          </Suspense>
+        </ErrorBoundary>
       </main>
     </div>
   );

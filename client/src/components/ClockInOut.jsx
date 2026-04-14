@@ -3,6 +3,7 @@ import api from '../api';
 import { useOffline } from '../contexts/OfflineContext';
 import { useFormPersist } from '../hooks/useFormPersist';
 
+import { silentError } from '../errorReporter';
 function getLocation() {
   return new Promise(resolve => {
     if (!navigator.geolocation) return resolve({ lat: null, lng: null });
@@ -22,7 +23,21 @@ function formatElapsed(seconds) {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
+const HINT_DISMISSED_KEY = 'opsfloa_clockin_hint_dismissed';
+
 export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geolocationEnabled = true, projectsEnabled = true }) {
+  // One-time hint shown until the user either dismisses it or clocks in once.
+  // We show it based on whether they've ever dismissed or clocked in — the
+  // server will return status=clocked-in-before on load if they have past
+  // entries, so we can trust the 'status === null && no past successful use'
+  // heuristic via the dismissed flag alone.
+  const [hintDismissed, setHintDismissed] = useState(() => {
+    try { return !!localStorage.getItem(HINT_DISMISSED_KEY); } catch { return false; }
+  });
+  const dismissHint = () => {
+    try { localStorage.setItem(HINT_DISMISSED_KEY, '1'); } catch { /* quota */ }
+    setHintDismissed(true);
+  };
   const { isOffline, queueCount, onSync, sendToSW } = useOffline() || {};
   const [status, setStatus] = useState(null); // null = loading, false = not clocked in, object = clocked in
   const [clockInForm, setClockInForm] = useState({ selectedProject: '', notes: '' });
@@ -67,7 +82,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     if (!onSync) return;
     return onSync(count => {
       if (count > 0) {
-        api.get('/clock/status').then(r => setStatus(r.data || false)).catch(() => {});
+        api.get('/clock/status').then(r => setStatus(r.data || false)).catch(silentError('clockinout'));
       }
     });
   }, [onSync]);
@@ -92,7 +107,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     if (!status || !status.clock_in_time || !geolocationEnabled || !navigator.geolocation) return;
 
     const pushLocation = (pos) => {
-      api.post('/clock/location', { lat: pos.coords.latitude, lng: pos.coords.longitude }).catch(() => {});
+      api.post('/clock/location', { lat: pos.coords.latitude, lng: pos.coords.longitude }).catch(silentError('clockinout'));
     };
 
     // watchPosition runs continuously while screen is on; fires on movement too
@@ -154,6 +169,8 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
       } else {
         setStatus(r.data);
         localStorage.setItem('lastProjectId', String(selectedProject));
+        // Auto-dismiss the first-clock-in hint — they've figured it out.
+        try { localStorage.setItem(HINT_DISMISSED_KEY, '1'); } catch {}
         onClockedIn?.(r.data);
         setNotes('');
         clearClockInPersisted();
@@ -303,7 +320,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   if (status === null) return (
     <div style={styles.card}>
       {offlineBanner}
-      <p style={{ color: '#9ca3af', fontSize: 14, margin: 0 }}>{t.clockingStatus}</p>
+      <p style={{ color: '#6b7280', fontSize: 14, margin: 0 }}>{t.clockingStatus}</p>
     </div>
   );
 
@@ -365,7 +382,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
               </div>
             )}
 
-            {error && <p style={styles.errorDark}>{error}</p>}
+            {error && <p role="alert" style={styles.errorDark}>{error}</p>}
 
             {switchingProject ? (
               <div style={styles.switchBox}>
@@ -445,6 +462,16 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
         </div>
       )}
       <h2 style={styles.heading}>{t.clockIn}</h2>
+      {!hintDismissed && (
+        <div style={styles.firstHint} role="note">
+          <span style={styles.firstHintIcon}>👋</span>
+          <div style={{ flex: 1 }}>
+            <div style={styles.firstHintTitle}>{t.firstClockinHintTitle}</div>
+            <div style={styles.firstHintBody}>{t.firstClockinHintBody}</div>
+          </div>
+          <button style={styles.firstHintDismiss} aria-label={t.dismiss} onClick={dismissHint}>✕</button>
+        </div>
+      )}
       <div style={styles.form}>
         {projectsEnabled && <div>
           <label htmlFor="clockin-project" style={styles.label}>{t.project}</label>
@@ -493,7 +520,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
             <p style={styles.locationDeniedText}>{t.locationAfterUpdate}</p>
           </div>
         )}
-        {error && <p style={styles.error}>{error}</p>}
+        {error && <p role="alert" style={styles.error}>{error}</p>}
         {pendingChecklist && (
           <div style={styles.checklistGate}>
             <div style={styles.checklistGateTitle}>{t.checklistRequiredTitle} {pendingChecklist.name}</div>
@@ -549,6 +576,11 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
 
 const styles = {
   card: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' },
+  firstHint: { display: 'flex', alignItems: 'flex-start', gap: 10, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: '12px 14px', marginBottom: 16 },
+  firstHintIcon: { fontSize: 20, lineHeight: 1, flexShrink: 0, marginTop: 2 },
+  firstHintTitle: { fontSize: 14, fontWeight: 700, color: '#1e3a8a', marginBottom: 2 },
+  firstHintBody: { fontSize: 13, color: '#1e40af', lineHeight: 1.4 },
+  firstHintDismiss: { background: 'none', border: 'none', color: '#1e40af', fontSize: 16, cursor: 'pointer', padding: '0 4px', lineHeight: 1, flexShrink: 0, opacity: 0.6 },
   clockedInCard: { background: '#1a56db', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.15)', color: '#fff', display: 'flex', flexDirection: 'column', gap: 10 },
   clockedInTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   clockedInLabel: { fontSize: 13, opacity: 0.8, marginBottom: 4 },
@@ -565,7 +597,7 @@ const styles = {
   heading: { marginBottom: 16, fontSize: 18, fontWeight: 700 },
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   label: { fontSize: 13, fontWeight: 600, color: '#555', display: 'block', marginBottom: 4 },
-  charCount: { fontSize: 11, color: '#9ca3af' },
+  charCount: { fontSize: 11, color: '#6b7280' },
   input: { padding: '9px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, width: '100%' },
   locationDenied: { background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 },
   locationDeniedTitle: { fontSize: 14, fontWeight: 700, color: '#854d0e' },
@@ -596,7 +628,7 @@ const styles = {
   noProjects: { textAlign: 'center', padding: '24px 16px' },
   noProjectsIcon: { fontSize: 36, marginBottom: 10 },
   noProjectsTitle: { fontWeight: 700, fontSize: 16, color: '#374151', marginBottom: 6 },
-  noProjectsText: { fontSize: 13, color: '#9ca3af', lineHeight: 1.5 },
+  noProjectsText: { fontSize: 13, color: '#6b7280', lineHeight: 1.5 },
   offlineBanner: { background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e', borderRadius: 7, padding: '8px 12px', fontSize: 13, fontWeight: 500, marginBottom: 12, display: 'flex', alignItems: 'center' },
   offlineBannerDark: { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', borderRadius: 7, padding: '8px 12px', fontSize: 12, fontWeight: 500 },
   syncRetryBtn: { background: '#92400e', color: '#fff', border: 'none', borderRadius: 5, padding: '2px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
@@ -607,5 +639,5 @@ const styles = {
   clockOutSummaryTitle: { fontSize: 15, fontWeight: 700, color: '#15803d' },
   clockOutSummaryProject: { fontSize: 13, color: '#374151', marginTop: 2 },
   clockOutSummaryDuration: { fontSize: 13, color: '#6b7280', marginTop: 2 },
-  clockOutSummaryDismiss: { background: 'none', border: 'none', color: '#9ca3af', fontSize: 18, cursor: 'pointer', padding: '0 4px', lineHeight: 1, flexShrink: 0 },
+  clockOutSummaryDismiss: { background: 'none', border: 'none', color: '#6b7280', fontSize: 18, cursor: 'pointer', padding: '0 4px', lineHeight: 1, flexShrink: 0 },
 };

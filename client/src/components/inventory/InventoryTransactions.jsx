@@ -3,6 +3,8 @@ import api from '../../api';
 import UomConversionModal from './UomConversionModal';
 import { useT } from '../../hooks/useT';
 import { SkeletonList } from '../Skeleton';
+import ModalShell from '../ModalShell';
+import { silentError } from '../../errorReporter';
 const TYPE_COLORS = {
   receive:  { color: '#059669', bg: '#d1fae5' },
   issue:    { color: '#d97706', bg: '#fef3c7' },
@@ -52,8 +54,8 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
   const [warning, setWarning] = useState('');
 
   useEffect(() => {
-    api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(() => {});
-    if (isAdmin) api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(() => {});
+    api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(silentError('inventory-transactions fetch'));
+    if (isAdmin) api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(silentError('inventory-transactions fetch'));
   }, [isAdmin]);
 
   // Load UOMs when item changes
@@ -64,7 +66,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
     if (!form.item_id) return;
     api.get(`/inventory/items/${form.item_id}/uoms`)
       .then(r => setItemUoms(r.data.filter(u => u.active)))
-      .catch(() => {});
+      .catch(silentError('inventory-transactions fetch'));
   }, [form.item_id]);
 
   // Prompt for conversion factor when admin selects a non-base UOM with factor=1
@@ -93,7 +95,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
         const row = (r.data.stock || r.data).find(s => String(s.item_id) === String(form.item_id));
         setLocationStock(row || null);
       })
-      .catch(() => {});
+      .catch(silentError('inventory-transactions fetch'));
   }, [form.item_id, form.from_location_id, form.type]);
 
   // Cascade bin options when destination location changes
@@ -104,7 +106,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
     if (!locId) return;
     api.get(`/inventory/setup/areas?location_id=${locId}&active=true`)
       .then(r => setBinOpts(b => ({ ...b, areas: r.data })))
-      .catch(() => {});
+      .catch(silentError('inventory-transactions fetch'));
   }, [form.to_location_id]);
 
   useEffect(() => {
@@ -113,7 +115,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
     if (!form.area_id) return;
     api.get(`/inventory/setup/racks?area_id=${form.area_id}&active=true`)
       .then(r => setBinOpts(b => ({ ...b, racks: r.data })))
-      .catch(() => {});
+      .catch(silentError('inventory-transactions fetch'));
   }, [form.area_id]);
 
   useEffect(() => {
@@ -122,7 +124,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
     if (!form.rack_id) return;
     api.get(`/inventory/setup/bays?rack_id=${form.rack_id}&active=true`)
       .then(r => setBinOpts(b => ({ ...b, bays: r.data })))
-      .catch(() => {});
+      .catch(silentError('inventory-transactions fetch'));
   }, [form.rack_id]);
 
   useEffect(() => {
@@ -131,7 +133,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
     if (!form.bay_id) return;
     api.get(`/inventory/setup/compartments?bay_id=${form.bay_id}&active=true`)
       .then(r => setBinOpts(b => ({ ...b, compartments: r.data })))
-      .catch(() => {});
+      .catch(silentError('inventory-transactions fetch'));
   }, [form.bay_id]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -403,7 +405,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
       <div style={f.field}>
         <label htmlFor="itx-notes" style={f.label}>{t.notes}</label>
         <textarea id="itx-notes" style={{ ...f.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.notes} onChange={e => set('notes', e.target.value)} />
-        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
+        <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 
       <div style={f.actions}>
@@ -446,7 +448,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
   const [suppliers, setSuppliers] = useState([]);
 
   useEffect(() => {
-    if (isAdmin) api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(() => {});
+    if (isAdmin) api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(silentError('inventory-transactions fetch'));
   }, [isAdmin]);
   const [offset, setOffset] = useState(0);
   const LIMIT = 50;
@@ -488,7 +490,11 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
     <div style={s.wrap}>
       {showForm && (
         <div style={s.formOverlay} onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
-          <div style={s.formModal}>
+          <ModalShell
+            onClose={() => setShowForm(false)}
+            ariaLabel={t.invTxLogMovement}
+            style={s.formModal}
+          >
             <TransactionForm
               isAdmin={isAdmin}
               locations={locations}
@@ -497,7 +503,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
               onCancel={() => setShowForm(false)}
               onConversionSaved={onConversionSaved}
             />
-          </div>
+          </ModalShell>
         </div>
       )}
       <>
@@ -546,7 +552,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
             </button>
           </div>
 
-          {error && <div style={s.error}>{error}</div>}
+          {error && <div role="alert" style={s.error}>{error}</div>}
 
           {loading ? (
             <SkeletonList count={4} rows={2} />
@@ -623,7 +629,7 @@ const f = {
   row:       { display: 'flex', gap: 12, flexWrap: 'wrap' },
   field:     { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 160, marginBottom: 14 },
   label:     { fontSize: 12, fontWeight: 600, color: '#374151' },
-  hint:      { fontSize: 11, color: '#9ca3af', fontWeight: 400 },
+  hint:      { fontSize: 11, color: '#6b7280', fontWeight: 400 },
   input:     { padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#111827', background: '#fff', width: '100%', boxSizing: 'border-box' },
   binRow:    { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 },
   binField:  { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 100 },
@@ -657,5 +663,5 @@ const s = {
   badge:       { display: 'inline-block', padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700 },
   loadMore:    { textAlign: 'center', padding: '16px 0' },
   loadMoreBtn: { padding: '8px 20px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
-  count:       { textAlign: 'center', fontSize: 13, color: '#9ca3af', marginTop: 8 },
+  count:       { textAlign: 'center', fontSize: 13, color: '#6b7280', marginTop: 8 },
 };

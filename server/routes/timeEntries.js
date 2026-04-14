@@ -1,9 +1,11 @@
 const router = require('express').Router();
 const pool = require('../db');
+const logger = require('../logger');
 const { requireAuth } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem } = require('./inbox');
 const { sendEmail } = require('../email');
+const { logAudit } = require('../auditLog');
 const rateLimit = require('express-rate-limit');
 
 const entryWriteLimiter = rateLimit({
@@ -37,7 +39,7 @@ router.get('/', requireAuth, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -52,6 +54,25 @@ router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
   if (notesTrimmed && notesTrimmed.length > 500) return res.status(400).json({ error: 'Notes must be 500 characters or fewer' });
   const companyId = req.user.company_id;
   try {
+    // Free tier: block submissions dated > 90 days ago. Matches the GET
+    // visibility clause at the top of this file so workers can't silently
+    // submit back-dated entries they'd never be able to see or edit.
+    const co = await pool.query(
+      'SELECT plan, subscription_status, trial_ends_at FROM companies WHERE id = $1',
+      [companyId]
+    );
+    const { plan, subscription_status, trial_ends_at } = co.rows[0] || {};
+    const trialActive = subscription_status === 'trial' && (!trial_ends_at || new Date(trial_ends_at) >= new Date());
+    const isFree = plan === 'free' && !trialActive;
+    if (isFree) {
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      const workDate = new Date(work_date + 'T00:00:00');
+      if (workDate < ninetyDaysAgo) {
+        return res.status(403).json({ error: 'Free plan is limited to entries within the last 90 days. Upgrade to submit older entries.' });
+      }
+    }
+
     const projectResult = await pool.query(
       'SELECT wage_type FROM projects WHERE id = $1 AND company_id = $2',
       [project_id, companyId]
@@ -74,6 +95,8 @@ router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(409).json({ error: 'Duplicate entry' });
     const entry = result.rows[0];
+    logAudit(companyId, req.user.id, req.user.full_name, 'entry.submitted', 'time_entry', entry.id, null,
+      { work_date, start_time, end_time, project_id });
     res.status(201).json(entry);
     // Optionally notify admins on submission
     setImmediate(async () => {
@@ -93,7 +116,7 @@ router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
       } catch (err) { console.error('Entry notification error:', err); }
     });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -129,9 +152,11 @@ router.patch('/:id', requireAuth, async (req, res) => {
        status = 'pending', approval_note = NULL WHERE id = $6 RETURNING *`,
       [start_time, end_time, notes?.trim() || null, bm, mileageVal, req.params.id]
     );
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'entry.edited', 'time_entry', req.params.id, null,
+      { from: { start_time: entry.start_time, end_time: entry.end_time }, to: { start_time, end_time } });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -154,7 +179,7 @@ router.get('/:id/messages', requireAuth, async (req, res) => {
       [req.params.id, req.user.id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /time-entries/:id/messages
@@ -199,7 +224,7 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
       createInboxItem(ownerId, req.user.company_id, 'comment', `Comment from ${req.user.full_name}`, snippet, '/dashboard');
     }
     res.status(201).json(msg);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET unread message count for current user
@@ -213,7 +238,7 @@ router.get('/messages/unread-count', requireAuth, async (req, res) => {
       [req.user.company_id, req.user.id, req.user.role]
     );
     res.json({ count: parseInt(result.rows[0].count) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // Delete an entry (own entries only)
@@ -228,13 +253,15 @@ router.delete('/:id', requireAuth, async (req, res) => {
     );
     if (locked.rowCount > 0) return res.status(403).json({ error: 'This entry is in a locked pay period' });
     const result = await pool.query(
-      'DELETE FROM time_entries WHERE id = $1 AND user_id = $2 RETURNING id',
+      'DELETE FROM time_entries WHERE id = $1 AND user_id = $2 RETURNING id, work_date',
       [req.params.id, req.user.id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'entry.deleted', 'time_entry', req.params.id, null,
+      { work_date: result.rows[0].work_date });
     res.json({ deleted: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -318,7 +345,7 @@ router.get('/pay-stubs', requireAuth, async (req, res) => {
       }
     }
     res.json(result);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /time-entries/sign-off — worker signs off on their entries for a date range
@@ -346,7 +373,7 @@ router.post('/sign-off', requireAuth, async (req, res) => {
       createInboxItem(adminId, req.user.company_id, 'signoff', signTitle, signBody, '/admin#approvals');
     }
     res.json({ signed: result.rowCount });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /time-entries/copy-last-week
@@ -400,7 +427,7 @@ router.post('/copy-last-week', requireAuth, async (req, res) => {
       existingDates.add(thisDateStr);
     }
     res.json({ created: created.length, skipped: lastWeek.rowCount - created.length, entries: created });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

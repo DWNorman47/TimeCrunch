@@ -3,6 +3,7 @@ import api from '../../api';
 import ItemLabelModal from './ItemLabelModal';
 import { useT } from '../../hooks/useT';
 
+import { silentError } from '../../errorReporter';
 const DEFAULT_UNITS = ['each', 'box', 'bag', 'bundle', 'pallet', 'lb', 'kg', 'ft', 'm', 'sq ft', 'gal', 'L', 'roll', 'sheet', 'piece', 'other'];
 
 function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUnits = DEFAULT_UNITS }) {
@@ -71,7 +72,7 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
   return (
     <form onSubmit={submit} style={f.form}>
       <h3 style={f.title}>{item ? t.editItem : t.addItem}</h3>
-      {error && <div style={f.error}>{error}</div>}
+      {error && <div role="alert" style={f.error}>{error}</div>}
       <div style={f.row}>
         <div style={f.field}>
           <label htmlFor="ii-name" style={f.label}>{t.itemNameLabel}</label>
@@ -121,7 +122,7 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
           )}
         </div>
         <div style={f.field}>
-          <label htmlFor="ii-unit-spec" style={f.label}>{t.itemUnitSpecLabel} <span style={{ fontWeight: 400, color: '#9ca3af' }}>(e.g. "50 ct", "10×50")</span></label>
+          <label htmlFor="ii-unit-spec" style={f.label}>{t.itemUnitSpecLabel} <span style={{ fontWeight: 400, color: '#6b7280' }}>(e.g. "50 ct", "10×50")</span></label>
           <input id="ii-unit-spec" style={f.input} value={form.unit_spec} onChange={e => set('unit_spec', e.target.value)} placeholder={t.optional} />
         </div>
       </div>
@@ -142,7 +143,7 @@ function ItemForm({ item, onSave, onCancel, activeUnits = DEFAULT_UNITS, knownUn
       <div style={f.field}>
         <label htmlFor="ii-description" style={f.label}>{t.itemDescriptionLabel}</label>
         <textarea id="ii-description" style={{ ...f.input, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={form.description} onChange={e => set('description', e.target.value)} />
-        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.description || '').length}/1000</div>
+        <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(form.description || '').length}/1000</div>
       </div>
       <div style={f.actions}>
         <button type="button" style={f.cancelBtn} onClick={onCancel}>{t.cancel}</button>
@@ -169,7 +170,7 @@ function ItemUOMPanel({ item }) {
   const load = () => {
     api.get(`/inventory/items/${item.id}/uoms`)
       .then(r => setUOMs(r.data))
-      .catch(() => {})
+      .catch(silentError('inventoryitems'))
       .finally(() => setLoading(false));
   };
   React.useEffect(() => { load(); }, [item.id]);
@@ -224,7 +225,7 @@ function ItemUOMPanel({ item }) {
         </button>
       </div>
 
-      {error && <div style={u.error}>{error}</div>}
+      {error && <div role="alert" style={u.error}>{error}</div>}
       {removeUomError && <div style={u.error}>{removeUomError}</div>}
 
       {addOpen && (
@@ -313,7 +314,7 @@ const u = {
   wrap:       { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginTop: 16 },
   header:     { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   title:      { fontSize: 14, fontWeight: 700, color: '#374151' },
-  hint:       { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  hint:       { fontSize: 12, color: '#6b7280', marginTop: 2 },
   addBtn:     { padding: '6px 14px', borderRadius: 7, border: 'none', background: '#92400e', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
   error:      { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13 },
   addForm:    { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, marginBottom: 12 },
@@ -321,10 +322,10 @@ const u = {
   field:      { display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 80 },
   label:      { fontSize: 11, fontWeight: 600, color: '#6b7280' },
   input:      { padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, width: '100%', boxSizing: 'border-box' },
-  factorNote: { fontSize: 11, color: '#9ca3af', marginTop: 8, marginBottom: 0 },
+  factorNote: { fontSize: 11, color: '#6b7280', marginTop: 8, marginBottom: 0 },
   saveBtn:    { padding: '6px 12px', borderRadius: 6, border: 'none', background: '#059669', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', alignSelf: 'flex-end' },
   cancelBtn:  { padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, cursor: 'pointer', marginLeft: 4 },
-  empty:      { fontSize: 13, color: '#9ca3af', padding: '8px 0' },
+  empty:      { fontSize: 13, color: '#6b7280', padding: '8px 0' },
   table:      { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
   th:         { padding: '6px 8px', fontWeight: 700, color: '#6b7280', fontSize: 11, textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #e5e7eb' },
   td:         { padding: '8px 8px', color: '#374151', borderBottom: '1px solid #f3f4f6' },
@@ -448,7 +449,7 @@ export default function InventoryItems({ onItemChange }) {
             <button style={s.addBtn} onClick={() => setEditingItem(false)}>{t.addItemBtn}</button>
           </div>
 
-          {error && <div style={s.error}>{error}</div>}
+          {error && <div role="alert" style={s.error}>{error}</div>}
 
           {loading ? (
             <div style={s.empty}>{t.advSettingsLoading}</div>
@@ -480,7 +481,7 @@ export default function InventoryItems({ onItemChange }) {
                       <td style={{ ...s.td, fontFamily: 'monospace', fontSize: 12, color: '#6b7280' }}>{item.sku || '—'}</td>
                       <td style={s.td}>{item.category || '—'}</td>
                       <td style={{ ...s.td, color: '#6b7280' }}>
-                        {item.unit}{item.unit_spec ? <span style={{ color: '#9ca3af', fontSize: 12 }}> ({item.unit_spec})</span> : ''}
+                        {item.unit}{item.unit_spec ? <span style={{ color: '#6b7280', fontSize: 12 }}> ({item.unit_spec})</span> : ''}
                       </td>
                       <td style={{ ...s.td, textAlign: 'right' }}>{item.unit_cost != null ? `$${parseFloat(item.unit_cost).toFixed(2)}` : '—'}</td>
                       <td style={{ ...s.td, textAlign: 'right' }}>{item.reorder_point > 0 ? item.reorder_point : '—'}</td>
@@ -488,7 +489,7 @@ export default function InventoryItems({ onItemChange }) {
                       <td style={s.td}>
                         {item.active
                           ? <span style={{ ...s.badge, color: '#059669', background: '#d1fae5' }}>{t.itemActiveStatus}</span>
-                          : <span style={{ ...s.badge, color: '#9ca3af', background: '#f3f4f6' }}>{t.itemArchivedStatus}</span>}
+                          : <span style={{ ...s.badge, color: '#6b7280', background: '#f3f4f6' }}>{t.itemArchivedStatus}</span>}
                       </td>
                       <td style={{ ...s.td, whiteSpace: 'nowrap' }}>
                         {item.active ? (

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { setApiToastHandler } from '../api';
 
 const ToastContext = createContext(null);
 
@@ -11,18 +12,36 @@ export function ToastProvider({ children }) {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4500);
   }, []);
 
+  // Expose the toast function to the axios interceptor so it can surface
+  // 429 / 503 / network errors without needing React context.
+  useEffect(() => {
+    setApiToastHandler(toast);
+    return () => setApiToastHandler(null);
+  }, [toast]);
+
   const dismiss = id => setToasts(prev => prev.filter(t => t.id !== id));
 
   return (
     <ToastContext.Provider value={toast}>
       {children}
       <div style={styles.container}>
-        {toasts.map(t => (
-          <div key={t.id} style={{ ...styles.toast, ...styles[t.type] }}>
-            <span style={styles.msg}>{t.message}</span>
-            <button style={styles.close} onClick={() => dismiss(t.id)}>×</button>
-          </div>
-        ))}
+        {toasts.map(t => {
+          // Urgent feedback (error/warning) interrupts the screen reader;
+          // status messages (success/info) are announced at the next idle moment.
+          const isUrgent = t.type === 'error' || t.type === 'warning';
+          return (
+            <div
+              key={t.id}
+              role={isUrgent ? 'alert' : 'status'}
+              aria-live={isUrgent ? 'assertive' : 'polite'}
+              aria-atomic="true"
+              style={{ ...styles.toast, ...styles[t.type] }}
+            >
+              <span style={styles.msg}>{t.message}</span>
+              <button style={styles.close} aria-label="Dismiss" onClick={() => dismiss(t.id)}>×</button>
+            </div>
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );

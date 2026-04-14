@@ -217,7 +217,7 @@ export default function MyCount() {
         <div style={s.empty}>
           <div style={s.emptyIcon}>✅</div>
           <p>{t.myCountEmpty}</p>
-          <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>{t.myCountEmptyHint}</p>
+          <p style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{t.myCountEmptyHint}</p>
         </div>
       ) : (
         groups.map(group => (

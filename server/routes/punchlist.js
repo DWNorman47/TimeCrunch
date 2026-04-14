@@ -45,7 +45,7 @@ router.get('/', requireAuth, async (req, res) => {
     ]);
     const total = parseInt(countResult.rows[0].count);
     res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /punchlist
@@ -91,7 +91,7 @@ router.post('/', requireAuth, async (req, res) => {
       });
     }
     res.status(201).json(item);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /punchlist/:id
@@ -156,7 +156,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       });
     }
     res.json(updated);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /punchlist/:id/checklist
@@ -171,7 +171,7 @@ router.get('/:id/checklist', requireAuth, async (req, res) => {
       [req.params.id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /punchlist/:id/checklist
@@ -188,7 +188,7 @@ router.post('/:id/checklist', requireAuth, async (req, res) => {
       [req.params.id, text.trim(), parseInt(maxOrder.rows[0].m) + 1]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /punchlist/:id/checklist/:checkId
@@ -207,7 +207,7 @@ router.patch('/:id/checklist/:checkId', requireAuth, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /punchlist/:id/checklist/:checkId
@@ -222,7 +222,7 @@ router.delete('/:id/checklist/:checkId', requireAuth, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /punchlist/:id
@@ -238,7 +238,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

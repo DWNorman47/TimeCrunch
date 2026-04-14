@@ -64,7 +64,7 @@ router.get('/', requireAuth, async (req, res) => {
     ]);
     const total = parseInt(countResult.rows[0].count);
     res.json({ items: dataResult.rows, total, page, pages: Math.ceil(total / limit) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /daily-reports/suggest — auto-fill manpower from time entries for a project+date
@@ -95,7 +95,7 @@ router.get('/suggest', requireAuth, async (req, res) => {
       params
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /daily-reports/:id — full report
@@ -104,7 +104,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     const report = await getFullReport(req.params.id, req.user.company_id);
     if (!report) return res.status(404).json({ error: 'Report not found' });
     res.json(report);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /daily-reports — create
@@ -184,7 +184,7 @@ router.post('/', requireAuth, async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === '23505') return res.status(409).json({ error: 'A report already exists for this project and date' });
-    console.error(err); res.status(500).json({ error: 'Server error' });
+    req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' });
   } finally { client.release(); }
 });
 
@@ -287,7 +287,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
     res.json(full);
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error(err); res.status(500).json({ error: 'Server error' });
+    req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' });
   } finally { client.release(); }
 });
 
@@ -305,7 +305,7 @@ router.patch('/:id/review', requireAdmin, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Report not found or not in submitted status' });
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /daily-reports/:id
@@ -318,7 +318,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     const result = await pool.query(`DELETE FROM daily_reports WHERE id=$1 AND ${cond} RETURNING id`, params);
     if (result.rowCount === 0) return res.status(404).json({ error: 'Report not found' });
     res.json({ deleted: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

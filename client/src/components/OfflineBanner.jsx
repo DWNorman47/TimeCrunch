@@ -11,18 +11,23 @@ export default function OfflineBanner() {
   const clear = () => sendToSW?.({ type: 'CLEAR_QUEUE' });
 
   return (
-    <div style={{
-      background: '#b45309',
-      color: '#fff',
-      textAlign: 'center',
-      padding: '6px 12px',
-      fontSize: '0.85rem',
-      fontWeight: 500,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 10,
-    }}>
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      style={{
+        background: '#b45309',
+        color: '#fff',
+        textAlign: 'center',
+        padding: '6px 12px',
+        fontSize: '0.85rem',
+        fontWeight: 500,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+      }}
+    >
       <span>
         {isOffline
           ? queueCount > 0

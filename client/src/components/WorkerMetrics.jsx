@@ -194,7 +194,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
           </div>
 
           {billData && billData.entries.length === 0 && (billData.reimbursements || []).length === 0 && (
-            <div style={{ marginTop: 12, color: '#9ca3af', fontSize: 14 }}>{t.noEntriesPeriod}</div>
+            <div style={{ marginTop: 12, color: '#6b7280', fontSize: 14 }}>{t.noEntriesPeriod}</div>
           )}
           {billData && (billData.entries.length > 0 || (billData.reimbursements || []).length > 0) && (
             <div style={{ marginTop: 16 }}>
@@ -255,12 +255,12 @@ const styles = {
   card: { background: '#fff', borderRadius: 12, marginBottom: 16, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', overflow: 'hidden' },
   summary: { padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 20, cursor: 'pointer', flexWrap: 'wrap' },
   name: { fontWeight: 700, fontSize: 17, marginRight: 8 },
-  username: { color: '#888', fontSize: 13 },
+  username: { color: '#6b7280', fontSize: 13 },
   metrics: { display: 'flex', gap: 20, flex: 1, flexWrap: 'wrap' },
   metric: { display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 60 },
   metricVal: { fontWeight: 700, fontSize: 18 },
   metricLabel: { fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: 0.5 },
-  expandBtn: { background: 'none', border: 'none', fontSize: 14, color: '#888', marginLeft: 'auto' },
+  expandBtn: { background: 'none', border: 'none', fontSize: 14, color: '#6b7280', marginLeft: 'auto' },
   billSection: { padding: '16px 20px', borderTop: '1px solid #f0f0f0', background: '#fafafa' },
   sectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   billHeading: { margin: 0, fontSize: 15, fontWeight: 600 },

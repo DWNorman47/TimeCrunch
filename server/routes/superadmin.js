@@ -1,7 +1,39 @@
 const router = require('express').Router();
 const pool = require('../db');
+const logger = require('../logger');
 const jwt = require('jsonwebtoken');
 const { requireSuperAdmin } = require('../middleware/auth');
+
+// GET /superadmin/client-errors — browser-reported errors, newest first
+router.get('/client-errors', requireSuperAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+    const since = req.query.since; // ISO date string, optional
+    const params = [];
+    let where = '';
+    if (since) {
+      params.push(since);
+      where = `WHERE ce.created_at >= $${params.length}`;
+    }
+    params.push(limit);
+    const { rows } = await pool.query(
+      `SELECT ce.id, ce.created_at, ce.company_id, ce.user_id, ce.kind, ce.message,
+              ce.stack, ce.url, ce.user_agent, ce.app_version, ce.ip,
+              u.full_name AS user_name, c.name AS company_name
+       FROM client_errors ce
+       LEFT JOIN users u ON u.id = ce.user_id
+       LEFT JOIN companies c ON c.id = ce.company_id
+       ${where}
+       ORDER BY ce.created_at DESC
+       LIMIT $${params.length}`,
+      params
+    );
+    res.json(rows);
+  } catch (err) {
+    logger.error({ err }, 'catch block error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // GET /superadmin/companies — all companies with usage stats
 router.get('/companies', requireSuperAdmin, async (req, res) => {
@@ -24,7 +56,7 @@ router.get('/companies', requireSuperAdmin, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -66,7 +98,7 @@ router.patch('/companies/:id', requireSuperAdmin, async (req, res) => {
     if (result.rowCount === 0) return res.status(404).json({ error: 'Company not found' });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -112,7 +144,7 @@ router.delete('/companies/:id', requireSuperAdmin, async (req, res) => {
     res.json({ deleted: true, name: check.rows[0].name });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   } finally {
     client.release();
@@ -146,7 +178,7 @@ router.post('/companies/:id/impersonate', requireSuperAdmin, async (req, res) =>
     );
     res.json({ token, full_name: user.full_name, company_name: user.company_name });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -161,7 +193,7 @@ router.get('/companies/:id/users', requireSuperAdmin, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -199,7 +231,7 @@ router.get('/affiliates', requireSuperAdmin, async (req, res) => {
     }));
     res.json(affiliates);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -218,7 +250,7 @@ router.post('/affiliates', requireSuperAdmin, async (req, res) => {
     );
     res.status(201).json({ ...result.rows[0], company_count: 0, active_mrr_cents: 0, companies: [] });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -241,7 +273,7 @@ router.patch('/affiliates/:id', requireSuperAdmin, async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -253,7 +285,7 @@ router.delete('/affiliates/:id', requireSuperAdmin, async (req, res) => {
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json({ deleted: true });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });

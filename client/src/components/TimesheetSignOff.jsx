@@ -138,7 +138,7 @@ const styles = {
   label: { fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
   input: { padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 },
   loadBtn: { padding: '7px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  empty: { color: '#9ca3af', fontSize: 13 },
+  empty: { color: '#6b7280', fontSize: 13 },
   list: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 },
   row: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', background: '#f9fafb', borderRadius: 7, gap: 8 },
   rowLeft: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', fontSize: 13 },
@@ -151,6 +151,6 @@ const styles = {
   signArea: { display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' },
   signBtn: { background: '#1a56db', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
   cancelSignBtn: { background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', padding: '10px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' },
-  signHint: { fontSize: 12, color: '#9ca3af' },
+  signHint: { fontSize: 12, color: '#6b7280' },
   allSignedMsg: { background: '#f0fdf4', color: '#065f46', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', fontSize: 14, fontWeight: 600 },
 };

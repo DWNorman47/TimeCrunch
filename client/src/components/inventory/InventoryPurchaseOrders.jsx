@@ -2,14 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api';
 import { useT } from '../../hooks/useT';
 import { SkeletonList } from '../Skeleton';
+import ModalShell from '../ModalShell';
 
+import { silentError } from '../../errorReporter';
 function useStatus(t) {
   return {
     draft:      { label: t.invPODraft,      color: '#6b7280', bg: '#f3f4f6' },
     submitted:  { label: t.invPOSubmitted,  color: '#2563eb', bg: '#dbeafe' },
     partial:    { label: t.invPOPartial,    color: '#d97706', bg: '#fef3c7' },
     received:   { label: t.invPOReceived,   color: '#059669', bg: '#d1fae5' },
-    cancelled:  { label: t.invPOCancelled,  color: '#9ca3af', bg: '#f3f4f6' },
+    cancelled:  { label: t.invPOCancelled,  color: '#6b7280', bg: '#f3f4f6' },
   };
 }
 
@@ -67,13 +69,13 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
 
   return (
     <div style={m.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={m.modal}>
+      <ModalShell onClose={onClose} titleId="po-receive-title" style={m.modal}>
         <div style={m.header}>
-          <h3 style={m.title}>{t.invPOReceiveTitle} — {po.po_number}</h3>
+          <h3 id="po-receive-title" style={m.title}>{t.invPOReceiveTitle} — {po.po_number}</h3>
           <button style={m.closeBtn} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
         </div>
 
-        {error && <div style={m.error}>{error}</div>}
+        {error && <div role="alert" style={m.error}>{error}</div>}
 
         <div style={m.field}>
           <label style={m.label}>{t.invPOReceivingLoc}</label>
@@ -103,7 +105,7 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
                   <tr key={line.id} style={{ background: i % 2 === 0 ? '#fafafa' : '#fff', borderBottom: '1px solid #f3f4f6' }}>
                     <td style={m.td}>
                       <div style={{ fontWeight: 600 }}>{line.item_name}</div>
-                      {line.sku && <div style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'monospace' }}>{line.sku}</div>}
+                      {line.sku && <div style={{ fontSize: 11, color: '#6b7280', fontFamily: 'monospace' }}>{line.sku}</div>}
                     </td>
                     <td style={{ ...m.td, textAlign: 'right', color: '#6b7280' }}>{parseFloat(line.qty_ordered)} {line.unit}</td>
                     <td style={{ ...m.td, textAlign: 'right', color: '#6b7280' }}>{parseFloat(line.qty_received)}</td>
@@ -132,7 +134,7 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
             {saving ? t.invPOReceiving : t.invPOConfirmReceipt}
           </button>
         </div>
-      </div>
+      </ModalShell>
     </div>
   );
 }
@@ -168,7 +170,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
 
   useEffect(() => {
     if (addingLine) {
-      api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(() => {});
+      api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(silentError('inventorypurchaseorders'));
     }
   }, [addingLine]);
 
@@ -363,22 +365,22 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             <div style={{ ...d.editField, flexBasis: '100%' }}>
               <label style={d.editLabel}>{t.notes}</label>
               <textarea style={{ ...d.editInput, minHeight: 52, resize: 'vertical' }} value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} maxLength={1000} />
-              <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(editForm.notes || '').length}/1000</div>
+              <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(editForm.notes || '').length}/1000</div>
             </div>
           </div>
         ) : (
           <div style={d.infoGrid}>
             <div style={d.infoItem}>
               <span style={d.infoLabel}>{t.invPOSupplier}</span>
-              <span style={d.infoValue}>{po.supplier_name || <em style={{ color: '#9ca3af' }}>{t.none}</em>}</span>
+              <span style={d.infoValue}>{po.supplier_name || <em style={{ color: '#6b7280' }}>{t.none}</em>}</span>
             </div>
             <div style={d.infoItem}>
               <span style={d.infoLabel}>{t.invPOReceiveTo}</span>
-              <span style={d.infoValue}>{po.to_location_name || <em style={{ color: '#9ca3af' }}>{t.invPONotSet}</em>}</span>
+              <span style={d.infoValue}>{po.to_location_name || <em style={{ color: '#6b7280' }}>{t.invPONotSet}</em>}</span>
             </div>
             <div style={d.infoItem}>
               <span style={d.infoLabel}>{t.invPOExpected}</span>
-              <span style={d.infoValue}>{po.expected_date ? new Date(po.expected_date + 'T00:00:00').toLocaleDateString() : <em style={{ color: '#9ca3af' }}>{t.invPONotSet}</em>}</span>
+              <span style={d.infoValue}>{po.expected_date ? new Date(po.expected_date + 'T00:00:00').toLocaleDateString() : <em style={{ color: '#6b7280' }}>{t.invPONotSet}</em>}</span>
             </div>
             {po.reference_no && (
               <div style={d.infoItem}>
@@ -574,7 +576,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
   const [error, setError]   = useState('');
 
   useEffect(() => {
-    api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(() => {});
+    api.get('/inventory/items?active=true').then(r => setItems(r.data)).catch(silentError('inventorypurchaseorders'));
   }, []);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -631,7 +633,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
   return (
     <div style={c.wrap}>
       <h3 style={c.title}>{t.invPONewPO}</h3>
-      {error && <div style={c.error}>{error}</div>}
+      {error && <div role="alert" style={c.error}>{error}</div>}
 
       <div style={c.row}>
         <div style={c.field}>
@@ -665,7 +667,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
       <div style={c.field}>
         <label style={c.label}>{t.notes}</label>
         <textarea style={{ ...c.input, minHeight: 52, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} maxLength={1000} />
-        <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
+        <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 
       <div style={c.linesHeader}>
@@ -753,7 +755,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
   // Load suppliers if not provided
   useEffect(() => {
     if (!suppliersProp || suppliersProp.length === 0) {
-      api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(() => {});
+      api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(silentError('inventorypurchaseorders'));
     }
   }, []);
 
@@ -862,7 +864,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
         <button style={l.createBtn} onClick={() => { setPrefillItems([]); setView('create'); }}>{t.invPONewPOBtn}</button>
       </div>
 
-      {error && <div style={l.error}>{error}</div>}
+      {error && <div role="alert" style={l.error}>{error}</div>}
       {loadDetailError && <div style={l.error}>{loadDetailError}</div>}
 
       {loading ? (
@@ -885,7 +887,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
                   <div style={l.cardLeft}>
                     <div style={l.cardPo}>{po.po_number}</div>
                     <div style={l.cardMeta}>
-                      {po.supplier_name || <em style={{ color: '#9ca3af' }}>{t.invPONoSupplier}</em>}
+                      {po.supplier_name || <em style={{ color: '#6b7280' }}>{t.invPONoSupplier}</em>}
                       {' · '}
                       {new Date(po.created_at).toLocaleDateString()}
                       {po.expected_date && ` · ${t.invPOExpected} ${new Date(po.expected_date + 'T00:00:00').toLocaleDateString()}`}
@@ -951,7 +953,7 @@ const d = {
   headerCard:   { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 20, marginBottom: 16 },
   headerTop:    { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 12 },
   poNumber:     { fontSize: 20, fontWeight: 800, color: '#111827' },
-  poMeta:       { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  poMeta:       { fontSize: 12, color: '#6b7280', marginTop: 2 },
   headerActions:{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' },
   nextActionHint: { fontSize: 12, color: '#6b7280', fontStyle: 'italic', textAlign: 'right', maxWidth: 260 },
   editBtn:      { padding: '7px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' },
@@ -965,7 +967,7 @@ const d = {
   error:        { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '8px 12px', marginTop: 8, fontSize: 13 },
   infoGrid:     { display: 'flex', flexWrap: 'wrap', gap: '8px 24px', marginTop: 4 },
   infoItem:     { display: 'flex', flexDirection: 'column', gap: 2 },
-  infoLabel:    { fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' },
+  infoLabel:    { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' },
   infoValue:    { fontSize: 14, color: '#374151' },
   editGrid:     { display: 'flex', flexWrap: 'wrap', gap: '8px 12px', marginTop: 8 },
   editField:    { display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 140 },
@@ -978,7 +980,7 @@ const d = {
   linesHeader:  { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   linesTitle:   { fontSize: 15, fontWeight: 700, color: '#374151' },
   addLineBtn:   { padding: '6px 14px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
-  emptyLines:   { fontSize: 13, color: '#9ca3af', padding: '16px 0' },
+  emptyLines:   { fontSize: 13, color: '#6b7280', padding: '16px 0' },
   tableWrap:    { overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb', marginBottom: 16 },
   table:        { width: '100%', borderCollapse: 'collapse', minWidth: 520 },
   thead:        { background: '#f9fafb' },
@@ -1007,11 +1009,11 @@ const c = {
   linesHeader:{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, marginTop: 4 },
   linesTitle: { fontSize: 14, fontWeight: 700, color: '#374151' },
   addLineBtn: { padding: '6px 14px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
-  emptyLines: { fontSize: 13, color: '#9ca3af', padding: '12px 0', marginBottom: 16 },
+  emptyLines: { fontSize: 13, color: '#6b7280', padding: '12px 0', marginBottom: 16 },
   th:         { padding: '8px 10px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', textAlign: 'left', borderBottom: '2px solid #e5e7eb', background: '#f9fafb' },
   td:         { padding: '6px 8px', borderBottom: '1px solid #f3f4f6' },
   cellInput:  { width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' },
-  removeBtn:  { background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 14, padding: '3px 5px' },
+  removeBtn:  { background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 14, padding: '3px 5px' },
   actions:    { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 },
   cancelBtn:  { padding: '9px 18px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#374151' },
   saveBtn:    { padding: '9px 20px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
@@ -1034,7 +1036,7 @@ const l = {
   cardPo:       { fontSize: 16, fontWeight: 800, color: '#111827', fontFamily: 'monospace' },
   cardMeta:     { fontSize: 12, color: '#6b7280', marginTop: 2 },
   cardRight:    { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
-  lineCount:    { fontSize: 12, color: '#9ca3af' },
+  lineCount:    { fontSize: 12, color: '#6b7280' },
   cardProgress: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 },
   progressBar:  { flex: 1, height: 5, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3, transition: 'width 0.3s' },

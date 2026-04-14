@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const pool = require('../db');
+const logger = require('../logger');
 const { requireAuth } = require('../middleware/auth');
 
 router.get('/', requireAuth, async (req, res) => {
@@ -10,7 +11,7 @@ router.get('/', requireAuth, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });

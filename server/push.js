@@ -1,5 +1,6 @@
 const webpush = require('web-push');
 const pool = require('./db');
+const logger = require('./logger');
 
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -22,10 +23,16 @@ async function sendPushToUser(userId, payload) {
       } catch (err) {
         if (err.statusCode === 410 || err.statusCode === 404) {
           await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [sub.id]);
+          logger.debug({ subId: sub.id, userId: sub.user_id, statusCode: err.statusCode }, 'pruned stale push subscription');
+        } else {
+          logger.warn({ err, subId: sub.id, userId: sub.user_id }, 'push send failed');
         }
       }
     }
-  } catch { /* don't fail callers if push fails */ }
+  } catch (err) {
+    // Bulk push failure (e.g. DB query failed) — log but don't fail caller.
+    logger.error({ err }, 'push broadcast failed');
+  }
 }
 
 async function sendPushToCompanyAdmins(companyId, payload) {
@@ -46,10 +53,16 @@ async function sendPushToCompanyAdmins(companyId, payload) {
       } catch (err) {
         if (err.statusCode === 410 || err.statusCode === 404) {
           await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [sub.id]);
+          logger.debug({ subId: sub.id, userId: sub.user_id, statusCode: err.statusCode }, 'pruned stale push subscription');
+        } else {
+          logger.warn({ err, subId: sub.id, userId: sub.user_id }, 'push send failed');
         }
       }
     }
-  } catch { /* don't fail callers if push fails */ }
+  } catch (err) {
+    // Bulk push failure (e.g. DB query failed) — log but don't fail caller.
+    logger.error({ err }, 'push broadcast failed');
+  }
 }
 
 async function sendPushToAllWorkers(companyId, payload) {
@@ -70,10 +83,16 @@ async function sendPushToAllWorkers(companyId, payload) {
       } catch (err) {
         if (err.statusCode === 410 || err.statusCode === 404) {
           await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [sub.id]);
+          logger.debug({ subId: sub.id, userId: sub.user_id, statusCode: err.statusCode }, 'pruned stale push subscription');
+        } else {
+          logger.warn({ err, subId: sub.id, userId: sub.user_id }, 'push send failed');
         }
       }
     }
-  } catch { /* don't fail callers if push fails */ }
+  } catch (err) {
+    // Bulk push failure (e.g. DB query failed) — log but don't fail caller.
+    logger.error({ err }, 'push broadcast failed');
+  }
 }
 
 module.exports = { sendPushToUser, sendPushToCompanyAdmins, sendPushToAllWorkers };

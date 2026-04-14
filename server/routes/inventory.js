@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const pool = require('../db');
+const logger = require('../logger');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadBase64 } = require('../r2');
 const { checkStorageLimit, incrementStorage } = require('../storage');
@@ -7,6 +8,7 @@ const { sendPushToCompanyAdmins } = require('../push');
 const { createInboxItemBatch } = require('./inbox');
 const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
 const { applySettingsRows, ADMIN_SETTINGS_DEFAULTS } = require('../settingsDefaults');
+const { logAudit } = require('../auditLog');
 
 // GET /api/inventory/units — active units for this company
 router.get('/units', requireAuth, async (req, res) => {
@@ -20,7 +22,7 @@ router.get('/units', requireAuth, async (req, res) => {
     const known = [...cfg.defaults, ...cfg.custom];
     res.json({ active, known });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -195,7 +197,7 @@ router.get('/items', requireAuth, async (req, res) => {
     }
     const result = await pool.query(`SELECT ${cols} ${where} ORDER BY name LIMIT 500`, values);
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/items
@@ -221,7 +223,7 @@ router.post('/items', requireAdmin, async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'SKU already exists for this company' });
-    console.error(err); res.status(500).json({ error: 'Server error' });
+    req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -259,7 +261,7 @@ router.patch('/items/:id', requireAdmin, async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'SKU already exists for this company' });
-    console.error(err); res.status(500).json({ error: 'Server error' });
+    req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -280,7 +282,7 @@ router.delete('/items/:id', requireAdmin, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Item not found' });
     res.json({ success: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /api/inventory/items/categories  — distinct categories for filter dropdowns
@@ -291,7 +293,7 @@ router.get('/items/categories', requireAuth, async (req, res) => {
       [req.user.company_id]
     );
     res.json(result.rows.map(r => r.category));
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Item UOMs ─────────────────────────────────────────────────────────────────
@@ -313,7 +315,7 @@ router.get('/uom-conversions', requireAdmin, async (req, res) => {
       ORDER BY i.name, u.factor, u.unit
     `, [companyId]);
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /api/inventory/items/:id/uoms
@@ -327,7 +329,7 @@ router.get('/items/:id/uoms', requireAuth, async (req, res) => {
       [req.params.id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/items/:id/uoms
@@ -360,7 +362,7 @@ router.post('/items/:id/uoms', requireAdmin, async (req, res) => {
       if (err.code === '23505') return res.status(409).json({ error: 'A UOM with that unit and spec already exists for this item.' });
       throw err;
     } finally { client.release(); }
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /api/inventory/items/:id/uoms/:uomId
@@ -395,7 +397,7 @@ router.patch('/items/:id/uoms/:uomId', requireAdmin, async (req, res) => {
       if (err.code === '23505') return res.status(409).json({ error: 'A UOM with that unit and spec already exists for this item.' });
       throw err;
     } finally { client.release(); }
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /api/inventory/items/:id/uoms/:uomId  (soft delete if in use; hard delete otherwise)
@@ -419,7 +421,7 @@ router.delete('/items/:id/uoms/:uomId', requireAdmin, async (req, res) => {
     }
     const all = await pool.query('SELECT * FROM inventory_item_uoms WHERE item_id=$1 ORDER BY is_base DESC, factor', [req.params.id]);
     res.json(all.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Locations ─────────────────────────────────────────────────────────────────
@@ -440,7 +442,7 @@ router.get('/locations', requireAuth, async (req, res) => {
       values
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 const VALID_LOCATION_TYPES = ['warehouse', 'job_site', 'truck', 'other'];
@@ -461,7 +463,7 @@ router.post('/locations', requireAdmin, async (req, res) => {
       [companyId, name.trim(), type, project_id || null, notes?.trim() || null, address?.trim() || null]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /api/inventory/locations/:id
@@ -493,7 +495,7 @@ router.patch('/locations/:id', requireAdmin, async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     if (err.storageLimit) return res.status(413).json({ error: err.message, storage_limit: true });
-    console.error(err); res.status(500).json({ error: 'Server error' });
+    req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -514,7 +516,7 @@ router.delete('/locations/:id', requireAdmin, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Location not found' });
     res.json({ success: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Stock ─────────────────────────────────────────────────────────────────────
@@ -563,7 +565,7 @@ router.get('/stock', requireAuth, async (req, res) => {
       values
     );
     res.json({ stock: result.rows, total: parseInt(totalResult.rows[0].count) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /api/inventory/stock/low
@@ -587,7 +589,7 @@ router.get('/stock/low', requireAdmin, async (req, res) => {
       [companyId]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Transactions ──────────────────────────────────────────────────────────────
@@ -714,13 +716,17 @@ router.post('/transactions', requireAuth, async (req, res) => {
     const anyNegative = stockCheck.rows.some(r => parseFloat(r.quantity) < 0);
     if (anyNegative) warning = 'stock_negative';
 
+    logAudit(companyId, req.user.id, req.user.full_name, `inventory.${type}`, 'inventory_transaction', txn.rows[0].id, null,
+      { item_id, quantity: absQty, from_location_id: from_location_id || null, to_location_id: to_location_id || null,
+        project_id: project_id || null, reference_no: reference_no || null });
+
     res.status(201).json({ ...txn.rows[0], warning });
 
     // Fire low-stock alert (async, after response sent)
     maybeSendLowStockAlert(companyId, item_id).catch(() => {});
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error(err); res.status(500).json({ error: 'Server error' });
+    req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' });
   } finally {
     client.release();
   }
@@ -768,7 +774,7 @@ router.get('/transactions', requireAuth, async (req, res) => {
     );
     const total = await pool.query(`SELECT COUNT(*) FROM inventory_transactions t WHERE ${conditions.join(' AND ')}`, values);
     res.json({ transactions: result.rows, total: parseInt(total.rows[0].count) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Cycle Counts ──────────────────────────────────────────────────────────────
@@ -810,7 +816,7 @@ router.get('/cycle-counts', requireAdmin, async (req, res) => {
       values
     );
     res.json({ counts: result.rows, total: parseInt(totalResult.rows[0].count) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/cycle-counts
@@ -910,7 +916,7 @@ router.post('/cycle-counts', requireAdmin, async (req, res) => {
     } finally {
       client.release();
     }
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /api/inventory/cycle-counts/my-assignments — worker's pending assignments across all active counts
@@ -942,7 +948,7 @@ router.get('/cycle-counts/my-assignments', requireAuth, async (req, res) => {
       [req.user.id, companyId]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // GET /api/inventory/cycle-counts/:id
@@ -989,7 +995,7 @@ router.get('/cycle-counts/:id', requireAdmin, async (req, res) => {
       ),
     ]);
     res.json({ ...cc.rows[0], lines: lines.rows, workers: workers.rows, assignments: assignments.rows });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /api/inventory/cycle-counts/:id  (header fields + draft→in_progress)
@@ -1011,7 +1017,7 @@ router.patch('/cycle-counts/:id', requireAdmin, async (req, res) => {
       vals
     );
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /api/inventory/cycle-counts/:id/lines/:lineId
@@ -1081,7 +1087,7 @@ router.patch('/cycle-counts/:id/lines/:lineId', requireAdmin, async (req, res) =
       autoCompleted = await checkAutoComplete(companyId, parseInt(req.params.id), req.user.id);
     }
     res.json({ line: result.rows[0], auto_completed: autoCompleted });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/cycle-counts/:id/complete
@@ -1147,6 +1153,8 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
       }
 
       await client.query('COMMIT');
+      logAudit(companyId, req.user.id, req.user.full_name, 'cycle_count.completed', 'cycle_count', req.params.id, null,
+        { adjustments_posted: linesWithVariance.length, count_type: cc.rows[0].count_type });
       res.json({ success: true, adjustments_posted: linesWithVariance.length });
     } catch (err) {
       await client.query('ROLLBACK');
@@ -1154,7 +1162,7 @@ router.post('/cycle-counts/:id/complete', requireAdmin, async (req, res) => {
     } finally {
       client.release();
     }
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Cycle Count Worker Assignments ────────────────────────────────────────────
@@ -1239,7 +1247,7 @@ router.get('/cycle-counts/:id/workers', requireAdmin, async (req, res) => {
       [req.params.id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/cycle-counts/:id/workers — upsert worker roles
@@ -1280,7 +1288,7 @@ router.post('/cycle-counts/:id/workers', requireAdmin, async (req, res) => {
       [req.params.id]
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /api/inventory/cycle-counts/:id/workers/:userId
@@ -1304,7 +1312,7 @@ router.delete('/cycle-counts/:id/workers/:userId', requireAdmin, async (req, res
       [req.params.id, req.params.userId]
     );
     res.json({ removed: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/cycle-counts/:id/distribute — round-robin assign lines to counters by location group
@@ -1375,7 +1383,7 @@ router.post('/cycle-counts/:id/distribute', requireAdmin, async (req, res) => {
     }
 
     res.json({ assigned });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /api/inventory/cycle-counts/:id/workers/:userId/lines — reassign specific lines to a different counter
@@ -1410,7 +1418,7 @@ router.patch('/cycle-counts/:id/workers/:userId/lines', requireAdmin, async (req
       reassigned += r.rowCount;
     }
     res.json({ reassigned });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/cycle-counts/:id/submit — worker submits a count, audit, or reconcile
@@ -1603,7 +1611,7 @@ router.post('/cycle-counts/:id/submit', requireAuth, async (req, res) => {
       [lineId]
     );
     res.json({ line: updatedLine.rows[0], auto_completed: autoCompleted });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/cycle-counts/:id/lines/:lineId/override — admin override a line's final value
@@ -1653,8 +1661,10 @@ router.post('/cycle-counts/:id/lines/:lineId/override', requireAdmin, async (req
     const updatedLine = await pool.query(
       'SELECT * FROM inventory_cycle_count_lines WHERE id=$1', [req.params.lineId]
     );
+    logAudit(companyId, req.user.id, req.user.full_name, 'cycle_count.line_overridden', 'cycle_count_line', req.params.lineId, null,
+      { cycle_count_id: req.params.id, item_id: line.item_id, previous_counted: line.counted_qty, new_counted: qty, variance });
     res.json({ line: updatedLine.rows[0], auto_completed: autoCompleted });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/cycle-counts/:id/reopen — admin reopens a completed count
@@ -1685,7 +1695,7 @@ router.post('/cycle-counts/:id/reopen', requireAdmin, async (req, res) => {
       [req.params.id]
     );
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Setup: Storage Hierarchy (Areas → Racks → Bays → Compartments) ────────────
@@ -1717,7 +1727,7 @@ function buildSetupRoutes(prefix, table, parentKey, parentTable) {
         vals
       );
       res.json(result.rows);
-    } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+    } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
   });
 
   // CREATE
@@ -1742,7 +1752,7 @@ function buildSetupRoutes(prefix, table, parentKey, parentTable) {
       res.status(201).json(result.rows[0]);
     } catch (err) {
       if (err.storageLimit) return res.status(413).json({ error: err.message, storage_limit: true });
-      console.error(err); res.status(500).json({ error: 'Server error' });
+      req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' });
     }
   });
 
@@ -1772,7 +1782,7 @@ function buildSetupRoutes(prefix, table, parentKey, parentTable) {
       res.json(result.rows[0]);
     } catch (err) {
       if (err.storageLimit) return res.status(413).json({ error: err.message, storage_limit: true });
-      console.error(err); res.status(500).json({ error: 'Server error' });
+      req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' });
     }
   });
 
@@ -1786,7 +1796,7 @@ function buildSetupRoutes(prefix, table, parentKey, parentTable) {
       );
       if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
       res.json({ success: true });
-    } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+    } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
   });
 }
 
@@ -1810,7 +1820,7 @@ router.get('/suppliers', requireAdmin, async (req, res) => {
       values
     );
     res.json(result.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/suppliers
@@ -1844,7 +1854,7 @@ router.post('/suppliers', requireAdmin, async (req, res) => {
        email?.trim() || null, website?.trim() || null, notes?.trim() || null]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /api/inventory/suppliers/:id
@@ -1877,7 +1887,7 @@ router.patch('/suppliers/:id', requireAdmin, async (req, res) => {
       vals
     );
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /api/inventory/suppliers/:id  (soft delete)
@@ -1890,7 +1900,7 @@ router.delete('/suppliers/:id', requireAdmin, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Supplier not found' });
     res.json({ success: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Purchase Orders ───────────────────────────────────────────────────────────
@@ -1946,7 +1956,7 @@ router.get('/purchase-orders', requireAdmin, async (req, res) => {
       values
     );
     res.json({ orders: result.rows, total: parseInt(totalResult.rows[0].count) });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/purchase-orders
@@ -1992,7 +2002,7 @@ router.post('/purchase-orders', requireAdmin, async (req, res) => {
     res.status(201).json(po);
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error(err); res.status(500).json({ error: 'Server error' });
+    req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' });
   } finally { client.release(); }
 });
 
@@ -2023,7 +2033,7 @@ router.get('/purchase-orders/:id', requireAdmin, async (req, res) => {
       [req.params.id]
     );
     res.json({ ...poResult.rows[0], lines: linesResult.rows });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /api/inventory/purchase-orders/:id
@@ -2062,7 +2072,7 @@ router.patch('/purchase-orders/:id', requireAdmin, async (req, res) => {
       vals
     );
     res.json(result.rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /api/inventory/purchase-orders/:id  (hard-delete drafts; cancel others)
@@ -2085,7 +2095,7 @@ router.delete('/purchase-orders/:id', requireAdmin, async (req, res) => {
       );
     }
     res.json({ success: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/purchase-orders/:id/lines
@@ -2122,7 +2132,7 @@ router.post('/purchase-orders/:id/lines', requireAdmin, async (req, res) => {
       [req.params.id]
     );
     res.status(201).json(lines.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // PATCH /api/inventory/purchase-orders/:id/lines/:lineId
@@ -2157,7 +2167,7 @@ router.patch('/purchase-orders/:id/lines/:lineId', requireAdmin, async (req, res
       [req.params.id]
     );
     res.json(lines.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /api/inventory/purchase-orders/:id/lines/:lineId
@@ -2178,7 +2188,7 @@ router.delete('/purchase-orders/:id/lines/:lineId', requireAdmin, async (req, re
       [req.params.id]
     );
     res.json(lines.rows);
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/inventory/purchase-orders/:id/receive
@@ -2276,7 +2286,7 @@ router.post('/purchase-orders/:id/receive', requireAdmin, async (req, res) => {
     }
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error(err); res.status(500).json({ error: 'Server error' });
+    req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' });
   } finally { client.release(); }
 });
 
@@ -2394,7 +2404,7 @@ router.post('/purchase-orders/:id/email', requireAdmin, async (req, res) => {
 
     res.json({ ok: true, sent_to: po.supplier_email });
   } catch (err) {
-    console.error(err);
+    logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -2449,7 +2459,7 @@ router.get('/valuation', requireAdmin, async (req, res) => {
       grand_total: parseFloat(totalResult.rows[0].grand_total),
       total: parseInt(totalResult.rows[0].total_items),
     });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

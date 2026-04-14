@@ -5,7 +5,9 @@ import { parseItemQR } from './ItemLabelModal';
 import UomConversionModal from './UomConversionModal';
 import { useT } from '../../hooks/useT';
 import { SkeletonList } from '../Skeleton';
+import ModalShell from '../ModalShell';
 
+import { silentError } from '../../errorReporter';
 function useCountTypes(t) {
   return {
     cycle:     { label: t.invCycCycleCount,     color: '#2563eb', bg: '#dbeafe',   desc: t.invCycCycleDesc },
@@ -79,7 +81,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     try {
       const r = await api.get(`/inventory/items/${itemId}/uoms`);
       setItemUomCache(prev => ({ ...prev, [itemId]: r.data.filter(u => u.active) }));
-    } catch {}
+    } catch (err) { silentError('cycle-count-misc')(err); }
   };
 
   const loadAllWorkers = async () => {
@@ -88,7 +90,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       const r = await api.get('/admin/workers');
       setAllWorkers(r.data || []);
       setWorkersLoaded(true);
-    } catch {}
+    } catch (err) { silentError('cycle-count-misc')(err); }
   };
 
   const saveWorker = async (userId, roles) => {
@@ -519,7 +521,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       {saveError && <div style={d.error}>{saveError}</div>}
       {statusError && <div style={d.error}>{statusError}</div>}
       {uncountedMsg && <div style={d.warnMsg}>{uncountedMsg}</div>}
-      {error && <div style={d.error}>{error}</div>}
+      {error && <div role="alert" style={d.error}>{error}</div>}
 
       {/* ── Tab Navigation ── */}
       <div style={d.tabRow}>
@@ -630,8 +632,8 @@ function CycleCountDetail({ count, onBack, onComplete }) {
           <div style={d.scanBinRow}>
             <span style={d.scanBinLabel}>
               {currentBin
-                ? <>📍 <strong>{currentBin.name}</strong> <span style={{ color: '#9ca3af', fontSize: 12 }}>({currentBin.type})</span></>
-                : <span style={{ color: '#9ca3af' }}>📍 {t.invCycNoBinScanned}</span>
+                ? <>📍 <strong>{currentBin.name}</strong> <span style={{ color: '#6b7280', fontSize: 12 }}>({currentBin.type})</span></>
+                : <span style={{ color: '#6b7280' }}>📍 {t.invCycNoBinScanned}</span>
               }
             </span>
             {currentBin && (
@@ -693,8 +695,12 @@ function CycleCountDetail({ count, onBack, onComplete }) {
 
       {reportLines && (
         <div style={d.modalOverlay}>
-          <div style={{ ...d.modal, maxWidth: 560 }}>
-            <h3 style={d.modalTitle}>{t.invCycVarianceReport}</h3>
+          <ModalShell
+            onClose={() => { setReportLines(null); onComplete(); }}
+            titleId="cyc-variance-title"
+            style={{ ...d.modal, maxWidth: 560 }}
+          >
+            <h3 id="cyc-variance-title" style={d.modalTitle}>{t.invCycVarianceReport}</h3>
             {(() => {
               const withVariance = reportLines.filter(l => {
                 if (l.counted_qty == null) return false;
@@ -730,11 +736,11 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                           return (
                             <tr key={l.id} style={{ background: isVar ? '#fff7ed' : (i % 2 === 0 ? '#fafafa' : '#fff') }}>
                               <td style={{ ...d.rtd, fontWeight: isVar ? 700 : 400 }}>
-                                {isFull && l.location_name ? <span style={{ color: '#9ca3af', marginRight: 4 }}>{l.location_name} —</span> : ''}
+                                {isFull && l.location_name ? <span style={{ color: '#6b7280', marginRight: 4 }}>{l.location_name} —</span> : ''}
                                 {l.item_name}
                               </td>
                               <td style={{ ...d.rtd, textAlign: 'right', color: '#6b7280' }}>{expected} {l.unit}</td>
-                              <td style={{ ...d.rtd, textAlign: 'right' }}>{counted != null ? `${counted} ${l.unit}` : <em style={{ color: '#9ca3af' }}>{t.invCycNotCounted}</em>}</td>
+                              <td style={{ ...d.rtd, textAlign: 'right' }}>{counted != null ? `${counted} ${l.unit}` : <em style={{ color: '#6b7280' }}>{t.invCycNotCounted}</em>}</td>
                               <td style={{ ...d.rtd, textAlign: 'right', fontWeight: 700,
                                 color: variance === null ? '#9ca3af' : variance > 0 ? '#059669' : variance < 0 ? '#dc2626' : '#374151' }}>
                                 {variance === null ? '—' : variance > 0 ? `+${variance}` : variance}
@@ -754,14 +760,18 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 {t.invCycDownloadCSV}
               </button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
 
       {confirmOpen && (
         <div style={d.modalOverlay}>
-          <div style={d.modal}>
-            <h3 style={d.modalTitle}>{t.invCycConfirmComplete} {COUNT_TYPES[countData.count_type]?.label || ''}?</h3>
+          <ModalShell
+            onClose={() => !completing && setConfirmOpen(false)}
+            titleId="cyc-confirm-title"
+            style={d.modal}
+          >
+            <h3 id="cyc-confirm-title" style={d.modalTitle}>{t.invCycConfirmComplete} {COUNT_TYPES[countData.count_type]?.label || ''}?</h3>
             {variantLines.length > 0 ? (
               <>
                 <p style={d.modalBody}>{variantLines.length} {t.invCycAdjustments}</p>
@@ -785,7 +795,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 {completing ? t.invCycCompleting : t.invCycConfirmBtn}
               </button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
 
@@ -808,8 +818,12 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       {/* ── Override Modal ── */}
       {overrideModal && (
         <div style={d.modalOverlay}>
-          <div style={d.modal}>
-            <h3 style={d.modalTitle}>{t.invCycOverrideTitle}: {overrideModal.line.item_name}</h3>
+          <ModalShell
+            onClose={() => setOverrideModal(null)}
+            titleId="cyc-override-title"
+            style={d.modal}
+          >
+            <h3 id="cyc-override-title" style={d.modalTitle}>{t.invCycOverrideTitle}: {overrideModal.line.item_name}</h3>
             <p style={d.modalBody}>
               {t.invCycOverrideExpected}: {parseFloat(overrideModal.line.expected_qty)} {overrideModal.line.unit}.
               {' '}{t.invCycOverrideDesc}
@@ -833,7 +847,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 {overriding ? t.invCycOverrideSaving : t.invCycOverride}
               </button>
             </div>
-          </div>
+          </ModalShell>
         </div>
       )}
     </div>
@@ -982,7 +996,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
         </select>
       </div>
 
-      {error && <div style={s.error}>{error}</div>}
+      {error && <div role="alert" style={s.error}>{error}</div>}
       {loadDetailError && <p style={s.inlineError}>{loadDetailError}</p>}
 
       {loading ? (

@@ -1,4 +1,5 @@
 import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
 import ClockInOut from '../components/ClockInOut';
 import TimeEntryForm from '../components/TimeEntryForm';
@@ -15,6 +16,7 @@ import { useOffline } from '../contexts/OfflineContext';
 import OfflineBanner from '../components/OfflineBanner';
 import SignatureModal from '../components/SignatureModal';
 
+import { silentError } from '../errorReporter';
 // Secondary tabs — lazy-loaded on first visit
 const TimesheetView    = lazy(() => import('../components/TimesheetView'));
 const WorkerSummary    = lazy(() => import('../components/WorkerSummary'));
@@ -25,7 +27,7 @@ const WorkerSchedule   = lazy(() => import('../components/WorkerSchedule'));
 const ReimbursementsView = lazy(() => import('../components/ReimbursementsView'));
 
 function TabLoader() {
-  return <div style={{ padding: '32px 0', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>Loading…</div>;
+  return <div style={{ padding: '32px 0', textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading…</div>;
 }
 
 const isPwa = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
@@ -133,7 +135,7 @@ export default function Dashboard() {
           m => m.sender_id !== user?.id && (!lastRead || new Date(m.created_at) > new Date(lastRead))
         );
         setChatUnread(hasUnread);
-      }).catch(() => {});
+      }).catch(silentError('dashboard'));
     };
     check();
     const iv = setInterval(check, 60000);
@@ -390,7 +392,7 @@ ${signatureDataUrl ? `
     try {
       await api.post('/auth/update-language', { language: lang });
       updateUser({ language: lang });
-    } catch {}
+    } catch (err) { silentError('update-language')(err); }
   };
 
   return (
@@ -430,11 +432,12 @@ ${signatureDataUrl ? `
         />
       )}
 
-      <main style={styles.main} className="mobile-main">
+      <main id="main-content" style={styles.main} className="mobile-main">
         <div style={styles.tabs} className="tab-bar">
-          {settings?.module_timeclock !== false && <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); history.replaceState(null, '', '#clock'); }}>{t.tabClock}</button>}
+          {settings?.module_timeclock !== false && <button aria-current={tab === 'clock' ? 'page' : undefined} style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); history.replaceState(null, '', '#clock'); }}>{t.tabClock}</button>}
           {settings?.module_timeclock !== false && (
             <button
+              aria-current={tab === 'messages' ? 'page' : undefined}
               style={tab === 'messages' ? styles.tabActive : styles.tab}
               onClick={() => {
                 setTab('messages');
@@ -443,14 +446,15 @@ ${signatureDataUrl ? `
                 localStorage.setItem('chatLastRead', new Date().toISOString());
               }}
             >
-              {t.tabMessages}{chatUnread && <span style={styles.unreadDot} />}
+              {t.tabMessages}
+              {chatUnread && <span style={styles.unreadDot} aria-label={t.unreadMessages || 'unread messages'} role="status" />}
             </button>
           )}
-          {settings?.module_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); history.replaceState(null, '', '#timesheet'); }}>{t.tabTimesheet}</button>}
-          <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); history.replaceState(null, '', '#timeoff'); }}>{t.tabTimeOff}</button>
-          {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); history.replaceState(null, '', '#schedule'); }}>{t.tabSchedule}</button>}
-          {settings?.feature_scheduling !== false && <button style={tab === 'availability' ? styles.tabActive : styles.tab} onClick={() => { setTab('availability'); history.replaceState(null, '', '#availability'); }}>{t.tabAvailability}</button>}
-          <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>{t.tabExpenses}</button>
+          {settings?.module_timeclock !== false && <button aria-current={tab === 'timesheet' ? 'page' : undefined} style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); history.replaceState(null, '', '#timesheet'); }}>{t.tabTimesheet}</button>}
+          {settings?.feature_pto !== false && <button aria-current={tab === 'timeoff' ? 'page' : undefined} style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); history.replaceState(null, '', '#timeoff'); }}>{t.tabTimeOff}</button>}
+          {settings?.feature_scheduling !== false && <button aria-current={tab === 'schedule' ? 'page' : undefined} style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); history.replaceState(null, '', '#schedule'); }}>{t.tabSchedule}</button>}
+          {settings?.feature_scheduling !== false && <button aria-current={tab === 'availability' ? 'page' : undefined} style={tab === 'availability' ? styles.tabActive : styles.tab} onClick={() => { setTab('availability'); history.replaceState(null, '', '#availability'); }}>{t.tabAvailability}</button>}
+          {settings?.feature_reimbursements !== false && <button aria-current={tab === 'reimbursements' ? 'page' : undefined} style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>{t.tabExpenses}</button>}
         </div>
 
         {tab === 'messages' && <CompanyChat onRead={() => { setChatUnread(false); localStorage.setItem('chatLastRead', new Date().toISOString()); }} />}
@@ -463,6 +467,7 @@ ${signatureDataUrl ? `
         )}
 
         {tab === 'timesheet' && (
+          <ErrorBoundary key="timesheet" mode="inline" label="Timesheet">
           <Suspense fallback={<TabLoader />}>
             <UpcomingShifts onFillEntry={handleFillFromShift} />
             {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} rateType={user?.rate_type ?? 'hourly'} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 0} overtimeEnabled={settings?.feature_overtime ?? true} overtimeRule={settings?.overtime_rule ?? 'daily'} overtimeThreshold={settings?.overtime_threshold ?? 8} showWages={settings?.show_worker_wages ?? false} currency={settings?.currency ?? 'USD'} />}
@@ -486,15 +491,16 @@ ${signatureDataUrl ? `
               <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} currentUserId={user?.id} projects={projects} onRefresh={refreshEntries} />
             )}
           </Suspense>
+          </ErrorBoundary>
         )}
 
-        {tab === 'timeoff' && <Suspense fallback={<TabLoader />}><TimeOffTab /></Suspense>}
+        {tab === 'timeoff' && settings?.feature_pto !== false && <ErrorBoundary key="timeoff" mode="inline" label="Time Off"><Suspense fallback={<TabLoader />}><TimeOffTab /></Suspense></ErrorBoundary>}
 
-        {tab === 'availability' && <Suspense fallback={<TabLoader />}><AvailabilityTab /></Suspense>}
+        {tab === 'availability' && <ErrorBoundary key="availability" mode="inline" label="Availability"><Suspense fallback={<TabLoader />}><AvailabilityTab /></Suspense></ErrorBoundary>}
 
         {tab === 'schedule' && <Suspense fallback={<TabLoader />}><WorkerSchedule /></Suspense>}
 
-        {tab === 'reimbursements' && <Suspense fallback={<TabLoader />}><ReimbursementsView /></Suspense>}
+        {tab === 'reimbursements' && settings?.feature_reimbursements !== false && <Suspense fallback={<TabLoader />}><ReimbursementsView /></Suspense>}
 
       </main>
     </div>

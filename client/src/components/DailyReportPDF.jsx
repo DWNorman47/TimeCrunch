@@ -52,7 +52,7 @@ const pdf = StyleSheet.create({
   summaryValue: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: '#1a56db' },
   // Footer
   footer: { position: 'absolute', bottom: 24, left: 48, right: 48, flexDirection: 'row', justifyContent: 'space-between', borderTop: '1 solid #e5e7eb', paddingTop: 6 },
-  footerText: { fontSize: 7, color: '#9ca3af' },
+  footerText: { fontSize: 7, color: '#6b7280' },
 });
 
 function SectionHeader({ title }) {
@@ -65,7 +65,7 @@ function SectionHeader({ title }) {
 }
 
 function TextBlock({ text, noneLabel }) {
-  if (!text?.trim()) return <Text style={{ ...pdf.textBlock, color: '#9ca3af', fontStyle: 'italic' }}>{noneLabel}</Text>;
+  if (!text?.trim()) return <Text style={{ ...pdf.textBlock, color: '#6b7280', fontStyle: 'italic' }}>{noneLabel}</Text>;
   return <Text style={pdf.textBlock}>{text}</Text>;
 }
 

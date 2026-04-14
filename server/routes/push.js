@@ -37,7 +37,7 @@ router.post('/subscribe', requireAuth, async (req, res) => {
       [req.user.id, req.user.company_id, endpoint, p256dh, auth]
     );
     res.json({ ok: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // DELETE /push/subscribe
@@ -47,7 +47,7 @@ router.delete('/subscribe', requireAuth, async (req, res) => {
   try {
     await pool.query('DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2', [req.user.id, endpoint]);
     res.json({ ok: true });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 module.exports = router;

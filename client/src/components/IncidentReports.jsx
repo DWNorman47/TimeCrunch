@@ -6,6 +6,7 @@ import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
 
+import { silentError } from '../errorReporter';
 function today() {
   return new Date().toLocaleDateString('en-CA');
 }
@@ -149,7 +150,7 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
         <span style={styles.checkLabel}>{t.workStoppedLabel}</span>
       </label>
 
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
 
       <div style={styles.formActions}>
         <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>
@@ -319,7 +320,7 @@ export default function IncidentReports({ projects }) {
       const r = await api.get('/incidents', { params });
       setIncidents(r.data.items);
       setTotalPages(r.data.pages);
-    } catch {}
+    } catch (err) { silentError('incident-reports fetch')(err); }
   };
 
   useEffect(() => { loadIncidents(filters, 1).finally(() => setLoading(false)); }, []);
@@ -341,7 +342,7 @@ export default function IncidentReports({ projects }) {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {incidents.length > 0 && <button style={{ ...styles.pdfBtn, ...(pdfGenerating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={downloadPDF} disabled={pdfGenerating}>{pdfGenerating ? t.preparing : t.exportPDF}</button>}
-          {!showForm && <button style={styles.newBtn} onClick={() => setShowForm(true)}>+ {t.newIncident}</button>}
+          {!showForm && <button style={styles.newBtn} onClick={() => setShowForm(true)}>{t.newIncident}</button>}
         </div>
       </div>
 
@@ -413,8 +414,8 @@ const styles = {
   list: { display: 'flex', flexDirection: 'column', gap: 10 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { color: '#9ca3af', fontSize: 15 },
-  hint: { color: '#9ca3af', fontSize: 14 },
+  emptyText: { color: '#6b7280', fontSize: 15 },
+  hint: { color: '#6b7280', fontSize: 14 },
   // Card
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '14px 16px', cursor: 'pointer', gap: 12 },
@@ -425,13 +426,13 @@ const styles = {
   cardMeta: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#6b7280', flexWrap: 'wrap' },
   projectTag: { background: '#ede9fe', color: '#6d28d9', padding: '1px 7px', borderRadius: 10, fontWeight: 600 },
   stoppedTag: { background: '#fee2e2', color: '#dc2626', padding: '1px 7px', borderRadius: 10, fontWeight: 700 },
-  chevron: { fontSize: 10, color: '#9ca3af' },
+  chevron: { fontSize: 10, color: '#6b7280' },
   badgeOpen: { fontSize: 11, fontWeight: 700, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 10 },
   badgeClosed: { fontSize: 11, fontWeight: 700, color: '#065f46', background: '#d1fae5', padding: '2px 8px', borderRadius: 10 },
   cardBody: { padding: '0 16px 14px', borderTop: '1px solid #f3f4f6' },
   injuryBox: { background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', margin: '12px 0', fontSize: 13, lineHeight: 1.8, color: '#374151' },
   section: { marginTop: 12 },
-  sectionLabel: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 4 },
+  sectionLabel: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280', marginBottom: 4 },
   sectionText: { fontSize: 14, color: '#374151', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' },
   cardActions: { display: 'flex', gap: 8, marginTop: 14 },
   closeBtn: { background: '#059669', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
@@ -446,8 +447,8 @@ const styles = {
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 5, flex: 1, minWidth: 180 },
   labelRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
   label: { fontSize: 13, fontWeight: 600, color: '#374151' },
-  charCount: { fontSize: 11, color: '#9ca3af' },
-  optional: { fontWeight: 400, color: '#9ca3af' },
+  charCount: { fontSize: 11, color: '#6b7280' },
+  optional: { fontWeight: 400, color: '#6b7280' },
   input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, background: '#fff' },
   textarea: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 },
   checkRow: { display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' },
