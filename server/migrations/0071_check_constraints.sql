@@ -37,15 +37,30 @@ ALTER TABLE users
 
 -- active_clock.clock_source (only 'worker' and 'admin' are written here — active sessions only)
 ALTER TABLE active_clock DROP CONSTRAINT IF EXISTS chk_active_clock_source;
-UPDATE active_clock SET clock_source = 'worker' WHERE clock_source NOT IN ('worker', 'admin');
+UPDATE active_clock
+SET clock_source = CASE
+  WHEN LOWER(TRIM(clock_source)) IN ('worker', 'admin') THEN LOWER(TRIM(clock_source))
+  ELSE 'worker'
+END
+WHERE clock_source IS DISTINCT FROM LOWER(TRIM(clock_source))
+   OR LOWER(TRIM(clock_source)) NOT IN ('worker', 'admin');
 ALTER TABLE active_clock
   ADD CONSTRAINT chk_active_clock_source
   CHECK (clock_source IN ('worker', 'admin'));
 
 -- time_entries.clock_source
 -- Three valid values: 'worker' (time-clock), 'admin' (admin clock-in/split), 'log_entry' (manual entry by worker or admin)
+-- Normalize case + whitespace first, then fall back to 'worker' for any
+-- unknown value so the constraint below cannot be violated by legacy data.
 ALTER TABLE time_entries DROP CONSTRAINT IF EXISTS chk_time_entries_clock_source;
-UPDATE time_entries SET clock_source = 'worker' WHERE clock_source NOT IN ('worker', 'admin', 'log_entry');
+UPDATE time_entries
+SET clock_source = CASE
+  WHEN LOWER(TRIM(clock_source)) IN ('worker', 'admin', 'log_entry')
+    THEN LOWER(TRIM(clock_source))
+  ELSE 'worker'
+END
+WHERE clock_source IS DISTINCT FROM LOWER(TRIM(clock_source))
+   OR LOWER(TRIM(clock_source)) NOT IN ('worker', 'admin', 'log_entry');
 ALTER TABLE time_entries
   ADD CONSTRAINT chk_time_entries_clock_source
   CHECK (clock_source IN ('worker', 'admin', 'log_entry'));
