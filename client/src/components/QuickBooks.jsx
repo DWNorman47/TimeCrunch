@@ -10,6 +10,32 @@ const EMPLOYEE_TYPES = ['employee', 'owner'];
 const IMPORT_PAGE_SIZE = 15;
 const MAP_PAGE_SIZE = 20;
 
+function CollapsibleSection({ title, badge, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={styles.section}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+          textAlign: 'left', minHeight: 'unset',
+          marginBottom: open ? 12 : 0,
+        }}
+      >
+        <span style={{ fontSize: 12, color: '#6b7280', width: 12, display: 'inline-block' }}>
+          {open ? '▾' : '▸'}
+        </span>
+        <h3 style={{ ...styles.sectionTitle, margin: 0 }}>{title}</h3>
+        {badge != null && <span style={styles.countBadge}>{badge}</span>}
+      </button>
+      {open && <div>{children}</div>}
+    </div>
+  );
+}
+
 function Paginator({ page, total, pageSize, onChange }) {
   const t = useT();
   if (total <= pageSize) return null;
@@ -502,11 +528,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             const page = workerMapPages[type] || 0;
             const pagedWorkers = typeWorkers.slice(page * MAP_PAGE_SIZE, (page + 1) * MAP_PAGE_SIZE);
             return (
-              <div key={type} style={styles.section}>
-                <div style={styles.sectionHeader}>
-                  <h3 style={styles.sectionTitle}>{TYPE_LABELS[type]}</h3>
-                  <span style={styles.countBadge}>{typeWorkers.length}</span>
-                </div>
+              <CollapsibleSection key={type} title={TYPE_LABELS[type]} badge={typeWorkers.length}>
                 {loadingMappings ? <p>{t.qboLoadingData}</p> : (
                   <>
                     <table style={styles.table}>
@@ -544,16 +566,12 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                     />
                   </>
                 )}
-              </div>
+              </CollapsibleSection>
             );
           })}
 
           {/* ── Project mapping table ── */}
-          <div style={styles.section}>
-            <div style={styles.sectionHeader}>
-              <h3 style={styles.sectionTitle}>{t.qboProjectMappings}</h3>
-              <span style={styles.countBadge}>{projects.length}</span>
-            </div>
+          <CollapsibleSection title={t.qboProjectMappings} badge={projects.length}>
             <p style={styles.hint}>{t.qboProjectMappingsHint}</p>
             {loadingMappings ? <p>{t.qboLoadingCustomers}</p> : (
               <>
@@ -607,17 +625,14 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 />
               </>
             )}
-          </div>
+          </CollapsibleSection>
 
           {/* ── Import from QuickBooks ── */}
           {!loadingMappings && totalUnmapped > 0 && (
-            <div style={styles.section}>
-              <div style={styles.sectionHeader}>
-                <h3 style={styles.sectionTitle}>{t.qboImportFromQB}</h3>
-                {totalSelections > 0 && (
-                  <span style={styles.selectedBadge}>{totalSelections} selected</span>
-                )}
-              </div>
+            <CollapsibleSection
+              title={t.qboImportFromQB}
+              badge={totalSelections > 0 ? `${totalSelections} selected` : undefined}
+            >
               <p style={styles.hint}>{t.qboImportHint}</p>
 
               <input
@@ -783,12 +798,11 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                   )}
                 </div>
               )}
-            </div>
+            </CollapsibleSection>
           )}
 
           {/* ── Auto-sync settings ── */}
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Auto-sync Settings</h3>
+          <CollapsibleSection title="Auto-sync Settings">
             <p style={styles.hint}>Automatically push records to QuickBooks when approved. Workers and projects must be mapped above for auto-sync to work.</p>
 
             <label style={styles.syncToggle}>
@@ -885,12 +899,11 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 </div>
               </div>
             )}
-          </div>
+          </CollapsibleSection>
 
           {/* ── Push expense reimbursements — only when the reimbursements feature is on ── */}
           {settings?.feature_reimbursements !== false && (
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Push Expense Reimbursements</h3>
+          <CollapsibleSection title="Push Expense Reimbursements">
             <p style={styles.hint}>Manually push approved reimbursements to QuickBooks as Purchase records for a date range.</p>
             <div style={styles.pushRow}>
               <div>
@@ -927,12 +940,11 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 )}
               </div>
             )}
-          </div>
+          </CollapsibleSection>
           )}
 
           {/* ── Payroll journal entry ── */}
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Push Payroll Journal Entry</h3>
+          <CollapsibleSection title="Push Payroll Journal Entry">
             <p style={styles.hint}>Creates a journal entry in QuickBooks for the total labor cost of approved time entries in a date range. Select the wage expense account to debit and the liability or bank account to credit.</p>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
               <div>
@@ -979,11 +991,10 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 <p style={{ margin: '4px 0 0', fontSize: 13, color: '#6b7280' }}>{payResult.description}</p>
               </div>
             )}
-          </div>
+          </CollapsibleSection>
 
           {/* ── Push Bills (contractor time + reimbursements per vendor) ── */}
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Push Bills (Contractors)</h3>
+          <CollapsibleSection title="Push Bills (Contractors)">
             <p style={styles.hint}>
               Creates one QBO Bill per contractor, combining approved time entries (as labor lines) and approved reimbursements (as expense lines) for the selected date range. Only contractors with a mapped QBO Vendor appear.
             </p>
@@ -1266,11 +1277,10 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 )}
               </div>
             )}
-          </div>
+          </CollapsibleSection>
 
           {/* ── Push time entries ── */}
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>{t.qboPushEntries}</h3>
+          <CollapsibleSection title={t.qboPushEntries}>
             <p style={styles.hint}>{t.qboPushHint}</p>
             <div style={styles.pushRow}>
               <div>
@@ -1313,7 +1323,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 )}
               </div>
             )}
-          </div>
+          </CollapsibleSection>
         </>
       )}
     </div>
