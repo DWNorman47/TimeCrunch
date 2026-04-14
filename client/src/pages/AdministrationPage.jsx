@@ -321,6 +321,11 @@ export default function AdministrationPage() {
   const [settings, setSettings] = useState(null);
   const [qboConnected, setQboConnected] = useState(false);
 
+  // Integrations sub-view: 'list' or 'quickbooks' — persists for the session
+  const [integrationView, setIntegrationView] = useState(() => sessionStorage.getItem('admin_integration_view') || 'list');
+  const openIntegration = (id) => { sessionStorage.setItem('admin_integration_view', id); setIntegrationView(id); };
+  const backToIntegrations = () => { sessionStorage.setItem('admin_integration_view', 'list'); setIntegrationView('list'); };
+
   const tabs = [
     { id: 'company',      label: t.adminTabCompany      },
     { id: 'team',         label: t.adminTabTeam         },
@@ -403,15 +408,48 @@ export default function AdministrationPage() {
         )}
         {tab === 'integrations' && (
           <div style={styles.tabContent}>
-            <h2 style={styles.tabTitle}>{t.integrations}</h2>
-            <QuickBooks
-              workers={workers}
-              projects={projects}
-              settings={settings}
-              onSettingsChange={setSettings}
-              onWorkersImported={imported => setWorkers(prev => [...prev, ...imported.map(w => ({ ...w, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 }))])}
-              onProjectsImported={imported => setProjects(prev => [...prev, ...imported])}
-            />
+            {integrationView === 'list' && (
+              <>
+                <h2 style={styles.tabTitle}>{t.integrations}</h2>
+                <div style={styles.integrationGrid}>
+                  <button
+                    type="button"
+                    style={styles.integrationCard}
+                    onClick={() => openIntegration('quickbooks')}
+                  >
+                    <div style={styles.integrationLogo}>QB</div>
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <div style={styles.integrationName}>QuickBooks Online</div>
+                      <div style={styles.integrationDesc}>Push time entries, reimbursements, and contractor bills to QBO.</div>
+                    </div>
+                    <span style={styles.integrationChevron} aria-hidden="true">›</span>
+                  </button>
+                </div>
+              </>
+            )}
+            {integrationView === 'quickbooks' && (
+              <>
+                <div style={styles.integrationHeader}>
+                  <button
+                    type="button"
+                    onClick={backToIntegrations}
+                    style={styles.backBtn}
+                    aria-label="Back to Integrations"
+                  >
+                    ← Integrations
+                  </button>
+                  <h2 style={{ ...styles.tabTitle, margin: 0 }}>QuickBooks Online</h2>
+                </div>
+                <QuickBooks
+                  workers={workers}
+                  projects={projects}
+                  settings={settings}
+                  onSettingsChange={setSettings}
+                  onWorkersImported={imported => setWorkers(prev => [...prev, ...imported.map(w => ({ ...w, total_entries: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, prevailing_hours: 0 }))])}
+                  onProjectsImported={imported => setProjects(prev => [...prev, ...imported])}
+                />
+              </>
+            )}
           </div>
         )}
         {tab === 'billing'  && <BillingTab />}
@@ -442,6 +480,29 @@ const styles = {
   tabContent: { display: 'flex', flexDirection: 'column', gap: 16 },
   sectionTitle: { fontSize: 17, fontWeight: 700, margin: '8px 0 0' },
   tabTitle: { fontSize: 22, fontWeight: 800, color: '#111827', margin: '0 0 4px' },
+  // Integrations
+  integrationGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 },
+  integrationCard: {
+    display: 'flex', alignItems: 'center', gap: 14,
+    background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12,
+    padding: '16px 18px', cursor: 'pointer', textAlign: 'left', width: '100%',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+  },
+  integrationLogo: {
+    width: 44, height: 44, borderRadius: 10,
+    background: '#2CA01C', color: '#fff',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontWeight: 800, fontSize: 16, flexShrink: 0,
+  },
+  integrationName: { fontSize: 15, fontWeight: 700, color: '#111827' },
+  integrationDesc: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  integrationChevron: { fontSize: 24, color: '#9ca3af', fontWeight: 300, marginLeft: 8 },
+  integrationHeader: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 8 },
+  backBtn: {
+    background: 'none', border: '1px solid #d1d5db', borderRadius: 8,
+    padding: '6px 12px', fontSize: 13, fontWeight: 600, color: '#374151',
+    cursor: 'pointer', minHeight: 'unset',
+  },
   // Cards
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
   cardRow: { display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px', borderBottom: '1px solid #f3f4f6' },
