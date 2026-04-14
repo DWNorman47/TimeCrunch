@@ -57,10 +57,26 @@ function timeRow(overrides = {}) {
     work_date: '2026-04-01', start_time: '08:00:00', end_time: '16:00:00',
     notes: 'framed east wall',
     qbo_bill_id: null, qbo_activity_id: null,
+    wage_type: 'regular', break_minutes: 0,
     full_name: 'Alex Rivera', qbo_vendor_id: 'V-1', hourly_rate: '45.00',
-    worker_type: 'contractor',
+    worker_type: 'contractor', overtime_rule: null, // let company default drive; tests override when they want per-user OT
     qbo_class_id: 'C-9', qbo_customer_id: 'CUST-1', project_name: 'Main St Build',
     ...overrides,
+  };
+}
+
+// Mock response for the overtime settings query. Default: OT OFF so existing
+// tests don't need to account for any premium dollars.
+function otOff() {
+  return { rows: [{ key: 'overtime_rule', value: 'none' }] };
+}
+function otDaily({ threshold = 8, multiplier = 1.5 } = {}) {
+  return {
+    rows: [
+      { key: 'overtime_rule', value: 'daily' },
+      { key: 'overtime_threshold', value: String(threshold) },
+      { key: 'overtime_multiplier', value: String(multiplier) },
+    ],
   };
 }
 
@@ -89,7 +105,8 @@ describe('POST /api/qbo/push-bills-preview', () => {
   test('groups time + reimbursements per vendor and sums labor correctly', async () => {
     pool.query
       .mockResolvedValueOnce({ rows: [timeRow({ id: 1 }), timeRow({ id: 2, start_time: '09:00:00', end_time: '12:30:00' })] })
-      .mockResolvedValueOnce({ rows: [reimbRow()] });
+      .mockResolvedValueOnce({ rows: [reimbRow()] })
+      .mockResolvedValueOnce(otOff());
 
     const res = await request(makeApp())
       .post('/api/qbo/push-bills-preview')
@@ -112,7 +129,8 @@ describe('POST /api/qbo/push-bills-preview', () => {
   test('excludes already-pushed rows unless force is set', async () => {
     pool.query
       .mockResolvedValueOnce({ rows: [timeRow({ id: 1, qbo_bill_id: 'BILL-1' }), timeRow({ id: 2 })] })
-      .mockResolvedValueOnce({ rows: [] });
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce(otOff());
 
     const res = await request(makeApp())
       .post('/api/qbo/push-bills-preview')
@@ -124,7 +142,8 @@ describe('POST /api/qbo/push-bills-preview', () => {
   test('includes already-pushed rows when force=true', async () => {
     pool.query
       .mockResolvedValueOnce({ rows: [timeRow({ id: 1, qbo_bill_id: 'BILL-1' }), timeRow({ id: 2 })] })
-      .mockResolvedValueOnce({ rows: [] });
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce(otOff());
 
     const res = await request(makeApp())
       .post('/api/qbo/push-bills-preview')
@@ -136,7 +155,8 @@ describe('POST /api/qbo/push-bills-preview', () => {
   test('returns empty groups array when nothing matches', async () => {
     pool.query
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] });
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce(otOff());
 
     const res = await request(makeApp())
       .post('/api/qbo/push-bills-preview')
@@ -144,6 +164,43 @@ describe('POST /api/qbo/push-bills-preview', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.groups).toEqual([]);
+  });
+
+  test('adds overtime premium when a day crosses the daily threshold', async () => {
+    // One 10h shift with daily threshold 8 and 1.5× multiplier:
+    //   2h OT × $45 × 0.5 = $45 premium on top of 10h × $45 = $450 base.
+    pool.query
+      .mockResolvedValueOnce({ rows: [timeRow({ id: 1, start_time: '08:00:00', end_time: '18:00:00' })] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce(otDaily({ threshold: 8, multiplier: 1.5 }));
+
+    const res = await request(makeApp())
+      .post('/api/qbo/push-bills-preview')
+      .send({ from: '2026-04-01', to: '2026-04-30' });
+
+    expect(res.status).toBe(200);
+    const g = res.body.groups[0];
+    expect(g.hours).toBeCloseTo(10);
+    expect(g.labor_amount).toBeCloseTo(10 * 45);
+    expect(g.overtime_hours).toBeCloseTo(2);
+    expect(g.overtime_premium).toBeCloseTo(2 * 45 * 0.5);
+    expect(g.total).toBeCloseTo(10 * 45 + 2 * 45 * 0.5);
+  });
+
+  test('no overtime premium when rule is none', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [timeRow({ start_time: '08:00:00', end_time: '20:00:00' })] }) // 12h
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce(otOff());
+
+    const res = await request(makeApp())
+      .post('/api/qbo/push-bills-preview')
+      .send({ from: '2026-04-01', to: '2026-04-30' });
+
+    const g = res.body.groups[0];
+    expect(g.overtime_hours).toBe(0);
+    expect(g.overtime_premium).toBe(0);
+    expect(g.total).toBeCloseTo(12 * 45);
   });
 });
 
@@ -204,6 +261,7 @@ describe('POST /api/qbo/push-bills', () => {
       .mockResolvedValueOnce({ rows: [{ qbo_realm_id: 'realm-1' }] })
       .mockResolvedValueOnce({ rows: [timeRow()] })
       .mockResolvedValueOnce({ rows: [reimbRow()] })
+      .mockResolvedValueOnce(otOff())
       .mockResolvedValueOnce({ rowCount: 1 })
       .mockResolvedValueOnce({ rowCount: 1 });
 
@@ -234,7 +292,8 @@ describe('POST /api/qbo/push-bills', () => {
       .mockResolvedValueOnce(mockSettings())
       .mockResolvedValueOnce({ rows: [{ qbo_realm_id: 'realm-1' }] })
       .mockResolvedValueOnce({ rows: [timeRow()] })
-      .mockResolvedValueOnce({ rows: [] });
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce(otOff());
 
     qbo.createBill.mockRejectedValueOnce(new Error('QBO validation failed: Item inactive'));
 
@@ -246,6 +305,33 @@ describe('POST /api/qbo/push-bills', () => {
     expect(res.body.pushed).toEqual([]);
     expect(res.body.skipped).toHaveLength(1);
     expect(res.body.skipped[0].reason).toMatch(/Item inactive/);
-    expect(pool.query).toHaveBeenCalledTimes(4);
+    // 5 reads (settings, realm, time, reimb, ot), 0 updates = 5 total
+    expect(pool.query).toHaveBeenCalledTimes(5);
+  });
+
+  test('pushes an overtime premium line for OT hours', async () => {
+    // 10h day, threshold 8, multiplier 1.5 → 2h OT premium at 0.5 × base.
+    pool.query
+      .mockResolvedValueOnce(mockSettings())
+      .mockResolvedValueOnce({ rows: [{ qbo_realm_id: 'realm-1' }] })
+      .mockResolvedValueOnce({ rows: [timeRow({ start_time: '08:00:00', end_time: '18:00:00' })] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce(otDaily({ threshold: 8, multiplier: 1.5 }))
+      .mockResolvedValueOnce({ rowCount: 1 });
+
+    qbo.createBill.mockResolvedValueOnce({ Id: 'BILL-OT-1' });
+
+    const res = await request(makeApp())
+      .post('/api/qbo/push-bills')
+      .send({ from: '2026-04-01', to: '2026-04-30' });
+
+    expect(res.status).toBe(200);
+    const call = qbo.createBill.mock.calls[0][1];
+    // 1 labor line for the entry + 1 OT premium line
+    expect(call.lines).toHaveLength(2);
+    expect(call.lines[0]).toMatchObject({ type: 'item', qty: 10, unitPrice: 45 });
+    expect(call.lines[1]).toMatchObject({ type: 'item', qty: 2 });
+    expect(call.lines[1].unitPrice).toBeCloseTo(45 * 0.5);
+    expect(call.lines[1].description).toMatch(/Overtime premium/);
   });
 });
