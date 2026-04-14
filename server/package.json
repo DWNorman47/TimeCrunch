@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node migrate.js && node index.js",
     "dev": "nodemon index.js",
-    "test": "jest"
+    "test": "jest",
+    "lint:migrations": "node scripts/lintMigrations.js"
   },
   "jest": {
     "testEnvironment": "node"
