@@ -1005,8 +1005,8 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             {/* Required settings */}
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16 }}>
               <div style={{ flex: 1, minWidth: 240 }}>
-                <label htmlFor="qbo-labor-item" style={styles.label}>Labor Service Item</label>
-                <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>The QBO Service item used on Bill labor lines (hours × rate). Required.</p>
+                <label htmlFor="qbo-labor-item" style={styles.label}>Labor Service Item *</label>
+                <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>QBO Service item used on Bill labor lines (hours × rate).</p>
                 <select
                   id="qbo-labor-item"
                   style={styles.select}
@@ -1017,6 +1017,22 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                   <option value="">— Select item —</option>
                   {qboItems.map(it => (
                     <option key={it.Id} value={it.Id}>{it.Name}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <label htmlFor="qbo-bill-expense" style={styles.label}>Reimbursement Expense Account *</label>
+                <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>Expense account for reimbursement lines (e.g. Job Materials, Travel).</p>
+                <select
+                  id="qbo-bill-expense"
+                  style={styles.select}
+                  value={settings?.qbo_expense_account_id || ''}
+                  onChange={e => saveAutoSyncSetting('qbo_expense_account_id', e.target.value)}
+                  disabled={savingAutoSync || loadingAccounts}
+                >
+                  <option value="">— Select account —</option>
+                  {qboAccounts.filter(a => ['Expense', 'OtherExpense', 'CostOfGoodsSold'].includes(a.AccountType)).map(a => (
+                    <option key={a.Id} value={a.Id}>{a.Name}</option>
                   ))}
                 </select>
               </div>
@@ -1036,7 +1052,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             </div>
             {(!settings?.qbo_labor_item_id || !settings?.qbo_expense_account_id) && (
               <p role="alert" style={{ fontSize: 13, color: '#92400e', background: '#fef3c7', padding: '8px 12px', borderRadius: 6, marginBottom: 12 }}>
-                Set a Labor Service Item (above) and an Expense Category Account (in the Auto-Sync settings) before pushing bills.
+                Set the two required settings (marked *) above before pushing bills.
               </p>
             )}
 
