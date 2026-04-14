@@ -66,7 +66,7 @@ export default function ResetPassword() {
             onChange={e => setConfirm(e.target.value)}
             required
           />
-          {error && <p style={styles.error}>{error}</p>}
+          {error && <p role="alert" style={styles.error}>{error}</p>}
           <button style={styles.btn} type="submit" disabled={loading}>
             {loading ? t.saving : t.resetSetPasswordBtn}
           </button>

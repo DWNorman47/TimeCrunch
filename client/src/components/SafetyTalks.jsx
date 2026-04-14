@@ -220,7 +220,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
         )}
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
         <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.createTalk}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
@@ -417,8 +417,8 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                   </>
                 )}
               </div>
-              {uploadError && <p style={styles.error}>{uploadError}</p>}
-              {attachDeleteError && <p style={styles.error}>{attachDeleteError}</p>}
+              {uploadError && <p role="alert" style={styles.error}>{uploadError}</p>}
+              {attachDeleteError && <p role="alert" style={styles.error}>{attachDeleteError}</p>}
               {attachments === null ? (
                 <SkeletonBlock width="100%" height={36} style={{ marginTop: 8 }} />
               ) : attachments.length === 0 ? (
@@ -491,7 +491,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
               ) : (
                 <button style={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>{t.delete}</button>
               )}
-              {deleteError && <p style={{ ...styles.error, margin: 0 }}>{deleteError}</p>}
+              {deleteError && <p role="alert" style={{ ...styles.error, margin: 0 }}>{deleteError}</p>}
             </div>
           )}
         </div>

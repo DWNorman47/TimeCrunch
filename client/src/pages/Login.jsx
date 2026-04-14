@@ -143,7 +143,7 @@ export default function Login() {
               onChange={e => setSetupForm(f => ({ ...f, confirm: e.target.value }))}
               required
             />
-            {error && <p style={styles.error}>{error}</p>}
+            {error && <p role="alert" style={styles.error}>{error}</p>}
             <button style={styles.button} type="submit" disabled={loading}>
               {loading ? t.saving : t.loginSetPasswordBtn}
             </button>
@@ -173,7 +173,7 @@ export default function Login() {
               placeholder="000000"
               required
             />
-            {error && <p style={styles.error}>{error}</p>}
+            {error && <p role="alert" style={styles.error}>{error}</p>}
             <button style={styles.button} type="submit" disabled={loading || mfaCode.length !== 6}>
               {loading ? t.loginVerifying : t.loginVerify}
             </button>
@@ -252,7 +252,7 @@ export default function Login() {
           />
           {error && (
             <div>
-              <p style={styles.error}>{error}</p>
+              <p role="alert" style={styles.error}>{error}</p>
               {unconfirmedEmail && (
                 <button
                   type="button"

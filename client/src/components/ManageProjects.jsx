@@ -318,7 +318,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
         <button style={{ ...s.addBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.adding : t.add}</button>
       </form>
       {error && (
-        <div style={s.errorBox}>
+        <div role="alert" style={s.errorBox}>
           <p style={s.errorText}>{error}</p>
           {archivedConflict && (
             <button type="button" style={s.restoreInlineBtn} onClick={handleRestoreConflict}>

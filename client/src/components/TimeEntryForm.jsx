@@ -137,7 +137,7 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
           </div>
           <input id="tef-notes" style={styles.input} type="text" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t.notesPlaceholder} maxLength={500} disabled={saving} />
         </div>
-        {error && <p style={styles.error}>{error}</p>}
+        {error && <p role="alert" style={styles.error}>{error}</p>}
         {success && <p style={styles.success}>{t.entrySaved}</p>}
         <button style={{ ...styles.button, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : t.logEntry}</button>
       </form>}

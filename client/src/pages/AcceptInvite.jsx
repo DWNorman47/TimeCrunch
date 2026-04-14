@@ -38,7 +38,7 @@ export default function AcceptInvite() {
   if (!token) return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <p style={styles.error}>{t.inviteInvalidLink}</p>
+        <p role="alert" style={styles.error}>{t.inviteInvalidLink}</p>
       </div>
     </div>
   );
@@ -61,7 +61,7 @@ export default function AcceptInvite() {
         <form onSubmit={handleSubmit} style={styles.form}>
           <PasswordInput style={styles.input} placeholder={t.inviteNewPasswordPh} value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
           <PasswordInput style={styles.input} placeholder={t.inviteConfirmPasswordPh} value={confirm} onChange={e => setConfirm(e.target.value)} required />
-          {error && <p style={styles.error}>{error}</p>}
+          {error && <p role="alert" style={styles.error}>{error}</p>}
           <button style={styles.btn} type="submit" disabled={loading}>{loading ? t.saving : t.inviteSetPasswordBtn}</button>
         </form>
       </div>

@@ -152,7 +152,7 @@ export default function Register() {
             required
             minLength={8}
           />
-          {error && <p style={styles.error}>{error}</p>}
+          {error && <p role="alert" style={styles.error}>{error}</p>}
           <button style={styles.btn} type="submit" disabled={saving}>
             {saving ? t.registerCreating : t.registerCreateBtn}
           </button>

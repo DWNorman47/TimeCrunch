@@ -386,7 +386,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             </button>
           </div>
         )}
-        {error && <p style={styles.error}>{error}</p>}
+        {error && <p role="alert" style={styles.error}>{error}</p>}
       </div>
 
       {status.connected && (

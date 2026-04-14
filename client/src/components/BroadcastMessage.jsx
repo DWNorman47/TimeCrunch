@@ -44,7 +44,7 @@ export default function BroadcastMessage() {
           {state === 'sending' ? t.sending : state === 'sent' ? t.sent : t.send}
         </button>
       </div>
-      {state === 'error' && <p style={styles.error}>{t.failedSend}</p>}
+      {state === 'error' && <p role="alert" style={styles.error}>{t.failedSend}</p>}
       <div style={styles.charCount}>{message.length}/200</div>
     </div>
   );

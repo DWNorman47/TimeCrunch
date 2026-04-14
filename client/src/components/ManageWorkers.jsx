@@ -555,7 +555,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 )}
               </div>
               {error && (
-                <div style={s.errorBox}>
+                <div role="alert" style={s.errorBox}>
                   <span style={s.errorText}>{error}</span>
                   {archivedConflict && <button type="button" style={s.restoreInlineBtn} onClick={handleRestoreConflict}>Restore {archivedConflict.name}</button>}
                 </div>

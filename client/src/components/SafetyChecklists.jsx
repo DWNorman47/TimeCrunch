@@ -148,7 +148,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
         {items.length === 0 && <p style={styles.hint}>{t.noItemsYet}</p>}
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
         <button style={{ ...styles.submitBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving}>{saving ? t.saving : isEdit ? t.saveChanges : t.createTemplate}</button>
         <button style={styles.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
@@ -267,7 +267,7 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
         </div>
       )}
 
-      {error && <p style={styles.error}>{error}</p>}
+      {error && <p role="alert" style={styles.error}>{error}</p>}
       <div style={styles.formActions}>
         <button style={{ ...styles.submitBtn, ...((saving || !templateId) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving || !templateId}>
           {saving ? t.submitting : t.submitChecklist}

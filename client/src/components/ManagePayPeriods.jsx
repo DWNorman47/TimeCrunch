@@ -94,7 +94,7 @@ export default function ManagePayPeriods() {
             </button>
           </div>
         </div>
-        {error && <p style={styles.error}>{error}</p>}
+        {error && <p role="alert" style={styles.error}>{error}</p>}
       </form>
 
       {loading ? <SkeletonList count={3} rows={1} /> : periods.length === 0 ? (

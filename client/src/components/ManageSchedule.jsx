@@ -527,7 +527,7 @@ export default function ManageSchedule({ workers, projects }) {
         </div>
         {availabilityWarning && <p style={styles.overlapWarning}>📅 {availabilityWarning}</p>}
         {overlapWarning && <p style={styles.overlapWarning}>⚠ {overlapWarning}</p>}
-        {error && <p style={styles.error}>{error}</p>}
+        {error && <p role="alert" style={styles.error}>{error}</p>}
       </form>
 
       <div style={styles.weekNav}>

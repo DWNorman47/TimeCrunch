@@ -62,7 +62,7 @@ export default function ForgotPassword() {
                 value={company}
                 onChange={e => setCompany(e.target.value)}
               />
-              {error && <p style={styles.error}>{error}</p>}
+              {error && <p role="alert" style={styles.error}>{error}</p>}
               <button style={styles.btn} type="submit" disabled={loading}>
                 {loading ? t.forgotSending : t.forgotSendLinkBtn}
               </button>
