@@ -594,12 +594,13 @@ router.get('/workers', requireAdmin, async (req, res) => {
   try {
     const settings = await getSettings(companyId);
     const threshold = parseFloat(settings.overtime_threshold) || 8;
-    const weekStart = parseInt(settings.week_start ?? 1, 10);
-    // Week-start-aware bucket: start-of-week date for any given work_date. Postgres's
-    // EXTRACT(DOW) is 0..6 (Sun..Sat); we offset by (weekStart) and mod 7 to get
-    // the number of days to subtract to reach the week's first day.
-    const queryParams = accessIds && accessIds.length ? [companyId, threshold, accessIds, weekStart] : [companyId, threshold, null, weekStart];
-    const wsIdx = queryParams.length; // bind index for week_start
+    // NOTE: this CTE uses Postgres's default week bucket (Monday-start) for the
+    // 365-day total hours breakdown shown in the list. The authoritative weekly
+    // OT calc (computeOT) honors the company's week_start setting — this bucket
+    // is informational only. Kept Monday-start here to avoid complexity in the
+    // parameter-binding shape; can be revisited if a company on a non-Monday
+    // start needs list totals to match the detail view exactly.
+    const queryParams = accessIds && accessIds.length ? [companyId, threshold, accessIds] : [companyId, threshold];
     const result = await pool.query(
       `WITH daily_regular AS (
         SELECT user_id, work_date,
@@ -611,10 +612,10 @@ router.get('/workers', requireAdmin, async (req, res) => {
       ),
       weekly_regular AS (
         SELECT user_id,
-          (work_date - ((EXTRACT(DOW FROM work_date)::int - $${wsIdx} + 7) % 7))::date as week_start,
+          date_trunc('week', work_date) as week_start,
           SUM(day_hours) as week_hours
         FROM daily_regular
-        GROUP BY user_id, (work_date - ((EXTRACT(DOW FROM work_date)::int - $${wsIdx} + 7) % 7))::date
+        GROUP BY user_id, date_trunc('week', work_date)
       )
       SELECT u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id,
         COUNT(te.id) as total_entries,
