@@ -792,8 +792,7 @@ router.post('/push-bills', requireAdmin, async (req, res) => {
     const laborItemId      = settingRows.rows.find(r => r.key === 'qbo_labor_item_id')?.value;
     const termsDays        = parseInt(settingRows.rows.find(r => r.key === 'qbo_bill_terms_days')?.value || '0', 10);
 
-    if (!laborItemId)      return res.status(400).json({ error: 'Configure a Labor Item in QBO Settings before pushing bills.' });
-    if (!expenseAccountId) return res.status(400).json({ error: 'Configure an Expense Account in QBO Settings before pushing bills.' });
+    if (!laborItemId) return res.status(400).json({ error: 'Configure a Labor Service Item before pushing bills.' });
 
     const company = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
     if (!company.rows[0]?.qbo_realm_id) return res.status(400).json({ error: 'QuickBooks not connected' });
@@ -802,6 +801,13 @@ router.post('/push-bills', requireAdmin, async (req, res) => {
       gatherBillData(companyId, { from, to, workerIds: worker_ids, force }),
       getOvertimeSettings(companyId),
     ]);
+
+    // Only require the expense account when we actually need it (any reimbursement
+    // line in this push). Contractors paid for time only don't need it.
+    const anyReimbursements = groups.some(g => g.reimbursements.length > 0);
+    if (anyReimbursements && !expenseAccountId) {
+      return res.status(400).json({ error: 'Some contractors have reimbursements — set a Reimbursement Expense Account before pushing.' });
+    }
 
     const today = new Date().toLocaleDateString('en-CA');
     const dueDate = (() => {

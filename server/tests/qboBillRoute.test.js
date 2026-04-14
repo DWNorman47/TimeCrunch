@@ -228,18 +228,42 @@ describe('POST /api/qbo/push-bills', () => {
       .send({ from: '2026-04-01', to: '2026-04-30' });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/Labor Item/);
+    expect(res.body.error).toMatch(/Labor Service Item/);
   });
 
-  test('400 when expense account not configured', async () => {
-    pool.query.mockResolvedValueOnce(mockSettings({ expenseAcct: '' }));
+  test('400 when expense account not configured AND any reimbursements in range', async () => {
+    pool.query
+      .mockResolvedValueOnce(mockSettings({ expenseAcct: '' }))
+      .mockResolvedValueOnce({ rows: [{ qbo_realm_id: 'realm-1' }] })
+      .mockResolvedValueOnce({ rows: [timeRow()] })
+      .mockResolvedValueOnce({ rows: [reimbRow()] })  // has a reimb → requires expense acct
+      .mockResolvedValueOnce(otOff());
 
     const res = await request(makeApp())
       .post('/api/qbo/push-bills')
       .send({ from: '2026-04-01', to: '2026-04-30' });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/Expense Account/);
+    expect(res.body.error).toMatch(/Reimbursement Expense Account/);
+  });
+
+  test('push succeeds with no expense account when there are no reimbursements', async () => {
+    pool.query
+      .mockResolvedValueOnce(mockSettings({ expenseAcct: '' }))  // no expense acct
+      .mockResolvedValueOnce({ rows: [{ qbo_realm_id: 'realm-1' }] })
+      .mockResolvedValueOnce({ rows: [timeRow()] })
+      .mockResolvedValueOnce({ rows: [] })                        // no reimbs
+      .mockResolvedValueOnce(otOff())
+      .mockResolvedValueOnce({ rowCount: 1 });
+
+    qbo.createBill.mockResolvedValueOnce({ Id: 'BILL-NO-REIMB' });
+
+    const res = await request(makeApp())
+      .post('/api/qbo/push-bills')
+      .send({ from: '2026-04-01', to: '2026-04-30' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.pushed).toHaveLength(1);
   });
 
   test('400 when QBO not connected', async () => {

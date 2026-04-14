@@ -1021,8 +1021,8 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 </select>
               </div>
               <div style={{ flex: 1, minWidth: 240 }}>
-                <label htmlFor="qbo-bill-expense" style={styles.label}>Reimbursement Expense Account *</label>
-                <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>Expense account for reimbursement lines (e.g. Job Materials, Travel).</p>
+                <label htmlFor="qbo-bill-expense" style={styles.label}>Reimbursement Expense Account</label>
+                <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>Only needed if you're billing reimbursements. The QBO account where mileage / expense dollars post (e.g. "Travel" or "Subcontractor Reimbursements").</p>
                 <select
                   id="qbo-bill-expense"
                   style={styles.select}
@@ -1050,9 +1050,9 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 />
               </div>
             </div>
-            {(!settings?.qbo_labor_item_id || !settings?.qbo_expense_account_id) && (
+            {!settings?.qbo_labor_item_id && (
               <p role="alert" style={{ fontSize: 13, color: '#92400e', background: '#fef3c7', padding: '8px 12px', borderRadius: 6, marginBottom: 12 }}>
-                Set the two required settings (marked *) above before pushing bills.
+                Labor Service Item is required. Reimbursement Expense Account is only needed if any contractor has reimbursements in the range.
               </p>
             )}
 
@@ -1121,11 +1121,14 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
               const missingLabor = !settings?.qbo_labor_item_id;
               const missingExpense = !settings?.qbo_expense_account_id;
               const noPreview = !billPreview || billPreview.length === 0;
-              const pushDisabled = billPushing || noPreview || missingLabor || missingExpense;
+              // Expense account is only required when at least one bill includes reimbursements
+              const previewHasReimbs = billPreview?.some(g => (g.reimbursements || 0) > 0);
+              const needExpenseAcct = previewHasReimbs && missingExpense;
+              const pushDisabled = billPushing || noPreview || missingLabor || needExpenseAcct;
               const reason = missingLabor
-                ? 'Set a Labor Service Item in the settings above first.'
-                : missingExpense
-                ? 'Set an Expense Category Account in the Auto-sync settings first.'
+                ? 'Set a Labor Service Item above first.'
+                : needExpenseAcct
+                ? 'One or more contractors have reimbursements — set a Reimbursement Expense Account first.'
                 : noPreview
                 ? 'Click Preview first to see what will be billed.'
                 : null;
