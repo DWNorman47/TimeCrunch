@@ -701,6 +701,21 @@ router.post('/push-bills-preview', requireAdmin, async (req, res) => {
         labor_amount: parseFloat(laborAmount.toFixed(2)),
         reimbursements: g.reimbursements.length,
         reimb_amount: parseFloat(reimbAmount.toFixed(2)),
+        time_entry_rows: g.timeEntries.map(te => ({
+          id: te.id,
+          work_date: isoDate(te.workDate),
+          hours: parseFloat(te.hours.toFixed(2)),
+          amount: parseFloat((te.hours * g.hourlyRate).toFixed(2)),
+          project_name: te.projectName,
+          description: te.description,
+        })),
+        reimbursement_rows: g.reimbursements.map(r => ({
+          id: r.id,
+          expense_date: isoDate(r.expenseDate),
+          amount: parseFloat(r.amount.toFixed(2)),
+          project_name: r.projectName,
+          description: r.description,
+        })),
         total: parseFloat((laborAmount + reimbAmount).toFixed(2)),
       };
     });
