@@ -10,18 +10,18 @@ const EMPLOYEE_TYPES = ['employee', 'owner'];
 const IMPORT_PAGE_SIZE = 15;
 const MAP_PAGE_SIZE = 20;
 
-// Returns last Monday–Sunday as ISO date strings. Weeks start Monday per
-// OpsFloa's pay-period convention.
-function previousWeekRange() {
+// Returns the ISO date strings for the previous full week, where the week
+// starts on `weekStart` (0=Sun, 1=Mon, …, 6=Sat). Defaults to Monday.
+function previousWeekRange(weekStart = 1) {
+  const ws = ((Number(weekStart) % 7) + 7) % 7; // normalize to 0-6
   const now = new Date();
-  const day = now.getDay(); // 0 = Sunday, 1 = Mon, …, 6 = Sat
-  const daysSinceMonday = (day + 6) % 7; // Mon=0, Tue=1, … Sun=6
-  const lastMonday = new Date(now);
-  lastMonday.setDate(now.getDate() - daysSinceMonday - 7);
-  const lastSunday = new Date(lastMonday);
-  lastSunday.setDate(lastMonday.getDate() + 6);
+  const daysSinceStart = (now.getDay() - ws + 7) % 7;
+  const lastStart = new Date(now);
+  lastStart.setDate(now.getDate() - daysSinceStart - 7);
+  const lastEnd = new Date(lastStart);
+  lastEnd.setDate(lastStart.getDate() + 6);
   const iso = (d) => d.toLocaleDateString('en-CA'); // YYYY-MM-DD in local tz
-  return { from: iso(lastMonday), to: iso(lastSunday) };
+  return { from: iso(lastStart), to: iso(lastEnd) };
 }
 
 function CollapsibleSection({ title, badge, defaultOpen = false, storageKey, children }) {
@@ -121,9 +121,19 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [pushing, setPushing] = useState(false);
   const [forcePush, setForcePush] = useState(false);
   // Push contractor Bills (time + reimbursements grouped per vendor)
-  // Default date range = previous calendar week (Mon-Sun), most common pay period
-  const [billFrom, setBillFrom] = useState(() => previousWeekRange().from);
-  const [billTo, setBillTo] = useState(() => previousWeekRange().to);
+  // Default date range = previous full week, using the company's week_start setting
+  const [billFrom, setBillFrom] = useState(() => previousWeekRange(settings?.week_start).from);
+  const [billTo, setBillTo] = useState(() => previousWeekRange(settings?.week_start).to);
+  // If settings arrive after mount, recompute defaults against the real week_start
+  const syncedBillDefaultsRef = React.useRef(settings?.week_start != null);
+  useEffect(() => {
+    if (settings?.week_start != null && !syncedBillDefaultsRef.current) {
+      const r = previousWeekRange(settings.week_start);
+      setBillFrom(r.from);
+      setBillTo(r.to);
+      syncedBillDefaultsRef.current = true;
+    }
+  }, [settings?.week_start]);
   const [billForce, setBillForce] = useState(false);
   const [billSelectedWorkers, setBillSelectedWorkers] = useState(new Set());
   const [billPreview, setBillPreview] = useState(null);

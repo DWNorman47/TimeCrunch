@@ -11,6 +11,7 @@ const SETTINGS_DEFAULTS = {
   report_weekly_payroll: false, report_weekly_low_stock: false, report_monthly_valuation: false,
   qbo_auto_push: false, qbo_auto_push_expenses: false, qbo_auto_create_customers: false, notify_qbo_disconnect: false,
   media_retention_days: 0,
+  week_start: 1, // 0=Sunday, 1=Monday, …, 6=Saturday (OpsFloa's default pay-period start)
   currency: 'USD', invoice_signature: 'optional', default_temp_password: '', global_required_checklist_template_id: '',
 };
 

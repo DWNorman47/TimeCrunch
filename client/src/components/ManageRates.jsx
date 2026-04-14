@@ -73,6 +73,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     overtime_multiplier: String(settings?.overtime_multiplier ?? 1.5),
     overtime_rule: settings?.overtime_rule ?? 'daily',
     overtime_threshold: String(settings?.overtime_threshold ?? 8),
+    week_start: String(settings?.week_start ?? 1),
     notification_inactive_days: String(settings?.notification_inactive_days ?? 3),
     notification_use_work_hours: settings?.notification_use_work_hours ?? true,
     notification_start_hour: String(settings?.notification_start_hour ?? 6),
@@ -148,6 +149,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       overtime_multiplier: String(settings.overtime_multiplier ?? 1.5),
       overtime_rule: settings.overtime_rule ?? 'daily',
       overtime_threshold: String(settings.overtime_threshold ?? 8),
+      week_start: String(settings.week_start ?? 1),
       notification_inactive_days: String(settings.notification_inactive_days ?? 3),
       notification_use_work_hours: settings.notification_use_work_hours ?? true,
       notification_start_hour: String(settings.notification_start_hour ?? 6),
@@ -202,6 +204,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         overtime_multiplier: parseFloat(form.overtime_multiplier),
         overtime_rule: form.overtime_rule,
         overtime_threshold: parseFloat(form.overtime_threshold),
+        week_start: parseInt(form.week_start, 10),
         notification_inactive_days: parseFloat(form.notification_inactive_days),
         notification_use_work_hours: form.notification_use_work_hours,
         notification_start_hour: parseFloat(form.notification_start_hour),
@@ -615,6 +618,20 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <div style={styles.inputGroup}>
               <input style={styles.input} type="number" min="1" step="0.5" value={form.overtime_threshold} onChange={e => set('overtime_threshold', e.target.value)} required />
               <span style={styles.suffix}>{t.ratesHrs}</span>
+            </div>
+          </div>
+          <div style={styles.row}>
+            <label style={styles.label}>Week starts on</label>
+            <div style={styles.inputGroup}>
+              <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.week_start} onChange={e => set('week_start', e.target.value)}>
+                <option value="0">Sunday</option>
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+              </select>
             </div>
           </div>
         </div>}
