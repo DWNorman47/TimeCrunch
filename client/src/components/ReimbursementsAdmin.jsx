@@ -29,7 +29,7 @@ function StatusBadge({ status }) {
 
 const DEFAULT_CATEGORIES = ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'];
 
-function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES }) {
+function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES, locale = 'en-US' }) {
   const t = useT();
   const resolveCategory = cat => cat && knownCategories.includes(cat) ? cat : cat ? 'Other' : null;
   const [expanded, setExpanded] = useState(false);
@@ -340,7 +340,7 @@ export default function ReimbursementsAdmin() {
       ) : (
         <div style={s.list}>
           {items.map(item => (
-            <ReimbursementRow key={item.id} item={item} onUpdate={handleUpdate} knownCategories={categories.known} />
+            <ReimbursementRow key={item.id} item={item} onUpdate={handleUpdate} knownCategories={categories.known} locale={locale} />
           ))}
         </div>
       )}
