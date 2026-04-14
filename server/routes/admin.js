@@ -590,16 +590,32 @@ router.get('/workers', requireAdmin, async (req, res) => {
   const allRoles = req.query.all_roles === 'true';
   const roleFilter = allRoles ? `u.role IN ('worker', 'admin')` : `u.role = 'worker'`;
   const accessIds = req.user.worker_access_ids;
-  const accessFilter = accessIds && accessIds.length ? `AND (u.role != 'worker' OR u.id = ANY($3))` : '';
   try {
     const settings = await getSettings(companyId);
     const threshold = parseFloat(settings.overtime_threshold) || 8;
     const weekStart = parseInt(settings.week_start ?? 1, 10);
-    // Week-start-aware bucket: start-of-week date for any given work_date. Postgres's
-    // EXTRACT(DOW) is 0..6 (Sun..Sat); we offset by (weekStart) and mod 7 to get
-    // the number of days to subtract to reach the week's first day.
-    const queryParams = accessIds && accessIds.length ? [companyId, threshold, accessIds, weekStart] : [companyId, threshold, null, weekStart];
-    const wsIdx = queryParams.length; // bind index for week_start
+
+    // LESSON LEARNED — node-pg parameter binding (Postgres 42P18):
+    // Postgres infers each parameter's type from how it's USED in the SQL.
+    // Passing a param that the SQL never references fails with
+    //   "could not determine data type of parameter $N"
+    // The earlier version passed `null` as $3 to keep $4 = weekStart at a
+    // fixed position, but when accessFilter was empty the SQL never touched
+    // $3 → 42P18. Fix: only push a param when we know the SQL will reference
+    // it, and let the index track the true position.
+    const queryParams = [companyId, threshold];
+    let accessParamSql = '';
+    if (accessIds && accessIds.length) {
+      queryParams.push(accessIds);
+      accessParamSql = `AND (u.role != 'worker' OR u.id = ANY($${queryParams.length}))`;
+    }
+    queryParams.push(weekStart);
+    const wsIdx = queryParams.length;
+
+    // Week-start-aware bucket: DATE - ((DOW - ws + 7) % 7) rolls any day
+    // back to the start of its week. DOW is 0..6 (Sun..Sat).
+    const weekBucketSql = `(work_date - ((EXTRACT(DOW FROM work_date)::int - $${wsIdx} + 7) % 7))::date`;
+
     const result = await pool.query(
       `WITH daily_regular AS (
         SELECT user_id, work_date,
@@ -611,10 +627,10 @@ router.get('/workers', requireAdmin, async (req, res) => {
       ),
       weekly_regular AS (
         SELECT user_id,
-          (work_date - ((EXTRACT(DOW FROM work_date)::int - $${wsIdx} + 7) % 7))::date as week_start,
+          ${weekBucketSql} as week_start,
           SUM(day_hours) as week_hours
         FROM daily_regular
-        GROUP BY user_id, (work_date - ((EXTRACT(DOW FROM work_date)::int - $${wsIdx} + 7) % 7))::date
+        GROUP BY user_id, ${weekBucketSql}
       )
       SELECT u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id,
         COUNT(te.id) as total_entries,
@@ -638,7 +654,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
       FROM users u
       LEFT JOIN time_entries te ON te.user_id = u.id
         AND te.work_date >= CURRENT_DATE - INTERVAL '365 days'
-      WHERE ${roleFilter} AND u.active = true AND u.company_id = $1 ${accessFilter}
+      WHERE ${roleFilter} AND u.active = true AND u.company_id = $1 ${accessParamSql}
       GROUP BY u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
