@@ -67,6 +67,7 @@ function getLocation() {
 // ── Lightbox ──────────────────────────────────────────────────────────────────
 
 function Lightbox({ photos, startIndex, onClose }) {
+  const t = useT();
   const [idx, setIdx] = useState(startIndex);
   const item = photos[idx];
   const isVid = item.media_type === 'video' || /\.(mp4|mov|webm|avi|m4v)$/i.test(item.url || '');
