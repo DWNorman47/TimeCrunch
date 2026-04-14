@@ -238,6 +238,54 @@ async function createPurchase(companyId, { bankAccountId, expenseAccountId, vend
   return data.Purchase;
 }
 
+/**
+ * Create a QBO Bill for a vendor with a mix of item-based (labor) and
+ * account-based (reimbursement) line items.
+ *
+ * lines: Array<
+ *   | { type: 'item',    itemId, qty, unitPrice, description, customerId?, classId? }
+ *   | { type: 'account', accountId, amount,                 description, customerId?, classId? }
+ * >
+ */
+async function createBill(companyId, { vendorId, txnDate, dueDate, memo, lines }) {
+  const qboLines = lines.map(l => {
+    if (l.type === 'item') {
+      const amount = parseFloat((l.qty * l.unitPrice).toFixed(2));
+      return {
+        DetailType: 'ItemBasedExpenseLineDetail',
+        Amount: amount,
+        Description: l.description || '',
+        ItemBasedExpenseLineDetail: {
+          ItemRef: { value: String(l.itemId) },
+          UnitPrice: parseFloat(l.unitPrice.toFixed(2)),
+          Qty: parseFloat(l.qty.toFixed(2)),
+          ...(l.classId ? { ClassRef: { value: String(l.classId) } } : {}),
+          ...(l.customerId ? { CustomerRef: { value: String(l.customerId) }, BillableStatus: 'NotBillable' } : {}),
+        },
+      };
+    }
+    return {
+      DetailType: 'AccountBasedExpenseLineDetail',
+      Amount: parseFloat(l.amount.toFixed(2)),
+      Description: l.description || '',
+      AccountBasedExpenseLineDetail: {
+        AccountRef: { value: String(l.accountId) },
+        ...(l.classId ? { ClassRef: { value: String(l.classId) } } : {}),
+        ...(l.customerId ? { CustomerRef: { value: String(l.customerId) }, BillableStatus: 'NotBillable' } : {}),
+      },
+    };
+  });
+  const body = {
+    VendorRef: { value: String(vendorId) },
+    TxnDate: txnDate || new Date().toLocaleDateString('en-CA'),
+    ...(dueDate ? { DueDate: dueDate } : {}),
+    ...(memo ? { PrivateNote: memo } : {}),
+    Line: qboLines,
+  };
+  const data = await qboPost(companyId, '/bill?minorversion=65', body);
+  return data.Bill;
+}
+
 async function pushTimeActivity(companyId, { employeeId, vendorId, customerId, classId, workDate, hours, description }) {
   const useVendor = !!vendorId;
   const body = {
@@ -316,4 +364,4 @@ async function createJournalEntry(companyId, { txnDate, description, debitAccoun
   return data.JournalEntry;
 }
 
-module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getCompanyInfo, listEmployees, listCustomers, listVendors, listItems, listAccounts, listClasses, createInvoice, getInvoice, createPurchase, createCustomer, createVendor, createJournalEntry, deleteTimeActivity, pushTimeActivity };
+module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getCompanyInfo, listEmployees, listCustomers, listVendors, listItems, listAccounts, listClasses, createInvoice, getInvoice, createPurchase, createCustomer, createVendor, createJournalEntry, createBill, deleteTimeActivity, pushTimeActivity };

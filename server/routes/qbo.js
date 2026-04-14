@@ -587,6 +587,225 @@ router.post('/push-expenses', requireAdmin, async (req, res) => {
   }
 });
 
+// ─── Push Bills ──────────────────────────────────────────────────────────
+// Gathers approved time entries + approved reimbursements in a date range for
+// the selected contractor-mapped workers, groups by vendor, and creates one
+// QBO Bill per vendor. Labor lines are item-based (hours × rate on an Item),
+// reimbursement lines are account-based (against qbo_expense_account_id).
+
+async function gatherBillData(companyId, { from, to, workerIds, force }) {
+  const ids = Array.isArray(workerIds) && workerIds.length ? workerIds : null;
+  const [timeRows, reimbRows] = await Promise.all([
+    pool.query(
+      `SELECT te.id, te.user_id, te.project_id, te.work_date, te.start_time, te.end_time,
+              te.notes, te.qbo_bill_id, te.qbo_activity_id,
+              u.full_name, u.qbo_vendor_id, u.hourly_rate, u.worker_type,
+              p.qbo_class_id, p.qbo_customer_id, p.name AS project_name
+         FROM time_entries te
+         JOIN users u    ON te.user_id = u.id
+         LEFT JOIN projects p ON te.project_id = p.id
+        WHERE te.company_id = $1
+          AND te.status = 'approved'
+          AND ($2::date IS NULL OR te.work_date >= $2::date)
+          AND ($3::date IS NULL OR te.work_date <= $3::date)
+          AND ($4::int[] IS NULL OR te.user_id = ANY($4::int[]))
+          AND u.qbo_vendor_id IS NOT NULL`,
+      [companyId, from || null, to || null, ids]
+    ),
+    pool.query(
+      `SELECT r.id, r.user_id, r.project_id, r.expense_date, r.amount, r.description, r.category,
+              r.qbo_bill_id, r.qbo_purchase_id,
+              u.full_name, u.qbo_vendor_id,
+              p.qbo_class_id, p.qbo_customer_id, p.name AS project_name
+         FROM reimbursements r
+         JOIN users u    ON r.user_id = u.id
+         LEFT JOIN projects p ON r.project_id = p.id
+        WHERE r.company_id = $1
+          AND r.status = 'approved'
+          AND ($2::date IS NULL OR r.expense_date >= $2::date)
+          AND ($3::date IS NULL OR r.expense_date <= $3::date)
+          AND ($4::int[] IS NULL OR r.user_id = ANY($4::int[]))
+          AND u.qbo_vendor_id IS NOT NULL`,
+      [companyId, from || null, to || null, ids]
+    ),
+  ]);
+
+  // Group per worker (vendor)
+  const byUser = new Map();
+  const get = (uid) => {
+    if (!byUser.has(uid)) byUser.set(uid, { userId: uid, fullName: '', vendorId: '', hourlyRate: 0, timeEntries: [], reimbursements: [] });
+    return byUser.get(uid);
+  };
+  for (const te of timeRows.rows) {
+    if (te.qbo_bill_id && !force) continue;
+    const hours = hoursBetween(te.start_time, te.end_time);
+    if (hours <= 0) continue;
+    const g = get(te.user_id);
+    g.fullName = te.full_name;
+    g.vendorId = te.qbo_vendor_id;
+    g.hourlyRate = parseFloat(te.hourly_rate) || 0;
+    g.timeEntries.push({
+      id: te.id, workDate: te.work_date, hours,
+      classId: te.qbo_class_id || null,
+      customerId: te.qbo_customer_id || null,
+      projectName: te.project_name || '',
+      description: te.notes || '',
+    });
+  }
+  for (const r of reimbRows.rows) {
+    if (r.qbo_bill_id && !force) continue;
+    const g = get(r.user_id);
+    g.fullName = r.full_name;
+    g.vendorId = r.qbo_vendor_id;
+    g.reimbursements.push({
+      id: r.id, expenseDate: r.expense_date, amount: parseFloat(r.amount) || 0,
+      classId: r.qbo_class_id || null,
+      customerId: r.qbo_customer_id || null,
+      projectName: r.project_name || '',
+      description: r.description || r.category || '',
+    });
+  }
+  return Array.from(byUser.values()).filter(g => g.timeEntries.length || g.reimbursements.length);
+}
+
+function hoursBetween(start, end) {
+  if (!start || !end) return 0;
+  const s = new Date(`1970-01-01T${start}`);
+  let e = new Date(`1970-01-01T${end}`);
+  if (e < s) e = new Date(e.getTime() + 24 * 3600 * 1000);
+  return Math.max(0, (e - s) / 3600000);
+}
+
+function isoDate(d) {
+  if (!d) return null;
+  if (typeof d === 'string') return d.substring(0, 10);
+  try { return d.toISOString().substring(0, 10); } catch { return String(d).substring(0, 10); }
+}
+
+// POST /api/qbo/push-bills-preview — dry-run summary of what would be billed
+// Body: { from, to, worker_ids, force }
+router.post('/push-bills-preview', requireAdmin, async (req, res) => {
+  const { from, to, worker_ids, force } = req.body;
+  try {
+    const groups = await gatherBillData(req.user.company_id, { from, to, workerIds: worker_ids, force });
+    const result = groups.map(g => {
+      const laborHours = g.timeEntries.reduce((s, t) => s + t.hours, 0);
+      const laborAmount = laborHours * g.hourlyRate;
+      const reimbAmount = g.reimbursements.reduce((s, r) => s + r.amount, 0);
+      return {
+        user_id: g.userId,
+        full_name: g.fullName,
+        hourly_rate: g.hourlyRate,
+        time_entries: g.timeEntries.length,
+        hours: parseFloat(laborHours.toFixed(2)),
+        labor_amount: parseFloat(laborAmount.toFixed(2)),
+        reimbursements: g.reimbursements.length,
+        reimb_amount: parseFloat(reimbAmount.toFixed(2)),
+        total: parseFloat((laborAmount + reimbAmount).toFixed(2)),
+      };
+    });
+    res.json({ groups: result });
+  } catch (err) {
+    logger.error({ err }, 'push-bills-preview error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/qbo/push-bills — create one QBO Bill per vendor
+// Body: { from, to, worker_ids, force }
+router.post('/push-bills', requireAdmin, async (req, res) => {
+  const { from, to, worker_ids, force } = req.body;
+  const companyId = req.user.company_id;
+  try {
+    const settingRows = await pool.query(
+      "SELECT key, value FROM settings WHERE company_id = $1 AND key IN ('qbo_expense_account_id', 'qbo_labor_item_id', 'qbo_bill_terms_days')",
+      [companyId]
+    );
+    const expenseAccountId = settingRows.rows.find(r => r.key === 'qbo_expense_account_id')?.value;
+    const laborItemId      = settingRows.rows.find(r => r.key === 'qbo_labor_item_id')?.value;
+    const termsDays        = parseInt(settingRows.rows.find(r => r.key === 'qbo_bill_terms_days')?.value || '0', 10);
+
+    if (!laborItemId)      return res.status(400).json({ error: 'Configure a Labor Item in QBO Settings before pushing bills.' });
+    if (!expenseAccountId) return res.status(400).json({ error: 'Configure an Expense Account in QBO Settings before pushing bills.' });
+
+    const company = await pool.query('SELECT qbo_realm_id FROM companies WHERE id = $1', [companyId]);
+    if (!company.rows[0]?.qbo_realm_id) return res.status(400).json({ error: 'QuickBooks not connected' });
+
+    const groups = await gatherBillData(companyId, { from, to, workerIds: worker_ids, force });
+
+    const today = new Date().toLocaleDateString('en-CA');
+    const dueDate = (() => {
+      if (!termsDays) return null;
+      const d = new Date(); d.setDate(d.getDate() + termsDays);
+      return d.toLocaleDateString('en-CA');
+    })();
+
+    const pushed = [];
+    const skipped = [];
+
+    for (const g of groups) {
+      const lines = [];
+      for (const te of g.timeEntries) {
+        lines.push({
+          type: 'item',
+          itemId: laborItemId,
+          qty: te.hours,
+          unitPrice: g.hourlyRate,
+          description: `${isoDate(te.workDate)}${te.projectName ? ' · ' + te.projectName : ''}${te.description ? ' — ' + te.description : ''}`.slice(0, 4000),
+          customerId: te.customerId,
+          classId: te.classId,
+        });
+      }
+      for (const r of g.reimbursements) {
+        lines.push({
+          type: 'account',
+          accountId: expenseAccountId,
+          amount: r.amount,
+          description: `${isoDate(r.expenseDate)}${r.projectName ? ' · ' + r.projectName : ''}${r.description ? ' — ' + r.description : ''}`.slice(0, 4000),
+          customerId: r.customerId,
+          classId: r.classId,
+        });
+      }
+      if (!lines.length) continue;
+
+      try {
+        const bill = await qbo.createBill(companyId, {
+          vendorId: g.vendorId,
+          txnDate: today,
+          dueDate,
+          memo: `OpsFloa bill ${from || ''}–${to || ''} for ${g.fullName}`.trim(),
+          lines,
+        });
+        const billId = bill?.Id || 'synced';
+        const timeIds = g.timeEntries.map(t => t.id);
+        const reimbIds = g.reimbursements.map(r => r.id);
+        if (timeIds.length) {
+          await pool.query(
+            "UPDATE time_entries SET qbo_bill_id = $1, qbo_synced_at = NOW() WHERE id = ANY($2::int[])",
+            [billId, timeIds]
+          );
+        }
+        if (reimbIds.length) {
+          await pool.query(
+            "UPDATE reimbursements SET qbo_bill_id = $1, qbo_synced_at = NOW() WHERE id = ANY($2::int[])",
+            [billId, reimbIds]
+          );
+        }
+        pushed.push({ user_id: g.userId, full_name: g.fullName, bill_id: billId, time_entries: timeIds.length, reimbursements: reimbIds.length });
+      } catch (pushErr) {
+        skipped.push({ user_id: g.userId, full_name: g.fullName, reason: pushErr.response?.data?.Fault?.Error?.[0]?.Detail || pushErr.message });
+      }
+    }
+
+    logAudit(req.user.company_id, req.user.id, req.user.full_name, 'qbo.bills_pushed', null, null, null,
+      { pushed: pushed.length, skipped: skipped.length, from, to });
+    res.json({ pushed, skipped });
+  } catch (err) {
+    logger.error({ err }, 'push-bills error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/qbo/push-payroll — push a payroll journal entry for a date range
 // Body: { from, to, debit_account_id, credit_account_id }
 router.post('/push-payroll', requireAdmin, async (req, res) => {
