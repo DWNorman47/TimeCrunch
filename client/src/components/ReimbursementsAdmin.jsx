@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
@@ -150,6 +150,20 @@ export default function ReimbursementsAdmin() {
   const fileRef = useRef();
   const isMileage = form.category === 'Mileage';
 
+  // Extra filters + sort (client-side, on top of the status filter)
+  const [filterWorker, setFilterWorker] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterProject, setFilterProject] = useState('');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
+  const [filterSearch, setFilterSearch] = useState('');
+  const [sortBy, setSortBy] = useState('date_desc');
+  const resetFilters = () => {
+    setFilterWorker(''); setFilterCategory(''); setFilterProject('');
+    setFilterFrom(''); setFilterTo(''); setFilterSearch(''); setSortBy('date_desc');
+  };
+  const anyFilterActive = filterWorker || filterCategory || filterProject || filterFrom || filterTo || filterSearch || sortBy !== 'date_desc';
+
   const filterLabels = {
     pending:  t.filterPending || t.statusPendingLabel,
     approved: t.filterApproved || t.statusApprovedLabel,
@@ -219,10 +233,53 @@ export default function ReimbursementsAdmin() {
     setItems(prev => prev.map(i => i.id === updated.id ? { ...i, ...updated } : i));
   };
 
-  const totals = items.reduce((acc, i) => {
+  const visibleItems = useMemo(() => {
+    const search = filterSearch.trim().toLowerCase();
+    let out = items.filter(i => {
+      if (filterWorker && String(i.user_id) !== String(filterWorker)) return false;
+      if (filterCategory && (i.category || '') !== filterCategory) return false;
+      if (filterProject && String(i.project_id || '') !== String(filterProject)) return false;
+      if (filterFrom && String(i.expense_date).substring(0, 10) < filterFrom) return false;
+      if (filterTo && String(i.expense_date).substring(0, 10) > filterTo) return false;
+      if (search) {
+        const hay = [i.full_name, i.username, i.description, i.category, i.project_name].filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(search)) return false;
+      }
+      return true;
+    });
+    const sorters = {
+      date_desc:   (a, b) => String(b.expense_date).localeCompare(String(a.expense_date)) || b.created_at.localeCompare(a.created_at),
+      date_asc:    (a, b) => String(a.expense_date).localeCompare(String(b.expense_date)) || a.created_at.localeCompare(b.created_at),
+      amount_desc: (a, b) => parseFloat(b.amount) - parseFloat(a.amount),
+      amount_asc:  (a, b) => parseFloat(a.amount) - parseFloat(b.amount),
+      worker_asc:  (a, b) => (a.full_name || '').localeCompare(b.full_name || ''),
+    };
+    return [...out].sort(sorters[sortBy] || sorters.date_desc);
+  }, [items, filterWorker, filterCategory, filterProject, filterFrom, filterTo, filterSearch, sortBy]);
+
+  const totals = visibleItems.reduce((acc, i) => {
     acc[i.status] = (acc[i.status] || 0) + parseFloat(i.amount);
     return acc;
   }, {});
+
+  // Workers used for filter dropdown — only those with expenses in the current list
+  const workersInList = useMemo(() => {
+    const map = new Map();
+    items.forEach(i => { if (i.user_id && !map.has(i.user_id)) map.set(i.user_id, i.full_name); });
+    return Array.from(map, ([id, name]) => ({ id, full_name: name })).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }, [items]);
+
+  const projectsInList = useMemo(() => {
+    const map = new Map();
+    items.forEach(i => { if (i.project_id && !map.has(i.project_id)) map.set(i.project_id, i.project_name || '—'); });
+    return Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [items]);
+
+  const categoriesInList = useMemo(() => {
+    const set = new Set();
+    items.forEach(i => { if (i.category) set.add(i.category); });
+    return Array.from(set).sort();
+  }, [items]);
 
   const allWorkers = [{ id: user?.id, full_name: `${user?.full_name || 'Me'} (you)` }, ...workers.filter(w => w.id !== user?.id)];
 
@@ -243,6 +300,44 @@ export default function ReimbursementsAdmin() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Secondary filters + sort */}
+      <div style={s.filterBar}>
+        <input
+          type="text"
+          placeholder="Search worker, description, project…"
+          value={filterSearch}
+          onChange={e => setFilterSearch(e.target.value)}
+          style={{ ...s.filterInput, flex: '2 1 220px' }}
+          aria-label="Search expenses"
+        />
+        <select style={s.filterInput} value={filterWorker} onChange={e => setFilterWorker(e.target.value)} aria-label="Filter by worker">
+          <option value="">All workers</option>
+          {workersInList.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
+        </select>
+        <select style={s.filterInput} value={filterCategory} onChange={e => setFilterCategory(e.target.value)} aria-label="Filter by category">
+          <option value="">All categories</option>
+          {categoriesInList.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        {projectsInList.length > 0 && (
+          <select style={s.filterInput} value={filterProject} onChange={e => setFilterProject(e.target.value)} aria-label="Filter by project">
+            <option value="">All projects</option>
+            {projectsInList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        )}
+        <input type="date" style={s.filterInput} value={filterFrom} onChange={e => setFilterFrom(e.target.value)} aria-label="From date" />
+        <input type="date" style={s.filterInput} value={filterTo} onChange={e => setFilterTo(e.target.value)} aria-label="To date" />
+        <select style={s.filterInput} value={sortBy} onChange={e => setSortBy(e.target.value)} aria-label="Sort by">
+          <option value="date_desc">Date ↓ (newest)</option>
+          <option value="date_asc">Date ↑ (oldest)</option>
+          <option value="amount_desc">Amount ↓</option>
+          <option value="amount_asc">Amount ↑</option>
+          <option value="worker_asc">Worker A–Z</option>
+        </select>
+        {anyFilterActive && (
+          <button type="button" onClick={resetFilters} style={s.resetBtn}>Reset</button>
+        )}
       </div>
 
       {formSuccess && <div style={s.successMsg}>{formSuccess}</div>}
@@ -328,18 +423,23 @@ export default function ReimbursementsAdmin() {
         </form>
       )}
 
-      {!loading && items.length > 0 && filter !== 'all' && (
+      {!loading && visibleItems.length > 0 && (
         <div style={s.summary}>
-          <span style={{ fontWeight: 600 }}>{items.length} request{items.length !== 1 ? 's' : ''}</span>
+          <span style={{ fontWeight: 600 }}>
+            {visibleItems.length} request{visibleItems.length !== 1 ? 's' : ''}
+            {visibleItems.length !== items.length && <span style={{ color: '#6b7280', fontWeight: 500 }}> of {items.length}</span>}
+          </span>
           <span>Total: <b>{fmtMoney(Object.values(totals).reduce((a, b) => a + b, 0))}</b></span>
         </div>
       )}
 
-      {loading ? null : items.length === 0 ? (
-        <div style={s.empty}>{t.noReimbursementsFilter}</div>
+      {loading ? null : visibleItems.length === 0 ? (
+        <div style={s.empty}>
+          {items.length === 0 ? t.noReimbursementsFilter : 'No expenses match the current filters.'}
+        </div>
       ) : (
         <div style={s.list}>
-          {items.map(item => (
+          {visibleItems.map(item => (
             <ReimbursementRow key={item.id} item={item} onUpdate={handleUpdate} knownCategories={categories.known} locale={locale} />
           ))}
         </div>
@@ -366,6 +466,20 @@ const s = {
   preview: { marginTop: 6, maxWidth: 180, maxHeight: 140, borderRadius: 6, border: '1px solid #e5e7eb', objectFit: 'cover' },
   submitBtn: { padding: '9px 22px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-start' },
   filters: { display: 'flex', gap: 6 },
+  filterBar: {
+    display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center',
+    background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+    padding: '10px 12px',
+  },
+  filterInput: {
+    padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7,
+    fontSize: 13, color: '#111827', background: '#fff', flex: '1 1 140px',
+    minWidth: 120,
+  },
+  resetBtn: {
+    padding: '7px 12px', background: '#f3f4f6', border: '1px solid #d1d5db',
+    borderRadius: 7, fontSize: 12, fontWeight: 600, color: '#374151', cursor: 'pointer',
+  },
   filter: { padding: '6px 14px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#6b7280', cursor: 'pointer' },
   filterActive: { padding: '6px 14px', background: '#1a56db', border: '1px solid #1a56db', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer' },
   summary: { display: 'flex', gap: 16, fontSize: 13, color: '#6b7280' },
