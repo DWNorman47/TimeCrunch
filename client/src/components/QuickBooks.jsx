@@ -10,13 +10,45 @@ const EMPLOYEE_TYPES = ['employee', 'owner'];
 const IMPORT_PAGE_SIZE = 15;
 const MAP_PAGE_SIZE = 20;
 
-function CollapsibleSection({ title, badge, defaultOpen = false, children }) {
-  const [open, setOpen] = useState(defaultOpen);
+// Returns last Monday–Sunday as ISO date strings. Weeks start Monday per
+// OpsFloa's pay-period convention.
+function previousWeekRange() {
+  const now = new Date();
+  const day = now.getDay(); // 0 = Sunday, 1 = Mon, …, 6 = Sat
+  const daysSinceMonday = (day + 6) % 7; // Mon=0, Tue=1, … Sun=6
+  const lastMonday = new Date(now);
+  lastMonday.setDate(now.getDate() - daysSinceMonday - 7);
+  const lastSunday = new Date(lastMonday);
+  lastSunday.setDate(lastMonday.getDate() + 6);
+  const iso = (d) => d.toLocaleDateString('en-CA'); // YYYY-MM-DD in local tz
+  return { from: iso(lastMonday), to: iso(lastSunday) };
+}
+
+function CollapsibleSection({ title, badge, defaultOpen = false, storageKey, children }) {
+  const storageFullKey = storageKey ? `qbo-section:${storageKey}` : null;
+  const [open, setOpen] = useState(() => {
+    if (!storageFullKey) return defaultOpen;
+    try {
+      const saved = localStorage.getItem(storageFullKey);
+      if (saved === '1') return true;
+      if (saved === '0') return false;
+    } catch { /* localStorage disabled */ }
+    return defaultOpen;
+  });
+  const toggle = () => {
+    setOpen(prev => {
+      const next = !prev;
+      if (storageFullKey) {
+        try { localStorage.setItem(storageFullKey, next ? '1' : '0'); } catch { /* no-op */ }
+      }
+      return next;
+    });
+  };
   return (
     <div style={styles.section}>
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={toggle}
         aria-expanded={open}
         style={{
           display: 'flex', alignItems: 'center', gap: 8, width: '100%',
@@ -89,8 +121,9 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
   const [pushing, setPushing] = useState(false);
   const [forcePush, setForcePush] = useState(false);
   // Push contractor Bills (time + reimbursements grouped per vendor)
-  const [billFrom, setBillFrom] = useState('');
-  const [billTo, setBillTo] = useState('');
+  // Default date range = previous calendar week (Mon-Sun), most common pay period
+  const [billFrom, setBillFrom] = useState(() => previousWeekRange().from);
+  const [billTo, setBillTo] = useState(() => previousWeekRange().to);
   const [billForce, setBillForce] = useState(false);
   const [billSelectedWorkers, setBillSelectedWorkers] = useState(new Set());
   const [billPreview, setBillPreview] = useState(null);
@@ -531,7 +564,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             const page = workerMapPages[type] || 0;
             const pagedWorkers = typeWorkers.slice(page * MAP_PAGE_SIZE, (page + 1) * MAP_PAGE_SIZE);
             return (
-              <CollapsibleSection key={type} title={TYPE_LABELS[type]} badge={typeWorkers.length}>
+              <CollapsibleSection key={type} title={TYPE_LABELS[type]} badge={typeWorkers.length} storageKey={`mappings-${type}`}>
                 {loadingMappings ? <p>{t.qboLoadingData}</p> : (
                   <>
                     <table style={styles.table}>
@@ -574,7 +607,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           })}
 
           {/* ── Project mapping table ── */}
-          <CollapsibleSection title={t.qboProjectMappings} badge={projects.length}>
+          <CollapsibleSection title={t.qboProjectMappings} badge={projects.length} storageKey="project-mappings">
             <p style={styles.hint}>{t.qboProjectMappingsHint}</p>
             {loadingMappings ? <p>{t.qboLoadingCustomers}</p> : (
               <>
@@ -635,6 +668,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
             <CollapsibleSection
               title={t.qboImportFromQB}
               badge={totalSelections > 0 ? `${totalSelections} selected` : undefined}
+              storageKey="import"
             >
               <p style={styles.hint}>{t.qboImportHint}</p>
 
@@ -805,7 +839,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           )}
 
           {/* ── Auto-sync settings ── */}
-          <CollapsibleSection title="Auto-sync Settings">
+          <CollapsibleSection title="Auto-sync Settings" storageKey="auto-sync">
             <p style={styles.hint}>Automatically push records to QuickBooks when approved. Workers and projects must be mapped above for auto-sync to work.</p>
 
             <label style={styles.syncToggle}>
@@ -906,7 +940,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
 
           {/* ── Push expense reimbursements — only when the reimbursements feature is on ── */}
           {settings?.feature_reimbursements !== false && (
-          <CollapsibleSection title="Push Expense Reimbursements">
+          <CollapsibleSection title="Push Expense Reimbursements" storageKey="push-expenses">
             <p style={styles.hint}>Manually push approved reimbursements to QuickBooks as Purchase records for a date range.</p>
             <div style={styles.pushRow}>
               <div>
@@ -947,7 +981,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           )}
 
           {/* ── Payroll journal entry ── */}
-          <CollapsibleSection title="Push Payroll Journal Entry">
+          <CollapsibleSection title="Push Payroll Journal Entry" storageKey="push-payroll">
             <p style={styles.hint}>Creates a journal entry in QuickBooks for the total labor cost of approved time entries in a date range. Select the wage expense account to debit and the liability or bank account to credit.</p>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
               <div>
@@ -997,7 +1031,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           </CollapsibleSection>
 
           {/* ── Push Bills (contractor time + reimbursements per vendor) ── */}
-          <CollapsibleSection title="Push Bills (Contractors)">
+          <CollapsibleSection title="Push Bills (Contractors)" storageKey="push-bills">
             <p style={styles.hint}>
               Creates one QBO Bill per contractor, combining approved time entries (as labor lines) and approved reimbursements (as expense lines) for the selected date range. Only contractors with a mapped QBO Vendor appear.
             </p>
@@ -1338,7 +1372,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           </CollapsibleSection>
 
           {/* ── Push time entries ── */}
-          <CollapsibleSection title={t.qboPushEntries}>
+          <CollapsibleSection title={t.qboPushEntries} storageKey="push-time">
             <p style={styles.hint}>{t.qboPushHint}</p>
             <div style={styles.pushRow}>
               <div>
