@@ -957,7 +957,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 <img src={lightboxPhoto.url} alt={lightboxPhoto.caption || ''} style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: 8 }} />
                 {lightboxPhoto.caption && <p style={{ color: '#f3f4f6', marginTop: 8, fontSize: 14 }}>{lightboxPhoto.caption}</p>}
                 {lightboxPhoto.worker_name && <p style={{ color: '#6b7280', fontSize: 12, margin: '2px 0 0' }}>{lightboxPhoto.worker_name} · {lightboxPhoto.report_date}</p>}
-                <button style={styles.lightboxClose} onClick={() => setLightboxPhoto(null)}>✕</button>
+                <button style={styles.lightboxClose} aria-label={t.close || 'Close'} onClick={() => setLightboxPhoto(null)}>✕</button>
               </div>
             </div>
           )}
