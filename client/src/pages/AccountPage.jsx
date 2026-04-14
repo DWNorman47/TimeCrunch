@@ -64,7 +64,7 @@ export default function AccountPage() {
       {langError && <p style={{ color: '#dc2626', fontSize: 13, margin: '8px 24px 0' }}>{langError}</p>}
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
 
-      <main style={styles.main} className="mobile-main">
+      <main id="main-content" style={styles.main} className="mobile-main">
         <NotificationSetup />
         <div style={styles.accountCard} className="mobile-card">
           <div style={styles.accountRow}>

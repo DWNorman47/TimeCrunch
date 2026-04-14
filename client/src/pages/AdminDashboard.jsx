@@ -174,7 +174,7 @@ export default function AdminDashboard() {
         );
       })()}
 
-      <main style={styles.main} className="admin-main">
+      <main id="main-content" style={styles.main} className="admin-main">
         <TabBar
           breakpoint={720}
           active={tab}

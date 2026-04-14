@@ -35,6 +35,15 @@ button {
   outline-offset: 2px;
   border-radius: 3px;
 }
+/* Skip-to-main-content link — hidden offscreen until keyboard focus, then
+   slides into view as the first focusable element on the page. */
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 0 !important;
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
 /* Inputs/textareas/selects look better with a subtle inner ring instead of
    an outline that clips on border-radius. */
 input:focus-visible,

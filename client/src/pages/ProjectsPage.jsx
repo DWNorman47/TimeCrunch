@@ -1419,16 +1419,18 @@ export default function ProjectsPage() {
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
-      <main style={styles.main}>
+      <main id="main-content" style={styles.main}>
         {/* Top-level tab bar */}
         <div style={styles.tabBar}>
           <button
+            aria-current={mainTab === 'projects' ? 'page' : undefined}
             style={{ ...styles.tabBtn, ...(mainTab === 'projects' ? styles.tabBtnActive : {}) }}
             onClick={() => setMainTab('projects')}
           >
             {t.projectsTabLabel}
           </button>
           <button
+            aria-current={mainTab === 'clients' ? 'page' : undefined}
             style={{ ...styles.tabBtn, ...(mainTab === 'clients' ? styles.tabBtnActive : {}) }}
             onClick={() => setMainTab('clients')}
           >

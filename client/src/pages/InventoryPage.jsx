@@ -108,7 +108,7 @@ export default function InventoryPage() {
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
-      <main style={styles.main}>
+      <main id="main-content" style={styles.main}>
         <TabBar
           active={tab}
           onChange={switchTab}

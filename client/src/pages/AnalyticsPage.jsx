@@ -53,7 +53,7 @@ export default function AnalyticsPage() {
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
 
-      <main style={styles.main} className="admin-main">
+      <main id="main-content" style={styles.main} className="admin-main">
         <div style={styles.pageHeader}>
           <h1 style={styles.pageTitle}>{t.analyticsTitle}</h1>
         </div>

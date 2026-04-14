@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import InstallPrompt from './components/InstallPrompt';
 import WelcomeModal from './components/WelcomeModal';
+import SkipLink from './components/SkipLink';
 import { ToastProvider } from './contexts/ToastContext';
 import { OfflineProvider } from './contexts/OfflineContext';
 
@@ -132,6 +133,7 @@ export default function App() {
       <BrowserRouter>
         <ToastProvider>
           <OfflineProvider>
+            <SkipLink />
             <WelcomeModal />
             <AppRoutes />
             <InstallPrompt />

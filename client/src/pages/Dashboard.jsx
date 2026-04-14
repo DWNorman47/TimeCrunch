@@ -432,11 +432,12 @@ ${signatureDataUrl ? `
         />
       )}
 
-      <main style={styles.main} className="mobile-main">
+      <main id="main-content" style={styles.main} className="mobile-main">
         <div style={styles.tabs} className="tab-bar">
-          {settings?.module_timeclock !== false && <button style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); history.replaceState(null, '', '#clock'); }}>{t.tabClock}</button>}
+          {settings?.module_timeclock !== false && <button aria-current={tab === 'clock' ? 'page' : undefined} style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); history.replaceState(null, '', '#clock'); }}>{t.tabClock}</button>}
           {settings?.module_timeclock !== false && (
             <button
+              aria-current={tab === 'messages' ? 'page' : undefined}
               style={tab === 'messages' ? styles.tabActive : styles.tab}
               onClick={() => {
                 setTab('messages');
@@ -445,14 +446,15 @@ ${signatureDataUrl ? `
                 localStorage.setItem('chatLastRead', new Date().toISOString());
               }}
             >
-              {t.tabMessages}{chatUnread && <span style={styles.unreadDot} />}
+              {t.tabMessages}
+              {chatUnread && <span style={styles.unreadDot} aria-label={t.unreadMessages || 'unread messages'} role="status" />}
             </button>
           )}
-          {settings?.module_timeclock !== false && <button style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); history.replaceState(null, '', '#timesheet'); }}>{t.tabTimesheet}</button>}
-          {settings?.feature_pto !== false && <button style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); history.replaceState(null, '', '#timeoff'); }}>{t.tabTimeOff}</button>}
-          {settings?.feature_scheduling !== false && <button style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); history.replaceState(null, '', '#schedule'); }}>{t.tabSchedule}</button>}
-          {settings?.feature_scheduling !== false && <button style={tab === 'availability' ? styles.tabActive : styles.tab} onClick={() => { setTab('availability'); history.replaceState(null, '', '#availability'); }}>{t.tabAvailability}</button>}
-          {settings?.feature_reimbursements !== false && <button style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>{t.tabExpenses}</button>}
+          {settings?.module_timeclock !== false && <button aria-current={tab === 'timesheet' ? 'page' : undefined} style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); history.replaceState(null, '', '#timesheet'); }}>{t.tabTimesheet}</button>}
+          {settings?.feature_pto !== false && <button aria-current={tab === 'timeoff' ? 'page' : undefined} style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); history.replaceState(null, '', '#timeoff'); }}>{t.tabTimeOff}</button>}
+          {settings?.feature_scheduling !== false && <button aria-current={tab === 'schedule' ? 'page' : undefined} style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); history.replaceState(null, '', '#schedule'); }}>{t.tabSchedule}</button>}
+          {settings?.feature_scheduling !== false && <button aria-current={tab === 'availability' ? 'page' : undefined} style={tab === 'availability' ? styles.tabActive : styles.tab} onClick={() => { setTab('availability'); history.replaceState(null, '', '#availability'); }}>{t.tabAvailability}</button>}
+          {settings?.feature_reimbursements !== false && <button aria-current={tab === 'reimbursements' ? 'page' : undefined} style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>{t.tabExpenses}</button>}
         </div>
 
         {tab === 'messages' && <CompanyChat onRead={() => { setChatUnread(false); localStorage.setItem('chatLastRead', new Date().toISOString()); }} />}

@@ -272,15 +272,15 @@ export default function SuperAdmin() {
         </div>
       )}
 
-      <main style={styles.main}>
+      <main id="main-content" style={styles.main}>
         <div style={styles.tabs}>
-          <button style={{ ...styles.tabBtn, ...(tab === 'companies' ? styles.tabActive : {}) }} onClick={() => setTab('companies')}>
+          <button aria-current={tab === 'companies' ? 'page' : undefined} style={{ ...styles.tabBtn, ...(tab === 'companies' ? styles.tabActive : {}) }} onClick={() => setTab('companies')}>
             Companies {companies.length > 0 && <span style={styles.tabCount}>{companies.length}</span>}
           </button>
-          <button style={{ ...styles.tabBtn, ...(tab === 'affiliates' ? styles.tabActive : {}) }} onClick={() => setTab('affiliates')}>
+          <button aria-current={tab === 'affiliates' ? 'page' : undefined} style={{ ...styles.tabBtn, ...(tab === 'affiliates' ? styles.tabActive : {}) }} onClick={() => setTab('affiliates')}>
             Affiliates {afList.length > 0 && <span style={styles.tabCount}>{afList.length}</span>}
           </button>
-          <button style={{ ...styles.tabBtn, ...(tab === 'errors' ? styles.tabActive : {}) }} onClick={() => setTab('errors')}>
+          <button aria-current={tab === 'errors' ? 'page' : undefined} style={{ ...styles.tabBtn, ...(tab === 'errors' ? styles.tabActive : {}) }} onClick={() => setTab('errors')}>
             Client Errors {errList.length > 0 && <span style={styles.tabCount}>{errList.length}</span>}
           </button>
         </div>
