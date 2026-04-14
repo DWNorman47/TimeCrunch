@@ -124,7 +124,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
   useEffect(() => {
     api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(silentError('managerates'));
   }, []);
-  const DEFAULT_COLLAPSED = { wages: true, overtime: true, pto: true, reimbursements: true, inventoryCount: true, notifications: true, reports: true, access: true, modules: true, features: true, storage: true };
+  const DEFAULT_COLLAPSED = { wages: true, overtime: true, pto: true, reimbursements: true, inventoryCount: true, notifications: true, reports: true, access: true, standards: true, modules: true, features: true, storage: true };
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem('opsfloa_company_sections');
@@ -525,6 +525,54 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         {!collapsed.access && <SectionFooter section="access" />}
       </div>
 
+      {/* ── Company Standards ── */}
+      <div style={styles.section}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('standards')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('standards')}>
+          <span style={styles.sectionIcon}>📏</span>
+          <div style={{ flex: 1 }}>
+            <div style={styles.sectionTitle}>Company Standards</div>
+            <div style={styles.sectionSub}>Shared conventions used across reports, schedules, and payroll.</div>
+          </div>
+          <span style={styles.collapseChevron}>{collapsed.standards ? '▶' : '▼'}</span>
+        </div>
+        {!collapsed.standards && <div style={styles.sectionBody}>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Week starts on</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                Drives weekly overtime bucketing, weekly reports, and default date ranges.
+              </div>
+            </div>
+            <div style={styles.inputGroup}>
+              <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.week_start} onChange={e => set('week_start', e.target.value)}>
+                <option value="0">Sunday</option>
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+              </select>
+            </div>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Company Timezone</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                Used for scheduled reports and notification timing. Leave blank to use each user's browser timezone.
+              </div>
+            </div>
+            <div style={styles.inputGroup}>
+              <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.company_timezone} onChange={e => set('company_timezone', e.target.value)}>
+                <option value="">(Use browser timezone)</option>
+                {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>}
+        {!collapsed.standards && <SectionFooter section="standards" />}
+      </div>
+
       {/* ── Wages ── */}
       <div style={styles.section}>
         <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('wages')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('wages')}>
@@ -541,15 +589,6 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <div style={styles.inputGroup}>
               <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.currency} onChange={e => set('currency', e.target.value)}>
                 {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div style={styles.row}>
-            <label style={styles.label}>Company Timezone</label>
-            <div style={styles.inputGroup}>
-              <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.company_timezone} onChange={e => set('company_timezone', e.target.value)}>
-                <option value="">(Use browser timezone)</option>
-                {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
               </select>
             </div>
           </div>
@@ -618,20 +657,6 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             <div style={styles.inputGroup}>
               <input style={styles.input} type="number" min="1" step="0.5" value={form.overtime_threshold} onChange={e => set('overtime_threshold', e.target.value)} required />
               <span style={styles.suffix}>{t.ratesHrs}</span>
-            </div>
-          </div>
-          <div style={styles.row}>
-            <label style={styles.label}>Week starts on</label>
-            <div style={styles.inputGroup}>
-              <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.week_start} onChange={e => set('week_start', e.target.value)}>
-                <option value="0">Sunday</option>
-                <option value="1">Monday</option>
-                <option value="2">Tuesday</option>
-                <option value="3">Wednesday</option>
-                <option value="4">Thursday</option>
-                <option value="5">Friday</option>
-                <option value="6">Saturday</option>
-              </select>
             </div>
           </div>
         </div>}
