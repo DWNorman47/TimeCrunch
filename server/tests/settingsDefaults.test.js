@@ -105,3 +105,101 @@ describe('applySettingsRows', () => {
     expect(result.overtime_rule).toBe('weekly');
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// Dirty-data cases — what happens when settings rows drift from spec
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('applySettingsRows — dirty data', () => {
+  test('feature flag value "true" (not "1") is treated as FALSE', () => {
+    // The spec is '1' = true, anything else = false. Documents what happens
+    // if a migration or admin UI accidentally stores the literal string.
+    const rows = [{ key: 'feature_chat', value: 'true' }];
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    expect(result.feature_chat).toBe(false);
+  });
+
+  test('feature flag value "" (empty) is treated as false', () => {
+    const rows = [{ key: 'feature_chat', value: '' }];
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    expect(result.feature_chat).toBe(false);
+  });
+
+  test('feature flag value "0" turns a defaulted-true flag off', () => {
+    expect(SETTINGS_DEFAULTS.feature_chat).toBe(true);
+    const rows = [{ key: 'feature_chat', value: '0' }];
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    expect(result.feature_chat).toBe(false);
+  });
+
+  test('string key with null value is applied (and becomes null)', () => {
+    // String keys don't transform — null falls through as null
+    const rows = [{ key: 'company_timezone', value: null }];
+    const result = applySettingsRows(rows, ADMIN_SETTINGS_DEFAULTS);
+    expect(result.company_timezone).toBeNull();
+  });
+
+  test('string key with whitespace preserved (no trimming)', () => {
+    // Documents current behavior — callers shouldn't assume trimming
+    const rows = [{ key: 'currency', value: '  USD  ' }];
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    expect(result.currency).toBe('  USD  ');
+  });
+
+  test('duplicate keys: later row wins', () => {
+    // Important — if two rows for the same key somehow coexist in the DB,
+    // the order returned determines which value applies.
+    const rows = [
+      { key: 'default_hourly_rate', value: '25' },
+      { key: 'default_hourly_rate', value: '40' },
+    ];
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    expect(result.default_hourly_rate).toBe(40);
+  });
+
+  test('orphaned key (no longer in defaults) is added with parseFloat', () => {
+    // If a migration removed a key from defaults but the row still exists in
+    // the DB, the function still includes it. Callers should be resilient.
+    const rows = [{ key: 'deprecated_setting', value: '99' }];
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    expect(result.deprecated_setting).toBe(99);
+  });
+
+  test('numeric key with empty string becomes NaN (documents quirk)', () => {
+    const rows = [{ key: 'overtime_multiplier', value: '' }];
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    expect(result.overtime_multiplier).toBeNaN();
+  });
+
+  test('feature flag and numeric key in same batch both resolve correctly', () => {
+    const rows = [
+      { key: 'feature_chat', value: '0' },
+      { key: 'overtime_multiplier', value: '1.75' },
+    ];
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    expect(result.feature_chat).toBe(false);
+    expect(result.overtime_multiplier).toBe(1.75);
+  });
+
+  test('empty key list returns shallow copy of defaults, not the same reference', () => {
+    const result = applySettingsRows([], SETTINGS_DEFAULTS);
+    expect(result).toEqual(SETTINGS_DEFAULTS);
+    expect(result).not.toBe(SETTINGS_DEFAULTS); // different object
+  });
+
+  test('all known FEATURE_KEYS flip to true on "1"', () => {
+    const rows = FEATURE_KEYS.map(key => ({ key, value: '1' }));
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    for (const key of FEATURE_KEYS) {
+      expect(result[key]).toBe(true);
+    }
+  });
+
+  test('all known FEATURE_KEYS flip to false on "0"', () => {
+    const rows = FEATURE_KEYS.map(key => ({ key, value: '0' }));
+    const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
+    for (const key of FEATURE_KEYS) {
+      expect(result[key]).toBe(false);
+    }
+  });
+});

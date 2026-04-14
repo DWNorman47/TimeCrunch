@@ -619,7 +619,7 @@ const SUITES = [
       guard('DELETE /admin/clients/0',                   '/admin/clients/0', 'DELETE'),
       guard('GET /admin/clients/0/documents',            '/admin/clients/0/documents'),
       guard('POST /admin/clients/0/documents',           '/admin/clients/0/documents', 'POST'),
-      guard('GET /admin/clients/0/documents/upload-url', '/admin/clients/0/documents/upload-url'),
+      guard('POST /admin/clients/0/documents/upload',    '/admin/clients/0/documents/upload', 'POST'),
     ],
   },
 
@@ -630,9 +630,9 @@ const SUITES = [
       guard('POST /time-off',                      '/time-off', 'POST'),
       guard('GET /time-off/mine',                  '/time-off/mine'),
       guard('DELETE /time-off/0',                  '/time-off/0', 'DELETE'),
-      guard('GET /admin/time-off',                 '/admin/time-off'),
-      guard('PATCH /admin/time-off/0/approve',     '/admin/time-off/0/approve', 'PATCH'),
-      guard('PATCH /admin/time-off/0/deny',        '/admin/time-off/0/deny', 'PATCH'),
+      guard('GET /time-off (admin list)',          '/time-off'),
+      guard('PATCH /time-off/0/approve',            '/time-off/0/approve', 'PATCH'),
+      guard('PATCH /time-off/0/deny',               '/time-off/0/deny', 'PATCH'),
     ],
   },
 
@@ -816,8 +816,8 @@ const SUITES = [
         assertOneOf(r.status, [200, 404]);
         if (r.status === 200) assert(Array.isArray(await r.json()), 'Expected array');
       }},
-      { name: '/admin/time-off → array', run: async () => {
-        const r = await get('/admin/time-off', TOKEN());
+      { name: '/time-off (admin list) → array', run: async () => {
+        const r = await get('/time-off', TOKEN());
         if (r.status !== 200) return;
         assert(Array.isArray(await r.json()), 'Expected array');
       }},
