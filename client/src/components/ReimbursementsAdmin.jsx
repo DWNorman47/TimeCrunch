@@ -29,7 +29,7 @@ function StatusBadge({ status }) {
 
 const DEFAULT_CATEGORIES = ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'];
 
-function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES, locale = 'en-US' }) {
+export function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CATEGORIES, locale = 'en-US' }) {
   const t = useT();
   const resolveCategory = cat => cat && knownCategories.includes(cat) ? cat : cat ? 'Other' : null;
   const [expanded, setExpanded] = useState(false);
