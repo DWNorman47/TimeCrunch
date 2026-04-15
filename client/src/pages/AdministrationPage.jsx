@@ -399,6 +399,7 @@ export default function AdministrationPage() {
               qboConnected={qboConnected}
               trackClassifications={plan.hasCertifiedPayroll && settings?.cp_track_classifications !== false}
               trackFringes={plan.hasCertifiedPayroll && settings?.cp_track_fringes !== false}
+              collectSsn={plan.hasCertifiedPayroll && settings?.cp_collect_ssn !== false}
             />
           </div>
         )}

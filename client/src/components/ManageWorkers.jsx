@@ -6,6 +6,7 @@ import { useT } from '../hooks/useT';
 import { SkeletonList } from './Skeleton';
 import ModalShell from './ModalShell';
 import WorkerFringes from './WorkerFringes';
+import WorkerSsn from './WorkerSsn';
 
 import { silentError } from '../errorReporter';
 function WorkerDocuments({ workerId }) {
@@ -136,7 +137,7 @@ function RoleBadge({ role }) {
   );
 }
 
-export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, defaultTempPassword = '', showRate = true, identityEditable = true, currency = 'USD', currentUser = null, qboConnected = false, trackClassifications = false, trackFringes = false }) {
+export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, defaultTempPassword = '', showRate = true, identityEditable = true, currency = 'USD', currentUser = null, qboConnected = false, trackClassifications = false, trackFringes = false, collectSsn = false }) {
   const toast = useToast();
   const t = useT();
   const rateTypes = [
@@ -991,6 +992,11 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                     {/* ── Certified Payroll fringe benefits ── */}
                     {!isEditing && trackFringes && w.role === 'worker' && (
                       <WorkerFringes userId={w.id} currency={currency} />
+                    )}
+
+                    {/* ── Certified Payroll SSN last-4 ── */}
+                    {!isEditing && collectSsn && w.role === 'worker' && (
+                      <WorkerSsn userId={w.id} />
                     )}
 
                     {/* ── Remove ── */}

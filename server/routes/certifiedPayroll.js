@@ -10,6 +10,8 @@ const pool   = require('../db');
 const logger = require('../logger');
 const { requireAuth, requireAdmin, requireCertifiedPayrollAddon } = require('../middleware/auth');
 const { getAdvancedSettings } = require('./admin');
+const { encrypt, decrypt } = require('../services/encryption');
+const { logAudit } = require('../auditLog');
 
 // GET /api/certified-payroll/classifications — resolved list of job classes
 // (default ∖ suppressed ∪ custom). Admins use this for dropdowns whether or
@@ -99,5 +101,76 @@ router.put('/workers/:id/fringes', requireAdmin, async (req, res) => {
   }
 });
 
+// ────────────────────────────────────────────────────────────────────────────
+// SSN last-4 (encrypted, write-mostly)
+// ────────────────────────────────────────────────────────────────────────────
+// We store only the last 4 digits, encrypted with the same AES-GCM key used
+// for QBO refresh tokens. The GET endpoint returns ONLY a boolean "hasSsn"
+// — we never send the value back to the client after it's been set, and
+// never log it. To change the value, admins re-enter the last 4 digits.
+
+// GET /api/certified-payroll/workers/:id/ssn — presence check only
+router.get('/workers/:id/ssn', requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT ssn_last4_enc FROM users WHERE id = $1 AND company_id = $2',
+      [req.params.id, req.user.company_id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Worker not found' });
+    res.json({ hasSsn: !!rows[0].ssn_last4_enc });
+  } catch (err) {
+    logger.error({ err }, 'catch block error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PUT /api/certified-payroll/workers/:id/ssn { ssn_last4 } — set or clear
+router.put('/workers/:id/ssn', requireAdmin, async (req, res) => {
+  const raw = String(req.body.ssn_last4 || '').replace(/\D/g, '');
+  try {
+    const ok = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [req.params.id, req.user.company_id]);
+    if (ok.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
+
+    if (!raw) {
+      // Clearing the value
+      await pool.query('UPDATE users SET ssn_last4_enc = NULL WHERE id = $1 AND company_id = $2', [req.params.id, req.user.company_id]);
+      await logAudit(req.user.company_id, req.user.id, req.user.full_name, 'worker.ssn_cleared', 'worker', req.params.id, null);
+      return res.json({ hasSsn: false });
+    }
+
+    if (raw.length !== 4) return res.status(400).json({ error: 'SSN must be exactly 4 digits (last 4 only)' });
+
+    const ciphertext = encrypt(raw);
+    await pool.query(
+      'UPDATE users SET ssn_last4_enc = $1 WHERE id = $2 AND company_id = $3',
+      [ciphertext, req.params.id, req.user.company_id]
+    );
+    // Audit trail records that it was set (never the value).
+    await logAudit(req.user.company_id, req.user.id, req.user.full_name, 'worker.ssn_set', 'worker', req.params.id, null);
+    res.json({ hasSsn: true });
+  } catch (err) {
+    logger.error({ err }, 'catch block error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Helper for the report generator — not exposed as a route.
+async function loadSsnLast4(userIds) {
+  if (!userIds.length) return {};
+  const { rows } = await pool.query(
+    'SELECT id, ssn_last4_enc FROM users WHERE id = ANY($1::int[])',
+    [userIds]
+  );
+  const out = {};
+  for (const r of rows) {
+    if (r.ssn_last4_enc) {
+      try { out[r.id] = decrypt(r.ssn_last4_enc); }
+      catch (e) { logger.warn({ user_id: r.id, err: e.message }, 'ssn_decrypt_failed'); }
+    }
+  }
+  return out;
+}
+
 module.exports = router;
 module.exports.requireCertifiedPayrollAddon = requireCertifiedPayrollAddon;
+module.exports.loadSsnLast4 = loadSsnLast4;
