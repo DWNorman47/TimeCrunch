@@ -397,7 +397,8 @@ export default function AdministrationPage() {
               currency={settings?.currency ?? 'USD'}
               currentUser={user}
               qboConnected={qboConnected}
-              trackClassifications={settings?.cp_track_classifications !== false}
+              trackClassifications={plan.hasCertifiedPayroll && settings?.cp_track_classifications !== false}
+              trackFringes={plan.hasCertifiedPayroll && settings?.cp_track_fringes !== false}
             />
           </div>
         )}
