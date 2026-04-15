@@ -171,6 +171,86 @@ async function loadSsnLast4(userIds) {
   return out;
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Statement of Compliance signatures
+// ────────────────────────────────────────────────────────────────────────────
+
+// The legal text signed with each weekly report. WH-347 calls for this
+// declaration per the Davis-Bacon Act / Copeland Anti-Kickback Act.
+const DEFAULT_COMPLIANCE_TEXT = [
+  'I, the undersigned, do hereby state:',
+  '(1) That I pay or supervise the payment of the persons employed by the above contractor on the above-referenced project; that during the payroll period noted, all persons employed on said project have been paid the full weekly wages earned, that no rebates have been or will be made either directly or indirectly to or on behalf of said contractor from the full weekly wages earned by any person and that no deductions have been made either directly or indirectly from the full wages earned by any person, other than permissible deductions as defined in Regulations, Part 3 (29 CFR Subtitle A).',
+  '(2) That any payrolls otherwise under this contract required to be submitted for the above period are correct and complete; that the wage rates for laborers or mechanics contained therein are not less than the applicable wage rates contained in any wage determination incorporated into the contract; that the classifications set forth therein for each laborer or mechanic conform with the work he or she performed.',
+  '(3) That any apprentices employed in the above period are duly registered in a bona fide apprenticeship program registered with a State apprenticeship agency recognized by the Bureau of Apprenticeship and Training, United States Department of Labor, or if no such recognized agency exists in a State, are registered with the Bureau of Apprenticeship and Training, United States Department of Labor.',
+  '(4) That fringe benefits have been paid as specified in the contract.',
+].join('\n\n');
+
+// GET /api/certified-payroll/signatures?project_id=&week_ending= — most recent signature for this report, if any
+router.get('/signatures', requireAdmin, async (req, res) => {
+  const { project_id, week_ending } = req.query;
+  if (!week_ending || !/^\d{4}-\d{2}-\d{2}$/.test(week_ending)) {
+    return res.status(400).json({ error: 'week_ending (YYYY-MM-DD) is required' });
+  }
+  try {
+    const params = [req.user.company_id, week_ending];
+    let projectClause = 'AND project_id IS NULL';
+    if (project_id) { params.push(project_id); projectClause = `AND project_id = $${params.length}`; }
+    const { rows } = await pool.query(
+      `SELECT id, signer_user_id, signer_name, signer_title, compliance_text, signed_at
+         FROM certified_payroll_signatures
+        WHERE company_id = $1 AND week_ending = $2 ${projectClause}
+        ORDER BY signed_at DESC
+        LIMIT 1`,
+      params
+    );
+    res.json({ signature: rows[0] || null, default_compliance_text: DEFAULT_COMPLIANCE_TEXT });
+  } catch (err) {
+    logger.error({ err }, 'catch block error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/certified-payroll/signatures { project_id?, week_ending, signer_name, signer_title?, signature_data }
+router.post('/signatures', requireAdmin, async (req, res) => {
+  const { project_id, week_ending, signer_name, signer_title, signature_data } = req.body;
+  if (!week_ending || !/^\d{4}-\d{2}-\d{2}$/.test(week_ending)) {
+    return res.status(400).json({ error: 'week_ending (YYYY-MM-DD) is required' });
+  }
+  const name = (signer_name || '').trim();
+  const sig = (signature_data || '').trim();
+  if (!name) return res.status(400).json({ error: 'signer_name is required' });
+  if (!sig)  return res.status(400).json({ error: 'signature_data is required' });
+  if (name.length > 200 || sig.length > 2000) return res.status(400).json({ error: 'Signature or name too long' });
+  const title = (signer_title || '').trim().slice(0, 200) || null;
+
+  try {
+    // Upsert — one signature per (company, project, week). Re-signing overwrites
+    // with the new snapshot; history lives in the audit log.
+    const ip = req.ip || req.headers['x-forwarded-for'] || null;
+    const { rows } = await pool.query(
+      `INSERT INTO certified_payroll_signatures
+         (company_id, project_id, week_ending, signer_user_id, signer_name, signer_title, signature_data, compliance_text, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (company_id, project_id, week_ending) DO UPDATE
+         SET signer_user_id = EXCLUDED.signer_user_id,
+             signer_name    = EXCLUDED.signer_name,
+             signer_title   = EXCLUDED.signer_title,
+             signature_data = EXCLUDED.signature_data,
+             compliance_text = EXCLUDED.compliance_text,
+             ip_address     = EXCLUDED.ip_address,
+             signed_at      = NOW()
+       RETURNING id, signer_user_id, signer_name, signer_title, compliance_text, signed_at`,
+      [req.user.company_id, project_id || null, week_ending, req.user.id, name, title, sig, DEFAULT_COMPLIANCE_TEXT, ip]
+    );
+    await logAudit(req.user.company_id, req.user.id, req.user.full_name, 'certified_payroll.signed', 'signature', rows[0].id, `${name} · ${week_ending}`, { project_id: project_id || null });
+    res.json({ signature: rows[0] });
+  } catch (err) {
+    logger.error({ err }, 'catch block error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;
 module.exports.requireCertifiedPayrollAddon = requireCertifiedPayrollAddon;
 module.exports.loadSsnLast4 = loadSsnLast4;
+module.exports.DEFAULT_COMPLIANCE_TEXT = DEFAULT_COMPLIANCE_TEXT;

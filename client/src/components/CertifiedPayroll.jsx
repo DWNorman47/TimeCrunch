@@ -3,6 +3,7 @@ import api from '../api';
 import { useT } from '../hooks/useT';
 import { useAuth } from '../contexts/AuthContext';
 import { langToLocale } from '../utils';
+import CertifiedPayrollSignature from './CertifiedPayrollSignature';
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -24,10 +25,11 @@ function lastSunday() {
   return d.toLocaleDateString('en-CA');
 }
 
-export default function CertifiedPayroll({ projects }) {
+export default function CertifiedPayroll({ projects, requireSignature = false }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
+  const [showSignModal, setShowSignModal] = useState(false);
   const [weekEnd, setWeekEnd] = useState(lastSunday());
   const [projectId, setProjectId] = useState('');
   const [data, setData] = useState(null);
@@ -148,8 +150,23 @@ export default function CertifiedPayroll({ projects }) {
               <div style={styles.metaLine}><strong>{t.project}:</strong> {data.project || t.allProjectsOpt}</div>
               <div style={styles.metaLine}><strong>Period:</strong> {fmtDate(data.week_start, locale)} – {fmtDate(data.week_end, locale)}</div>
             </div>
-            <button style={styles.printBtn} onClick={printReport}>{t.printSavePDF}</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {requireSignature && (
+                <button style={styles.signBtn} onClick={() => setShowSignModal(true)}>
+                  📝 Sign
+                </button>
+              )}
+              <button style={styles.printBtn} onClick={printReport}>{t.printSavePDF}</button>
+            </div>
           </div>
+          {showSignModal && (
+            <CertifiedPayrollSignature
+              projectId={projectId || null}
+              weekEnding={weekEnd}
+              defaultName={user?.full_name || ''}
+              onClose={() => setShowSignModal(false)}
+            />
+          )}
 
           {data.workers.length === 0 ? (
             <p style={styles.empty}>{t.noTimeEntriesFound}</p>
@@ -214,6 +231,7 @@ const styles = {
   reportHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 },
   metaLine: { fontSize: 13, color: '#374151', marginBottom: 4 },
   printBtn: { background: '#059669', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  signBtn:  { background: '#1f2937', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   empty: { color: '#6b7280', fontSize: 13 },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 700 },
