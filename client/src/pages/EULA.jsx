@@ -1,6 +1,11 @@
 import React from 'react';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 export default function EULA() {
+  useDocumentMeta({
+    title: 'End-User License Agreement — OpsFloa',
+    description: 'OpsFloa End-User License Agreement. Terms for using the OpsFloa construction time tracking platform.',
+  });
   return (
     <div style={styles.page}>
       <div style={styles.container}>
