@@ -214,7 +214,7 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
 
 // ── Advanced Settings ──────────────────────────────────────────────────────────
 
-const ADVANCED_SETTING_KEYS = ['reimbursement_categories', 'item_units', 'mileage_rate'];
+const ADVANCED_SETTING_KEYS = ['reimbursement_categories', 'item_units', 'mileage_rate', 'job_classifications'];
 
 // Hardcoded defaults — never stored in DB unless overridden
 const ADVANCED_DEFAULTS = {
@@ -229,6 +229,20 @@ const ADVANCED_DEFAULTS = {
     custom: [],
   },
   mileage_rate: { rate: 0.67 },
+  // Job classifications used for Certified Payroll. Defaults are the common
+  // Davis-Bacon / construction trades; companies can suppress defaults they
+  // don't use and add custom ones (e.g. "Concrete Finisher — Journeyman").
+  job_classifications: {
+    defaults: [
+      'Carpenter', 'Electrician', 'Plumber', 'Laborer', 'Operating Engineer',
+      'Ironworker', 'Cement Mason', 'Painter', 'Roofer', 'Sheet Metal Worker',
+      'Pipefitter', 'Welder', 'Drywall Installer', 'Glazier', 'Insulator',
+      'Heavy Equipment Operator', 'Truck Driver', 'Foreman', 'Apprentice',
+      'Journeyman', 'Helper',
+    ],
+    suppressed: [],
+    custom: [],
+  },
 };
 
 async function getAdvancedSettings(companyId) {
@@ -263,7 +277,7 @@ router.patch('/advanced-settings/:key', requireAdmin, requirePermission('manage_
     const def = ADVANCED_DEFAULTS[key];
     let value = {};
 
-    if (key === 'reimbursement_categories' || key === 'item_units') {
+    if (key === 'reimbursement_categories' || key === 'item_units' || key === 'job_classifications') {
       const suppressed = Array.isArray(req.body.suppressed)
         ? req.body.suppressed.filter(s => def.defaults.includes(s))
         : [];
@@ -632,7 +646,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         FROM daily_regular
         GROUP BY user_id, ${weekBucketSql}
       )
-      SELECT u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id,
+      SELECT u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE(
@@ -655,7 +669,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
       LEFT JOIN time_entries te ON te.user_id = u.id
         AND te.work_date >= CURRENT_DATE - INTERVAL '365 days'
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1 ${accessParamSql}
-      GROUP BY u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id
+      GROUP BY u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
       queryParams
@@ -1123,6 +1137,11 @@ router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), 
     if (overtime_rule !== undefined) { fields.push(`overtime_rule = $${idx++}`); values.push(overtime_rule); }
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email || null); }
     if (worker_type !== undefined) { fields.push(`worker_type = $${idx++}`); values.push(worker_type); }
+    if (req.body.classification !== undefined) {
+      const cls = req.body.classification?.trim() || null;
+      if (cls && cls.length > 100) return res.status(400).json({ error: 'classification must be 100 characters or fewer' });
+      fields.push(`classification = $${idx++}`); values.push(cls);
+    }
     if (req.body.invoice_name !== undefined) {
       const inv = req.body.invoice_name?.trim() || null;
       if (inv && inv.length > 100) return res.status(400).json({ error: 'invoice_name must be 100 characters or fewer' });
@@ -1150,7 +1169,7 @@ router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), 
     values.push(req.params.id);
     values.push(companyId);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, invoice_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type, guaranteed_weekly_hours, updated_at`,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, invoice_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type, classification, guaranteed_weekly_hours, updated_at`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });

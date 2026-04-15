@@ -179,6 +179,15 @@ export default function AdvancedSettings({ settings }) {
                   />
                 </CollapsibleCategory>
               )}
+              {config.job_classifications && settings?.cp_track_classifications !== false && (
+                <CollapsibleCategory title="Job Classifications (Certified Payroll)">
+                  <CategorySection
+                    cfg={config.job_classifications}
+                    onSave={makeSaver('job_classifications')}
+                    saving={saving}
+                  />
+                </CollapsibleCategory>
+              )}
             </>
           ) : null}
         </div>

@@ -120,6 +120,7 @@ app.use('/api/safety-checklists', requireAuth, requirePlan('business'), require(
 app.use('/api/inbox', require('./routes/inbox'));
 app.use('/api/time-off', requireAuth, require('./routes/timeOff'));
 app.use('/api/reimbursements', requireAuth, require('./routes/reimbursements'));
+app.use('/api/certified-payroll', require('./routes/certifiedPayroll'));
 app.use('/api/availability', requireAuth, require('./routes/availability'));
 // Unauthenticated: browsers report errors here. The route itself extracts
 // user identity from the auth header when present.
