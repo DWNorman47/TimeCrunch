@@ -1,0 +1,31 @@
+# OpsFloa robots policy
+# Marketing pages are public; authenticated app surface is not indexed.
+
+User-agent: *
+Allow: /
+Allow: /privacy
+Allow: /eula
+
+# Authenticated app — no value to indexing
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /accept-invite
+Disallow: /confirm-email
+Disallow: /dashboard
+Disallow: /timeclock
+Disallow: /admin
+Disallow: /administration
+Disallow: /analytics
+Disallow: /projects
+Disallow: /inventory
+Disallow: /field
+Disallow: /account
+Disallow: /superadmin
+Disallow: /__tests__
+
+# Dev subdomain — block entirely to avoid duplicate indexing
+# (separate robots served at dev.opsfloa.com if needed; this is prod)
+
+Sitemap: https://opsfloa.com/sitemap.xml

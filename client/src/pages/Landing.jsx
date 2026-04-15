@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 const painPoints = [
   { icon: '📝', text: 'Paper timesheets that go missing — or never get turned in at all.' },
@@ -118,6 +119,10 @@ function FAQItem({ q, a }) {
 }
 
 export default function Landing() {
+  useDocumentMeta({
+    title: 'OpsFloa — Time, Field, Safety & Payroll for Contractors',
+    description: 'GPS time clock, scheduling, field reports, and QuickBooks-ready payroll — built for construction crews, not HR departments. Free for up to 3 workers.',
+  });
   return (
     <div id="top" style={styles.page}>
       {/* Header */}
