@@ -1,0 +1,58 @@
+# OpsFloa
+
+> Time tracking, scheduling, field reports, safety checklists, and
+> QuickBooks-ready payroll built for construction contractors — not
+> HR departments. Workers clock in with GPS on any mobile browser;
+> admins approve hours, push time and reimbursements to QuickBooks,
+> and produce certified payroll (WH-347) reports.
+
+OpsFloa (opsfloa.com) is a SaaS platform for small to mid-sized construction crews (~3–100 workers per company). It replaces paper timesheets, spreadsheet payroll prep, and the patchwork of apps most contractors use.
+
+## Core capabilities
+
+- **GPS time clock** — workers clock in/out from any mobile browser; admins see live clocked-in status, hours worked, and location
+- **Offline-first** — entries sync when connection returns; no data loss in poor-signal job sites
+- **Scheduling** — drag-and-drop weekly shift scheduling with worker notifications
+- **Field reports** — photo/video-rich daily logs, incident reports, RFIs, safety talks, inspections, punchlists
+- **Approvals workflow** — admins review and approve (or edit) time entries before they count toward payroll
+- **QuickBooks Online integration** — one-click push of time entries and reimbursements; vendor/customer/class mapping; contractor bill creation
+- **Certified Payroll (WH-347)** — per-worker classifications, fringe benefits, encrypted SSN last-4, weekly Statement of Compliance signatures, and WH-347-formatted PDF export — for prevailing-wage and Davis-Bacon-covered projects
+- **Prevailing wage tracking** — separate regular vs prevailing wage entries with per-project rates
+- **Reimbursements & mileage** — receipt upload, admin approval, mileage auto-calculated at configurable rate
+- **PTO tracking** — accrual rules, balances, approvals, optional
+- **Reports & analytics** — time by project, worker, client; budget burn; export to CSV/PDF
+
+## Pricing
+
+- **Free** — up to 3 workers, GPS time clock, scheduling, no credit card required
+- **Starter** — $15/mo, up to 10 workers, projects, approvals, exports
+- **Business** — $35/mo, 15 workers included ($2/mo per additional), unlimited projects, analytics, field reports, certified payroll add-on eligible
+- **QuickBooks add-on** — extra, for QBO sync
+- **Certified Payroll add-on** — extra, for WH-347 support
+
+Annual billing offers 2 months free.
+
+## Key links
+
+- [Landing / product overview](https://opsfloa.com/)
+- [Privacy policy](https://opsfloa.com/privacy)
+- [End-user license agreement](https://opsfloa.com/eula)
+- [Sitemap](https://opsfloa.com/sitemap.xml)
+
+## What OpsFloa is NOT
+
+- Not a full payroll processor — withholding calculation and paycheck issuance remain with QuickBooks/ADP/Paychex
+- Not ERP — no inventory (beyond basic item tracking), AR/AP, or GL
+- Not general-purpose — the UX, language, and integrations are construction-specific
+
+## Common questions
+
+**Does it work offline?** Yes. Workers can clock in and submit entries without a connection; syncs automatically when back online.
+
+**Do workers need to download an app?** No. OpsFloa is a PWA that runs in any mobile browser and can be "installed" to the home screen for a native app experience — no app store required.
+
+**How does QuickBooks integration work?** Connect your QBO account in one click. Map workers and projects to their QB counterparts. Push approved time entries as Time Activities, or create vendor Bills combining time and reimbursements for 1099 contractors.
+
+**Can it produce certified payroll reports?** Yes, with the Certified Payroll add-on. Tracks job classifications, fringe benefits (health, pension, vacation, apprenticeship, other), encrypted SSN last-4, and weekly signed Statement of Compliance. Generates WH-347-formatted PDF.
+
+**Prevailing wage / Davis-Bacon support?** Yes. Every time entry is taggable as regular or prevailing wage with configurable per-project rates, daily vs weekly OT rules, and OT multipliers.
