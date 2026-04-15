@@ -25,11 +25,37 @@ function lastSunday() {
   return d.toLocaleDateString('en-CA');
 }
 
-export default function CertifiedPayroll({ projects, requireSignature = false }) {
+export default function CertifiedPayroll({ projects, requireSignature = false, wh347Format = false }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
   const [showSignModal, setShowSignModal] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const downloadWh347Pdf = async () => {
+    if (!data) return;
+    setPdfLoading(true);
+    try {
+      // Dynamically import @react-pdf/renderer and the template — keeps the
+      // ~400KB dep out of the main bundle for non-CP customers.
+      const [{ pdf }, { default: CertifiedPayrollPDF }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./CertifiedPayrollPDF'),
+      ]);
+      const blob = await pdf(<CertifiedPayrollPDF report={data} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `WH-347_${data.week_end}${projectId ? `_proj-${projectId}` : ''}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[wh347-pdf]', err);
+      alert('Failed to generate WH-347 PDF');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
   const [weekEnd, setWeekEnd] = useState(lastSunday());
   const [projectId, setProjectId] = useState('');
   const [data, setData] = useState(null);
@@ -150,10 +176,19 @@ export default function CertifiedPayroll({ projects, requireSignature = false })
               <div style={styles.metaLine}><strong>{t.project}:</strong> {data.project || t.allProjectsOpt}</div>
               <div style={styles.metaLine}><strong>Period:</strong> {fmtDate(data.week_start, locale)} – {fmtDate(data.week_end, locale)}</div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {requireSignature && (
                 <button style={styles.signBtn} onClick={() => setShowSignModal(true)}>
                   📝 Sign
+                </button>
+              )}
+              {wh347Format && (
+                <button
+                  style={{ ...styles.pdfBtn, ...(pdfLoading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                  onClick={downloadWh347Pdf}
+                  disabled={pdfLoading}
+                >
+                  {pdfLoading ? 'Generating…' : '⬇ WH-347 PDF'}
                 </button>
               )}
               <button style={styles.printBtn} onClick={printReport}>{t.printSavePDF}</button>
@@ -232,6 +267,7 @@ const styles = {
   metaLine: { fontSize: 13, color: '#374151', marginBottom: 4 },
   printBtn: { background: '#059669', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   signBtn:  { background: '#1f2937', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  pdfBtn:   { background: '#1a56db', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   empty: { color: '#6b7280', fontSize: 13 },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 700 },

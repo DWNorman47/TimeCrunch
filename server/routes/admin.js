@@ -2801,9 +2801,10 @@ router.get('/certified-payroll', requireAdmin, requirePermission('view_reports')
     if (project_id) { conditions.push(`te.project_id = $${idx++}`); values.push(parseInt(project_id)); }
 
     const result = await pool.query(
-      `SELECT te.user_id, COALESCE(u.invoice_name, u.full_name) as worker_name, u.hourly_rate,
+      `SELECT te.user_id, COALESCE(u.invoice_name, u.full_name) as worker_name, u.hourly_rate, u.classification,
               to_char(te.work_date, 'YYYY-MM-DD') as work_date,
-              te.start_time, te.end_time, te.break_minutes, te.wage_type
+              te.start_time, te.end_time, te.break_minutes, te.wage_type,
+              te.classification AS entry_classification
        FROM time_entries te
        JOIN users u ON te.user_id = u.id
        WHERE ${conditions.join(' AND ')}
@@ -2822,8 +2823,9 @@ router.get('/certified-payroll', requireAdmin, requirePermission('view_reports')
       if (!workerMap[row.user_id]) {
         workerMap[row.user_id] = {
           worker_id: row.user_id,
-          worker_name: row.worker_name,  // already COALESCE(invoice_name, full_name) from SQL
+          worker_name: row.worker_name,
           rate: parseFloat(row.hourly_rate) || defaultRate,
+          classification: row.entry_classification || row.classification || null,
           regular_days: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0 },
           prevailing_days: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0 },
         };
@@ -2838,13 +2840,65 @@ router.get('/certified-payroll', requireAdmin, requirePermission('view_reports')
       }
     }
 
+    // Pull fringes and SSN last-4 (both gated by feature flags; the CP addon
+    // being off silently yields empty values).
+    const userIds = Object.keys(workerMap).map(Number);
+    const { loadSsnLast4 } = require('./certifiedPayroll');
+    const [fringesRows, ssnMap] = await Promise.all([
+      userIds.length ? pool.query('SELECT user_id, category, rate_per_hour FROM worker_fringes WHERE user_id = ANY($1::int[])', [userIds]) : Promise.resolve({ rows: [] }),
+      s.cp_collect_ssn !== false ? loadSsnLast4(userIds) : {},
+    ]);
+    const fringesByUser = {};
+    for (const r of fringesRows.rows) {
+      (fringesByUser[r.user_id] ||= {})[r.category] = parseFloat(r.rate_per_hour);
+    }
+
     const workers = Object.values(workerMap).map(w => {
       const regTotal = +Object.values(w.regular_days).reduce((s, h) => s + h, 0).toFixed(2);
       const prevTotal = +Object.values(w.prevailing_days).reduce((s, h) => s + h, 0).toFixed(2);
-      return { ...w, regular_total: regTotal, prevailing_total: prevTotal, total: +(regTotal + prevTotal).toFixed(2), prevailing_rate: prevRate };
+      const total = +(regTotal + prevTotal).toFixed(2);
+      const fringes = fringesByUser[w.worker_id] || {};
+      const fringeTotalPerHour = Object.values(fringes).reduce((a, b) => a + b, 0);
+      return {
+        ...w,
+        regular_total: regTotal,
+        prevailing_total: prevTotal,
+        total,
+        prevailing_rate: prevRate,
+        ssn_last4: ssnMap[w.worker_id] || null,
+        fringes,
+        fringe_total_per_hour: +fringeTotalPerHour.toFixed(4),
+        gross_pay: +((regTotal * w.rate) + (prevTotal * prevRate)).toFixed(2),
+      };
     });
 
-    res.json({ week_start: weekStart, week_end, contractor, project: projectName, workers });
+    // Pull the signature for this report window, if any.
+    const sigParams = [companyId, week_end];
+    let sigProjectClause = 'AND project_id IS NULL';
+    if (project_id) { sigParams.push(project_id); sigProjectClause = `AND project_id = $${sigParams.length}`; }
+    const sigRes = await pool.query(
+      `SELECT signer_name, signer_title, compliance_text, signed_at
+         FROM certified_payroll_signatures
+        WHERE company_id = $1 AND week_ending = $2 ${sigProjectClause}
+        ORDER BY signed_at DESC LIMIT 1`,
+      sigParams
+    );
+
+    res.json({
+      week_start: weekStart,
+      week_end,
+      contractor,
+      project: projectName,
+      workers,
+      signature: sigRes.rows[0] || null,
+      settings: {
+        cp_track_classifications: s.cp_track_classifications !== false,
+        cp_track_fringes:         s.cp_track_fringes !== false,
+        cp_collect_ssn:           s.cp_collect_ssn !== false,
+        cp_require_signature:     s.cp_require_signature !== false,
+        cp_wh347_format:          s.cp_wh347_format !== false,
+      },
+    });
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
