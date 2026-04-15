@@ -3,17 +3,84 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover" />
-    <title>Ops Flow Assist</title>
+
+    <!-- Primary -->
+    <title>OpsFloa — Time, Field, Safety &amp; Payroll for Contractors</title>
+    <meta name="description" content="GPS time clock, scheduling, field reports, and QuickBooks-ready payroll — built for construction crews, not HR departments. Free for up to 3 workers." />
+    <link rel="canonical" href="https://opsfloa.com/" />
+
+    <!-- Open Graph (LinkedIn, Facebook, Slack, Discord) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="OpsFloa" />
+    <meta property="og:url" content="https://opsfloa.com/" />
+    <meta property="og:title" content="OpsFloa — Time, Field, Safety &amp; Payroll for Contractors" />
+    <meta property="og:description" content="GPS time clock, scheduling, field reports, and QuickBooks-ready payroll — built for construction crews, not HR departments. Free for up to 3 workers." />
+    <meta property="og:image" content="https://opsfloa.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="OpsFloa — Construction time tracking and field management" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="OpsFloa — Time, Field, Safety &amp; Payroll for Contractors" />
+    <meta name="twitter:description" content="GPS time clock, scheduling, field reports, and QuickBooks-ready payroll — built for construction crews, not HR departments. Free for up to 3 workers." />
+    <meta name="twitter:image" content="https://opsfloa.com/og-image.png" />
+
+    <!-- Icons / Manifest -->
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
     <link rel="apple-touch-icon" sizes="152x152" href="/icon-152x152.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/icon-192x192.png" />
+
+    <!-- PWA / mobile -->
     <meta name="theme-color" content="#1a56db" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Ops Flow" />
+    <meta name="apple-mobile-web-app-title" content="OpsFloa" />
+
+    <!-- Structured data: SoftwareApplication -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "OpsFloa",
+        "description": "GPS time clock, scheduling, field reports, safety checklists, and QuickBooks-ready payroll for construction contractors.",
+        "url": "https://opsfloa.com/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web, iOS, Android",
+        "offers": [
+          { "@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "USD", "description": "Up to 3 workers, GPS time clock, scheduling." },
+          { "@type": "Offer", "name": "Starter", "price": "15", "priceCurrency": "USD", "description": "Up to 10 workers, projects, approvals, exports." },
+          { "@type": "Offer", "name": "Business", "price": "35", "priceCurrency": "USD", "description": "15 workers included, unlimited projects, certified payroll add-on." }
+        ],
+        "publisher": {
+          "@type": "Organization",
+          "name": "OpsFloa",
+          "url": "https://opsfloa.com/"
+        }
+      }
+    </script>
+
+    <!-- Structured data: FAQPage (mirrors Landing.jsx) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Is the free plan actually free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes — no credit card required, no trial period, no catch. The Free plan supports up to 3 workers with GPS time clock and scheduling. Upgrade when your crew grows." } },
+          { "@type": "Question", "name": "Do my workers need to download an app?", "acceptedAnswer": { "@type": "Answer", "text": "No download required. OpsFloa works in any mobile browser. Workers can also install it to their home screen as a PWA for a native app experience." } },
+          { "@type": "Question", "name": "Does it work without internet or in poor signal areas?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Workers can clock in and submit entries offline. Everything syncs automatically when they're back online — no data is lost." } },
+          { "@type": "Question", "name": "How does the Business plan pricing work?", "acceptedAnswer": { "@type": "Answer", "text": "It's $35/month and includes 15 workers. After that, it's $2 per additional worker per month. Annual billing is available with 2 months free." } },
+          { "@type": "Question", "name": "Can I track prevailing wage and regular hours separately?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Every time entry is tagged as regular or prevailing wage. Rates, overtime multipliers, and daily vs. weekly OT rules are all configurable. The Pro add-on adds certified payroll reports in WH-347 format." } },
+          { "@type": "Question", "name": "How does the QuickBooks integration work?", "acceptedAnswer": { "@type": "Answer", "text": "Connect your QuickBooks Online account in one click. Map your workers and projects to their QB counterparts. When ready, push approved time entries directly to QuickBooks as Time Activities — no manual re-entry." } },
+          { "@type": "Question", "name": "What happens to my data if I cancel?", "acceptedAnswer": { "@type": "Answer", "text": "No contracts, no cancellation fees. Cancel from your billing page at any time. Your data stays accessible through the end of your current billing period." } },
+          { "@type": "Question", "name": "Can different workers have different pay rates?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Each worker has their own hourly rate. Overtime multipliers and prevailing wage rates are set at the company level. Pay stubs and reports use each worker's individual rate." } }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,6 +1,11 @@
 import React from 'react';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 export default function PrivacyPolicy() {
+  useDocumentMeta({
+    title: 'Privacy Policy — OpsFloa',
+    description: 'How OpsFloa collects, uses, and protects your data. Construction time tracking and payroll for contractors.',
+  });
   return (
     <div style={styles.page}>
       <div style={styles.container}>

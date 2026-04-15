@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a56db"/>
+      <stop offset="100%" stop-color="#0f3a9e"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <g stroke="#ffffff" stroke-opacity="0.06" stroke-width="1">
+    <line x1="0" y1="105" x2="1200" y2="105"/>
+    <line x1="0" y1="210" x2="1200" y2="210"/>
+    <line x1="0" y1="315" x2="1200" y2="315"/>
+    <line x1="0" y1="420" x2="1200" y2="420"/>
+    <line x1="0" y1="525" x2="1200" y2="525"/>
+    <line x1="200" y1="0" x2="200" y2="630"/>
+    <line x1="400" y1="0" x2="400" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/>
+    <line x1="800" y1="0" x2="800" y2="630"/>
+    <line x1="1000" y1="0" x2="1000" y2="630"/>
+  </g>
+
+  <!-- Brand -->
+  <text x="80" y="130" fill="#ffffff" font-family="-apple-system, Segoe UI, Roboto, sans-serif" font-size="36" font-weight="700" letter-spacing="2">OPSFLOA</text>
+
+  <!-- Main -->
+  <text x="80" y="280" fill="#ffffff" font-family="-apple-system, Segoe UI, Roboto, sans-serif" font-size="72" font-weight="800">Time. Field.</text>
+  <text x="80" y="360" fill="#ffffff" font-family="-apple-system, Segoe UI, Roboto, sans-serif" font-size="72" font-weight="800">Safety. Payroll.</text>
+
+  <!-- Tagline -->
+  <text x="80" y="430" fill="#ffffff" fill-opacity="0.85" font-family="-apple-system, Segoe UI, Roboto, sans-serif" font-size="30" font-weight="400">Built for contractors, not HR departments.</text>
+
+  <!-- Feature chips -->
+  <g font-family="-apple-system, Segoe UI, Roboto, sans-serif" font-size="20" font-weight="600" fill="#ffffff">
+    <rect x="80"  y="500" width="170" height="50" rx="25" fill="#ffffff" fill-opacity="0.15"/>
+    <text x="103" y="532">📍 GPS clock</text>
+    <rect x="270" y="500" width="170" height="50" rx="25" fill="#ffffff" fill-opacity="0.15"/>
+    <text x="293" y="532">📋 Field reports</text>
+    <rect x="460" y="500" width="205" height="50" rx="25" fill="#ffffff" fill-opacity="0.15"/>
+    <text x="483" y="532">💰 QB Online sync</text>
+    <rect x="685" y="500" width="170" height="50" rx="25" fill="#ffffff" fill-opacity="0.15"/>
+    <text x="708" y="532">📊 Payroll</text>
+  </g>
+
+  <!-- URL -->
+  <text x="1050" y="592" fill="#ffffff" fill-opacity="0.7" font-family="-apple-system, Segoe UI, Roboto, sans-serif" font-size="22" text-anchor="end">opsfloa.com</text>
+</svg>
