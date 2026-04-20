@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import api from '../../api';
 import ItemLabelModal from './ItemLabelModal';
 import { useT } from '../../hooks/useT';
+
+const ImportItemsModal = lazy(() => import('./ImportItemsModal'));
 
 import { silentError } from '../../errorReporter';
 const DEFAULT_UNITS = ['each', 'box', 'bag', 'bundle', 'pallet', 'lb', 'kg', 'ft', 'm', 'sq ft', 'gal', 'L', 'roll', 'sheet', 'piece', 'other'];
@@ -354,6 +356,7 @@ export default function InventoryItems({ onItemChange }) {
   const [archiveError, setArchiveError] = useState('');
   const [restoreError, setRestoreError] = useState('');
   const [labelItem, setLabelItem] = useState(null);
+  const [importing, setImporting] = useState(false);
 
   const load = async (p = page) => {
     setLoading(true);
@@ -446,8 +449,18 @@ export default function InventoryItems({ onItemChange }) {
               <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} />
               {t.showArchived}
             </label>
+            <button style={s.importBtn} onClick={() => setImporting(true)}>{t.invImportBtn || 'Import'}</button>
             <button style={s.addBtn} onClick={() => setEditingItem(false)}>{t.addItemBtn}</button>
           </div>
+
+          {importing && (
+            <Suspense fallback={null}>
+              <ImportItemsModal
+                onClose={() => setImporting(false)}
+                onDone={() => { load(); onItemChange?.(); }}
+              />
+            </Suspense>
+          )}
 
           {error && <div role="alert" style={s.error}>{error}</div>}
 
@@ -561,6 +574,7 @@ const s = {
   select:      { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151' },
   toggle:      { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer', whiteSpace: 'nowrap' },
   addBtn:      { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
+  importBtn:   { padding: '8px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
   error:       { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },
   empty:       { textAlign: 'center', padding: '60px 24px', color: '#6b7280', fontSize: 15 },
   emptyIcon:   { fontSize: 40, marginBottom: 12 },

@@ -3,6 +3,7 @@ import api from '../api';
 import { currencySymbol } from '../utils';
 import { useT } from '../hooks/useT';
 import { usePlan } from '../hooks/usePlan';
+import { invalidateCache } from '../offlineDb';
 
 import { silentError } from '../errorReporter';
 import HelpTip from './HelpTip';
@@ -270,6 +271,10 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         report_monthly_valuation: form.report_monthly_valuation,
       });
       onSettingsUpdated(r.data);
+      // Bust the worker-facing settings cache so gating toggles (Project
+      // Integration, modules, etc.) take effect on the next request instead of
+      // the next TTL window.
+      invalidateCache('settings');
       setSaved(section);
       // If PTO was saved at 0, collapse the input back to the "+ Enable" button.
       if (section === 'pto' && (parseFloat(form.pto_annual_days) || 0) === 0) {
