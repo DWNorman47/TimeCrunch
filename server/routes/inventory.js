@@ -693,7 +693,16 @@ router.post('/transactions', requireAuth, async (req, res) => {
   if (type === 'receive' && !to_location_id) return res.status(400).json({ error: 'to_location_id required for receive' });
   if (type === 'issue' && !from_location_id) return res.status(400).json({ error: 'from_location_id required for issue' });
   if (type === 'transfer' && !to_location_id) return res.status(400).json({ error: 'to_location_id required for transfer' });
-  if (type === 'transfer' && from_location_id && from_location_id === to_location_id) return res.status(400).json({ error: 'from and to locations must differ' });
+  if (
+    type === 'transfer' &&
+    from_location_id &&
+    from_location_id === to_location_id &&
+    !req.body.area_id && !req.body.rack_id && !req.body.bay_id && !req.body.compartment_id
+  ) {
+    // Same location is allowed when moving between bins (area/rack/bay/compartment).
+    // Reject only when no bin is supplied — that's genuinely a no-op.
+    return res.status(400).json({ error: 'from and to must differ — pick a different location or bin' });
+  }
   if (type === 'adjust' && !to_location_id) return res.status(400).json({ error: 'to_location_id required for adjust' });
   if (notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
   if (reference_no && reference_no.trim().length > 100) return res.status(400).json({ error: 'reference_no too long (max 100 characters)' });
