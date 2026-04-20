@@ -57,7 +57,17 @@ router.post('/in', requireAuth, clockLimiter, async (req, res) => {
     const projectsEnabled = settingsMap['feature_project_integration'] !== '0';
     const globalChecklistId = settingsMap['global_required_checklist_template_id'] ? parseInt(settingsMap['global_required_checklist_template_id']) : null;
 
-    if (!project_id && projectsEnabled) return res.status(400).json({ error: 'project_id required' });
+    if (!project_id && projectsEnabled) {
+      // Fall back gracefully when the company has no active projects — otherwise
+      // workers are stranded with nothing to pick.
+      const anyProjects = await pool.query(
+        'SELECT 1 FROM projects WHERE company_id = $1 AND active = true LIMIT 1',
+        [companyId]
+      );
+      if (anyProjects.rowCount > 0) {
+        return res.status(400).json({ error: 'project_id required' });
+      }
+    }
 
     // Verify project and fetch everything needed in one query (reused below for response)
     let projName = null, projWageType = 'regular';

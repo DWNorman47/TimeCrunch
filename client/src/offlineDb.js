@@ -7,7 +7,9 @@ const SYNC_STORE = 'pending-syncs';
 
 const TTL = {
   projects: 24 * 60 * 60 * 1000,
-  settings: 24 * 60 * 60 * 1000,
+  // Settings drive gating (Project Integration, modules, etc.) so stale caches
+  // block workers after an admin flips a toggle. Short TTL keeps that window small.
+  settings: 5 * 60 * 1000,
   shifts: 60 * 60 * 1000,
   entries: 15 * 60 * 1000,
   'my-count-assignments': 15 * 60 * 1000,
@@ -80,6 +82,15 @@ export async function clearCache() {
   try {
     const db = await getDb();
     await db.clear(STORE);
+  } catch {
+    // ignore
+  }
+}
+
+export async function invalidateCache(key) {
+  try {
+    const db = await getDb();
+    await db.delete(STORE, key);
   } catch {
     // ignore
   }
