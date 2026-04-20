@@ -147,7 +147,10 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   const projectHasGeofence = !!(selectedProjectData?.geo_lat && selectedProjectData?.geo_lng && selectedProjectData?.geo_radius_ft);
 
   const handleClockIn = async () => {
-    if (projectsEnabled && !selectedProject) { setError(t.selectProjectFirst); return; }
+    // When Project Integration is on but the company has zero active projects,
+    // fall back to project-less clock-in instead of blocking the worker.
+    const hasProjects = (projects?.length || 0) > 0;
+    if (projectsEnabled && hasProjects && !selectedProject) { setError(t.selectProjectFirst); return; }
     setError('');
     setLocationDenied(false);
     setLoading(true);
