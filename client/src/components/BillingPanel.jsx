@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
 import { SkeletonList } from './Skeleton';
 
 import { silentError } from '../errorReporter';
@@ -412,6 +413,8 @@ export default function BillingPanel() {
             </div>
           </div>
 
+          <ClientPortalProPlaceholder />
+
           {isTrial && selectedPlan && selectedPlan !== 'free' && (
             <div style={s.trialCta}>
               <div style={{ fontSize: 14, color: '#111827' }}>
@@ -445,6 +448,60 @@ export default function BillingPanel() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Placeholder card for the future Client Portal Pro add-on. Not a buy
+ * button — just a "notify me" flag so we can measure demand before
+ * committing build effort. Once the addon is real, this component
+ * gets replaced with the real billing widget.
+ */
+function ClientPortalProPlaceholder() {
+  const [registered, setRegistered] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const { user, updateUser } = useAuth();
+  const alreadyRegistered = !!user?.client_portal_pro_interest;
+
+  const register = async () => {
+    setSaving(true);
+    try {
+      await api.post('/admin/service-requests/client-portal-interest');
+      setRegistered(true);
+      updateUser?.({ client_portal_pro_interest: true });
+    } catch { /* silent */ } finally { setSaving(false); }
+  };
+
+  const isRegistered = registered || alreadyRegistered;
+
+  return (
+    <div style={{ ...s.addonCard, borderColor: '#c7d2fe', background: '#eef2ff', opacity: isRegistered ? 0.9 : 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 20 }}>🏗️</span>
+        <span style={{ ...s.addonTitle, color: '#3730a3' }}>
+          Client Portal Pro &nbsp;
+          <span style={{ fontSize: 12, fontWeight: 700, background: '#c7d2fe', color: '#3730a3', padding: '2px 8px', borderRadius: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Coming soon</span>
+        </span>
+      </div>
+      <div style={{ paddingLeft: 30, fontSize: 12, color: '#4338ca', lineHeight: 1.55, marginTop: 6 }}>
+        Branded client portal with project status tracking, online invoicing and payment, scheduling, and custom logos.
+        Not available yet — click below to let us know you're interested.
+      </div>
+      <div style={{ paddingLeft: 30, marginTop: 10 }}>
+        {isRegistered ? (
+          <span style={{ fontSize: 13, color: '#065f46', fontWeight: 600 }}>✓ We'll email you the moment it launches.</span>
+        ) : (
+          <button
+            type="button"
+            onClick={register}
+            disabled={saving}
+            style={{ padding: '7px 14px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.55 : 1 }}
+          >
+            {saving ? 'Saving…' : 'Notify me when available'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

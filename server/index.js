@@ -121,6 +121,12 @@ app.use('/api/inbox', require('./routes/inbox'));
 app.use('/api/time-off', requireAuth, require('./routes/timeOff'));
 app.use('/api/reimbursements', requireAuth, require('./routes/reimbursements'));
 app.use('/api/certified-payroll', require('./routes/certifiedPayroll'));
+
+// Client-submitted service requests — public intake unauthenticated,
+// admin management behind /api/admin/service-requests.
+const serviceRequestsRoutes = require('./routes/serviceRequests');
+app.use('/api/public/service-requests', serviceRequestsRoutes.publicRouter);
+app.use('/api/admin/service-requests', serviceRequestsRoutes);
 app.use('/api/availability', requireAuth, require('./routes/availability'));
 // Unauthenticated: browsers report errors here. The route itself extracts
 // user identity from the auth header when present.

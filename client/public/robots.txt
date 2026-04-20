@@ -26,6 +26,9 @@ Disallow: /account
 Disallow: /superadmin
 Disallow: /__tests__
 
+# Public intake forms — company-specific, per-client URLs; not indexed
+Disallow: /r/
+
 # ── LLM / AI crawlers ───────────────────────────────────────────────────────
 # Two categories:
 #   LIVE-QUERY bots fetch a page when a user asks their assistant a question
