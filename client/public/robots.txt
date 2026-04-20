@@ -1,6 +1,7 @@
 # OpsFloa robots policy
 # Marketing pages are public; authenticated app surface is not indexed.
 
+# ── Default rules for all crawlers (search + AI) ────────────────────────────
 User-agent: *
 Allow: /
 Allow: /privacy
@@ -25,7 +26,95 @@ Disallow: /account
 Disallow: /superadmin
 Disallow: /__tests__
 
-# Dev subdomain — block entirely to avoid duplicate indexing
-# (separate robots served at dev.opsfloa.com if needed; this is prod)
+# Public intake forms — company-specific, per-client URLs; not indexed
+Disallow: /r/
+
+# ── LLM / AI crawlers ───────────────────────────────────────────────────────
+# Two categories:
+#   LIVE-QUERY bots fetch a page when a user asks their assistant a question
+#   and usually cite the source. We allow these — they drive discovery.
+#   TRAINING bots scrape in bulk to build foundation-model knowledge. We
+#   block these; blocking them doesn't hurt current discoverability (live
+#   bots still work) but preserves some control over bulk content reuse.
+#
+# Flip any of these to "Allow: /" if the stance changes.
+
+# LIVE-QUERY BOTS — allowed
+User-agent: ChatGPT-User
+Allow: /
+Allow: /privacy
+Allow: /eula
+Disallow: /login
+Disallow: /register
+Disallow: /dashboard
+Disallow: /timeclock
+Disallow: /admin
+Disallow: /administration
+Disallow: /superadmin
+Disallow: /__tests__
+
+User-agent: PerplexityBot
+Allow: /
+Allow: /privacy
+Allow: /eula
+Disallow: /login
+Disallow: /register
+Disallow: /dashboard
+Disallow: /timeclock
+Disallow: /admin
+Disallow: /administration
+Disallow: /superadmin
+Disallow: /__tests__
+
+User-agent: Perplexity-User
+Allow: /
+Allow: /privacy
+Allow: /eula
+Disallow: /login
+Disallow: /register
+Disallow: /dashboard
+Disallow: /timeclock
+Disallow: /admin
+Disallow: /administration
+Disallow: /superadmin
+Disallow: /__tests__
+
+# TRAINING BOTS — blocked
+# Flip to Allow: / if you want your content in their training sets.
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: FacebookBot
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: Meta-ExternalAgent
+Disallow: /
 
 Sitemap: https://opsfloa.com/sitemap.xml

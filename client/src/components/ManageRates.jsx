@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { currencySymbol } from '../utils';
 import { useT } from '../hooks/useT';
+import { usePlan } from '../hooks/usePlan';
 
 import { silentError } from '../errorReporter';
 import HelpTip from './HelpTip';
@@ -66,6 +67,7 @@ function formatBytes(bytes) {
 }
 
 export default function ManageRates({ settings, onSettingsUpdated }) {
+  const plan = usePlan();
   const t = useT();
   const [form, setForm] = useState({
     prevailing_wage_rate: String(settings?.prevailing_wage_rate ?? 0),
@@ -97,6 +99,12 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     feature_media_gallery: settings?.feature_media_gallery ?? false,
     feature_reimbursements: settings?.feature_reimbursements ?? true,
     feature_pto: settings?.feature_pto ?? true,
+    cp_track_classifications: settings?.cp_track_classifications ?? true,
+    cp_track_fringes:         settings?.cp_track_fringes ?? true,
+    cp_collect_ssn:           settings?.cp_collect_ssn ?? true,
+    cp_require_signature:     settings?.cp_require_signature ?? true,
+    cp_wh347_format:          settings?.cp_wh347_format ?? true,
+    cp_compute_deductions:    settings?.cp_compute_deductions ?? false,
     show_worker_wages: settings?.show_worker_wages ?? false,
     global_required_checklist_template_id: settings?.global_required_checklist_template_id ?? '',
     currency: settings?.currency ?? 'USD',
@@ -124,7 +132,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
   useEffect(() => {
     api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(silentError('managerates'));
   }, []);
-  const DEFAULT_COLLAPSED = { wages: true, overtime: true, pto: true, reimbursements: true, inventoryCount: true, notifications: true, reports: true, access: true, standards: true, modules: true, features: true, storage: true };
+  const DEFAULT_COLLAPSED = { wages: true, overtime: true, pto: true, reimbursements: true, inventoryCount: true, notifications: true, reports: true, access: true, standards: true, modules: true, features: true, storage: true, certifiedPayroll: true };
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem('opsfloa_company_sections');
@@ -173,6 +181,12 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       feature_media_gallery: settings.feature_media_gallery ?? false,
       feature_reimbursements: settings.feature_reimbursements ?? true,
       feature_pto: settings.feature_pto ?? true,
+      cp_track_classifications: settings.cp_track_classifications ?? true,
+      cp_track_fringes:         settings.cp_track_fringes ?? true,
+      cp_collect_ssn:           settings.cp_collect_ssn ?? true,
+      cp_require_signature:     settings.cp_require_signature ?? true,
+      cp_wh347_format:          settings.cp_wh347_format ?? true,
+      cp_compute_deductions:    settings.cp_compute_deductions ?? false,
       show_worker_wages: settings.show_worker_wages ?? false,
       global_required_checklist_template_id: settings.global_required_checklist_template_id ?? '',
       currency: settings.currency ?? 'USD',
@@ -228,6 +242,12 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_media_gallery: form.feature_media_gallery,
         feature_reimbursements: form.feature_reimbursements,
         feature_pto: form.feature_pto,
+        cp_track_classifications: form.cp_track_classifications,
+        cp_track_fringes:         form.cp_track_fringes,
+        cp_collect_ssn:           form.cp_collect_ssn,
+        cp_require_signature:     form.cp_require_signature,
+        cp_wh347_format:          form.cp_wh347_format,
+        cp_compute_deductions:    form.cp_compute_deductions,
         show_worker_wages: form.show_worker_wages,
         global_required_checklist_template_id: form.global_required_checklist_template_id,
         currency: form.currency,
@@ -662,6 +682,41 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         </div>}
         {!collapsed.overtime && <SectionFooter section="overtime" />}
       </div>}
+
+      {/* ── Certified Payroll (addon-gated) ── */}
+      {plan.hasCertifiedPayroll && (
+      <div style={styles.section}>
+        <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('certifiedPayroll')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('certifiedPayroll')}>
+          <span style={styles.sectionIcon}>📜</span>
+          <div style={{ flex: 1 }}>
+            <div style={styles.sectionTitle}>Certified Payroll</div>
+            <div style={styles.sectionSub}>Controls what OpsFloa tracks and reports for WH-347 compliance.</div>
+          </div>
+          <span style={styles.collapseChevron}>{collapsed.certifiedPayroll ? '▶' : '▼'}</span>
+        </div>
+        {!collapsed.certifiedPayroll && <div style={styles.sectionBody}>
+          {[
+            { key: 'cp_track_classifications', label: 'Track job classifications', desc: 'Collect trade / class per worker (Carpenter, Electrician, etc.). Required for an accurate WH-347.' },
+            { key: 'cp_track_fringes',         label: 'Track fringe benefits',    desc: 'Per-worker health, pension, vacation, apprenticeship, and other hourly fringe rates.' },
+            { key: 'cp_collect_ssn',           label: 'Collect SSN last-4',       desc: 'Encrypted at rest. Shown only on the generated report — never displayed in the app after setting.' },
+            { key: 'cp_require_signature',     label: 'Require weekly signature', desc: 'Admin signs the Statement of Compliance before a report can be exported.' },
+            { key: 'cp_wh347_format',          label: 'WH-347 format PDF',        desc: 'Generate a PDF matching the official DOL Form WH-347. Leave off for the classic print view.' },
+            { key: 'cp_compute_deductions',    label: 'Compute deductions (Strategy A)', desc: 'EXPERIMENTAL — have OpsFloa compute fed/state/FICA withholdings itself. Default OFF. Most shops let their payroll processor (QBO, ADP, Paychex) handle this.', risky: true },
+          ].map(f => (
+            <div key={f.key} style={styles.row}>
+              <div>
+                <div style={styles.label}>{f.label}</div>
+                <div style={{ fontSize: 12, color: f.risky ? '#b91c1c' : '#6b7280', marginTop: 2 }}>{f.desc}</div>
+              </div>
+              <label style={{ ...styles.toggle, background: form[f.key] ? '#1a56db' : '#d1d5db' }}>
+                <input type="checkbox" checked={!!form[f.key]} onChange={e => set(f.key, e.target.checked)} style={{ display: 'none' }} />
+                <span style={{ ...styles.toggleKnob, transform: form[f.key] ? 'translateX(46px)' : 'translateX(0)' }} />
+              </label>
+            </div>
+          ))}
+        </div>}
+        {!collapsed.certifiedPayroll && <SectionFooter section="certifiedPayroll" />}
+      </div>)}
 
       {/* ── PTO (feature-gated) ── */}
       {form.feature_pto && (

@@ -9,6 +9,7 @@ export function usePlan() {
   const plan = user?.plan || 'free';
   const status = user?.subscription_status || 'trial';
   const qboAddon = user?.addon_qbo || false;
+  const certifiedPayrollAddon = user?.addon_certified_payroll || false;
   const isTrial = status === 'trial';
   const isExempt = status === 'exempt';
   const isTrialExpired = status === 'trial_expired';
@@ -34,6 +35,7 @@ export function usePlan() {
     isStarter: atLeast('starter'),
     isBusiness: atLeast('business'),
     hasQbo: qboAddon || isTrial || isExempt,
+    hasCertifiedPayroll: certifiedPayrollAddon || isTrial || isExempt,
     atLeast,
     // History limit in days — null means no limit
     historyDays: atLeast('starter') ? null : 90,

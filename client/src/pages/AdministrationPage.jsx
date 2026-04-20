@@ -10,6 +10,7 @@ import ManageWorkers from '../components/ManageWorkers';
 import ManageRates from '../components/ManageRates';
 import AdvancedSettings from '../components/AdvancedSettings';
 import AuditLog from '../components/AuditLog';
+import ServiceRequestsAdmin from '../components/ServiceRequestsAdmin';
 import QuickBooks from '../components/QuickBooks';
 import MFASetup from '../components/MFASetup';
 import { usePlan } from '../hooks/usePlan';
@@ -304,7 +305,7 @@ function AccountTab() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const ADMIN_TABS = ['company', 'team', 'integrations', 'billing', 'log', 'account'];
+const ADMIN_TABS = ['company', 'team', 'requests', 'integrations', 'billing', 'log', 'account'];
 
 export default function AdministrationPage() {
   const { user, logout } = useAuth();
@@ -329,6 +330,7 @@ export default function AdministrationPage() {
   const tabs = [
     { id: 'company',      label: t.adminTabCompany      },
     { id: 'team',         label: t.adminTabTeam         },
+    { id: 'requests',     label: 'Requests'             },
     ...(plan.hasQbo ? [{ id: 'integrations', label: t.adminTabIntegrations }] : []),
     { id: 'billing',      label: t.adminTabBilling      },
     { id: 'log',          label: t.adminTabLog          },
@@ -397,7 +399,16 @@ export default function AdministrationPage() {
               currency={settings?.currency ?? 'USD'}
               currentUser={user}
               qboConnected={qboConnected}
+              trackClassifications={plan.hasCertifiedPayroll && settings?.cp_track_classifications !== false}
+              trackFringes={plan.hasCertifiedPayroll && settings?.cp_track_fringes !== false}
+              collectSsn={plan.hasCertifiedPayroll && settings?.cp_collect_ssn !== false}
             />
+          </div>
+        )}
+        {tab === 'requests' && (
+          <div style={styles.tabContent}>
+            <h2 style={styles.tabTitle}>Requests</h2>
+            <ServiceRequestsAdmin />
           </div>
         )}
         {tab === 'log'      && (
