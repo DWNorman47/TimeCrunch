@@ -154,18 +154,32 @@ router.delete('/companies/:id', requireSuperAdmin, async (req, res) => {
   }
 });
 
-// POST /superadmin/companies/:id/impersonate — return a short-lived JWT for an admin of this company
+// POST /superadmin/companies/:id/impersonate — return a short-lived JWT for a
+// user of this company. When { user_id } is provided in the body, impersonate
+// that specific user (any role). Otherwise default to the first active admin
+// so existing "Login as" buttons keep working.
 router.post('/companies/:id/impersonate', requireSuperAdmin, async (req, res) => {
   try {
-    const r = await pool.query(
-      `SELECT u.*, c.name AS company_name
-       FROM users u
-       JOIN companies c ON c.id = u.company_id
-       WHERE u.company_id = $1 AND u.role IN ('admin','super_admin') AND u.active = true
-       ORDER BY u.created_at ASC LIMIT 1`,
-      [req.params.id]
-    );
-    if (r.rowCount === 0) return res.status(404).json({ error: 'No active admin found for this company' });
+    const targetUserId = req.body?.user_id ? parseInt(req.body.user_id) : null;
+    const r = targetUserId
+      ? await pool.query(
+          `SELECT u.*, c.name AS company_name
+           FROM users u
+           JOIN companies c ON c.id = u.company_id
+           WHERE u.company_id = $1 AND u.id = $2 AND u.active = true`,
+          [req.params.id, targetUserId]
+        )
+      : await pool.query(
+          `SELECT u.*, c.name AS company_name
+           FROM users u
+           JOIN companies c ON c.id = u.company_id
+           WHERE u.company_id = $1 AND u.role IN ('admin','super_admin') AND u.active = true
+           ORDER BY u.created_at ASC LIMIT 1`,
+          [req.params.id]
+        );
+    if (r.rowCount === 0) {
+      return res.status(404).json({ error: targetUserId ? 'User not found in this company' : 'No active admin found for this company' });
+    }
     const user = r.rows[0];
     const token = jwt.sign(
       {
