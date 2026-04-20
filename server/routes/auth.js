@@ -89,9 +89,14 @@ router.post('/login', loginLimiter, async (req, res) => {
     }
     const companyId = companyRes.rows[0].id;
 
-    // Step 2: check username within that company
+    // Step 2: check username (or email) within that company. Accepting email
+    // matches what users instinctively try — most SaaS apps use email as the
+    // login identifier — and avoids tickets like "I can't log in".
     const userRes = await pool.query(
-      'SELECT u.*, $2::text as company_name FROM users u WHERE LOWER(u.username) = LOWER($1) AND u.company_id = $3 AND u.active = true',
+      `SELECT u.*, $2::text as company_name FROM users u
+        WHERE (LOWER(u.username) = LOWER($1) OR LOWER(u.email) = LOWER($1))
+          AND u.company_id = $3 AND u.active = true
+        LIMIT 1`,
       [username, company_name, companyId]
     );
     const user = userRes.rows[0];
