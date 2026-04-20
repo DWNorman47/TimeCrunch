@@ -20,9 +20,19 @@ const { requireAdmin } = require('../middleware/auth');
 const { logAudit } = require('../auditLog');
 const { createInboxItemBatch } = require('./inbox');
 const { sendEmail } = require('../email');
+const { getAdvancedSettings } = require('./admin');
 
-const VALID_CATEGORIES = ['new_work', 'service_call', 'quote', 'other'];
-const VALID_STATUSES   = ['new', 'in_review', 'converted', 'declined', 'spam'];
+const VALID_STATUSES = ['new', 'in_review', 'converted', 'declined', 'spam'];
+
+// Resolve the active (default ∖ suppressed ∪ custom) category list for a company
+async function loadActiveCategories(companyId) {
+  const all = await getAdvancedSettings(companyId);
+  const cfg = all.service_request_categories;
+  return [
+    ...cfg.defaults.filter(c => !cfg.suppressed.includes(c)),
+    ...cfg.custom,
+  ];
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Public intake (unauthenticated)
@@ -45,9 +55,11 @@ publicRouter.get('/:slug', async (req, res) => {
       [req.params.slug]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Company not found' });
+    const categories = await loadActiveCategories(rows[0].id);
     res.json({
       company_name: rows[0].name,
       accepting: !!rows[0].accepts_service_requests,
+      categories,
     });
   } catch (err) {
     logger.error({ err }, 'catch block error');
@@ -74,7 +86,6 @@ publicRouter.post('/:slug', publicSubmitLimiter, async (req, res) => {
     const desc = String(description || '').trim();
     if (!name || name.length > 200) return res.status(400).json({ error: 'Name is required (max 200 chars)' });
     if (!desc || desc.length > 5000) return res.status(400).json({ error: 'Description is required (max 5000 chars)' });
-    const cat = VALID_CATEGORIES.includes(category) ? category : 'new_work';
 
     const companyRes = await pool.query(
       'SELECT id, name, accepts_service_requests FROM companies WHERE slug = $1 AND active = true',
@@ -83,6 +94,11 @@ publicRouter.post('/:slug', publicSubmitLimiter, async (req, res) => {
     if (companyRes.rows.length === 0) return res.status(404).json({ error: 'Company not found' });
     const company = companyRes.rows[0];
     if (!company.accepts_service_requests) return res.status(403).json({ error: 'This company is not accepting requests right now.' });
+
+    // Validate category against the company's active list.
+    const activeCats = await loadActiveCategories(company.id);
+    const catRaw = String(category || '').trim();
+    const cat = activeCats.find(c => c.toLowerCase() === catRaw.toLowerCase()) || activeCats[0] || 'Other';
 
     const email = String(requester_email || '').trim().slice(0, 200) || null;
     const phone = String(requester_phone || '').trim().slice(0, 40) || null;
@@ -113,12 +129,14 @@ publicRouter.post('/:slug', publicSubmitLimiter, async (req, res) => {
 async function notifyAdminsOfNewRequest(companyId, companyName, requestId, requesterName, category) {
   const admins = await pool.query(
     `SELECT id, email, full_name, language FROM users
-      WHERE company_id = $1 AND role IN ('admin', 'super_admin') AND active = true`,
+      WHERE company_id = $1 AND role IN ('admin', 'super_admin') AND active = true
+        AND notify_service_requests = true`,
     [companyId]
   );
   if (admins.rows.length === 0) return;
 
-  const catLabel = category === 'service_call' ? 'Service call' : category === 'quote' ? 'Quote request' : category === 'other' ? 'Other' : 'New work request';
+  // Category is now a free-form label (admin-configurable); use it verbatim.
+  const catLabel = category || 'Request';
 
   // Inbox
   createInboxItemBatch(
@@ -195,6 +213,42 @@ router.patch('/settings', requireAdmin, async (req, res) => {
     await pool.query('UPDATE companies SET accepts_service_requests = $1 WHERE id = $2', [accepts_service_requests, req.user.company_id]);
     await logAudit(req.user.company_id, req.user.id, req.user.full_name, `service_requests.${accepts_service_requests ? 'enabled' : 'disabled'}`, null, null, null);
     res.json({ accepts_service_requests });
+  } catch (err) {
+    logger.error({ err }, 'catch block error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/admin/service-requests/recipients — list of admin users with their notify flags
+router.get('/recipients', requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, full_name, username, email, notify_service_requests
+         FROM users
+        WHERE company_id = $1 AND role IN ('admin', 'super_admin') AND active = true
+        ORDER BY full_name`,
+      [req.user.company_id]
+    );
+    res.json({ recipients: rows });
+  } catch (err) {
+    logger.error({ err }, 'catch block error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /api/admin/service-requests/recipients/:userId { notify } — toggle one admin's flag
+router.patch('/recipients/:userId', requireAdmin, async (req, res) => {
+  const { notify } = req.body;
+  if (typeof notify !== 'boolean') return res.status(400).json({ error: 'notify (boolean) required' });
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE users SET notify_service_requests = $1
+        WHERE id = $2 AND company_id = $3 AND role IN ('admin', 'super_admin')`,
+      [notify, req.params.userId, req.user.company_id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Admin not found' });
+    await logAudit(req.user.company_id, req.user.id, req.user.full_name, `service_request.notify_${notify ? 'on' : 'off'}`, 'user', req.params.userId, null);
+    res.json({ ok: true });
   } catch (err) {
     logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });

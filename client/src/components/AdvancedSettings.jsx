@@ -188,6 +188,15 @@ export default function AdvancedSettings({ settings }) {
                   />
                 </CollapsibleCategory>
               )}
+              {config.service_request_categories && (
+                <CollapsibleCategory title="Service Request Categories (client intake form)">
+                  <CategorySection
+                    cfg={config.service_request_categories}
+                    onSave={makeSaver('service_request_categories')}
+                    saving={saving}
+                  />
+                </CollapsibleCategory>
+              )}
             </>
           ) : null}
         </div>

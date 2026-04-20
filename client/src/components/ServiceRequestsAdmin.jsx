@@ -18,13 +18,6 @@ const STATUS_FILTERS = [
   { key: 'all',       label: 'All' },
 ];
 
-const CATEGORY_LABELS = {
-  new_work:     'New work',
-  service_call: 'Service call',
-  quote:        'Quote',
-  other:        'Other',
-};
-
 export default function ServiceRequestsAdmin() {
   const { user, updateUser } = useAuth();
   const [accepting, setAccepting] = useState(!!user?.accepts_service_requests);
@@ -36,6 +29,8 @@ export default function ServiceRequestsAdmin() {
   const [notesDraft, setNotesDraft] = useState({});
   const [convertingId, setConvertingId] = useState(null);
   const [error, setError] = useState('');
+  const [recipients, setRecipients] = useState([]);
+  const [recipientsLoaded, setRecipientsLoaded] = useState(false);
 
   const publicUrl = useMemo(() => {
     if (!user?.company_slug) return null;
@@ -51,6 +46,23 @@ export default function ServiceRequestsAdmin() {
       .finally(() => setLoading(false));
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
+
+  useEffect(() => {
+    api.get('/admin/service-requests/recipients')
+      .then(r => { setRecipients(r.data.recipients || []); setRecipientsLoaded(true); })
+      .catch(silentError('servicerequests-recipients'));
+  }, []);
+
+  const toggleRecipient = async (userId, next) => {
+    // Optimistic update
+    setRecipients(rs => rs.map(u => u.id === userId ? { ...u, notify_service_requests: next } : u));
+    try {
+      await api.patch(`/admin/service-requests/recipients/${userId}`, { notify: next });
+    } catch {
+      // revert on failure
+      setRecipients(rs => rs.map(u => u.id === userId ? { ...u, notify_service_requests: !next } : u));
+    }
+  };
 
   const toggleAccepting = async () => {
     setSavingToggle(true);
@@ -127,6 +139,41 @@ export default function ServiceRequestsAdmin() {
         </div>
       </div>
 
+      {/* Notification recipients */}
+      {recipientsLoaded && (
+        <div style={s.recipientsCard}>
+          <div style={s.recipientsHeader}>
+            <div>
+              <div style={s.recipientsTitle}>Notification recipients</div>
+              <div style={s.recipientsHint}>Admins listed here receive an email + Inbox item for every new request.</div>
+            </div>
+            <div style={s.recipientsCount}>
+              {recipients.filter(r => r.notify_service_requests).length} of {recipients.length} on
+            </div>
+          </div>
+          <div style={s.recipientsList}>
+            {recipients.map(r => (
+              <label key={r.id} style={s.recipientRow}>
+                <input
+                  type="checkbox"
+                  checked={!!r.notify_service_requests}
+                  onChange={e => toggleRecipient(r.id, e.target.checked)}
+                />
+                <span style={s.recipientName}>{r.full_name}</span>
+                {r.email ? (
+                  <span style={s.recipientEmail}>{r.email}</span>
+                ) : (
+                  <span style={s.recipientNoEmail}>no email — won't be emailed</span>
+                )}
+              </label>
+            ))}
+          </div>
+          <div style={s.recipientsFooter}>
+            Edit available categories in Administration → Company → Advanced settings → Service Request Categories.
+          </div>
+        </div>
+      )}
+
       {/* Status filters */}
       <div style={s.filterBar}>
         {STATUS_FILTERS.map(f => (
@@ -154,7 +201,7 @@ export default function ServiceRequestsAdmin() {
               <div key={r.id} style={s.card}>
                 <div style={s.row} onClick={() => setExpandedId(open ? null : r.id)}>
                   <div style={s.name}>{r.requester_name}</div>
-                  <div style={s.categoryPill}>{CATEGORY_LABELS[r.category] || r.category}</div>
+                  <div style={s.categoryPill}>{r.category || 'Request'}</div>
                   <div style={s.statusPill(r.status)}>{r.status.replace('_', ' ')}</div>
                   <div style={s.created}>{new Date(r.created_at).toLocaleString()}</div>
                   <span style={s.chevron}>{open ? '▾' : '▸'}</span>
@@ -232,6 +279,17 @@ const s = {
   statusDot:     { width: 8, height: 8, borderRadius: '50%', background: 'currentColor' },
   startBtn:      { padding: '7px 14px', background: '#059669', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   pauseBtn:      { padding: '7px 14px', background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  recipientsCard:   { background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', padding: 16 },
+  recipientsHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 10, flexWrap: 'wrap' },
+  recipientsTitle:  { fontSize: 14, fontWeight: 700, color: '#111827' },
+  recipientsHint:   { fontSize: 12, color: '#6b7280', marginTop: 2 },
+  recipientsCount:  { fontSize: 12, fontWeight: 600, color: '#059669' },
+  recipientsList:   { display: 'flex', flexDirection: 'column', gap: 6 },
+  recipientRow:     { display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 6, cursor: 'pointer' },
+  recipientName:    { fontSize: 13, fontWeight: 600, color: '#111827' },
+  recipientEmail:   { fontSize: 12, color: '#6b7280', marginLeft: 'auto' },
+  recipientNoEmail: { fontSize: 12, color: '#92400e', marginLeft: 'auto', fontStyle: 'italic' },
+  recipientsFooter: { fontSize: 11, color: '#9ca3af', marginTop: 10, paddingTop: 10, borderTop: '1px solid #f3f4f6' },
   filterBar:     { display: 'flex', gap: 6, flexWrap: 'wrap' },
   filter:        { padding: '6px 14px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#6b7280', cursor: 'pointer' },
   filterActive:  { padding: '6px 14px', background: '#1a56db', border: '1px solid #1a56db', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer' },

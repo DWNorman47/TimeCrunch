@@ -9,17 +9,11 @@ import { useParams } from 'react-router-dom';
 import api from '../api';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
-const CATEGORIES = [
-  { key: 'new_work',     label: 'New work / project inquiry' },
-  { key: 'service_call', label: 'Service call / repair' },
-  { key: 'quote',        label: 'Request a quote' },
-  { key: 'other',        label: 'Other' },
-];
-
 export default function ServiceRequest() {
   const { slug } = useParams();
   const [companyName, setCompanyName] = useState('');
   const [accepting, setAccepting] = useState(true);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -30,7 +24,7 @@ export default function ServiceRequest() {
     requester_email: '',
     requester_phone: '',
     requester_address: '',
-    category: 'new_work',
+    category: '',
     description: '',
     website: '', // honeypot
   });
@@ -46,6 +40,9 @@ export default function ServiceRequest() {
       .then(r => {
         setCompanyName(r.data.company_name);
         setAccepting(r.data.accepting);
+        const cats = r.data.categories || [];
+        setCategories(cats);
+        if (cats.length > 0) setForm(f => ({ ...f, category: cats[0] }));
       })
       .catch(err => {
         if (err.response?.status === 404) setNotFound(true);
@@ -147,14 +144,16 @@ export default function ServiceRequest() {
               </label>
             </div>
 
-            <div style={styles.row}>
-              <label style={styles.field}>
-                <span style={styles.label}>What do you need? *</span>
-                <select style={styles.input} value={form.category} onChange={e => set('category', e.target.value)}>
-                  {CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
-                </select>
-              </label>
-            </div>
+            {categories.length > 0 && (
+              <div style={styles.row}>
+                <label style={styles.field}>
+                  <span style={styles.label}>What do you need? *</span>
+                  <select style={styles.input} value={form.category} onChange={e => set('category', e.target.value)}>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </label>
+              </div>
+            )}
 
             <div style={styles.row}>
               <label style={styles.field}>

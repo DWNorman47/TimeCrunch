@@ -214,7 +214,7 @@ router.patch('/settings', requireAdmin, requirePermission('manage_settings'), as
 
 // ── Advanced Settings ──────────────────────────────────────────────────────────
 
-const ADVANCED_SETTING_KEYS = ['reimbursement_categories', 'item_units', 'mileage_rate', 'job_classifications'];
+const ADVANCED_SETTING_KEYS = ['reimbursement_categories', 'item_units', 'mileage_rate', 'job_classifications', 'service_request_categories'];
 
 // Hardcoded defaults — never stored in DB unless overridden
 const ADVANCED_DEFAULTS = {
@@ -239,6 +239,19 @@ const ADVANCED_DEFAULTS = {
       'Pipefitter', 'Welder', 'Drywall Installer', 'Glazier', 'Insulator',
       'Heavy Equipment Operator', 'Truck Driver', 'Foreman', 'Apprentice',
       'Journeyman', 'Helper',
+    ],
+    suppressed: [],
+    custom: [],
+  },
+  // Categories shown in the public client intake form. Admins can
+  // suppress defaults and add custom categories; the selected label is
+  // stored verbatim in service_requests.category.
+  service_request_categories: {
+    defaults: [
+      'New work / project inquiry',
+      'Service call / repair',
+      'Request a quote',
+      'Other',
     ],
     suppressed: [],
     custom: [],
@@ -277,7 +290,7 @@ router.patch('/advanced-settings/:key', requireAdmin, requirePermission('manage_
     const def = ADVANCED_DEFAULTS[key];
     let value = {};
 
-    if (key === 'reimbursement_categories' || key === 'item_units' || key === 'job_classifications') {
+    if (key === 'reimbursement_categories' || key === 'item_units' || key === 'job_classifications' || key === 'service_request_categories') {
       const suppressed = Array.isArray(req.body.suppressed)
         ? req.body.suppressed.filter(s => def.defaults.includes(s))
         : [];
