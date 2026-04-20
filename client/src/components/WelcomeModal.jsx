@@ -16,12 +16,12 @@ function WelcomeModalInner({ user, isAdmin, firstName, handleStart, t }) {
         <h2 id="welcome-modal-title" style={styles.title}>{t.welcome}, {firstName}!</h2>
         {isAdmin ? (
           <>
-            <p style={styles.body}><strong>Ops Flow Assist</strong> {t.welcomeAdminBody1}</p>
+            <p style={styles.body}>{t.welcomeAdminBody1}</p>
             <p style={styles.body}>{t.welcomeAdminBody2}</p>
           </>
         ) : (
           <>
-            <p style={styles.body}><strong>Ops Flow Assist</strong> {t.welcomeWorkerBody1}</p>
+            <p style={styles.body}>{t.welcomeWorkerBody1}</p>
             <p style={styles.body}>{t.welcomeWorkerBody2}</p>
           </>
         )}
