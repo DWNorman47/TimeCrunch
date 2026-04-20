@@ -492,9 +492,6 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
         <div style={styles.detailBody}>
           {tab === 'overview' && (
             <div>
-              {/* Visibility — who sees this project in Time Clock */}
-              <ProjectVisibility project={project} onProjectUpdated={onProjectUpdated} />
-
               {/* Project metadata */}
               {(project.client_name || project.job_number || project.address || project.start_date || project.end_date || project.description || (project.status && project.status !== 'in_progress')) && (
                 <div style={{ ...styles.budgetSection, marginBottom: 16 }}>
@@ -558,6 +555,9 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   )}
                 </div>
               )}
+
+              {/* Visibility — who sees this project in Time Clock */}
+              <ProjectVisibility project={project} onProjectUpdated={onProjectUpdated} toggleStyle={styles.activityToggle} countStyle={styles.activityCount} />
 
               {/* Punchlist */}
               <div style={{ marginBottom: 16 }}>
@@ -1226,7 +1226,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 // match the overview tab's other panels (budgetSection look). Collapsed by
 // default; header is clickable. Empty selection = visible to everyone.
 
-function ProjectVisibility({ project, onProjectUpdated }) {
+function ProjectVisibility({ project, onProjectUpdated, toggleStyle, countStyle }) {
   const [open, setOpen] = useState(false);
   const [workers, setWorkers] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1279,30 +1279,28 @@ function ProjectVisibility({ project, onProjectUpdated }) {
   };
 
   const restricted = selected.size > 0;
-  const summary = restricted
-    ? `${selected.size} worker${selected.size === 1 ? '' : 's'}`
-    : 'Everyone';
-
-  // Match the overview tab's budgetSection look — same light gray panel, same
-  // uppercase section title — but with a clickable row and a collapsible body.
-  const sectionStyle = { background: '#f9fafb', borderRadius: 10, padding: '14px 16px', marginBottom: 16 };
-  const titleStyle   = { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280' };
-  const summaryStyle = { fontSize: 12, fontWeight: 600, color: restricted ? '#1e40af' : '#6b7280', marginLeft: 'auto' };
 
   return (
-    <div style={sectionStyle}>
+    <div style={{ marginBottom: 16 }}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', minHeight: 'unset' }}
+        style={toggleStyle}
       >
-        <span style={{ fontSize: 11, color: '#6b7280', width: 10, display: 'inline-block' }}>{open ? '▾' : '▸'}</span>
-        <span style={titleStyle}>Visibility</span>
-        <span style={summaryStyle}>{summary}</span>
+        <span>Visibility</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {restricted && (
+            <span style={{ ...countStyle, background: '#3b82f6' }}>
+              {selected.size} {selected.size === 1 ? 'worker' : 'workers'}
+            </span>
+          )}
+          {!restricted && <span style={countStyle}>Everyone</span>}
+          <span style={{ fontSize: 12, color: '#6b7280' }}>{open ? '▴' : '▾'}</span>
+        </span>
       </button>
       {open && (
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 8 }}>
           <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 12px' }}>
             Choose which workers see this project in their Time Clock dropdown. Leave empty to make it visible to
             everyone. Admins always see every project regardless of this setting.
