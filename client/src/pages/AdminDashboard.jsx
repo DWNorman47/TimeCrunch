@@ -258,7 +258,7 @@ export default function AdminDashboard() {
               <span>{t.payrollLabel}</span>
               <span style={styles.chevron}>{collapsedSections.payroll ? '▶' : '▼'}</span>
             </button>
-            {!collapsedSections.payroll && (plan.hasQbo ? <CertifiedPayroll projects={projects} /> : <UpgradePrompt requiredPlan="qbo" feature={t.payrollLabel} />)}
+            {!collapsedSections.payroll && (plan.hasQbo ? <CertifiedPayroll projects={projects} requireSignature={plan.hasCertifiedPayroll && settings?.cp_require_signature !== false} wh347Format={plan.hasCertifiedPayroll && settings?.cp_wh347_format !== false} /> : <UpgradePrompt requiredPlan="qbo" feature={t.payrollLabel} />)}
             <button style={styles.sectionToggle} onClick={() => toggleSection('export')}>
               <span>{t.export}</span>
               <span style={styles.chevron}>{collapsedSections.export ? '▶' : '▼'}</span>

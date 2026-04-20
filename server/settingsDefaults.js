@@ -1,4 +1,4 @@
-const FEATURE_KEYS = ['feature_scheduling', 'feature_analytics', 'feature_chat', 'feature_prevailing_wage', 'feature_reimbursements', 'feature_pto', 'module_field', 'module_timeclock', 'module_projects', 'module_inventory', 'module_analytics', 'feature_project_integration', 'feature_overtime', 'feature_geolocation', 'feature_inactive_alerts', 'feature_overtime_alerts', 'feature_broadcast', 'feature_media_gallery', 'show_worker_wages', 'notification_use_work_hours', 'media_delete_on_project_archive', 'notify_timeoff_requests', 'notify_budget_alerts', 'notify_entry_submitted', 'report_weekly_payroll', 'report_weekly_low_stock', 'report_monthly_valuation', 'qbo_auto_push', 'qbo_auto_push_expenses', 'qbo_auto_create_customers', 'notify_qbo_disconnect'];
+const FEATURE_KEYS = ['feature_scheduling', 'feature_analytics', 'feature_chat', 'feature_prevailing_wage', 'feature_reimbursements', 'feature_pto', 'module_field', 'module_timeclock', 'module_projects', 'module_inventory', 'module_analytics', 'feature_project_integration', 'feature_overtime', 'feature_geolocation', 'feature_inactive_alerts', 'feature_overtime_alerts', 'feature_broadcast', 'feature_media_gallery', 'show_worker_wages', 'notification_use_work_hours', 'media_delete_on_project_archive', 'notify_timeoff_requests', 'notify_budget_alerts', 'notify_entry_submitted', 'report_weekly_payroll', 'report_weekly_low_stock', 'report_monthly_valuation', 'qbo_auto_push', 'qbo_auto_push_expenses', 'qbo_auto_create_customers', 'notify_qbo_disconnect', 'cp_track_classifications', 'cp_track_fringes', 'cp_collect_ssn', 'cp_require_signature', 'cp_compute_deductions', 'cp_wh347_format'];
 const STRING_KEYS = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id', 'cycle_count_reconcile_threshold_type', 'qbo_expense_account_id', 'qbo_bank_account_id', 'qbo_labor_item_id'];
 
 // Defaults available to all authenticated users
@@ -10,6 +10,14 @@ const SETTINGS_DEFAULTS = {
   notify_timeoff_requests: false, notify_budget_alerts: false, notify_entry_submitted: false,
   report_weekly_payroll: false, report_weekly_low_stock: false, report_monthly_valuation: false,
   qbo_auto_push: false, qbo_auto_push_expenses: false, qbo_auto_create_customers: false, notify_qbo_disconnect: false,
+  // Certified Payroll sub-settings — only take effect if the addon is active.
+  // Defaults: Strategy B (everything on EXCEPT deductions = the risky Strategy A path).
+  cp_track_classifications: true,   // Job classification per worker + per entry
+  cp_track_fringes: true,           // Per-worker fringe benefits (health, pension, …)
+  cp_collect_ssn: true,             // Encrypted SSN last-4 on workers
+  cp_require_signature: true,       // Weekly Statement of Compliance
+  cp_wh347_format: true,            // Generate PDF matching the official WH-347 layout
+  cp_compute_deductions: false,     // Strategy A — OpsFloa computes fed/state/FICA withholdings (OFF by default; payroll processor handles this)
   media_retention_days: 0,
   week_start: 1, // 0=Sunday, 1=Monday, …, 6=Saturday (OpsFloa's default pay-period start)
   currency: 'USD', invoice_signature: 'optional', default_temp_password: '', global_required_checklist_template_id: '',

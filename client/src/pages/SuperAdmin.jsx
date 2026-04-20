@@ -379,6 +379,30 @@ export default function SuperAdmin() {
                             </div>
                           )}
                           <div style={styles.controlGroup}>
+                            <span style={styles.controlLabel}>QBO add-on</span>
+                            <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                              <input
+                                type="checkbox"
+                                checked={!!c.addon_qbo}
+                                onChange={e => patchCompany(c.id, { addon_qbo: e.target.checked })}
+                                disabled={working === c.id}
+                              />
+                              {c.addon_qbo ? 'On' : 'Off'}
+                            </label>
+                          </div>
+                          <div style={styles.controlGroup}>
+                            <span style={styles.controlLabel}>Certified Payroll add-on</span>
+                            <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                              <input
+                                type="checkbox"
+                                checked={!!c.addon_certified_payroll}
+                                onChange={e => patchCompany(c.id, { addon_certified_payroll: e.target.checked })}
+                                disabled={working === c.id}
+                              />
+                              {c.addon_certified_payroll ? 'On' : 'Off'}
+                            </label>
+                          </div>
+                          <div style={styles.controlGroup}>
                             <span style={styles.controlLabel}>Affiliate</span>
                             <select
                               style={styles.controlSelect}

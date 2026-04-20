@@ -5,6 +5,8 @@ import { formatCurrency } from '../utils';
 import { useT } from '../hooks/useT';
 import { SkeletonList } from './Skeleton';
 import ModalShell from './ModalShell';
+import WorkerFringes from './WorkerFringes';
+import WorkerSsn from './WorkerSsn';
 
 import { silentError } from '../errorReporter';
 function WorkerDocuments({ workerId }) {
@@ -135,7 +137,7 @@ function RoleBadge({ role }) {
   );
 }
 
-export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, defaultTempPassword = '', showRate = true, identityEditable = true, currency = 'USD', currentUser = null, qboConnected = false }) {
+export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, defaultTempPassword = '', showRate = true, identityEditable = true, currency = 'USD', currentUser = null, qboConnected = false, trackClassifications = false, trackFringes = false, collectSsn = false }) {
   const toast = useToast();
   const t = useT();
   const rateTypes = [
@@ -201,6 +203,15 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const [loadingArchived, setLoadingArchived] = useState(false);
   const [archivedFetched, setArchivedFetched] = useState(false);
   const [pendingRemoveId, setPendingRemoveId] = useState(null);
+
+  // Classifications for Certified Payroll — fetched only when the feature is on.
+  const [classifications, setClassifications] = useState([]);
+  useEffect(() => {
+    if (!trackClassifications) return;
+    api.get('/certified-payroll/classifications')
+      .then(r => setClassifications(r.data.active || []))
+      .catch(silentError('manageworkers'));
+  }, [trackClassifications]);
 
   // ── Add form helpers ────────────────────────────────────────────────────────
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -306,7 +317,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const startEditInfo = w => {
     setEditingId(w.id); setEditSection('info');
     setEditWorkerUpdatedAt(w.updated_at || null);
-    setEditInfoForm({ full_name: w.full_name, invoice_name: w.invoice_name || '', email: w.email || '', role: w.role, language: w.language || 'English', worker_type: w.worker_type || 'employee' });
+    setEditInfoForm({ full_name: w.full_name, invoice_name: w.invoice_name || '', email: w.email || '', role: w.role, language: w.language || 'English', worker_type: w.worker_type || 'employee', classification: w.classification || '' });
   };
 
   const startEditUsername = w => {
@@ -684,6 +695,23 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                   {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                                 </select>
                               </div>
+                              {trackClassifications && (
+                                <div style={s.fieldGroup}>
+                                  <label htmlFor="mw-edit-classification" style={s.label}>Job Classification</label>
+                                  <select
+                                    id="mw-edit-classification"
+                                    style={s.input}
+                                    value={editInfoForm.classification || ''}
+                                    onChange={e => setEditInfoForm(f => ({ ...f, classification: e.target.value }))}
+                                  >
+                                    <option value="">— None —</option>
+                                    {classifications.map(c => <option key={c} value={c}>{c}</option>)}
+                                    {editInfoForm.classification && !classifications.includes(editInfoForm.classification) && (
+                                      <option value={editInfoForm.classification}>{editInfoForm.classification} (not in list)</option>
+                                    )}
+                                  </select>
+                                </div>
+                              )}
                             </div>
                             <div style={s.editActions}>
                               <button style={{ ...s.saveBtn, ...(editInfoSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveInfo(w.id)} disabled={editInfoSaving}>{editInfoSaving ? t.loading : t.save}</button>
@@ -707,6 +735,12 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               <span style={s.infoValue}><RoleBadge role={w.role} /></span>
                               <span style={s.infoLabel}>Worker Type</span>
                               <span style={s.infoValue}>{WORKER_TYPE_LABELS[w.worker_type || 'employee']}</span>
+                              {trackClassifications && (
+                                <>
+                                  <span style={s.infoLabel}>Classification</span>
+                                  <span style={s.infoValue}>{w.classification || <em style={{ color: '#6b7280' }}>{t.notSet}</em>}</span>
+                                </>
+                              )}
                             </div>
                             {w.must_change_password && w.email && (
                               <div style={s.inviteBanner}>
@@ -954,6 +988,16 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
                     {/* ── Documents ── */}
                     {!isEditing && <WorkerDocuments workerId={w.id} />}
+
+                    {/* ── Certified Payroll fringe benefits ── */}
+                    {!isEditing && trackFringes && w.role === 'worker' && (
+                      <WorkerFringes userId={w.id} currency={currency} />
+                    )}
+
+                    {/* ── Certified Payroll SSN last-4 ── */}
+                    {!isEditing && collectSsn && w.role === 'worker' && (
+                      <WorkerSsn userId={w.id} />
+                    )}
 
                     {/* ── Remove ── */}
                     {identityEditable && !isEditing && (

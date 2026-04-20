@@ -138,6 +138,38 @@ async function requireProAddon(req, res, next) {
   }
 }
 
+// Gate a route to the Certified Payroll add-on. Same trial/exempt bypass as
+// requireProAddon; otherwise requires companies.addon_certified_payroll.
+async function requireCertifiedPayrollAddon(req, res, next) {
+  try {
+    const r = await pool.query(
+      'SELECT plan, subscription_status, addon_certified_payroll, trial_ends_at FROM companies WHERE id = $1',
+      [req.user.company_id]
+    );
+    const company = r.rows[0];
+    if (!company) return res.status(403).json({ error: 'Company not found' });
+
+    if (company.subscription_status === 'trial' && company.trial_ends_at && new Date(company.trial_ends_at) < new Date()) {
+      await pool.query('UPDATE companies SET subscription_status = $1 WHERE id = $2', ['trial_expired', req.user.company_id]);
+      return res.status(403).json({ error: 'Trial expired', code: 'subscription_required' });
+    }
+
+    if (company.subscription_status === 'canceled' || company.subscription_status === 'trial_expired') {
+      return res.status(403).json({ error: 'Subscription required', code: 'subscription_required' });
+    }
+
+    if (company.subscription_status === 'exempt' || company.subscription_status === 'trial' || company.addon_certified_payroll) {
+      req.company = company;
+      return next();
+    }
+
+    return res.status(403).json({ error: 'Certified Payroll add-on required', code: 'certified_payroll_required' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 // Returns true if the user has a given admin permission.
 // null admin_permissions = full access (existing admins + company founder).
 function hasAdminPermission(user, key) {
@@ -156,4 +188,4 @@ function requirePermission(key) {
   };
 }
 
-module.exports = { requireAuth, requireAdmin, requireSuperAdmin, requirePlan, requireProAddon, hasAdminPermission, requirePermission };
+module.exports = { requireAuth, requireAdmin, requireSuperAdmin, requirePlan, requireProAddon, requireCertifiedPayrollAddon, hasAdminPermission, requirePermission };

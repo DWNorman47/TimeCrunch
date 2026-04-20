@@ -162,7 +162,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const [companyRes, userRes] = await Promise.all([
-      pool.query('SELECT plan, subscription_status, addon_qbo, trial_ends_at FROM companies WHERE id = $1', [req.user.company_id]),
+      pool.query('SELECT plan, subscription_status, addon_qbo, addon_certified_payroll, trial_ends_at, slug, accepts_service_requests, client_portal_pro_interest FROM companies WHERE id = $1', [req.user.company_id]),
       pool.query('SELECT mfa_enabled, language, admin_permissions, hourly_rate, rate_type, guaranteed_weekly_hours FROM users WHERE id = $1', [req.user.id]),
     ]);
     const company = companyRes.rows[0] || {};
@@ -174,6 +174,10 @@ router.get('/me', requireAuth, async (req, res) => {
         plan: company.plan || 'free',
         subscription_status: company.subscription_status,
         addon_qbo: company.addon_qbo || false,
+        addon_certified_payroll: company.addon_certified_payroll || false,
+        company_slug: company.slug || null,
+        accepts_service_requests: !!company.accepts_service_requests,
+        client_portal_pro_interest: !!company.client_portal_pro_interest,
         trial_ends_at: company.trial_ends_at,
         mfa_enabled: userRow.mfa_enabled || false,
         admin_permissions: userRow.admin_permissions || null,
