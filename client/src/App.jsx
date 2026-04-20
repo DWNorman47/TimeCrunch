@@ -127,10 +127,9 @@ function AppRoutes() {
   if (!token) return;
   sessionStorage.removeItem('impersonate_token');
   localStorage.setItem('tc_token', token);
-  // The impersonated user inherits the impersonator's IndexedDB cache, which
-  // typically holds the admin's project/settings snapshots and doesn't match
-  // what the target user should see. Nuke it before React boots.
-  try { indexedDB.deleteDatabase('opsfloa-cache'); } catch { /* ignore */ }
+  // Intentionally do NOT clear the IndexedDB cache here — the super admin
+  // impersonating a user wants to reproduce exactly what the user sees,
+  // including stale-cache artifacts. Clearing it would mask diagnostic bugs.
   // Strip the query param so normal auth flow runs from here
   window.history.replaceState({}, '', window.location.pathname);
 })();
