@@ -556,6 +556,9 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 </div>
               )}
 
+              {/* Visibility — who sees this project in Time Clock */}
+              <ProjectVisibility project={project} onProjectUpdated={onProjectUpdated} toggleStyle={styles.activityToggle} countStyle={styles.activityCount} />
+
               {/* Punchlist */}
               <div style={{ marginBottom: 16 }}>
                 <button
@@ -1216,6 +1219,145 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     </div>
   );
 }
+
+// ── Per-Project Visibility ──────────────────────────────────────────────────
+//
+// Controls who sees this project in their Time Clock dropdown. Styled to
+// match the overview tab's other panels (budgetSection look). Collapsed by
+// default; header is clickable. Empty selection = visible to everyone.
+
+function ProjectVisibility({ project, onProjectUpdated, toggleStyle, countStyle }) {
+  const [open, setOpen] = useState(false);
+  const [workers, setWorkers] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState(() => new Set(project.visible_to_user_ids || []));
+
+  useEffect(() => {
+    setSelected(new Set(project.visible_to_user_ids || []));
+  }, [project.id, project.visible_to_user_ids]);
+
+  useEffect(() => {
+    if (!open || workers !== null) return;
+    setLoading(true);
+    api.get('/admin/workers')
+      .then(r => setWorkers(r.data.filter(w => w.role === 'worker')))
+      .catch(() => setError('Could not load workers'))
+      .finally(() => setLoading(false));
+  }, [open, workers]);
+
+  const toggleWorker = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+    setSaved(false);
+  };
+  const clearAll = () => { setSelected(new Set()); setSaved(false); };
+  const selectAll = () => {
+    if (!workers) return;
+    setSelected(new Set(workers.map(w => w.id)));
+    setSaved(false);
+  };
+
+  const save = async () => {
+    setSaving(true); setError('');
+    try {
+      const ids = selected.size > 0 ? Array.from(selected) : null;
+      const r = await api.patch(`/admin/projects/${project.id}`, { visible_to_user_ids: ids });
+      onProjectUpdated?.(r.data);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const restricted = selected.size > 0;
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        style={toggleStyle}
+      >
+        <span>Visibility</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {restricted && (
+            <span style={{ ...countStyle, background: '#3b82f6' }}>
+              {selected.size} {selected.size === 1 ? 'worker' : 'workers'}
+            </span>
+          )}
+          {!restricted && <span style={countStyle}>Everyone</span>}
+          <span style={{ fontSize: 12, color: '#6b7280' }}>{open ? '▴' : '▾'}</span>
+        </span>
+      </button>
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 12px' }}>
+            Choose which workers see this project in their Time Clock dropdown. Leave empty to make it visible to
+            everyone. Admins always see every project regardless of this setting.
+          </p>
+          {loading && <p style={{ fontSize: 13, color: '#6b7280' }}>Loading workers…</p>}
+          {workers && workers.length === 0 && <p style={{ fontSize: 13, color: '#6b7280' }}>No workers in the company yet.</p>}
+          {workers && workers.length > 0 && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                <button type="button" style={pvStyles.linkBtn} onClick={selectAll}>Select all</button>
+                <button type="button" style={pvStyles.linkBtn} onClick={clearAll}>Clear (visible to all)</button>
+                <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 'auto' }}>{selected.size} / {workers.length} selected</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {workers.map(w => {
+                  const on = selected.has(w.id);
+                  return (
+                    <label
+                      key={w.id}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '6px 12px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
+                        background: on ? '#dbeafe' : '#fff',
+                        border: `1px solid ${on ? '#60a5fa' : '#e5e7eb'}`,
+                        color: on ? '#1e40af' : '#374151',
+                        fontWeight: on ? 600 : 500,
+                      }}
+                    >
+                      <input type="checkbox" checked={on} onChange={() => toggleWorker(w.id)} style={{ margin: 0 }} />
+                      {w.full_name}
+                    </label>
+                  );
+                })}
+              </div>
+              {error && <p role="alert" style={{ color: '#991b1b', fontSize: 13, marginTop: 8 }}>{error}</p>}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
+                {saved && <span style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>✓ Saved</span>}
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={saving}
+                  style={{ padding: '7px 16px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.55 : 1 }}
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const pvStyles = {
+  linkBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, color: '#374151', cursor: 'pointer' },
+};
 
 // ── Project Row (list view) ───────────────────────────────────────────────────
 

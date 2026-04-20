@@ -1397,7 +1397,7 @@ router.get('/projects', requireAdmin, async (req, res) => {
       `SELECT id, company_id, name, wage_type, prevailing_wage_rate, geo_lat, geo_lng, geo_radius_ft,
               budget_hours, budget_dollars, active, created_at,
               client_name, job_number, address, start_date, end_date, description, status,
-              required_checklist_template_id, progress_pct
+              required_checklist_template_id, progress_pct, visible_to_user_ids
        FROM projects WHERE (active = true OR $2 = true) AND company_id = $1 ORDER BY active DESC, name LIMIT 500`,
       [companyId, req.query.include_archived === 'true']
     );
@@ -1503,6 +1503,16 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
       fields.push(`progress_pct = $${idx++}`); values.push(pp);
     }
     if (active !== undefined) { fields.push(`active = $${idx++}`); values.push(!!active); }
+    if (req.body.visible_to_user_ids !== undefined) {
+      // null or empty array → unrestricted (visible to everyone in the company)
+      const raw = req.body.visible_to_user_ids;
+      let value = null;
+      if (Array.isArray(raw) && raw.length > 0) {
+        value = raw.map(Number).filter(n => Number.isInteger(n) && n > 0);
+        if (value.length === 0) value = null;
+      }
+      fields.push(`visible_to_user_ids = $${idx++}`); values.push(value);
+    }
     if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
     const clientUpdatedAt = req.body.updated_at || null;
     if (clientUpdatedAt) {
