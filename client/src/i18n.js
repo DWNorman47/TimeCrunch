@@ -700,10 +700,10 @@ const translations = {
     ptoOf: 'of',
 
     // ── WelcomeModal ─────────────────────────────────────────────────────────
-    welcomeBrand: 'OpsFloa · Operations Flow Assistant',
-    welcomeAdminBody1: 'OpsFloa is your all-in-one field operations platform — built for contractors and the crews who run the job.',
+    welcomeBrand: 'OpsFloA · Ops Flow Assist',
+    welcomeAdminBody1: 'is your all-in-one field operations platform — built for contractors and the crews who run the job.',
     welcomeAdminBody2: "As an admin, you're in control. Add your team, set up projects, track time, approve timesheets, and push hours straight to QuickBooks.",
-    welcomeWorkerBody1: 'OpsFloa is your field operations hub — time clock, schedule, reports, and more, right in your pocket.',
+    welcomeWorkerBody1: '(OpsFloA) is your field operations hub — time clock, schedule, reports, and more, right in your pocket.',
     welcomeWorkerBody2: 'Use the Time Clock to log your hours, check your upcoming shifts, and submit field reports — all from this app.',
     welcomeLetsGo: "Let's get started →",
     welcomeGotIt: 'Got it →',
@@ -3100,10 +3100,10 @@ const translations = {
     ptoOf: 'de',
 
     // ── WelcomeModal ─────────────────────────────────────────────────────────
-    welcomeBrand: 'OpsFloa · Asistente de Operaciones',
-    welcomeAdminBody1: 'OpsFloa es tu plataforma integral de operaciones de campo — creada para contratistas y los equipos que dirigen el trabajo.',
+    welcomeBrand: 'OpsFloA · Asistente de Operaciones',
+    welcomeAdminBody1: 'es tu plataforma integral de operaciones de campo — creada para contratistas y los equipos que dirigen el trabajo.',
     welcomeAdminBody2: 'Como administrador, tienes el control. Agrega tu equipo, configura proyectos, rastrea el tiempo, aprueba hojas de tiempo y envía horas a QuickBooks.',
-    welcomeWorkerBody1: 'OpsFloa es tu centro de operaciones de campo — reloj de tiempo, horario, reportes y más, en tu bolsillo.',
+    welcomeWorkerBody1: '(OpsFloA) es tu centro de operaciones de campo — reloj de tiempo, horario, reportes y más, en tu bolsillo.',
     welcomeWorkerBody2: 'Usa el Reloj de Tiempo para registrar tus horas, consultar tus turnos próximos y enviar reportes de campo — todo desde esta app.',
     welcomeLetsGo: 'Comenzar →',
     welcomeGotIt: 'Entendido →',
