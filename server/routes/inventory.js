@@ -227,6 +227,85 @@ router.post('/items', requireAdmin, async (req, res) => {
   }
 });
 
+// POST /api/inventory/items/bulk — batch import of items from a spreadsheet.
+// Each row is processed independently; per-row failures don't abort the batch.
+// When update_existing is true, rows with a matching SKU overwrite the
+// existing item's editable fields. Otherwise duplicates are reported as skipped.
+router.post('/items/bulk', requireAdmin, async (req, res) => {
+  const { items, update_existing = false } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'items array required' });
+  }
+  if (items.length > 1000) {
+    return res.status(400).json({ error: 'Too many rows — import at most 1000 at a time' });
+  }
+  const companyId = req.user.company_id;
+  const imported = [], updated = [], skipped = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const row = items[i] || {};
+    const rowNum = i + 1;
+    const name = (row.name || '').trim();
+    const sku  = (row.sku || '').trim() || null;
+
+    if (!name) { skipped.push({ row: rowNum, reason: 'name required' }); continue; }
+    if (name.length > 255) { skipped.push({ row: rowNum, name, reason: 'name too long (max 255)' }); continue; }
+    if (sku && sku.length > 100) { skipped.push({ row: rowNum, name, reason: 'sku too long (max 100)' }); continue; }
+
+    const description = (row.description || '').trim() || null;
+    if (description && description.length > 1000) { skipped.push({ row: rowNum, name, reason: 'description too long (max 1000)' }); continue; }
+    const category = (row.category || '').trim() || null;
+    if (category && category.length > 100) { skipped.push({ row: rowNum, name, reason: 'category too long (max 100)' }); continue; }
+
+    const unit = (row.unit || '').trim() || 'each';
+    const unit_spec = (row.unit_spec || '').trim() || null;
+    const unit_cost = row.unit_cost !== '' && row.unit_cost != null && !isNaN(parseFloat(row.unit_cost))
+      ? parseFloat(row.unit_cost) : null;
+    const reorder_point = parseInt(row.reorder_point) || 0;
+    const reorder_qty   = parseInt(row.reorder_qty)   || 0;
+
+    try {
+      if (update_existing && sku) {
+        const existing = await pool.query(
+          'SELECT id FROM inventory_items WHERE company_id=$1 AND sku=$2',
+          [companyId, sku]
+        );
+        if (existing.rowCount > 0) {
+          const r = await pool.query(
+            `UPDATE inventory_items
+                SET name=$3, description=$4, category=$5, unit=$6, unit_spec=$7,
+                    unit_cost=$8, reorder_point=$9, reorder_qty=$10, updated_at=NOW()
+              WHERE id=$1 AND company_id=$2 RETURNING id, name, sku`,
+            [existing.rows[0].id, companyId, name, description, category, unit, unit_spec,
+             unit_cost, reorder_point, reorder_qty]
+          );
+          updated.push(r.rows[0]);
+          continue;
+        }
+      }
+
+      const r = await pool.query(
+        `INSERT INTO inventory_items
+           (company_id, name, sku, description, category, unit, unit_spec, unit_cost,
+            reorder_point, reorder_qty, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id, name, sku`,
+        [companyId, name, sku, description, category, unit, unit_spec, unit_cost,
+         reorder_point, reorder_qty, req.user.id]
+      );
+      imported.push(r.rows[0]);
+    } catch (err) {
+      if (err.code === '23505') {
+        skipped.push({ row: rowNum, name, sku, reason: 'SKU already exists' });
+      } else {
+        req.log.error({ err, row: rowNum }, 'bulk import row failed');
+        skipped.push({ row: rowNum, name, reason: 'unexpected error' });
+      }
+    }
+  }
+
+  res.json({ imported, updated, skipped });
+});
+
 // PATCH /api/inventory/items/:id
 router.patch('/items/:id', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
@@ -614,7 +693,16 @@ router.post('/transactions', requireAuth, async (req, res) => {
   if (type === 'receive' && !to_location_id) return res.status(400).json({ error: 'to_location_id required for receive' });
   if (type === 'issue' && !from_location_id) return res.status(400).json({ error: 'from_location_id required for issue' });
   if (type === 'transfer' && !to_location_id) return res.status(400).json({ error: 'to_location_id required for transfer' });
-  if (type === 'transfer' && from_location_id && from_location_id === to_location_id) return res.status(400).json({ error: 'from and to locations must differ' });
+  if (
+    type === 'transfer' &&
+    from_location_id &&
+    from_location_id === to_location_id &&
+    !req.body.area_id && !req.body.rack_id && !req.body.bay_id && !req.body.compartment_id
+  ) {
+    // Same location is allowed when moving between bins (area/rack/bay/compartment).
+    // Reject only when no bin is supplied — that's genuinely a no-op.
+    return res.status(400).json({ error: 'from and to must differ — pick a different location or bin' });
+  }
   if (type === 'adjust' && !to_location_id) return res.status(400).json({ error: 'to_location_id required for adjust' });
   if (notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
   if (reference_no && reference_no.trim().length > 100) return res.status(400).json({ error: 'reference_no too long (max 100 characters)' });
