@@ -15,7 +15,7 @@ const features = [
   { icon: '📸', title: 'Field Reports & Photos', body: 'Workers submit photo and video reports from the field, tagged with location, project, and time. No more hunting through text messages to find a job site photo.' },
   { icon: '✅', title: 'Punchlist & RFIs', body: 'Track deficiency items from open to resolved. Submit and manage RFIs with status and response fields. Every item tied to a project, nothing falls through.' },
   { icon: '🦺', title: 'Safety Checklists', body: 'Build reusable safety checklist templates and require workers to complete one before they can clock in. Every submission is timestamped and stored for compliance.' },
-  { icon: '🏖', title: 'Time Off Requests', body: 'Workers submit time off requests from their dashboard. Admins approve or deny from the admin panel. Everyone sees the status — no more back-and-forth over text.' },
+  { icon: '🌴', title: 'Time Off Requests', body: 'Workers submit time off requests from their dashboard. Admins approve or deny from the admin panel. Everyone sees the status — no more back-and-forth over text.' },
   { icon: '💵', title: 'Payroll & Overtime', body: 'Daily or weekly overtime rules, configurable thresholds and multipliers, prevailing wage tracking, and certified payroll reports — everything payroll needs, already calculated.' },
   { icon: '📅', title: 'Crew Scheduling', body: 'Assign workers to shifts and projects. Workers see their upcoming schedule the moment they log in and can clock in directly from a shift with one tap.' },
   { icon: '📊', title: 'Analytics & Reports', body: 'Live dashboards, overtime alerts, weekly trends, top projects, and approval queues. Know your labor cost before payroll closes — not after.' },

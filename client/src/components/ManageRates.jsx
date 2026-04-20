@@ -722,7 +722,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       {form.feature_pto && (
       <div style={styles.section}>
         <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('pto')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('pto')}>
-          <span style={styles.sectionIcon}>🏖️</span>
+          <span style={styles.sectionIcon}>🌴</span>
           <div style={{ flex: 1 }}>
             <div style={styles.sectionTitle}>{t.ratesPto || 'Paid Time Off'}</div>
             <div style={styles.sectionSub}>{t.ratesPtoDesc || 'Annual PTO balance tracking per worker'}</div>
