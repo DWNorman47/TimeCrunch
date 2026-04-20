@@ -49,7 +49,12 @@ export default function Dashboard() {
   const headerTimerRef = useRef(null);
   const TABS = ['clock', 'messages', 'timesheet', 'timeoff', 'schedule', 'reimbursements'];
   const hashTab = window.location.hash.replace('#', '');
-  const [tab, setTab] = useState(TABS.includes(hashTab) ? hashTab : 'clock');
+  // #availability is legacy — it used to be a top-level tab; now it opens the
+  // Availability sub-tab inside Schedule. Anyone with a bookmarked link still
+  // lands in the right place.
+  const initialTab = hashTab === 'availability' ? 'schedule' : (TABS.includes(hashTab) ? hashTab : 'clock');
+  const [tab, setTab] = useState(initialTab);
+  const [scheduleSubtab, setScheduleSubtab] = useState(hashTab === 'availability' ? 'availability' : 'schedule');
   const [entryView, setEntryView] = useState('list');
   const [shiftPrefill, setShiftPrefill] = useState(null);
   const [chatUnread, setChatUnread] = useState(false);
@@ -453,7 +458,6 @@ ${signatureDataUrl ? `
           {settings?.module_timeclock !== false && <button aria-current={tab === 'timesheet' ? 'page' : undefined} style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); history.replaceState(null, '', '#timesheet'); }}>{t.tabTimesheet}</button>}
           {settings?.feature_pto !== false && <button aria-current={tab === 'timeoff' ? 'page' : undefined} style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); history.replaceState(null, '', '#timeoff'); }}>{t.tabTimeOff}</button>}
           {settings?.feature_scheduling !== false && <button aria-current={tab === 'schedule' ? 'page' : undefined} style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); history.replaceState(null, '', '#schedule'); }}>{t.tabSchedule}</button>}
-          {settings?.feature_scheduling !== false && <button aria-current={tab === 'availability' ? 'page' : undefined} style={tab === 'availability' ? styles.tabActive : styles.tab} onClick={() => { setTab('availability'); history.replaceState(null, '', '#availability'); }}>{t.tabAvailability}</button>}
           {settings?.feature_reimbursements !== false && <button aria-current={tab === 'reimbursements' ? 'page' : undefined} style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>{t.tabExpenses}</button>}
         </div>
 
@@ -496,9 +500,34 @@ ${signatureDataUrl ? `
 
         {tab === 'timeoff' && settings?.feature_pto !== false && <ErrorBoundary key="timeoff" mode="inline" label="Time Off"><Suspense fallback={<TabLoader />}><TimeOffTab /></Suspense></ErrorBoundary>}
 
-        {tab === 'availability' && <ErrorBoundary key="availability" mode="inline" label="Availability"><Suspense fallback={<TabLoader />}><AvailabilityTab /></Suspense></ErrorBoundary>}
-
-        {tab === 'schedule' && <Suspense fallback={<TabLoader />}><WorkerSchedule /></Suspense>}
+        {tab === 'schedule' && (
+          <div>
+            <div style={styles.subtabBar}>
+              <button
+                aria-current={scheduleSubtab === 'schedule' ? 'page' : undefined}
+                style={scheduleSubtab === 'schedule' ? styles.subtabActive : styles.subtab}
+                onClick={() => { setScheduleSubtab('schedule'); history.replaceState(null, '', '#schedule'); }}
+              >
+                {t.tabSchedule}
+              </button>
+              <button
+                aria-current={scheduleSubtab === 'availability' ? 'page' : undefined}
+                style={scheduleSubtab === 'availability' ? styles.subtabActive : styles.subtab}
+                onClick={() => { setScheduleSubtab('availability'); history.replaceState(null, '', '#availability'); }}
+              >
+                {t.tabAvailability}
+              </button>
+            </div>
+            {scheduleSubtab === 'schedule' && (
+              <Suspense fallback={<TabLoader />}><WorkerSchedule /></Suspense>
+            )}
+            {scheduleSubtab === 'availability' && (
+              <ErrorBoundary key="availability" mode="inline" label="Availability">
+                <Suspense fallback={<TabLoader />}><AvailabilityTab /></Suspense>
+              </ErrorBoundary>
+            )}
+          </div>
+        )}
 
         {tab === 'reimbursements' && settings?.feature_reimbursements !== false && <Suspense fallback={<TabLoader />}><ReimbursementsView /></Suspense>}
 
@@ -524,6 +553,9 @@ const styles = {
   tabs: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 10, padding: 4, width: '100%' },
   tab: { flex: 1, padding: '14px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#666', cursor: 'pointer', textAlign: 'center' },
   tabActive: { flex: 1, padding: '14px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', textAlign: 'center', position: 'relative' },
+  subtabBar: { display: 'flex', gap: 6, background: '#e8edf5', padding: 4, borderRadius: 10, marginBottom: 16 },
+  subtab: { flex: 1, padding: '9px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, color: '#6b7280', cursor: 'pointer' },
+  subtabActive: { flex: 1, padding: '9px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 700, fontSize: 13, color: '#111827', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' },
   unreadDot: { display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#ef4444', marginLeft: 4, verticalAlign: 'middle', flexShrink: 0 },
   timesheetToolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
   viewToggle: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 8, padding: 3, width: 'fit-content' },

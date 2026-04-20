@@ -55,6 +55,20 @@ const APPS = [
     path: '/account',
   },
   {
+    id: 'team',
+    name: 'Team',
+    bg: '#0ea5e9',
+    icon: (
+      <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+        <circle cx="7" cy="7.5" r="2.6" />
+        <circle cx="13.5" cy="7.5" r="2.6" />
+        <path d="M2.5 17c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5" />
+        <path d="M9 17c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5" />
+      </svg>
+    ),
+    path: '/team',
+  },
+  {
     id: 'projects',
     name: 'Projects',
     bg: '#8b5cf6',
@@ -108,6 +122,7 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
     if (a.id === 'projects' && features?.module_projects === false) return false;
     if (a.id === 'inventory' && features?.module_inventory === false) return false;
     if (a.id === 'analytics' && features?.module_analytics === false) return false;
+    if (a.id === 'team' && features?.module_team === false) return false;
     // Only hide Time Clock from admins when toggle is off
     if (a.id === 'timeclock' && features?.module_timeclock === false && isAdmin) return false;
     return true;

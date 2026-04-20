@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useT } from '../hooks/useT';
 
-const DEFAULT_CATEGORIES = ['Fuel', 'Tools & Equipment', 'Supplies', 'Meals', 'Travel', 'Lodging', 'Parking', 'Other'];
-
 function CategorySection({ cfg, onSave, saving }) {
   const t = useT();
+  // Per-section defaults come from the cfg the server sent. CategorySection
+  // used to hardcode a single global DEFAULT_CATEGORIES list, which made
+  // every section render the same reimbursement defaults regardless of key.
+  const defaults = cfg?.defaults || [];
   const [suppressed, setSuppressed] = useState(cfg?.suppressed || []);
   const [custom, setCustom]         = useState(cfg?.custom || []);
   const [newCat, setNewCat]         = useState('');
@@ -26,7 +28,7 @@ function CategorySection({ cfg, onSave, saving }) {
 
   const addCustom = () => {
     const trimmed = newCat.trim();
-    if (!trimmed || custom.includes(trimmed) || DEFAULT_CATEGORIES.includes(trimmed)) return;
+    if (!trimmed || custom.includes(trimmed) || defaults.includes(trimmed)) return;
     setCustom(prev => [...prev, trimmed]);
     setNewCat('');
     setDirty(true);
@@ -41,7 +43,7 @@ function CategorySection({ cfg, onSave, saving }) {
     <div style={s.catSection}>
       <div style={s.catLabel}>{t.defaultCategories}</div>
       <div style={s.catList}>
-        {DEFAULT_CATEGORIES.map(cat => {
+        {defaults.map(cat => {
           const active = !suppressed.includes(cat);
           return (
             <div key={cat} style={s.catRow}>

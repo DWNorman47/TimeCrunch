@@ -613,8 +613,8 @@ router.post('/transactions', requireAuth, async (req, res) => {
   // Type-specific validation
   if (type === 'receive' && !to_location_id) return res.status(400).json({ error: 'to_location_id required for receive' });
   if (type === 'issue' && !from_location_id) return res.status(400).json({ error: 'from_location_id required for issue' });
-  if (type === 'transfer' && (!from_location_id || !to_location_id)) return res.status(400).json({ error: 'from_location_id and to_location_id required for transfer' });
-  if (type === 'transfer' && from_location_id === to_location_id) return res.status(400).json({ error: 'from and to locations must differ' });
+  if (type === 'transfer' && !to_location_id) return res.status(400).json({ error: 'to_location_id required for transfer' });
+  if (type === 'transfer' && from_location_id && from_location_id === to_location_id) return res.status(400).json({ error: 'from and to locations must differ' });
   if (type === 'adjust' && !to_location_id) return res.status(400).json({ error: 'to_location_id required for adjust' });
   if (notes && notes.trim().length > 1000) return res.status(400).json({ error: 'notes too long (max 1000 characters)' });
   if (reference_no && reference_no.trim().length > 100) return res.status(400).json({ error: 'reference_no too long (max 100 characters)' });
@@ -692,11 +692,14 @@ router.post('/transactions', requireAuth, async (req, res) => {
       await applyStockDelta(client, companyId, item_id, from_location_id, -issueQty, {}, issueUomId);
     }
     if (type === 'transfer') {
-      // Auto-convert the outgoing side
-      const { uomId: fromUomId, qty: fromQty } = await autoConvertIssueUom(
-        client, companyId, item_id, from_location_id, resolvedUomId, absQty
-      );
-      await applyStockDelta(client, companyId, item_id, from_location_id, -fromQty, {}, fromUomId);
+      // from_location is optional — skipping the debit when unknown lets users
+      // record an inbound move without having to guess where stock was before.
+      if (from_location_id) {
+        const { uomId: fromUomId, qty: fromQty } = await autoConvertIssueUom(
+          client, companyId, item_id, from_location_id, resolvedUomId, absQty
+        );
+        await applyStockDelta(client, companyId, item_id, from_location_id, -fromQty, {}, fromUomId);
+      }
       await applyStockDelta(client, companyId, item_id, to_location_id, absQty, bin, resolvedUomId);
     }
     if (type === 'adjust') {

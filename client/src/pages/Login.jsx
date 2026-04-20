@@ -232,7 +232,7 @@ export default function Login() {
               required
             />
           )}
-          <label htmlFor="username" style={styles.label}>{t.username}</label>
+          <label htmlFor="username" style={styles.label}>{t.loginUsernameLabel}</label>
           <input
             id="username"
             style={styles.input}

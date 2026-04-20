@@ -15,6 +15,7 @@ const ResetPassword     = lazy(() => import('./pages/ResetPassword'));
 const AcceptInvite      = lazy(() => import('./pages/AcceptInvite'));
 const ConfirmEmail      = lazy(() => import('./pages/ConfirmEmail'));
 const ServiceRequest    = lazy(() => import('./pages/ServiceRequest'));
+const TeamPage          = lazy(() => import('./pages/TeamPage'));
 const Dashboard         = lazy(() => import('./pages/Dashboard'));
 const AdminDashboard    = lazy(() => import('./pages/AdminDashboard'));
 const FieldPage         = lazy(() => import('./pages/FieldPage'));
@@ -99,6 +100,7 @@ function AppRoutes() {
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/confirm-email" element={<ConfirmEmail />} />
       <Route path="/r/:slug" element={<ServiceRequest />} />
+      <Route path="/team" element={<PrivateRoute><TeamPage /></PrivateRoute>} />
       <Route path="/__tests__" element={<Tests />} />
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/timeclock" element={<PrivateRoute adminOnly><AdminDashboard /></PrivateRoute>} />
