@@ -167,10 +167,14 @@ export default function SuperAdmin() {
     } finally { setDeleteWorking(false); }
   };
 
-  const handleImpersonate = async (company) => {
-    setImpersonating(company.id);
+  const handleImpersonate = async (company, userId = null) => {
+    const key = userId ? `${company.id}:${userId}` : company.id;
+    setImpersonating(key);
     try {
-      const r = await api.post(`/superadmin/companies/${company.id}/impersonate`);
+      const r = await api.post(
+        `/superadmin/companies/${company.id}/impersonate`,
+        userId ? { user_id: userId } : {}
+      );
       // Store token in sessionStorage under a known key, then open a new tab
       // The new tab reads it once via ?impersonate=1 and clears it
       sessionStorage.setItem('impersonate_token', r.data.token);
@@ -464,26 +468,42 @@ export default function SuperAdmin() {
                                 <th style={styles.th}>Email</th>
                                 <th style={styles.th}>Role</th>
                                 <th style={styles.th}>Status</th>
+                                <th style={styles.th}></th>
                               </tr>
                             </thead>
                             <tbody>
-                              {companyUsers[c.id].map(u => (
-                                <tr key={u.id}>
-                                  <td style={styles.td}>{u.full_name}</td>
-                                  <td style={styles.td}><code>{u.username}</code></td>
-                                  <td style={styles.td}>{u.email || '—'}</td>
-                                  <td style={styles.td}>
-                                    <span style={{ ...styles.roleTag, background: u.role === 'admin' ? '#dbeafe' : '#f3f4f6', color: u.role === 'admin' ? '#1e40af' : '#374151' }}>
-                                      {u.role}
-                                    </span>
-                                  </td>
-                                  <td style={styles.td}>
-                                    <span style={{ color: u.active ? '#059669' : '#9ca3af', fontSize: 12 }}>
-                                      {u.active ? 'Active' : 'Inactive'}
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
+                              {companyUsers[c.id].map(u => {
+                                const busy = impersonating === `${c.id}:${u.id}`;
+                                return (
+                                  <tr key={u.id}>
+                                    <td style={styles.td}>{u.full_name}</td>
+                                    <td style={styles.td}><code>{u.username}</code></td>
+                                    <td style={styles.td}>{u.email || '—'}</td>
+                                    <td style={styles.td}>
+                                      <span style={{ ...styles.roleTag, background: u.role === 'admin' ? '#dbeafe' : '#f3f4f6', color: u.role === 'admin' ? '#1e40af' : '#374151' }}>
+                                        {u.role}
+                                      </span>
+                                    </td>
+                                    <td style={styles.td}>
+                                      <span style={{ color: u.active ? '#059669' : '#9ca3af', fontSize: 12 }}>
+                                        {u.active ? 'Active' : 'Inactive'}
+                                      </span>
+                                    </td>
+                                    <td style={styles.td}>
+                                      {u.active && (
+                                        <button
+                                          style={{ ...styles.userImpersonateBtn, ...(busy ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                                          onClick={() => handleImpersonate(c, u.id)}
+                                          disabled={busy}
+                                          title={`Open a new tab as ${u.full_name}`}
+                                        >
+                                          {busy ? '…' : 'Login as'}
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         )}
@@ -829,6 +849,7 @@ const styles = {
   th: { textAlign: 'left', padding: '6px 10px', color: '#6b7280', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', borderBottom: '1px solid #e5e7eb' },
   td: { padding: '8px 10px', borderBottom: '1px solid #f3f4f6', color: '#374151' },
   roleTag: { padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 },
+  userImpersonateBtn: { padding: '4px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#1e40af', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
   // Delete modal
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modal: { background: '#fff', borderRadius: 12, padding: 28, maxWidth: 440, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' },
