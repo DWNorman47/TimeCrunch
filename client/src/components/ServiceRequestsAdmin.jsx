@@ -111,17 +111,20 @@ export default function ServiceRequestsAdmin() {
           )}
           <div style={s.hint}>Share this link with clients to let them submit service or project requests.</div>
         </div>
-        <label style={s.toggleLabel}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginRight: 10 }}>
-            {accepting ? 'Accepting' : 'Paused'}
-          </span>
-          <input
-            type="checkbox"
-            checked={accepting}
-            onChange={toggleAccepting}
+        <div style={s.statusGroup}>
+          <div style={accepting ? s.statusOn : s.statusOff}>
+            <span style={s.statusDot}></span>
+            {accepting ? 'Accepting requests' : 'Paused — form shows a pause message'}
+          </div>
+          <button
+            type="button"
+            onClick={toggleAccepting}
             disabled={savingToggle || !publicUrl}
-          />
-        </label>
+            style={accepting ? s.pauseBtn : s.startBtn}
+          >
+            {savingToggle ? '…' : accepting ? 'Pause' : 'Start accepting'}
+          </button>
+        </div>
       </div>
 
       {/* Status filters */}
@@ -223,7 +226,12 @@ const s = {
   copyBtn:       { padding: '6px 10px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   viewBtn:       { padding: '6px 10px', background: '#f3f4f6', color: '#374151', borderRadius: 6, fontSize: 12, fontWeight: 600, textDecoration: 'none' },
   hint:          { fontSize: 12, color: '#6b7280', marginTop: 4 },
-  toggleLabel:   { display: 'flex', alignItems: 'center', cursor: 'pointer' },
+  statusGroup:   { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 },
+  statusOn:      { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, background: '#d1fae5', color: '#065f46', fontSize: 12, fontWeight: 700 },
+  statusOff:     { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, background: '#fef3c7', color: '#92400e', fontSize: 12, fontWeight: 700 },
+  statusDot:     { width: 8, height: 8, borderRadius: '50%', background: 'currentColor' },
+  startBtn:      { padding: '7px 14px', background: '#059669', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  pauseBtn:      { padding: '7px 14px', background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   filterBar:     { display: 'flex', gap: 6, flexWrap: 'wrap' },
   filter:        { padding: '6px 14px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#6b7280', cursor: 'pointer' },
   filterActive:  { padding: '6px 14px', background: '#1a56db', border: '1px solid #1a56db', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer' },
