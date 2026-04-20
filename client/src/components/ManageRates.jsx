@@ -92,6 +92,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     module_projects: settings?.module_projects ?? true,
     module_inventory: settings?.module_inventory ?? false,
     module_analytics: settings?.module_analytics ?? false,
+    module_team: settings?.module_team ?? true,
     feature_project_integration: settings?.feature_project_integration ?? true,
     feature_inactive_alerts: settings?.feature_inactive_alerts ?? true,
     feature_overtime_alerts: settings?.feature_overtime_alerts ?? true,
@@ -174,6 +175,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       module_projects: settings.module_projects ?? true,
       module_inventory: settings.module_inventory ?? false,
       module_analytics: settings.module_analytics ?? false,
+      module_team: settings.module_team ?? true,
       feature_project_integration: settings.feature_project_integration ?? true,
       feature_inactive_alerts: settings.feature_inactive_alerts ?? true,
       feature_overtime_alerts: settings.feature_overtime_alerts ?? true,
@@ -235,6 +237,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         module_projects: form.module_projects,
         module_inventory: form.module_inventory,
         module_analytics: form.module_analytics,
+        module_team: form.module_team,
         feature_project_integration: form.feature_project_integration,
         feature_inactive_alerts: form.feature_inactive_alerts,
         feature_overtime_alerts: form.feature_overtime_alerts,
@@ -365,6 +368,16 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
                 if (!e.target.checked) set('feature_analytics', false);
               }} style={{ display: 'none' }} />
               <span style={{ ...styles.toggleKnob, transform: form.module_analytics ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>Team</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show the Team directory in the app switcher (admins manage workers here)</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.module_team ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.module_team} onChange={e => set('module_team', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.module_team ? 'translateX(46px)' : 'translateX(0)' }} />
             </label>
           </div>
         </div>}

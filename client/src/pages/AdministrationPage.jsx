@@ -6,7 +6,6 @@ import AppSwitcher from '../components/AppSwitcher';
 import PasswordInput from '../components/PasswordInput';
 import TabBar from '../components/TabBar';
 import BillingPanel from '../components/BillingPanel';
-import ManageWorkers from '../components/ManageWorkers';
 import ManageRates from '../components/ManageRates';
 import AdvancedSettings from '../components/AdvancedSettings';
 import AuditLog from '../components/AuditLog';
@@ -305,14 +304,22 @@ function AccountTab() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const ADMIN_TABS = ['company', 'team', 'requests', 'integrations', 'billing', 'log', 'account'];
+const ADMIN_TABS = ['company', 'requests', 'integrations', 'billing', 'log', 'account'];
 
 export default function AdministrationPage() {
   const { user, logout } = useAuth();
   const plan = usePlan();
   const t = useT();
 
+  // #team used to be the Team admin tab; it's now the /team module. Any
+  // bookmark or link still using #team lands in the right place.
   const hashTab = window.location.hash.replace('#', '');
+  useEffect(() => {
+    if (hashTab === 'team') {
+      window.location.replace('/team');
+    }
+  }, [hashTab]);
+
   const [tab, setTab] = useState(ADMIN_TABS.includes(hashTab) ? hashTab : 'company');
   const switchTab = t => { setTab(t); history.replaceState(null, '', '#' + t); };
 
@@ -329,7 +336,6 @@ export default function AdministrationPage() {
 
   const tabs = [
     { id: 'company',      label: t.adminTabCompany      },
-    { id: 'team',         label: t.adminTabTeam         },
     { id: 'requests',     label: 'Requests'             },
     ...(plan.hasQbo ? [{ id: 'integrations', label: t.adminTabIntegrations }] : []),
     { id: 'billing',      label: t.adminTabBilling      },
@@ -381,28 +387,6 @@ export default function AdministrationPage() {
             <h3 style={{ ...styles.sectionTitle, marginTop: 8 }}>{t.settings}</h3>
             <ManageRates settings={settings} onSettingsUpdated={setSettings} />
             <AdvancedSettings settings={settings} />
-          </div>
-        )}
-        {tab === 'team'     && (
-          <div style={styles.tabContent}>
-            <h2 style={styles.tabTitle}>{t.team}</h2>
-            <ManageWorkers
-              workers={workers}
-              onWorkerAdded={handleWorkerAdded}
-              onWorkerDeleted={handleWorkerDeleted}
-              onWorkerUpdated={handleWorkerUpdated}
-              onWorkerRestored={handleWorkerRestored}
-              defaultRate={settings?.default_hourly_rate ?? 0}
-              defaultTempPassword={settings?.default_temp_password ?? ''}
-              showRate={true}
-              identityEditable={true}
-              currency={settings?.currency ?? 'USD'}
-              currentUser={user}
-              qboConnected={qboConnected}
-              trackClassifications={plan.hasCertifiedPayroll && settings?.cp_track_classifications !== false}
-              trackFringes={plan.hasCertifiedPayroll && settings?.cp_track_fringes !== false}
-              collectSsn={plan.hasCertifiedPayroll && settings?.cp_collect_ssn !== false}
-            />
           </div>
         )}
         {tab === 'requests' && (
