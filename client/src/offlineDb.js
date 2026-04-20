@@ -6,7 +6,9 @@ const STORE = 'api-cache';
 const SYNC_STORE = 'pending-syncs';
 
 const TTL = {
-  projects: 24 * 60 * 60 * 1000,
+  // Projects appear in worker clock-in pickers, so a stale cache blocks them
+  // from seeing freshly-created projects. Keep the window short.
+  projects: 5 * 60 * 1000,
   // Settings drive gating (Project Integration, modules, etc.) so stale caches
   // block workers after an admin flips a toggle. Short TTL keeps that window small.
   settings: 5 * 60 * 1000,
