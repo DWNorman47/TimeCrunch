@@ -947,6 +947,9 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   </div>
                 )}
               </div>
+
+              {/* Time-Clock visibility */}
+              <ProjectVisibility project={project} onProjectUpdated={onProjectUpdated} />
             </div>
           )}
 
@@ -1216,6 +1219,155 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     </div>
   );
 }
+
+// ── Per-Project Time-Clock Visibility ────────────────────────────────────────
+//
+// Controls who sees this project in their Time Clock dropdown.
+// Collapsed by default because most projects won't need a restriction.
+// Empty selection = visible to everyone (the default).
+
+function ProjectVisibility({ project, onProjectUpdated }) {
+  const [open, setOpen] = useState(false);
+  const [workers, setWorkers] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState(() => new Set(project.visible_to_user_ids || []));
+
+  // Re-sync when the project prop changes (e.g. after another edit saved)
+  useEffect(() => {
+    setSelected(new Set(project.visible_to_user_ids || []));
+  }, [project.id, project.visible_to_user_ids]);
+
+  // Lazy-load the worker list only when the section is first opened
+  useEffect(() => {
+    if (!open || workers !== null) return;
+    setLoading(true);
+    api.get('/admin/workers')
+      .then(r => setWorkers(r.data.filter(w => w.role === 'worker')))
+      .catch(() => setError('Could not load workers'))
+      .finally(() => setLoading(false));
+  }, [open, workers]);
+
+  const toggleWorker = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+    setSaved(false);
+  };
+
+  const clearAll = () => { setSelected(new Set()); setSaved(false); };
+  const selectAll = () => {
+    if (!workers) return;
+    setSelected(new Set(workers.map(w => w.id)));
+    setSaved(false);
+  };
+
+  const save = async () => {
+    setSaving(true); setError('');
+    try {
+      const ids = selected.size > 0 ? Array.from(selected) : null;
+      const r = await api.patch(`/admin/projects/${project.id}`, { visible_to_user_ids: ids });
+      onProjectUpdated?.(r.data);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const restricted = selected.size > 0;
+  const summary = restricted
+    ? `Visible to ${selected.size} worker${selected.size === 1 ? '' : 's'}`
+    : 'Visible to everyone (default)';
+
+  return (
+    <div style={pvStyles.wrap}>
+      <button type="button" onClick={() => setOpen(o => !o)} style={pvStyles.header} aria-expanded={open}>
+        <span style={pvStyles.chev}>{open ? '▾' : '▸'}</span>
+        <span style={pvStyles.title}>Time-Clock visibility</span>
+        <span style={restricted ? pvStyles.badgeOn : pvStyles.badgeOff}>{summary}</span>
+      </button>
+      {open && (
+        <div style={pvStyles.body}>
+          <p style={pvStyles.hint}>
+            Choose which workers see this project in their Time Clock dropdown. Leave empty to make it visible to
+            everyone in the company. Admins always see every project regardless of this setting.
+          </p>
+          {loading && <p style={pvStyles.muted}>Loading workers…</p>}
+          {workers && workers.length === 0 && <p style={pvStyles.muted}>No workers in the company yet.</p>}
+          {workers && workers.length > 0 && (
+            <>
+              <div style={pvStyles.actions}>
+                <button type="button" style={pvStyles.linkBtn} onClick={selectAll}>Select all</button>
+                <button type="button" style={pvStyles.linkBtn} onClick={clearAll}>Clear (visible to all)</button>
+                <span style={pvStyles.counter}>{selected.size} / {workers.length} selected</span>
+              </div>
+              <div style={pvStyles.grid}>
+                {workers.map(w => {
+                  const on = selected.has(w.id);
+                  return (
+                    <label
+                      key={w.id}
+                      style={{
+                        ...pvStyles.chip,
+                        background: on ? '#dbeafe' : '#f3f4f6',
+                        border: `1px solid ${on ? '#60a5fa' : '#e5e7eb'}`,
+                        color: on ? '#1e40af' : '#374151',
+                        fontWeight: on ? 600 : 500,
+                      }}
+                    >
+                      <input type="checkbox" checked={on} onChange={() => toggleWorker(w.id)} style={{ margin: 0 }} />
+                      {w.full_name}
+                    </label>
+                  );
+                })}
+              </div>
+              {error && <p role="alert" style={pvStyles.error}>{error}</p>}
+              <div style={pvStyles.footer}>
+                {saved && <span style={pvStyles.savedMsg}>✓ Saved</span>}
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={saving}
+                  style={{ ...pvStyles.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                >
+                  {saving ? 'Saving…' : 'Save visibility'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const pvStyles = {
+  wrap:      { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, marginTop: 16, overflow: 'hidden' },
+  header:    { display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'none', border: 'none', padding: '12px 16px', cursor: 'pointer', textAlign: 'left', minHeight: 'unset' },
+  chev:      { fontSize: 11, color: '#6b7280', width: 12 },
+  title:     { fontSize: 14, fontWeight: 700, color: '#111827' },
+  badgeOn:   { marginLeft: 'auto', fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#1e40af', padding: '3px 10px', borderRadius: 10 },
+  badgeOff:  { marginLeft: 'auto', fontSize: 11, fontWeight: 600, background: '#f3f4f6', color: '#6b7280', padding: '3px 10px', borderRadius: 10 },
+  body:      { padding: '0 16px 16px', borderTop: '1px solid #f3f4f6' },
+  hint:      { fontSize: 12, color: '#6b7280', marginTop: 12, marginBottom: 10 },
+  actions:   { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' },
+  linkBtn:   { background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, color: '#374151', cursor: 'pointer' },
+  counter:   { fontSize: 12, color: '#6b7280', marginLeft: 'auto' },
+  grid:      { display: 'flex', flexWrap: 'wrap', gap: 6 },
+  chip:      { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20, fontSize: 13, cursor: 'pointer' },
+  muted:     { fontSize: 13, color: '#6b7280', margin: '10px 0' },
+  error:     { color: '#991b1b', fontSize: 13, marginTop: 8 },
+  footer:    { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, marginTop: 14, paddingTop: 10, borderTop: '1px solid #f3f4f6' },
+  savedMsg:  { fontSize: 13, color: '#059669', fontWeight: 600 },
+  saveBtn:   { padding: '7px 16px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+};
 
 // ── Project Row (list view) ───────────────────────────────────────────────────
 
