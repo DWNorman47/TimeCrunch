@@ -37,18 +37,19 @@ router.get('/status', requireAuth, async (req, res) => {
 });
 
 const { validCoords } = require('../utils/geoUtils');
+const { coerceBody } = require('../middleware/coerce');
+const { logFailure } = require('../failureLog');
 
 // POST /api/clock/in
-router.post('/in', requireAuth, clockLimiter, async (req, res) => {
-  const { lat, lng, local_work_date, timezone, location_denied, clock_in_time } = req.body;
-  // Coerce empty string to null — the client sends '' when no project is selected.
-  const project_id = req.body.project_id ? parseInt(req.body.project_id) : null;
-  if (req.body.project_id && Number.isNaN(project_id)) {
-    return res.status(400).json({ error: 'Invalid project_id' });
-  }
+router.post('/in', requireAuth, clockLimiter, coerceBody({ int: ['project_id'] }), async (req, res) => {
+  const { project_id, lat, lng, local_work_date, timezone, location_denied, clock_in_time } = req.body;
   const notes = req.body.notes?.trim() || null;
-  if (notes && notes.length > 500) return res.status(400).json({ error: 'notes too long (max 500 characters)' });
+  if (notes && notes.length > 500) {
+    logFailure(req, 'clock.in', 'notes_too_long', { length: notes.length });
+    return res.status(400).json({ error: 'notes too long (max 500 characters)' });
+  }
   if ((lat != null || lng != null) && !validCoords(lat, lng)) {
+    logFailure(req, 'clock.in', 'invalid_coords', { lat, lng });
     return res.status(400).json({ error: 'Invalid coordinates' });
   }
   const companyId = req.user.company_id;
@@ -70,6 +71,7 @@ router.post('/in', requireAuth, clockLimiter, async (req, res) => {
         [companyId]
       );
       if (anyProjects.rowCount > 0) {
+        logFailure(req, 'clock.in', 'project_required_not_supplied');
         return res.status(400).json({ error: 'project_id required' });
       }
     }
@@ -81,7 +83,10 @@ router.post('/in', requireAuth, clockLimiter, async (req, res) => {
         'SELECT id, name, wage_type, geo_lat, geo_lng, geo_radius_ft, required_checklist_template_id FROM projects WHERE id = $1 AND company_id = $2 AND active = true',
         [project_id, companyId]
       );
-      if (proj.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
+      if (proj.rowCount === 0) {
+        logFailure(req, 'clock.in', 'project_not_found', { project_id });
+        return res.status(400).json({ error: 'Project not found' });
+      }
 
       const p = proj.rows[0];
       projName = p.name;
@@ -90,10 +95,12 @@ router.post('/in', requireAuth, clockLimiter, async (req, res) => {
       // Geofence check
       if (p.geo_lat && p.geo_lng && p.geo_radius_ft) {
         if (!lat || !lng) {
+          logFailure(req, 'clock.in', 'geofence_missing_location', { project_id });
           return res.status(403).json({ error: 'This job site requires location access to clock in. Please enable GPS and try again.', geofence: true });
         }
         const distanceFt = Math.round(haversineDistanceFt(lat, lng, parseFloat(p.geo_lat), parseFloat(p.geo_lng)));
         if (distanceFt > p.geo_radius_ft) {
+          logFailure(req, 'clock.in', 'geofence_too_far', { project_id, distance_ft: distanceFt, radius_ft: p.geo_radius_ft });
           return res.status(403).json({
             error: `You are ${distanceFt.toLocaleString()} ft from the job site. Must be within ${p.geo_radius_ft.toLocaleString()} ft to clock in.`,
             geofence: true,
@@ -112,6 +119,7 @@ router.post('/in', requireAuth, clockLimiter, async (req, res) => {
           [companyId, requiredChecklistId, req.user.id]
         );
         if (sub.rowCount === 0) {
+          logFailure(req, 'clock.in', 'checklist_required', { template_id: requiredChecklistId, project_id });
           return res.status(403).json({
             error: 'Complete the required safety checklist before clocking in.',
             checklist_required: true,
@@ -126,6 +134,7 @@ router.post('/in', requireAuth, clockLimiter, async (req, res) => {
         [companyId, globalChecklistId, req.user.id]
       );
       if (sub.rowCount === 0) {
+        logFailure(req, 'clock.in', 'checklist_required', { template_id: globalChecklistId });
         return res.status(403).json({
           error: 'Complete the required safety checklist before clocking in.',
           checklist_required: true,
@@ -216,7 +225,7 @@ router.post('/in', requireAuth, clockLimiter, async (req, res) => {
 });
 
 // POST /api/clock/out
-router.post('/out', requireAuth, clockLimiter, async (req, res) => {
+router.post('/out', requireAuth, clockLimiter, coerceBody({ float: ['break_minutes', 'mileage'] }), async (req, res) => {
   const { lat, lng, break_minutes, mileage, local_clock_in, local_clock_out } = req.body;
   if ((lat != null || lng != null) && !validCoords(lat, lng)) {
     return res.status(400).json({ error: 'Invalid coordinates' });

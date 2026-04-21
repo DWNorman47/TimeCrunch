@@ -9,6 +9,13 @@ const { createInboxItemBatch } = require('./inbox');
 const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
 const { applySettingsRows, ADMIN_SETTINGS_DEFAULTS } = require('../settingsDefaults');
 const { logAudit } = require('../auditLog');
+const { coerceBody } = require('../middleware/coerce');
+
+const TXN_COERCE = coerceBody({
+  int: ['item_id', 'from_location_id', 'to_location_id', 'uom_id', 'to_uom_id',
+        'area_id', 'rack_id', 'bay_id', 'compartment_id', 'project_id', 'supplier_id'],
+  float: ['quantity', 'to_quantity', 'unit_cost'],
+});
 
 // GET /api/inventory/units — active units for this company
 router.get('/units', requireAuth, async (req, res) => {
@@ -674,7 +681,7 @@ router.get('/stock/low', requireAdmin, async (req, res) => {
 // ── Transactions ──────────────────────────────────────────────────────────────
 
 // POST /api/inventory/transactions
-router.post('/transactions', requireAuth, async (req, res) => {
+router.post('/transactions', requireAuth, TXN_COERCE, async (req, res) => {
   const { type, item_id, quantity, from_location_id, to_location_id, project_id, notes, reference_no, unit_cost,
           area_id, rack_id, bay_id, compartment_id,
           uom_id, to_uom_id, to_quantity,
