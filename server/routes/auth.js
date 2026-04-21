@@ -172,12 +172,13 @@ router.get('/me', requireAuth, async (req, res) => {
     ]);
     const company = companyRes.rows[0] || {};
     const userRow = userRes.rows[0] || {};
+    const { effectiveSubscriptionStatus } = require('../utils/subscription');
     res.json({
       user: {
         ...req.user,
         language: userRow.language || req.user.language,
         plan: company.plan || 'free',
-        subscription_status: company.subscription_status,
+        subscription_status: effectiveSubscriptionStatus(company),
         addon_qbo: company.addon_qbo || false,
         addon_certified_payroll: company.addon_certified_payroll || false,
         company_slug: company.slug || null,

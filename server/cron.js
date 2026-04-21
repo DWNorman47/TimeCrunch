@@ -147,14 +147,39 @@ async function sendSignoffReminders() {
   }
 }
 
+// Flip expired-trial companies from 'trial' to 'trial_expired' in the DB.
+// The /me endpoint already resolves this at read time via
+// effectiveSubscriptionStatus, so worker clients see the change immediately.
+// This job just keeps the canonical DB state tidy so admin filters and
+// SuperAdmin dashboards don't keep listing expired trials as active.
+async function expireOldTrials() {
+  try {
+    const result = await pool.query(
+      `UPDATE companies
+          SET subscription_status = 'trial_expired'
+        WHERE subscription_status = 'trial'
+          AND trial_ends_at IS NOT NULL
+          AND trial_ends_at < NOW()
+        RETURNING id, name`
+    );
+    if (result.rowCount > 0) {
+      console.log(`[cron] expireOldTrials: flipped ${result.rowCount} companies to trial_expired`);
+    }
+  } catch (err) {
+    console.error('[cron] expireOldTrials error:', err);
+  }
+}
+
 function startCron() {
   // Run immediately on startup (catches any missed window from restart)
   sendShiftReminders();
   sendSignoffReminders();
+  expireOldTrials();
   // Then run every hour
   setInterval(sendShiftReminders, 60 * 60 * 1000);
   setInterval(sendSignoffReminders, 60 * 60 * 1000);
-  console.log('[cron] Shift reminder and sign-off crons started');
+  setInterval(expireOldTrials, 60 * 60 * 1000);
+  console.log('[cron] Shift reminder, sign-off, and trial-expiry crons started');
 }
 
 module.exports = { startCron };
