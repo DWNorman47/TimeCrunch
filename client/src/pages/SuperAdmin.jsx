@@ -292,6 +292,16 @@ export default function SuperAdmin() {
         {/* ── Companies tab ── */}
         {tab === 'companies' && (
           <>
+            <div style={styles.diagnosticsRow}>
+              <button
+                style={styles.diagnosticsBtn}
+                onClick={() => import('../utils/debugBundle').then(m => m.downloadDebugBundle())}
+                title="Download this browser's localStorage, IndexedDB cache, and service-worker state as JSON. Use after 'Login as' to snapshot what a user's session looked like."
+              >
+                Download debug bundle
+              </button>
+              <span style={styles.diagnosticsHint}>Captures this browser's client state (caches, persisted forms) to JSON.</span>
+            </div>
             {loading ? (
               <p style={{ color: '#6b7280' }}>Loading...</p>
             ) : companies.length === 0 ? (
@@ -850,6 +860,9 @@ const styles = {
   td: { padding: '8px 10px', borderBottom: '1px solid #f3f4f6', color: '#374151' },
   roleTag: { padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 },
   userImpersonateBtn: { padding: '4px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#1e40af', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  diagnosticsRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 16, flexWrap: 'wrap' },
+  diagnosticsBtn: { padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  diagnosticsHint: { fontSize: 12, color: '#6b7280' },
   // Delete modal
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modal: { background: '#fff', borderRadius: 12, padding: 28, maxWidth: 440, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' },
