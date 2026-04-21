@@ -16,7 +16,7 @@ export default function ForgotPassword() {
     setError('');
     setLoading(true);
     try {
-      await api.post('/auth/forgot-password', { email, company });
+      await api.post('/auth/forgot-password', { email, company }, { suppressToast: true });
       setSent(true);
     } catch {
       setError(t.forgotError);

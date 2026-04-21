@@ -295,7 +295,135 @@ router.post('/companies/:id/impersonate', requireSuperAdmin, async (req, res) =>
       process.env.JWT_SECRET,
       { expiresIn: '4h' }
     );
+
+    // Forensic trail — every "Login as" leaves a row so we can answer
+    // "did someone log in as me on that date?" without reconstructing
+    // from logs. Never let this fail the request.
+    pool.query(
+      `INSERT INTO impersonation_log
+         (super_admin_id, super_admin_name, target_user_id, target_user_name,
+          target_role, company_id, company_name, ip, user_agent)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [req.user.id, req.user.full_name || req.user.username,
+       user.id, user.full_name, user.role,
+       user.company_id, user.company_name,
+       (req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null),
+       (req.headers['user-agent'] || null)?.slice(0, 500)]
+    ).catch(err => logger.warn({ err }, 'impersonation_log insert failed'));
+
     res.json({ token, full_name: user.full_name, company_name: user.company_name });
+  } catch (err) {
+    logger.error({ err }, 'catch block error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /superadmin/impersonation-log — recent "Login as" events, newest first
+router.get('/impersonation-log', requireSuperAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+    const { rows } = await pool.query(
+      `SELECT id, super_admin_name, target_user_name, target_role,
+              company_name, ip, created_at
+         FROM impersonation_log
+        ORDER BY created_at DESC
+        LIMIT $1`,
+      [limit]
+    );
+    res.json(rows);
+  } catch (err) {
+    logger.error({ err }, 'catch block error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /superadmin/companies/:id/export — dump every row belonging to this
+// company as a single JSON blob. Useful for support investigations and for
+// giving churned customers their data back. Same company-rooted tables the
+// delete handler targets — kept in sync by structure.
+router.get('/companies/:id/export', requireSuperAdmin, async (req, res) => {
+  const id = req.params.id;
+  const companyRes = await pool.query('SELECT * FROM companies WHERE id = $1', [id]);
+  if (companyRes.rowCount === 0) return res.status(404).json({ error: 'Company not found' });
+
+  // Same list as the delete handler. If you add a new company_id table,
+  // add it both places. Tables are listed parent-first so the JSON reads
+  // in a natural order.
+  const tables = [
+    'users', 'settings', 'advanced_settings',
+    'clients', 'projects', 'shifts', 'pay_periods',
+    'time_entries', 'active_clock', 'entry_messages',
+    'reimbursements', 'time_off_requests',
+    'worker_documents', 'worker_availability', 'worker_fringes',
+    'certified_payroll_signatures',
+    'equipment_items', 'equipment_hours',
+    'field_reports', 'field_report_photos',
+    'daily_reports', 'punchlist_items', 'safety_talks',
+    'safety_checklist_templates', 'safety_checklist_submissions',
+    'incident_reports', 'sub_reports', 'rfis',
+    'inspection_templates', 'inspections',
+    'inventory_locations', 'inventory_areas', 'inventory_racks', 'inventory_bays', 'inventory_compartments',
+    'inventory_items', 'inventory_item_uoms', 'inventory_stock',
+    'inventory_transactions', 'inventory_cycle_counts', 'inventory_cycle_count_lines',
+    'inventory_suppliers', 'purchase_orders', 'purchase_order_lines',
+    'project_documents', 'project_invoices', 'service_requests',
+    'audit_log', 'inbox', 'push_subscriptions', 'company_chat',
+  ];
+
+  const output = {
+    exported_at: new Date().toISOString(),
+    company: companyRes.rows[0],
+    tables: {},
+  };
+
+  try {
+    for (const table of tables) {
+      try {
+        // Most tables have company_id directly. A handful don't — skip them
+        // gracefully so a refactor elsewhere doesn't break export.
+        const r = await pool.query(`SELECT * FROM ${table} WHERE company_id = $1 ORDER BY id`, [id]);
+        output.tables[table] = r.rows;
+      } catch (err) {
+        // Table might not exist in this environment, or might not have a
+        // company_id column. Either way, record an empty result + the error
+        // message so the output is still consistent.
+        output.tables[table] = { error: err.message };
+      }
+    }
+
+    // Strip sensitive columns that should never leave the server
+    output.tables.users = (output.tables.users || []).map(u => {
+      const { password_hash, reset_token, reset_token_expires,
+              invite_token, invite_token_expires,
+              email_confirm_token, email_confirm_token_expires,
+              mfa_secret, ...safe } = u;
+      return safe;
+    });
+
+    const filename = `opsfloa-company-${id}-${Date.now()}.json`;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(JSON.stringify(output, null, 2));
+  } catch (err) {
+    logger.error({ err }, 'company export failed');
+    res.status(500).json({ error: 'Export failed' });
+  }
+});
+
+// POST /superadmin/users/:id/revoke-sessions — invalidate every JWT for this
+// user by bumping their token_version. Their next API call 401s and they're
+// bounced to /login. Useful for "a user lost their device" and similar.
+router.post('/users/:id/revoke-sessions', requireSuperAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE users
+          SET token_version = COALESCE(token_version, 0) + 1
+        WHERE id = $1
+        RETURNING id, username, full_name, token_version`,
+      [req.params.id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    res.json({ revoked: true, user: result.rows[0] });
   } catch (err) {
     logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });

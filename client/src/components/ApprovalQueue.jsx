@@ -86,6 +86,7 @@ export default function ApprovalQueue({ onCountChange }) {
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
   const [editProject, setEditProject] = useState('');
+  const [editOtOverride, setEditOtOverride] = useState(''); // '' = don't override, number = explicit OT hours
   const [editUpdatedAt, setEditUpdatedAt] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
   // Split state
@@ -161,6 +162,7 @@ export default function ApprovalQueue({ onCountChange }) {
     setEditStart(e.start_time.substring(0, 5));
     setEditEnd(e.end_time.substring(0, 5));
     setEditProject(e.project_id ? String(e.project_id) : '');
+    setEditOtOverride(e.overtime_hours_override != null ? String(e.overtime_hours_override) : '');
     setEditUpdatedAt(e.updated_at || null);
     setSplittingId(null);
   };
@@ -172,6 +174,9 @@ export default function ApprovalQueue({ onCountChange }) {
         start_time: editStart,
         end_time: editEnd,
         project_id: editProject ? parseInt(editProject) : null,
+        // Empty string clears the override; blank vs number distinguishes
+        // "no override" from "override of 0 hours (i.e. never counts as OT)".
+        overtime_hours_override: editOtOverride === '' ? null : parseFloat(editOtOverride),
         updated_at: editUpdatedAt,
       });
       setEntries(prev => prev.map(e => e.id === id ? { ...e, ...updated.data } : e));
@@ -446,6 +451,11 @@ export default function ApprovalQueue({ onCountChange }) {
                       <span style={{ ...styles.wageTag, background: e.wage_type === 'prevailing' ? '#d97706' : '#2563eb' }}>
                         {e.wage_type === 'prevailing' ? t.prevailing : t.regular}
                       </span>
+                      {e.overtime_hours_override != null && (
+                        <span style={{ ...styles.wageTag, background: '#7c3aed' }} title={t.aqOvertimeOverrideBadgeTitle || 'Admin set a manual overtime value for this entry'}>
+                          OT {parseFloat(e.overtime_hours_override)}h
+                        </span>
+                      )}
                     </div>
                     {e.worker_signed_at && (
                       <span style={styles.signedTag}>{t.workerSigned}</span>
@@ -517,6 +527,23 @@ export default function ApprovalQueue({ onCountChange }) {
                             <option key={p.id} value={p.id}>{p.name}</option>
                           ))}
                         </select>
+                      </div>
+                      <div style={{ marginTop: 8 }}>
+                        <div style={styles.editTimesLabel}>
+                          {t.aqOvertimeOverrideLabel || 'Overtime hours (override)'}
+                          <span style={{ color: '#6b7280', fontWeight: 400, marginLeft: 6 }}>
+                            {t.aqOvertimeOverrideHint || '— leave blank to use the normal rule'}
+                          </span>
+                        </div>
+                        <input
+                          type="number"
+                          step="0.25"
+                          min="0"
+                          placeholder={t.aqOvertimeOverridePlaceholder || 'e.g. 2.5'}
+                          style={{ ...styles.editTimeInput, width: 140 }}
+                          value={editOtOverride}
+                          onChange={ev => setEditOtOverride(ev.target.value)}
+                        />
                       </div>
                       <div style={styles.editTimesActions}>
                         <button style={{ ...styles.saveTimesBtn, ...(editSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => { setEditSaveError(''); saveEdit(e.id); }} disabled={editSaving}>{editSaving ? t.saving : t.save}</button>

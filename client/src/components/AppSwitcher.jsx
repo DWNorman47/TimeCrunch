@@ -150,7 +150,7 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
     <div ref={ref} style={styles.wrap}>
       <button style={styles.trigger} onClick={() => setOpen(o => !o)}>
         <div style={{ ...styles.appIcon, background: current.bg }}>{current.icon}</div>
-        <span style={styles.appName}>{current.name}</span>
+        <span style={styles.appName} className="app-switcher-name">{current.name}</span>
         <svg style={{ ...styles.chevron, transform: open ? 'rotate(180deg)' : 'none' }}
           viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="12" height="12">
           <polyline points="2,4 6,8 10,4" />

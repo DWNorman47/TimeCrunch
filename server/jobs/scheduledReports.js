@@ -4,6 +4,7 @@ const logger = require('../logger');
 const { sendEmail } = require('../email');
 const { runJob } = require('./runJob');
 const { weekRange } = require('../utils/weekBounds');
+const { computeOT, hoursWorked } = require('../utils/payCalculations');
 
 const APP_URL = process.env.APP_URL || 'https://app.opsfloa.com';
 
@@ -88,35 +89,53 @@ async function sendWeeklyPayrollReport(companyId, companyName) {
 
   const fmtDisplay = s => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-  const r = await pool.query(
-    `SELECT u.full_name, u.id as user_id,
-            COUNT(te.id) AS entry_count,
-            COALESCE(SUM(te.total_hours), 0) AS total_hours,
-            COALESCE(SUM(te.overtime_hours), 0) AS overtime_hours
-     FROM users u
-     LEFT JOIN time_entries te ON te.user_id = u.id
-       AND te.company_id = $1
-       AND te.work_date BETWEEN $2 AND $3
-     WHERE u.company_id = $1 AND u.role = 'worker' AND u.active = true
-     GROUP BY u.id, u.full_name
-     ORDER BY total_hours DESC`,
+  // Previous implementation referenced te.total_hours / te.overtime_hours as
+  // if they were stored columns — they're not, so that query errored silently
+  // every Monday. Now we load approved entries and use computeOT so reg/OT
+  // split honors the per-entry overtime_hours_override column as well.
+  const otRuleRow = await pool.query("SELECT value FROM settings WHERE company_id = $1 AND key = 'overtime_rule'", [companyId]);
+  const otThRow   = await pool.query("SELECT value FROM settings WHERE company_id = $1 AND key = 'overtime_threshold'", [companyId]);
+  const otRule    = otRuleRow.rows[0]?.value || 'daily';
+  const otThresh  = parseFloat(otThRow.rows[0]?.value) || (otRule === 'weekly' ? 40 : 8);
+
+  const entRes = await pool.query(
+    `SELECT te.user_id, te.work_date, te.start_time, te.end_time, te.break_minutes,
+            te.wage_type, te.overtime_hours_override, u.full_name
+       FROM users u
+  LEFT JOIN time_entries te ON te.user_id = u.id
+        AND te.company_id = $1
+        AND te.work_date BETWEEN $2 AND $3
+        AND te.status != 'rejected'
+      WHERE u.company_id = $1 AND u.role = 'worker' AND u.active = true`,
     [companyId, from, to]
   );
 
-  if (r.rowCount === 0) return;
+  // Group by user
+  const byUser = new Map();
+  for (const row of entRes.rows) {
+    const key = row.user_id || `nohrs-${row.full_name}`;
+    if (!byUser.has(key)) byUser.set(key, { full_name: row.full_name, entries: [] });
+    if (row.work_date) byUser.get(key).entries.push(row);
+  }
 
-  const totalHours    = r.rows.reduce((s, row) => s + parseFloat(row.total_hours), 0);
-  const totalOT       = r.rows.reduce((s, row) => s + parseFloat(row.overtime_hours), 0);
-  const activeWorkers = r.rows.filter(row => parseFloat(row.total_hours) > 0).length;
+  const workerRows = [...byUser.values()].map(u => {
+    const { regularHours, overtimeHours } = computeOT(u.entries, otRule, otThresh, ws);
+    const totalH = u.entries.reduce((s, e) => s + hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60, 0);
+    return { full_name: u.full_name, entry_count: u.entries.length, total_hours: totalH, overtime_hours: overtimeHours, regular_hours: regularHours };
+  }).sort((a, b) => b.total_hours - a.total_hours);
 
-  const rows = r.rows.map(row => {
-    const hrs = parseFloat(row.total_hours);
-    const ot  = parseFloat(row.overtime_hours);
+  if (workerRows.length === 0) return;
+
+  const totalHours    = workerRows.reduce((s, row) => s + row.total_hours, 0);
+  const totalOT       = workerRows.reduce((s, row) => s + row.overtime_hours, 0);
+  const activeWorkers = workerRows.filter(row => row.total_hours > 0).length;
+
+  const rows = workerRows.map(row => {
     return `<tr>
       ${td(row.full_name, { bold: true })}
       ${td(row.entry_count)}
-      ${td(hrs.toFixed(2), { align: 'right' })}
-      ${td(ot > 0 ? `<span style="color:#d97706;font-weight:700">${ot.toFixed(2)}</span>` : '—', { align: 'right' })}
+      ${td(row.total_hours.toFixed(2), { align: 'right' })}
+      ${td(row.overtime_hours > 0 ? `<span style="color:#d97706;font-weight:700">${row.overtime_hours.toFixed(2)}</span>` : '—', { align: 'right' })}
     </tr>`;
   }).join('');
 

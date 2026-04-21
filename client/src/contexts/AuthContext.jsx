@@ -29,7 +29,7 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password, company_name) => {
     await clearCache();
-    const r = await api.post('/auth/login', { username, password, company_name });
+    const r = await api.post('/auth/login', { username, password, company_name }, { suppressToast: true });
     if (r.data.mfa_required) {
       return { mfa_required: true, mfa_token: r.data.mfa_token };
     }

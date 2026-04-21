@@ -90,9 +90,29 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
     fetchActive(true);
     fetchInactive();
     fetchTodayShifts();
-    intervalRef.current = setInterval(() => { fetchActive(); fetchTodayShifts(); }, 90000);
+
+    // This component is lazy-loaded + only mounted when the admin is on the
+    // Live tab, so we can poll aggressively without worrying about wasting
+    // requests elsewhere. Pause the interval entirely when the tab is
+    // backgrounded — no point polling a screen nobody is looking at.
+    const POLL_MS = 10 * 1000;
+    const tick = () => { fetchActive(); fetchTodayShifts(); };
+
+    const startPolling = () => {
+      clearInterval(intervalRef.current);
+      intervalRef.current = setInterval(tick, POLL_MS);
+    };
+
+    if (document.visibilityState === 'visible') startPolling();
+
     const onVisible = () => {
-      if (document.visibilityState === 'visible') fetchActive();
+      if (document.visibilityState === 'visible') {
+        tick();           // catch up immediately after returning
+        startPolling();
+      } else {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => { clearInterval(intervalRef.current); document.removeEventListener('visibilitychange', onVisible); };

@@ -159,6 +159,10 @@ input, select, textarea {
     padding: 5px 10px !important;
     font-size: 12px !important;
   }
+  /* AppSwitcher: hide the app name label on narrow screens — the icon chip
+     is enough to identify the current app, and "Administration" was pushing
+     the header-right actions off the edge. */
+  .app-switcher-name { display: none !important; }
   /* Company name — second row, darker band edge-to-edge */
   .company-name-desktop { display: none !important; }
   .company-name-row {

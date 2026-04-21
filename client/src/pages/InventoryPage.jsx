@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
 import AppSwitcher from '../components/AppSwitcher';
+import { RefreshButton, LanguageSwitcher } from '../components/HeaderActions';
 import TabBar from '../components/TabBar';
 import InventoryStock from '../components/inventory/InventoryStock';
 import InventoryItems from '../components/inventory/InventoryItems';
@@ -100,9 +101,11 @@ export default function InventoryPage() {
             <AppSwitcher currentApp="inventory" userRole={user?.role} features={features} />
             {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
           </div>
-          <div style={styles.headerRight}>
-            {!isAdmin && <span style={styles.userName}>{user?.full_name}</span>}
-            <button style={styles.headerBtn} onClick={logout}>Logout</button>
+          <div style={styles.headerRight} className="header-right">
+            {!isAdmin && <span style={styles.userName} className="header-username">{user?.full_name}</span>}
+            <RefreshButton />
+            <LanguageSwitcher />
+            <button style={styles.headerBtn} className="header-btn" onClick={logout}>Logout</button>
           </div>
         </div>
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
