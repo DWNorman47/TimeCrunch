@@ -48,6 +48,13 @@ api.interceptors.response.use(
   },
   err => {
     const status = err.response?.status;
+    const config = err.config || {};
+    // Components can opt out of the global 4xx toast by passing
+    // { suppressToast: true } in the axios config. Use this when the caller
+    // already renders the error in its own UI (form-level error box, inline
+    // warning, etc.) and a toast on top would just duplicate the message.
+    const suppressToast = config.suppressToast === true;
+
     if (status === 401 && !window.location.pathname.startsWith('/login')) {
       localStorage.removeItem('tc_token');
       window.location.href = '/login?session=expired';
@@ -63,6 +70,17 @@ api.interceptors.response.use(
       if (navigator.onLine !== false) {
         throttledToast('network', 'Network error. Please check your connection and try again.', 'error');
       }
+    } else if (status >= 400 && status < 500 && status !== 401 && status !== 429 && !suppressToast) {
+      // Default 4xx handler: surface the server's error message so silent
+      // "button did nothing" bugs become impossible. Components that render
+      // the error themselves should pass { suppressToast: true } to avoid
+      // double-notifying.
+      const msg = err.response?.data?.error
+        || (status === 403 ? "You don't have permission to do that." :
+            status === 404 ? 'Not found.' :
+            status === 409 ? 'Conflict — please refresh and try again.' :
+            `Request failed (${status}).`);
+      throttledToast(`4xx:${status}:${config.url || ''}`, msg, 'error');
     }
     return Promise.reject(err);
   }

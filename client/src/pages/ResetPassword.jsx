@@ -20,7 +20,7 @@ export default function ResetPassword() {
     setError('');
     setLoading(true);
     try {
-      await api.post('/auth/reset-password', { token, password });
+      await api.post('/auth/reset-password', { token, password }, { suppressToast: true });
       navigate('/login?reset=1');
     } catch (err) {
       setError(err.response?.data?.error || t.resetFailed);
