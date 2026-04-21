@@ -9,6 +9,7 @@ import LiveKPIs from '../components/LiveKPIs';
 import { SkeletonStatRow, SkeletonList } from '../components/Skeleton';
 import BroadcastMessage from '../components/BroadcastMessage';
 import AppSwitcher from '../components/AppSwitcher';
+import { RefreshButton, LanguageSwitcher } from '../components/HeaderActions';
 import TabBar from '../components/TabBar';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import api from '../api';
@@ -148,9 +149,10 @@ export default function AdminDashboard() {
             <AppSwitcher currentApp="timeclock" userRole={user?.role} features={settings} />
             {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
           </div>
-          <div style={styles.headerRight}>
+          <div style={styles.headerRight} className="header-right">
             <NotificationBell />
-            {isPwa && <button style={styles.headerBtn} onClick={() => window.location.reload()}>↻</button>}
+            <RefreshButton title={t.refresh || 'Refresh'} />
+            <LanguageSwitcher />
             <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
           </div>
         </div>

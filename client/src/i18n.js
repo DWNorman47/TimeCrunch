@@ -3,6 +3,7 @@ const translations = {
     // ── Header / Dashboard (worker) ──────────────────────────────────────────
     changePassword: 'Change Password',
     logout: 'Logout',
+    refresh: 'Refresh',
     loadingEntries: 'Loading entries...',
     loadError: 'Failed to load data.',
     retry: 'Retry',
@@ -2436,6 +2437,7 @@ const translations = {
     // ── Header / Dashboard (worker) ──────────────────────────────────────────
     changePassword: 'Cambiar Contraseña',
     logout: 'Cerrar Sesión',
+    refresh: 'Actualizar',
     loadingEntries: 'Cargando entradas...',
     loadError: 'Error al cargar los datos.',
     retry: 'Reintentar',

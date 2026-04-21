@@ -5,6 +5,7 @@ import { useT } from '../hooks/useT';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
 import AppSwitcher from '../components/AppSwitcher';
+import { RefreshButton, LanguageSwitcher } from '../components/HeaderActions';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import { SkeletonStatRow, SkeletonList } from '../components/Skeleton';
 
@@ -48,7 +49,11 @@ export default function AnalyticsPage() {
             <AppSwitcher currentApp="analytics" userRole={user?.role} features={features} />
             {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
           </div>
-          <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }} className="header-right">
+            <RefreshButton title={t.refresh || 'Refresh'} />
+            <LanguageSwitcher />
+            <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
+          </div>
         </div>
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
       </header>
