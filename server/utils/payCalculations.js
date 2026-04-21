@@ -12,10 +12,22 @@ function hoursWorked(start, end) {
   return ms / 3600000;
 }
 
+function entryDuration(e) {
+  return hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
+}
+
 /**
  * Split an array of time entries into regularHours and overtimeHours.
  * Only entries with wage_type === 'regular' count toward OT.
- * @param {Array}  entries   - rows with {wage_type, start_time, end_time, work_date, break_minutes}
+ *
+ * Per-entry admin override: if `entry.overtime_hours_override` is not null,
+ * that entry is carved out of the automatic daily/weekly calc. The override
+ * value is taken as the OT portion (clamped to 0..total), and the remainder
+ * of the entry becomes regular. This lets an admin say "this particular 14h
+ * entry should only count 2h as OT" without affecting the other entries in
+ * the pay period.
+ *
+ * @param {Array}  entries   - rows with {wage_type, start_time, end_time, work_date, break_minutes, overtime_hours_override?}
  * @param {string} rule      - 'daily' | 'weekly' | 'none'
  * @param {number} threshold - hours before OT kicks in (e.g. 8 for daily, 40 for weekly)
  * @param {number} [weekStart=1] - 0=Sun … 6=Sat (only affects the 'weekly' rule)
@@ -23,34 +35,44 @@ function hoursWorked(start, end) {
 function computeOT(entries, rule, threshold, weekStart = 1) {
   const regular = entries.filter(e => e.wage_type === 'regular');
 
+  // Partition entries with an explicit override out of the automatic calc.
+  const overridden = regular.filter(e => e.overtime_hours_override != null);
+  const auto       = regular.filter(e => e.overtime_hours_override == null);
+
+  let overrideReg = 0, overrideOt = 0;
+  for (const e of overridden) {
+    const total = entryDuration(e);
+    const ot = Math.max(0, Math.min(total, parseFloat(e.overtime_hours_override)));
+    overrideReg += total - ot;
+    overrideOt  += ot;
+  }
+
+  let autoReg = 0, autoOt = 0;
   if (rule === 'weekly') {
     const weekly = {};
-    regular.forEach(e => {
+    auto.forEach(e => {
       const key = weekBucketKey(e.work_date, weekStart);
-      const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
-      weekly[key] = (weekly[key] || 0) + h;
+      weekly[key] = (weekly[key] || 0) + entryDuration(e);
     });
-    const reg = Object.values(weekly).reduce((s, h) => s + Math.min(h, threshold), 0);
-    const ot = Object.values(weekly).reduce((s, h) => s + Math.max(h - threshold, 0), 0);
-    return { regularHours: reg, overtimeHours: ot };
+    autoReg = Object.values(weekly).reduce((s, h) => s + Math.min(h, threshold), 0);
+    autoOt  = Object.values(weekly).reduce((s, h) => s + Math.max(h - threshold, 0), 0);
+  } else if (rule === 'none') {
+    autoReg = auto.reduce((s, e) => s + entryDuration(e), 0);
+  } else {
+    // daily (default)
+    const daily = {};
+    auto.forEach(e => {
+      const key = e.work_date.toString().substring(0, 10);
+      daily[key] = (daily[key] || 0) + entryDuration(e);
+    });
+    autoReg = Object.values(daily).reduce((s, h) => s + Math.min(h, threshold), 0);
+    autoOt  = Object.values(daily).reduce((s, h) => s + Math.max(h - threshold, 0), 0);
   }
 
-  // none — no overtime, all hours are regular
-  if (rule === 'none') {
-    const total = regular.reduce((s, e) => s + hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60, 0);
-    return { regularHours: total, overtimeHours: 0 };
-  }
-
-  // daily (default)
-  const daily = {};
-  regular.forEach(e => {
-    const key = e.work_date.toString().substring(0, 10);
-    const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
-    daily[key] = (daily[key] || 0) + h;
-  });
-  const reg = Object.values(daily).reduce((s, h) => s + Math.min(h, threshold), 0);
-  const ot = Object.values(daily).reduce((s, h) => s + Math.max(h - threshold, 0), 0);
-  return { regularHours: reg, overtimeHours: ot };
+  return {
+    regularHours:  overrideReg + autoReg,
+    overtimeHours: overrideOt  + autoOt,
+  };
 }
 
 /**

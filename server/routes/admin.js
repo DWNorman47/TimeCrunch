@@ -484,12 +484,15 @@ router.patch('/entries/:id/times', requireAdmin, requirePermission('manage_worke
 
 // PATCH /admin/entries/:id/edit — admin edits times + project on a pending entry
 router.patch('/entries/:id/edit', requireAdmin, requirePermission('approve_entries'),
-  coerceBody({ int: ['project_id'] }),
+  coerceBody({ int: ['project_id'], float: ['overtime_hours_override'] }),
   async (req, res) => {
   const companyId = req.user.company_id;
-  const { start_time, end_time, project_id } = req.body;
+  const { start_time, end_time, project_id, overtime_hours_override } = req.body;
   const clientUpdatedAt = req.body.updated_at || null;
   if (!start_time || !end_time) return res.status(400).json({ error: 'start_time and end_time required' });
+  if (overtime_hours_override != null && overtime_hours_override < 0) {
+    return res.status(400).json({ error: 'overtime_hours_override must be non-negative' });
+  }
   try {
     if (clientUpdatedAt) {
       const cur = await pool.query('SELECT updated_at FROM time_entries WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
@@ -505,11 +508,23 @@ router.patch('/entries/:id/edit', requireAdmin, requirePermission('approve_entri
       if (proj.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
       wage_type = proj.rows[0].wage_type;
     }
-    const result = await pool.query(
-      `UPDATE time_entries SET start_time=$1, end_time=$2, project_id=$3, wage_type=$4, updated_at=NOW()
-       WHERE id=$5 AND company_id=$6 RETURNING *`,
-      [start_time, end_time, project_id || null, wage_type, req.params.id, companyId]
-    );
+    // overtime_hours_override is only meaningful when the field is explicitly
+    // present on the request body. `in req.body` distinguishes "don't touch"
+    // from "clear to null".
+    const touchOvertimeOverride = 'overtime_hours_override' in req.body;
+    const result = touchOvertimeOverride
+      ? await pool.query(
+          `UPDATE time_entries
+              SET start_time=$1, end_time=$2, project_id=$3, wage_type=$4,
+                  overtime_hours_override=$5, updated_at=NOW()
+            WHERE id=$6 AND company_id=$7 RETURNING *`,
+          [start_time, end_time, project_id || null, wage_type, overtime_hours_override, req.params.id, companyId]
+        )
+      : await pool.query(
+          `UPDATE time_entries SET start_time=$1, end_time=$2, project_id=$3, wage_type=$4, updated_at=NOW()
+            WHERE id=$5 AND company_id=$6 RETURNING *`,
+          [start_time, end_time, project_id || null, wage_type, req.params.id, companyId]
+        );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
     // Return with project name joined
     const full = await pool.query(
@@ -2264,18 +2279,27 @@ router.post('/entries/approve-all', requireAdmin, requirePermission('approve_ent
 });
 
 // PATCH /admin/entries/:id/approve
-router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_entries'),
+  coerceBody({ float: ['overtime_hours_override'] }),
+  async (req, res) => {
   const companyId = req.user.company_id;
-  const { note } = req.body;
+  const { note, overtime_hours_override } = req.body;
   if (note && note.length > 500) return res.status(400).json({ error: 'Note must be 500 characters or fewer' });
+  if (overtime_hours_override != null && overtime_hours_override < 0) {
+    return res.status(400).json({ error: 'overtime_hours_override must be non-negative' });
+  }
+  const touchOverride = 'overtime_hours_override' in req.body;
   const accessIds = req.user.worker_access_ids;
   try {
-    const workerFilter = accessIds && accessIds.length ? `AND user_id = ANY($5)` : '';
-    const params = accessIds && accessIds.length
-      ? [note || null, req.user.id, req.params.id, companyId, accessIds]
-      : [note || null, req.user.id, req.params.id, companyId];
+    // Include the override in the UPDATE only when it was part of the request.
+    // Same shape as /edit — 'not in body' means "don't touch existing value".
+    const setOverride = touchOverride ? ', overtime_hours_override = $5' : '';
+    const baseParams = [note || null, req.user.id, req.params.id, companyId];
+    if (touchOverride) baseParams.push(overtime_hours_override);
+    const workerFilter = accessIds && accessIds.length ? `AND user_id = ANY($${baseParams.length + 1})` : '';
+    const params = accessIds && accessIds.length ? [...baseParams, accessIds] : baseParams;
     const result = await pool.query(
-      `UPDATE time_entries SET status = 'approved', locked = true, approval_note = $1, approved_by = $2, approved_at = NOW()
+      `UPDATE time_entries SET status = 'approved', locked = true, approval_note = $1, approved_by = $2, approved_at = NOW()${setOverride}
        WHERE id = $3 AND company_id = $4 ${workerFilter} RETURNING *`,
       params
     );

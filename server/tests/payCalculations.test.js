@@ -358,3 +358,77 @@ describe('computeDailyPayCosts', () => {
     expect(overtimeCost).toBeCloseTo(37.5, 2);
   });
 });
+
+describe('computeOT — per-entry overtime_hours_override', () => {
+  function makeEntry(work_date, start_time, end_time, extras = {}) {
+    return { work_date, start_time, end_time, wage_type: 'regular', break_minutes: 0, ...extras };
+  }
+
+  test('override=0 forces all hours to regular regardless of threshold', () => {
+    // 14h shift that would normally be 8h reg + 6h OT under daily rule.
+    const entries = [makeEntry('2024-01-01', '06:00', '20:00', { overtime_hours_override: 0 })];
+    const { regularHours, overtimeHours } = computeOT(entries, 'daily', 8);
+    expect(regularHours).toBeCloseTo(14);
+    expect(overtimeHours).toBeCloseTo(0);
+  });
+
+  test('override=2 forces exactly 2h OT, rest regular', () => {
+    // 14h shift. Normal daily rule: 8 reg + 6 OT. Override: 2 OT, 12 reg.
+    const entries = [makeEntry('2024-01-01', '06:00', '20:00', { overtime_hours_override: 2 })];
+    const { regularHours, overtimeHours } = computeOT(entries, 'daily', 8);
+    expect(regularHours).toBeCloseTo(12);
+    expect(overtimeHours).toBeCloseTo(2);
+  });
+
+  test('override exceeding total hours is clamped to total', () => {
+    const entries = [makeEntry('2024-01-01', '09:00', '17:00', { overtime_hours_override: 99 })]; // 8h
+    const { regularHours, overtimeHours } = computeOT(entries, 'daily', 8);
+    expect(regularHours).toBeCloseTo(0);
+    expect(overtimeHours).toBeCloseTo(8);
+  });
+
+  test('override on one entry does not affect auto-calc on others', () => {
+    // Mon: 14h overridden to only 2 OT → 12 reg + 2 OT
+    // Tue: 10h normal daily rule → 8 reg + 2 OT
+    // Expected: 20 reg, 4 OT
+    const entries = [
+      makeEntry('2024-01-01', '06:00', '20:00', { overtime_hours_override: 2 }),
+      makeEntry('2024-01-02', '08:00', '18:00'),
+    ];
+    const { regularHours, overtimeHours } = computeOT(entries, 'daily', 8);
+    expect(regularHours).toBeCloseTo(20);
+    expect(overtimeHours).toBeCloseTo(4);
+  });
+
+  test('override honored under weekly rule too', () => {
+    // 12h entry with override=3 → 9 reg + 3 OT, bypassing weekly threshold entirely
+    const entries = [makeEntry('2024-01-03', '06:00', '18:00', { overtime_hours_override: 3 })];
+    const { regularHours, overtimeHours } = computeOT(entries, 'weekly', 40);
+    expect(overtimeHours).toBeCloseTo(3);
+    expect(regularHours).toBeCloseTo(9);
+  });
+
+  test('override on prevailing-wage entry is ignored (prevailing never counts toward OT)', () => {
+    const entries = [
+      { work_date: '2024-01-01', start_time: '06:00', end_time: '20:00', wage_type: 'prevailing', break_minutes: 0, overtime_hours_override: 5 },
+    ];
+    const { regularHours, overtimeHours } = computeOT(entries, 'daily', 8);
+    expect(regularHours).toBeCloseTo(0);
+    expect(overtimeHours).toBeCloseTo(0);
+  });
+
+  test('null override behaves like no override (default auto-calc)', () => {
+    const entries = [makeEntry('2024-01-01', '06:00', '20:00', { overtime_hours_override: null })];
+    const { regularHours, overtimeHours } = computeOT(entries, 'daily', 8);
+    expect(regularHours).toBeCloseTo(8);
+    expect(overtimeHours).toBeCloseTo(6);
+  });
+
+  test('override with break_minutes: break is subtracted from total first', () => {
+    // 14h shift, 30min break, override=1 → total worked = 13.5h → 12.5 reg + 1 OT
+    const entries = [makeEntry('2024-01-01', '06:00', '20:00', { break_minutes: 30, overtime_hours_override: 1 })];
+    const { regularHours, overtimeHours } = computeOT(entries, 'daily', 8);
+    expect(regularHours).toBeCloseTo(12.5);
+    expect(overtimeHours).toBeCloseTo(1);
+  });
+});
