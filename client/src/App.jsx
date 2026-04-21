@@ -6,6 +6,7 @@ import WelcomeModal from './components/WelcomeModal';
 import SkipLink from './components/SkipLink';
 import { ToastProvider } from './contexts/ToastContext';
 import { OfflineProvider } from './contexts/OfflineContext';
+import { clearCache } from './offlineDb';
 
 const Login             = lazy(() => import('./pages/Login'));
 const Register          = lazy(() => import('./pages/Register'));
@@ -121,6 +122,23 @@ function AppRoutes() {
 
 // If this tab was opened via "Login as" from SuperAdmin, swap in the impersonate token
 // before React even mounts so AuthProvider picks it up on first render.
+// Drop the API cache on every online page load.
+//
+// The cache exists so the PWA keeps working in dead zones — it is *not*
+// meant to silently outlive a refresh when the network is available. Before
+// this, refreshing the page re-read stale data from IndexedDB because the
+// cache-first code ran again on the persisted store. Now: refresh while
+// online = fresh data, same as any normal website. When offline we keep
+// the cache, because it's the only thing we have.
+//
+// The clear is async but fire-and-forget: the clear transaction is queued
+// on the same IDB connection that getOrFetch will use, so the first reads
+// see an empty store.
+(function dropCacheOnOnlineLoad() {
+  if (navigator.onLine === false) return;
+  clearCache();
+})();
+
 (function applyImpersonateToken() {
   if (!window.location.search.includes('impersonate=1')) return;
   const token = sessionStorage.getItem('impersonate_token');
