@@ -28,25 +28,21 @@ api.interceptors.request.use(config => {
   return config;
 });
 
-// Map of URL patterns → cache keys to invalidate after a write succeeds. Keeps
-// the admin's own session from serving a stale list after they just mutated it;
-// cross-device freshness falls back on the short cache TTL in offlineDb.
-const CACHE_INVALIDATION_RULES = [
-  { pattern: /\/admin\/projects(\/|\?|$)/, keys: ['projects'] },
-  { pattern: /\/admin\/settings/,          keys: ['settings'] },
-];
-
+// After a successful write, ask the cache registry which cached collections
+// this URL should invalidate and purge them. Keeps the admin's own session
+// from serving a stale list; cross-device freshness falls back on the short
+// TTL declared alongside each key in cacheRegistry.js.
 api.interceptors.response.use(
   r => {
     const method = (r.config?.method || '').toLowerCase();
     if (['post', 'patch', 'put', 'delete'].includes(method)) {
       const url = r.config?.url || '';
-      const matched = CACHE_INVALIDATION_RULES.filter(rule => rule.pattern.test(url));
-      if (matched.length > 0) {
-        import('./offlineDb').then(({ invalidateCache }) => {
-          matched.forEach(rule => rule.keys.forEach(invalidateCache));
-        }).catch(() => { /* ignore */ });
-      }
+      Promise.all([
+        import('./cacheRegistry'),
+        import('./offlineDb'),
+      ]).then(([{ keysInvalidatedByUrl }, { invalidateCache }]) => {
+        keysInvalidatedByUrl(url).forEach(invalidateCache);
+      }).catch(() => { /* ignore */ });
     }
     return r;
   },

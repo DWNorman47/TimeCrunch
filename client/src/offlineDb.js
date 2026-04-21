@@ -1,21 +1,10 @@
 import { openDB } from 'idb';
+import { ttlFor } from './cacheRegistry';
 
 const DB_NAME = 'opsfloa-cache';
 const DB_VERSION = 2;
 const STORE = 'api-cache';
 const SYNC_STORE = 'pending-syncs';
-
-const TTL = {
-  // Projects appear in worker clock-in pickers, so a stale cache blocks them
-  // from seeing freshly-created projects. Keep the window short.
-  projects: 5 * 60 * 1000,
-  // Settings drive gating (Project Integration, modules, etc.) so stale caches
-  // block workers after an admin flips a toggle. Short TTL keeps that window small.
-  settings: 5 * 60 * 1000,
-  shifts: 60 * 60 * 1000,
-  entries: 15 * 60 * 1000,
-  'my-count-assignments': 15 * 60 * 1000,
-};
 
 let _db;
 async function getDb() {
@@ -76,8 +65,7 @@ export async function setCached(key, data) {
 
 export function isFresh(record, key) {
   if (!record) return false;
-  const ttl = TTL[key] ?? 15 * 60 * 1000;
-  return Date.now() - record.ts < ttl;
+  return Date.now() - record.ts < ttlFor(key);
 }
 
 export async function clearCache() {
