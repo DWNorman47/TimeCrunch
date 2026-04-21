@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
-import AppSwitcher from '../components/AppSwitcher';
-import { RefreshButton, LanguageSwitcher } from '../components/HeaderActions';
+import AppHeader from '../components/AppHeader';
 import TabBar from '../components/TabBar';
 import InventoryStock from '../components/inventory/InventoryStock';
 import InventoryItems from '../components/inventory/InventoryItems';
@@ -17,7 +16,7 @@ import MyCount from '../components/MyCount';
 
 import { silentError } from '../errorReporter';
 export default function InventoryPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const [features, setFeatures] = useState({});
@@ -73,17 +72,7 @@ export default function InventoryPage() {
   if (!features.module_inventory) {
     return (
       <div style={styles.page}>
-        <header style={styles.header} className="app-header">
-          <div style={styles.headerTopRow}>
-            <div style={styles.logoGroup}>
-              <AppSwitcher currentApp="inventory" userRole={user?.role} features={features} />
-            </div>
-            <div style={styles.headerRight}>
-              <button style={styles.headerBtn} onClick={logout}>Logout</button>
-            </div>
-          </div>
-          {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
-        </header>
+        <AppHeader currentApp="inventory" features={features} />
         <div style={styles.disabled}>
           <div style={styles.disabledIcon}>📦</div>
           <h2 style={styles.disabledTitle}>Inventory Not Enabled</h2>
@@ -95,21 +84,7 @@ export default function InventoryPage() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <div style={styles.headerTopRow}>
-          <div style={styles.logoGroup}>
-            <AppSwitcher currentApp="inventory" userRole={user?.role} features={features} />
-            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
-          </div>
-          <div style={styles.headerRight} className="header-right">
-            {!isAdmin && <span style={styles.userName} className="header-username">{user?.full_name}</span>}
-            <RefreshButton />
-            <LanguageSwitcher />
-            <button style={styles.headerBtn} className="header-btn" onClick={logout}>Logout</button>
-          </div>
-        </div>
-        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
-      </header>
+      <AppHeader currentApp="inventory" features={features} />
 
       <main id="main-content" style={styles.main}>
         <TabBar

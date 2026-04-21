@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
-import AppSwitcher from '../components/AppSwitcher';
-import { RefreshButton, LanguageSwitcher } from '../components/HeaderActions';
+import AppHeader from '../components/AppHeader';
 import ManageClients from '../components/ManageClients';
 import { useT } from '../hooks/useT';
 import { SkeletonList } from '../components/Skeleton';
@@ -1502,7 +1501,7 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
 }
 
 export default function ProjectsPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const t = useT();
   const [mainTab, setMainTab] = useState('projects');
   const [projects, setProjects] = useState([]);
@@ -1549,20 +1548,7 @@ export default function ProjectsPage() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header} className="app-header">
-        <div style={styles.headerTopRow}>
-          <div style={styles.logoGroup}>
-            <AppSwitcher currentApp="projects" userRole={user?.role} features={features} />
-            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
-          </div>
-          <div style={styles.headerRight} className="header-right">
-            <RefreshButton />
-            <LanguageSwitcher />
-            <button style={styles.headerBtn} className="header-btn" onClick={logout}>Logout</button>
-          </div>
-        </div>
-        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
-      </header>
+      <AppHeader currentApp="projects" features={features} />
 
       <main id="main-content" style={styles.main}>
         {/* Top-level tab bar */}

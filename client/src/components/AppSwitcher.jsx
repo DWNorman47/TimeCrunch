@@ -3,7 +3,7 @@ import { useT } from '../hooks/useT';
 
 // Workers see: Time Clock, Field, Inventory, Account
 // Admins see: Time Clock, Field, Inventory, Projects, Administration, Analytics
-const APPS = [
+export const APPS = [
   {
     id: 'timeclock',
     name: 'Time Clock',
