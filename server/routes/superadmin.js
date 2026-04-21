@@ -106,45 +106,147 @@ router.patch('/companies/:id', requireSuperAdmin, async (req, res) => {
   }
 });
 
-// DELETE /superadmin/companies/:id — hard delete all company data in a transaction
+// DELETE /superadmin/companies/:id — hard delete all company data in a transaction.
+// Also collects R2 media URLs and deletes them from object storage after the
+// DB commit succeeds, so a rolled-back transaction never leaves the bucket
+// missing files that are still referenced.
+//
+// Note: this does NOT cancel Stripe subscriptions automatically. If the company
+// has an active subscription, deleting the row here would leave Stripe charging
+// a card for a company that no longer exists. The handler refuses to delete
+// in that case; the super_admin must cancel the subscription (or mark the
+// company canceled) before proceeding.
 router.delete('/companies/:id', requireSuperAdmin, async (req, res) => {
   const { id } = req.params;
-  const check = await pool.query('SELECT name FROM companies WHERE id = $1', [id]);
+  const check = await pool.query(
+    'SELECT name, stripe_subscription_id, subscription_status FROM companies WHERE id = $1',
+    [id]
+  );
   if (check.rowCount === 0) return res.status(404).json({ error: 'Company not found' });
+  const company = check.rows[0];
+  if (company.stripe_subscription_id && company.subscription_status !== 'canceled') {
+    return res.status(409).json({
+      error: 'Cancel the Stripe subscription (or set subscription_status to canceled) before deleting this company.',
+      stripe_subscription_id: company.stripe_subscription_id,
+    });
+  }
 
   const client = await pool.connect();
+  let mediaUrls = [];
   try {
     await client.query('BEGIN');
-    // Delete leaf tables first (those with FKs pointing to other company tables)
+
+    // ── Collect R2 URLs before we drop the rows that point to them.
+    // Fire deletes against R2 only after the DB commit succeeds.
+
+    // Scalar URL columns
+    const scalarUrlQueries = [
+      `SELECT url FROM field_report_photos WHERE field_report_id IN (SELECT id FROM field_reports WHERE company_id = $1) AND url IS NOT NULL`,
+      `SELECT receipt_url AS url FROM reimbursements WHERE company_id = $1 AND receipt_url IS NOT NULL`,
+      `SELECT url FROM worker_documents   WHERE company_id = $1 AND url IS NOT NULL`,
+      `SELECT url FROM project_documents  WHERE company_id = $1 AND url IS NOT NULL`,
+      `SELECT url FROM client_documents   WHERE company_id = $1 AND url IS NOT NULL`,
+      `SELECT url FROM safety_talk_attachments WHERE talk_id IN (SELECT id FROM safety_talks WHERE company_id = $1) AND url IS NOT NULL`,
+    ];
+    for (const q of scalarUrlQueries) {
+      try {
+        const r = await client.query(q, [id]);
+        for (const row of r.rows) if (row.url) mediaUrls.push(row.url);
+      } catch { /* table may not exist in some dev DBs; skip */ }
+    }
+
+    // JSONB array columns — photo_urls is a JSONB array of strings. Use
+    // jsonb_array_elements_text to flatten and union across all tables.
+    const jsonbArrayQueries = [
+      `SELECT jsonb_array_elements_text(photo_urls) AS url FROM inventory_locations   WHERE company_id = $1 AND jsonb_array_length(photo_urls) > 0`,
+      `SELECT jsonb_array_elements_text(photo_urls) AS url FROM inventory_areas       WHERE company_id = $1 AND jsonb_array_length(photo_urls) > 0`,
+      `SELECT jsonb_array_elements_text(photo_urls) AS url FROM inventory_racks       WHERE company_id = $1 AND jsonb_array_length(photo_urls) > 0`,
+      `SELECT jsonb_array_elements_text(photo_urls) AS url FROM inventory_bays        WHERE company_id = $1 AND jsonb_array_length(photo_urls) > 0`,
+      `SELECT jsonb_array_elements_text(photo_urls) AS url FROM inventory_compartments WHERE company_id = $1 AND jsonb_array_length(photo_urls) > 0`,
+      `SELECT jsonb_array_elements_text(photo_urls) AS url FROM service_requests     WHERE company_id = $1 AND jsonb_array_length(photo_urls) > 0`,
+    ];
+    for (const q of jsonbArrayQueries) {
+      try {
+        const r = await client.query(q, [id]);
+        for (const row of r.rows) if (row.url) mediaUrls.push(row.url);
+      } catch { /* table may not exist in some dev DBs; skip */ }
+    }
+
+    // ── Leaf tables (children of things we're about to delete) ──────────────
     await client.query(`DELETE FROM field_report_photos WHERE field_report_id IN (SELECT id FROM field_reports WHERE company_id = $1)`, [id]);
-    await client.query(`DELETE FROM time_entry_comments  WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM equipment_hours      WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM company_chat         WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM incident_reports     WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM sub_reports          WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM rfis                 WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM inspections          WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM inspection_templates WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM entry_messages              WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM equipment_hours             WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM company_chat                WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM incident_reports            WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM sub_reports                 WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM rfis                        WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM inspections                 WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM inspection_templates        WHERE company_id = $1`, [id]);
     await client.query(`DELETE FROM safety_checklist_submissions WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM safety_checklist_templates   WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM field_reports    WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM daily_reports    WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM punchlist_items  WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM safety_talks     WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM audit_log        WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM shifts           WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM time_entries     WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM active_clock     WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM pay_periods      WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM inbox            WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM push_subscriptions WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM equipment_items  WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM projects         WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM settings         WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM users            WHERE company_id = $1`, [id]);
-    await client.query(`DELETE FROM companies        WHERE id = $1`, [id]);
+    await client.query(`DELETE FROM safety_checklist_templates  WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM field_reports               WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM daily_reports               WHERE company_id = $1`, [id]); // cascades report_manpower/equipment/materials
+    await client.query(`DELETE FROM punchlist_items             WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM safety_talks                WHERE company_id = $1`, [id]); // cascades signoffs/attachments/quiz
+
+    // ── Timekeeping ─────────────────────────────────────────────────────────
+    await client.query(`DELETE FROM time_entries                WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM active_clock                WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM pay_periods                 WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM shifts                      WHERE company_id = $1`, [id]);
+
+    // ── Worker-level records ────────────────────────────────────────────────
+    await client.query(`DELETE FROM worker_documents            WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM worker_availability         WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM worker_fringes              WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM certified_payroll_signatures WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM time_off_requests           WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM reimbursements              WHERE company_id = $1`, [id]);
+
+    // ── Inventory (order matters: transactions & cycle counts reference items/locations via RESTRICT) ──
+    await client.query(`DELETE FROM inventory_transactions      WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM inventory_cycle_counts      WHERE company_id = $1`, [id]); // cascades cycle_count_lines + worker assignments
+    await client.query(`DELETE FROM purchase_orders             WHERE company_id = $1`, [id]); // cascades purchase_order_lines
+    await client.query(`DELETE FROM inventory_items             WHERE company_id = $1`, [id]); // cascades stock, item_uoms
+    await client.query(`DELETE FROM inventory_locations         WHERE company_id = $1`, [id]); // cascades areas → racks → bays → compartments
+    await client.query(`DELETE FROM inventory_suppliers         WHERE company_id = $1`, [id]);
+
+    // ── Project-level records ───────────────────────────────────────────────
+    await client.query(`DELETE FROM project_documents           WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM project_invoices            WHERE company_id = $1`, [id]);
+
+    // ── Support / SaaS surfaces ─────────────────────────────────────────────
+    await client.query(`DELETE FROM service_requests            WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM qbo_sync_errors             WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM client_errors               WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM inbox                       WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM push_subscriptions          WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM audit_log                   WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM equipment_items             WHERE company_id = $1`, [id]);
+
+    // ── Base entities ───────────────────────────────────────────────────────
+    await client.query(`DELETE FROM clients                     WHERE company_id = $1`, [id]); // cascades client_documents
+    await client.query(`DELETE FROM projects                    WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM advanced_settings           WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM settings                    WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM users                       WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM companies                   WHERE id = $1`, [id]);
+
     await client.query('COMMIT');
-    res.json({ deleted: true, name: check.rows[0].name });
+
+    // After commit: best-effort R2 cleanup. Failures here don't undo the
+    // delete — they just leave orphaned blobs the R2 lifecycle can reap later.
+    if (mediaUrls.length > 0) {
+      const { deleteByUrl } = require('../r2');
+      Promise.allSettled(mediaUrls.map(u => deleteByUrl(u))).then(results => {
+        const failed = results.filter(r => r.status === 'rejected').length;
+        if (failed > 0) {
+          logger.warn({ company_id: id, failed, total: mediaUrls.length }, 'r2 cleanup had failures after company delete');
+        }
+      });
+    }
+
+    res.json({ deleted: true, name: company.name, media_files: mediaUrls.length });
   } catch (err) {
     await client.query('ROLLBACK');
     logger.error({ err }, 'catch block error');

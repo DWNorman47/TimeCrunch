@@ -153,7 +153,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   // Add form state
   const [showForm, setShowForm] = useState(false);
   const [addMode, setAddMode] = useState('manual');
-  const [form, setForm] = useState({ first_name: '', last_name: '', username: '', password: defaultTempPassword, email: '', role: 'worker', worker_type: 'employee', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
+  const [form, setForm] = useState({ first_name: '', last_name: '', username: '', password: defaultTempPassword, email: '', role: 'worker', worker_type: 'employee', classification: '', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' });
   const [inviteForm, setInviteForm] = useState({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) });
   const [error, setError] = useState('');
   const [inviteError, setInviteError] = useState('');
@@ -490,20 +490,29 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
           </div>
 
           {addMode === 'manual' ? (
-            <form onSubmit={handleAdd} style={s.addForm}>
+            <form onSubmit={handleAdd} style={s.addForm} autoComplete="off">
+              {/* Honeypot fields: some browsers (Chrome in particular) ignore
+                  autoComplete="off" on the real username/password and look for
+                  the first such fields in the form to autofill. These invisible
+                  decoys absorb that autofill so the admin's own credentials
+                  don't end up prefilled into the real fields below. */}
+              <input type="text"     name="fake-username" autoComplete="username"      tabIndex={-1} aria-hidden="true" style={{ position: 'absolute', left: -9999, width: 1, height: 1, opacity: 0 }} />
+              <input type="password" name="fake-password" autoComplete="current-password" tabIndex={-1} aria-hidden="true" style={{ position: 'absolute', left: -9999, width: 1, height: 1, opacity: 0 }} />
               <div style={s.formGrid}>
                 <div style={s.fieldGroup}>
                   <label htmlFor="mw-first-name" style={s.label}>{t.firstName}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-                  <input id="mw-first-name" style={s.input} value={form.first_name} onChange={e => handleFirstNameChange(e.target.value)} required />
+                  <input id="mw-first-name" name="mw-first-name" autoComplete="off" style={s.input} value={form.first_name} onChange={e => handleFirstNameChange(e.target.value)} required />
                 </div>
                 <div style={s.fieldGroup}>
                   <label htmlFor="mw-last-name" style={s.label}>{t.lastName}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
-                  <input id="mw-last-name" style={s.input} value={form.last_name} onChange={e => handleLastNameChange(e.target.value)} required />
+                  <input id="mw-last-name" name="mw-last-name" autoComplete="off" style={s.input} value={form.last_name} onChange={e => handleLastNameChange(e.target.value)} required />
                 </div>
                 <div style={s.fieldGroup}>
                   <label htmlFor="mw-username" style={s.label}>Username<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>{usernameChecking ? ' (checking...)' : usernameTaken ? ' ⚠ taken' : ''}</label>
                   <input
                     id="mw-username"
+                    name="mw-new-username"
+                    autoComplete="off"
                     style={{ ...s.input, borderColor: usernameTaken ? '#fca5a5' : undefined }}
                     value={form.username}
                     onChange={e => { setUsernameEdited(!!e.target.value); set('username', e.target.value); setUsernameTaken(false); }}
@@ -514,13 +523,13 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 <div style={s.fieldGroup}>
                   <label htmlFor="mw-password" style={s.label}>{t.temporaryPassword}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
                   <div style={{ position: 'relative' }}>
-                    <input id="mw-password" style={{ ...s.input, width: '100%', paddingRight: 36, boxSizing: 'border-box' }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} required minLength={8} />
+                    <input id="mw-password" name="mw-new-password" autoComplete="new-password" style={{ ...s.input, width: '100%', paddingRight: 36, boxSizing: 'border-box' }} type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} required minLength={8} />
                     <button type="button" onClick={() => setShowPassword(v => !v)} style={s.eyeBtn} tabIndex={-1}>{showPassword ? '🙈' : '👁'}</button>
                   </div>
                 </div>
                 <div style={s.fieldGroup}>
                   <label htmlFor="mw-email" style={s.label}>{t.emailOptional}</label>
-                  <input id="mw-email" style={s.input} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+                  <input id="mw-email" name="mw-new-email" autoComplete="off" style={s.input} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
                 </div>
                 <div style={s.fieldGroup}>
                   <label htmlFor="mw-role" style={s.label}>{t.role}</label>
@@ -538,6 +547,15 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                     <option value="owner">Owner / Officer</option>
                   </select>
                 </div>
+                {trackClassifications && (
+                  <div style={s.fieldGroup}>
+                    <label htmlFor="mw-classification" style={s.label}>Job Classification <span style={{ color: '#6b7280', fontSize: 12, fontWeight: 400 }}>(optional)</span></label>
+                    <select id="mw-classification" style={s.input} value={form.classification} onChange={e => set('classification', e.target.value)}>
+                      <option value="">— None —</option>
+                      {classifications.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div style={s.fieldGroup}>
                   <label htmlFor="mw-language" style={s.label}>{t.language}</label>
                   <select id="mw-language" style={s.input} value={form.language} onChange={e => set('language', e.target.value)}>

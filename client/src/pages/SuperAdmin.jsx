@@ -9,6 +9,44 @@ function formatDate(str, locale = 'en-US') {
   return new Date(str).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/**
+ * Native <input type="date"> fires onChange on every partial edit. If the
+ * parent hands that straight to an API call, typing "2026" flushes as "0002",
+ * then "0020", etc. — each round-trip re-renders the input and yanks the
+ * cursor out of the year segment. This wrapper keeps the typed value local
+ * and only commits on blur (or when cleared entirely).
+ */
+function CommitOnBlurDateInput({ value, onCommit, style, disabled }) {
+  const [local, setLocal] = React.useState(value || '');
+  React.useEffect(() => { setLocal(value || ''); }, [value]);
+  const commit = () => {
+    const next = local || null;
+    // Guard against year < 1000 — likely a mid-type "0020" rather than an
+    // intentional date in the year 20 AD.
+    if (next) {
+      const year = parseInt(next.slice(0, 4), 10);
+      if (!Number.isFinite(year) || year < 1000) {
+        setLocal(value || '');
+        return;
+      }
+    }
+    if (next !== (value || null)) onCommit(next);
+  };
+  return (
+    <input
+      type="date"
+      min="1900-01-01"
+      max="2100-12-31"
+      style={style}
+      disabled={disabled}
+      value={local}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+    />
+  );
+}
+
 function formatMrr(cents, locale = 'en-US') {
   if (!cents) return '—';
   return '$' + (cents / 100).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -292,6 +330,16 @@ export default function SuperAdmin() {
         {/* ── Companies tab ── */}
         {tab === 'companies' && (
           <>
+            <div style={styles.diagnosticsRow}>
+              <button
+                style={styles.diagnosticsBtn}
+                onClick={() => import('../utils/debugBundle').then(m => m.downloadDebugBundle())}
+                title="Download this browser's localStorage, IndexedDB cache, and service-worker state as JSON. Use after 'Login as' to snapshot what a user's session looked like."
+              >
+                Download debug bundle
+              </button>
+              <span style={styles.diagnosticsHint}>Captures this browser's client state (caches, persisted forms) to JSON.</span>
+            </div>
             {loading ? (
               <p style={{ color: '#6b7280' }}>Loading...</p>
             ) : companies.length === 0 ? (
@@ -373,11 +421,10 @@ export default function SuperAdmin() {
                           {(c.subscription_status === 'trial' || c.trial_ends_at) && (
                             <div style={styles.controlGroup}>
                               <span style={styles.controlLabel}>Trial ends</span>
-                              <input
-                                type="date"
+                              <CommitOnBlurDateInput
                                 style={styles.controlSelect}
                                 value={c.trial_ends_at ? c.trial_ends_at.substring(0, 10) : ''}
-                                onChange={e => patchCompany(c.id, { trial_ends_at: e.target.value || null })}
+                                onCommit={next => patchCompany(c.id, { trial_ends_at: next })}
                                 disabled={working === c.id}
                               />
                             </div>
@@ -426,13 +473,6 @@ export default function SuperAdmin() {
                         </button>
                         <button style={styles.actionBtn} onClick={() => startRename(c)} disabled={working === c.id}>
                           Rename
-                        </button>
-                        <button
-                          style={styles.actionBtn}
-                          onClick={() => { setImpersonateError(null); handleImpersonate(c); }}
-                          disabled={impersonating === c.id}
-                        >
-                          {impersonating === c.id ? '...' : 'Login as'}
                         </button>
                         {impersonateError?.id === c.id && (
                           <span style={{ fontSize: 12, color: '#ef4444' }}>{impersonateError.msg}</span>
@@ -850,6 +890,9 @@ const styles = {
   td: { padding: '8px 10px', borderBottom: '1px solid #f3f4f6', color: '#374151' },
   roleTag: { padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 },
   userImpersonateBtn: { padding: '4px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#1e40af', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  diagnosticsRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 16, flexWrap: 'wrap' },
+  diagnosticsBtn: { padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  diagnosticsHint: { fontSize: 12, color: '#6b7280' },
   // Delete modal
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modal: { background: '#fff', borderRadius: 12, padding: 28, maxWidth: 440, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' },
