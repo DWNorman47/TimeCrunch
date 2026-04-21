@@ -10,6 +10,16 @@ import { Link } from 'react-router-dom';
 
 const ENTRIES = [
   {
+    version: '2026-04-21 (afternoon)',
+    headline: 'Polish',
+    items: [
+      'Unified header across every module — same buttons, same layout, mobile-friendly.',
+      'Admins can override overtime hours per entry, in hours + minutes.',
+      'Live admin view refreshes every 10 seconds while you\'re watching it.',
+      '4xx server errors no longer silently disappear — you see what went wrong.',
+    ],
+  },
+  {
     version: '2026-04-21',
     headline: 'Reliability',
     items: [
