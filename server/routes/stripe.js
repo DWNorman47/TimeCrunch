@@ -192,6 +192,46 @@ router.post('/webhook', async (req, res) => {
         const companyId = sub.metadata?.company_id;
         if (companyId) {
           await pool.query('UPDATE companies SET subscription_status = $1 WHERE id = $2', ['past_due', companyId]);
+
+          // Email every admin so they can update the payment method before
+          // the card is retried-then-stopped and their workers get locked out.
+          try {
+            const [companyRes, adminsRes] = await Promise.all([
+              pool.query('SELECT name FROM companies WHERE id = $1', [companyId]),
+              pool.query(
+                `SELECT email, full_name FROM users
+                  WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true AND email IS NOT NULL`,
+                [companyId]
+              ),
+            ]);
+            const company = companyRes.rows[0];
+            if (company && adminsRes.rows.length > 0) {
+              const amountStr = obj.amount_due != null
+                ? `$${(obj.amount_due / 100).toFixed(2)}`
+                : null;
+              const { sendEmail } = require('../email');
+              for (const admin of adminsRes.rows) {
+                sendEmail({
+                  to: admin.email,
+                  subject: `Payment failed for your OpsFloa subscription`,
+                  html: `
+                    <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px">
+                      <h2 style="color:#b91c1c;margin-bottom:8px">Payment failed</h2>
+                      <p style="color:#444">Hi ${admin.full_name || ''}, we weren't able to charge your payment method${amountStr ? ` for ${amountStr}` : ''} for <strong>${company.name}</strong>.</p>
+                      <p style="color:#444">Stripe will automatically retry, but to avoid losing access, please update your payment method in billing.</p>
+                      <a href="${process.env.APP_URL}/administration#billing"
+                         style="display:inline-block;background:#1a56db;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;margin-top:12px">
+                        Update payment method
+                      </a>
+                      <p style="color:#9ca3af;font-size:12px;margin-top:24px">If the retry succeeds, no action is needed and you'll stay on your current plan.</p>
+                    </div>
+                  `,
+                }).catch(err => req.log.warn({ err }, 'payment_failed email send failed'));
+              }
+            }
+          } catch (err) {
+            req.log.warn({ err }, 'payment_failed notification failed (status already flipped)');
+          }
         }
       }
     } else if (event.type === 'invoice.payment_succeeded') {
