@@ -98,6 +98,8 @@ export default function SuperAdmin() {
 
   // impersonate
   const [impersonating, setImpersonating] = useState(null); // companyId
+  const [revoking, setRevoking] = useState(null); // user id
+  const [impersonationLog, setImpersonationLog] = useState(null); // null = not loaded, [] = empty, [...] = rows
   const [impersonateError, setImpersonateError] = useState(null); // { id, msg }
 
   // affiliate delete confirm
@@ -222,6 +224,26 @@ export default function SuperAdmin() {
     } finally { setImpersonating(null); }
   };
 
+  const handleRevoke = async (user) => {
+    const confirm = window.confirm(
+      `Force-logout ${user.full_name} (@${user.username}) on all devices? Their next request will return 401 and they'll be sent to /login.`
+    );
+    if (!confirm) return;
+    setRevoking(user.id);
+    try {
+      await api.post(`/superadmin/users/${user.id}/revoke-sessions`);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Revoke failed');
+    } finally { setRevoking(null); }
+  };
+
+  const loadImpersonationLog = async () => {
+    try {
+      const r = await api.get('/superadmin/impersonation-log?limit=100');
+      setImpersonationLog(r.data);
+    } catch (err) { silentError('superadmin impersonation-log')(err); }
+  };
+
   const toggleExpand = async (id) => {
     if (expandedId === id) { setExpandedId(null); return; }
     setExpandedId(id);
@@ -338,8 +360,50 @@ export default function SuperAdmin() {
               >
                 Download debug bundle
               </button>
-              <span style={styles.diagnosticsHint}>Captures this browser's client state (caches, persisted forms) to JSON.</span>
+              <button style={styles.diagnosticsBtn} onClick={loadImpersonationLog}>
+                Impersonation log
+              </button>
+              <span style={styles.diagnosticsHint}>Captures this browser's client state; shows recent "Login as" events.</span>
             </div>
+
+            {impersonationLog !== null && (
+              <div style={styles.modalOverlay} onClick={() => setImpersonationLog(null)}>
+                <div style={styles.impersonationModal} onClick={e => e.stopPropagation()}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#111827' }}>Recent impersonations</h3>
+                    <button style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#6b7280' }} onClick={() => setImpersonationLog(null)}>✕</button>
+                  </div>
+                  {impersonationLog.length === 0 ? (
+                    <p style={{ color: '#6b7280', fontSize: 13 }}>No impersonation events recorded yet.</p>
+                  ) : (
+                    <table style={styles.table}>
+                      <thead>
+                        <tr>
+                          <th style={styles.th}>When</th>
+                          <th style={styles.th}>Super admin</th>
+                          <th style={styles.th}>Target</th>
+                          <th style={styles.th}>Role</th>
+                          <th style={styles.th}>Company</th>
+                          <th style={styles.th}>IP</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {impersonationLog.map(r => (
+                          <tr key={r.id}>
+                            <td style={styles.td}>{new Date(r.created_at).toLocaleString()}</td>
+                            <td style={styles.td}>{r.super_admin_name || '—'}</td>
+                            <td style={styles.td}>{r.target_user_name || '—'}</td>
+                            <td style={styles.td}>{r.target_role}</td>
+                            <td style={styles.td}>{r.company_name || '—'}</td>
+                            <td style={{ ...styles.td, fontFamily: 'monospace', fontSize: 12, color: '#6b7280' }}>{r.ip || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
             {loading ? (
               <p style={{ color: '#6b7280' }}>Loading...</p>
             ) : companies.length === 0 ? (
@@ -531,14 +595,24 @@ export default function SuperAdmin() {
                                     </td>
                                     <td style={styles.td}>
                                       {u.active && (
-                                        <button
-                                          style={{ ...styles.userImpersonateBtn, ...(busy ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
-                                          onClick={() => handleImpersonate(c, u.id)}
-                                          disabled={busy}
-                                          title={`Open a new tab as ${u.full_name}`}
-                                        >
-                                          {busy ? '…' : 'Login as'}
-                                        </button>
+                                        <>
+                                          <button
+                                            style={{ ...styles.userImpersonateBtn, ...(busy ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                                            onClick={() => handleImpersonate(c, u.id)}
+                                            disabled={busy}
+                                            title={`Open a new tab as ${u.full_name}`}
+                                          >
+                                            {busy ? '…' : 'Login as'}
+                                          </button>
+                                          <button
+                                            style={{ ...styles.userRevokeBtn, ...(revoking === u.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                                            onClick={() => handleRevoke(u)}
+                                            disabled={revoking === u.id}
+                                            title="Force-logout this user on all devices"
+                                          >
+                                            {revoking === u.id ? '…' : 'Revoke sessions'}
+                                          </button>
+                                        </>
                                       )}
                                     </td>
                                   </tr>
@@ -890,6 +964,8 @@ const styles = {
   td: { padding: '8px 10px', borderBottom: '1px solid #f3f4f6', color: '#374151' },
   roleTag: { padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 },
   userImpersonateBtn: { padding: '4px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#1e40af', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  userRevokeBtn:      { padding: '4px 10px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fff', color: '#b91c1c', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: 6 },
+  impersonationModal: { background: '#fff', borderRadius: 12, padding: 24, maxWidth: 820, width: '90%', maxHeight: '80vh', overflow: 'auto' },
   diagnosticsRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 16, flexWrap: 'wrap' },
   diagnosticsBtn: { padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   diagnosticsHint: { fontSize: 12, color: '#6b7280' },
