@@ -9,6 +9,44 @@ function formatDate(str, locale = 'en-US') {
   return new Date(str).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/**
+ * Native <input type="date"> fires onChange on every partial edit. If the
+ * parent hands that straight to an API call, typing "2026" flushes as "0002",
+ * then "0020", etc. — each round-trip re-renders the input and yanks the
+ * cursor out of the year segment. This wrapper keeps the typed value local
+ * and only commits on blur (or when cleared entirely).
+ */
+function CommitOnBlurDateInput({ value, onCommit, style, disabled }) {
+  const [local, setLocal] = React.useState(value || '');
+  React.useEffect(() => { setLocal(value || ''); }, [value]);
+  const commit = () => {
+    const next = local || null;
+    // Guard against year < 1000 — likely a mid-type "0020" rather than an
+    // intentional date in the year 20 AD.
+    if (next) {
+      const year = parseInt(next.slice(0, 4), 10);
+      if (!Number.isFinite(year) || year < 1000) {
+        setLocal(value || '');
+        return;
+      }
+    }
+    if (next !== (value || null)) onCommit(next);
+  };
+  return (
+    <input
+      type="date"
+      min="1900-01-01"
+      max="2100-12-31"
+      style={style}
+      disabled={disabled}
+      value={local}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+    />
+  );
+}
+
 function formatMrr(cents, locale = 'en-US') {
   if (!cents) return '—';
   return '$' + (cents / 100).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -383,11 +421,10 @@ export default function SuperAdmin() {
                           {(c.subscription_status === 'trial' || c.trial_ends_at) && (
                             <div style={styles.controlGroup}>
                               <span style={styles.controlLabel}>Trial ends</span>
-                              <input
-                                type="date"
+                              <CommitOnBlurDateInput
                                 style={styles.controlSelect}
                                 value={c.trial_ends_at ? c.trial_ends_at.substring(0, 10) : ''}
-                                onChange={e => patchCompany(c.id, { trial_ends_at: e.target.value || null })}
+                                onCommit={next => patchCompany(c.id, { trial_ends_at: next })}
                                 disabled={working === c.id}
                               />
                             </div>
