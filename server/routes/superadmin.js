@@ -138,7 +138,9 @@ router.delete('/companies/:id', requireSuperAdmin, async (req, res) => {
 
     // ── Collect R2 URLs before we drop the rows that point to them.
     // Fire deletes against R2 only after the DB commit succeeds.
-    const urlQueries = [
+
+    // Scalar URL columns
+    const scalarUrlQueries = [
       `SELECT url FROM field_report_photos WHERE field_report_id IN (SELECT id FROM field_reports WHERE company_id = $1) AND url IS NOT NULL`,
       `SELECT receipt_url AS url FROM reimbursements WHERE company_id = $1 AND receipt_url IS NOT NULL`,
       `SELECT url FROM worker_documents   WHERE company_id = $1 AND url IS NOT NULL`,
@@ -146,7 +148,24 @@ router.delete('/companies/:id', requireSuperAdmin, async (req, res) => {
       `SELECT url FROM client_documents   WHERE company_id = $1 AND url IS NOT NULL`,
       `SELECT url FROM safety_talk_attachments WHERE talk_id IN (SELECT id FROM safety_talks WHERE company_id = $1) AND url IS NOT NULL`,
     ];
-    for (const q of urlQueries) {
+    for (const q of scalarUrlQueries) {
+      try {
+        const r = await client.query(q, [id]);
+        for (const row of r.rows) if (row.url) mediaUrls.push(row.url);
+      } catch { /* table may not exist in some dev DBs; skip */ }
+    }
+
+    // JSONB array columns — photo_urls is a JSONB array of strings. Use
+    // jsonb_array_elements_text to flatten and union across all tables.
+    const jsonbArrayQueries = [
+      `SELECT jsonb_array_elements_text(photo_urls) AS url FROM inventory_locations   WHERE company_id = $1 AND jsonb_array_length(photo_urls) > 0`,
+      `SELECT jsonb_array_elements_text(photo_urls) AS url FROM inventory_areas       WHERE company_id = $1 AND jsonb_array_length(photo_urls) > 0`,
+      `SELECT jsonb_array_elements_text(photo_urls) AS url FROM inventory_racks       WHERE company_id = $1 AND jsonb_array_length(photo_urls) > 0`,
+      `SELECT jsonb_array_elements_text(photo_urls) AS url FROM inventory_bays        WHERE company_id = $1 AND jsonb_array_length(photo_urls) > 0`,
+      `SELECT jsonb_array_elements_text(photo_urls) AS url FROM inventory_compartments WHERE company_id = $1 AND jsonb_array_length(photo_urls) > 0`,
+      `SELECT jsonb_array_elements_text(photo_urls) AS url FROM service_requests     WHERE company_id = $1 AND jsonb_array_length(photo_urls) > 0`,
+    ];
+    for (const q of jsonbArrayQueries) {
       try {
         const r = await client.query(q, [id]);
         for (const row of r.rows) if (row.url) mediaUrls.push(row.url);
