@@ -9,6 +9,7 @@ const { incrementStorage, decrementStorage, checkStorageLimit } = require('../st
 const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
 const qbo = require('../services/qbo');
 const { logAudit } = require('../auditLog');
+const { coerceBody } = require('../middleware/coerce');
 
 // GET /api/reimbursements/categories
 // Returns:
@@ -63,7 +64,7 @@ const reimbLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-router.post('/', reimbLimiter, async (req, res) => {
+router.post('/', reimbLimiter, coerceBody({ int: ['project_id'], float: ['miles', 'amount'] }), async (req, res) => {
   const { expense_date, receipt, project_id } = req.body;
   const description = req.body.description?.trim() || null;
   const category    = req.body.category?.trim() || null;

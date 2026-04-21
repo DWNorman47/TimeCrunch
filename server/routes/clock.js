@@ -228,6 +228,7 @@ router.post('/in', requireAuth, clockLimiter, coerceBody({ int: ['project_id'] }
 router.post('/out', requireAuth, clockLimiter, coerceBody({ float: ['break_minutes', 'mileage'] }), async (req, res) => {
   const { lat, lng, break_minutes, mileage, local_clock_in, local_clock_out } = req.body;
   if ((lat != null || lng != null) && !validCoords(lat, lng)) {
+    logFailure(req, 'clock.out', 'invalid_coords', { lat, lng });
     return res.status(400).json({ error: 'Invalid coordinates' });
   }
   const companyId = req.user.company_id;
@@ -236,14 +237,20 @@ router.post('/out', requireAuth, clockLimiter, coerceBody({ float: ['break_minut
       'SELECT user_id, company_id, project_id, clock_in_time, clock_in_lat, clock_in_lng, work_date, notes, timezone, clock_source, clocked_in_by FROM active_clock WHERE user_id = $1',
       [req.user.id]
     );
-    if (clockResult.rowCount === 0) return res.status(400).json({ error: 'Not clocked in' });
+    if (clockResult.rowCount === 0) {
+      logFailure(req, 'clock.out', 'not_clocked_in');
+      return res.status(400).json({ error: 'Not clocked in' });
+    }
     const clock = clockResult.rows[0];
 
     // Get project wage_type (project may be null if projects feature is off)
     const projResult = clock.project_id
       ? await pool.query('SELECT wage_type, name FROM projects WHERE id = $1', [clock.project_id])
       : { rows: [{ wage_type: 'regular', name: null }] };
-    if (clock.project_id && projResult.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
+    if (clock.project_id && projResult.rowCount === 0) {
+      logFailure(req, 'clock.out', 'project_not_found', { project_id: clock.project_id });
+      return res.status(400).json({ error: 'Project not found' });
+    }
     const { wage_type, name: project_name } = projResult.rows[0];
 
     // Use client-supplied local times if available (avoids UTC offset issues on server)

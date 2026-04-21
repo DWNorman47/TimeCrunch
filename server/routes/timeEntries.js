@@ -6,6 +6,8 @@ const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem } = require('./inbox');
 const { sendEmail } = require('../email');
 const { logAudit } = require('../auditLog');
+const { coerceBody } = require('../middleware/coerce');
+const { logFailure } = require('../failureLog');
 const rateLimit = require('express-rate-limit');
 
 const entryWriteLimiter = rateLimit({
@@ -45,13 +47,20 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // Submit a time entry (wage_type inherited from project)
-router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
+router.post('/', requireAuth, entryWriteLimiter,
+  coerceBody({ int: ['project_id', 'break_minutes'], float: ['mileage'] }),
+  async (req, res) => {
   const { project_id, work_date, start_time, end_time, break_minutes, mileage, timezone, client_id } = req.body;
   const notesTrimmed = req.body.notes?.trim() || null;
   if (!project_id || !work_date || !start_time || !end_time) {
+    logFailure(req, 'time_entries.create', 'missing_required_fields',
+      { has_project: !!project_id, has_work_date: !!work_date, has_start: !!start_time, has_end: !!end_time });
     return res.status(400).json({ error: 'project_id, work_date, start_time, and end_time are required' });
   }
-  if (notesTrimmed && notesTrimmed.length > 500) return res.status(400).json({ error: 'Notes must be 500 characters or fewer' });
+  if (notesTrimmed && notesTrimmed.length > 500) {
+    logFailure(req, 'time_entries.create', 'notes_too_long', { length: notesTrimmed.length });
+    return res.status(400).json({ error: 'Notes must be 500 characters or fewer' });
+  }
   const companyId = req.user.company_id;
   try {
     // Free tier: block submissions dated > 90 days ago. Matches the GET
@@ -69,6 +78,7 @@ router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
       const workDate = new Date(work_date + 'T00:00:00');
       if (workDate < ninetyDaysAgo) {
+        logFailure(req, 'time_entries.create', 'free_plan_date_limit', { work_date });
         return res.status(403).json({ error: 'Free plan is limited to entries within the last 90 days. Upgrade to submit older entries.' });
       }
     }
@@ -77,13 +87,18 @@ router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
       'SELECT wage_type FROM projects WHERE id = $1 AND company_id = $2',
       [project_id, companyId]
     );
-    if (projectResult.rowCount === 0) return res.status(400).json({ error: 'Project not found' });
+    if (projectResult.rowCount === 0) {
+      logFailure(req, 'time_entries.create', 'project_not_found', { project_id });
+      return res.status(400).json({ error: 'Project not found' });
+    }
     const wage_type = projectResult.rows[0].wage_type;
 
-    const bm = parseInt(break_minutes) || 0;
-    if (bm < 0) return res.status(400).json({ error: 'break_minutes must be non-negative' });
-    const mileageParsed = mileage != null ? parseFloat(mileage) : null;
-    const mileageVal = (mileageParsed != null && !isNaN(mileageParsed) && mileageParsed >= 0) ? mileageParsed : null;
+    const bm = break_minutes ?? 0;
+    if (bm < 0) {
+      logFailure(req, 'time_entries.create', 'negative_break', { break_minutes: bm });
+      return res.status(400).json({ error: 'break_minutes must be non-negative' });
+    }
+    const mileageVal = (mileage != null && mileage >= 0) ? mileage : null;
     const cid = (typeof client_id === 'string' && client_id.length <= 36) ? client_id : null;
     const result = await pool.query(
       `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes, break_minutes, mileage, timezone, client_id, clock_source)
@@ -93,7 +108,10 @@ router.post('/', requireAuth, entryWriteLimiter, async (req, res) => {
       [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notesTrimmed,
        bm, mileageVal, timezone || null, cid, 'log_entry']
     );
-    if (result.rowCount === 0) return res.status(409).json({ error: 'Duplicate entry' });
+    if (result.rowCount === 0) {
+      logFailure(req, 'time_entries.create', 'duplicate_entry', { client_id: cid });
+      return res.status(409).json({ error: 'Duplicate entry' });
+    }
     const entry = result.rows[0];
     logAudit(companyId, req.user.id, req.user.full_name, 'entry.submitted', 'time_entry', entry.id, null,
       { work_date, start_time, end_time, project_id });

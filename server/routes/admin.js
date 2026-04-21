@@ -9,6 +9,8 @@ const pool = require('../db');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function isValidEmail(email) { return EMAIL_RE.test(String(email).trim()); }
 const { requireAdmin, requirePlan, requireProAddon, requirePermission } = require('../middleware/auth');
+const { coerceBody } = require('../middleware/coerce');
+const { logFailure } = require('../failureLog');
 const { sendPushToUser, sendPushToAllWorkers } = require('../push');
 const { sendEmail } = require('../email');
 const { hoursWorked, computeOT, computeDailyPayCosts } = require('../utils/payCalculations');
@@ -481,7 +483,9 @@ router.patch('/entries/:id/times', requireAdmin, requirePermission('manage_worke
 });
 
 // PATCH /admin/entries/:id/edit — admin edits times + project on a pending entry
-router.patch('/entries/:id/edit', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+router.patch('/entries/:id/edit', requireAdmin, requirePermission('approve_entries'),
+  coerceBody({ int: ['project_id'] }),
+  async (req, res) => {
   const companyId = req.user.company_id;
   const { start_time, end_time, project_id } = req.body;
   const clientUpdatedAt = req.body.updated_at || null;
@@ -1014,7 +1018,9 @@ router.post('/workers/:id/send-invite', requireAdmin, requirePermission('manage_
 });
 
 // Create a worker or admin
-router.post('/workers', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+router.post('/workers', requireAdmin, requirePermission('manage_workers'),
+  coerceBody({ float: ['hourly_rate'] }),
+  async (req, res) => {
   const { password, role } = req.body;
   const username = req.body.username?.trim();
   const full_name = req.body.full_name?.trim();
@@ -1094,7 +1100,9 @@ function computeGuaranteeShortfall(totalHours, guaranteedWeeklyHours, fromDate, 
 }
 
 // Update a worker (full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, email, worker_type)
-router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'),
+  coerceBody({ float: ['hourly_rate', 'guaranteed_weekly_hours'] }),
+  async (req, res) => {
   const { role, language, hourly_rate, rate_type, overtime_rule, worker_type } = req.body;
   const full_name = req.body.full_name?.trim();
   const first_name = req.body.first_name !== undefined ? (req.body.first_name?.trim() || null) : undefined;
@@ -1438,17 +1446,25 @@ router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
 });
 
 // Update project (name and/or wage_type and/or geofence)
-router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
+router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects'),
+  coerceBody({
+    int:   ['geo_radius_ft', 'required_checklist_template_id', 'progress_pct'],
+    float: ['geo_lat', 'geo_lng', 'budget_hours', 'budget_dollars', 'prevailing_wage_rate'],
+  }),
+  async (req, res) => {
   const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence, budget_hours, budget_dollars, prevailing_wage_rate, required_checklist_template_id,
           client_name, job_number, address, start_date, end_date, description, status, progress_pct, active } = req.body;
   const VALID_STATUSES = ['planning', 'in_progress', 'on_hold', 'completed'];
   if (status !== undefined && !VALID_STATUSES.includes(status)) {
+    logFailure(req, 'admin.projects.update', 'invalid_status', { status });
     return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
   }
   if (wage_type !== undefined && !['regular', 'prevailing'].includes(wage_type)) {
+    logFailure(req, 'admin.projects.update', 'invalid_wage_type', { wage_type });
     return res.status(400).json({ error: 'wage_type must be regular or prevailing' });
   }
   if (name !== undefined && !name.trim()) {
+    logFailure(req, 'admin.projects.update', 'empty_name');
     return res.status(400).json({ error: 'Project name cannot be empty' });
   }
   const companyId = req.user.company_id;
@@ -1463,32 +1479,40 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
     } else {
       if (geo_lat !== undefined) { fields.push(`geo_lat = $${idx++}`); values.push(parseFloat(geo_lat)); }
       if (geo_lng !== undefined) { fields.push(`geo_lng = $${idx++}`); values.push(parseFloat(geo_lng)); }
-      if (geo_radius_ft !== undefined) {
-        const radius = parseInt(geo_radius_ft);
-        if (isNaN(radius) || radius <= 0) return res.status(400).json({ error: 'geo_radius_ft must be a positive number' });
-        fields.push(`geo_radius_ft = $${idx++}`); values.push(radius);
+      if (geo_radius_ft !== undefined && geo_radius_ft !== null) {
+        if (geo_radius_ft <= 0) {
+          logFailure(req, 'admin.projects.update', 'invalid_geo_radius', { geo_radius_ft });
+          return res.status(400).json({ error: 'geo_radius_ft must be a positive number' });
+        }
+        fields.push(`geo_radius_ft = $${idx++}`); values.push(geo_radius_ft);
       }
     }
     if (budget_hours !== undefined) {
-      const bh = budget_hours === null ? null : parseFloat(budget_hours);
-      if (bh !== null && (isNaN(bh) || bh < 0)) return res.status(400).json({ error: 'budget_hours must be non-negative' });
-      fields.push(`budget_hours = $${idx++}`); values.push(bh);
+      if (budget_hours !== null && budget_hours < 0) {
+        logFailure(req, 'admin.projects.update', 'negative_budget_hours', { budget_hours });
+        return res.status(400).json({ error: 'budget_hours must be non-negative' });
+      }
+      fields.push(`budget_hours = $${idx++}`); values.push(budget_hours);
       // Reset alert tracker so new budget gets fresh alerts
       fields.push(`budget_alert_pct = NULL`);
     }
     if (budget_dollars !== undefined) {
-      const bd = budget_dollars === null ? null : parseFloat(budget_dollars);
-      if (bd !== null && (isNaN(bd) || bd < 0)) return res.status(400).json({ error: 'budget_dollars must be non-negative' });
-      fields.push(`budget_dollars = $${idx++}`); values.push(bd);
+      if (budget_dollars !== null && budget_dollars < 0) {
+        logFailure(req, 'admin.projects.update', 'negative_budget_dollars', { budget_dollars });
+        return res.status(400).json({ error: 'budget_dollars must be non-negative' });
+      }
+      fields.push(`budget_dollars = $${idx++}`); values.push(budget_dollars);
     }
     if (prevailing_wage_rate !== undefined) {
-      const pwr = prevailing_wage_rate === null ? null : parseFloat(prevailing_wage_rate);
-      if (pwr !== null && (isNaN(pwr) || pwr < 0)) return res.status(400).json({ error: 'prevailing_wage_rate must be non-negative' });
-      fields.push(`prevailing_wage_rate = $${idx++}`); values.push(pwr);
+      if (prevailing_wage_rate !== null && prevailing_wage_rate < 0) {
+        logFailure(req, 'admin.projects.update', 'negative_wage_rate', { prevailing_wage_rate });
+        return res.status(400).json({ error: 'prevailing_wage_rate must be non-negative' });
+      }
+      fields.push(`prevailing_wage_rate = $${idx++}`); values.push(prevailing_wage_rate);
     }
     if (required_checklist_template_id !== undefined) {
       fields.push(`required_checklist_template_id = $${idx++}`);
-      values.push(required_checklist_template_id ? parseInt(required_checklist_template_id) : null);
+      values.push(required_checklist_template_id);
     }
     if (client_name !== undefined) { fields.push(`client_name = $${idx++}`); values.push(client_name || null); }
     if (job_number !== undefined)   { fields.push(`job_number = $${idx++}`);   values.push(job_number || null); }
@@ -1498,9 +1522,11 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
     if (description !== undefined)  { fields.push(`description = $${idx++}`);  values.push(description || null); }
     if (status !== undefined)       { fields.push(`status = $${idx++}`);       values.push(status); }
     if (progress_pct !== undefined) {
-      const pp = progress_pct === null ? null : parseInt(progress_pct, 10);
-      if (pp !== null && (isNaN(pp) || pp < 0 || pp > 100)) return res.status(400).json({ error: 'progress_pct must be 0–100' });
-      fields.push(`progress_pct = $${idx++}`); values.push(pp);
+      if (progress_pct !== null && (progress_pct < 0 || progress_pct > 100)) {
+        logFailure(req, 'admin.projects.update', 'progress_out_of_range', { progress_pct });
+        return res.status(400).json({ error: 'progress_pct must be 0–100' });
+      }
+      fields.push(`progress_pct = $${idx++}`); values.push(progress_pct);
     }
     if (active !== undefined) { fields.push(`active = $${idx++}`); values.push(!!active); }
     if (req.body.visible_to_user_ids !== undefined) {
@@ -1513,12 +1539,19 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
       }
       fields.push(`visible_to_user_ids = $${idx++}`); values.push(value);
     }
-    if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+    if (fields.length === 0) {
+      logFailure(req, 'admin.projects.update', 'nothing_to_update');
+      return res.status(400).json({ error: 'Nothing to update' });
+    }
     const clientUpdatedAt = req.body.updated_at || null;
     if (clientUpdatedAt) {
       const cur = await pool.query('SELECT updated_at FROM projects WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
-      if (!cur.rows.length) return res.status(404).json({ error: 'Project not found' });
+      if (!cur.rows.length) {
+        logFailure(req, 'admin.projects.update', 'not_found', { project_id: req.params.id });
+        return res.status(404).json({ error: 'Project not found' });
+      }
       if (new Date(cur.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
+        logFailure(req, 'admin.projects.update', 'conflict', { project_id: req.params.id });
         return res.status(409).json({ error: 'conflict' });
       }
     }
@@ -1529,7 +1562,10 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
       `UPDATE projects SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING *`,
       values
     );
-    if (result.rowCount === 0) return res.status(404).json({ error: 'Project not found' });
+    if (result.rowCount === 0) {
+      logFailure(req, 'admin.projects.update', 'not_found', { project_id: req.params.id });
+      return res.status(404).json({ error: 'Project not found' });
+    }
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.updated', 'project', result.rows[0].id, result.rows[0].name);
     res.json(result.rows[0]);
   } catch (err) {
@@ -1539,14 +1575,22 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
 });
 
 // Create a project
-router.post('/projects', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
+router.post('/projects', requireAdmin, requirePermission('manage_projects'),
+  coerceBody({ float: ['prevailing_wage_rate'] }),
+  async (req, res) => {
   const { wage_type, prevailing_wage_rate, client_id, job_number, address, start_date, end_date, status, description } = req.body;
   const name = req.body.name?.trim();
-  if (!name) return res.status(400).json({ error: 'Project name required' });
+  if (!name) {
+    logFailure(req, 'admin.projects.create', 'name_required');
+    return res.status(400).json({ error: 'Project name required' });
+  }
   const companyId = req.user.company_id;
   const wt = wage_type === 'prevailing' ? 'prevailing' : 'regular';
-  const pwr = prevailing_wage_rate != null ? parseFloat(prevailing_wage_rate) : null;
-  if (pwr !== null && (isNaN(pwr) || pwr < 0)) return res.status(400).json({ error: 'prevailing_wage_rate must be non-negative' });
+  const pwr = prevailing_wage_rate;
+  if (pwr !== null && pwr !== undefined && pwr < 0) {
+    logFailure(req, 'admin.projects.create', 'negative_wage_rate', { pwr });
+    return res.status(400).json({ error: 'prevailing_wage_rate must be non-negative' });
+  }
   const validStatuses = ['planning', 'in_progress', 'on_hold', 'completed'];
   const st = validStatuses.includes(status) ? status : 'in_progress';
   try {
@@ -1584,8 +1628,10 @@ router.post('/projects', requireAdmin, requirePermission('manage_projects'), asy
       const existing = await pool.query('SELECT id, name, active FROM projects WHERE name = $1 AND company_id = $2', [name, companyId]);
       const p = existing.rows[0];
       if (p && !p.active) {
+        logFailure(req, 'admin.projects.create', 'archived_name_collision', { archived_id: p.id });
         return res.status(409).json({ error: `A removed project named "${name}" already exists. Restore it instead?`, archived_id: p.id, archived_name: p.name });
       }
+      logFailure(req, 'admin.projects.create', 'name_conflict');
       return res.status(409).json({ error: 'Project already exists' });
     }
     logger.error({ err }, 'catch block error');
