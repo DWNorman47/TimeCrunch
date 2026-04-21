@@ -67,10 +67,18 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     api.get('/clock/status').then(r => setStatus(r.data || false)).catch(() => setStatus(false));
   }, []);
 
-  // Pre-select last used project when projects load and no project is already chosen
+  // Pre-select last used project when projects load and no project is already chosen.
+  // Also scrub any stale selection restored by useFormPersist — if the persisted
+  // project id isn't in the current list (project was archived, renumbered, or the
+  // user now belongs to a different company), clear it so we don't submit a
+  // ghost project_id that the server rejects with "Project not found".
   useEffect(() => {
     if (!projects || projects.length === 0) return;
-    if (clockInForm.selectedProject) return; // already set (persisted or user chose)
+    if (clockInForm.selectedProject) {
+      const stillValid = projects.some(p => String(p.id) === String(clockInForm.selectedProject));
+      if (!stillValid) setSelectedProject('');
+      return;
+    }
     const last = localStorage.getItem('lastProjectId');
     if (last && projects.find(p => String(p.id) === last)) {
       setSelectedProject(last);

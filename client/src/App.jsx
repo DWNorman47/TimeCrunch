@@ -2,10 +2,12 @@ import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import InstallPrompt from './components/InstallPrompt';
+import UpdatePrompt from './components/UpdatePrompt';
 import WelcomeModal from './components/WelcomeModal';
 import SkipLink from './components/SkipLink';
 import { ToastProvider } from './contexts/ToastContext';
 import { OfflineProvider } from './contexts/OfflineContext';
+import { clearCache } from './offlineDb';
 
 const Login             = lazy(() => import('./pages/Login'));
 const Register          = lazy(() => import('./pages/Register'));
@@ -121,12 +123,51 @@ function AppRoutes() {
 
 // If this tab was opened via "Login as" from SuperAdmin, swap in the impersonate token
 // before React even mounts so AuthProvider picks it up on first render.
+// Drop the API cache on every online page load.
+//
+// The cache exists so the PWA keeps working in dead zones — it is *not*
+// meant to silently outlive a refresh when the network is available. Before
+// this, refreshing the page re-read stale data from IndexedDB because the
+// cache-first code ran again on the persisted store. Now: refresh while
+// online = fresh data, same as any normal website. When offline we keep
+// the cache, because it's the only thing we have.
+//
+// The clear is async but fire-and-forget: the clear transaction is queued
+// on the same IDB connection that getOrFetch will use, so the first reads
+// see an empty store.
+(function dropCacheOnOnlineLoad() {
+  if (navigator.onLine === false) return;
+  clearCache();
+})();
+
+// Clear the cache when the user returns to the tab after a meaningful
+// absence. Covers "admin created a project in another tab, worker tabbed
+// back — why haven't I seen it yet?" Threshold kept at 30s so momentary
+// tab flips don't force a full refetch.
+(function dropCacheOnTabRefocus() {
+  let hiddenAt = null;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      hiddenAt = Date.now();
+      return;
+    }
+    if (document.visibilityState === 'visible' && navigator.onLine !== false) {
+      const elapsed = hiddenAt ? Date.now() - hiddenAt : Infinity;
+      if (elapsed > 30 * 1000) clearCache();
+      hiddenAt = null;
+    }
+  });
+})();
+
 (function applyImpersonateToken() {
   if (!window.location.search.includes('impersonate=1')) return;
   const token = sessionStorage.getItem('impersonate_token');
   if (!token) return;
   sessionStorage.removeItem('impersonate_token');
   localStorage.setItem('tc_token', token);
+  // Intentionally do NOT clear the IndexedDB cache here — the super admin
+  // impersonating a user wants to reproduce exactly what the user sees,
+  // including stale-cache artifacts. Clearing it would mask diagnostic bugs.
   // Strip the query param so normal auth flow runs from here
   window.history.replaceState({}, '', window.location.pathname);
 })();
@@ -141,6 +182,7 @@ export default function App() {
             <WelcomeModal />
             <AppRoutes />
             <InstallPrompt />
+            <UpdatePrompt />
           </OfflineProvider>
         </ToastProvider>
       </BrowserRouter>
