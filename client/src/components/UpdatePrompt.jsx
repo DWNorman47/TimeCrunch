@@ -63,6 +63,9 @@ export default function UpdatePrompt() {
         <span style={styles.dot} aria-hidden="true" />
         A new version of OpsFloa is ready.
       </span>
+      <a href="/changelog" target="_blank" rel="noopener noreferrer" style={styles.whatsNew}>
+        What's new
+      </a>
       <button type="button" style={styles.reloadBtn} onClick={reload}>
         Reload
       </button>
@@ -95,6 +98,9 @@ const styles = {
   dot: {
     width: 8, height: 8, borderRadius: '50%',
     background: '#22c55e', display: 'inline-block',
+  },
+  whatsNew: {
+    color: '#93c5fd', textDecoration: 'underline', fontSize: 13, marginRight: 2,
   },
   reloadBtn: {
     background: '#2563eb', color: '#fff', border: 'none',

@@ -157,7 +157,6 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   const handleClockIn = async () => {
     // When Project Integration is on but the company has zero active projects,
     // fall back to project-less clock-in instead of blocking the worker.
-    const hasProjects = (projects?.length || 0) > 0;
     if (projectsEnabled && hasProjects && !selectedProject) { setError(t.selectProjectFirst); return; }
     setError('');
     setLocationDenied(false);
@@ -444,19 +443,10 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     );
   }
 
-  if (!projects || projects.length === 0) {
-    return (
-      <div style={styles.card}>
-        {offlineBanner}
-        <h2 style={styles.heading}>{t.clockIn}</h2>
-        <div style={styles.noProjects}>
-          <div style={styles.noProjectsIcon}>📋</div>
-          <div style={styles.noProjectsTitle}>{t.noProjectsTitle}</div>
-          <div style={styles.noProjectsText}>{t.noProjectsText}</div>
-        </div>
-      </div>
-    );
-  }
+  // When there are zero projects, don't block clock-in — the server falls
+  // back to accepting a project-less clock-in in that case (see clock.js).
+  // We just hide the project picker below and render the rest of the form.
+  const hasProjects = projects && projects.length > 0;
 
   return (
     <div style={styles.card}>
@@ -484,7 +474,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
         </div>
       )}
       <div style={styles.form}>
-        {projectsEnabled && <div>
+        {projectsEnabled && hasProjects && <div>
           <label htmlFor="clockin-project" style={styles.label}>{t.project}</label>
           <select
             id="clockin-project"

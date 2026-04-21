@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import api from '../api';
 import AppSwitcher from '../components/AppSwitcher';
+import { RefreshButton, LanguageSwitcher } from '../components/HeaderActions';
 import PasswordInput from '../components/PasswordInput';
 import TabBar from '../components/TabBar';
 import BillingPanel from '../components/BillingPanel';
@@ -370,8 +371,10 @@ export default function AdministrationPage() {
             <AppSwitcher currentApp="administration" userRole={user?.role} features={settings} />
             {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
           </div>
-          <div style={styles.headerRight}>
-            <button style={styles.headerBtn} onClick={logout}>{t.logout}</button>
+          <div style={styles.headerRight} className="header-right">
+            <RefreshButton title={t.refresh || 'Refresh'} />
+            <LanguageSwitcher />
+            <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
           </div>
         </div>
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}

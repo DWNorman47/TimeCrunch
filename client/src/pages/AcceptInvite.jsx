@@ -24,7 +24,7 @@ export default function AcceptInvite() {
     if (password.length < 6) return setError(t.invitePasswordTooShort);
     setLoading(true);
     try {
-      const r = await api.post('/auth/accept-invite', { token, password });
+      const r = await api.post('/auth/accept-invite', { token, password }, { suppressToast: true });
       setUsername(r.data.username);
       setCompanyName(r.data.company_name || '');
       setDone(true);

@@ -95,9 +95,12 @@ export default function SuperAdmin() {
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleteWorking, setDeleteWorking] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // impersonate
   const [impersonating, setImpersonating] = useState(null); // companyId
+  const [revoking, setRevoking] = useState(null); // user id
+  const [impersonationLog, setImpersonationLog] = useState(null); // null = not loaded, [] = empty, [...] = rows
   const [impersonateError, setImpersonateError] = useState(null); // { id, msg }
 
   // affiliate delete confirm
@@ -197,11 +200,15 @@ export default function SuperAdmin() {
   const confirmDelete = async () => {
     if (!deleteTarget || deleteConfirm !== deleteTarget.name) return;
     setDeleteWorking(true);
+    setDeleteError('');
     try {
       await api.delete(`/superadmin/companies/${deleteTarget.id}`);
       setCompanies(prev => prev.filter(c => c.id !== deleteTarget.id));
       setDeleteTarget(null);
       setDeleteConfirm('');
+    } catch (err) {
+      // Surface the server's 409/5xx instead of silently closing the modal.
+      setDeleteError(err.response?.data?.error || `Delete failed (${err.response?.status || 'network'})`);
     } finally { setDeleteWorking(false); }
   };
 
@@ -220,6 +227,42 @@ export default function SuperAdmin() {
     } catch (err) {
       setImpersonateError({ id: company.id, msg: err.response?.data?.error || 'Could not impersonate' });
     } finally { setImpersonating(null); }
+  };
+
+  const handleRevoke = async (user) => {
+    const confirm = window.confirm(
+      `Force-logout ${user.full_name} (@${user.username}) on all devices? Their next request will return 401 and they'll be sent to /login.`
+    );
+    if (!confirm) return;
+    setRevoking(user.id);
+    try {
+      await api.post(`/superadmin/users/${user.id}/revoke-sessions`);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Revoke failed');
+    } finally { setRevoking(null); }
+  };
+
+  const exportCompany = async (company) => {
+    try {
+      const r = await api.get(`/superadmin/companies/${company.id}/export`, { responseType: 'blob' });
+      const url = URL.createObjectURL(r.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `opsfloa-${company.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Export failed');
+    }
+  };
+
+  const loadImpersonationLog = async () => {
+    try {
+      const r = await api.get('/superadmin/impersonation-log?limit=100');
+      setImpersonationLog(r.data);
+    } catch (err) { silentError('superadmin impersonation-log')(err); }
   };
 
   const toggleExpand = async (id) => {
@@ -281,7 +324,7 @@ export default function SuperAdmin() {
       {deleteTarget && (
         <div style={styles.modalOverlay}>
           <ModalShell
-            onClose={() => !deleteWorking && (setDeleteTarget(null), setDeleteConfirm(''))}
+            onClose={() => !deleteWorking && (setDeleteTarget(null), setDeleteConfirm(''), setDeleteError(''))}
             titleId="sa-delete-title"
             style={styles.modal}
           >
@@ -294,10 +337,13 @@ export default function SuperAdmin() {
             <input
               style={styles.modalInput}
               value={deleteConfirm}
-              onChange={e => setDeleteConfirm(e.target.value)}
+              onChange={e => { setDeleteConfirm(e.target.value); setDeleteError(''); }}
               placeholder={deleteTarget.name}
               autoFocus
             />
+            {deleteError && (
+              <div role="alert" style={styles.deleteErrorBox}>{deleteError}</div>
+            )}
             <div style={styles.modalActions}>
               <button
                 style={{ ...styles.deleteConfirmBtn, opacity: deleteConfirm === deleteTarget.name ? 1 : 0.4 }}
@@ -306,7 +352,7 @@ export default function SuperAdmin() {
               >
                 {deleteWorking ? 'Deleting...' : 'Delete permanently'}
               </button>
-              <button style={styles.modalCancelBtn} onClick={() => { setDeleteTarget(null); setDeleteConfirm(''); }}>
+              <button style={styles.modalCancelBtn} onClick={() => { setDeleteTarget(null); setDeleteConfirm(''); setDeleteError(''); }}>
                 Cancel
               </button>
             </div>
@@ -338,8 +384,50 @@ export default function SuperAdmin() {
               >
                 Download debug bundle
               </button>
-              <span style={styles.diagnosticsHint}>Captures this browser's client state (caches, persisted forms) to JSON.</span>
+              <button style={styles.diagnosticsBtn} onClick={loadImpersonationLog}>
+                Impersonation log
+              </button>
+              <span style={styles.diagnosticsHint}>Captures this browser's client state; shows recent "Login as" events.</span>
             </div>
+
+            {impersonationLog !== null && (
+              <div style={styles.modalOverlay} onClick={() => setImpersonationLog(null)}>
+                <div style={styles.impersonationModal} onClick={e => e.stopPropagation()}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#111827' }}>Recent impersonations</h3>
+                    <button style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#6b7280' }} onClick={() => setImpersonationLog(null)}>✕</button>
+                  </div>
+                  {impersonationLog.length === 0 ? (
+                    <p style={{ color: '#6b7280', fontSize: 13 }}>No impersonation events recorded yet.</p>
+                  ) : (
+                    <table style={styles.table}>
+                      <thead>
+                        <tr>
+                          <th style={styles.th}>When</th>
+                          <th style={styles.th}>Super admin</th>
+                          <th style={styles.th}>Target</th>
+                          <th style={styles.th}>Role</th>
+                          <th style={styles.th}>Company</th>
+                          <th style={styles.th}>IP</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {impersonationLog.map(r => (
+                          <tr key={r.id}>
+                            <td style={styles.td}>{new Date(r.created_at).toLocaleString()}</td>
+                            <td style={styles.td}>{r.super_admin_name || '—'}</td>
+                            <td style={styles.td}>{r.target_user_name || '—'}</td>
+                            <td style={styles.td}>{r.target_role}</td>
+                            <td style={styles.td}>{r.company_name || '—'}</td>
+                            <td style={{ ...styles.td, fontFamily: 'monospace', fontSize: 12, color: '#6b7280' }}>{r.ip || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
             {loading ? (
               <p style={{ color: '#6b7280' }}>Loading...</p>
             ) : companies.length === 0 ? (
@@ -485,6 +573,13 @@ export default function SuperAdmin() {
                           {working === c.id ? '...' : c.active ? 'Deactivate' : 'Activate'}
                         </button>
                         <button
+                          style={styles.actionBtn}
+                          onClick={() => exportCompany(c)}
+                          title="Download every row belonging to this company as a single JSON file"
+                        >
+                          Export
+                        </button>
+                        <button
                           style={styles.deleteBtn}
                           onClick={() => { setDeleteTarget({ id: c.id, name: c.name }); setDeleteConfirm(''); }}
                         >
@@ -531,14 +626,24 @@ export default function SuperAdmin() {
                                     </td>
                                     <td style={styles.td}>
                                       {u.active && (
-                                        <button
-                                          style={{ ...styles.userImpersonateBtn, ...(busy ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
-                                          onClick={() => handleImpersonate(c, u.id)}
-                                          disabled={busy}
-                                          title={`Open a new tab as ${u.full_name}`}
-                                        >
-                                          {busy ? '…' : 'Login as'}
-                                        </button>
+                                        <>
+                                          <button
+                                            style={{ ...styles.userImpersonateBtn, ...(busy ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                                            onClick={() => handleImpersonate(c, u.id)}
+                                            disabled={busy}
+                                            title={`Open a new tab as ${u.full_name}`}
+                                          >
+                                            {busy ? '…' : 'Login as'}
+                                          </button>
+                                          <button
+                                            style={{ ...styles.userRevokeBtn, ...(revoking === u.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                                            onClick={() => handleRevoke(u)}
+                                            disabled={revoking === u.id}
+                                            title="Force-logout this user on all devices"
+                                          >
+                                            {revoking === u.id ? '…' : 'Revoke sessions'}
+                                          </button>
+                                        </>
                                       )}
                                     </td>
                                   </tr>
@@ -890,6 +995,8 @@ const styles = {
   td: { padding: '8px 10px', borderBottom: '1px solid #f3f4f6', color: '#374151' },
   roleTag: { padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 },
   userImpersonateBtn: { padding: '4px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#1e40af', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  userRevokeBtn:      { padding: '4px 10px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fff', color: '#b91c1c', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: 6 },
+  impersonationModal: { background: '#fff', borderRadius: 12, padding: 24, maxWidth: 820, width: '90%', maxHeight: '80vh', overflow: 'auto' },
   diagnosticsRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 16, flexWrap: 'wrap' },
   diagnosticsBtn: { padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   diagnosticsHint: { fontSize: 12, color: '#6b7280' },
@@ -901,6 +1008,7 @@ const styles = {
   modalInput: { width: '100%', padding: '9px 11px', border: '2px solid #fca5a5', borderRadius: 8, fontSize: 14, marginBottom: 16 },
   modalActions: { display: 'flex', gap: 10 },
   deleteConfirmBtn: { flex: 1, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  deleteErrorBox: { background: '#fee2e2', color: '#991b1b', padding: '10px 12px', borderRadius: 8, fontSize: 13, lineHeight: 1.45, marginBottom: 12 },
   modalCancelBtn: { padding: '10px 18px', background: 'none', border: '1px solid #d1d5db', color: '#374151', borderRadius: 8, fontSize: 14, cursor: 'pointer' },
   // Affiliate form
   afFormCard: { background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', marginBottom: 16 },

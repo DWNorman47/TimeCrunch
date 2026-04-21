@@ -12,6 +12,7 @@ import { useT } from '../hooks/useT';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
 import AppSwitcher from '../components/AppSwitcher';
+import { RefreshButton, LanguageSwitcher } from '../components/HeaderActions';
 import TabBar from '../components/TabBar';
 import ErrorBoundary from '../components/ErrorBoundary';
 import RetryBanner from '../components/RetryBanner';
@@ -181,9 +182,11 @@ export default function TeamPage() {
             <AppSwitcher currentApp="team" userRole={user?.role} features={features} />
             {user?.company_name && <span style={s.companyName} className="company-name-desktop">{user.company_name}</span>}
           </div>
-          <div style={s.headerRight}>
-            {!isAdmin && <span style={s.userName}>{user?.full_name}</span>}
-            <button style={s.headerBtn} onClick={logout}>{t.logout}</button>
+          <div style={s.headerRight} className="header-right">
+            {!isAdmin && <span style={s.userName} className="header-username">{user?.full_name}</span>}
+            <RefreshButton title={t.refresh || 'Refresh'} />
+            <LanguageSwitcher />
+            <button style={s.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
           </div>
         </div>
         {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}

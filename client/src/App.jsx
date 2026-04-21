@@ -30,6 +30,7 @@ const AccountPage       = lazy(() => import('./pages/AccountPage'));
 const PrivacyPolicy     = lazy(() => import('./pages/PrivacyPolicy'));
 const EULA              = lazy(() => import('./pages/EULA'));
 const Tests             = lazy(() => import('./pages/Tests'));
+const Changelog         = lazy(() => import('./pages/Changelog'));
 
 function PageLoader() {
   return (
@@ -97,6 +98,7 @@ function AppRoutes() {
       <Route path="/register" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Register />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/eula" element={<EULA />} />
+      <Route path="/changelog" element={<Changelog />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
