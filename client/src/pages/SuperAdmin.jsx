@@ -95,6 +95,7 @@ export default function SuperAdmin() {
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleteWorking, setDeleteWorking] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // impersonate
   const [impersonating, setImpersonating] = useState(null); // companyId
@@ -199,11 +200,15 @@ export default function SuperAdmin() {
   const confirmDelete = async () => {
     if (!deleteTarget || deleteConfirm !== deleteTarget.name) return;
     setDeleteWorking(true);
+    setDeleteError('');
     try {
       await api.delete(`/superadmin/companies/${deleteTarget.id}`);
       setCompanies(prev => prev.filter(c => c.id !== deleteTarget.id));
       setDeleteTarget(null);
       setDeleteConfirm('');
+    } catch (err) {
+      // Surface the server's 409/5xx instead of silently closing the modal.
+      setDeleteError(err.response?.data?.error || `Delete failed (${err.response?.status || 'network'})`);
     } finally { setDeleteWorking(false); }
   };
 
@@ -319,7 +324,7 @@ export default function SuperAdmin() {
       {deleteTarget && (
         <div style={styles.modalOverlay}>
           <ModalShell
-            onClose={() => !deleteWorking && (setDeleteTarget(null), setDeleteConfirm(''))}
+            onClose={() => !deleteWorking && (setDeleteTarget(null), setDeleteConfirm(''), setDeleteError(''))}
             titleId="sa-delete-title"
             style={styles.modal}
           >
@@ -332,10 +337,13 @@ export default function SuperAdmin() {
             <input
               style={styles.modalInput}
               value={deleteConfirm}
-              onChange={e => setDeleteConfirm(e.target.value)}
+              onChange={e => { setDeleteConfirm(e.target.value); setDeleteError(''); }}
               placeholder={deleteTarget.name}
               autoFocus
             />
+            {deleteError && (
+              <div role="alert" style={styles.deleteErrorBox}>{deleteError}</div>
+            )}
             <div style={styles.modalActions}>
               <button
                 style={{ ...styles.deleteConfirmBtn, opacity: deleteConfirm === deleteTarget.name ? 1 : 0.4 }}
@@ -344,7 +352,7 @@ export default function SuperAdmin() {
               >
                 {deleteWorking ? 'Deleting...' : 'Delete permanently'}
               </button>
-              <button style={styles.modalCancelBtn} onClick={() => { setDeleteTarget(null); setDeleteConfirm(''); }}>
+              <button style={styles.modalCancelBtn} onClick={() => { setDeleteTarget(null); setDeleteConfirm(''); setDeleteError(''); }}>
                 Cancel
               </button>
             </div>
@@ -1000,6 +1008,7 @@ const styles = {
   modalInput: { width: '100%', padding: '9px 11px', border: '2px solid #fca5a5', borderRadius: 8, fontSize: 14, marginBottom: 16 },
   modalActions: { display: 'flex', gap: 10 },
   deleteConfirmBtn: { flex: 1, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  deleteErrorBox: { background: '#fee2e2', color: '#991b1b', padding: '10px 12px', borderRadius: 8, fontSize: 13, lineHeight: 1.45, marginBottom: 12 },
   modalCancelBtn: { padding: '10px 18px', background: 'none', border: '1px solid #d1d5db', color: '#374151', borderRadius: 8, fontSize: 14, cursor: 'pointer' },
   // Affiliate form
   afFormCard: { background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', marginBottom: 16 },
