@@ -64,6 +64,27 @@ function formatHours(start, end) {
   return fmtHours((e - s) / 3600000);
 }
 
+// Default OT override suggestion when the admin opens Edit on an entry that
+// has no override saved yet. Uses the company's overtime rule + threshold
+// applied to *this entry viewed alone*. Prevailing-wage entries never count
+// toward OT, so they always suggest 0. Weekly/none rules can't be resolved
+// without peer entries in the period, so they default to blank (h=0, m=0).
+function suggestedOverrideFor(entry, rule, threshold) {
+  if (entry.wage_type === 'prevailing') return { h: 0, m: 0 };
+  if (rule !== 'daily') return { h: 0, m: 0 };
+  const s = new Date(`1970-01-01T${entry.start_time}`);
+  const e = new Date(`1970-01-01T${entry.end_time}`);
+  let ms = e - s;
+  if (ms < 0) ms += 86400000;
+  const total = ms / 3600000 - (entry.break_minutes || 0) / 60;
+  const ot = Math.max(0, total - (parseFloat(threshold) || 8));
+  const h = Math.trunc(ot);
+  const m = Math.round((ot - h) * 60);
+  // Handle rounding: 59.6min → 60 should bubble to h+1 / 0m
+  if (m >= 60) return { h: h + 1, m: 0 };
+  return { h, m };
+}
+
 export default function ApprovalQueue({ onCountChange }) {
   const { user } = useAuth();
   const t = useT();
@@ -81,6 +102,10 @@ export default function ApprovalQueue({ onCountChange }) {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [workerFilter, setWorkerFilter] = useState('');
+  // Overtime rule + threshold used to pre-fill the override input when the
+  // admin opens Edit on an entry that has no override set.
+  const [otRule, setOtRule] = useState('daily');
+  const [otThreshold, setOtThreshold] = useState(8);
   // Edit state
   const [editingId, setEditingId] = useState(null);
   const [editStart, setEditStart] = useState('');
@@ -119,8 +144,15 @@ export default function ApprovalQueue({ onCountChange }) {
     Promise.all([
       api.get('/admin/entries/pending', { params }),
       getOrFetch('projects', () => api.get('/projects').then(r => r.data)),
+      getOrFetch('settings', () => api.get('/settings').then(r => r.data)),
     ])
-      .then(([r, p]) => { setEntries(r.data.entries); setHasMore(r.data.has_more); setProjects(p); })
+      .then(([r, p, s]) => {
+        setEntries(r.data.entries);
+        setHasMore(r.data.has_more);
+        setProjects(p);
+        if (s?.overtime_rule) setOtRule(s.overtime_rule);
+        if (s?.overtime_threshold != null) setOtThreshold(parseFloat(s.overtime_threshold) || 8);
+      })
       .catch(() => setFetchError(true))
       .finally(() => setLoading(false));
   };
@@ -173,8 +205,15 @@ export default function ApprovalQueue({ onCountChange }) {
       setEditOtHours(String(h));
       setEditOtMinutes(m > 0 ? String(m) : '');
     } else {
-      setEditOtHours('');
-      setEditOtMinutes('');
+      // No saved override → pre-fill with what the current OT rule would
+      // produce for this entry viewed in isolation. Gives the admin a
+      // sensible starting value they can accept or tweak instead of
+      // starting from a blank that looks like "this entry has no OT".
+      // Weekly/none rules can't be computed per-entry without peer
+      // entries, so those still default to blank.
+      const { h, m } = suggestedOverrideFor(e, otRule, otThreshold);
+      setEditOtHours(h > 0 || m > 0 ? String(h) : '');
+      setEditOtMinutes(m > 0 ? String(m) : '');
     }
     setEditUpdatedAt(e.updated_at || null);
     setSplittingId(null);
