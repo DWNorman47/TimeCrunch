@@ -474,13 +474,6 @@ export default function SuperAdmin() {
                         <button style={styles.actionBtn} onClick={() => startRename(c)} disabled={working === c.id}>
                           Rename
                         </button>
-                        <button
-                          style={styles.actionBtn}
-                          onClick={() => { setImpersonateError(null); handleImpersonate(c); }}
-                          disabled={impersonating === c.id}
-                        >
-                          {impersonating === c.id ? '...' : 'Login as'}
-                        </button>
                         {impersonateError?.id === c.id && (
                           <span style={{ fontSize: 12, color: '#ef4444' }}>{impersonateError.msg}</span>
                         )}
