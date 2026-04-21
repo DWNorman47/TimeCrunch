@@ -194,6 +194,63 @@ router.post('/webhook', async (req, res) => {
           await pool.query('UPDATE companies SET subscription_status = $1 WHERE id = $2', ['past_due', companyId]);
         }
       }
+    } else if (event.type === 'invoice.payment_succeeded') {
+      // Counterpart to invoice.payment_failed: a previously past_due
+      // subscription whose latest invoice just cleared should flip back to
+      // 'active'. Skip when there's no subscription (one-off invoices).
+      if (obj.subscription) {
+        const stripe = getStripe();
+        const sub = await stripe.subscriptions.retrieve(obj.subscription);
+        const companyId = sub.metadata?.company_id;
+        if (companyId) {
+          await pool.query(
+            `UPDATE companies
+                SET subscription_status = 'active'
+              WHERE id = $1
+                AND subscription_status IN ('past_due', 'trial', 'trial_expired')`,
+            [companyId]
+          );
+        }
+      }
+    } else if (event.type === 'customer.subscription.trial_will_end') {
+      // Fires ~3 days before a trial ends. Email the company's admins so
+      // they're not surprised when access cuts off. No DB change needed —
+      // the trial is still active until trial_ends_at.
+      const companyId = obj.metadata?.company_id;
+      if (companyId) {
+        try {
+          const companyRes = await pool.query('SELECT name, trial_ends_at FROM companies WHERE id = $1', [companyId]);
+          const adminsRes  = await pool.query(
+            `SELECT email, full_name FROM users
+              WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true AND email IS NOT NULL`,
+            [companyId]
+          );
+          const company = companyRes.rows[0];
+          if (company && adminsRes.rows.length > 0) {
+            const endsStr = new Date(company.trial_ends_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            const { sendEmail } = require('../email');
+            for (const admin of adminsRes.rows) {
+              sendEmail({
+                to: admin.email,
+                subject: `Your OpsFloa trial ends ${endsStr}`,
+                html: `
+                  <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px">
+                    <h2 style="color:#1a56db;margin-bottom:8px">Trial ending soon</h2>
+                    <p style="color:#444">Hi ${admin.full_name || ''}, your OpsFloa trial for <strong>${company.name}</strong> ends on <strong>${endsStr}</strong>.</p>
+                    <p style="color:#444">To keep your team's access, add a payment method in Administration → Billing before the trial ends.</p>
+                    <a href="${process.env.APP_URL}/administration#billing"
+                       style="display:inline-block;background:#1a56db;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;margin-top:12px">
+                      Go to billing
+                    </a>
+                  </div>
+                `,
+              }).catch(err => req.log.warn({ err }, 'trial-will-end email send failed'));
+            }
+          }
+        } catch (err) {
+          req.log.warn({ err }, 'trial_will_end processing failed (email only)');
+        }
+      }
     }
   } catch (err) {
     // Webhook processing failed after signature verification succeeded.
