@@ -237,6 +237,22 @@ export default function SuperAdmin() {
     } finally { setRevoking(null); }
   };
 
+  const exportCompany = async (company) => {
+    try {
+      const r = await api.get(`/superadmin/companies/${company.id}/export`, { responseType: 'blob' });
+      const url = URL.createObjectURL(r.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `opsfloa-${company.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Export failed');
+    }
+  };
+
   const loadImpersonationLog = async () => {
     try {
       const r = await api.get('/superadmin/impersonation-log?limit=100');
@@ -547,6 +563,13 @@ export default function SuperAdmin() {
                           disabled={working === c.id}
                         >
                           {working === c.id ? '...' : c.active ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          style={styles.actionBtn}
+                          onClick={() => exportCompany(c)}
+                          title="Download every row belonging to this company as a single JSON file"
+                        >
+                          Export
                         </button>
                         <button
                           style={styles.deleteBtn}
