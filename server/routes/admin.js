@@ -1357,55 +1357,69 @@ router.get('/projects/:id/entries', requireAdmin, async (req, res) => {
   }
 });
 
-// Project metrics report (active projects only)
+// Project metrics report (active projects only).
+// Rewritten to load entries + run computeOT per project so per-entry
+// overtime_hours_override is honored. The previous SQL-only path used
+// GREATEST/LEAST per day-bucket, which couldn't see the override column.
 router.get('/projects/metrics', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const metricsSettings = await getSettings(companyId);
     const defaultRate = metricsSettings.default_hourly_rate || 30;
     const otThreshold = metricsSettings.overtime_threshold || 8;
-    const result = await pool.query(
-      `WITH daily_regular AS (
-        SELECT project_id, work_date,
-          SUM(
-            EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END)) / 3600
-            - COALESCE(break_minutes, 0)::float / 60
-          ) as day_hours
-        FROM time_entries
-        WHERE wage_type = 'regular' AND company_id = $1 AND status != 'rejected'
-        GROUP BY project_id, work_date
-      )
-      SELECT p.id, p.name, p.budget_hours, p.budget_dollars,
-        COUNT(te.id) as total_entries,
-        COUNT(DISTINCT te.user_id) as worker_count,
-        COALESCE(SUM(
-          EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600
-          - COALESCE(te.break_minutes, 0)::float / 60
-        ), 0) as total_hours,
-        COALESCE((SELECT SUM(LEAST(day_hours, $2)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as regular_hours,
-        COALESCE((SELECT SUM(GREATEST(day_hours - $2, 0)) FROM daily_regular dr WHERE dr.project_id = p.id), 0) as overtime_hours,
-        COALESCE(SUM(CASE WHEN te.wage_type = 'prevailing' THEN
-          EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600
-          - COALESCE(te.break_minutes, 0)::float / 60
-        ELSE 0 END), 0) as prevailing_hours,
-        COALESCE((
-          SELECT SUM(
-            (EXTRACT(EPOCH FROM (CASE WHEN te2.end_time < te2.start_time THEN te2.end_time + INTERVAL '1 day' - te2.start_time ELSE te2.end_time - te2.start_time END)) / 3600
-             - COALESCE(te2.break_minutes, 0)::float / 60)
-            * COALESCE(u2.hourly_rate, $3)
-          )
-          FROM time_entries te2
-          JOIN users u2 ON te2.user_id = u2.id
-          WHERE te2.project_id = p.id AND te2.company_id = $1 AND te2.status != 'rejected'
-        ), 0) as estimated_cost
-      FROM projects p
-      LEFT JOIN time_entries te ON te.project_id = p.id AND te.status != 'rejected'
-      WHERE p.active = true AND p.company_id = $1
-      GROUP BY p.id, p.name
-      ORDER BY p.name`,
-      [companyId, otThreshold, defaultRate]
-    );
-    res.json(result.rows);
+    const weekStart   = parseInt(metricsSettings.week_start) || 1;
+
+    const [projectsRes, entriesRes] = await Promise.all([
+      pool.query(
+        `SELECT id, name, budget_hours, budget_dollars
+           FROM projects
+          WHERE active = true AND company_id = $1`,
+        [companyId]
+      ),
+      pool.query(
+        `SELECT te.project_id, te.user_id, te.work_date, te.start_time, te.end_time,
+                te.break_minutes, te.wage_type, te.overtime_hours_override,
+                COALESCE(u.hourly_rate, $2) AS rate
+           FROM time_entries te
+           JOIN users u ON te.user_id = u.id
+          WHERE te.company_id = $1 AND te.status != 'rejected'`,
+        [companyId, defaultRate]
+      ),
+    ]);
+
+    const byProject = new Map();
+    for (const e of entriesRes.rows) {
+      if (!byProject.has(e.project_id)) byProject.set(e.project_id, []);
+      byProject.get(e.project_id).push(e);
+    }
+
+    const rows = projectsRes.rows.map(p => {
+      const pe = byProject.get(p.id) || [];
+      const { regularHours, overtimeHours } = computeOT(pe, 'daily', otThreshold, weekStart);
+      let totalHours = 0, prevailingHours = 0, estimatedCost = 0;
+      const workerIds = new Set();
+      for (const e of pe) {
+        const h = hoursWorked(e.start_time, e.end_time) - (e.break_minutes || 0) / 60;
+        totalHours += h;
+        if (e.wage_type === 'prevailing') prevailingHours += h;
+        estimatedCost += h * parseFloat(e.rate);
+        workerIds.add(e.user_id);
+      }
+      return {
+        id: p.id,
+        name: p.name,
+        budget_hours: p.budget_hours,
+        budget_dollars: p.budget_dollars,
+        total_entries: pe.length,
+        worker_count: workerIds.size,
+        total_hours: totalHours,
+        regular_hours: regularHours,
+        overtime_hours: overtimeHours,
+        prevailing_hours: prevailingHours,
+        estimated_cost: estimatedCost,
+      };
+    });
+    res.json(rows);
   } catch (err) {
     logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });

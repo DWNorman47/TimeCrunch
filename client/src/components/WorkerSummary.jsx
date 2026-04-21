@@ -32,27 +32,44 @@ function entryHours(e) {
   return (en - s) / 3600000 - (e.break_minutes || 0) / 60;
 }
 
+// Client mirror of server/utils/payCalculations.js computeOT. Kept in sync by
+// hand because the worker's WorkerSummary needs the same numbers the server
+// will pay them. Must honor overtime_hours_override the same way the server does.
 function computeOT(entries, rule, threshold) {
   const regular = entries.filter(e => e.wage_type === 'regular');
+  const overridden = regular.filter(e => e.overtime_hours_override != null);
+  const auto       = regular.filter(e => e.overtime_hours_override == null);
+
+  let overrideReg = 0, overrideOt = 0;
+  for (const e of overridden) {
+    const total = entryHours(e);
+    const ot = Math.max(0, Math.min(total, parseFloat(e.overtime_hours_override)));
+    overrideReg += total - ot;
+    overrideOt  += ot;
+  }
+
+  let autoReg = 0, autoOt = 0;
   if (rule === 'weekly') {
     const weekly = {};
-    regular.forEach(e => {
+    auto.forEach(e => {
       const d = new Date(e.work_date.substring(0, 10) + 'T00:00:00');
       const jan4 = new Date(d.getFullYear(), 0, 4);
       const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7);
       const key = `${d.getFullYear()}-W${week}`;
       weekly[key] = (weekly[key] || 0) + entryHours(e);
     });
-    return {
-      regularHours: Object.values(weekly).reduce((s, h) => s + Math.min(h, threshold), 0),
-      overtimeHours: Object.values(weekly).reduce((s, h) => s + Math.max(h - threshold, 0), 0),
-    };
+    autoReg = Object.values(weekly).reduce((s, h) => s + Math.min(h, threshold), 0);
+    autoOt  = Object.values(weekly).reduce((s, h) => s + Math.max(h - threshold, 0), 0);
+  } else {
+    const daily = {};
+    auto.forEach(e => { daily[e.work_date.substring(0, 10)] = (daily[e.work_date.substring(0, 10)] || 0) + entryHours(e); });
+    autoReg = Object.values(daily).reduce((s, h) => s + Math.min(h, threshold), 0);
+    autoOt  = Object.values(daily).reduce((s, h) => s + Math.max(h - threshold, 0), 0);
   }
-  const daily = {};
-  regular.forEach(e => { daily[e.work_date.substring(0, 10)] = (daily[e.work_date.substring(0, 10)] || 0) + entryHours(e); });
+
   return {
-    regularHours: Object.values(daily).reduce((s, h) => s + Math.min(h, threshold), 0),
-    overtimeHours: Object.values(daily).reduce((s, h) => s + Math.max(h - threshold, 0), 0),
+    regularHours:  overrideReg + autoReg,
+    overtimeHours: overrideOt  + autoOt,
   };
 }
 
