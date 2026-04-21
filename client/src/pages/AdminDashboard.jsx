@@ -3,13 +3,11 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
 import { usePlan } from '../hooks/usePlan';
 import { useT } from '../hooks/useT';
-import NotificationBell from '../components/NotificationBell';
 import CompanyChat from '../components/CompanyChat';
 import LiveKPIs from '../components/LiveKPIs';
 import { SkeletonStatRow, SkeletonList } from '../components/Skeleton';
 import BroadcastMessage from '../components/BroadcastMessage';
-import AppSwitcher from '../components/AppSwitcher';
-import { RefreshButton, LanguageSwitcher } from '../components/HeaderActions';
+import AppHeader from '../components/AppHeader';
 import TabBar from '../components/TabBar';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import api from '../api';
@@ -53,7 +51,7 @@ function UpgradePrompt({ requiredPlan, feature }) {
 const isPwa = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
 export default function AdminDashboard() {
-  const { logout, user } = useAuth();
+  const { user } = useAuth();
   const plan = usePlan();
   const t = useT();
   const [workers, setWorkers] = useState([]);
@@ -143,21 +141,7 @@ export default function AdminDashboard() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header} className="app-header">
-        <div style={styles.headerTopRow}>
-          <div style={styles.logoGroup}>
-            <AppSwitcher currentApp="timeclock" userRole={user?.role} features={settings} />
-            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
-          </div>
-          <div style={styles.headerRight} className="header-right">
-            <NotificationBell />
-            <RefreshButton title={t.refresh || 'Refresh'} />
-            <LanguageSwitcher />
-            <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
-          </div>
-        </div>
-        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
-      </header>
+      <AppHeader currentApp="timeclock" features={settings} />
 
       {billing?.subscription_status === 'trial_expired' && (
         <div style={{ ...styles.trialBanner, background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' }}>

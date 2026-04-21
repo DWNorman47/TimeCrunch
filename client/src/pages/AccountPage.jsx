@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import AppSwitcher from '../components/AppSwitcher';
+import AppHeader from '../components/AppHeader';
 import NotificationSetup from '../components/NotificationSetup';
 import ChangePassword from '../components/ChangePassword';
 import MFASetup from '../components/MFASetup';
@@ -12,13 +12,12 @@ import { getOrFetch } from '../offlineDb';
 
 import { silentError } from '../errorReporter';
 export default function AccountPage() {
-  const { user, logout, updateUser } = useAuth();
+  const { user } = useAuth();
   const t = getT(user?.language);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [settings, setSettings] = useState(null);
   const [companyInfo, setCompanyInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [langError, setLangError] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -30,38 +29,11 @@ export default function AccountPage() {
     }).catch(silentError('accountpage')).finally(() => setLoading(false));
   }, []);
 
-  const handleLanguageChange = async lang => {
-    setLangError('');
-    try {
-      await api.post('/auth/update-language', { language: lang });
-      updateUser({ language: lang });
-    } catch {
-      setLangError(t.failedSave || 'Failed to save language preference.');
-    }
-  };
-
   return (
     <div style={styles.page}>
       <OfflineBanner />
-      <header style={styles.header} className="app-header">
-        <div style={styles.headerTopRow}>
-          <div style={styles.logoGroup}>
-            <AppSwitcher currentApp="account" userRole={user?.role} features={settings || {}} />
-            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
-          </div>
-          <div style={styles.headerRight} className="header-right">
-            <span style={styles.userName} className="header-username">{user?.full_name}</span>
-            <select style={styles.langSelect} value={user?.language || 'English'} onChange={e => handleLanguageChange(e.target.value)}>
-              <option value="English" style={{ color: '#111827', background: '#fff' }}>EN</option>
-              <option value="Spanish" style={{ color: '#111827', background: '#fff' }}>ES</option>
-            </select>
-            <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
-          </div>
-        </div>
-        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
-      </header>
+      <AppHeader currentApp="account" features={settings || {}} />
 
-      {langError && <p style={{ color: '#dc2626', fontSize: 13, margin: '8px 24px 0' }}>{langError}</p>}
       {showChangePassword && <ChangePassword onClose={() => setShowChangePassword(false)} t={t} />}
 
       <main id="main-content" style={styles.main} className="mobile-main">

@@ -6,8 +6,7 @@ import TimeEntryForm from '../components/TimeEntryForm';
 import EntryList from '../components/EntryList';
 import UpcomingShifts from '../components/UpcomingShifts';
 import CompanyChat from '../components/CompanyChat';
-import AppSwitcher from '../components/AppSwitcher';
-import NotificationBell from '../components/NotificationBell';
+import AppHeader from '../components/AppHeader';
 import { getT } from '../i18n';
 import { langToLocale } from '../utils';
 import api from '../api';
@@ -30,10 +29,8 @@ function TabLoader() {
   return <div style={{ padding: '32px 0', textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading…</div>;
 }
 
-const isPwa = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-
 export default function Dashboard() {
-  const { user, logout, updateUser } = useAuth();
+  const { user } = useAuth();
   const { onSync } = useOffline() || {};
   const t = getT(user?.language);
   const [entries, setEntries] = useState([]);
@@ -393,41 +390,15 @@ ${signatureDataUrl ? `
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
 
-  const handleLanguageChange = async lang => {
-    try {
-      await api.post('/auth/update-language', { language: lang });
-      updateUser({ language: lang });
-    } catch (err) { silentError('update-language')(err); }
-  };
-
   return (
     <div style={styles.page}>
       <OfflineBanner />
-      <header style={styles.header} className="app-header">
-        <div style={styles.headerTopRow}>
-          <div style={styles.logoGroup}>
-            <AppSwitcher currentApp="timeclock" userRole={user?.role} features={settings} />
-            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
-          </div>
-          <div style={styles.headerRight} className="header-right">
-            <NotificationBell />
-            {isPwa && <button style={styles.headerBtn} className="header-btn" onClick={() => window.location.reload()}>↻</button>}
-            <span style={styles.userName} className="header-username">{user.full_name}</span>
-            <select style={styles.langSelect} value={user?.language || 'English'} onChange={e => handleLanguageChange(e.target.value)}>
-              <option value="English" style={{ color: '#111827', background: '#fff' }}>EN</option>
-              <option value="Spanish" style={{ color: '#111827', background: '#fff' }}>ES</option>
-            </select>
-            {headerClock && <span style={styles.headerTimer} className="header-clock-timer-desktop">⏱ {fmtHeaderElapsed(headerElapsed)}</span>}
-            <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
-          </div>
-        </div>
-        {user?.company_name && (
-          <div className="company-name-row">
-            <span className="company-name">{user.company_name}</span>
-            {headerClock && <span className="header-clock-timer-mobile" style={styles.headerTimerMobile}>⏱ {fmtHeaderElapsed(headerElapsed)}</span>}
-          </div>
-        )}
-      </header>
+      <AppHeader
+        currentApp="timeclock"
+        features={settings}
+        rightExtras={headerClock && <span style={styles.headerTimer} className="header-clock-timer-desktop">⏱ {fmtHeaderElapsed(headerElapsed)}</span>}
+        companyBandExtras={headerClock && <span className="header-clock-timer-mobile" style={styles.headerTimerMobile}>⏱ {fmtHeaderElapsed(headerElapsed)}</span>}
+      />
 
       {showSignatureModal && (
         <SignatureModal

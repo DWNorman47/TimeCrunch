@@ -4,8 +4,7 @@ import { usePlan } from '../hooks/usePlan';
 import { useT } from '../hooks/useT';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
-import AppSwitcher from '../components/AppSwitcher';
-import { RefreshButton, LanguageSwitcher } from '../components/HeaderActions';
+import AppHeader from '../components/AppHeader';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import { SkeletonStatRow, SkeletonList } from '../components/Skeleton';
 
@@ -28,7 +27,7 @@ function UpgradePrompt() {
 }
 
 export default function AnalyticsPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const t = useT();
   const plan = usePlan();
   const [features, setFeatures] = useState({});
@@ -43,20 +42,7 @@ export default function AnalyticsPage() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header} className="app-header">
-        <div style={styles.headerTopRow}>
-          <div style={styles.logoGroup}>
-            <AppSwitcher currentApp="analytics" userRole={user?.role} features={features} />
-            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }} className="header-right">
-            <RefreshButton title={t.refresh || 'Refresh'} />
-            <LanguageSwitcher />
-            <button style={styles.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
-          </div>
-        </div>
-        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
-      </header>
+      <AppHeader currentApp="analytics" features={features} />
 
       <main id="main-content" style={styles.main} className="admin-main">
         <div style={styles.pageHeader}>

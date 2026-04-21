@@ -11,8 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
-import AppSwitcher from '../components/AppSwitcher';
-import { RefreshButton, LanguageSwitcher } from '../components/HeaderActions';
+import AppHeader from '../components/AppHeader';
 import TabBar from '../components/TabBar';
 import ErrorBoundary from '../components/ErrorBoundary';
 import RetryBanner from '../components/RetryBanner';
@@ -108,7 +107,7 @@ function DirectoryView({ team, loading, search, onSearchChange }) {
 }
 
 export default function TeamPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
@@ -176,21 +175,7 @@ export default function TeamPage() {
 
   return (
     <div style={s.page}>
-      <header style={s.header} className="app-header">
-        <div style={s.headerTopRow}>
-          <div style={s.logoGroup}>
-            <AppSwitcher currentApp="team" userRole={user?.role} features={features} />
-            {user?.company_name && <span style={s.companyName} className="company-name-desktop">{user.company_name}</span>}
-          </div>
-          <div style={s.headerRight} className="header-right">
-            {!isAdmin && <span style={s.userName} className="header-username">{user?.full_name}</span>}
-            <RefreshButton title={t.refresh || 'Refresh'} />
-            <LanguageSwitcher />
-            <button style={s.headerBtn} className="header-btn" onClick={logout}>{t.logout}</button>
-          </div>
-        </div>
-        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
-      </header>
+      <AppHeader currentApp="team" features={features} />
 
       <main id="main-content" style={s.main}>
         {isAdmin && (
