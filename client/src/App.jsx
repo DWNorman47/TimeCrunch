@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import InstallPrompt from './components/InstallPrompt';
+import UpdatePrompt from './components/UpdatePrompt';
 import WelcomeModal from './components/WelcomeModal';
 import SkipLink from './components/SkipLink';
 import { ToastProvider } from './contexts/ToastContext';
@@ -139,6 +140,25 @@ function AppRoutes() {
   clearCache();
 })();
 
+// Clear the cache when the user returns to the tab after a meaningful
+// absence. Covers "admin created a project in another tab, worker tabbed
+// back — why haven't I seen it yet?" Threshold kept at 30s so momentary
+// tab flips don't force a full refetch.
+(function dropCacheOnTabRefocus() {
+  let hiddenAt = null;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      hiddenAt = Date.now();
+      return;
+    }
+    if (document.visibilityState === 'visible' && navigator.onLine !== false) {
+      const elapsed = hiddenAt ? Date.now() - hiddenAt : Infinity;
+      if (elapsed > 30 * 1000) clearCache();
+      hiddenAt = null;
+    }
+  });
+})();
+
 (function applyImpersonateToken() {
   if (!window.location.search.includes('impersonate=1')) return;
   const token = sessionStorage.getItem('impersonate_token');
@@ -162,6 +182,7 @@ export default function App() {
             <WelcomeModal />
             <AppRoutes />
             <InstallPrompt />
+            <UpdatePrompt />
           </OfflineProvider>
         </ToastProvider>
       </BrowserRouter>

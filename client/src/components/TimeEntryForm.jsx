@@ -29,7 +29,30 @@ export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, proj
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const { clearPersisted } = useFormPersist('time-entry', form, setForm);
+  // Validate + scrub the persisted form on restore: a project_id saved in
+  // a prior session may reference a project that's since been archived,
+  // renumbered, or belongs to a different company after a user switch.
+  // Pass `projects` via a ref so the validator sees the live list at mount.
+  const { clearPersisted } = useFormPersist('time-entry', form, setForm, {
+    validate: saved => {
+      if (!saved || typeof saved !== 'object') return {};
+      if (saved.project_id && projects?.length > 0 &&
+          !projects.some(p => String(p.id) === String(saved.project_id))) {
+        return { ...saved, project_id: '' };
+      }
+      return saved;
+    },
+  });
+
+  // Safety net for the case where projects arrive after the form has
+  // already restored from localStorage. Mirrors the scrub in ClockInOut.
+  useEffect(() => {
+    if (!projects || projects.length === 0) return;
+    if (!form.project_id) return;
+    const stillValid = projects.some(p => String(p.id) === String(form.project_id));
+    if (!stillValid) setForm(f => ({ ...f, project_id: '' }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects]);
 
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
 
