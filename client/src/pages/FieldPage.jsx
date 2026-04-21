@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
-import AppSwitcher from '../components/AppSwitcher';
+import AppHeader from '../components/AppHeader';
 import TabBar from '../components/TabBar';
 import FieldDayLog from '../components/FieldDayLog';
 import { reportClientError } from '../errorReporter';
@@ -29,7 +29,7 @@ function TabLoader() {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function FieldPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
@@ -65,19 +65,7 @@ export default function FieldPage() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header} className="app-header">
-        <div style={styles.headerTopRow}>
-          <div style={styles.logoGroup}>
-            <AppSwitcher currentApp="field" userRole={user?.role} features={features} />
-            {user?.company_name && <span style={styles.companyName} className="company-name-desktop">{user.company_name}</span>}
-          </div>
-          <div style={styles.headerRight}>
-            {!isAdmin && <span style={styles.userName}>{user?.full_name}</span>}
-            <button style={styles.headerBtn} onClick={logout}>{t.logout}</button>
-          </div>
-        </div>
-        {user?.company_name && <div className="company-name-row"><span className="company-name">{user.company_name}</span></div>}
-      </header>
+      <AppHeader currentApp="field" features={features} />
 
       <main id="main-content" style={styles.main}>
         <RetryBanner message={loadError} onRetry={init} />
