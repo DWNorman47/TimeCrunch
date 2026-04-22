@@ -539,19 +539,19 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   </select>
                 </div>
                 <div style={s.fieldGroup}>
-                  <label htmlFor="mw-worker-type" style={s.label}>Worker Type</label>
+                  <label htmlFor="mw-worker-type" style={s.label}>{t.mwWorkerType}</label>
                   <select id="mw-worker-type" style={s.input} value={form.worker_type} onChange={e => set('worker_type', e.target.value)}>
-                    <option value="employee">Employee (W-2)</option>
-                    <option value="contractor">Independent Contractor (1099-NEC)</option>
-                    <option value="subcontractor">Subcontractor (1099-NEC)</option>
-                    <option value="owner">Owner / Officer</option>
+                    <option value="employee">{t.mwTypeEmployee}</option>
+                    <option value="contractor">{t.mwTypeContractor}</option>
+                    <option value="subcontractor">{t.mwTypeSubcontractor}</option>
+                    <option value="owner">{t.mwTypeOwner}</option>
                   </select>
                 </div>
                 {trackClassifications && (
                   <div style={s.fieldGroup}>
-                    <label htmlFor="mw-classification" style={s.label}>Job Classification <span style={{ color: '#6b7280', fontSize: 12, fontWeight: 400 }}>(optional)</span></label>
+                    <label htmlFor="mw-classification" style={s.label}>{t.mwJobClassification} <span style={{ color: '#6b7280', fontSize: 12, fontWeight: 400 }}>{t.mwOptional}</span></label>
                     <select id="mw-classification" style={s.input} value={form.classification} onChange={e => set('classification', e.target.value)}>
-                      <option value="">— None —</option>
+                      <option value="">{t.mwNoneOption}</option>
                       {classifications.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
@@ -684,7 +684,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 <input id="mw-edit-full-name" style={s.input} value={editInfoForm.full_name} onChange={e => setEditInfoForm(f => ({ ...f, full_name: e.target.value }))} />
                               </div>
                               <div style={s.fieldGroup}>
-                                <label htmlFor="mw-edit-invoice-name" style={s.label}>Invoice Name <span style={{ color: '#6b7280', fontWeight: 400 }}>(optional)</span></label>
+                                <label htmlFor="mw-edit-invoice-name" style={s.label}>{t.mwInvoiceName} <span style={{ color: '#6b7280', fontWeight: 400 }}>{t.mwOptional}</span></label>
                                 <input id="mw-edit-invoice-name" style={s.input} value={editInfoForm.invoice_name} onChange={e => setEditInfoForm(f => ({ ...f, invoice_name: e.target.value }))} placeholder={t.invoiceNamePlaceholder} />
                               </div>
                               <div style={s.fieldGroup}>
@@ -845,7 +845,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                   checked={editRateForm.guarantee_enabled}
                                   onChange={e => setEditRateForm(f => ({ ...f, guarantee_enabled: e.target.checked }))}
                                 />
-                                <span style={{ fontWeight: 600 }}>Weekly minimum hour guarantee</span>
+                                <span style={{ fontWeight: 600 }}>{t.mwWeeklyMinGuarantee}</span>
                               </label>
                               {editRateForm.guarantee_enabled && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, marginLeft: 24 }}>
@@ -857,7 +857,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                     value={editRateForm.guaranteed_weekly_hours}
                                     onChange={e => setEditRateForm(f => ({ ...f, guaranteed_weekly_hours: e.target.value }))}
                                   />
-                                  <span style={{ fontSize: 13, color: '#6b7280' }}>hrs/week — invoice will include shortfall to reach this minimum</span>
+                                  <span style={{ fontSize: 13, color: '#6b7280' }}>{t.mwWeeklyMinHint}</span>
                                 </div>
                               )}
                             </div>
@@ -886,7 +886,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                     {w.role === 'admin' && !currentUser?.admin_permissions && (
                       <div style={s.section}>
                         <div style={s.sectionHeader}>
-                          <span style={s.sectionTitle}>Permissions</span>
+                          <span style={s.sectionTitle}>{t.mwPermissions}</span>
                           {(!isEditing || editSection !== 'permissions') && (
                             <button style={s.sectionBtn} onClick={() => startEditPermissions(w)}>Edit</button>
                           )}
@@ -899,7 +899,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 checked={editPermForm.full_access}
                                 onChange={e => setEditPermForm(f => ({ ...f, full_access: e.target.checked }))}
                               />
-                              Full access (no restrictions)
+                              {t.mwFullAccessNoRestrictions}
                             </label>
                             {!editPermForm.full_access && (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 4, marginTop: 4 }}>
@@ -923,14 +923,14 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                         ) : (
                           <div>
                             {w.admin_permissions == null
-                              ? <span style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>Full access</span>
+                              ? <span style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>{t.mwFullAccess}</span>
                               : (
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
                                   {PERM_LABELS.filter(({ key }) => w.admin_permissions[key]).map(({ key, label }) => (
                                     <span key={key} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: '#dbeafe', color: '#1e40af' }}>{label}</span>
                                   ))}
                                   {PERM_LABELS.every(({ key }) => !w.admin_permissions[key]) && (
-                                    <span style={{ fontSize: 13, color: '#6b7280' }}>No permissions</span>
+                                    <span style={{ fontSize: 13, color: '#6b7280' }}>{t.mwNoPermissions}</span>
                                   )}
                                 </div>
                               )
@@ -944,7 +944,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                     {w.role === 'admin' && !currentUser?.admin_permissions && (
                       <div style={s.section}>
                         <div style={s.sectionHeader}>
-                          <span style={s.sectionTitle}>Worker access</span>
+                          <span style={s.sectionTitle}>{t.mwWorkerAccess}</span>
                           {(!isEditing || editSection !== 'worker-access') && (
                             <button style={s.sectionBtn} onClick={() => startEditWorkerAccess(w)}>Edit</button>
                           )}
@@ -957,7 +957,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 checked={editWorkerAccessForm.all_workers}
                                 onChange={e => setEditWorkerAccessForm(f => ({ ...f, all_workers: e.target.checked }))}
                               />
-                              All workers
+                              {t.mwAllWorkers}
                             </label>
                             {!editWorkerAccessForm.all_workers && (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 4, marginTop: 4, maxHeight: 220, overflowY: 'auto' }}>
