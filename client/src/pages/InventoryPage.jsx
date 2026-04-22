@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
 import AppHeader from '../components/AppHeader';
@@ -17,6 +18,7 @@ import MyCount from '../components/MyCount';
 import { silentError } from '../errorReporter';
 export default function InventoryPage() {
   const { user } = useAuth();
+  const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const [features, setFeatures] = useState({});
@@ -75,8 +77,8 @@ export default function InventoryPage() {
         <AppHeader currentApp="inventory" features={features} />
         <div style={styles.disabled}>
           <div style={styles.disabledIcon}>📦</div>
-          <h2 style={styles.disabledTitle}>Inventory Not Enabled</h2>
-          <p style={styles.disabledBody}>Enable the Inventory module from Administration → Company → Modules.</p>
+          <h2 style={styles.disabledTitle}>{t.invNotEnabled}</h2>
+          <p style={styles.disabledBody}>{t.invNotEnabledBody}</p>
         </div>
       </div>
     );

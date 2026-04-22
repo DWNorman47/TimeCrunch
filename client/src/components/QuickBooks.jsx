@@ -843,7 +843,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           )}
 
           {/* ── Auto-sync settings ── */}
-          <CollapsibleSection title="Auto-sync Settings" storageKey="auto-sync">
+          <CollapsibleSection title={t.qbAutoSyncSettings} storageKey="auto-sync">
             <p style={styles.hint}>Automatically push records to QuickBooks when approved. Workers and projects must be mapped above for auto-sync to work.</p>
 
             <label style={styles.syncToggle}>
@@ -885,7 +885,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 style={{ marginRight: 8 }}
               />
               <span>
-                <span style={{ fontWeight: 600, color: '#1a202c', fontSize: 14 }}>Email admins when QuickBooks disconnects</span>
+                <span style={{ fontWeight: 600, color: '#1a202c', fontSize: 14 }}>{t.qbEmailOnDisconnect}</span>
                 <span style={{ display: 'block', fontSize: 12, color: '#6b7280', marginTop: 1 }}>Send an email to all admins if the QuickBooks token expires or is revoked.</span>
               </span>
             </label>
@@ -923,7 +923,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                   </select>
                 </div>
                 <div style={{ flex: 1, minWidth: 220 }}>
-                  <label htmlFor="qbo-expense-account" style={styles.label}>Expense Category Account</label>
+                  <label htmlFor="qbo-expense-account" style={styles.label}>{t.qbExpenseCategoryAccount}</label>
                   <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>The expense account for the line item (e.g. Job Materials, Travel)</p>
                   <select
                     id="qbo-expense-account"
@@ -944,7 +944,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
 
           {/* ── Push expense reimbursements — only when the reimbursements feature is on ── */}
           {settings?.feature_reimbursements !== false && (
-          <CollapsibleSection title="Push Expense Reimbursements" storageKey="push-expenses">
+          <CollapsibleSection title={t.qbPushExpenseReimb} storageKey="push-expenses">
             <p style={styles.hint}>Manually push approved reimbursements to QuickBooks as Purchase records for a date range.</p>
             <div style={styles.pushRow}>
               <div>
@@ -985,7 +985,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           )}
 
           {/* ── Payroll journal entry ── */}
-          <CollapsibleSection title="Push Payroll Journal Entry" storageKey="push-payroll">
+          <CollapsibleSection title={t.qbPushPayrollJournal} storageKey="push-payroll">
             <p style={styles.hint}>Creates a journal entry in QuickBooks for the total labor cost of approved time entries in a date range. Select the wage expense account to debit and the liability or bank account to credit.</p>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
               <div>
@@ -1035,7 +1035,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
           </CollapsibleSection>
 
           {/* ── Push Bills (contractor time + reimbursements per vendor) ── */}
-          <CollapsibleSection title="Push Bills (Contractors)" storageKey="push-bills">
+          <CollapsibleSection title={t.qbPushBillsContractors} storageKey="push-bills">
             <p style={styles.hint}>
               Creates one QBO Bill per contractor, combining approved time entries (as labor lines) and approved reimbursements (as expense lines) for the selected date range. Only contractors with a mapped QBO Vendor appear.
             </p>
@@ -1059,7 +1059,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 </select>
               </div>
               <div style={{ flex: 1, minWidth: 240 }}>
-                <label htmlFor="qbo-bill-expense" style={styles.label}>Reimbursement Expense Account</label>
+                <label htmlFor="qbo-bill-expense" style={styles.label}>{t.qbReimbExpenseAccount}</label>
                 <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 6px' }}>Only needed if you're billing reimbursements. The QBO account where mileage / expense dollars post (e.g. "Travel" or "Subcontractor Reimbursements").</p>
                 <select
                   id="qbo-bill-expense"
@@ -1217,7 +1217,7 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                       <th style={{ ...styles.th, textAlign: 'right' }}>OT hrs</th>
                       <th style={{ ...styles.th, textAlign: 'right' }}>OT premium $</th>
                       <th style={{ ...styles.th, textAlign: 'right' }}>Reimb. $</th>
-                      <th style={{ ...styles.th, textAlign: 'right' }}>Bill Total</th>
+                      <th style={{ ...styles.th, textAlign: 'right' }}>{t.qbBillTotal}</th>
                     </tr>
                   </thead>
                   <tbody>

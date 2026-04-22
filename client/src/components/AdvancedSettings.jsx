@@ -182,7 +182,7 @@ export default function AdvancedSettings({ settings }) {
                 </CollapsibleCategory>
               )}
               {config.job_classifications && settings?.cp_track_classifications !== false && (
-                <CollapsibleCategory title="Job Classifications (Certified Payroll)">
+                <CollapsibleCategory title={t.asJobClassificationsTitle}>
                   <CategorySection
                     cfg={config.job_classifications}
                     onSave={makeSaver('job_classifications')}
@@ -191,7 +191,7 @@ export default function AdvancedSettings({ settings }) {
                 </CollapsibleCategory>
               )}
               {config.service_request_categories && (
-                <CollapsibleCategory title="Service Request Categories (client intake form)">
+                <CollapsibleCategory title={t.asServiceRequestCategoriesTitle}>
                   <CategorySection
                     cfg={config.service_request_categories}
                     onSave={makeSaver('service_request_categories')}

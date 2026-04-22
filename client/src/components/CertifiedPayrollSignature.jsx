@@ -11,6 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import ModalShell from './ModalShell';
+import { useT } from '../hooks/useT';
 
 export default function CertifiedPayrollSignature({
   projectId = null,
@@ -20,6 +21,7 @@ export default function CertifiedPayrollSignature({
   defaultName = '',
   defaultTitle = '',
 }) {
+  const t = useT();
   const [complianceText, setComplianceText] = useState('');
   const [existing, setExisting] = useState(null);
   const [name, setName] = useState(defaultName);
@@ -37,12 +39,12 @@ export default function CertifiedPayrollSignature({
         setComplianceText(r.data.default_compliance_text || '');
         setExisting(r.data.signature);
       })
-      .catch(() => setError('Could not load Statement of Compliance'));
+      .catch(() => setError(t.cpsErrLoad));
   }, [projectId, weekEnding]);
 
   const submit = async () => {
-    if (!name.trim()) { setError('Your name is required'); return; }
-    if (!signature.trim()) { setError('Type your name as signature'); return; }
+    if (!name.trim()) { setError(t.cpsErrNameRequired); return; }
+    if (!signature.trim()) { setError(t.cpsErrSignatureRequired); return; }
     setSaving(true); setError('');
     try {
       const r = await api.post('/certified-payroll/signatures', {
@@ -55,7 +57,7 @@ export default function CertifiedPayrollSignature({
       onSigned?.(r.data.signature);
       onClose?.();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save signature');
+      setError(err.response?.data?.error || t.cpsErrSave);
     } finally {
       setSaving(false);
     }
@@ -63,59 +65,54 @@ export default function CertifiedPayrollSignature({
 
   return (
     <ModalShell onClose={onClose} labelId="cp-sign-title" maxWidth={680}>
-      <h2 id="cp-sign-title" style={styles.title}>Statement of Compliance</h2>
-      <p style={styles.subtitle}>Week ending {weekEnding}{projectId ? ` · Project #${projectId}` : ''}</p>
+      <h2 id="cp-sign-title" style={styles.title}>{t.cpsStatementOfCompliance}</h2>
+      <p style={styles.subtitle}>{t.cpsWeekEnding} {weekEnding}{projectId ? ` · ${t.cpsProjectPrefix}${projectId}` : ''}</p>
 
       {existing && (
         <div role="status" style={styles.existing}>
-          Already signed by <strong>{existing.signer_name}</strong>
-          {existing.signer_title ? ` (${existing.signer_title})` : ''} on{' '}
+          {t.cpsAlreadySignedBy} <strong>{existing.signer_name}</strong>
+          {existing.signer_title ? ` (${existing.signer_title})` : ''}{' · '}
           {new Date(existing.signed_at).toLocaleString()}.
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-            Re-signing will overwrite the above and record a new audit entry.
-          </div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{t.cpsReSignNote}</div>
         </div>
       )}
 
-      <div style={styles.complianceBox} role="document" aria-label="Statement of Compliance text">
+      <div style={styles.complianceBox} role="document" aria-label={t.cpsStatementTextAria}>
         {complianceText.split('\n\n').map((p, i) => <p key={i} style={styles.complianceP}>{p}</p>)}
       </div>
 
       <div style={styles.fields}>
         <label style={styles.field}>
-          <span style={styles.label}>Your full name *</span>
+          <span style={styles.label}>{t.cpsYourFullName}</span>
           <input
             style={styles.input}
             value={name}
             onChange={e => setName(e.target.value)}
-            placeholder="e.g. Maria Gonzalez"
+            placeholder={t.cpsNamePlaceholder}
             maxLength={200}
             autoFocus
           />
         </label>
         <label style={styles.field}>
-          <span style={styles.label}>Your title</span>
+          <span style={styles.label}>{t.cpsYourTitle}</span>
           <input
             style={styles.input}
             value={title}
             onChange={e => setTitle(e.target.value)}
-            placeholder="e.g. President, Payroll Manager"
+            placeholder={t.cpsTitlePlaceholder}
             maxLength={200}
           />
         </label>
         <label style={styles.field}>
-          <span style={styles.label}>Typed signature *</span>
+          <span style={styles.label}>{t.cpsTypedSignature}</span>
           <input
             style={{ ...styles.input, fontFamily: '"Dancing Script", "Segoe Script", cursive', fontSize: 22 }}
             value={signature}
             onChange={e => setSignature(e.target.value)}
-            placeholder="Type your full name as signature"
+            placeholder={t.cpsTypedSignaturePlaceholder}
             maxLength={2000}
           />
-          <span style={styles.note}>
-            By typing your name above you are signing the Statement of Compliance electronically.
-            WH-347 accepts typed signatures when accompanied by the signer's identification.
-          </span>
+          <span style={styles.note}>{t.cpsElectronicNote}</span>
         </label>
       </div>
 
