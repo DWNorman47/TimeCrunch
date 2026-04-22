@@ -11,8 +11,10 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { silentError } from '../errorReporter';
+import { useT } from '../hooks/useT';
 
 export default function WorkerSsn({ userId }) {
+  const t = useT();
   const [hasSsn, setHasSsn] = useState(null);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
@@ -28,7 +30,7 @@ export default function WorkerSsn({ userId }) {
 
   const save = async () => {
     const digits = value.replace(/\D/g, '');
-    if (digits.length !== 4) { setError('Enter exactly 4 digits'); return; }
+    if (digits.length !== 4) { setError(t.ssnEnter4Digits); return; }
     setSaving(true); setError('');
     try {
       await api.put(`/certified-payroll/workers/${userId}/ssn`, { ssn_last4: digits });
@@ -45,7 +47,7 @@ export default function WorkerSsn({ userId }) {
   };
 
   const clear = async () => {
-    if (!window.confirm('Remove the stored SSN last-4 for this worker?')) return;
+    if (!window.confirm(t.ssnConfirmClear)) return;
     setSaving(true); setError('');
     try {
       await api.put(`/certified-payroll/workers/${userId}/ssn`, { ssn_last4: '' });
@@ -63,7 +65,7 @@ export default function WorkerSsn({ userId }) {
   return (
     <div style={styles.wrap}>
       <div style={styles.row}>
-        <span style={styles.label}>SSN (last 4 only)</span>
+        <span style={styles.label}>{t.ssnLabel}</span>
         {editing ? (
           <div style={styles.editGroup}>
             <input
@@ -78,26 +80,24 @@ export default function WorkerSsn({ userId }) {
               autoFocus
             />
             <button type="button" style={styles.saveBtn} onClick={save} disabled={saving}>
-              {saving ? '…' : 'Save'}
+              {saving ? '…' : t.save}
             </button>
             <button type="button" style={styles.cancelBtn} onClick={() => { setEditing(false); setValue(''); setError(''); }}>
-              Cancel
+              {t.cancel}
             </button>
           </div>
         ) : (
           <div style={styles.viewGroup}>
-            <span style={styles.value}>{hasSsn ? '●●●●' : <em style={{ color: '#9ca3af' }}>Not set</em>}</span>
-            {saved && <span style={styles.saved}>✓ Saved</span>}
+            <span style={styles.value}>{hasSsn ? '●●●●' : <em style={{ color: '#9ca3af' }}>{t.ssnNotSet}</em>}</span>
+            {saved && <span style={styles.saved}>✓ {t.saved || 'Saved'}</span>}
             <button type="button" style={styles.editBtn} onClick={() => setEditing(true)}>
-              {hasSsn ? 'Change' : 'Add'}
+              {hasSsn ? t.ssnChange : t.ssnAdd}
             </button>
-            {hasSsn && <button type="button" style={styles.clearBtn} onClick={clear} disabled={saving}>Clear</button>}
+            {hasSsn && <button type="button" style={styles.clearBtn} onClick={clear} disabled={saving}>{t.ssnClear}</button>}
           </div>
         )}
       </div>
-      <p style={styles.note}>
-        Stored encrypted. Only the last 4 digits — never the full SSN. Used on WH-347 reports.
-      </p>
+      <p style={styles.note}>{t.ssnStorageNote}</p>
       {error && <div role="alert" style={styles.error}>{error}</div>}
     </div>
   );

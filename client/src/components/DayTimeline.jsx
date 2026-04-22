@@ -299,20 +299,20 @@ export default function DayTimeline({ entries, projects, onEntryAdded, onEntryUp
                       {isSplitting && (
                         <div style={s.splitPanel}>
                           <div style={s.modeBtns}>
-                            <button style={splitMode === 'break' ? s.modeBtnOn : s.modeBtn} onClick={() => setSplitMode('break')}>Insert break</button>
-                            <button style={splitMode === 'switch' ? s.modeBtnOn : s.modeBtn} onClick={() => setSplitMode('switch')}>Project switch</button>
+                            <button style={splitMode === 'break' ? s.modeBtnOn : s.modeBtn} onClick={() => setSplitMode('break')}>{t.dtInsertBreak}</button>
+                            <button style={splitMode === 'switch' ? s.modeBtnOn : s.modeBtn} onClick={() => setSplitMode('switch')}>{t.dtProjectSwitch}</button>
                           </div>
 
                           {splitMode === 'break' && (
                             <div style={s.form}>
                               <p style={s.hint}>Break times must fall within {minToDisplay(seg.start)} – {minToDisplay(seg.end)}.</p>
                               <div style={s.timeRow}>
-                                <label htmlFor="dt-break-start" style={s.miniLabel}>Break start</label>
+                                <label htmlFor="dt-break-start" style={s.miniLabel}>{t.dtBreakStart}</label>
                                 <input id="dt-break-start" type="time" style={s.timeInput} value={splitBreakForm.breakStart}
                                   onChange={e => setSplitBreakForm(f => ({ ...f, breakStart: e.target.value }))} />
                               </div>
                               <div style={s.timeRow}>
-                                <label htmlFor="dt-break-end" style={s.miniLabel}>Break end</label>
+                                <label htmlFor="dt-break-end" style={s.miniLabel}>{t.dtBreakEnd}</label>
                                 <input id="dt-break-end" type="time" style={s.timeInput} value={splitBreakForm.breakEnd}
                                   onChange={e => setSplitBreakForm(f => ({ ...f, breakEnd: e.target.value }))} />
                               </div>

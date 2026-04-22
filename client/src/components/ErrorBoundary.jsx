@@ -1,5 +1,18 @@
 import React from 'react';
 import { reportClientError } from '../errorReporter';
+import { getT } from '../i18n';
+
+// ErrorBoundary can't use hooks (class component), and when it renders it's
+// because something inside AuthProvider crashed — so useAuth may be
+// unavailable. Read the user's saved language directly from the auth blob
+// in localStorage, fall back to English.
+function readLang() {
+  try {
+    const raw = localStorage.getItem('tc_user');
+    if (raw) return JSON.parse(raw)?.language || 'English';
+  } catch { /* ignore */ }
+  return 'English';
+}
 
 /**
  * True if the error looks like a stale-build / failed-chunk-load.
@@ -96,6 +109,7 @@ export default class ErrorBoundary extends React.Component {
 
   render() {
     if (!this.state.error) return this.props.children;
+    const t = getT(readLang());
 
     if (this.props.mode === 'inline') {
       return (
@@ -103,13 +117,13 @@ export default class ErrorBoundary extends React.Component {
           <div style={styles.inlineIcon}>⚠️</div>
           <div style={{ flex: 1 }}>
             <div style={styles.inlineTitle}>
-              {this.props.label ? `${this.props.label} crashed` : 'This section crashed'}
+              {this.props.label
+                ? (t.errorSectionLabelCrashed || '{label} crashed').replace('{label}', this.props.label)
+                : t.errorSectionCrashed}
             </div>
-            <div style={styles.inlineMsg}>
-              The rest of the app is still working. Try again, or reload if the problem persists.
-            </div>
+            <div style={styles.inlineMsg}>{t.errorStillWorking}</div>
           </div>
-          <button style={styles.inlineBtn} onClick={this.reset}>Try again</button>
+          <button style={styles.inlineBtn} onClick={this.reset}>{t.errorTryAgain}</button>
         </div>
       );
     }
@@ -119,11 +133,11 @@ export default class ErrorBoundary extends React.Component {
       <div style={styles.wrap}>
         <div style={styles.card}>
           <div style={styles.icon}>⚠️</div>
-          <h2 style={styles.title}>Something went wrong</h2>
-          <p style={styles.msg}>An unexpected error occurred. Try refreshing the page.</p>
-          <button style={styles.btn} onClick={() => window.location.reload()}>Reload page</button>
+          <h2 style={styles.title}>{t.errorSomethingWentWrong}</h2>
+          <p style={styles.msg}>{t.errorUnexpectedTryReload}</p>
+          <button style={styles.btn} onClick={() => window.location.reload()}>{t.errorReloadPage}</button>
           <details style={styles.details}>
-            <summary style={styles.summary}>Error details</summary>
+            <summary style={styles.summary}>{t.errorDetails}</summary>
             <pre style={styles.pre}>{this.state.error.stack || this.state.error.message}</pre>
           </details>
         </div>
