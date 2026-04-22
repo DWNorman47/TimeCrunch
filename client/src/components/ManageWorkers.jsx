@@ -106,19 +106,19 @@ const ds = {
 
 const LANGUAGES = ['English', 'Spanish'];
 
-const WORKER_TYPE_LABELS = {
-  employee: 'Employee (W-2)',
-  contractor: 'Independent Contractor (1099-NEC)',
-  subcontractor: 'Subcontractor (1099-NEC)',
-  owner: 'Owner / Officer',
-};
+const workerTypeLabel = (type, t) => ({
+  employee:      t.mwTypeEmployee,
+  contractor:    t.mwTypeContractor,
+  subcontractor: t.mwTypeSubcontractor,
+  owner:         t.mwTypeOwner,
+}[type] || type);
 
-const PERM_LABELS = [
-  { key: 'approve_entries', label: 'Approve entries' },
-  { key: 'manage_workers', label: 'Manage workers' },
-  { key: 'manage_projects', label: 'Manage projects' },
-  { key: 'view_reports', label: 'View reports' },
-  { key: 'manage_settings', label: 'Manage settings' },
+const permLabels = (t) => [
+  { key: 'approve_entries', label: t.mwPermApproveEntries },
+  { key: 'manage_workers', label: t.mwPermManageWorkers },
+  { key: 'manage_projects', label: t.mwPermManageProjects },
+  { key: 'view_reports', label: t.mwPermViewReports },
+  { key: 'manage_settings', label: t.mwPermManageSettings },
 ];
 
 function fmtRate(w, currency = 'USD') {
@@ -396,7 +396,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const startEditPermissions = w => {
     setEditingId(w.id); setEditSection('permissions');
     const fullAccess = w.admin_permissions == null;
-    const defaultKeys = PERM_LABELS.reduce((acc, { key }) => ({ ...acc, [key]: true }), {});
+    const defaultKeys = permLabels(t).reduce((acc, { key }) => ({ ...acc, [key]: true }), {});
     setEditPermForm({ full_access: fullAccess, keys: fullAccess ? defaultKeys : { ...defaultKeys, ...w.admin_permissions } });
   };
 
@@ -508,7 +508,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   <input id="mw-last-name" name="mw-last-name" autoComplete="off" style={s.input} value={form.last_name} onChange={e => handleLastNameChange(e.target.value)} required />
                 </div>
                 <div style={s.fieldGroup}>
-                  <label htmlFor="mw-username" style={s.label}>Username<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>{usernameChecking ? ' (checking...)' : usernameTaken ? ' ⚠ taken' : ''}</label>
+                  <label htmlFor="mw-username" style={s.label}>{t.username}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>{usernameChecking ? ` ${t.mwChecking}` : usernameTaken ? ` ${t.mwTaken}` : ''}</label>
                   <input
                     id="mw-username"
                     name="mw-new-username"
@@ -699,12 +699,12 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 </select>
                               </div>
                               <div style={s.fieldGroup}>
-                                <label htmlFor="mw-edit-worker-type" style={s.label}>Worker Type</label>
+                                <label htmlFor="mw-edit-worker-type" style={s.label}>{t.mwWorkerType}</label>
                                 <select id="mw-edit-worker-type" style={s.input} value={editInfoForm.worker_type || 'employee'} onChange={e => setEditInfoForm(f => ({ ...f, worker_type: e.target.value }))}>
-                                  <option value="employee">Employee (W-2)</option>
-                                  <option value="contractor">Independent Contractor (1099-NEC)</option>
-                                  <option value="subcontractor">Subcontractor (1099-NEC)</option>
-                                  <option value="owner">Owner / Officer</option>
+                                  <option value="employee">{t.mwTypeEmployee}</option>
+                                  <option value="contractor">{t.mwTypeContractor}</option>
+                                  <option value="subcontractor">{t.mwTypeSubcontractor}</option>
+                                  <option value="owner">{t.mwTypeOwner}</option>
                                 </select>
                               </div>
                               <div style={s.fieldGroup}>
@@ -715,17 +715,17 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               </div>
                               {trackClassifications && (
                                 <div style={s.fieldGroup}>
-                                  <label htmlFor="mw-edit-classification" style={s.label}>Job Classification</label>
+                                  <label htmlFor="mw-edit-classification" style={s.label}>{t.mwJobClassification}</label>
                                   <select
                                     id="mw-edit-classification"
                                     style={s.input}
                                     value={editInfoForm.classification || ''}
                                     onChange={e => setEditInfoForm(f => ({ ...f, classification: e.target.value }))}
                                   >
-                                    <option value="">— None —</option>
+                                    <option value="">{t.mwNoneOption}</option>
                                     {classifications.map(c => <option key={c} value={c}>{c}</option>)}
                                     {editInfoForm.classification && !classifications.includes(editInfoForm.classification) && (
-                                      <option value={editInfoForm.classification}>{editInfoForm.classification} (not in list)</option>
+                                      <option value={editInfoForm.classification}>{editInfoForm.classification} {t.mwNotInList}</option>
                                     )}
                                   </select>
                                 </div>
@@ -739,35 +739,35 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                         ) : (
                           <>
                             <div style={s.infoGrid}>
-                              <span style={s.infoLabel}>Name</span>
+                              <span style={s.infoLabel}>{t.mwName}</span>
                               <span style={s.infoValue}>{w.full_name}</span>
                               {w.invoice_name && <>
-                                <span style={s.infoLabel}>Invoice Name</span>
+                                <span style={s.infoLabel}>{t.mwInvoiceName}</span>
                                 <span style={s.infoValue}>{w.invoice_name}</span>
                               </>}
-                              <span style={s.infoLabel}>Email</span>
+                              <span style={s.infoLabel}>{t.email}</span>
                               <span style={s.infoValue}>{w.email || <em style={{ color: '#6b7280' }}>{t.notSet}</em>}</span>
-                              <span style={s.infoLabel}>Language</span>
+                              <span style={s.infoLabel}>{t.language}</span>
                               <span style={s.infoValue}>{w.language || 'English'}</span>
-                              <span style={s.infoLabel}>Role</span>
+                              <span style={s.infoLabel}>{t.role}</span>
                               <span style={s.infoValue}><RoleBadge role={w.role} /></span>
-                              <span style={s.infoLabel}>Worker Type</span>
-                              <span style={s.infoValue}>{WORKER_TYPE_LABELS[w.worker_type || 'employee']}</span>
+                              <span style={s.infoLabel}>{t.mwWorkerType}</span>
+                              <span style={s.infoValue}>{workerTypeLabel(w.worker_type || 'employee', t)}</span>
                               {trackClassifications && (
                                 <>
-                                  <span style={s.infoLabel}>Classification</span>
+                                  <span style={s.infoLabel}>{t.mwClassification}</span>
                                   <span style={s.infoValue}>{w.classification || <em style={{ color: '#6b7280' }}>{t.notSet}</em>}</span>
                                 </>
                               )}
                             </div>
                             {w.must_change_password && w.email && (
                               <div style={s.inviteBanner}>
-                                <span style={s.inviteBannerText}>Has not signed in yet.</span>
+                                <span style={s.inviteBannerText}>{t.mwHasNotSignedIn}</span>
                                 {invitedIds.has(w.id) ? (
-                                  <span style={s.inviteSentLabel}>Invite sent ✓</span>
+                                  <span style={s.inviteSentLabel}>{t.mwInviteSent}</span>
                                 ) : (
                                   <button style={{ ...s.inviteBtn, ...(inviteSending.has(w.id) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => sendInvite(w.id)} disabled={inviteSending.has(w.id)}>
-                                    {inviteSending.has(w.id) ? 'Sending...' : 'Send invite email'}
+                                    {inviteSending.has(w.id) ? t.mwSendingEllipsis : t.mwSendInviteEmail}
                                   </button>
                                 )}
                               </div>
@@ -789,7 +789,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                         {isEditing && editSection === 'username' ? (
                           <div style={s.editBlock}>
                             <div style={s.fieldGroup}>
-                              <label htmlFor="mw-edit-username" style={s.label}>{t.newUsername}{editUsernameChecking ? ' (checking...)' : editUsernameTaken ? ' ⚠ taken' : ''}</label>
+                              <label htmlFor="mw-edit-username" style={s.label}>{t.newUsername}{editUsernameChecking ? ` ${t.mwChecking}` : editUsernameTaken ? ` ${t.mwTaken}` : ''}</label>
                               <input
                                 id="mw-edit-username"
                                 style={{ ...s.input, borderColor: editUsernameTaken ? '#fca5a5' : undefined, maxWidth: 240 }}
@@ -874,7 +874,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                             </span>
                             {w.guaranteed_weekly_hours != null && parseFloat(w.guaranteed_weekly_hours) > 0 && (
                               <span style={{ ...s.infoValue, marginLeft: 10, fontSize: 12, color: '#2563eb', background: '#dbeafe', padding: '1px 7px', borderRadius: 8 }}>
-                                {parseFloat(w.guaranteed_weekly_hours)}h/wk min
+                                {parseFloat(w.guaranteed_weekly_hours)}{t.mwHwkMin}
                               </span>
                             )}
                           </div>
@@ -888,7 +888,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                         <div style={s.sectionHeader}>
                           <span style={s.sectionTitle}>{t.mwPermissions}</span>
                           {(!isEditing || editSection !== 'permissions') && (
-                            <button style={s.sectionBtn} onClick={() => startEditPermissions(w)}>Edit</button>
+                            <button style={s.sectionBtn} onClick={() => startEditPermissions(w)}>{t.edit}</button>
                           )}
                         </div>
                         {isEditing && editSection === 'permissions' ? (
@@ -903,7 +903,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                             </label>
                             {!editPermForm.full_access && (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 4, marginTop: 4 }}>
-                                {PERM_LABELS.map(({ key, label }) => (
+                                {permLabels(t).map(({ key, label }) => (
                                   <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#374151' }}>
                                     <input
                                       type="checkbox"
@@ -926,10 +926,10 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               ? <span style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>{t.mwFullAccess}</span>
                               : (
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
-                                  {PERM_LABELS.filter(({ key }) => w.admin_permissions[key]).map(({ key, label }) => (
+                                  {permLabels(t).filter(({ key }) => w.admin_permissions[key]).map(({ key, label }) => (
                                     <span key={key} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: '#dbeafe', color: '#1e40af' }}>{label}</span>
                                   ))}
-                                  {PERM_LABELS.every(({ key }) => !w.admin_permissions[key]) && (
+                                  {permLabels(t).every(({ key }) => !w.admin_permissions[key]) && (
                                     <span style={{ fontSize: 13, color: '#6b7280' }}>{t.mwNoPermissions}</span>
                                   )}
                                 </div>
@@ -946,7 +946,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                         <div style={s.sectionHeader}>
                           <span style={s.sectionTitle}>{t.mwWorkerAccess}</span>
                           {(!isEditing || editSection !== 'worker-access') && (
-                            <button style={s.sectionBtn} onClick={() => startEditWorkerAccess(w)}>Edit</button>
+                            <button style={s.sectionBtn} onClick={() => startEditWorkerAccess(w)}>{t.edit}</button>
                           )}
                         </div>
                         {isEditing && editSection === 'worker-access' ? (
@@ -987,7 +987,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                         ) : (
                           <div>
                             {!w.worker_access_ids || w.worker_access_ids.length === 0
-                              ? <span style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>All workers</span>
+                              ? <span style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>{t.mwAllWorkers}</span>
                               : (
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
                                   {w.worker_access_ids.map(id => {
@@ -1049,7 +1049,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 <div style={s.emptyState}>
                   <div style={s.emptyStateIcon}>🗑️</div>
                   <p style={s.emptyStateTitle}>{t.noRemovedUsers}</p>
-                  <p style={s.emptyStateSubtitle}>Removed workers will appear here.</p>
+                  <p style={s.emptyStateSubtitle}>{t.mwRemovedWorkersHere}</p>
                 </div>
               )
               : archived.map(w => (
@@ -1075,25 +1075,24 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
             titleId="mw-qbo-vendor-title"
             style={s.qboPromptModal}
           >
-            <div id="mw-qbo-vendor-title" style={s.qboPromptTitle}>Create QuickBooks Vendor?</div>
+            <div id="mw-qbo-vendor-title" style={s.qboPromptTitle}>{t.mwQboVendorTitle}</div>
             <p style={s.qboPromptBody}>
-              <strong>{qboVendorPrompt.display_name}</strong> was added as a contractor.
-              Would you like to create them as a Vendor in QuickBooks Online so they can be mapped for expense tracking?
+              <strong>{qboVendorPrompt.display_name}</strong>{t.mwQboVendorBodyPrefix}
             </p>
             {qboVendorResult === 'ok' && (
-              <div style={s.qboPromptSuccess}>Vendor created successfully in QuickBooks.</div>
+              <div style={s.qboPromptSuccess}>{t.mwQboVendorCreated}</div>
             )}
             {qboVendorResult === 'error' && (
-              <div style={s.qboPromptError}>Failed to create vendor in QuickBooks. You can set the mapping manually in QBO settings.</div>
+              <div style={s.qboPromptError}>{t.mwQboVendorFailed}</div>
             )}
             <div style={s.qboPromptActions}>
               {!qboVendorResult && (
                 <button style={{ ...s.saveBtn, ...(qboVendorCreating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={createQboVendor} disabled={qboVendorCreating}>
-                  {qboVendorCreating ? 'Creating…' : 'Yes, Create Vendor'}
+                  {qboVendorCreating ? t.mwQboCreating : t.mwQboYesCreate}
                 </button>
               )}
               <button style={s.cancelBtn} onClick={() => { setQboVendorPrompt(null); setQboVendorResult(null); }}>
-                {qboVendorResult ? 'Close' : 'Skip'}
+                {qboVendorResult ? t.mwQboClose : t.mwQboSkip}
               </button>
             </div>
           </ModalShell>
