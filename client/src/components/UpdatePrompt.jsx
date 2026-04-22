@@ -7,8 +7,10 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useT } from '../hooks/useT';
 
 export default function UpdatePrompt() {
+  const t = useT();
   const [updateReady, setUpdateReady] = useState(false);
 
   useEffect(() => {
@@ -61,15 +63,15 @@ export default function UpdatePrompt() {
     <div style={styles.banner} role="status" aria-live="polite">
       <span style={styles.message}>
         <span style={styles.dot} aria-hidden="true" />
-        A new version of OpsFloa is ready.
+        {t.updateReady}
       </span>
       <a href="/changelog" target="_blank" rel="noopener noreferrer" style={styles.whatsNew}>
-        What's new
+        {t.updateWhatsNew}
       </a>
       <button type="button" style={styles.reloadBtn} onClick={reload}>
-        Reload
+        {t.updateReload}
       </button>
-      <button type="button" style={styles.dismissBtn} onClick={() => setUpdateReady(false)} aria-label="Dismiss">
+      <button type="button" style={styles.dismissBtn} onClick={() => setUpdateReady(false)} aria-label={t.updateDismissAria}>
         ✕
       </button>
     </div>

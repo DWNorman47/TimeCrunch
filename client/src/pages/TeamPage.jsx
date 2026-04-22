@@ -23,18 +23,23 @@ function TabLoader() {
   return <div style={{ padding: '40px 0', textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading…</div>;
 }
 
-const ROLE_LABELS = {
-  worker:      { label: 'Worker',      bg: '#e0e7ff', fg: '#3730a3' },
-  admin:       { label: 'Admin',       bg: '#fef3c7', fg: '#92400e' },
-  super_admin: { label: 'Super Admin', bg: '#fee2e2', fg: '#991b1b' },
+const ROLE_META = {
+  worker:      { bg: '#e0e7ff', fg: '#3730a3' },
+  admin:       { bg: '#fef3c7', fg: '#92400e' },
+  super_admin: { bg: '#fee2e2', fg: '#991b1b' },
 };
+const roleLabel = (role, t) => ({
+  worker:      t.workerRole,
+  admin:       t.adminRole,
+  super_admin: t.superAdminRole,
+}[role] || role);
 
-const WORKER_TYPE_LABELS = {
-  employee:      'Employee',
-  contractor:    'Contractor',
-  subcontractor: 'Subcontractor',
-  owner:         'Owner',
-};
+const workerTypeLabel = (type, t) => ({
+  employee:      t.workerTypeEmployee,
+  contractor:    t.workerTypeContractor,
+  subcontractor: t.workerTypeSubcontractor,
+  owner:         t.workerTypeOwner,
+}[type] || type);
 
 function initials(name) {
   if (!name) return '?';
@@ -44,7 +49,7 @@ function initials(name) {
   return (first + last).toUpperCase();
 }
 
-function DirectoryView({ team, loading, search, onSearchChange }) {
+function DirectoryView({ team, loading, search, onSearchChange, t }) {
   const lower = search.trim().toLowerCase();
   const filtered = lower
     ? team.filter(m =>
@@ -61,37 +66,37 @@ function DirectoryView({ team, loading, search, onSearchChange }) {
       <div style={s.searchRow}>
         <input
           type="search"
-          placeholder="Search by name, username, or classification…"
+          placeholder={t.teamSearchPlaceholder}
           value={search}
           onChange={e => onSearchChange(e.target.value)}
           style={s.search}
-          aria-label="Search team directory"
+          aria-label={t.teamSearchAria}
         />
         <span style={s.counter}>
-          {filtered.length} {filtered.length === 1 ? 'person' : 'people'}
-          {lower && filtered.length !== team.length && ` of ${team.length}`}
+          {filtered.length} {filtered.length === 1 ? t.teamPersonSingular : t.teamPersonPlural}
+          {lower && filtered.length !== team.length && ` ${t.teamOfWord} ${team.length}`}
         </span>
       </div>
       {filtered.length === 0 ? (
         <div style={s.empty}>
-          {lower ? 'No matches.' : 'No team members yet.'}
+          {lower ? t.teamNoMatches : t.teamNoMembers}
         </div>
       ) : (
         <div style={s.grid}>
           {filtered.map(m => {
-            const role = ROLE_LABELS[m.role] || ROLE_LABELS.worker;
+            const role = ROLE_META[m.role] || ROLE_META.worker;
             return (
               <div key={m.id} style={s.card}>
                 <div style={s.avatar}>{initials(m.full_name)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={s.name}>
                     {m.full_name}
-                    {m.must_change_password && <span style={s.pendingPill} title="Hasn't signed in yet">pending</span>}
+                    {m.must_change_password && <span style={s.pendingPill} title={t.teamNotSignedInYet}>{t.teamPendingBadge}</span>}
                   </div>
                   <div style={s.meta}>
-                    <span style={{ ...s.rolePill, background: role.bg, color: role.fg }}>{role.label}</span>
+                    <span style={{ ...s.rolePill, background: role.bg, color: role.fg }}>{roleLabel(m.role, t)}</span>
                     {m.worker_type && m.role === 'worker' && (
-                      <span style={s.typePill}>{WORKER_TYPE_LABELS[m.worker_type] || m.worker_type}</span>
+                      <span style={s.typePill}>{workerTypeLabel(m.worker_type, t)}</span>
                     )}
                     {m.classification && <span style={s.classPill}>{m.classification}</span>}
                   </div>
@@ -183,15 +188,15 @@ export default function TeamPage() {
             active={teamTab}
             onChange={switchTab}
             tabs={[
-              { id: 'directory', label: 'Directory' },
-              { id: 'manage',    label: 'Manage' },
+              { id: 'directory', label: t.teamDirectoryTab },
+              { id: 'manage',    label: t.teamManageTab },
             ]}
           />
         )}
 
-        <ErrorBoundary key={teamTab} mode="inline" label={teamTab === 'manage' ? 'Team · Manage' : 'Team · Directory'}>
+        <ErrorBoundary key={teamTab} mode="inline" label={teamTab === 'manage' ? `${t.teamManageTab}` : `${t.teamDirectoryTab}`}>
           {teamTab === 'directory' && (
-            <DirectoryView team={team} loading={teamLoading} search={search} onSearchChange={setSearch} />
+            <DirectoryView team={team} loading={teamLoading} search={search} onSearchChange={setSearch} t={t} />
           )}
           {teamTab === 'manage' && isAdmin && (
             <>
