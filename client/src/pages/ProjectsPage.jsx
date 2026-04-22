@@ -16,6 +16,7 @@ function punchColor(status) {
 // ── Project Card ──────────────────────────────────────────────────────────────
 
 function ProjectCard({ project, metrics, settings, onClick }) {
+  const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
   const m = metrics || {};
