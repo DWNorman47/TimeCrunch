@@ -188,7 +188,7 @@ export default function ReimbursementsView() {
                 </button>
               )}
               {receiptPreview && !noReceipt && receiptPreview.startsWith('data:image') && (
-                <img src={receiptPreview} alt="Receipt preview" style={s.preview} />
+                <img src={receiptPreview} alt={t.receiptPreviewAlt} style={s.preview} />
               )}
               {receiptPreview && !noReceipt && receiptPreview.startsWith('data:application/pdf') && (
                 <div style={s.pdfHint}>{t.pdfAttached}</div>

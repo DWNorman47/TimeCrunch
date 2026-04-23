@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useT } from '../hooks/useT';
 
 const ENTRIES = [
   {
@@ -36,11 +37,12 @@ const ENTRIES = [
 ];
 
 export default function Changelog() {
+  const t = useT();
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <Link to="/" style={styles.back}>← Back</Link>
-        <h1 style={styles.title}>What's new</h1>
+        <Link to="/" style={styles.back}>{t.changelogBack}</Link>
+        <h1 style={styles.title}>{t.changelogTitle}</h1>
         {ENTRIES.map(entry => (
           <section key={entry.version} style={styles.entry}>
             <header style={styles.entryHeader}>
@@ -53,7 +55,7 @@ export default function Changelog() {
           </section>
         ))}
         <p style={styles.footer}>
-          Have feedback? Email <a href="mailto:support@opsfloa.com" style={styles.link}>support@opsfloa.com</a>.
+          {t.changelogFeedback} <a href="mailto:support@opsfloa.com" style={styles.link}>support@opsfloa.com</a>.
         </p>
       </div>
     </div>

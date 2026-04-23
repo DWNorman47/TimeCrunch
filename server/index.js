@@ -149,11 +149,14 @@ app.get('/api/settings', requireAuth, async (req, res) => {
     const resolvedPlan = plan || 'free';
     const resolvedStatus = subscription_status || 'trial';
 
-    // Exempt companies get all features enabled regardless of stored settings
+    // Exempt companies get all plan-gated features enabled regardless of
+    // stored settings. module_* flags are admin-controlled visibility toggles,
+    // not plan-gated, so we don't override those — otherwise turning a module
+    // off in admin settings has no effect for exempt companies.
     const featureOverrides = resolvedStatus === 'exempt'
       ? Object.fromEntries(
           Object.keys(settings)
-            .filter(k => k.startsWith('module_') || k.startsWith('feature_'))
+            .filter(k => k.startsWith('feature_'))
             .map(k => [k, true])
         )
       : {};

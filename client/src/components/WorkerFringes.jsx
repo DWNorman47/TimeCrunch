@@ -10,17 +10,20 @@
 
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useT } from '../hooks/useT';
 import { silentError } from '../errorReporter';
 
-const CATEGORIES = [
-  { key: 'health',         label: 'Health & Welfare' },
-  { key: 'pension',        label: 'Pension' },
-  { key: 'vacation',       label: 'Vacation / Holiday' },
-  { key: 'apprenticeship', label: 'Apprenticeship / Training' },
-  { key: 'other',          label: 'Other Fringes' },
-];
+const CATEGORY_KEYS = ['health', 'pension', 'vacation', 'apprenticeship', 'other'];
 
 export default function WorkerFringes({ userId, currency = 'USD' }) {
+  const t = useT();
+  const CATEGORIES = [
+    { key: 'health',         label: t.wfHealth },
+    { key: 'pension',        label: t.wfPension },
+    { key: 'vacation',       label: t.wfVacation },
+    { key: 'apprenticeship', label: t.wfApprenticeship },
+    { key: 'other',          label: t.wfOther },
+  ];
   const [rates, setRates] = useState({ health: '', pension: '', vacation: '', apprenticeship: '', other: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,7 +52,7 @@ export default function WorkerFringes({ userId, currency = 'USD' }) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save fringes');
+      setError(err.response?.data?.error || t.wfSaveError);
     } finally {
       setSaving(false);
     }
@@ -58,18 +61,15 @@ export default function WorkerFringes({ userId, currency = 'USD' }) {
   const sym = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : currency + ' ';
   const total = CATEGORIES.reduce((s, c) => s + (parseFloat(rates[c.key]) || 0), 0);
 
-  if (loading) return <div style={styles.loading}>Loading fringes…</div>;
+  if (loading) return <div style={styles.loading}>{t.wfLoading}</div>;
 
   return (
     <div style={styles.wrap}>
       <div style={styles.headerRow}>
-        <span style={styles.title}>Fringe Benefits (per hour)</span>
-        <span style={styles.total}>Total: {sym}{total.toFixed(4)}/hr</span>
+        <span style={styles.title}>{t.wfTitle}</span>
+        <span style={styles.total}>{t.wfTotal}: {sym}{total.toFixed(4)}/hr</span>
       </div>
-      <p style={styles.hint}>
-        Enter each fringe category as a dollar amount paid per hour worked. Leave blank or 0 if not applicable.
-        Used on WH-347 Certified Payroll reports.
-      </p>
+      <p style={styles.hint}>{t.wfHint}</p>
       <div style={styles.grid}>
         {CATEGORIES.map(c => (
           <div key={c.key} style={styles.field}>
@@ -92,14 +92,14 @@ export default function WorkerFringes({ userId, currency = 'USD' }) {
       </div>
       {error && <div role="alert" style={styles.error}>{error}</div>}
       <div style={styles.actions}>
-        {saved && <span style={styles.savedMsg}>✓ Saved</span>}
+        {saved && <span style={styles.savedMsg}>{t.wfSaved}</span>}
         <button
           type="button"
           style={{ ...styles.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
           onClick={save}
           disabled={saving}
         >
-          {saving ? 'Saving…' : 'Save fringes'}
+          {saving ? t.wfSaving : t.wfSaveBtn}
         </button>
       </div>
     </div>

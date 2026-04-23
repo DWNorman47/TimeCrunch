@@ -95,9 +95,9 @@ export default function InstallPrompt() {
         <>
           <div style={styles.heading}>{t.installOpsFloa}</div>
           <div style={styles.steps}>
-            <Step n={1}>Tap the <strong>Share</strong> button <ShareIcon /> at the bottom of Safari</Step>
-            <Step n={2}>Scroll down and tap <strong>"Add to Home Screen"</strong></Step>
-            <Step n={3}>Tap <strong>"Add"</strong> in the top right — done!</Step>
+            <Step n={1}>{t.installIosStep1} <ShareIcon /></Step>
+            <Step n={2}>{t.installIosStep2}</Step>
+            <Step n={3}>{t.installIosStep3}</Step>
           </div>
           <div style={styles.note}>{t.installNativeAppNote}</div>
         </>
@@ -107,7 +107,7 @@ export default function InstallPrompt() {
         <>
           <div style={styles.heading}>{t.installOpenSafariHeading}</div>
           <div style={styles.body}>
-            iPhone only supports installing apps from <strong>Safari</strong>. Copy this URL, open Safari, paste it, then tap Share <ShareIcon /> → <strong>Add to Home Screen</strong>.
+            {t.installOpenSafariBodyBefore} <ShareIcon /> {t.installOpenSafariBodyAfter}
           </div>
         </>
       )}
@@ -125,9 +125,9 @@ export default function InstallPrompt() {
           ) : (
             <>
               <div style={styles.steps}>
-                <Step n={1}>Tap the <strong>⋮ menu</strong> in the top-right of Chrome</Step>
-                <Step n={2}>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong></Step>
-                <Step n={3}>Tap <strong>"Add"</strong> — done!</Step>
+                <Step n={1}>{t.installAndroidStep1}</Step>
+                <Step n={2}>{t.installAndroidStep2}</Step>
+                <Step n={3}>{t.installAndroidStep3}</Step>
               </div>
               <div style={styles.note}>{t.installNativeAppNote}</div>
             </>

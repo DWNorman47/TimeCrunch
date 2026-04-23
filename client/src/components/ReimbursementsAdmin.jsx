@@ -306,29 +306,29 @@ export default function ReimbursementsAdmin() {
       <div style={s.filterBar}>
         <input
           type="text"
-          placeholder="Search worker, description, project…"
+          placeholder={t.raSearchPlaceholder}
           value={filterSearch}
           onChange={e => setFilterSearch(e.target.value)}
           style={{ ...s.filterInput, flex: '2 1 220px' }}
-          aria-label="Search expenses"
+          aria-label={t.raSearchAria}
         />
-        <select style={s.filterInput} value={filterWorker} onChange={e => setFilterWorker(e.target.value)} aria-label="Filter by worker">
-          <option value="">All workers</option>
+        <select style={s.filterInput} value={filterWorker} onChange={e => setFilterWorker(e.target.value)} aria-label={t.raFilterWorkerAria}>
+          <option value="">{t.raAllWorkers}</option>
           {workersInList.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
         </select>
-        <select style={s.filterInput} value={filterCategory} onChange={e => setFilterCategory(e.target.value)} aria-label="Filter by category">
-          <option value="">All categories</option>
+        <select style={s.filterInput} value={filterCategory} onChange={e => setFilterCategory(e.target.value)} aria-label={t.raFilterCategoryAria}>
+          <option value="">{t.raAllCategories}</option>
           {categoriesInList.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         {projectsInList.length > 0 && (
-          <select style={s.filterInput} value={filterProject} onChange={e => setFilterProject(e.target.value)} aria-label="Filter by project">
-            <option value="">All projects</option>
+          <select style={s.filterInput} value={filterProject} onChange={e => setFilterProject(e.target.value)} aria-label={t.raFilterProjectAria}>
+            <option value="">{t.raAllProjects}</option>
             {projectsInList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
-        <input type="date" style={s.filterInput} value={filterFrom} onChange={e => setFilterFrom(e.target.value)} aria-label="From date" />
-        <input type="date" style={s.filterInput} value={filterTo} onChange={e => setFilterTo(e.target.value)} aria-label="To date" />
-        <select style={s.filterInput} value={sortBy} onChange={e => setSortBy(e.target.value)} aria-label="Sort by">
+        <input type="date" style={s.filterInput} value={filterFrom} onChange={e => setFilterFrom(e.target.value)} aria-label={t.raFromDateAria} />
+        <input type="date" style={s.filterInput} value={filterTo} onChange={e => setFilterTo(e.target.value)} aria-label={t.raToDateAria} />
+        <select style={s.filterInput} value={sortBy} onChange={e => setSortBy(e.target.value)} aria-label={t.raSortByAria}>
           <option value="date_desc">Date ↓ (newest)</option>
           <option value="date_asc">Date ↑ (oldest)</option>
           <option value="amount_desc">Amount ↓</option>

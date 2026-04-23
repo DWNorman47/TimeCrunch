@@ -7,6 +7,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
 import { silentError } from '../errorReporter';
 
 const STATUS_FILTERS = [
@@ -19,6 +20,7 @@ const STATUS_FILTERS = [
 ];
 
 export default function ServiceRequestsAdmin() {
+  const t = useT();
   const { user, updateUser } = useAuth();
   const [accepting, setAccepting] = useState(!!user?.accepts_service_requests);
   const [savingToggle, setSavingToggle] = useState(false);
@@ -42,7 +44,7 @@ export default function ServiceRequestsAdmin() {
     setLoading(true); setError('');
     api.get(`/admin/service-requests?status=${filter}`)
       .then(r => setRequests(r.data.requests || []))
-      .catch(() => setError('Failed to load requests.'))
+      .catch(() => setError(t.srFailedToLoad))
       .finally(() => setLoading(false));
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
@@ -93,7 +95,7 @@ export default function ServiceRequestsAdmin() {
   };
 
   const convert = async (req) => {
-    const projectName = window.prompt('Project name:', `Request from ${req.requester_name}`);
+    const projectName = window.prompt(t.srProjectNamePrompt, `${t.srProjectFromRequest || 'Request from'} ${req.requester_name}`);
     if (!projectName) return;
     setConvertingId(req.id);
     try {
@@ -111,7 +113,7 @@ export default function ServiceRequestsAdmin() {
       {/* Public URL + accepting toggle */}
       <div style={s.settingsCard}>
         <div style={{ flex: 1 }}>
-          <div style={s.settingsLabel}>Public intake form</div>
+          <div style={s.settingsLabel}>{t.srPublicIntakeForm}</div>
           {publicUrl ? (
             <div style={s.urlRow}>
               <code style={s.url}>{publicUrl}</code>
@@ -144,7 +146,7 @@ export default function ServiceRequestsAdmin() {
         <div style={s.recipientsCard}>
           <div style={s.recipientsHeader}>
             <div>
-              <div style={s.recipientsTitle}>Notification recipients</div>
+              <div style={s.recipientsTitle}>{t.srNotificationRecipients}</div>
               <div style={s.recipientsHint}>Admins listed here receive an email + Inbox item for every new request.</div>
             </div>
             <div style={s.recipientsCount}>
@@ -220,21 +222,21 @@ export default function ServiceRequestsAdmin() {
                       </div>
                     )}
                     <div style={s.notesBlock}>
-                      <label style={s.notesLabel}>Internal notes</label>
+                      <label style={s.notesLabel}>{t.srInternalNotes}</label>
                       <textarea
                         style={s.notesInput}
                         rows={2}
                         value={notesDraft[r.id] ?? r.admin_notes ?? ''}
                         onChange={e => setNotesDraft(d => ({ ...d, [r.id]: e.target.value }))}
-                        placeholder="Private — only visible to admins"
+                        placeholder={t.srAdminPrivateNotePlaceholder}
                       />
-                      <button onClick={() => saveNotes(r.id)} style={s.smallBtn}>Save notes</button>
+                      <button onClick={() => saveNotes(r.id)} style={s.smallBtn}>{t.srSaveNotes}</button>
                     </div>
                     <div style={s.actions}>
                       {r.status !== 'converted' && (
                         <>
                           {r.status === 'new' && (
-                            <button onClick={() => updateStatus(r.id, 'in_review')} style={s.reviewBtn}>Mark in review</button>
+                            <button onClick={() => updateStatus(r.id, 'in_review')} style={s.reviewBtn}>{t.srMarkInReview}</button>
                           )}
                           <button
                             onClick={() => convert(r)}

@@ -16,6 +16,7 @@ function punchColor(status) {
 // ── Project Card ──────────────────────────────────────────────────────────────
 
 function ProjectCard({ project, metrics, settings, onClick }) {
+  const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
   const m = metrics || {};
@@ -61,12 +62,12 @@ function ProjectCard({ project, metrics, settings, onClick }) {
       <div style={styles.statsRow}>
         <div style={styles.statItem}>
           <div style={styles.statValue}>{fmtHours(totalHours)}</div>
-          <div style={styles.statLabel}>Total hours</div>
+          <div style={styles.statLabel}>{t.ppTotalHoursStat}</div>
         </div>
         {budgetHours > 0 && (
           <div style={styles.statItem}>
             <div style={{ ...styles.statValue, color: hourColor }}>{fmtHours(budgetHours)}</div>
-            <div style={styles.statLabel}>Budget hours</div>
+            <div style={styles.statLabel}>{t.ppBudgetHoursStat}</div>
           </div>
         )}
         {m.overtime_hours > 0 && (
@@ -495,7 +496,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
               {/* Project metadata */}
               {(project.client_name || project.job_number || project.address || project.start_date || project.end_date || project.description || (project.status && project.status !== 'in_progress')) && (
                 <div style={{ ...styles.budgetSection, marginBottom: 16 }}>
-                  <div style={styles.sectionTitle}>Project Info</div>
+                  <div style={styles.sectionTitle}>{t.mpProjectInfo}</div>
                   {project.status && (() => {
                     const statusColors = { planning: '#dbeafe|#1d4ed8', in_progress: '#d1fae5|#065f46', on_hold: '#fef3c7|#92400e', completed: '#e5e7eb|#374151' };
                     const [bg, fg] = (statusColors[project.status] || '#f3f4f6|#6b7280').split('|');
@@ -506,7 +507,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   {project.job_number && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Job #</span><span style={styles.budgetValue}>{project.job_number}</span></div>}
                   {project.address && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Address</span><span style={{ ...styles.budgetValue, textAlign: 'right', maxWidth: 220 }}>{project.address}</span></div>}
                   {project.start_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Start</span><span style={styles.budgetValue}>{new Date(project.start_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
-                  {project.end_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Target End</span><span style={styles.budgetValue}>{new Date(project.end_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
+                  {project.end_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>{t.ppTargetEnd}</span><span style={styles.budgetValue}>{new Date(project.end_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
                   {project.description && <p style={{ fontSize: 13, color: '#374151', margin: '8px 0 0', lineHeight: 1.5 }}>{project.description}</p>}
                 </div>
               )}
@@ -514,17 +515,17 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
               <div style={styles.metricsGrid}>
                 <div style={styles.metricCard}>
                   <div style={styles.metricValue}>{fmtHours(m.total_hours)}</div>
-                  <div style={styles.metricLabel}>Total Hours</div>
+                  <div style={styles.metricLabel}>{t.ppTotalHours}</div>
                 </div>
                 <div style={styles.metricCard}>
                   <div style={styles.metricValue}>{fmtHours(m.regular_hours)}</div>
-                  <div style={styles.metricLabel}>Regular Hours</div>
+                  <div style={styles.metricLabel}>{t.ppRegularHours}</div>
                 </div>
                 <div style={styles.metricCard}>
                   <div style={{ ...styles.metricValue, color: parseFloat(m.overtime_hours) > 0 ? '#f59e0b' : '#111827' }}>
                     {fmtHours(m.overtime_hours)}
                   </div>
-                  <div style={styles.metricLabel}>Overtime Hours</div>
+                  <div style={styles.metricLabel}>{t.ppOvertimeHours}</div>
                 </div>
                 <div style={styles.metricCard}>
                   <div style={styles.metricValue}>{parseInt(m.worker_count || 0)}</div>
@@ -582,7 +583,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 {punchOpen && (
                   <div>
                     {punchLoaded && punch.length === 0 && !punchFormOpen && (
-                      <p style={{ fontSize: 12, color: '#6b7280', margin: '8px 0 6px' }}>No punchlist items.</p>
+                      <p style={{ fontSize: 12, color: '#6b7280', margin: '8px 0 6px' }}>{t.ppNoPunchlist}</p>
                     )}
                     {punch.length > 0 && (
                       <div style={{ ...styles.activityList, marginBottom: 8 }}>
@@ -614,7 +615,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                         <input
                           style={styles.rfiInput}
                           type="text"
-                          placeholder="Title *"
+                          placeholder={t.ppPunchTitlePlaceholder}
                           value={punchForm.title}
                           onChange={e => setPunchForm(f => ({ ...f, title: e.target.value }))}
                           required
@@ -622,7 +623,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                         <input
                           style={styles.rfiInput}
                           type="text"
-                          placeholder="Location"
+                          placeholder={t.ppPunchLocationPlaceholder}
                           value={punchForm.location}
                           onChange={e => setPunchForm(f => ({ ...f, location: e.target.value }))}
                         />
@@ -637,7 +638,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                         </select>
                         <textarea
                           style={{ ...styles.rfiInput, resize: 'vertical', minHeight: 56, fontFamily: 'inherit' }}
-                          placeholder="Description"
+                          placeholder={t.ppPunchDescPlaceholder}
                           value={punchForm.description}
                           onChange={e => setPunchForm(f => ({ ...f, description: e.target.value }))}
                         />
@@ -719,7 +720,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   })()}
                   {project.budget_dollars > 0 && !health && (
                     <div style={styles.budgetRow}>
-                      <span style={styles.budgetLabel}>Dollar Budget</span>
+                      <span style={styles.budgetLabel}>{t.ppDollarBudget}</span>
                       <span style={styles.budgetValue}>{fmtMoney(project.budget_dollars)}</span>
                     </div>
                   )}
@@ -834,7 +835,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 {docsOpen && (
                   <div style={{ marginTop: 6 }}>
                     {docsLoaded && docs.length === 0 && !uploading && (
-                      <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 8px' }}>No documents yet.</p>
+                      <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 8px' }}>{t.ppNoDocuments}</p>
                     )}
                     {docs.map(doc => (
                       <div key={doc.id} style={styles.docRow}>
@@ -909,7 +910,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                         <input
                           style={styles.rfiInput}
                           type="text"
-                          placeholder="Subject *"
+                          placeholder={t.ppRfiSubjectPlaceholder}
                           value={rfiForm.subject}
                           onChange={e => setRfiForm(f => ({ ...f, subject: e.target.value }))}
                           required
@@ -917,20 +918,20 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                         <input
                           style={styles.rfiInput}
                           type="text"
-                          placeholder="Directed to"
+                          placeholder={t.ppRfiDirectedPlaceholder}
                           value={rfiForm.directed_to}
                           onChange={e => setRfiForm(f => ({ ...f, directed_to: e.target.value }))}
                         />
                         <input
                           style={styles.rfiInput}
                           type="date"
-                          title="Due date"
+                          title={t.ppRfiDueDateTitle}
                           value={rfiForm.date_due}
                           onChange={e => setRfiForm(f => ({ ...f, date_due: e.target.value }))}
                         />
                         <textarea
                           style={{ ...styles.rfiInput, resize: 'vertical', minHeight: 60, fontFamily: 'inherit' }}
-                          placeholder="Description"
+                          placeholder={t.ppPunchDescPlaceholder}
                           value={rfiForm.description}
                           onChange={e => setRfiForm(f => ({ ...f, description: e.target.value }))}
                         />
@@ -991,18 +992,18 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                   <div style={styles.metricsGrid}>
                     <div style={styles.metricCard}>
                       <div style={styles.metricValue}>{parseFloat(billData.summary.total_hours).toFixed(1)}h</div>
-                      <div style={styles.metricLabel}>Total Hours</div>
+                      <div style={styles.metricLabel}>{t.ppTotalHours}</div>
                     </div>
                     <div style={styles.metricCard}>
                       <div style={{ ...styles.metricValue, color: '#1a56db' }}>
                         {fmtMoney(billData.summary.total_cost)}
                       </div>
-                      <div style={styles.metricLabel}>Total Cost</div>
+                      <div style={styles.metricLabel}>{t.ppTotalCost}</div>
                     </div>
                   </div>
 
                   <div style={styles.budgetSection}>
-                    <div style={styles.sectionTitle}>Cost Breakdown</div>
+                    <div style={styles.sectionTitle}>{t.ppCostBreakdown}</div>
                     {billData.summary.regular_hours > 0 && (
                       <div style={styles.budgetRow}>
                         <span style={styles.budgetLabel}>Regular ({parseFloat(billData.summary.regular_hours).toFixed(1)}h)</span>
@@ -1022,7 +1023,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                       </div>
                     )}
                     <div style={{ ...styles.budgetRow, borderTop: '1px solid #e5e7eb', marginTop: 6, paddingTop: 8 }}>
-                      <span style={{ ...styles.budgetLabel, fontWeight: 700, color: '#111827' }}>Total Due</span>
+                      <span style={{ ...styles.budgetLabel, fontWeight: 700, color: '#111827' }}>{t.ppTotalDue}</span>
                       <span style={{ ...styles.budgetValue, fontSize: 16, color: '#111827' }}>{fmtMoney(billData.summary.total_cost)}</span>
                     </div>
                   </div>
@@ -1040,7 +1041,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 
                   {showQboPicker && qboItems !== null && (
                     <div style={styles.qboPicker}>
-                      <div style={styles.qboPickerLabel}>Select QuickBooks service item:</div>
+                      <div style={styles.qboPickerLabel}>{t.ppQboServiceLabel}</div>
                       {qboItems.length === 0 ? (
                         <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>{t.noQboServiceItems}</p>
                       ) : (
@@ -1099,7 +1100,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
               )}
 
               {!billData && !billLoading && (
-                <p style={styles.emptyText}>Set a date range and click Generate to see billing.</p>
+                <p style={styles.emptyText}>{t.ppSetDateRangeHint}</p>
               )}
             </div>
           )}
@@ -1108,7 +1109,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
             <>
             <RetryBanner message={entriesError} onRetry={() => { setEntriesError(null); setEntriesLoading(true); api.get(`/admin/projects/${project.id}/entries`).then(r => setEntries(r.data.entries || [])).catch(err => { setEntriesError(t.failedLoadEntries || 'Failed to load entries'); silentError('project entries retry')(err); }).finally(() => setEntriesLoading(false)); }} />
             {entriesLoading ? <p style={styles.loadingText}>Loading…</p> :
-            entries.length === 0 ? <p style={styles.emptyText}>No time entries for this project.</p> :
+            entries.length === 0 ? <p style={styles.emptyText}>{t.ppNoTimeEntries}</p> :
             <div style={styles.entriesTable}>
               <div style={styles.tableHeader}>
                 <span style={styles.thDate}>Date</span>
@@ -1227,6 +1228,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 // default; header is clickable. Empty selection = visible to everyone.
 
 function ProjectVisibility({ project, onProjectUpdated, toggleStyle, countStyle }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [workers, setWorkers] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1305,12 +1307,12 @@ function ProjectVisibility({ project, onProjectUpdated, toggleStyle, countStyle 
             Choose which workers see this project in their Time Clock dropdown. Leave empty to make it visible to
             everyone. Admins always see every project regardless of this setting.
           </p>
-          {loading && <p style={{ fontSize: 13, color: '#6b7280' }}>Loading workers…</p>}
-          {workers && workers.length === 0 && <p style={{ fontSize: 13, color: '#6b7280' }}>No workers in the company yet.</p>}
+          {loading && <p style={{ fontSize: 13, color: '#6b7280' }}>{t.ppLoadingWorkers}</p>}
+          {workers && workers.length === 0 && <p style={{ fontSize: 13, color: '#6b7280' }}>{t.ppNoWorkersYet}</p>}
           {workers && workers.length > 0 && (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-                <button type="button" style={pvStyles.linkBtn} onClick={selectAll}>Select all</button>
+                <button type="button" style={pvStyles.linkBtn} onClick={selectAll}>{t.ppSelectAllBtn}</button>
                 <button type="button" style={pvStyles.linkBtn} onClick={clearAll}>Clear (visible to all)</button>
                 <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 'auto' }}>{selected.size} / {workers.length} selected</span>
               </div>
@@ -1588,12 +1590,12 @@ export default function ProjectsPage() {
                   <div style={styles.viewToggle}>
                     <button
                       style={{ ...styles.viewToggleBtn, ...(viewMode === 'grid' ? styles.viewToggleBtnActive : {}) }}
-                      title="Grid view"
+                      title={t.ppGridViewTitle}
                       onClick={() => { setViewMode('grid'); localStorage.setItem('opsfloa_projects_view', 'grid'); }}
                     >⊞</button>
                     <button
                       style={{ ...styles.viewToggleBtn, ...(viewMode === 'list' ? styles.viewToggleBtnActive : {}) }}
-                      title="List view"
+                      title={t.ppListViewTitle}
                       onClick={() => { setViewMode('list'); localStorage.setItem('opsfloa_projects_view', 'list'); }}
                     >☰</button>
                   </div>
@@ -1628,12 +1630,12 @@ export default function ProjectsPage() {
             ) : loadError ? (
               <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '16px 20px', color: '#991b1b', fontSize: 14 }}>
                 Failed to load projects.{' '}
-                <button style={{ background: 'none', border: 'none', color: '#1a56db', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: 0 }} onClick={() => { setLoadError(false); loadProjects(showArchived); }}>Try again</button>
+                <button style={{ background: 'none', border: 'none', color: '#1a56db', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: 0 }} onClick={() => { setLoadError(false); loadProjects(showArchived); }}>{t.ppTryAgainLink}</button>
               </div>
             ) : projects.length === 0 ? (
               <div style={styles.empty}>
                 <div style={styles.emptyIcon}>📁</div>
-                <p style={styles.emptyText}>No projects yet. Click "+ New Project" to get started.</p>
+                <p style={styles.emptyText}>{t.ppNoProjectsYet}</p>
               </div>
             ) : viewMode === 'grid' ? (
               <div style={styles.grid}>

@@ -55,13 +55,17 @@ export function OfflineProvider({ children }) {
         if (count > 0) {
           addToast(`${count} offline entr${count === 1 ? 'y' : 'ies'} synced`, 'success');
         }
-        listenersRef.current.forEach(fn => fn(count));
+        listenersRef.current.forEach(fn => fn(count ?? 0));
       }
       if (type === 'REPLAY_AUTH_FAILED') {
-        addToast('Session expired — please log in again to sync offline entries', 'error');
+        addToast('Session expired — log in again. If you clocked out offline, check your status and clock out again if needed.', 'error');
+        // Fire sync listeners so views (e.g. ClockInOut) can refresh from
+        // the server and reveal any active_clock that didn't get cleared.
+        listenersRef.current.forEach(fn => fn(0));
       }
       if (type === 'REPLAY_PARTIAL_FAILURE') {
-        addToast('Some offline entries could not be synced and were removed', 'warning');
+        addToast('Some offline entries could not be synced. If you clocked out, please verify and clock out again if needed.', 'warning');
+        listenersRef.current.forEach(fn => fn(0));
       }
     };
 
