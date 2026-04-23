@@ -146,41 +146,44 @@ describe('smoke: unauthenticated pages', () => {
   });
 });
 
-// ── Worker-facing pages ───────────────────────────────────────────────────────
+// ── Worker-facing pages (per language) ───────────────────────────────────────
+// Loop over English + Spanish so missing i18n keys (t.foo === undefined) are
+// caught here. A missing key often renders as blank in JSX but crashes when
+// concatenated into a string, used as a prop, or passed to .replace/.split.
 
-describe('smoke: worker pages', () => {
-  const worker = makeUser('worker');
+describe.each([['English'], ['Spanish']])('smoke: worker pages (%s)', (language) => {
+  const worker = makeUser('worker', { language });
 
-  test('Dashboard (worker)', async () => {
+  test('Dashboard', async () => {
     const { default: Dashboard } = await import('../pages/Dashboard');
     await smokeRender(<Dashboard />, { user: worker });
   });
 
-  test('AccountPage (worker)', async () => {
+  test('AccountPage', async () => {
     const { default: AccountPage } = await import('../pages/AccountPage');
     await smokeRender(<AccountPage />, { user: worker });
   });
 
-  test('FieldPage (worker)', async () => {
+  test('FieldPage', async () => {
     const { default: FieldPage } = await import('../pages/FieldPage');
     await smokeRender(<FieldPage />, { user: worker });
   });
 
-  test('InventoryPage (worker)', async () => {
+  test('InventoryPage', async () => {
     const { default: InventoryPage } = await import('../pages/InventoryPage');
     await smokeRender(<InventoryPage />, { user: worker });
   });
 
-  test('TeamPage (worker)', async () => {
+  test('TeamPage', async () => {
     const { default: TeamPage } = await import('../pages/TeamPage');
     await smokeRender(<TeamPage />, { user: worker });
   });
 });
 
-// ── Admin-facing pages ────────────────────────────────────────────────────────
+// ── Admin-facing pages (per language) ────────────────────────────────────────
 
-describe('smoke: admin pages', () => {
-  const admin = makeUser('admin');
+describe.each([['English'], ['Spanish']])('smoke: admin pages (%s)', (language) => {
+  const admin = makeUser('admin', { language });
 
   test('AdminDashboard', async () => {
     const { default: AdminDashboard } = await import('../pages/AdminDashboard');
@@ -221,17 +224,17 @@ describe('smoke: admin pages', () => {
     await smokeRender(<ProjectsPage />, { user: admin });
   });
 
-  test('TeamPage (admin)', async () => {
+  test('TeamPage', async () => {
     const { default: TeamPage } = await import('../pages/TeamPage');
     await smokeRender(<TeamPage />, { user: admin });
   });
 
-  test('FieldPage (admin)', async () => {
+  test('FieldPage', async () => {
     const { default: FieldPage } = await import('../pages/FieldPage');
     await smokeRender(<FieldPage />, { user: admin });
   });
 
-  test('InventoryPage (admin)', async () => {
+  test('InventoryPage', async () => {
     const { default: InventoryPage } = await import('../pages/InventoryPage');
     await smokeRender(<InventoryPage />, { user: admin });
   });
@@ -306,7 +309,7 @@ describe('smoke: populated list views (catches sub-component bugs)', () => {
     await smokeRender(<AdminDashboard />, { user: makeUser('admin') });
   });
 
-  test('ProjectsPage renders at least one ProjectCard', async () => {
+  test('ProjectsPage renders at least one ProjectCard (admin)', async () => {
     const api = (await import('../api')).default;
     const project = {
       id: 1,
@@ -334,5 +337,65 @@ describe('smoke: populated list views (catches sub-component bugs)', () => {
     // Force an extra tick so the project list effect resolves and ProjectCard renders
     await act(async () => { await new Promise(r => setTimeout(r, 0)); });
     expect(view).toBeTruthy();
+  });
+});
+
+// ── Subscription status variants ─────────────────────────────────────────────
+// BLOCKED_STATUSES = ['trial_expired', 'canceled']. Workers see
+// WorkerSubscriptionWall; admins are redirected to /administration (billing).
+// 'exempt' companies bypass all plan gates. Render key pages in each state
+// to catch crashes in banner/warning paths that only appear under these
+// statuses (e.g. AdminDashboard's trial-expired banner, Dashboard's "plan
+// required" messaging, AdministrationPage's billing section).
+
+describe.each([
+  ['trial', 'starter'],
+  ['trial_expired', 'free'],
+  ['canceled', 'free'],
+  ['exempt', 'business'],
+])('smoke: subscription status = %s', (subscription_status, plan) => {
+  test('AdminDashboard renders', async () => {
+    const api = (await import('../api')).default;
+    api.get.mockImplementation((url) => {
+      if (url.startsWith('/admin/kpis')) return Promise.resolve({ data: { pending_entries: 0, clocked_in: 0, hours_this_week: 0 } });
+      if (url.startsWith('/stripe/status') || url.startsWith('/stripe/billing'))
+        return Promise.resolve({ data: { subscription_status, plan, trial_ends_at: null } });
+      if (url.startsWith('/admin/settings') || url.startsWith('/settings'))
+        return Promise.resolve({ data: { ...DEFAULT_SETTINGS, subscription_status, plan } });
+      return Promise.resolve({ data: [] });
+    });
+    const { default: AdminDashboard } = await import('../pages/AdminDashboard');
+    await smokeRender(<AdminDashboard />, {
+      user: makeUser('admin', { subscription_status, plan }),
+    });
+  });
+
+  test('Dashboard (worker) renders', async () => {
+    const api = (await import('../api')).default;
+    api.get.mockImplementation((url) => {
+      if (url.startsWith('/settings'))
+        return Promise.resolve({ data: { ...DEFAULT_SETTINGS, subscription_status, plan } });
+      if (url.startsWith('/clock/status')) return Promise.resolve({ data: null });
+      return Promise.resolve({ data: [] });
+    });
+    const { default: Dashboard } = await import('../pages/Dashboard');
+    await smokeRender(<Dashboard />, {
+      user: makeUser('worker', { subscription_status, plan }),
+    });
+  });
+
+  test('AdministrationPage renders (billing tab visible for blocked admins)', async () => {
+    const api = (await import('../api')).default;
+    api.get.mockImplementation((url) => {
+      if (url.startsWith('/stripe/status') || url.startsWith('/stripe/plans'))
+        return Promise.resolve({ data: { subscription_status, plan, trial_ends_at: null, plans: [] } });
+      if (url.startsWith('/admin/settings') || url.startsWith('/settings'))
+        return Promise.resolve({ data: { ...DEFAULT_SETTINGS, subscription_status, plan } });
+      return Promise.resolve({ data: [] });
+    });
+    const { default: AdministrationPage } = await import('../pages/AdministrationPage');
+    await smokeRender(<AdministrationPage />, {
+      user: makeUser('admin', { subscription_status, plan }),
+    });
   });
 });
