@@ -64,7 +64,15 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   const timerRef = useRef(null);
 
   useEffect(() => {
-    api.get('/clock/status').then(r => setStatus(r.data || false)).catch(() => setStatus(false));
+    const refreshStatus = () => api.get('/clock/status').then(r => setStatus(r.data || false)).catch(() => setStatus(false));
+    refreshStatus();
+    // Re-check whenever the PWA becomes visible again — covers the case
+    // where the worker pocketed the phone after clocking out, the request
+    // failed/queued in the background, and they come back later expecting
+    // to be clocked out.
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshStatus(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
   // Pre-select last used project when projects load and no project is already chosen.
@@ -85,13 +93,15 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     }
   }, [projects]);
 
-  // Refresh clock status after offline queue syncs
+  // Refresh clock status after the offline queue runs — whether anything
+  // synced, failed auth, or was dropped as bad. Without this, an offline
+  // clock-out that the SW silently dropped (auth-failed or 4xx during
+  // replay) leaves the server with a stale active_clock row, and the
+  // worker comes back to find themselves "still clocked in".
   useEffect(() => {
     if (!onSync) return;
-    return onSync(count => {
-      if (count > 0) {
-        api.get('/clock/status').then(r => setStatus(r.data || false)).catch(silentError('clockinout'));
-      }
+    return onSync(() => {
+      api.get('/clock/status').then(r => setStatus(r.data || false)).catch(silentError('clockinout'));
     });
   }, [onSync]);
 
