@@ -145,7 +145,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
       const params = { from: d, to: d };
       if (proj) params.project_id = proj;
       const r = await api.get('/field-reports', { params });
-      setDayReports(r.data.items);
+      setDayReports(r.data.items || []);
     } catch { setError(t.failedLoadFieldReports); } finally { setLoading(false); }
   };
 
