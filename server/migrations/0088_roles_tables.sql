@@ -14,7 +14,7 @@
 
 CREATE TABLE IF NOT EXISTS roles (
   id            SERIAL PRIMARY KEY,
-  company_id    INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id    UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   name          VARCHAR(60) NOT NULL,
   description   TEXT,
   is_builtin    BOOLEAN NOT NULL DEFAULT false,
