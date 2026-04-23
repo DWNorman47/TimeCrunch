@@ -41,7 +41,8 @@ export default function Login() {
 
   const navigateAfterLogin = user => {
     saveCompany(companyName.trim());
-    if (user.role === 'admin') {
+    const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+    if (isAdmin) {
       const key = `tc_visited_${user.id}`;
       const firstTime = !localStorage.getItem(key);
       localStorage.setItem(key, '1');
