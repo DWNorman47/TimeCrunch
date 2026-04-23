@@ -10,20 +10,25 @@ export function AuthProvider({ children }) {
   const [firstLogin, setFirstLogin] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('tc_token');
+    // sessionStorage takes precedence: impersonation tabs have their own
+    // tab-scoped token + user cache so they don't pollute the super admin's
+    // localStorage in the original tab.
+    const isImpersonation = !!sessionStorage.getItem('tc_token');
+    const tokenStore = isImpersonation ? sessionStorage : localStorage;
+    const token = tokenStore.getItem('tc_token');
     if (!token) { setLoading(false); return; }
 
     // If offline, use cached user so the app works without a network round-trip
     if (!navigator.onLine) {
-      const cached = localStorage.getItem('tc_user');
+      const cached = tokenStore.getItem('tc_user');
       if (cached) { try { setUser(JSON.parse(cached)); } catch {} }
       setLoading(false);
       return;
     }
 
     api.get('/auth/me', { timeout: 10000 })
-      .then(r => { setUser(r.data.user); localStorage.setItem('tc_user', JSON.stringify(r.data.user)); })
-      .catch(() => localStorage.removeItem('tc_token'))
+      .then(r => { setUser(r.data.user); tokenStore.setItem('tc_user', JSON.stringify(r.data.user)); })
+      .catch(() => tokenStore.removeItem('tc_token'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -63,8 +68,13 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     clearCache();
+    // Clear both stores so an impersonation tab logging out doesn't leave
+    // the super admin's localStorage token alive for a future page load,
+    // and a normal logout clears any stray sessionStorage too.
     localStorage.removeItem('tc_token');
     localStorage.removeItem('tc_user');
+    sessionStorage.removeItem('tc_token');
+    sessionStorage.removeItem('tc_user');
     setUser(null);
     setFirstLogin(false);
   };
