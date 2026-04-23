@@ -61,7 +61,7 @@ function WorkerChat({ onRead }) {
         <span style={styles.title}>💬 {t.chatMessagesWithAdmin}</span>
         <span style={styles.sub}>{t.chatPrivateNote}</span>
       </div>
-      <Thread messages={messages} loading={loading} currentUserId={user?.id} bottomRef={bottomRef} t={t} />
+      <Thread messages={messages} loading={loading} currentUserId={user?.id} bottomRef={bottomRef} t={t} locale={locale} />
       <ChatForm body={body} setBody={setBody} sending={sending} onSubmit={send} t={t} />
     </div>
   );
@@ -71,6 +71,7 @@ function WorkerChat({ onRead }) {
 function AdminChat({ workers }) {
   const { user } = useAuth();
   const t = useT();
+  const locale = langToLocale(user?.language);
   const [selectedId, setSelectedId] = useState('');
   const [threads, setThreads] = useState([]); // workers with recent messages
   const [messages, setMessages] = useState([]);
@@ -157,7 +158,7 @@ function AdminChat({ workers }) {
       </div>
       {selectedId ? (
         <>
-          <Thread messages={messages} loading={loading} currentUserId={user?.id} bottomRef={bottomRef} t={t} />
+          <Thread messages={messages} loading={loading} currentUserId={user?.id} bottomRef={bottomRef} t={t} locale={locale} />
           <ChatForm body={body} setBody={setBody} sending={sending} onSubmit={send} t={t} />
         </>
       ) : (
@@ -167,7 +168,7 @@ function AdminChat({ workers }) {
   );
 }
 
-function Thread({ messages, loading, currentUserId, bottomRef, t }) {
+function Thread({ messages, loading, currentUserId, bottomRef, t, locale }) {
   return (
     <div style={styles.thread}>
       {loading ? (
