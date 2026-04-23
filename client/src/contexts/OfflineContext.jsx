@@ -2,12 +2,12 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef } f
 import { useToast } from './ToastContext';
 
 import { silentError } from '../errorReporter';
-const OfflineContext = createContext(null);
+export const OfflineContext = createContext(null);
 
 export function OfflineProvider({ children }) {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [queueCount, setQueueCount] = useState(0);
-  const { addToast } = useToast();
+  const addToast = useToast();
   const listenersRef = useRef([]);
 
   const sendToSW = useCallback((msg) => {

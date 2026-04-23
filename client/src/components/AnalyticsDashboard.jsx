@@ -101,7 +101,7 @@ export default function AnalyticsDashboard({ weekStart = 1 }) {
   // These useMemo calls must come before any early returns (rules of hooks)
   const dailyFilled = useMemo(() => {
     if (!data) return [];
-    const { daily_hours } = data;
+    const { daily_hours = [] } = data;
     const dailyMap = Object.fromEntries(daily_hours.map(d => [d.date, parseFloat(d.hours)]));
     const result = [];
     if (showCustom && customFrom && customTo) {
@@ -131,7 +131,7 @@ export default function AnalyticsDashboard({ weekStart = 1 }) {
   // Fill weekly chart
   const weeklyFilled = useMemo(() => {
     if (!data) return [];
-    const { weekly_hours } = data;
+    const { weekly_hours = [] } = data;
     const weeklyMap = Object.fromEntries((weekly_hours || []).map(d => [d.week_start, parseFloat(d.hours)]));
     const result = [];
     if (showCustom) {
