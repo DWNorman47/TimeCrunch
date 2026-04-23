@@ -8,9 +8,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function UpdatePrompt() {
   const t = useT();
+  const { user } = useAuth();
   const [updateReady, setUpdateReady] = useState(false);
 
   useEffect(() => {
@@ -52,7 +54,7 @@ export default function UpdatePrompt() {
     };
   }, []);
 
-  if (!updateReady) return null;
+  if (!updateReady || !user) return null;
 
   const reload = () => {
     try { window.location.reload(); }
