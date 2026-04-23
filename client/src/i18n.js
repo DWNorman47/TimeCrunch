@@ -220,6 +220,8 @@ const translations = {
     errorSomethingWentWrong: 'Something went wrong',
     errorUnexpectedTryReload: 'An unexpected error occurred. Try refreshing the page.',
     errorReloadPage: 'Reload page',
+    errorGoHome: 'Go to home',
+    errorSignOut: 'Sign out',
     errorDetails: 'Error details',
     // InstallPrompt
     installIosStep1: 'Tap the Share button at the bottom of Safari',
@@ -2940,6 +2942,8 @@ const translations = {
     errorSomethingWentWrong: 'Algo salió mal',
     errorUnexpectedTryReload: 'Ocurrió un error inesperado. Intenta actualizar la página.',
     errorReloadPage: 'Recargar página',
+    errorGoHome: 'Ir al inicio',
+    errorSignOut: 'Cerrar sesión',
     errorDetails: 'Detalles del error',
     // InstallPrompt
     installIosStep1: 'Toca el botón Compartir en la parte inferior de Safari',
