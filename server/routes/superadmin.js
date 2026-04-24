@@ -148,11 +148,22 @@ router.delete('/companies/:id', requireSuperAdmin, async (req, res) => {
       `SELECT url FROM client_documents   WHERE company_id = $1 AND url IS NOT NULL`,
       `SELECT url FROM safety_talk_attachments WHERE talk_id IN (SELECT id FROM safety_talks WHERE company_id = $1) AND url IS NOT NULL`,
     ];
+    // Wrap each optional query in a savepoint. Without it, a single
+    // failing query (e.g. a table that doesn't exist on this deployment
+    // or a schema mismatch) poisons the whole transaction with Postgres
+    // 25P02 "current transaction is aborted, commands ignored until end
+    // of transaction block" — every subsequent DELETE then fails too.
+    // Savepoints let us roll back just the failing read without losing
+    // the outer transaction.
     for (const q of scalarUrlQueries) {
+      await client.query('SAVEPOINT sp_url');
       try {
         const r = await client.query(q, [id]);
         for (const row of r.rows) if (row.url) mediaUrls.push(row.url);
-      } catch { /* table may not exist in some dev DBs; skip */ }
+        await client.query('RELEASE SAVEPOINT sp_url');
+      } catch {
+        await client.query('ROLLBACK TO SAVEPOINT sp_url');
+      }
     }
 
     // JSONB array columns — photo_urls is a JSONB array of strings. Use
@@ -166,10 +177,14 @@ router.delete('/companies/:id', requireSuperAdmin, async (req, res) => {
       `SELECT jsonb_array_elements_text(photo_urls) AS url FROM service_requests     WHERE company_id = $1 AND jsonb_array_length(photo_urls) > 0`,
     ];
     for (const q of jsonbArrayQueries) {
+      await client.query('SAVEPOINT sp_url');
       try {
         const r = await client.query(q, [id]);
         for (const row of r.rows) if (row.url) mediaUrls.push(row.url);
-      } catch { /* table may not exist in some dev DBs; skip */ }
+        await client.query('RELEASE SAVEPOINT sp_url');
+      } catch {
+        await client.query('ROLLBACK TO SAVEPOINT sp_url');
+      }
     }
 
     // ── Leaf tables (children of things we're about to delete) ──────────────
