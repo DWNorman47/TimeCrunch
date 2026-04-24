@@ -3682,10 +3682,11 @@ router.delete('/roles/:id', requireAdmin, requirePerm('manage_roles'), async (re
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      // Reassign every active user on this role to the parent built-in.
-      // Inactive users get role_id NULL via the FK's ON DELETE SET NULL.
+      // Reassign every active user on this role to the parent built-in,
+      // and bump their token_version so any in-flight JWT becomes invalid
+      // and they re-auth with the new permission set.
       await client.query(
-        'UPDATE users SET role_id = $1 WHERE role_id = $2',
+        'UPDATE users SET role_id = $1, token_version = COALESCE(token_version, 0) + 1 WHERE role_id = $2',
         [fallback.rows[0].id, role.id]
       );
       await client.query('DELETE FROM roles WHERE id = $1', [role.id]);
@@ -3742,10 +3743,14 @@ router.patch('/workers/:id/role', requireAdmin, requirePerm('assign_roles'), asy
       }
     }
 
-    // Update both columns. users.role is the legacy parent role;
-    // role_id is the new authoritative reference.
+    // Update both columns + bump token_version. users.role is the legacy
+    // parent role; role_id is the new authoritative reference. Bumping
+    // token_version invalidates the user's existing JWT (which carries
+    // the old role_id) so the next request 401s and they re-auth, picking
+    // up a fresh token + permission set. Without this, they'd walk around
+    // with stale permissions until their JWT expires (8h).
     await pool.query(
-      'UPDATE users SET role_id = $1, role = $2 WHERE id = $3',
+      'UPDATE users SET role_id = $1, role = $2, token_version = COALESCE(token_version, 0) + 1 WHERE id = $3',
       [role_id, targetRole.rows[0].parent_role, user.id]
     );
     res.json({ updated: true });

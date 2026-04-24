@@ -169,13 +169,21 @@ router.post('/login', loginLimiter, async (req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const { getUserPermissions } = require('../permissions');
-    const [companyRes, userRes, permissions] = await Promise.all([
+    const [companyRes, userRes] = await Promise.all([
       pool.query('SELECT plan, subscription_status, addon_qbo, addon_certified_payroll, trial_ends_at, slug, accepts_service_requests, client_portal_pro_interest FROM companies WHERE id = $1', [req.user.company_id]),
       pool.query('SELECT mfa_enabled, language, admin_permissions, role_id, hourly_rate, rate_type, guaranteed_weekly_hours FROM users WHERE id = $1', [req.user.id]),
-      getUserPermissions(req.user),
     ]);
     const company = companyRes.rows[0] || {};
     const userRow = userRes.rows[0] || {};
+    // Compute permissions from the FRESH DB role_id, not the JWT. The JWT
+    // can be stale: a user reassigned to a new role (or whose old role was
+    // deleted, FK SET NULL'd) is still walking around with the old role_id
+    // until their token expires. Using userRow.role_id always reflects truth.
+    const permissions = await getUserPermissions({
+      ...req.user,
+      role_id: userRow.role_id ?? null,
+      admin_permissions: userRow.admin_permissions ?? null,
+    });
     const { effectiveSubscriptionStatus } = require('../utils/subscription');
     res.json({
       user: {
