@@ -679,7 +679,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         FROM daily_regular
         GROUP BY user_id, ${weekBucketSql}
       )
-      SELECT u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification,
+      SELECT u.id, u.full_name, u.invoice_name, u.username, u.role, u.role_id, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE(
@@ -702,7 +702,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
       LEFT JOIN time_entries te ON te.user_id = u.id
         AND te.work_date >= CURRENT_DATE - INTERVAL '365 days'
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1 ${accessParamSql}
-      GROUP BY u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification
+      GROUP BY u.id, u.full_name, u.invoice_name, u.username, u.role, u.role_id, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
       queryParams
@@ -947,15 +947,38 @@ router.post('/workers/invite', requireAdmin, requirePermission('manage_workers')
     username = baseUsername + suffix++;
   }
 
+  // Phase B: optional role_id at invite time. Same escalation guard as POST.
+  let resolvedRoleId = null;
+  let resolvedLegacyRole = assignedRole;
+  if (req.body.role_id != null) {
+    const roleLookup = await pool.query(
+      `SELECT r.id, r.parent_role,
+              ARRAY(SELECT permission FROM role_permissions WHERE role_id = r.id) AS perms
+         FROM roles r WHERE r.id = $1 AND r.company_id = $2`,
+      [parseInt(req.body.role_id), companyId]
+    );
+    if (roleLookup.rowCount === 0) return res.status(404).json({ error: 'Role not found' });
+    const reqPerms = await getUserPermissions(req.user);
+    for (const p of roleLookup.rows[0].perms) {
+      if (!reqPerms.has(p)) return res.status(403).json({ error: `Cannot assign a role granting "${p}" — you don't have it yourself`, code: 'permission_escalation', required: p });
+    }
+    resolvedRoleId = roleLookup.rows[0].id;
+    resolvedLegacyRole = roleLookup.rows[0].parent_role;
+  } else {
+    const defaultName = assignedRole === 'admin' ? 'Admin' : 'Worker';
+    const def = await pool.query('SELECT id FROM roles WHERE company_id = $1 AND is_builtin = true AND name = $2', [companyId, defaultName]);
+    if (def.rowCount > 0) resolvedRoleId = def.rows[0].id;
+  }
+
   const token = crypto.randomBytes(32).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
   try {
     const result = await pool.query(
-      `INSERT INTO users (company_id, username, password_hash, full_name, role, language, hourly_rate, email, invite_token, invite_token_expires, invite_pending)
-       VALUES ($1, $2, '', $3, $4, $5, $6, $7, $8, $9, true)
-       RETURNING id, username, full_name, role, language, hourly_rate, email`,
-      [companyId, username, full_name, assignedRole, assignedLanguage, assignedRate, email, tokenHash, expires]
+      `INSERT INTO users (company_id, username, password_hash, full_name, role, role_id, language, hourly_rate, email, invite_token, invite_token_expires, invite_pending)
+       VALUES ($1, $2, '', $3, $4, $5, $6, $7, $8, $9, $10, true)
+       RETURNING id, username, full_name, role, role_id, language, hourly_rate, email`,
+      [companyId, username, full_name, resolvedLegacyRole, resolvedRoleId, assignedLanguage, assignedRate, email, tokenHash, expires]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.invited', 'worker', result.rows[0].id, full_name, { email });
     const inviteUrl = `${process.env.APP_URL}/accept-invite?token=${token}`;
@@ -1035,9 +1058,9 @@ router.post('/workers/:id/send-invite', requireAdmin, requirePermission('manage_
 
 // Create a worker or admin
 router.post('/workers', requireAdmin, requirePermission('manage_workers'),
-  coerceBody({ float: ['hourly_rate'] }),
+  coerceBody({ float: ['hourly_rate'], int: ['role_id'] }),
   async (req, res) => {
-  const { password, role } = req.body;
+  const { password, role, role_id } = req.body;
   const username = req.body.username?.trim();
   const full_name = req.body.full_name?.trim();
   const first_name = req.body.first_name?.trim() || null;
@@ -1078,13 +1101,51 @@ router.post('/workers', requireAdmin, requirePermission('manage_workers'),
     }
   }
 
+  // Phase B: optional role_id assignment at creation. If supplied, validate
+  // it's a real role for this company and that the requester can grant it.
+  // Also rewrite assignedRole to match the role's parent_role so the legacy
+  // role column stays consistent with role_id.
+  let resolvedRoleId = null;
+  let resolvedLegacyRole = assignedRole;
+  if (role_id != null) {
+    const roleLookup = await pool.query(
+      `SELECT r.id, r.parent_role,
+              ARRAY(SELECT permission FROM role_permissions WHERE role_id = r.id) AS perms
+         FROM roles r WHERE r.id = $1 AND r.company_id = $2`,
+      [role_id, companyId]
+    );
+    if (roleLookup.rowCount === 0) return res.status(404).json({ error: 'Role not found' });
+    const reqPerms = await getUserPermissions(req.user);
+    for (const p of roleLookup.rows[0].perms) {
+      if (!reqPerms.has(p)) {
+        return res.status(403).json({
+          error: `Cannot assign a role granting "${p}" — you don't have it yourself`,
+          code: 'permission_escalation',
+          required: p,
+        });
+      }
+    }
+    resolvedRoleId = roleLookup.rows[0].id;
+    resolvedLegacyRole = roleLookup.rows[0].parent_role;
+  } else {
+    // No role_id given. Default to the company's built-in Worker or Admin
+    // role based on the legacy `role` field, so newly created users always
+    // have a role_id (no more "stuck on legacy fallback" problem).
+    const defaultName = assignedRole === 'admin' ? 'Admin' : 'Worker';
+    const defaultLookup = await pool.query(
+      `SELECT id FROM roles WHERE company_id = $1 AND is_builtin = true AND name = $2`,
+      [companyId, defaultName]
+    );
+    if (defaultLookup.rowCount > 0) resolvedRoleId = defaultLookup.rows[0].id;
+  }
+
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      'INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, language, hourly_rate, rate_type, overtime_rule, email, email_confirmed, must_change_password, worker_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true, true, $14) RETURNING id, username, full_name, first_name, middle_name, last_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type',
-      [companyId, username, hash, full_name, first_name || null, middle_name || null, last_name || null, assignedRole, assignedLanguage, assignedRate, assignedRateType, assignedOTRule, assignedEmail, assignedWorkerType]
+      'INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, role_id, language, hourly_rate, rate_type, overtime_rule, email, email_confirmed, must_change_password, worker_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true, true, $15) RETURNING id, username, full_name, first_name, middle_name, last_name, role, role_id, language, hourly_rate, rate_type, overtime_rule, email, worker_type',
+      [companyId, username, hash, full_name, first_name || null, middle_name || null, last_name || null, resolvedLegacyRole, resolvedRoleId, assignedLanguage, assignedRate, assignedRateType, assignedOTRule, assignedEmail, assignedWorkerType]
     );
-    await logAudit(companyId, req.user.id, req.user.full_name, 'worker.created', 'worker', result.rows[0].id, full_name, { role: assignedRole });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'worker.created', 'worker', result.rows[0].id, full_name, { role: resolvedLegacyRole, role_id: resolvedRoleId });
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') {

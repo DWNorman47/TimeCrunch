@@ -115,20 +115,40 @@ describe('hasPerm — legacy fallback', () => {
     expect(await hasPerm(user, 'view_reports')).toBe(true);
   });
 
-  test('non-legacy perms deny when role_id is null and user is admin', async () => {
-    // manage_billing is Owner-only; no legacy equivalent exists, so an admin
-    // without a role_id cannot use it even with null admin_permissions.
+  test('null admin_permissions grants every Admin-tier permission, including new ones', async () => {
+    // The historical "null = full access" contract means a legacy admin
+    // should be able to do anything an Admin can — including new perms like
+    // assign_roles and clock_in_self that didn't exist when their account
+    // was created.
     const user = { id: 1, role: 'admin', role_id: null, admin_permissions: null };
+    expect(await hasPerm(user, 'assign_roles')).toBe(true);
+    expect(await hasPerm(user, 'clock_in_self')).toBe(true);
+    expect(await hasPerm(user, 'view_workers_list')).toBe(true);
+    // Owner-only perms still denied — those weren't part of the legacy admin.
     expect(await hasPerm(user, 'manage_billing')).toBe(false);
     expect(await hasPerm(user, 'delete_company')).toBe(false);
+    expect(await hasPerm(user, 'manage_roles')).toBe(false);
   });
 
-  test('worker with no role_id denies worker-only perms too', async () => {
-    // clock_in_self isn't a legacy key, so pre-backfill workers are denied.
-    // This is acceptable because the backfill runs on deploy; the window
-    // between 0088 apply and 0089 apply is <1s.
+  test('restricted legacy admin: legacy 5 + worker baseline, nothing else admin-tier', async () => {
+    const user = {
+      id: 1, role: 'admin', role_id: null,
+      admin_permissions: { approve_entries: true },
+    };
+    expect(await hasPerm(user, 'approve_entries')).toBe(true);
+    expect(await hasPerm(user, 'clock_in_self')).toBe(true); // worker baseline
+    expect(await hasPerm(user, 'assign_roles')).toBe(false); // not a legacy key, not worker-tier
+  });
+
+  test('worker with no role_id has the standard Worker permissions', async () => {
+    // Pre-backfill workers should be able to clock in / submit entries.
     const user = { id: 1, role: 'worker', role_id: null, admin_permissions: null };
-    expect(await hasPerm(user, 'clock_in_self')).toBe(false);
+    expect(await hasPerm(user, 'clock_in_self')).toBe(true);
+    expect(await hasPerm(user, 'submit_time_entry_self')).toBe(true);
+    expect(await hasPerm(user, 'view_projects')).toBe(true);
+    // No admin-tier access
+    expect(await hasPerm(user, 'manage_workers')).toBe(false);
+    expect(await hasPerm(user, 'approve_entries')).toBe(false);
   });
 });
 

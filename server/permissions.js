@@ -221,15 +221,26 @@ async function hasPerm(userOrReq, key) {
     return set.has(key);
   }
 
-  // Legacy fallback — user predates the roles rollout.
-  const legacyKey = Object.keys(LEGACY_TO_NEW).find(lk => LEGACY_TO_NEW[lk] === key);
-  if (legacyKey && (user.role === 'admin' || user.role === 'super_admin')) {
-    if (!user.admin_permissions) return true; // null = full access
-    return user.admin_permissions[legacyKey] === true;
+  // Legacy fallback — user predates the roles rollout (or was created by an
+  // older endpoint that didn't set role_id). Map their legacy admin_permissions
+  // to the new permission catalog:
+  //   - admin with NULL admin_permissions = full admin (matches the historical
+  //     "null = full access" contract). Granted: every key in ADMIN_PERMISSIONS.
+  //   - admin with restricted admin_permissions = legacy 5 keys + worker baseline.
+  //   - worker = baseline worker permissions.
+  if (user.role === 'admin') {
+    if (!user.admin_permissions) {
+      return ADMIN_PERMISSIONS.includes(key);
+    }
+    const legacyKey = Object.keys(LEGACY_TO_NEW).find(lk => LEGACY_TO_NEW[lk] === key);
+    if (legacyKey) return user.admin_permissions[legacyKey] === true;
+    // Non-legacy perm for a restricted admin: grant if it's a worker-tier
+    // perm (everyone has those by virtue of being in the company), otherwise deny.
+    return WORKER_PERMISSIONS.includes(key);
   }
-  // Non-legacy permission for a user with no role_id — deny. This will happen
-  // for workers checked against worker-only permissions like clock_in_self
-  // until the backfill runs. Backfill assigns role_id to every worker.
+  if (user.role === 'worker') {
+    return WORKER_PERMISSIONS.includes(key);
+  }
   return false;
 }
 
