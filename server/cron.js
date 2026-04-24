@@ -3,7 +3,14 @@
  * Uses setInterval; runs in-process alongside the Express server.
  */
 const pool = require('./db');
-const { sendPushToUser } = require('./push');
+const { sendPushToUser, sendPushToCompanyAdmins } = require('./push');
+const { createInboxItemBatch } = require('./routes/inbox');
+
+// A worker who has been clocked in this many hours without clocking out
+// is almost certainly forgotten — phone died, app uninstalled, drove home
+// without remembering. Alert admins so they can edit the entry.
+// Threshold is intentionally generous so a long workday doesn't trigger.
+const STALE_CLOCK_HOURS = 16;
 
 function getHourInTimezone(timezone) {
   try {
@@ -170,16 +177,77 @@ async function expireOldTrials() {
   }
 }
 
+// Find any active_clock rows older than STALE_CLOCK_HOURS that haven't
+// been alerted on yet, and notify the company's admins. Doesn't auto-finalize
+// the entry — admins must decide the actual end time via the existing
+// /admin/active-clock/:user_id PATCH or the worker has to clock out.
+// stale_alert_sent_at is set per-row so a stuck row alerts at most once.
+async function sweepStaleActiveClock() {
+  try {
+    const stale = await pool.query(
+      `SELECT ac.user_id, ac.company_id, ac.clock_in_time,
+              u.full_name AS worker_name, p.name AS project_name,
+              EXTRACT(EPOCH FROM (NOW() - ac.clock_in_time)) / 3600 AS hours_clocked
+         FROM active_clock ac
+         JOIN users u ON u.id = ac.user_id
+         LEFT JOIN projects p ON p.id = ac.project_id
+        WHERE ac.clock_in_time < NOW() - ($1 || ' hours')::INTERVAL
+          AND ac.stale_alert_sent_at IS NULL`,
+      [STALE_CLOCK_HOURS]
+    );
+
+    if (stale.rowCount === 0) return;
+
+    for (const row of stale.rows) {
+      const hours = Math.round(row.hours_clocked);
+      const title = `Worker still clocked in: ${row.worker_name}`;
+      const body = `${row.worker_name} has been clocked in for ${hours}h${row.project_name ? ` on ${row.project_name}` : ''}. They may have forgotten to clock out — review on the Live tab.`;
+
+      // Push to all admins; don't await per-admin so a slow push doesn't
+      // block the rest of the sweep.
+      sendPushToCompanyAdmins(row.company_id, { title, body, url: '/timeclock#live' })
+        .catch(err => console.error('[cron] sweepStaleActiveClock push:', err));
+
+      // Inbox item too, so the alert is visible after the push notification expires.
+      const adminRows = await pool.query(
+        `SELECT id FROM users WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true`,
+        [row.company_id]
+      );
+      if (adminRows.rowCount > 0) {
+        createInboxItemBatch(
+          adminRows.rows.map(a => a.id),
+          row.company_id,
+          'stale_active_clock',
+          title,
+          body,
+          '/timeclock#live'
+        );
+      }
+
+      await pool.query(
+        `UPDATE active_clock SET stale_alert_sent_at = NOW() WHERE user_id = $1`,
+        [row.user_id]
+      );
+    }
+
+    console.log(`[cron] sweepStaleActiveClock: alerted on ${stale.rowCount} stale active_clock row(s)`);
+  } catch (err) {
+    console.error('[cron] sweepStaleActiveClock error:', err);
+  }
+}
+
 function startCron() {
   // Run immediately on startup (catches any missed window from restart)
   sendShiftReminders();
   sendSignoffReminders();
   expireOldTrials();
+  sweepStaleActiveClock();
   // Then run every hour
   setInterval(sendShiftReminders, 60 * 60 * 1000);
   setInterval(sendSignoffReminders, 60 * 60 * 1000);
   setInterval(expireOldTrials, 60 * 60 * 1000);
-  console.log('[cron] Shift reminder, sign-off, and trial-expiry crons started');
+  setInterval(sweepStaleActiveClock, 60 * 60 * 1000);
+  console.log('[cron] Shift reminder, sign-off, trial-expiry, and stale-clock crons started');
 }
 
 module.exports = { startCron };

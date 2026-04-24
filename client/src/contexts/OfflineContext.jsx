@@ -47,6 +47,15 @@ export function OfflineProvider({ children }) {
   useEffect(() => {
     const handleMessage = (event) => {
       const { type, count } = event.data || {};
+      // SW asks for the user's current auth header before replaying queued
+      // requests. Reply via the MessagePort the SW sent so the response
+      // reaches the right replay attempt. Reading from sessionStorage first
+      // matches api.js so an impersonation tab's token is preferred.
+      if (type === 'GET_AUTH' && event.ports && event.ports[0]) {
+        const token = sessionStorage.getItem('tc_token') || localStorage.getItem('tc_token');
+        event.ports[0].postMessage({ auth: token ? `Bearer ${token}` : null });
+        return;
+      }
       if (type === 'QUEUE_COUNT') {
         setQueueCount(count ?? 0);
       }
