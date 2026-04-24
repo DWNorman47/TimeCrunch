@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const pool = require('../db');
 const logger = require('../logger');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requirePerm } = require('../middleware/auth');
 const { haversineDistanceFt } = require('../utils/geoUtils');
 const { sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem, createInboxItemBatch } = require('./inbox');
@@ -41,7 +41,7 @@ const { coerceBody } = require('../middleware/coerce');
 const { logFailure } = require('../failureLog');
 
 // POST /api/clock/in
-router.post('/in', requireAuth, clockLimiter, coerceBody({ int: ['project_id'] }), async (req, res) => {
+router.post('/in', requireAuth, requirePerm('clock_in_self'), clockLimiter, coerceBody({ int: ['project_id'] }), async (req, res) => {
   const { project_id, lat, lng, local_work_date, timezone, location_denied, clock_in_time } = req.body;
   const notes = req.body.notes?.trim() || null;
   if (notes && notes.length > 500) {
@@ -225,7 +225,7 @@ router.post('/in', requireAuth, clockLimiter, coerceBody({ int: ['project_id'] }
 });
 
 // POST /api/clock/out
-router.post('/out', requireAuth, clockLimiter, coerceBody({ float: ['break_minutes', 'mileage'] }), async (req, res) => {
+router.post('/out', requireAuth, requirePerm('clock_out_self'), clockLimiter, coerceBody({ float: ['break_minutes', 'mileage'] }), async (req, res) => {
   const { lat, lng, break_minutes, mileage, local_clock_in, local_clock_out } = req.body;
   if ((lat != null || lng != null) && !validCoords(lat, lng)) {
     logFailure(req, 'clock.out', 'invalid_coords', { lat, lng });

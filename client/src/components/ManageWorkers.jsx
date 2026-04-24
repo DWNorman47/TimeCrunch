@@ -127,9 +127,29 @@ function fmtRate(w, currency = 'USD') {
   return `${formatCurrency(amt, currency)} / hr`;
 }
 
-function RoleBadge({ role }) {
+// Shows the user's actual role name (Owner / Admin / Worker / custom).
+// Falls back to the legacy worker/admin label if no role data is available.
+// Owner gets a gold badge so it stands out — easy answer to "who owns this account?".
+function RoleBadge({ worker, role, availableRoles }) {
   const t = useT();
-  const isAdmin = role === 'admin' || role === 'super_admin';
+  // If we know the role_id and have the catalog, show the actual role name.
+  if (worker?.role_id && availableRoles?.length) {
+    const roleObj = availableRoles.find(r => r.id === worker.role_id);
+    if (roleObj) {
+      const isOwner = roleObj.is_builtin && roleObj.name === 'Owner';
+      const isAdminTier = roleObj.parent_role === 'admin';
+      const bg = isOwner ? '#fef3c7' : isAdminTier ? '#dbeafe' : '#f3f4f6';
+      const fg = isOwner ? '#92400e' : isAdminTier ? '#1e40af' : '#6b7280';
+      return (
+        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: bg, color: fg }}>
+          {roleObj.name}
+        </span>
+      );
+    }
+  }
+  // Legacy fallback: just worker/admin from users.role
+  const r = role ?? worker?.role;
+  const isAdmin = r === 'admin' || r === 'super_admin';
   return (
     <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: isAdmin ? '#dbeafe' : '#f3f4f6', color: isAdmin ? '#1e40af' : '#6b7280' }}>
       {isAdmin ? t.adminRole : t.workerRole}
@@ -557,9 +577,27 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 </div>
                 <div style={s.fieldGroup}>
                   <label htmlFor="mw-role" style={s.label}>{t.role}</label>
-                  <select id="mw-role" style={s.input} value={form.role} onChange={e => set('role', e.target.value)}>
-                    <option value="worker">{t.workerRole}</option>
-                    <option value="admin">{t.adminRole}</option>
+                  <select
+                    id="mw-role"
+                    style={s.input}
+                    value={form.role_id ?? ''}
+                    onChange={e => {
+                      const id = e.target.value ? parseInt(e.target.value) : '';
+                      const picked = availableRoles.find(r => r.id === id);
+                      // Keep legacy `form.role` in sync with the chosen role's parent
+                      // so the existing POST handler still routes it correctly during
+                      // Phase B's coexistence window.
+                      setForm(f => ({ ...f, role_id: id || null, role: picked?.parent_role || 'worker' }));
+                    }}
+                  >
+                    {availableRoles.length === 0 && (
+                      <>
+                        <option value="">{t.workerRole}</option>
+                      </>
+                    )}
+                    {availableRoles.map(r => (
+                      <option key={r.id} value={r.id}>{r.name}{r.is_builtin ? '' : ` (${r.parent_role})`}</option>
+                    ))}
                   </select>
                 </div>
                 <div style={s.fieldGroup}>
@@ -683,7 +721,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   <div style={s.itemLeft}>
                     <span style={s.itemName}>{w.full_name}</span>
                     <span style={s.itemUsername}>@{w.username}</span>
-                    <RoleBadge role={w.role} />
+                    <RoleBadge worker={w} availableRoles={availableRoles} />
                   </div>
                   <span style={{ ...s.chevron, transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▾</span>
                 </button>
@@ -781,7 +819,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               <span style={s.infoLabel}>{t.language}</span>
                               <span style={s.infoValue}>{w.language || 'English'}</span>
                               <span style={s.infoLabel}>{t.role}</span>
-                              <span style={s.infoValue}><RoleBadge role={w.role} /></span>
+                              <span style={s.infoValue}><RoleBadge worker={w} availableRoles={availableRoles} /></span>
                               <span style={s.infoLabel}>{t.mwWorkerType}</span>
                               <span style={s.infoValue}>{workerTypeLabel(w.worker_type || 'employee', t)}</span>
                               {trackClassifications && (
@@ -1088,7 +1126,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   <div style={s.itemLeft}>
                     <span style={{ ...s.itemName, color: '#6b7280' }}>{w.full_name}</span>
                     <span style={{ ...s.itemUsername, color: '#d1d5db' }}>@{w.username}</span>
-                    <RoleBadge role={w.role} />
+                    <RoleBadge worker={w} availableRoles={availableRoles} />
                   </div>
                   <button style={s.restoreBtn} onClick={() => handleRestore(w.id)}>{t.restore}</button>
                 </div>
