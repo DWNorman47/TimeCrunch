@@ -430,6 +430,30 @@ describe('smoke: API error states', () => {
   });
 });
 
+// ── Phase D: zero-permission user ────────────────────────────────────────────
+// A worker assigned to a custom role with NO permissions should still be
+// able to render their AccountPage (always-visible) and the AppHeader
+// (which contains the AppSwitcher) without crashing. Modules they have
+// no perms for must not appear in the switcher.
+
+describe('smoke: zero-permission user', () => {
+  test('AccountPage renders for a user with no permissions', async () => {
+    const { default: AccountPage } = await import('../pages/AccountPage');
+    await smokeRender(<AccountPage />, {
+      user: makeUser('worker', { permissions: [] }),
+    });
+  });
+
+  test('AdministrationPage renders with only Company + Account tabs visible', async () => {
+    // Admin role but every admin perm stripped — should fall through to
+    // just the always-visible tabs (Company info + own Account).
+    const { default: AdministrationPage } = await import('../pages/AdministrationPage');
+    await smokeRender(<AdministrationPage />, {
+      user: makeUser('admin', { permissions: [] }),
+    });
+  });
+});
+
 // ── Subscription status variants ─────────────────────────────────────────────
 // BLOCKED_STATUSES = ['trial_expired', 'canceled']. Workers see
 // WorkerSubscriptionWall; admins are redirected to /administration (billing).

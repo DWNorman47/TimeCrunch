@@ -42,14 +42,18 @@ export default function Login() {
   const navigateAfterLogin = user => {
     saveCompany(companyName.trim());
     const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+    // First-time admins still get the welcoming nudge to /administration so
+    // they know where billing / settings live. After that, route to whichever
+    // module they actually have access to (Phase D — picks the first module
+    // their permissions unlock; falls back to /account if they have none).
     if (isAdmin) {
       const key = `tc_visited_${user.id}`;
       const firstTime = !localStorage.getItem(key);
       localStorage.setItem(key, '1');
-      navigate(firstTime ? '/administration' : '/timeclock');
-    } else {
-      navigate('/dashboard');
+      if (firstTime) { navigate('/administration'); return; }
     }
+    const { pickLandingPath } = require('../modulePermissions');
+    navigate(pickLandingPath(user));
   };
 
   const handleSubmit = async e => {

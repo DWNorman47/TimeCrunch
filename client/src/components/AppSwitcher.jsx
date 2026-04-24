@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useT } from '../hooks/useT';
+import { useAuth } from '../contexts/AuthContext';
+import { userCanSeeModule } from '../modulePermissions';
 
 // Workers see: Time Clock, Field, Inventory, Account
 // Admins see: Time Clock, Field, Inventory, Projects, Administration, Analytics
@@ -112,19 +114,25 @@ export const APPS = [
 
 export default function AppSwitcher({ currentApp = 'timeclock', userRole, features = {} }) {
   const t = useT();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const visibleApps = APPS.filter(a => {
     if (a.adminOnly && !isAdmin) return false;
     if (a.workerOnly && isAdmin) return false;
+    // Company-level feature toggles (admin choice). These hide modules
+    // entirely regardless of user perms — the company doesn't use the feature.
     if (a.id === 'field' && features?.module_field === false) return false;
     if (a.id === 'projects' && features?.module_projects === false) return false;
     if (a.id === 'inventory' && features?.module_inventory === false) return false;
     if (a.id === 'analytics' && features?.module_analytics === false) return false;
     if (a.id === 'team' && features?.module_team === false) return false;
-    // Only hide Time Clock from admins when toggle is off
+    // Only hide Time Clock from admins when toggle is off (workers always need it)
     if (a.id === 'timeclock' && features?.module_timeclock === false && isAdmin) return false;
+    // Phase D: per-user permission gate. A user with zero perms inside a
+    // module shouldn't see it at all. Account is always shown.
+    if (!userCanSeeModule(user, a.id)) return false;
     return true;
   });
   const current = APPS.find(a => a.id === currentApp) || APPS[0];

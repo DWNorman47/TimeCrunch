@@ -20,6 +20,39 @@ import { AuthContext } from '../contexts/AuthContext';
 import { ToastProvider } from '../contexts/ToastContext';
 import { OfflineContext } from '../contexts/OfflineContext';
 
+// Default permission sets for each role so tests don't have to spell them
+// out every time. Pass `permissions: [...]` in overrides to test specific
+// permission combos (notably the empty-set "zero-perm user" case).
+const DEFAULT_PERMS_BY_ROLE = {
+  worker: [
+    'clock_in_self', 'clock_out_self', 'submit_time_entry_self',
+    'edit_own_pending_entry', 'view_own_entries', 'view_projects',
+    'submit_reimbursement_self', 'view_own_reimbursements',
+    'submit_field_reports', 'manage_punchlist', 'manage_rfis',
+    'manage_safety_checklists', 'manage_equipment', 'manage_incidents',
+    'manage_inspections', 'view_inventory',
+    'view_company_chat', 'send_company_chat',
+  ],
+  admin: [
+    // Worker baseline + admin tier minus Owner-only
+    'clock_in_self', 'clock_out_self', 'submit_time_entry_self',
+    'edit_own_pending_entry', 'view_own_entries', 'view_projects',
+    'submit_reimbursement_self', 'view_own_reimbursements',
+    'submit_field_reports', 'manage_punchlist', 'manage_rfis',
+    'manage_safety_checklists', 'manage_equipment', 'manage_incidents',
+    'manage_inspections', 'view_inventory', 'view_company_chat',
+    'send_company_chat',
+    'clock_in_others', 'edit_any_entry', 'approve_entries',
+    'manage_pay_periods', 'view_workers_list', 'view_worker_wages',
+    'manage_workers', 'assign_roles',
+    'manage_projects', 'manage_project_visibility',
+    'view_reports', 'view_analytics', 'view_certified_payroll', 'export_data',
+    'manage_reimbursements', 'manage_settings', 'manage_advanced_settings',
+    'manage_integrations', 'send_broadcast', 'manage_inventory',
+  ],
+  super_admin: [], // unused — useAuth short-circuits on role === 'super_admin'
+};
+
 export function makeUser(role = 'worker', overrides = {}) {
   return {
     id: 1,
@@ -34,6 +67,8 @@ export function makeUser(role = 'worker', overrides = {}) {
     plan: 'starter',
     admin_permissions: null,
     worker_access_ids: null,
+    role_id: role === 'worker' ? 1 : role === 'admin' ? 2 : null,
+    permissions: DEFAULT_PERMS_BY_ROLE[role] || [],
     ...overrides,
   };
 }
