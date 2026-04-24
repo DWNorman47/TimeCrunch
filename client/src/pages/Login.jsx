@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import api from '../api';
 import PasswordInput from '../components/PasswordInput';
+import { pickLandingPath } from '../modulePermissions';
 
 function getSavedCompanies() {
   try { return JSON.parse(localStorage.getItem('tc_companies') || '[]'); } catch { return []; }
@@ -52,7 +53,6 @@ export default function Login() {
       localStorage.setItem(key, '1');
       if (firstTime) { navigate('/administration'); return; }
     }
-    const { pickLandingPath } = require('../modulePermissions');
     navigate(pickLandingPath(user));
   };
 

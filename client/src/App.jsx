@@ -8,6 +8,7 @@ import SkipLink from './components/SkipLink';
 import { ToastProvider } from './contexts/ToastContext';
 import { OfflineProvider } from './contexts/OfflineContext';
 import { clearCache } from './offlineDb';
+import { userCanSeeModule, pickLandingPath } from './modulePermissions';
 
 const Login             = lazy(() => import('./pages/Login'));
 const Register          = lazy(() => import('./pages/Register'));
@@ -80,8 +81,6 @@ function PrivateRoute({ children, adminOnly = false, superAdminOnly = false, mod
   // no permissions for bounces you to your landing page (the first module
   // you DO have access to, or /account if none).
   if (moduleId) {
-    // require here to avoid a circular import via modulePermissions → usePerm → AuthContext
-    const { userCanSeeModule, pickLandingPath } = require('./modulePermissions');
     if (!userCanSeeModule(user, moduleId)) {
       const landing = pickLandingPath(user);
       // Avoid redirect loops if the landing itself fails the check.
@@ -117,7 +116,6 @@ function landingFor(user) {
       return '/administration';
     }
   }
-  const { pickLandingPath } = require('./modulePermissions');
   return pickLandingPath(user);
 }
 
