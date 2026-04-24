@@ -64,11 +64,9 @@ select:focus-visible {
   input, select, textarea {
     font-size: 16px !important;
   }
-  /* Hide the user's name in the top header on tablets + phones. The
-     company band below the header already shows who's logged in via
-     context; adding the name on a narrow screen crowds the header-right
-     actions. Applied at 768px so landscape phones and tablets pick it up. */
-  .header-username {
+  /* SuperAdmin has its own top bar (not the shared AppHeader). The user's
+     name next to the Logout button crowds the header on narrow screens. */
+  .sa-header-username {
     display: none !important;
   }
 }

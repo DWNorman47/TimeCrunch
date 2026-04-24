@@ -330,7 +330,7 @@ export default function SuperAdmin() {
           <span style={styles.superBadge}>Super Admin</span>
         </div>
         <div style={styles.headerRight}>
-          <span style={styles.userName}>{user?.full_name}</span>
+          <span style={styles.userName} className="sa-header-username">{user?.full_name}</span>
           <button style={styles.headerBtn} onClick={logout}>Logout</button>
         </div>
       </header>
