@@ -141,7 +141,7 @@ router.delete('/companies/:id', requireSuperAdmin, async (req, res) => {
 
     // Scalar URL columns
     const scalarUrlQueries = [
-      `SELECT url FROM field_report_photos WHERE field_report_id IN (SELECT id FROM field_reports WHERE company_id = $1) AND url IS NOT NULL`,
+      `SELECT url FROM field_report_photos WHERE report_id IN (SELECT id FROM field_reports WHERE company_id = $1) AND url IS NOT NULL`,
       `SELECT receipt_url AS url FROM reimbursements WHERE company_id = $1 AND receipt_url IS NOT NULL`,
       `SELECT url FROM worker_documents   WHERE company_id = $1 AND url IS NOT NULL`,
       `SELECT url FROM project_documents  WHERE company_id = $1 AND url IS NOT NULL`,
@@ -188,7 +188,7 @@ router.delete('/companies/:id', requireSuperAdmin, async (req, res) => {
     }
 
     // ── Leaf tables (children of things we're about to delete) ──────────────
-    await client.query(`DELETE FROM field_report_photos WHERE field_report_id IN (SELECT id FROM field_reports WHERE company_id = $1)`, [id]);
+    await client.query(`DELETE FROM field_report_photos WHERE report_id IN (SELECT id FROM field_reports WHERE company_id = $1)`, [id]);
     await client.query(`DELETE FROM entry_messages              WHERE company_id = $1`, [id]);
     await client.query(`DELETE FROM equipment_hours             WHERE company_id = $1`, [id]);
     await client.query(`DELETE FROM company_chat                WHERE company_id = $1`, [id]);
