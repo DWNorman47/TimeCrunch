@@ -8,7 +8,7 @@ const pool = require('../db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function isValidEmail(email) { return EMAIL_RE.test(String(email).trim()); }
-const { requireAdmin, requirePlan, requireProAddon, requirePermission, requirePerm } = require('../middleware/auth');
+const { requireAdmin, requirePlan, requireProAddon, requirePerm } = require('../middleware/auth');
 const { PERMISSIONS, PERMISSION_KEYS, BUILTIN_ROLES, getUserPermissions } = require('../permissions');
 const { coerceBody } = require('../middleware/coerce');
 const { logFailure } = require('../failureLog');
@@ -150,7 +150,7 @@ router.get('/settings', requireAdmin, async (req, res) => {
 });
 
 // Update settings
-router.patch('/settings', requireAdmin, requirePermission('manage_settings'), async (req, res) => {
+router.patch('/settings', requireAdmin, requirePerm('manage_settings'), async (req, res) => {
   const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
   const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour', 'chat_retention_days'];
   const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold', 'media_retention_days', 'qbo_bill_terms_days', 'week_start'];
@@ -284,7 +284,7 @@ router.get('/advanced-settings', requireAdmin, async (req, res) => {
   }
 });
 
-router.patch('/advanced-settings/:key', requireAdmin, requirePermission('manage_settings'), async (req, res) => {
+router.patch('/advanced-settings/:key', requireAdmin, requirePerm('manage_settings'), async (req, res) => {
   const { key } = req.params;
   if (!ADVANCED_SETTING_KEYS.includes(key))
     return res.status(400).json({ error: 'Unknown advanced setting key' });
@@ -345,7 +345,7 @@ router.get('/notifications', requireAdmin, async (req, res) => {
 });
 
 // POST /admin/clock-in — admin clocks in a worker on their behalf
-router.post('/clock-in', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+router.post('/clock-in', requireAdmin, requirePerm('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
   const { user_id, project_id } = req.body;
   const notes = req.body.notes?.trim() || null;
@@ -384,7 +384,7 @@ router.post('/clock-in', requireAdmin, requirePermission('manage_workers'), asyn
 });
 
 // POST /admin/clock-out/:user_id — admin clocks out a worker
-router.post('/clock-out/:user_id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+router.post('/clock-out/:user_id', requireAdmin, requirePerm('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
   const { break_minutes, mileage } = req.body;
   const mileageVal = mileage != null && mileage !== '' ? parseFloat(mileage) : null;
@@ -441,7 +441,7 @@ router.post('/clock-out/:user_id', requireAdmin, requirePermission('manage_worke
 });
 
 // PATCH /admin/active-clock/:user_id — admin edits the clock-in time of a running clock
-router.patch('/active-clock/:user_id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+router.patch('/active-clock/:user_id', requireAdmin, requirePerm('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
   const { clock_in_time } = req.body;
   if (!clock_in_time) return res.status(400).json({ error: 'clock_in_time required' });
@@ -463,7 +463,7 @@ router.patch('/active-clock/:user_id', requireAdmin, requirePermission('manage_w
 });
 
 // PATCH /admin/entries/:id/times — admin edits start/end times (kept for backwards compat)
-router.patch('/entries/:id/times', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+router.patch('/entries/:id/times', requireAdmin, requirePerm('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
   const { start_time, end_time } = req.body;
   if (!start_time || !end_time) return res.status(400).json({ error: 'start_time and end_time required' });
@@ -484,7 +484,7 @@ router.patch('/entries/:id/times', requireAdmin, requirePermission('manage_worke
 });
 
 // PATCH /admin/entries/:id/edit — admin edits times + project on a pending entry
-router.patch('/entries/:id/edit', requireAdmin, requirePermission('approve_entries'),
+router.patch('/entries/:id/edit', requireAdmin, requirePerm('approve_entries'),
   coerceBody({ int: ['project_id'], float: ['overtime_hours_override'] }),
   async (req, res) => {
   const companyId = req.user.company_id;
@@ -545,7 +545,7 @@ router.patch('/entries/:id/edit', requireAdmin, requirePermission('approve_entri
 });
 
 // POST /admin/entries/:id/split — split a pending entry into multiple project segments
-router.post('/entries/:id/split', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+router.post('/entries/:id/split', requireAdmin, requirePerm('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const { segments } = req.body; // [{ project_id, start_time, end_time }, ...]
   if (!Array.isArray(segments) || segments.length < 2) {
@@ -679,7 +679,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         FROM daily_regular
         GROUP BY user_id, ${weekBucketSql}
       )
-      SELECT u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification,
+      SELECT u.id, u.full_name, u.invoice_name, u.username, u.role, u.role_id, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE(
@@ -702,7 +702,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
       LEFT JOIN time_entries te ON te.user_id = u.id
         AND te.work_date >= CURRENT_DATE - INTERVAL '365 days'
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1 ${accessParamSql}
-      GROUP BY u.id, u.full_name, u.invoice_name, u.username, u.role, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification
+      GROUP BY u.id, u.full_name, u.invoice_name, u.username, u.role, u.role_id, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
       queryParams
@@ -748,7 +748,7 @@ router.patch('/workers/:id/restore', requireAdmin, async (req, res) => {
 });
 
 // Get a worker's entries for a date range (for bill generation)
-router.post('/workers/:id/entries', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+router.post('/workers/:id/entries', requireAdmin, requirePerm('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
   const { work_date, start_time, end_time, project_id, break_minutes, mileage } = req.body;
   const notes = req.body.notes?.trim() || null;
@@ -904,7 +904,7 @@ const inviteLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-router.post('/workers/invite', requireAdmin, requirePermission('manage_workers'), inviteLimiter, async (req, res) => {
+router.post('/workers/invite', requireAdmin, requirePerm('manage_workers'), inviteLimiter, async (req, res) => {
   const full_name = req.body.full_name?.trim();
   const email = req.body.email?.trim();
   const { role, language, hourly_rate } = req.body;
@@ -947,15 +947,38 @@ router.post('/workers/invite', requireAdmin, requirePermission('manage_workers')
     username = baseUsername + suffix++;
   }
 
+  // Phase B: optional role_id at invite time. Same escalation guard as POST.
+  let resolvedRoleId = null;
+  let resolvedLegacyRole = assignedRole;
+  if (req.body.role_id != null) {
+    const roleLookup = await pool.query(
+      `SELECT r.id, r.parent_role,
+              ARRAY(SELECT permission FROM role_permissions WHERE role_id = r.id) AS perms
+         FROM roles r WHERE r.id = $1 AND r.company_id = $2`,
+      [parseInt(req.body.role_id), companyId]
+    );
+    if (roleLookup.rowCount === 0) return res.status(404).json({ error: 'Role not found' });
+    const reqPerms = await getUserPermissions(req.user);
+    for (const p of roleLookup.rows[0].perms) {
+      if (!reqPerms.has(p)) return res.status(403).json({ error: `Cannot assign a role granting "${p}" — you don't have it yourself`, code: 'permission_escalation', required: p });
+    }
+    resolvedRoleId = roleLookup.rows[0].id;
+    resolvedLegacyRole = roleLookup.rows[0].parent_role;
+  } else {
+    const defaultName = assignedRole === 'admin' ? 'Admin' : 'Worker';
+    const def = await pool.query('SELECT id FROM roles WHERE company_id = $1 AND is_builtin = true AND name = $2', [companyId, defaultName]);
+    if (def.rowCount > 0) resolvedRoleId = def.rows[0].id;
+  }
+
   const token = crypto.randomBytes(32).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
   try {
     const result = await pool.query(
-      `INSERT INTO users (company_id, username, password_hash, full_name, role, language, hourly_rate, email, invite_token, invite_token_expires, invite_pending)
-       VALUES ($1, $2, '', $3, $4, $5, $6, $7, $8, $9, true)
-       RETURNING id, username, full_name, role, language, hourly_rate, email`,
-      [companyId, username, full_name, assignedRole, assignedLanguage, assignedRate, email, tokenHash, expires]
+      `INSERT INTO users (company_id, username, password_hash, full_name, role, role_id, language, hourly_rate, email, invite_token, invite_token_expires, invite_pending)
+       VALUES ($1, $2, '', $3, $4, $5, $6, $7, $8, $9, $10, true)
+       RETURNING id, username, full_name, role, role_id, language, hourly_rate, email`,
+      [companyId, username, full_name, resolvedLegacyRole, resolvedRoleId, assignedLanguage, assignedRate, email, tokenHash, expires]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.invited', 'worker', result.rows[0].id, full_name, { email });
     const inviteUrl = `${process.env.APP_URL}/accept-invite?token=${token}`;
@@ -987,7 +1010,7 @@ router.post('/workers/invite', requireAdmin, requirePermission('manage_workers')
 });
 
 // Send invite email to an existing worker who hasn't signed in yet
-router.post('/workers/:id/send-invite', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+router.post('/workers/:id/send-invite', requireAdmin, requirePerm('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -1034,10 +1057,10 @@ router.post('/workers/:id/send-invite', requireAdmin, requirePermission('manage_
 });
 
 // Create a worker or admin
-router.post('/workers', requireAdmin, requirePermission('manage_workers'),
-  coerceBody({ float: ['hourly_rate'] }),
+router.post('/workers', requireAdmin, requirePerm('manage_workers'),
+  coerceBody({ float: ['hourly_rate'], int: ['role_id'] }),
   async (req, res) => {
-  const { password, role } = req.body;
+  const { password, role, role_id } = req.body;
   const username = req.body.username?.trim();
   const full_name = req.body.full_name?.trim();
   const first_name = req.body.first_name?.trim() || null;
@@ -1078,13 +1101,51 @@ router.post('/workers', requireAdmin, requirePermission('manage_workers'),
     }
   }
 
+  // Phase B: optional role_id assignment at creation. If supplied, validate
+  // it's a real role for this company and that the requester can grant it.
+  // Also rewrite assignedRole to match the role's parent_role so the legacy
+  // role column stays consistent with role_id.
+  let resolvedRoleId = null;
+  let resolvedLegacyRole = assignedRole;
+  if (role_id != null) {
+    const roleLookup = await pool.query(
+      `SELECT r.id, r.parent_role,
+              ARRAY(SELECT permission FROM role_permissions WHERE role_id = r.id) AS perms
+         FROM roles r WHERE r.id = $1 AND r.company_id = $2`,
+      [role_id, companyId]
+    );
+    if (roleLookup.rowCount === 0) return res.status(404).json({ error: 'Role not found' });
+    const reqPerms = await getUserPermissions(req.user);
+    for (const p of roleLookup.rows[0].perms) {
+      if (!reqPerms.has(p)) {
+        return res.status(403).json({
+          error: `Cannot assign a role granting "${p}" — you don't have it yourself`,
+          code: 'permission_escalation',
+          required: p,
+        });
+      }
+    }
+    resolvedRoleId = roleLookup.rows[0].id;
+    resolvedLegacyRole = roleLookup.rows[0].parent_role;
+  } else {
+    // No role_id given. Default to the company's built-in Worker or Admin
+    // role based on the legacy `role` field, so newly created users always
+    // have a role_id (no more "stuck on legacy fallback" problem).
+    const defaultName = assignedRole === 'admin' ? 'Admin' : 'Worker';
+    const defaultLookup = await pool.query(
+      `SELECT id FROM roles WHERE company_id = $1 AND is_builtin = true AND name = $2`,
+      [companyId, defaultName]
+    );
+    if (defaultLookup.rowCount > 0) resolvedRoleId = defaultLookup.rows[0].id;
+  }
+
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      'INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, language, hourly_rate, rate_type, overtime_rule, email, email_confirmed, must_change_password, worker_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true, true, $14) RETURNING id, username, full_name, first_name, middle_name, last_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type',
-      [companyId, username, hash, full_name, first_name || null, middle_name || null, last_name || null, assignedRole, assignedLanguage, assignedRate, assignedRateType, assignedOTRule, assignedEmail, assignedWorkerType]
+      'INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, role_id, language, hourly_rate, rate_type, overtime_rule, email, email_confirmed, must_change_password, worker_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true, true, $15) RETURNING id, username, full_name, first_name, middle_name, last_name, role, role_id, language, hourly_rate, rate_type, overtime_rule, email, worker_type',
+      [companyId, username, hash, full_name, first_name || null, middle_name || null, last_name || null, resolvedLegacyRole, resolvedRoleId, assignedLanguage, assignedRate, assignedRateType, assignedOTRule, assignedEmail, assignedWorkerType]
     );
-    await logAudit(companyId, req.user.id, req.user.full_name, 'worker.created', 'worker', result.rows[0].id, full_name, { role: assignedRole });
+    await logAudit(companyId, req.user.id, req.user.full_name, 'worker.created', 'worker', result.rows[0].id, full_name, { role: resolvedLegacyRole, role_id: resolvedRoleId });
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') {
@@ -1116,7 +1177,7 @@ function computeGuaranteeShortfall(totalHours, guaranteedWeeklyHours, fromDate, 
 }
 
 // Update a worker (full_name, first_name, middle_name, last_name, username, role, language, hourly_rate, rate_type, email, worker_type)
-router.patch('/workers/:id', requireAdmin, requirePermission('manage_workers'),
+router.patch('/workers/:id', requireAdmin, requirePerm('manage_workers'),
   coerceBody({ float: ['hourly_rate', 'guaranteed_weekly_hours'] }),
   async (req, res) => {
   const { role, language, hourly_rate, rate_type, overtime_rule, worker_type } = req.body;
@@ -1275,7 +1336,7 @@ router.patch('/workers/:id/worker-access', requireAdmin, async (req, res) => {
 });
 
 // Remove (soft-delete) a worker
-router.delete('/workers/:id', requireAdmin, requirePermission('manage_workers'), async (req, res) => {
+router.delete('/workers/:id', requireAdmin, requirePerm('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const worker = await pool.query('SELECT full_name FROM users WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
@@ -1476,7 +1537,7 @@ router.patch('/projects/:id/restore', requireAdmin, async (req, res) => {
 });
 
 // Update project (name and/or wage_type and/or geofence)
-router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects'),
+router.patch('/projects/:id', requireAdmin, requirePerm('manage_projects'),
   coerceBody({
     int:   ['geo_radius_ft', 'required_checklist_template_id', 'progress_pct'],
     float: ['geo_lat', 'geo_lng', 'budget_hours', 'budget_dollars', 'prevailing_wage_rate'],
@@ -1605,7 +1666,7 @@ router.patch('/projects/:id', requireAdmin, requirePermission('manage_projects')
 });
 
 // Create a project
-router.post('/projects', requireAdmin, requirePermission('manage_projects'),
+router.post('/projects', requireAdmin, requirePerm('manage_projects'),
   coerceBody({ float: ['prevailing_wage_rate'] }),
   async (req, res) => {
   const { wage_type, prevailing_wage_rate, client_id, job_number, address, start_date, end_date, status, description } = req.body;
@@ -1975,7 +2036,7 @@ router.get('/projects/:id/media-zip', requireAdmin, async (req, res) => {
 });
 
 // Merge one project into another — moves all data, deletes source
-router.post('/projects/:id/merge-into/:target_id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
+router.post('/projects/:id/merge-into/:target_id', requireAdmin, requirePerm('manage_projects'), async (req, res) => {
   const sourceId = parseInt(req.params.id);
   const targetId = parseInt(req.params.target_id);
   const companyId = req.user.company_id;
@@ -2027,7 +2088,7 @@ router.post('/projects/:id/merge-into/:target_id', requireAdmin, requirePermissi
   }
 });
 
-router.delete('/projects/:id', requireAdmin, requirePermission('manage_projects'), async (req, res) => {
+router.delete('/projects/:id', requireAdmin, requirePerm('manage_projects'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const project = await pool.query('SELECT name FROM projects WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
@@ -2058,7 +2119,7 @@ router.delete('/projects/:id', requireAdmin, requirePermission('manage_projects'
 });
 
 // GET /admin/analytics?from=YYYY-MM-DD&to=YYYY-MM-DD
-router.get('/analytics', requireAdmin, requirePermission('view_reports'), requirePlan('business'), async (req, res) => {
+router.get('/analytics', requireAdmin, requirePerm('view_reports'), requirePlan('business'), async (req, res) => {
   const companyId = req.user.company_id;
   const { from, to } = req.query;
   // Validate dates if provided
@@ -2172,7 +2233,7 @@ router.get('/analytics', requireAdmin, requirePermission('view_reports'), requir
 });
 
 // GET /admin/entries/pending — pending time entries for this company (max 200 per page; has_more signals more available)
-router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+router.get('/entries/pending', requireAdmin, requirePerm('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const LIMIT = 200;
   const accessIds = req.user.worker_access_ids;
@@ -2209,7 +2270,7 @@ router.get('/entries/pending', requireAdmin, requirePermission('approve_entries'
 });
 
 // GET /admin/entries/recently-approved — entries approved in the last 24 hours
-router.get('/entries/recently-approved', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+router.get('/entries/recently-approved', requireAdmin, requirePerm('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const accessIds = req.user.worker_access_ids;
   try {
@@ -2237,7 +2298,7 @@ router.get('/entries/recently-approved', requireAdmin, requirePermission('approv
 });
 
 // POST /admin/entries/bulk-approve — approve a specific set of entry IDs
-router.post('/entries/bulk-approve', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+router.post('/entries/bulk-approve', requireAdmin, requirePerm('approve_entries'), async (req, res) => {
   const { ids } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
   if (ids.length > 200) return res.status(400).json({ error: 'Max 200 entries per bulk approve' });
@@ -2274,7 +2335,7 @@ router.post('/entries/bulk-approve', requireAdmin, requirePermission('approve_en
 });
 
 // POST /admin/entries/approve-all — approve every pending entry for this company
-router.post('/entries/approve-all', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+router.post('/entries/approve-all', requireAdmin, requirePerm('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const accessIds = req.user.worker_access_ids;
   try {
@@ -2294,7 +2355,7 @@ router.post('/entries/approve-all', requireAdmin, requirePermission('approve_ent
 });
 
 // PATCH /admin/entries/:id/approve
-router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_entries'),
+router.patch('/entries/:id/approve', requireAdmin, requirePerm('approve_entries'),
   coerceBody({ float: ['overtime_hours_override'] }),
   async (req, res) => {
   const companyId = req.user.company_id;
@@ -2436,7 +2497,7 @@ router.patch('/entries/:id/approve', requireAdmin, requirePermission('approve_en
 });
 
 // PATCH /admin/entries/:id/reject
-router.patch('/entries/:id/reject', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+router.patch('/entries/:id/reject', requireAdmin, requirePerm('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const { note } = req.body;
   if (note && note.length > 500) return res.status(400).json({ error: 'Note must be 500 characters or fewer' });
@@ -2485,7 +2546,7 @@ router.patch('/entries/:id/reject', requireAdmin, requirePermission('approve_ent
 });
 
 // PATCH /admin/entries/:id/unapprove — revert an approved entry back to pending
-router.patch('/entries/:id/unapprove', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+router.patch('/entries/:id/unapprove', requireAdmin, requirePerm('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const accessIds = req.user.worker_access_ids;
   try {
@@ -2521,7 +2582,7 @@ router.patch('/entries/:id/unapprove', requireAdmin, requirePermission('approve_
 });
 
 // PATCH /admin/entries/:id/unlock
-router.patch('/entries/:id/unlock', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+router.patch('/entries/:id/unlock', requireAdmin, requirePerm('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   const accessIds = req.user.worker_access_ids;
   try {
@@ -2553,7 +2614,7 @@ router.get('/pay-periods', requireAdmin, async (req, res) => {
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/pay-periods', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+router.post('/pay-periods', requireAdmin, requirePerm('approve_entries'), async (req, res) => {
   const { period_start, period_end, label } = req.body;
   if (!period_start || !period_end) return res.status(400).json({ error: 'period_start and period_end required' });
   if (period_start >= period_end) return res.status(400).json({ error: 'period_end must be after period_start' });
@@ -2572,7 +2633,7 @@ router.post('/pay-periods', requireAdmin, requirePermission('approve_entries'), 
   }
 });
 
-router.delete('/pay-periods/:id', requireAdmin, requirePermission('approve_entries'), async (req, res) => {
+router.delete('/pay-periods/:id', requireAdmin, requirePerm('approve_entries'), async (req, res) => {
   const companyId = req.user.company_id;
   try {
     const result = await pool.query(
@@ -2586,7 +2647,7 @@ router.delete('/pay-periods/:id', requireAdmin, requirePermission('approve_entri
 });
 
 // CSV Export
-router.get('/export', requireAdmin, requirePermission('view_reports'), requirePlan('starter'), async (req, res) => {
+router.get('/export', requireAdmin, requirePerm('view_reports'), requirePlan('starter'), async (req, res) => {
   const { from, to, worker_id, project_id, status } = req.query;
   if (!from || !to) return res.status(400).json({ error: 'from and to required' });
   const companyId = req.user.company_id;
@@ -2628,7 +2689,7 @@ router.get('/export', requireAdmin, requirePermission('view_reports'), requirePl
 });
 
 // Overtime report
-router.get('/overtime-report', requireAdmin, requirePermission('view_reports'), requirePlan('starter'), async (req, res) => {
+router.get('/overtime-report', requireAdmin, requirePerm('view_reports'), requirePlan('starter'), async (req, res) => {
   const { from, to } = req.query;
   if (!from || !to) return res.status(400).json({ error: 'from and to required' });
   const companyId = req.user.company_id;
@@ -2705,7 +2766,7 @@ router.get('/overtime-report', requireAdmin, requirePermission('view_reports'), 
 });
 
 // Payroll export CSV
-router.get('/payroll-export', requireAdmin, requirePermission('view_reports'), requirePlan('starter'), async (req, res) => {
+router.get('/payroll-export', requireAdmin, requirePerm('view_reports'), requirePlan('starter'), async (req, res) => {
   const { from, to } = req.query;
   if (!from || !to) return res.status(400).json({ error: 'from and to required' });
   const companyId = req.user.company_id;
@@ -2854,7 +2915,7 @@ router.get('/audit-log', requireAdmin, async (req, res) => {
 });
 
 // POST /admin/broadcast — push a message to all active workers
-router.post('/broadcast', requireAdmin, requirePermission('manage_settings'), requirePlan('business'), async (req, res) => {
+router.post('/broadcast', requireAdmin, requirePerm('manage_settings'), requirePlan('business'), async (req, res) => {
   const { message } = req.body;
   if (!message?.trim()) return res.status(400).json({ error: 'message required' });
   if (message.length > 200) return res.status(400).json({ error: 'Message must be 200 characters or fewer' });
@@ -2881,7 +2942,7 @@ router.post('/broadcast', requireAdmin, requirePermission('manage_settings'), re
 
 // GET /admin/certified-payroll?week_end=YYYY-MM-DD&project_id=N
 // Returns prevailing-wage hours by worker broken down by day of week for a 7-day window
-router.get('/certified-payroll', requireAdmin, requirePermission('view_reports'), requireProAddon, async (req, res) => {
+router.get('/certified-payroll', requireAdmin, requirePerm('view_reports'), requireProAddon, async (req, res) => {
   const { week_end, project_id } = req.query;
   if (!week_end) return res.status(400).json({ error: 'week_end required' });
   const companyId = req.user.company_id;
@@ -3642,7 +3703,7 @@ router.delete('/roles/:id', requireAdmin, requirePerm('manage_roles'), async (re
 
 // PATCH /admin/workers/:id/role — assign a role to a worker
 // Side effect: also updates legacy users.role to match the role's parent_role
-// so legacy `requirePermission(...)` middleware keeps working through Phase B.
+// so legacy `requirePerm(...)` middleware keeps working through Phase B.
 // Phase C drops users.role and removes this side effect.
 router.patch('/workers/:id/role', requireAdmin, requirePerm('assign_roles'), async (req, res) => {
   const { role_id } = req.body || {};

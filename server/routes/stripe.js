@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const Stripe = require('stripe');
 const pool = require('../db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAdmin, requirePerm } = require('../middleware/auth');
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY not configured');
@@ -56,7 +56,7 @@ router.get('/plans', requireAdmin, (req, res) => {
 });
 
 // GET /stripe/status
-router.get('/status', requireAdmin, async (req, res) => {
+router.get('/status', requireAdmin, requirePerm('manage_billing'), async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT subscription_status, trial_ends_at, plan, addon_qbo, billing_cycle, stripe_customer_id, stripe_subscription_id FROM companies WHERE id = $1',
@@ -67,7 +67,7 @@ router.get('/status', requireAdmin, async (req, res) => {
 });
 
 // POST /stripe/checkout — create Stripe Checkout session
-router.post('/checkout', requireAdmin, async (req, res) => {
+router.post('/checkout', requireAdmin, requirePerm('manage_billing'), async (req, res) => {
   const { price_id, worker_price_id, worker_count, add_qbo, qbo_price_id } = req.body;
   if (!price_id) return res.status(400).json({ error: 'price_id required' });
   try {
@@ -119,7 +119,7 @@ router.post('/checkout', requireAdmin, async (req, res) => {
 });
 
 // POST /stripe/portal — customer billing portal
-router.post('/portal', requireAdmin, async (req, res) => {
+router.post('/portal', requireAdmin, requirePerm('manage_billing'), async (req, res) => {
   try {
     const stripe = getStripe();
     const company = await pool.query('SELECT stripe_customer_id FROM companies WHERE id = $1', [req.user.company_id]);
