@@ -8,16 +8,19 @@
 import React from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useT } from '../hooks/useT';
 import { silentError } from '../errorReporter';
 
-export function RefreshButton({ title = 'Refresh' }) {
+export function RefreshButton({ title }) {
+  const t = useT();
+  const label = title || t.refresh || 'Refresh';
   return (
     <button
       type="button"
       className="header-btn"
       style={styles.refreshBtn}
-      title={title}
-      aria-label={title}
+      title={label}
+      aria-label={label}
       onClick={() => window.location.reload()}
     >
       ↻
@@ -27,6 +30,7 @@ export function RefreshButton({ title = 'Refresh' }) {
 
 export function LanguageSwitcher() {
   const { user, updateUser } = useAuth();
+  const t = useT();
   const change = async lang => {
     try {
       await api.post('/auth/update-language', { language: lang }, { suppressToast: true });
@@ -39,7 +43,7 @@ export function LanguageSwitcher() {
       className="header-lang"
       value={user?.language || 'English'}
       onChange={e => change(e.target.value)}
-      aria-label="Language"
+      aria-label={t.languageAria || 'Language'}
     >
       <option value="English" style={{ color: '#111827', background: '#fff' }}>EN</option>
       <option value="Spanish" style={{ color: '#111827', background: '#fff' }}>ES</option>

@@ -166,7 +166,11 @@ function AppRoutes() {
   const token = sessionStorage.getItem('impersonate_token');
   if (!token) return;
   sessionStorage.removeItem('impersonate_token');
-  localStorage.setItem('tc_token', token);
+  // Store the impersonation token in sessionStorage (tab-scoped), NOT
+  // localStorage (origin-scoped). Otherwise the impersonation tab would
+  // overwrite the super admin's tc_token in their original SuperAdmin tab,
+  // and the next /superadmin/* request from there would 403.
+  sessionStorage.setItem('tc_token', token);
   // Intentionally do NOT clear the IndexedDB cache here — the super admin
   // impersonating a user wants to reproduce exactly what the user sees,
   // including stale-cache artifacts. Clearing it would mask diagnostic bugs.

@@ -10,6 +10,12 @@ import { act } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import UpdatePrompt from '../UpdatePrompt';
 
+// UpdatePrompt uses useT → useAuth; stub the context so we don't need to
+// wrap every test in AuthProvider.
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { language: 'English' } }),
+}));
+
 function setupSW({ initialController }) {
   const listeners = {};
   const sw = {

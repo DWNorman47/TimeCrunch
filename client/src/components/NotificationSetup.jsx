@@ -39,7 +39,7 @@ export default function NotificationSetup() {
     setErrorMsg('');
     try {
       const keyRes = await api.get('/push/vapid-public-key');
-      if (!keyRes.data?.publicKey) throw new Error('Push notifications are not configured on the server yet.');
+      if (!keyRes.data?.publicKey) throw new Error(t.pushNotConfigured);
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,

@@ -403,8 +403,8 @@ export default function AdministrationPage() {
                   >
                     <div style={styles.integrationLogo}>QB</div>
                     <div style={{ flex: 1, textAlign: 'left' }}>
-                      <div style={styles.integrationName}>QuickBooks Online</div>
-                      <div style={styles.integrationDesc}>Push time entries, reimbursements, and contractor bills to QBO.</div>
+                      <div style={styles.integrationName}>{t.adminQuickBooksOnline}</div>
+                      <div style={styles.integrationDesc}>{t.adminQboDesc}</div>
                     </div>
                     <span style={styles.integrationChevron} aria-hidden="true">›</span>
                   </button>
@@ -418,11 +418,11 @@ export default function AdministrationPage() {
                     type="button"
                     onClick={backToIntegrations}
                     style={styles.backBtn}
-                    aria-label="Back to Integrations"
+                    aria-label={t.adminBackToIntegrations}
                   >
-                    ← Integrations
+                    {t.adminIntegrationsBack}
                   </button>
-                  <h2 style={{ ...styles.tabTitle, margin: 0 }}>QuickBooks Online</h2>
+                  <h2 style={{ ...styles.tabTitle, margin: 0 }}>{t.adminQuickBooksOnline}</h2>
                 </div>
                 <QuickBooks
                   workers={workers}

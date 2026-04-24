@@ -113,7 +113,7 @@ const styles = {
   wrap: { position: 'relative' },
   bell: {
     position: 'relative', background: 'none', border: 'none', cursor: 'pointer',
-    color: '#6b7280', padding: '6px', borderRadius: 8, display: 'flex', alignItems: 'center',
+    color: '#fff', padding: '6px', borderRadius: 8, display: 'flex', alignItems: 'center',
     transition: 'color 0.15s',
   },
   badge: {

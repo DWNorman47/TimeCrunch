@@ -380,7 +380,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                         )}
                         {showWageType && (
                           <div style={s.fieldGroup}>
-                            <label htmlFor="mp-wage-type" style={s.fieldLabel}>Wage type</label>
+                            <label htmlFor="mp-wage-type" style={s.fieldLabel}>{t.mpWageType}</label>
                             <select id="mp-wage-type" style={s.editInput} value={editWageType} onChange={e => { setEditWageType(e.target.value); setEditPrevailingRate(''); }}>
                               <option value="regular">{t.regularWages}</option>
                               <option value="prevailing">{t.prevailingWages}</option>
@@ -389,7 +389,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                         )}
                         {editWageType === 'prevailing' && (
                           <div style={s.fieldGroup}>
-                            <label htmlFor="mp-rate" style={s.fieldLabel}>Rate ($/hr)</label>
+                            <label htmlFor="mp-rate" style={s.fieldLabel}>{t.mpRatePerHr}</label>
                             <input id="mp-rate" style={s.editInput} type="number" min="0" step="0.01" placeholder={defaultPrevailingRate || '45.00'} value={editPrevailingRate} onChange={e => setEditPrevailingRate(e.target.value)} />
                           </div>
                         )}
@@ -398,40 +398,40 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
 
                     {/* Project Info */}
                     <div style={s.section}>
-                      <div style={s.sectionTitle}>Project Info</div>
+                      <div style={s.sectionTitle}>{t.mpProjectInfo}</div>
                       <div style={s.fieldsGrid}>
                         <div style={s.fieldGroup}>
-                          <label htmlFor="mp-status" style={s.fieldLabel}>Status</label>
+                          <label htmlFor="mp-status" style={s.fieldLabel}>{t.mpStatus}</label>
                           <select id="mp-status" style={s.editInput} value={editStatus} onChange={e => setEditStatus(e.target.value)}>
-                            <option value="planning">Planning</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="on_hold">On Hold</option>
-                            <option value="completed">Completed</option>
+                            <option value="planning">{t.mpStatusPlanning}</option>
+                            <option value="in_progress">{t.mpStatusInProgress}</option>
+                            <option value="on_hold">{t.mpStatusOnHold}</option>
+                            <option value="completed">{t.mpStatusCompleted}</option>
                           </select>
                         </div>
                         <div style={s.fieldGroup}>
-                          <label htmlFor="mp-client-name" style={s.fieldLabel}>Client Name</label>
+                          <label htmlFor="mp-client-name" style={s.fieldLabel}>{t.mpClientName}</label>
                           <input id="mp-client-name" style={s.editInput} value={editClientName} onChange={e => setEditClientName(e.target.value)} placeholder={t.clientNameShortPlaceholder} />
                         </div>
                         <div style={s.fieldGroup}>
-                          <label htmlFor="mp-job-number" style={s.fieldLabel}>Job Number</label>
+                          <label htmlFor="mp-job-number" style={s.fieldLabel}>{t.mpJobNumber}</label>
                           <input id="mp-job-number" style={s.editInput} value={editJobNumber} onChange={e => setEditJobNumber(e.target.value)} placeholder={t.jobNumberPlaceholder} />
                         </div>
                         <div style={s.fieldGroup}>
-                          <label htmlFor="mp-start-date" style={s.fieldLabel}>Start Date</label>
+                          <label htmlFor="mp-start-date" style={s.fieldLabel}>{t.mpStartDate}</label>
                           <input id="mp-start-date" style={s.editInput} type="date" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
                         </div>
                         <div style={s.fieldGroup}>
-                          <label htmlFor="mp-end-date" style={s.fieldLabel}>Target End Date</label>
+                          <label htmlFor="mp-end-date" style={s.fieldLabel}>{t.mpTargetEndDate}</label>
                           <input id="mp-end-date" style={s.editInput} type="date" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} />
                         </div>
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
-                        <label htmlFor="mp-address" style={s.fieldLabel}>Address / Location</label>
+                        <label htmlFor="mp-address" style={s.fieldLabel}>{t.mpAddressLocation}</label>
                         <input id="mp-address" style={s.editInput} maxLength={255} value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder={t.projectAddressPlaceholder} />
                       </div>
                       <div style={{ ...s.fieldGroup, marginTop: 8 }}>
-                        <label htmlFor="mp-description" style={s.fieldLabel}>Description</label>
+                        <label htmlFor="mp-description" style={s.fieldLabel}>{t.mpDescription}</label>
                         <textarea id="mp-description" style={{ ...s.editInput, minHeight: 60, resize: 'vertical' }} maxLength={1000} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder={t.projectDescPlaceholder} />
                         <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(editDescription || '').length}/1000</div>
                       </div>
@@ -586,7 +586,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
                   {t.downloadMediaUrls}
                 </button>
               )}
-              <span style={s.downloadHint}>Download all photos and attachments for this project before archiving</span>
+              <span style={s.downloadHint}>{t.mpArchiveDownloadHint}</span>
             </div>
             <div style={s.modalActions}>
               <button style={s.cancelBtn} onClick={() => setArchiveTarget(null)}>{t.cancel}</button>

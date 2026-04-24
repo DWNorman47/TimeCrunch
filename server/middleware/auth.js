@@ -188,4 +188,14 @@ function requirePermission(key) {
   };
 }
 
-module.exports = { requireAuth, requireAdmin, requireSuperAdmin, requirePlan, requireProAddon, requireCertifiedPayrollAddon, hasAdminPermission, requirePermission };
+// Re-export the Phase A permission framework so callers can pull both old
+// and new checks from one import site. When Phase C lands and every route
+// uses requirePerm, the legacy requirePermission/hasAdminPermission exports
+// will be removed.
+const { hasPerm, requirePerm } = require('../permissions');
+
+module.exports = {
+  requireAuth, requireAdmin, requireSuperAdmin, requirePlan, requireProAddon, requireCertifiedPayrollAddon,
+  hasAdminPermission, requirePermission,
+  hasPerm, requirePerm,
+};

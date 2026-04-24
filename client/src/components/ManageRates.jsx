@@ -311,16 +311,16 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('modules')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('modules')}>
           <span style={styles.sectionIcon}>📦</span>
           <div style={{ flex: 1 }}>
-            <div style={styles.sectionTitle}>Modules</div>
-            <div style={styles.sectionSub}>Enable or disable entire app modules for all users</div>
+            <div style={styles.sectionTitle}>{t.mrModulesTitle}</div>
+            <div style={styles.sectionSub}>{t.mrModulesSub}</div>
           </div>
           <span style={styles.collapseChevron}>{collapsed.modules ? '▶' : '▼'}</span>
         </div>
         {!collapsed.modules && <div style={styles.sectionBody}>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Time Clock</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show the Time Clock app in the app switcher</div>
+              <div style={styles.label}>{t.mrModuleTimeClock}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrModuleTimeClockDesc}</div>
             </div>
             <label style={{ ...styles.toggle, background: form.module_timeclock ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.module_timeclock} onChange={e => set('module_timeclock', e.target.checked)} style={{ display: 'none' }} />
@@ -339,8 +339,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Projects</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show the Projects module in the app switcher</div>
+              <div style={styles.label}>{t.mrModuleProjects}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrModuleProjectsDesc}</div>
             </div>
             <label style={{ ...styles.toggle, background: form.module_projects ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.module_projects} onChange={e => {
@@ -352,8 +352,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Inventory</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show the Inventory module in the app switcher</div>
+              <div style={styles.label}>{t.mrModuleInventory}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrModuleInventoryDesc}</div>
             </div>
             <label style={{ ...styles.toggle, background: form.module_inventory ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.module_inventory} onChange={e => set('module_inventory', e.target.checked)} style={{ display: 'none' }} />
@@ -364,8 +364,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               a separate section rendered after Reimbursements — see below. */}
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Analytics</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show the Analytics module in the app switcher</div>
+              <div style={styles.label}>{t.mrModuleAnalytics}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrModuleAnalyticsDesc}</div>
             </div>
             <label style={{ ...styles.toggle, background: form.module_analytics ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.module_analytics} onChange={e => {
@@ -377,8 +377,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Team</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show the Team directory in the app switcher (admins manage workers here)</div>
+              <div style={styles.label}>{t.mrModuleTeam}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrModuleTeamDesc}</div>
             </div>
             <label style={{ ...styles.toggle, background: form.module_team ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.module_team} onChange={e => set('module_team', e.target.checked)} style={{ display: 'none' }} />
@@ -402,8 +402,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         {!collapsed.features && <div style={styles.sectionBody}>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Project Integration</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Require project selection on time entries and clock-in</div>
+              <div style={styles.label}>{t.mrFeatProjectIntegration}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrFeatProjectIntegrationDesc}</div>
             </div>
             <label style={{ ...styles.toggle, background: form.feature_project_integration ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_project_integration} onChange={e => set('feature_project_integration', e.target.checked)} style={{ display: 'none' }} />
@@ -452,8 +452,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Announce to All Workers</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show broadcast message tool on the Live tab</div>
+              <div style={styles.label}>{t.mrFeatBroadcast}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrFeatBroadcastDesc}</div>
             </div>
             <label style={{ ...styles.toggle, background: form.feature_broadcast ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_broadcast} onChange={e => set('feature_broadcast', e.target.checked)} style={{ display: 'none' }} />
@@ -462,8 +462,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Media Gallery</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Show a dedicated Media tab in Field for browsing all photos and videos</div>
+              <div style={styles.label}>{t.mrFeatMediaGallery}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrFeatMediaGalleryDesc}</div>
             </div>
             <label style={{ ...styles.toggle, background: form.feature_media_gallery ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_media_gallery} onChange={e => set('feature_media_gallery', e.target.checked)} style={{ display: 'none' }} />
@@ -492,17 +492,17 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Global Clock-in Checklist</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Require all workers to complete a safety checklist before clocking in (any project)</div>
+              <div style={styles.label}>{t.mrFeatGlobalChecklist}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrFeatGlobalChecklistDesc}</div>
             </div>
             <select
               style={{ ...styles.input, width: 'auto', textAlign: 'left', minWidth: 160 }}
               value={form.global_required_checklist_template_id}
               onChange={e => set('global_required_checklist_template_id', e.target.value)}
             >
-              <option value="">None</option>
-              {checklistTemplates.map(t => (
-                <option key={t.id} value={String(t.id)}>{t.name}</option>
+              <option value="">{t.none}</option>
+              {checklistTemplates.map(ct => (
+                <option key={ct.id} value={String(ct.id)}>{ct.name}</option>
               ))}
             </select>
           </div>
@@ -533,8 +533,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Default Temporary Password</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Auto-filled when creating a new worker</div>
+              <div style={styles.label}>{t.mrDefaultTempPassword}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrDefaultTempPasswordDesc}</div>
             </div>
             <input
               style={{ ...styles.input, width: 180, textAlign: 'right' }}
@@ -546,17 +546,17 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
           <div className="invoice-sig-row" style={styles.row}>
             <div>
-              <div style={styles.label}>Invoice Digital Signature</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Whether workers must sign invoices before exporting</div>
+              <div style={styles.label}>{t.mrInvoiceSig}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrInvoiceSigDesc}</div>
             </div>
             <select
               style={{ ...styles.input, width: 'auto', textAlign: 'left' }}
               value={form.invoice_signature}
               onChange={e => set('invoice_signature', e.target.value)}
             >
-              <option value="none">None — export without prompt</option>
-              <option value="optional">Optional — worker can skip</option>
-              <option value="required">Required — must sign to export</option>
+              <option value="none">{t.mrInvoiceSigNone}</option>
+              <option value="optional">{t.mrInvoiceSigOptional}</option>
+              <option value="required">{t.mrInvoiceSigRequired}</option>
             </select>
           </div>
         </div>}
@@ -568,41 +568,37 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('standards')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('standards')}>
           <span style={styles.sectionIcon}>📏</span>
           <div style={{ flex: 1 }}>
-            <div style={styles.sectionTitle}>Company Standards</div>
-            <div style={styles.sectionSub}>Shared conventions used across reports, schedules, and payroll.</div>
+            <div style={styles.sectionTitle}>{t.mrStandardsTitle}</div>
+            <div style={styles.sectionSub}>{t.mrStandardsSub}</div>
           </div>
           <span style={styles.collapseChevron}>{collapsed.standards ? '▶' : '▼'}</span>
         </div>
         {!collapsed.standards && <div style={styles.sectionBody}>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Week starts on</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                Drives weekly overtime bucketing, weekly reports, and default date ranges.
-              </div>
+              <div style={styles.label}>{t.mrWeekStartsOn}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrWeekStartsDesc}</div>
             </div>
             <div style={styles.inputGroup}>
               <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.week_start} onChange={e => set('week_start', e.target.value)}>
-                <option value="0">Sunday</option>
-                <option value="1">Monday</option>
-                <option value="2">Tuesday</option>
-                <option value="3">Wednesday</option>
-                <option value="4">Thursday</option>
-                <option value="5">Friday</option>
-                <option value="6">Saturday</option>
+                <option value="0">{t.daySunday}</option>
+                <option value="1">{t.dayMonday}</option>
+                <option value="2">{t.dayTuesday}</option>
+                <option value="3">{t.dayWednesday}</option>
+                <option value="4">{t.dayThursday}</option>
+                <option value="5">{t.dayFriday}</option>
+                <option value="6">{t.daySaturday}</option>
               </select>
             </div>
           </div>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Company Timezone</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                Used for scheduled reports and notification timing. Leave blank to use each user's browser timezone.
-              </div>
+              <div style={styles.label}>{t.mrCompanyTimezone}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrCompanyTimezoneDesc}</div>
             </div>
             <div style={styles.inputGroup}>
               <select style={{ ...styles.input, width: 'auto', textAlign: 'left' }} value={form.company_timezone} onChange={e => set('company_timezone', e.target.value)}>
-                <option value="">(Use browser timezone)</option>
+                <option value="">{t.mrUseBrowserTimezone}</option>
                 {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
               </select>
             </div>
@@ -651,8 +647,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           </div>
           <div style={styles.row}>
             <div>
-              <div style={styles.label}>Allow Overtime</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Track and display overtime hours and pay</div>
+              <div style={styles.label}>{t.mrAllowOvertime}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrAllowOvertimeDesc}</div>
             </div>
             <label style={{ ...styles.toggle, background: form.feature_overtime ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_overtime} onChange={e => set('feature_overtime', e.target.checked)} style={{ display: 'none' }} />
@@ -707,19 +703,19 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('certifiedPayroll')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('certifiedPayroll')}>
           <span style={styles.sectionIcon}>📜</span>
           <div style={{ flex: 1 }}>
-            <div style={styles.sectionTitle}>Certified Payroll</div>
-            <div style={styles.sectionSub}>Controls what OpsFloa tracks and reports for WH-347 compliance.</div>
+            <div style={styles.sectionTitle}>{t.mrCpTitle}</div>
+            <div style={styles.sectionSub}>{t.mrCpSub}</div>
           </div>
           <span style={styles.collapseChevron}>{collapsed.certifiedPayroll ? '▶' : '▼'}</span>
         </div>
         {!collapsed.certifiedPayroll && <div style={styles.sectionBody}>
           {[
-            { key: 'cp_track_classifications', label: 'Track job classifications', desc: 'Collect trade / class per worker (Carpenter, Electrician, etc.). Required for an accurate WH-347.' },
-            { key: 'cp_track_fringes',         label: 'Track fringe benefits',    desc: 'Per-worker health, pension, vacation, apprenticeship, and other hourly fringe rates.' },
-            { key: 'cp_collect_ssn',           label: 'Collect SSN last-4',       desc: 'Encrypted at rest. Shown only on the generated report — never displayed in the app after setting.' },
-            { key: 'cp_require_signature',     label: 'Require weekly signature', desc: 'Admin signs the Statement of Compliance before a report can be exported.' },
-            { key: 'cp_wh347_format',          label: 'WH-347 format PDF',        desc: 'Generate a PDF matching the official DOL Form WH-347. Leave off for the classic print view.' },
-            { key: 'cp_compute_deductions',    label: 'Compute deductions (Strategy A)', desc: 'EXPERIMENTAL — have OpsFloa compute fed/state/FICA withholdings itself. Default OFF. Most shops let their payroll processor (QBO, ADP, Paychex) handle this.', risky: true },
+            { key: 'cp_track_classifications', label: t.mrCpTrackClass,       desc: t.mrCpTrackClassDesc },
+            { key: 'cp_track_fringes',         label: t.mrCpTrackFringes,     desc: t.mrCpTrackFringesDesc },
+            { key: 'cp_collect_ssn',           label: t.mrCpCollectSsn,       desc: t.mrCpCollectSsnDesc },
+            { key: 'cp_require_signature',     label: t.mrCpRequireSig,       desc: t.mrCpRequireSigDesc },
+            { key: 'cp_wh347_format',          label: t.mrCpWh347Format,      desc: t.mrCpWh347FormatDesc },
+            { key: 'cp_compute_deductions',    label: t.mrCpComputeDeductions, desc: t.mrCpComputeDeductionsDesc, risky: true },
           ].map(f => (
             <div key={f.key} style={styles.row}>
               <div>

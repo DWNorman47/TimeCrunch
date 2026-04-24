@@ -1,5 +1,18 @@
 import React from 'react';
 import { reportClientError } from '../errorReporter';
+import { getT } from '../i18n';
+
+// ErrorBoundary can't use hooks (class component), and when it renders it's
+// because something inside AuthProvider crashed — so useAuth may be
+// unavailable. Read the user's saved language directly from the auth blob
+// in localStorage, fall back to English.
+function readLang() {
+  try {
+    const raw = localStorage.getItem('tc_user');
+    if (raw) return JSON.parse(raw)?.language || 'English';
+  } catch { /* ignore */ }
+  return 'English';
+}
 
 /**
  * True if the error looks like a stale-build / failed-chunk-load.
@@ -96,6 +109,7 @@ export default class ErrorBoundary extends React.Component {
 
   render() {
     if (!this.state.error) return this.props.children;
+    const t = getT(readLang());
 
     if (this.props.mode === 'inline') {
       return (
@@ -103,27 +117,43 @@ export default class ErrorBoundary extends React.Component {
           <div style={styles.inlineIcon}>⚠️</div>
           <div style={{ flex: 1 }}>
             <div style={styles.inlineTitle}>
-              {this.props.label ? `${this.props.label} crashed` : 'This section crashed'}
+              {this.props.label
+                ? (t.errorSectionLabelCrashed || '{label} crashed').replace('{label}', this.props.label)
+                : t.errorSectionCrashed}
             </div>
-            <div style={styles.inlineMsg}>
-              The rest of the app is still working. Try again, or reload if the problem persists.
-            </div>
+            <div style={styles.inlineMsg}>{t.errorStillWorking}</div>
           </div>
-          <button style={styles.inlineBtn} onClick={this.reset}>Try again</button>
+          <button style={styles.inlineBtn} onClick={this.reset}>{t.errorTryAgain}</button>
         </div>
       );
     }
 
     // Top-level / full-page
+    const goHome = () => {
+      // Use href (not pushState) so the app fully remounts and any
+      // bad in-memory state from the crash is discarded.
+      window.location.href = '/';
+    };
+    const signOut = () => {
+      try { localStorage.removeItem('tc_user'); } catch { /* ignore */ }
+      window.location.href = '/login';
+    };
+    const onHome = window.location.pathname === '/' || window.location.pathname === '';
     return (
       <div style={styles.wrap}>
         <div style={styles.card}>
           <div style={styles.icon}>⚠️</div>
-          <h2 style={styles.title}>Something went wrong</h2>
-          <p style={styles.msg}>An unexpected error occurred. Try refreshing the page.</p>
-          <button style={styles.btn} onClick={() => window.location.reload()}>Reload page</button>
+          <h2 style={styles.title}>{t.errorSomethingWentWrong}</h2>
+          <p style={styles.msg}>{t.errorUnexpectedTryReload}</p>
+          <div style={styles.btnRow}>
+            <button style={styles.btn} onClick={() => window.location.reload()}>{t.errorReloadPage}</button>
+            {!onHome && (
+              <button style={styles.btnSecondary} onClick={goHome}>{t.errorGoHome}</button>
+            )}
+            <button style={styles.btnGhost} onClick={signOut}>{t.errorSignOut}</button>
+          </div>
           <details style={styles.details}>
-            <summary style={styles.summary}>Error details</summary>
+            <summary style={styles.summary}>{t.errorDetails}</summary>
             <pre style={styles.pre}>{this.state.error.stack || this.state.error.message}</pre>
           </details>
         </div>
@@ -139,7 +169,10 @@ const styles = {
   icon: { fontSize: 48, marginBottom: 16 },
   title: { fontSize: 20, fontWeight: 700, color: '#111827', marginBottom: 8 },
   msg: { fontSize: 14, color: '#6b7280', marginBottom: 24 },
-  btn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer', marginBottom: 20 },
+  btnRow: { display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 20 },
+  btn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
+  btnSecondary: { background: '#fff', color: '#1a56db', border: '1px solid #1a56db', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
+  btnGhost: { background: 'transparent', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
   details: { textAlign: 'left', marginTop: 8 },
   summary: { fontSize: 12, color: '#6b7280', cursor: 'pointer' },
   pre: { fontSize: 11, color: '#ef4444', background: '#fef2f2', borderRadius: 6, padding: 10, overflowX: 'auto', marginTop: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
