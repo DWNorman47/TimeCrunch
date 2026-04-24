@@ -8,6 +8,7 @@ import SkipLink from './components/SkipLink';
 import { ToastProvider } from './contexts/ToastContext';
 import { OfflineProvider } from './contexts/OfflineContext';
 import { clearCache } from './offlineDb';
+import { userCanSeeModule, pickLandingPath } from './modulePermissions';
 
 const Login             = lazy(() => import('./pages/Login'));
 const Register          = lazy(() => import('./pages/Register'));
@@ -56,7 +57,7 @@ function WorkerSubscriptionWall() {
   );
 }
 
-function PrivateRoute({ children, adminOnly = false, superAdminOnly = false }) {
+function PrivateRoute({ children, adminOnly = false, superAdminOnly = false, moduleId = null }) {
   const { user, loading } = useAuth();
   if (loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f6f9', color: '#6b7280', fontSize: 15 }}>Loading…</div>;
   if (!user) return <Navigate to="/login" replace />;
@@ -76,6 +77,19 @@ function PrivateRoute({ children, adminOnly = false, superAdminOnly = false }) {
     }
   }
 
+  // Phase D: per-module permission guard. Deep-linking to a module you have
+  // no permissions for bounces you to your landing page (the first module
+  // you DO have access to, or /account if none).
+  if (moduleId) {
+    if (!userCanSeeModule(user, moduleId)) {
+      const landing = pickLandingPath(user);
+      // Avoid redirect loops if the landing itself fails the check.
+      if (landing !== window.location.pathname) {
+        return <Navigate to={landing} replace />;
+      }
+    }
+  }
+
   return children;
 }
 
@@ -88,14 +102,31 @@ function adminHome(userId) {
   return '/timeclock';
 }
 
+// Phase D: choose where a logged-in user lands when they hit / or *.
+// super_admin keeps the /superadmin tools page (cross-tenant). Admin first-
+// time users still get the welcoming /administration nudge. Everyone else
+// falls through to pickLandingPath which chooses the first module their
+// permissions actually unlock.
+function landingFor(user) {
+  if (user.role === 'super_admin') return '/superadmin';
+  if (user.role === 'admin') {
+    const key = `admin_welcomed_${user.id}`;
+    if (!localStorage.getItem(key)) {
+      localStorage.setItem(key, '1');
+      return '/administration';
+    }
+  }
+  return pickLandingPath(user);
+}
+
 function AppRoutes() {
   const { user, loading } = useAuth();
   if (loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f6f9', color: '#6b7280', fontSize: 15 }}>Loading…</div>;
   return (
     <Suspense fallback={<PageLoader />}>
     <Routes>
-      <Route path="/login" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Login />} />
-      <Route path="/register" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Register />} />
+      <Route path="/login" element={user ? <Navigate to={landingFor(user)} replace /> : <Login />} />
+      <Route path="/register" element={user ? <Navigate to={landingFor(user)} replace /> : <Register />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/eula" element={<EULA />} />
       <Route path="/changelog" element={<Changelog />} />
@@ -104,20 +135,20 @@ function AppRoutes() {
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/confirm-email" element={<ConfirmEmail />} />
       <Route path="/r/:slug" element={<ServiceRequest />} />
-      <Route path="/team" element={<PrivateRoute><TeamPage /></PrivateRoute>} />
+      <Route path="/team" element={<PrivateRoute moduleId="team"><TeamPage /></PrivateRoute>} />
       <Route path="/__tests__" element={<Tests />} />
-      <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-      <Route path="/timeclock" element={<PrivateRoute adminOnly><AdminDashboard /></PrivateRoute>} />
+      <Route path="/dashboard" element={<PrivateRoute moduleId="timeclock"><Dashboard /></PrivateRoute>} />
+      <Route path="/timeclock" element={<PrivateRoute adminOnly moduleId="timeclock"><AdminDashboard /></PrivateRoute>} />
       <Route path="/admin" element={<Navigate to="/timeclock" replace />} />
-      <Route path="/field" element={<PrivateRoute><FieldPage /></PrivateRoute>} />
-      <Route path="/projects" element={<PrivateRoute adminOnly><ProjectsPage /></PrivateRoute>} />
-      <Route path="/administration" element={<PrivateRoute adminOnly><AdministrationPage /></PrivateRoute>} />
-      <Route path="/analytics" element={<PrivateRoute adminOnly><AnalyticsPage /></PrivateRoute>} />
-      <Route path="/inventory" element={<PrivateRoute><InventoryPage /></PrivateRoute>} />
+      <Route path="/field" element={<PrivateRoute moduleId="field"><FieldPage /></PrivateRoute>} />
+      <Route path="/projects" element={<PrivateRoute adminOnly moduleId="projects"><ProjectsPage /></PrivateRoute>} />
+      <Route path="/administration" element={<PrivateRoute adminOnly moduleId="administration"><AdministrationPage /></PrivateRoute>} />
+      <Route path="/analytics" element={<PrivateRoute adminOnly moduleId="analytics"><AnalyticsPage /></PrivateRoute>} />
+      <Route path="/inventory" element={<PrivateRoute moduleId="inventory"><InventoryPage /></PrivateRoute>} />
       <Route path="/account" element={<PrivateRoute><AccountPage /></PrivateRoute>} />
       <Route path="/superadmin" element={<PrivateRoute superAdminOnly><SuperAdmin /></PrivateRoute>} />
-      <Route path="/" element={user ? <Navigate to={user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard'} replace /> : <Landing />} />
-      <Route path="*" element={<Navigate to={user ? (user.role === 'super_admin' ? '/superadmin' : user.role === 'admin' ? adminHome(user.id) : '/dashboard') : '/'} replace />} />
+      <Route path="/" element={user ? <Navigate to={landingFor(user)} replace /> : <Landing />} />
+      <Route path="*" element={<Navigate to={user ? landingFor(user) : '/'} replace />} />
     </Routes>
     </Suspense>
   );

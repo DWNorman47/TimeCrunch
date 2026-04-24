@@ -162,12 +162,12 @@ export default function TeamPage() {
   useEffect(() => { loadTeam(); }, [loadTeam]);
 
   useEffect(() => {
-    if (isAdmin && !features.module_team) {
-      // Pull settings once so the AppSwitcher gets the right feature map.
-      getOrFetch('settings', () => api.get('/settings').then(r => r.data))
-        .then(setFeatures).catch(silentError('teampage-settings'));
-    }
-    // eslint-disable-next-line
+    // Always fetch settings (workers + admins) so the AppSwitcher's
+    // module_* filters know what the company has turned off. Without this,
+    // a disabled module like Field still showed in the switcher when
+    // viewed from /team because features stayed `{}`.
+    getOrFetch('settings', () => api.get('/settings').then(r => r.data))
+      .then(setFeatures).catch(silentError('teampage-settings'));
   }, []);
 
   useEffect(() => {
