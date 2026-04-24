@@ -43,7 +43,7 @@ INSERT INTO role_permissions (role_id, permission)
 SELECT r.id, perm
 FROM roles r
 CROSS JOIN unnest(ARRAY[
-  'clock_in_self','clock_out_self','submit_time_entry_self','edit_own_pending_entry',
+  'clock_self','submit_time_entry_self','edit_own_pending_entry',
   'view_own_entries','view_projects','submit_reimbursement_self','view_own_reimbursements',
   'submit_field_reports','manage_punchlist','manage_rfis','manage_safety_checklists',
   'manage_equipment','manage_incidents','manage_inspections','view_inventory',
@@ -59,7 +59,7 @@ SELECT r.id, perm
 FROM roles r
 CROSS JOIN unnest(ARRAY[
   -- Worker's set
-  'clock_in_self','clock_out_self','submit_time_entry_self','edit_own_pending_entry',
+  'clock_self','submit_time_entry_self','edit_own_pending_entry',
   'view_own_entries','view_projects','submit_reimbursement_self','view_own_reimbursements',
   'submit_field_reports','manage_punchlist','manage_rfis','manage_safety_checklists',
   'manage_equipment','manage_incidents','manage_inspections','view_inventory',
@@ -81,7 +81,7 @@ SELECT r.id, perm
 FROM roles r
 CROSS JOIN unnest(ARRAY[
   -- Admin's full set
-  'clock_in_self','clock_out_self','submit_time_entry_self','edit_own_pending_entry',
+  'clock_self','submit_time_entry_self','edit_own_pending_entry',
   'view_own_entries','view_projects','submit_reimbursement_self','view_own_reimbursements',
   'submit_field_reports','manage_punchlist','manage_rfis','manage_safety_checklists',
   'manage_equipment','manage_incidents','manage_inspections','view_inventory',

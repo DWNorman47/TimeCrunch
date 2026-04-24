@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import api from '../api';
 import PasswordInput from '../components/PasswordInput';
+import { pickLandingPath } from '../modulePermissions';
 
 function getSavedCompanies() {
   try { return JSON.parse(localStorage.getItem('tc_companies') || '[]'); } catch { return []; }
@@ -42,14 +43,17 @@ export default function Login() {
   const navigateAfterLogin = user => {
     saveCompany(companyName.trim());
     const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+    // First-time admins still get the welcoming nudge to /administration so
+    // they know where billing / settings live. After that, route to whichever
+    // module they actually have access to (Phase D — picks the first module
+    // their permissions unlock; falls back to /account if they have none).
     if (isAdmin) {
       const key = `tc_visited_${user.id}`;
       const firstTime = !localStorage.getItem(key);
       localStorage.setItem(key, '1');
-      navigate(firstTime ? '/administration' : '/timeclock');
-    } else {
-      navigate('/dashboard');
+      if (firstTime) { navigate('/administration'); return; }
     }
+    navigate(pickLandingPath(user));
   };
 
   const handleSubmit = async e => {

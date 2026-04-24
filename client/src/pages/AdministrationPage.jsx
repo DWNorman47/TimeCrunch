@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
+import { usePerm, useHasAnyPerm } from '../hooks/usePerm';
 import api from '../api';
 import AppHeader from '../components/AppHeader';
 import PasswordInput from '../components/PasswordInput';
@@ -310,6 +311,15 @@ export default function AdministrationPage() {
   const { user } = useAuth();
   const plan = usePlan();
   const t = useT();
+  // Phase D: per-tab permission gates. Company + Account always visible
+  // (every user in the company has a profile and can see basic company info).
+  const canManageSettings     = usePerm('manage_settings');
+  const canManageIntegrations = usePerm('manage_integrations');
+  const canManageBilling      = usePerm('manage_billing');
+  // Service requests + audit log share manage_settings for now (no narrower
+  // perm yet defined). Owner can grant manage_settings to delegate.
+  const canSeeRequests        = useHasAnyPerm(['manage_settings', 'manage_advanced_settings']);
+  const canSeeLog             = useHasAnyPerm(['manage_settings', 'view_reports']);
 
   // #team used to be the Team admin tab; it's now the /team module. Any
   // bookmark or link still using #team lands in the right place.
@@ -334,14 +344,22 @@ export default function AdministrationPage() {
   const openIntegration = (id) => { sessionStorage.setItem('admin_integration_view', id); setIntegrationView(id); };
   const backToIntegrations = () => { sessionStorage.setItem('admin_integration_view', 'list'); setIntegrationView('list'); };
 
+  // Build the tab list filtered by permission. Each tab is included only
+  // if the user can see it. Company + Account stay always-on; the others
+  // appear only with the matching perm.
   const tabs = [
     { id: 'company',      label: t.adminTabCompany      },
-    { id: 'requests',     label: 'Requests'             },
-    ...(plan.hasQbo ? [{ id: 'integrations', label: t.adminTabIntegrations }] : []),
-    { id: 'billing',      label: t.adminTabBilling      },
-    { id: 'log',          label: t.adminTabLog          },
+    ...(canSeeRequests ? [{ id: 'requests', label: 'Requests' }] : []),
+    ...((plan.hasQbo && canManageIntegrations) ? [{ id: 'integrations', label: t.adminTabIntegrations }] : []),
+    ...(canManageBilling ? [{ id: 'billing', label: t.adminTabBilling }] : []),
+    ...(canSeeLog ? [{ id: 'log', label: t.adminTabLog }] : []),
     { id: 'account',      label: t.adminTabAccount      },
   ];
+
+  // If the user landed on a tab they can't see (deep link with hash), fall
+  // back to Company so we never render a hidden tab's content.
+  const visibleIds = new Set(tabs.map(x => x.id));
+  const safeTab = visibleIds.has(tab) ? tab : 'company';
 
   useEffect(() => {
     Promise.all([
@@ -367,30 +385,36 @@ export default function AdministrationPage() {
       <AppHeader currentApp="administration" features={settings} />
 
       <main id="main-content" style={styles.main}>
-        <TabBar active={tab} onChange={switchTab} tabs={tabs} />
+        <TabBar active={safeTab} onChange={switchTab} tabs={tabs} />
 
-        {tab === 'company'  && (
+        {safeTab === 'company'  && (
           <div style={styles.tabContent}>
             <h2 style={styles.tabTitle}>{t.company}</h2>
             <CompanyTab />
-            <h3 style={{ ...styles.sectionTitle, marginTop: 8 }}>{t.settings}</h3>
-            <ManageRates settings={settings} onSettingsUpdated={setSettings} />
-            <AdvancedSettings settings={settings} />
+            {/* Settings sub-section is gated by manage_settings — a user
+                with no settings perm sees just the company info card. */}
+            {canManageSettings && (
+              <>
+                <h3 style={{ ...styles.sectionTitle, marginTop: 8 }}>{t.settings}</h3>
+                <ManageRates settings={settings} onSettingsUpdated={setSettings} />
+                <AdvancedSettings settings={settings} />
+              </>
+            )}
           </div>
         )}
-        {tab === 'requests' && (
+        {safeTab === 'requests' && (
           <div style={styles.tabContent}>
             <h2 style={styles.tabTitle}>Requests</h2>
             <ServiceRequestsAdmin />
           </div>
         )}
-        {tab === 'log'      && (
+        {safeTab === 'log'      && (
           <div style={styles.tabContent}>
             <h2 style={styles.tabTitle}>{t.auditLog}</h2>
             <AuditLog timezone={settings?.company_timezone ?? ''} />
           </div>
         )}
-        {tab === 'integrations' && (
+        {safeTab === 'integrations' && (
           <div style={styles.tabContent}>
             {integrationView === 'list' && (
               <>
@@ -436,8 +460,8 @@ export default function AdministrationPage() {
             )}
           </div>
         )}
-        {tab === 'billing'  && <BillingTab />}
-        {tab === 'account'  && <AccountTab />}
+        {safeTab === 'billing'  && <BillingTab />}
+        {safeTab === 'account'  && <AccountTab />}
       </main>
     </div>
   );

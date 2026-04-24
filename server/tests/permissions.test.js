@@ -67,7 +67,7 @@ describe('hasPerm — super_admin', () => {
     const user = { id: 1, role: 'super_admin', role_id: null, admin_permissions: null };
     expect(await hasPerm(user, 'manage_billing')).toBe(true);
     expect(await hasPerm(user, 'delete_company')).toBe(true);
-    expect(await hasPerm(user, 'clock_in_self')).toBe(true);
+    expect(await hasPerm(user, 'clock_self')).toBe(true);
     expect(pool.query).not.toHaveBeenCalled();
   });
 });
@@ -118,11 +118,11 @@ describe('hasPerm — legacy fallback', () => {
   test('null admin_permissions grants every Admin-tier permission, including new ones', async () => {
     // The historical "null = full access" contract means a legacy admin
     // should be able to do anything an Admin can — including new perms like
-    // assign_roles and clock_in_self that didn't exist when their account
+    // assign_roles and clock_self that didn't exist when their account
     // was created.
     const user = { id: 1, role: 'admin', role_id: null, admin_permissions: null };
     expect(await hasPerm(user, 'assign_roles')).toBe(true);
-    expect(await hasPerm(user, 'clock_in_self')).toBe(true);
+    expect(await hasPerm(user, 'clock_self')).toBe(true);
     expect(await hasPerm(user, 'view_workers_list')).toBe(true);
     // Owner-only perms still denied — those weren't part of the legacy admin.
     expect(await hasPerm(user, 'manage_billing')).toBe(false);
@@ -136,14 +136,14 @@ describe('hasPerm — legacy fallback', () => {
       admin_permissions: { approve_entries: true },
     };
     expect(await hasPerm(user, 'approve_entries')).toBe(true);
-    expect(await hasPerm(user, 'clock_in_self')).toBe(true); // worker baseline
+    expect(await hasPerm(user, 'clock_self')).toBe(true); // worker baseline
     expect(await hasPerm(user, 'assign_roles')).toBe(false); // not a legacy key, not worker-tier
   });
 
   test('worker with no role_id has the standard Worker permissions', async () => {
     // Pre-backfill workers should be able to clock in / submit entries.
     const user = { id: 1, role: 'worker', role_id: null, admin_permissions: null };
-    expect(await hasPerm(user, 'clock_in_self')).toBe(true);
+    expect(await hasPerm(user, 'clock_self')).toBe(true);
     expect(await hasPerm(user, 'submit_time_entry_self')).toBe(true);
     expect(await hasPerm(user, 'view_projects')).toBe(true);
     // No admin-tier access
