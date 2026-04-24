@@ -620,7 +620,7 @@ export default function SuperAdmin() {
                           aria-expanded={usersVisibleIds.has(c.id)}
                         >
                           <span style={styles.usersHeaderLabel}>
-                            Users <span style={styles.usersCount}>({(c.worker_count || 0) + (c.admin_count || 0)})</span>
+                            Users <span style={styles.usersCount}>({(parseInt(c.worker_count) || 0) + (parseInt(c.admin_count) || 0)})</span>
                           </span>
                           <span style={styles.chevron} aria-hidden="true">{usersVisibleIds.has(c.id) ? '▾' : '▸'}</span>
                         </button>
@@ -1033,7 +1033,10 @@ const styles = {
   controlGroup: { display: 'flex', flexDirection: 'column', gap: 3 },
   controlLabel: { fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' },
   controlSelect: { fontSize: 12, padding: '4px 7px', border: '1px solid #d1d5db', borderRadius: 6, color: '#374151', background: '#fff' },
-  cardActions: { display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch', minWidth: 110 },
+  cardActions: {
+    display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center',
+    marginTop: 12, paddingTop: 12, borderTop: '1px solid #f3f4f6',
+  },
   expandBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer', textAlign: 'center' },
   actionBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer', textAlign: 'center' },
   deactivateBtn: { background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '6px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'center' },
