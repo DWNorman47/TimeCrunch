@@ -146,41 +146,44 @@ describe('smoke: unauthenticated pages', () => {
   });
 });
 
-// ── Worker-facing pages ───────────────────────────────────────────────────────
+// ── Worker-facing pages (per language) ───────────────────────────────────────
+// Loop over English + Spanish so missing i18n keys (t.foo === undefined) are
+// caught here. A missing key often renders as blank in JSX but crashes when
+// concatenated into a string, used as a prop, or passed to .replace/.split.
 
-describe('smoke: worker pages', () => {
-  const worker = makeUser('worker');
+describe.each([['English'], ['Spanish']])('smoke: worker pages (%s)', (language) => {
+  const worker = makeUser('worker', { language });
 
-  test('Dashboard (worker)', async () => {
+  test('Dashboard', async () => {
     const { default: Dashboard } = await import('../pages/Dashboard');
     await smokeRender(<Dashboard />, { user: worker });
   });
 
-  test('AccountPage (worker)', async () => {
+  test('AccountPage', async () => {
     const { default: AccountPage } = await import('../pages/AccountPage');
     await smokeRender(<AccountPage />, { user: worker });
   });
 
-  test('FieldPage (worker)', async () => {
+  test('FieldPage', async () => {
     const { default: FieldPage } = await import('../pages/FieldPage');
     await smokeRender(<FieldPage />, { user: worker });
   });
 
-  test('InventoryPage (worker)', async () => {
+  test('InventoryPage', async () => {
     const { default: InventoryPage } = await import('../pages/InventoryPage');
     await smokeRender(<InventoryPage />, { user: worker });
   });
 
-  test('TeamPage (worker)', async () => {
+  test('TeamPage', async () => {
     const { default: TeamPage } = await import('../pages/TeamPage');
     await smokeRender(<TeamPage />, { user: worker });
   });
 });
 
-// ── Admin-facing pages ────────────────────────────────────────────────────────
+// ── Admin-facing pages (per language) ────────────────────────────────────────
 
-describe('smoke: admin pages', () => {
-  const admin = makeUser('admin');
+describe.each([['English'], ['Spanish']])('smoke: admin pages (%s)', (language) => {
+  const admin = makeUser('admin', { language });
 
   test('AdminDashboard', async () => {
     const { default: AdminDashboard } = await import('../pages/AdminDashboard');
@@ -221,17 +224,17 @@ describe('smoke: admin pages', () => {
     await smokeRender(<ProjectsPage />, { user: admin });
   });
 
-  test('TeamPage (admin)', async () => {
+  test('TeamPage', async () => {
     const { default: TeamPage } = await import('../pages/TeamPage');
     await smokeRender(<TeamPage />, { user: admin });
   });
 
-  test('FieldPage (admin)', async () => {
+  test('FieldPage', async () => {
     const { default: FieldPage } = await import('../pages/FieldPage');
     await smokeRender(<FieldPage />, { user: admin });
   });
 
-  test('InventoryPage (admin)', async () => {
+  test('InventoryPage', async () => {
     const { default: InventoryPage } = await import('../pages/InventoryPage');
     await smokeRender(<InventoryPage />, { user: admin });
   });
@@ -244,7 +247,69 @@ describe('smoke: admin pages', () => {
 // list view enough data to exercise the item-renderer path.
 
 describe('smoke: populated list views (catches sub-component bugs)', () => {
-  test('ProjectsPage renders at least one ProjectCard', async () => {
+  test('TeamPage Directory renders with multiple members', async () => {
+    const api = (await import('../api')).default;
+    const team = [
+      { id: 1, full_name: 'Alice Admin', username: 'alice', role: 'admin', worker_type: null, classification: null, must_change_password: false },
+      { id: 2, full_name: 'Bob Worker', username: 'bob', role: 'worker', worker_type: 'employee', classification: 'Electrician', must_change_password: false },
+      { id: 3, full_name: 'Carol Contractor', username: 'carol', role: 'worker', worker_type: 'contractor', classification: null, must_change_password: true },
+    ];
+    api.get.mockImplementation((url) => {
+      if (url.startsWith('/team')) return Promise.resolve({ data: { team } });
+      return Promise.resolve({ data: [] });
+    });
+    const { default: TeamPage } = await import('../pages/TeamPage');
+    await smokeRender(<TeamPage />, { user: makeUser('worker') });
+  });
+
+  test('Dashboard (worker) renders with entries + projects populated', async () => {
+    const api = (await import('../api')).default;
+    const projects = [
+      { id: 10, name: 'Main Site', active: true, wage_type: 'regular' },
+      { id: 11, name: 'Annex', active: true, wage_type: 'prevailing' },
+    ];
+    const entries = [
+      { id: 1, project_id: 10, project_name: 'Main Site', work_date: '2026-04-22', start_time: '08:00:00', end_time: '16:30:00', break_minutes: 30, status: 'pending', wage_type: 'regular', notes: '' },
+      { id: 2, project_id: 11, project_name: 'Annex', work_date: '2026-04-21', start_time: '09:00:00', end_time: '17:00:00', break_minutes: 30, status: 'approved', wage_type: 'prevailing', notes: 'Footings' },
+    ];
+    api.get.mockImplementation((url) => {
+      if (url.startsWith('/time-entries')) return Promise.resolve({ data: entries });
+      if (url.startsWith('/projects')) return Promise.resolve({ data: projects });
+      if (url.startsWith('/settings')) return Promise.resolve({ data: DEFAULT_SETTINGS });
+      if (url.startsWith('/clock/status')) return Promise.resolve({ data: null });
+      return Promise.resolve({ data: [] });
+    });
+    const { default: Dashboard } = await import('../pages/Dashboard');
+    await smokeRender(<Dashboard />, { user: makeUser('worker') });
+  });
+
+  test('AdminDashboard renders with KPIs + active clocks + pending entries', async () => {
+    const api = (await import('../api')).default;
+    const workers = [
+      { id: 20, full_name: 'Alice Admin', username: 'alice', role: 'admin', active: true, hourly_rate: 40, rate_type: 'hourly' },
+      { id: 21, full_name: 'Bob Worker', username: 'bob', role: 'worker', active: true, hourly_rate: 25, rate_type: 'hourly', worker_type: 'employee' },
+    ];
+    const projects = [{ id: 30, name: 'Main Site', active: true, wage_type: 'regular' }];
+    const activeClocks = [{ user_id: 21, full_name: 'Bob Worker', project_id: 30, project_name: 'Main Site', clock_in_time: '2026-04-22T14:00:00Z' }];
+    const pendingEntries = [
+      { id: 100, user_id: 21, user_name: 'Bob Worker', project_id: 30, project_name: 'Main Site', work_date: '2026-04-21', start_time: '08:00:00', end_time: '16:00:00', break_minutes: 30, status: 'pending', wage_type: 'regular' },
+    ];
+    api.get.mockImplementation((url) => {
+      if (url.startsWith('/admin/kpis')) return Promise.resolve({ data: { pending_entries: 1, clocked_in: 1, hours_this_week: 40 } });
+      if (url.startsWith('/admin/workers')) return Promise.resolve({ data: workers });
+      if (url.startsWith('/admin/projects')) return Promise.resolve({ data: projects });
+      if (url.startsWith('/projects')) return Promise.resolve({ data: projects });
+      if (url.startsWith('/admin/entries/pending') || url.startsWith('/admin/entries/recently-approved')) return Promise.resolve({ data: pendingEntries });
+      if (url.startsWith('/admin/active-clocks')) return Promise.resolve({ data: activeClocks });
+      if (url.startsWith('/admin/settings')) return Promise.resolve({ data: DEFAULT_SETTINGS });
+      if (url.startsWith('/settings')) return Promise.resolve({ data: DEFAULT_SETTINGS });
+      return Promise.resolve({ data: [] });
+    });
+    const { default: AdminDashboard } = await import('../pages/AdminDashboard');
+    await smokeRender(<AdminDashboard />, { user: makeUser('admin') });
+  });
+
+  test('ProjectsPage renders at least one ProjectCard (admin)', async () => {
     const api = (await import('../api')).default;
     const project = {
       id: 1,
@@ -272,5 +337,65 @@ describe('smoke: populated list views (catches sub-component bugs)', () => {
     // Force an extra tick so the project list effect resolves and ProjectCard renders
     await act(async () => { await new Promise(r => setTimeout(r, 0)); });
     expect(view).toBeTruthy();
+  });
+});
+
+// ── Subscription status variants ─────────────────────────────────────────────
+// BLOCKED_STATUSES = ['trial_expired', 'canceled']. Workers see
+// WorkerSubscriptionWall; admins are redirected to /administration (billing).
+// 'exempt' companies bypass all plan gates. Render key pages in each state
+// to catch crashes in banner/warning paths that only appear under these
+// statuses (e.g. AdminDashboard's trial-expired banner, Dashboard's "plan
+// required" messaging, AdministrationPage's billing section).
+
+describe.each([
+  ['trial', 'starter'],
+  ['trial_expired', 'free'],
+  ['canceled', 'free'],
+  ['exempt', 'business'],
+])('smoke: subscription status = %s', (subscription_status, plan) => {
+  test('AdminDashboard renders', async () => {
+    const api = (await import('../api')).default;
+    api.get.mockImplementation((url) => {
+      if (url.startsWith('/admin/kpis')) return Promise.resolve({ data: { pending_entries: 0, clocked_in: 0, hours_this_week: 0 } });
+      if (url.startsWith('/stripe/status') || url.startsWith('/stripe/billing'))
+        return Promise.resolve({ data: { subscription_status, plan, trial_ends_at: null } });
+      if (url.startsWith('/admin/settings') || url.startsWith('/settings'))
+        return Promise.resolve({ data: { ...DEFAULT_SETTINGS, subscription_status, plan } });
+      return Promise.resolve({ data: [] });
+    });
+    const { default: AdminDashboard } = await import('../pages/AdminDashboard');
+    await smokeRender(<AdminDashboard />, {
+      user: makeUser('admin', { subscription_status, plan }),
+    });
+  });
+
+  test('Dashboard (worker) renders', async () => {
+    const api = (await import('../api')).default;
+    api.get.mockImplementation((url) => {
+      if (url.startsWith('/settings'))
+        return Promise.resolve({ data: { ...DEFAULT_SETTINGS, subscription_status, plan } });
+      if (url.startsWith('/clock/status')) return Promise.resolve({ data: null });
+      return Promise.resolve({ data: [] });
+    });
+    const { default: Dashboard } = await import('../pages/Dashboard');
+    await smokeRender(<Dashboard />, {
+      user: makeUser('worker', { subscription_status, plan }),
+    });
+  });
+
+  test('AdministrationPage renders (billing tab visible for blocked admins)', async () => {
+    const api = (await import('../api')).default;
+    api.get.mockImplementation((url) => {
+      if (url.startsWith('/stripe/status') || url.startsWith('/stripe/plans'))
+        return Promise.resolve({ data: { subscription_status, plan, trial_ends_at: null, plans: [] } });
+      if (url.startsWith('/admin/settings') || url.startsWith('/settings'))
+        return Promise.resolve({ data: { ...DEFAULT_SETTINGS, subscription_status, plan } });
+      return Promise.resolve({ data: [] });
+    });
+    const { default: AdministrationPage } = await import('../pages/AdministrationPage');
+    await smokeRender(<AdministrationPage />, {
+      user: makeUser('admin', { subscription_status, plan }),
+    });
   });
 });

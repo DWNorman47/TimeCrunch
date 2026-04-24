@@ -9,6 +9,7 @@ const sgMail = require('@sendgrid/mail');
 const rateLimit = require('express-rate-limit');
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { seedBuiltinRoles } = require('../permissions');
 
 // Hash a token for safe storage — raw token goes in the email, hash goes in the DB
 const sha256 = str => crypto.createHash('sha256').update(str).digest('hex');
@@ -56,6 +57,7 @@ function signToken(user) {
       company_name: user.company_name,
       admin_permissions: user.admin_permissions || null,
       worker_access_ids: user.worker_access_ids || null,
+      role_id: user.role_id ?? null,
       // tv (token version) lets us invalidate every outstanding token for
       // this user by bumping users.token_version. See middleware/auth.js.
       tv: user.token_version ?? 0,
@@ -289,13 +291,20 @@ router.post('/register', authLimiter, async (req, res) => {
     const confirmToken = crypto.randomBytes(32).toString('hex');
     const confirmTokenHash = sha256(confirmToken);
     const confirmExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await client.query(
+    const userResult = await client.query(
       `INSERT INTO users (company_id, username, password_hash, full_name, first_name, middle_name, last_name, role, email,
         email_confirmed, email_confirm_token, email_confirm_token_expires)
        VALUES ($1,$2,$3,$4,$5,$6,$7,'admin',$8,false,$9,$10)
        RETURNING id, username, full_name, role, company_id, email`,
       [companyId, username, hash, full_name, first_name||null, middle_name||null, last_name||null, email, confirmTokenHash, confirmExpires]
     );
+    const newUserId = userResult.rows[0].id;
+
+    // Seed Worker/Admin/Owner built-in roles for the new company and assign
+    // Owner to the admin we just created. Done inside the same transaction
+    // so a failure rolls back the whole company creation.
+    const { ownerId } = await seedBuiltinRoles(client, companyId);
+    await client.query('UPDATE users SET role_id = $1 WHERE id = $2', [ownerId, newUserId]);
 
     // Send confirmation email — COMMIT only after success so email failure rolls back the account
     const confirmUrl = `${process.env.APP_URL}/confirm-email?token=${confirmToken}`;
