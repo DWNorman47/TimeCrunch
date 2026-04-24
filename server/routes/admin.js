@@ -8,7 +8,8 @@ const pool = require('../db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function isValidEmail(email) { return EMAIL_RE.test(String(email).trim()); }
-const { requireAdmin, requirePlan, requireProAddon, requirePermission } = require('../middleware/auth');
+const { requireAdmin, requirePlan, requireProAddon, requirePermission, requirePerm } = require('../middleware/auth');
+const { PERMISSIONS, PERMISSION_KEYS, BUILTIN_ROLES, getUserPermissions } = require('../permissions');
 const { coerceBody } = require('../middleware/coerce');
 const { logFailure } = require('../failureLog');
 const { sendPushToUser, sendPushToAllWorkers } = require('../push');
@@ -3374,6 +3375,323 @@ router.delete('/workers/:id/documents/:docId', requireAdmin, async (req, res) =>
     deleteByUrl(doc.rows[0].url).catch(() => {});
     res.json({ deleted: true });
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Phase B: roles & permissions management ─────────────────────────────────
+//
+// Permission gates:
+//   - GET  /roles, /permissions/catalog: requireAdmin only — anyone with the
+//     admin dashboard needs to see the role list to pick from it. The picker
+//     itself is still gated by assign_roles at the assign endpoint.
+//   - POST/PATCH/DELETE /roles: requirePerm('manage_roles') — Owner-only
+//     by default, but Owner can delegate by granting the perm to another role.
+//   - PATCH /workers/:id/role: requirePerm('assign_roles') — usually all admins.
+//
+// Privilege-escalation guard: when creating or editing a role, the requester
+// can only grant permissions they themselves hold. Owner has all perms so
+// is unconstrained; a non-Owner with delegated manage_roles cannot grant
+// manage_billing or other Owner-only perms unless they themselves have them.
+//
+// Last-Owner guard: removing a user from the Owner role (via PATCH /workers/:id/role)
+// is rejected if they're the only Owner in the company. The same check
+// applies if the legacy users.role drops below 'admin' as a side effect.
+
+// GET /admin/roles — list all roles for the requester's company
+router.get('/roles', requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT r.id, r.name, r.description, r.is_builtin, r.parent_role,
+              r.created_at, r.updated_at,
+              COALESCE(perm_counts.cnt, 0) AS permission_count,
+              COALESCE(user_counts.cnt, 0) AS user_count
+         FROM roles r
+         LEFT JOIN (
+           SELECT role_id, COUNT(*)::int AS cnt FROM role_permissions GROUP BY role_id
+         ) perm_counts ON perm_counts.role_id = r.id
+         LEFT JOIN (
+           SELECT role_id, COUNT(*)::int AS cnt FROM users WHERE active = true GROUP BY role_id
+         ) user_counts ON user_counts.role_id = r.id
+         WHERE r.company_id = $1
+         ORDER BY r.is_builtin DESC, r.name`,
+      [req.user.company_id]
+    );
+    res.json(rows);
+  } catch (err) {
+    req.log.error({ err }, 'route error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /admin/roles/:id — single role with its full permission list
+router.get('/roles/:id', requireAdmin, async (req, res) => {
+  try {
+    const roleResult = await pool.query(
+      `SELECT id, name, description, is_builtin, parent_role, created_at, updated_at
+         FROM roles WHERE id = $1 AND company_id = $2`,
+      [req.params.id, req.user.company_id]
+    );
+    if (roleResult.rowCount === 0) return res.status(404).json({ error: 'Role not found' });
+    const permsResult = await pool.query(
+      'SELECT permission FROM role_permissions WHERE role_id = $1',
+      [req.params.id]
+    );
+    res.json({
+      ...roleResult.rows[0],
+      permissions: permsResult.rows.map(r => r.permission),
+    });
+  } catch (err) {
+    req.log.error({ err }, 'route error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /admin/permissions/catalog — return the full permission catalog so the
+// UI can render the checkbox grid grouped by area.
+router.get('/permissions/catalog', requireAdmin, (_req, res) => {
+  res.json(PERMISSIONS);
+});
+
+// POST /admin/roles — create a custom role
+router.post('/roles', requireAdmin, requirePerm('manage_roles'), async (req, res) => {
+  const { name, description, parent_role, permissions } = req.body || {};
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  if (parent_role !== 'worker' && parent_role !== 'admin') {
+    return res.status(400).json({ error: 'parent_role must be "worker" or "admin"' });
+  }
+  if (!Array.isArray(permissions)) {
+    return res.status(400).json({ error: 'permissions must be an array' });
+  }
+  for (const p of permissions) {
+    if (!PERMISSION_KEYS.has(p)) return res.status(400).json({ error: `Unknown permission: ${p}` });
+  }
+  // Privilege-escalation guard
+  const requesterPerms = await getUserPermissions(req.user);
+  for (const p of permissions) {
+    if (!requesterPerms.has(p)) {
+      return res.status(403).json({
+        error: `Cannot grant ${p} — you don't have it yourself`,
+        code: 'permission_escalation',
+        required: p,
+      });
+    }
+  }
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const r = await client.query(
+        `INSERT INTO roles (company_id, name, description, is_builtin, parent_role)
+         VALUES ($1, $2, $3, false, $4) RETURNING id`,
+        [req.user.company_id, name.trim(), description?.trim() || null, parent_role]
+      );
+      const roleId = r.rows[0].id;
+      for (const perm of permissions) {
+        await client.query(
+          'INSERT INTO role_permissions (role_id, permission) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [roleId, perm]
+        );
+      }
+      await client.query('COMMIT');
+      res.status(201).json({ id: roleId });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      if (err.code === '23505') {
+        return res.status(409).json({ error: 'A role with that name already exists' });
+      }
+      throw err;
+    } finally { client.release(); }
+  } catch (err) {
+    req.log.error({ err }, 'route error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /admin/roles/:id — edit a role's name, description, or permissions.
+// Built-in roles can have permissions edited but not name/parent.
+router.patch('/roles/:id', requireAdmin, requirePerm('manage_roles'), async (req, res) => {
+  const { name, description, permissions } = req.body || {};
+  try {
+    const existing = await pool.query(
+      'SELECT id, is_builtin FROM roles WHERE id = $1 AND company_id = $2',
+      [req.params.id, req.user.company_id]
+    );
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'Role not found' });
+    const role = existing.rows[0];
+
+    if (Array.isArray(permissions)) {
+      for (const p of permissions) {
+        if (!PERMISSION_KEYS.has(p)) return res.status(400).json({ error: `Unknown permission: ${p}` });
+      }
+      const requesterPerms = await getUserPermissions(req.user);
+      for (const p of permissions) {
+        if (!requesterPerms.has(p)) {
+          return res.status(403).json({
+            error: `Cannot grant ${p} — you don't have it yourself`,
+            code: 'permission_escalation',
+            required: p,
+          });
+        }
+      }
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Built-ins: only permissions are editable. Name and parent stay locked
+      // so the fallback-on-delete contract for custom roles always resolves.
+      if (!role.is_builtin) {
+        if (name !== undefined) {
+          if (!name.trim()) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'name cannot be empty' });
+          }
+          await client.query(
+            'UPDATE roles SET name = $1, updated_at = NOW() WHERE id = $2',
+            [name.trim(), role.id]
+          );
+        }
+        if (description !== undefined) {
+          await client.query(
+            'UPDATE roles SET description = $1, updated_at = NOW() WHERE id = $2',
+            [description?.trim() || null, role.id]
+          );
+        }
+      } else if ((name !== undefined && name !== null) || description !== undefined) {
+        // Allow description edit on built-ins, name change rejected
+        if (name !== undefined) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'Cannot rename a built-in role' });
+        }
+        await client.query(
+          'UPDATE roles SET description = $1, updated_at = NOW() WHERE id = $2',
+          [description?.trim() || null, role.id]
+        );
+      }
+
+      if (Array.isArray(permissions)) {
+        await client.query('DELETE FROM role_permissions WHERE role_id = $1', [role.id]);
+        for (const perm of permissions) {
+          await client.query(
+            'INSERT INTO role_permissions (role_id, permission) VALUES ($1, $2)',
+            [role.id, perm]
+          );
+        }
+        await client.query('UPDATE roles SET updated_at = NOW() WHERE id = $1', [role.id]);
+      }
+      await client.query('COMMIT');
+      res.json({ updated: true });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      if (err.code === '23505') {
+        return res.status(409).json({ error: 'A role with that name already exists' });
+      }
+      throw err;
+    } finally { client.release(); }
+  } catch (err) {
+    req.log.error({ err }, 'route error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /admin/roles/:id — delete a custom role; users on it fall back to
+// the parent's built-in role.
+router.delete('/roles/:id', requireAdmin, requirePerm('manage_roles'), async (req, res) => {
+  try {
+    const existing = await pool.query(
+      'SELECT id, is_builtin, parent_role FROM roles WHERE id = $1 AND company_id = $2',
+      [req.params.id, req.user.company_id]
+    );
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'Role not found' });
+    const role = existing.rows[0];
+    if (role.is_builtin) return res.status(400).json({ error: 'Cannot delete a built-in role' });
+
+    const fallbackName = role.parent_role === 'worker' ? 'Worker' : 'Admin';
+    const fallback = await pool.query(
+      'SELECT id FROM roles WHERE company_id = $1 AND is_builtin = true AND name = $2',
+      [req.user.company_id, fallbackName]
+    );
+    if (fallback.rowCount === 0) {
+      // Should not happen — built-ins are always seeded — but fail safely.
+      return res.status(500).json({ error: 'Fallback built-in role missing' });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Reassign every active user on this role to the parent built-in.
+      // Inactive users get role_id NULL via the FK's ON DELETE SET NULL.
+      await client.query(
+        'UPDATE users SET role_id = $1 WHERE role_id = $2',
+        [fallback.rows[0].id, role.id]
+      );
+      await client.query('DELETE FROM roles WHERE id = $1', [role.id]);
+      await client.query('COMMIT');
+      res.json({ deleted: true, fallback_role_id: fallback.rows[0].id });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally { client.release(); }
+  } catch (err) {
+    req.log.error({ err }, 'route error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /admin/workers/:id/role — assign a role to a worker
+// Side effect: also updates legacy users.role to match the role's parent_role
+// so legacy `requirePermission(...)` middleware keeps working through Phase B.
+// Phase C drops users.role and removes this side effect.
+router.patch('/workers/:id/role', requireAdmin, requirePerm('assign_roles'), async (req, res) => {
+  const { role_id } = req.body || {};
+  if (!role_id) return res.status(400).json({ error: 'role_id is required' });
+  try {
+    const targetRole = await pool.query(
+      'SELECT id, name, parent_role, is_builtin FROM roles WHERE id = $1 AND company_id = $2',
+      [role_id, req.user.company_id]
+    );
+    if (targetRole.rowCount === 0) return res.status(404).json({ error: 'Role not found' });
+
+    const targetUser = await pool.query(
+      `SELECT u.id, u.full_name, u.role_id AS current_role_id, r.name AS current_role_name
+         FROM users u LEFT JOIN roles r ON r.id = u.role_id
+         WHERE u.id = $1 AND u.company_id = $2 AND u.active = true`,
+      [req.params.id, req.user.company_id]
+    );
+    if (targetUser.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
+    const user = targetUser.rows[0];
+
+    // Last-Owner guard: if changing AWAY from Owner, ensure ≥1 other Owner
+    // remains in the company. Built-in Owner role has name 'Owner'.
+    if (user.current_role_name === 'Owner' && targetRole.rows[0].name !== 'Owner') {
+      const otherOwners = await pool.query(
+        `SELECT COUNT(*)::int AS cnt FROM users u
+           JOIN roles r ON r.id = u.role_id
+           WHERE u.company_id = $1 AND r.is_builtin = true AND r.name = 'Owner'
+             AND u.id != $2 AND u.active = true`,
+        [req.user.company_id, user.id]
+      );
+      if (otherOwners.rows[0].cnt === 0) {
+        return res.status(400).json({
+          error: 'Cannot remove the only Owner. Promote another user to Owner first.',
+          code: 'last_owner',
+        });
+      }
+    }
+
+    // Update both columns. users.role is the legacy parent role;
+    // role_id is the new authoritative reference.
+    await pool.query(
+      'UPDATE users SET role_id = $1, role = $2 WHERE id = $3',
+      [role_id, targetRole.rows[0].parent_role, user.id]
+    );
+    res.json({ updated: true });
+  } catch (err) {
+    req.log.error({ err }, 'route error');
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 module.exports = router;

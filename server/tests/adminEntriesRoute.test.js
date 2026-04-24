@@ -14,6 +14,7 @@ jest.mock('../middleware/auth', () => ({
   requireAuth:      (req, _res, next) => { req.user = mockCurrentUser; next(); },
   requireAdmin:     (req, _res, next) => { req.user = mockCurrentUser; next(); },
   requirePermission: () => (req, _res, next) => { req.user = mockCurrentUser; next(); },
+  requirePerm:      () => (req, _res, next) => { req.user = mockCurrentUser; next(); },
   requirePlan:      () => (req, _res, next) => { req.user = mockCurrentUser; next(); },
   requireProAddon:  (req, _res, next) => { req.user = mockCurrentUser; next(); },
   hasAdminPermission: () => true,

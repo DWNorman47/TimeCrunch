@@ -283,6 +283,27 @@ describe('smoke: populated list views (catches sub-component bugs)', () => {
     await smokeRender(<Dashboard />, { user: makeUser('worker') });
   });
 
+  test('TeamPage Roles tab (admin) renders with built-in roles populated', async () => {
+    const api = (await import('../api')).default;
+    const builtins = [
+      { id: 1, name: 'Worker', is_builtin: true, parent_role: 'worker', user_count: 5, permission_count: 18, description: 'Standard worker' },
+      { id: 2, name: 'Admin',  is_builtin: true, parent_role: 'admin',  user_count: 2, permission_count: 38, description: 'Company admin' },
+      { id: 3, name: 'Owner',  is_builtin: true, parent_role: 'admin',  user_count: 1, permission_count: 41, description: 'Company owner' },
+    ];
+    api.get.mockImplementation((url) => {
+      if (url.startsWith('/admin/roles') && !url.match(/\/admin\/roles\/\d/)) return Promise.resolve({ data: builtins });
+      if (url.startsWith('/admin/permissions/catalog')) return Promise.resolve({ data: [
+        { key: 'approve_entries', group: 'time', label: 'Approve entries' },
+        { key: 'manage_billing',  group: 'money', label: 'Manage billing' },
+      ]});
+      if (url.startsWith('/team')) return Promise.resolve({ data: { team: [] } });
+      return Promise.resolve({ data: [] });
+    });
+    window.location.hash = '#roles';
+    const { default: TeamPage } = await import('../pages/TeamPage');
+    await smokeRender(<TeamPage />, { user: makeUser('admin') });
+  });
+
   test('AdminDashboard renders with KPIs + active clocks + pending entries', async () => {
     const api = (await import('../api')).default;
     const workers = [
