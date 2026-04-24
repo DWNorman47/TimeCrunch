@@ -124,6 +124,7 @@ describe('DELETE /superadmin/companies/:id', () => {
       'project_documents', 'project_invoices',
       'service_requests', 'qbo_sync_errors', 'client_errors',
       'inbox', 'push_subscriptions', 'audit_log', 'equipment_items',
+      'impersonation_log',
       'clients', 'projects', 'advanced_settings', 'settings', 'users', 'companies',
     ];
     for (const table of expectedTables) {

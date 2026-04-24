@@ -224,6 +224,19 @@ router.delete('/companies/:id', requireSuperAdmin, async (req, res) => {
     await client.query(`DELETE FROM audit_log                   WHERE company_id = $1`, [id]);
     await client.query(`DELETE FROM equipment_items             WHERE company_id = $1`, [id]);
 
+    // impersonation_log has a constraint bug: super_admin_id is NOT NULL
+    // REFERENCES users(id) ON DELETE SET NULL, which is contradictory. If
+    // any user in this company is referenced as super_admin_id, the
+    // DELETE FROM users below would fail. Clear out any rows referencing
+    // users in this company — and any rows where this company was the
+    // impersonation target — before the user delete fires.
+    await client.query(
+      `DELETE FROM impersonation_log
+        WHERE company_id = $1
+           OR super_admin_id IN (SELECT id FROM users WHERE company_id = $1)`,
+      [id]
+    );
+
     // ── Base entities ───────────────────────────────────────────────────────
     await client.query(`DELETE FROM clients                     WHERE company_id = $1`, [id]); // cascades client_documents
     await client.query(`DELETE FROM projects                    WHERE company_id = $1`, [id]);
@@ -291,6 +304,11 @@ router.post('/companies/:id/impersonate', requireSuperAdmin, async (req, res) =>
         company_name: user.company_name,
         admin_permissions: user.admin_permissions || null,
         worker_access_ids: null,
+        // Include role_id so requirePerm middleware resolves the user's
+        // permissions against their assigned role during impersonation.
+        // Without this the server falls back to the legacy role-based
+        // check and misses any custom-role-only perms the user has.
+        role_id: user.role_id ?? null,
       },
       process.env.JWT_SECRET,
       { expiresIn: '4h' }
