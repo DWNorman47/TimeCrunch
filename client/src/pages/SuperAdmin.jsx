@@ -82,7 +82,12 @@ export default function SuperAdmin() {
   const [companies, setCompanies]   = useState([]);
   const [loading, setLoading]       = useState(true);
   const [working, setWorking]       = useState(null);
-  const [expandedId, setExpandedId] = useState(null);
+  // Collapsible card + nested Users section. cardExpandedId is the single
+  // company card currently showing its controls. usersVisibleIds is a Set
+  // because multiple cards can be expanded simultaneously in principle,
+  // though the current UX opens one at a time via cardExpandedId.
+  const [cardExpandedId, setCardExpandedId] = useState(null);
+  const [usersVisibleIds, setUsersVisibleIds] = useState(() => new Set());
   const [companyUsers, setCompanyUsers] = useState({});
   const [affiliates, setAffiliates] = useState([]);
 
@@ -265,10 +270,20 @@ export default function SuperAdmin() {
     } catch (err) { silentError('superadmin impersonation-log')(err); }
   };
 
-  const toggleExpand = async (id) => {
-    if (expandedId === id) { setExpandedId(null); return; }
-    setExpandedId(id);
-    if (!companyUsers[id]) {
+  const toggleCardExpand = (id) => {
+    setCardExpandedId(prev => prev === id ? null : id);
+  };
+
+  // Users section inside a company card. Lazy-fetches the user list the
+  // first time it's opened; subsequent opens reuse the cache.
+  const toggleUsersExpand = async (id) => {
+    const wasOpen = usersVisibleIds.has(id);
+    setUsersVisibleIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+    if (!wasOpen && !companyUsers[id]) {
       try {
         const r = await api.get(`/superadmin/companies/${id}/users`);
         setCompanyUsers(prev => ({ ...prev, [id]: r.data }));
@@ -434,37 +449,27 @@ export default function SuperAdmin() {
               <p style={{ color: '#6b7280' }}>No companies yet.</p>
             ) : (
               <div style={styles.list}>
-                {companies.map(c => (
+                {companies.map(c => {
+                  const isExpanded = cardExpandedId === c.id;
+                  const isRenaming = renamingId === c.id;
+                  return (
                   <div key={c.id} style={{ ...styles.card, opacity: c.active ? 1 : 0.6 }}>
-                    <div style={styles.cardTop}>
-                      <div style={styles.cardLeft}>
-
-                        {/* Company name / rename */}
+                    {/* Collapsed header — always visible, click to expand.
+                        Shows name + status tags + key stats; actions and
+                        controls live in the expanded body below. */}
+                    <button
+                      type="button"
+                      style={styles.cardHeaderBtn}
+                      onClick={() => toggleCardExpand(c.id)}
+                      aria-expanded={isExpanded}
+                    >
+                      <div style={styles.cardSummary}>
                         <div style={styles.companyName}>
-                          {renamingId === c.id ? (
-                            <>
-                              <input
-                                style={styles.renameInput}
-                                value={renameValue}
-                                onChange={e => setRenameValue(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') saveRename(c.id); if (e.key === 'Escape') setRenamingId(null); }}
-                                autoFocus
-                              />
-                              <button style={styles.renameSaveBtn} onClick={() => saveRename(c.id)} disabled={renameSaving}>
-                                {renameSaving ? '...' : 'Save'}
-                              </button>
-                              <button style={styles.renameCancelBtn} onClick={() => setRenamingId(null)}>Cancel</button>
-                            </>
-                          ) : (
-                            <>
-                              {c.name}
-                              {!c.active && <span style={styles.inactiveTag}>Deactivated</span>}
-                              {statusTag(c.subscription_status, c.plan)}
-                              {c.affiliate_name && <span style={styles.affiliateTag}>via {c.affiliate_name}</span>}
-                            </>
-                          )}
+                          {c.name}
+                          {!c.active && <span style={styles.inactiveTag}>Deactivated</span>}
+                          {statusTag(c.subscription_status, c.plan)}
+                          {c.affiliate_name && <span style={styles.affiliateTag}>via {c.affiliate_name}</span>}
                         </div>
-
                         <div style={styles.meta}>
                           <span>slug: <code style={styles.slug}>{c.slug}</code></span>
                           <span style={styles.sep}>·</span>
@@ -474,91 +479,108 @@ export default function SuperAdmin() {
                             <span style={{ color: '#059669', fontWeight: 600 }}>MRR {formatMrr(c.mrr_cents, locale)}</span>
                           </>}
                         </div>
-
                         <div style={styles.stats}>
                           <span style={styles.stat}><strong>{c.worker_count}</strong> workers</span>
                           <span style={styles.stat}><strong>{c.admin_count}</strong> admins</span>
                           <span style={styles.stat}><strong>{c.entry_count}</strong> entries</span>
                           {c.last_entry_at && <span style={styles.stat}>Last entry: {formatDate(c.last_entry_at, locale)}</span>}
                         </div>
+                      </div>
+                      <span style={styles.chevron} aria-hidden="true">{isExpanded ? '▾' : '▸'}</span>
+                    </button>
 
-                        {/* Controls row */}
-                        <div style={styles.controlsRow}>
+                    {isExpanded && (
+                    <div style={styles.cardBody}>
+                      {/* Rename inline (only while renaming this specific company) */}
+                      {isRenaming && (
+                        <div style={styles.renameRow}>
+                          <input
+                            style={styles.renameInput}
+                            value={renameValue}
+                            onChange={e => setRenameValue(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') saveRename(c.id); if (e.key === 'Escape') setRenamingId(null); }}
+                            autoFocus
+                          />
+                          <button style={styles.renameSaveBtn} onClick={() => saveRename(c.id)} disabled={renameSaving}>
+                            {renameSaving ? '...' : 'Save'}
+                          </button>
+                          <button style={styles.renameCancelBtn} onClick={() => setRenamingId(null)}>Cancel</button>
+                        </div>
+                      )}
+
+                      {/* Controls row */}
+                      <div style={styles.controlsRow}>
+                        <div style={styles.controlGroup}>
+                          <span style={styles.controlLabel}>Status</span>
+                          <select
+                            style={styles.controlSelect}
+                            value={c.subscription_status || 'trial'}
+                            onChange={e => patchCompany(c.id, { subscription_status: e.target.value })}
+                            disabled={working === c.id}
+                          >
+                            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                        <div style={styles.controlGroup}>
+                          <span style={styles.controlLabel}>Plan</span>
+                          <select
+                            style={styles.controlSelect}
+                            value={c.plan || 'free'}
+                            onChange={e => patchCompany(c.id, { plan: e.target.value })}
+                            disabled={working === c.id}
+                          >
+                            {PLANS.map(p => <option key={p} value={p}>{p}</option>)}
+                          </select>
+                        </div>
+                        {(c.subscription_status === 'trial' || c.trial_ends_at) && (
                           <div style={styles.controlGroup}>
-                            <span style={styles.controlLabel}>Status</span>
-                            <select
+                            <span style={styles.controlLabel}>Trial ends</span>
+                            <CommitOnBlurDateInput
                               style={styles.controlSelect}
-                              value={c.subscription_status || 'trial'}
-                              onChange={e => patchCompany(c.id, { subscription_status: e.target.value })}
+                              value={c.trial_ends_at ? c.trial_ends_at.substring(0, 10) : ''}
+                              onCommit={next => patchCompany(c.id, { trial_ends_at: next })}
                               disabled={working === c.id}
-                            >
-                              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
+                            />
                           </div>
-                          <div style={styles.controlGroup}>
-                            <span style={styles.controlLabel}>Plan</span>
-                            <select
-                              style={styles.controlSelect}
-                              value={c.plan || 'free'}
-                              onChange={e => patchCompany(c.id, { plan: e.target.value })}
+                        )}
+                        <div style={styles.controlGroup}>
+                          <span style={styles.controlLabel}>QBO add-on</span>
+                          <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                            <input
+                              type="checkbox"
+                              checked={!!c.addon_qbo}
+                              onChange={e => patchCompany(c.id, { addon_qbo: e.target.checked })}
                               disabled={working === c.id}
-                            >
-                              {PLANS.map(p => <option key={p} value={p}>{p}</option>)}
-                            </select>
-                          </div>
-                          {(c.subscription_status === 'trial' || c.trial_ends_at) && (
-                            <div style={styles.controlGroup}>
-                              <span style={styles.controlLabel}>Trial ends</span>
-                              <CommitOnBlurDateInput
-                                style={styles.controlSelect}
-                                value={c.trial_ends_at ? c.trial_ends_at.substring(0, 10) : ''}
-                                onCommit={next => patchCompany(c.id, { trial_ends_at: next })}
-                                disabled={working === c.id}
-                              />
-                            </div>
-                          )}
-                          <div style={styles.controlGroup}>
-                            <span style={styles.controlLabel}>QBO add-on</span>
-                            <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                              <input
-                                type="checkbox"
-                                checked={!!c.addon_qbo}
-                                onChange={e => patchCompany(c.id, { addon_qbo: e.target.checked })}
-                                disabled={working === c.id}
-                              />
-                              {c.addon_qbo ? 'On' : 'Off'}
-                            </label>
-                          </div>
-                          <div style={styles.controlGroup}>
-                            <span style={styles.controlLabel}>Certified Payroll add-on</span>
-                            <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                              <input
-                                type="checkbox"
-                                checked={!!c.addon_certified_payroll}
-                                onChange={e => patchCompany(c.id, { addon_certified_payroll: e.target.checked })}
-                                disabled={working === c.id}
-                              />
-                              {c.addon_certified_payroll ? 'On' : 'Off'}
-                            </label>
-                          </div>
-                          <div style={styles.controlGroup}>
-                            <span style={styles.controlLabel}>Affiliate</span>
-                            <select
-                              style={styles.controlSelect}
-                              value={c.affiliate_id || ''}
-                              onChange={e => assignAffiliate(c.id, e.target.value)}
-                            >
-                              <option value="">None</option>
-                              {affiliates.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                            </select>
-                          </div>
+                            />
+                            {c.addon_qbo ? 'On' : 'Off'}
+                          </label>
+                        </div>
+                        <div style={styles.controlGroup}>
+                          <span style={styles.controlLabel}>Certified Payroll add-on</span>
+                          <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                            <input
+                              type="checkbox"
+                              checked={!!c.addon_certified_payroll}
+                              onChange={e => patchCompany(c.id, { addon_certified_payroll: e.target.checked })}
+                              disabled={working === c.id}
+                            />
+                            {c.addon_certified_payroll ? 'On' : 'Off'}
+                          </label>
+                        </div>
+                        <div style={styles.controlGroup}>
+                          <span style={styles.controlLabel}>Affiliate</span>
+                          <select
+                            style={styles.controlSelect}
+                            value={c.affiliate_id || ''}
+                            onChange={e => assignAffiliate(c.id, e.target.value)}
+                          >
+                            <option value="">None</option>
+                            {affiliates.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                          </select>
                         </div>
                       </div>
 
                       <div style={styles.cardActions}>
-                        <button style={styles.expandBtn} onClick={() => toggleExpand(c.id)}>
-                          {expandedId === c.id ? 'Hide users' : 'Users'}
-                        </button>
                         <button style={styles.actionBtn} onClick={() => startRename(c)} disabled={working === c.id}>
                           Rename
                         </button>
@@ -586,76 +608,94 @@ export default function SuperAdmin() {
                           Delete
                         </button>
                       </div>
-                    </div>
 
-                    {expandedId === c.id && (
-                      <div style={styles.userTable}>
-                        {!companyUsers[c.id] ? (
-                          <p style={{ color: '#6b7280', fontSize: 13 }}>Loading...</p>
-                        ) : companyUsers[c.id].length === 0 ? (
-                          <p style={{ color: '#6b7280', fontSize: 13 }}>No users.</p>
-                        ) : (
-                          <table style={styles.table}>
-                            <thead>
-                              <tr>
-                                <th style={styles.th}>Name</th>
-                                <th style={styles.th}>Username</th>
-                                <th style={styles.th}>Email</th>
-                                <th style={styles.th}>Role</th>
-                                <th style={styles.th}>Status</th>
-                                <th style={styles.th}></th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {companyUsers[c.id].map(u => {
-                                const busy = impersonating === `${c.id}:${u.id}`;
-                                return (
-                                  <tr key={u.id}>
-                                    <td style={styles.td}>{u.full_name}</td>
-                                    <td style={styles.td}><code>{u.username}</code></td>
-                                    <td style={styles.td}>{u.email || '—'}</td>
-                                    <td style={styles.td}>
-                                      <span style={{ ...styles.roleTag, background: u.role === 'admin' ? '#dbeafe' : '#f3f4f6', color: u.role === 'admin' ? '#1e40af' : '#374151' }}>
-                                        {u.role}
-                                      </span>
-                                    </td>
-                                    <td style={styles.td}>
-                                      <span style={{ color: u.active ? '#059669' : '#9ca3af', fontSize: 12 }}>
-                                        {u.active ? 'Active' : 'Inactive'}
-                                      </span>
-                                    </td>
-                                    <td style={styles.td}>
-                                      {u.active && (
-                                        <>
-                                          <button
-                                            style={{ ...styles.userImpersonateBtn, ...(busy ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
-                                            onClick={() => handleImpersonate(c, u.id)}
-                                            disabled={busy}
-                                            title={`Open a new tab as ${u.full_name}`}
-                                          >
-                                            {busy ? '…' : 'Login as'}
-                                          </button>
-                                          <button
-                                            style={{ ...styles.userRevokeBtn, ...(revoking === u.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
-                                            onClick={() => handleRevoke(u)}
-                                            disabled={revoking === u.id}
-                                            title="Force-logout this user on all devices"
-                                          >
-                                            {revoking === u.id ? '…' : 'Revoke sessions'}
-                                          </button>
-                                        </>
-                                      )}
-                                    </td>
+                      {/* Users collapsible sub-section. Users list is loaded
+                          lazily on first expand; subsequent toggles reuse the
+                          cached response. */}
+                      <div style={styles.usersSection}>
+                        <button
+                          type="button"
+                          style={styles.usersHeader}
+                          onClick={() => toggleUsersExpand(c.id)}
+                          aria-expanded={usersVisibleIds.has(c.id)}
+                        >
+                          <span style={styles.usersHeaderLabel}>
+                            Users <span style={styles.usersCount}>({(c.worker_count || 0) + (c.admin_count || 0)})</span>
+                          </span>
+                          <span style={styles.chevron} aria-hidden="true">{usersVisibleIds.has(c.id) ? '▾' : '▸'}</span>
+                        </button>
+                        {usersVisibleIds.has(c.id) && (
+                          <div style={styles.userTable}>
+                            {!companyUsers[c.id] ? (
+                              <p style={{ color: '#6b7280', fontSize: 13 }}>Loading...</p>
+                            ) : companyUsers[c.id].length === 0 ? (
+                              <p style={{ color: '#6b7280', fontSize: 13 }}>No users.</p>
+                            ) : (
+                              <table style={styles.table}>
+                                <thead>
+                                  <tr>
+                                    <th style={styles.th}>Name</th>
+                                    <th style={styles.th}>Username</th>
+                                    <th style={styles.th}>Email</th>
+                                    <th style={styles.th}>Role</th>
+                                    <th style={styles.th}>Status</th>
+                                    <th style={styles.th}></th>
                                   </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
+                                </thead>
+                                <tbody>
+                                  {companyUsers[c.id].map(u => {
+                                    const busy = impersonating === `${c.id}:${u.id}`;
+                                    return (
+                                      <tr key={u.id}>
+                                        <td style={styles.td}>{u.full_name}</td>
+                                        <td style={styles.td}><code>{u.username}</code></td>
+                                        <td style={styles.td}>{u.email || '—'}</td>
+                                        <td style={styles.td}>
+                                          <span style={{ ...styles.roleTag, background: u.role === 'admin' ? '#dbeafe' : '#f3f4f6', color: u.role === 'admin' ? '#1e40af' : '#374151' }}>
+                                            {u.role}
+                                          </span>
+                                        </td>
+                                        <td style={styles.td}>
+                                          <span style={{ color: u.active ? '#059669' : '#9ca3af', fontSize: 12 }}>
+                                            {u.active ? 'Active' : 'Inactive'}
+                                          </span>
+                                        </td>
+                                        <td style={styles.td}>
+                                          {u.active && (
+                                            <>
+                                              <button
+                                                style={{ ...styles.userImpersonateBtn, ...(busy ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                                                onClick={() => handleImpersonate(c, u.id)}
+                                                disabled={busy}
+                                                title={`Open a new tab as ${u.full_name}`}
+                                              >
+                                                {busy ? '…' : 'Login as'}
+                                              </button>
+                                              <button
+                                                style={{ ...styles.userRevokeBtn, ...(revoking === u.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                                                onClick={() => handleRevoke(u)}
+                                                disabled={revoking === u.id}
+                                                title="Force-logout this user on all devices"
+                                              >
+                                                {revoking === u.id ? '…' : 'Revoke sessions'}
+                                              </button>
+                                            </>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            )}
+                          </div>
                         )}
                       </div>
+                    </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
@@ -965,9 +1005,22 @@ const styles = {
   title: { fontSize: 22, fontWeight: 700, margin: 0 },
   newBtn: { marginLeft: 'auto', padding: '8px 16px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   list: { display: 'flex', flexDirection: 'column', gap: 12 },
-  card: { background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
-  cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
-  cardLeft: { flex: 1 },
+  card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', overflow: 'hidden' },
+  cardHeaderBtn: {
+    width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+    gap: 16, padding: '18px 24px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer',
+  },
+  cardSummary: { flex: 1, minWidth: 0 },
+  cardBody: { padding: '4px 24px 20px', borderTop: '1px solid #f3f4f6' },
+  chevron: { color: '#6b7280', fontSize: 14, marginTop: 2, flexShrink: 0 },
+  renameRow: { display: 'flex', gap: 8, alignItems: 'center', marginTop: 14, flexWrap: 'wrap' },
+  usersSection: { marginTop: 16, borderTop: '1px solid #f3f4f6' },
+  usersHeader: {
+    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '12px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
+  },
+  usersHeaderLabel: { fontWeight: 600, fontSize: 14, color: '#374151' },
+  usersCount: { color: '#6b7280', fontWeight: 400, marginLeft: 4 },
   companyName: { fontWeight: 700, fontSize: 17, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   inactiveTag: { background: '#fee2e2', color: '#dc2626', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
   affiliateTag: { background: '#f0fdf4', color: '#15803d', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10 },
@@ -989,7 +1042,7 @@ const styles = {
   renameInput: { flex: 1, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 15, fontWeight: 700 },
   renameSaveBtn: { padding: '4px 12px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   renameCancelBtn: { padding: '4px 10px', background: 'none', border: '1px solid #d1d5db', color: '#6b7280', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
-  userTable: { marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 16 },
+  userTable: { paddingBottom: 12 },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
   th: { textAlign: 'left', padding: '6px 10px', color: '#6b7280', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', borderBottom: '1px solid #e5e7eb' },
   td: { padding: '8px 10px', borderBottom: '1px solid #f3f4f6', color: '#374151' },
