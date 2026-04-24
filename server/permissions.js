@@ -28,8 +28,7 @@ const pool = require('./db');
 
 const PERMISSIONS = [
   // Time & attendance
-  { key: 'clock_in_self', group: 'time', label: 'Clock self in' },
-  { key: 'clock_out_self', group: 'time', label: 'Clock self out' },
+  { key: 'clock_self', group: 'time', label: 'Clock self in/out' },
   { key: 'submit_time_entry_self', group: 'time', label: 'Submit own time entry' },
   { key: 'edit_own_pending_entry', group: 'time', label: 'Edit own pending entry' },
   { key: 'view_own_entries', group: 'time', label: 'View own time history' },
@@ -95,8 +94,7 @@ const PERMISSION_KEYS = new Set(PERMISSIONS.map(p => p.key));
 // from this role will fall back to on deletion (must be 'worker' or 'admin').
 
 const WORKER_PERMISSIONS = [
-  'clock_in_self',
-  'clock_out_self',
+  'clock_self',
   'submit_time_entry_self',
   'edit_own_pending_entry',
   'view_own_entries',

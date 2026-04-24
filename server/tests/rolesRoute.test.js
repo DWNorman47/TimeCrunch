@@ -95,7 +95,7 @@ describe('GET /admin/permissions/catalog', () => {
     // Spot check: known keys are present
     const keys = res.body.map(p => p.key);
     expect(keys).toContain('manage_billing');
-    expect(keys).toContain('clock_in_self');
+    expect(keys).toContain('clock_self');
   });
 });
 

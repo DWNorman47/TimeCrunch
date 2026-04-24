@@ -25,7 +25,7 @@ import { OfflineContext } from '../contexts/OfflineContext';
 // permission combos (notably the empty-set "zero-perm user" case).
 const DEFAULT_PERMS_BY_ROLE = {
   worker: [
-    'clock_in_self', 'clock_out_self', 'submit_time_entry_self',
+    'clock_self', 'submit_time_entry_self',
     'edit_own_pending_entry', 'view_own_entries', 'view_projects',
     'submit_reimbursement_self', 'view_own_reimbursements',
     'submit_field_reports', 'manage_punchlist', 'manage_rfis',
@@ -35,7 +35,7 @@ const DEFAULT_PERMS_BY_ROLE = {
   ],
   admin: [
     // Worker baseline + admin tier minus Owner-only
-    'clock_in_self', 'clock_out_self', 'submit_time_entry_self',
+    'clock_self', 'submit_time_entry_self',
     'edit_own_pending_entry', 'view_own_entries', 'view_projects',
     'submit_reimbursement_self', 'view_own_reimbursements',
     'submit_field_reports', 'manage_punchlist', 'manage_rfis',

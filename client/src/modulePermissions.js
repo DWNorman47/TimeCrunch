@@ -17,7 +17,7 @@
 export const MODULE_PERMISSIONS = {
   timeclock: [
     // Worker-tier
-    'clock_in_self', 'clock_out_self', 'submit_time_entry_self',
+    'clock_self', 'submit_time_entry_self',
     'edit_own_pending_entry', 'view_own_entries',
     // Admin-tier (Live tab, approvals)
     'clock_in_others', 'edit_any_entry', 'approve_entries',

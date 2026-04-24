@@ -109,8 +109,8 @@ describe('Permission gate coverage', () => {
     const routes = gatedRoutes(clockRouter);
     const inRoute = routes.find(r => r.path === '/in' && r.method === 'POST');
     const outRoute = routes.find(r => r.path === '/out' && r.method === 'POST');
-    expect(inRoute?.key).toBe('clock_in_self');
-    expect(outRoute?.key).toBe('clock_out_self');
+    expect(inRoute?.key).toBe('clock_self');
+    expect(outRoute?.key).toBe('clock_self');
   });
 
   test('every gated route registers a tagged middleware (no silent passthrough)', () => {
