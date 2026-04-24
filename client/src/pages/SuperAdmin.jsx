@@ -89,6 +89,10 @@ export default function SuperAdmin() {
   const [cardExpandedId, setCardExpandedId] = useState(null);
   const [usersVisibleIds, setUsersVisibleIds] = useState(() => new Set());
   const [companyUsers, setCompanyUsers] = useState({});
+  // Per-user collapse state on the mobile card layout. Keyed "${companyId}:${userId}"
+  // so the same user in two different companies (possible via impersonation logs)
+  // doesn't share expand state.
+  const [expandedUserKeys, setExpandedUserKeys] = useState(() => new Set());
   const [affiliates, setAffiliates] = useState([]);
 
   // inline rename
@@ -272,6 +276,14 @@ export default function SuperAdmin() {
 
   const toggleCardExpand = (id) => {
     setCardExpandedId(prev => prev === id ? null : id);
+  };
+
+  const toggleUserCard = (key) => {
+    setExpandedUserKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
   };
 
   // Users section inside a company card. Lazy-fetches the user list the
@@ -630,8 +642,9 @@ export default function SuperAdmin() {
                               <p style={{ color: '#6b7280', fontSize: 13 }}>Loading...</p>
                             ) : companyUsers[c.id].length === 0 ? (
                               <p style={{ color: '#6b7280', fontSize: 13 }}>No users.</p>
-                            ) : (
-                              <table style={styles.table}>
+                            ) : (<>
+                              {/* Desktop: table (hidden on mobile via CSS) */}
+                              <table style={styles.table} className="sa-users-table">
                                 <thead>
                                   <tr>
                                     <th style={styles.th}>Name</th>
@@ -687,7 +700,70 @@ export default function SuperAdmin() {
                                   })}
                                 </tbody>
                               </table>
-                            )}
+
+                              {/* Mobile: card list (hidden on desktop via CSS).
+                                  Each user is collapsed to name + role; tap
+                                  to reveal username, email, status, and actions. */}
+                              <div className="sa-users-mobile">
+                                {companyUsers[c.id].map(u => {
+                                  const busy = impersonating === `${c.id}:${u.id}`;
+                                  const key = `${c.id}:${u.id}`;
+                                  const open = expandedUserKeys.has(key);
+                                  return (
+                                    <div key={u.id} style={styles.userCard}>
+                                      <button
+                                        type="button"
+                                        style={styles.userCardHeader}
+                                        onClick={() => toggleUserCard(key)}
+                                        aria-expanded={open}
+                                      >
+                                        <span style={styles.userCardName}>{u.full_name}</span>
+                                        <span style={{ ...styles.roleTag, background: u.role === 'admin' ? '#dbeafe' : '#f3f4f6', color: u.role === 'admin' ? '#1e40af' : '#374151' }}>
+                                          {u.role}
+                                        </span>
+                                        <span style={styles.chevron} aria-hidden="true">{open ? '▾' : '▸'}</span>
+                                      </button>
+                                      {open && (
+                                        <div style={styles.userCardBody}>
+                                          <div style={styles.userCardRow}>
+                                            <span style={styles.userCardLabel}>Username</span>
+                                            <code style={{ fontSize: 12 }}>{u.username}</code>
+                                          </div>
+                                          <div style={styles.userCardRow}>
+                                            <span style={styles.userCardLabel}>Email</span>
+                                            <span>{u.email || '—'}</span>
+                                          </div>
+                                          <div style={styles.userCardRow}>
+                                            <span style={styles.userCardLabel}>Status</span>
+                                            <span style={{ color: u.active ? '#059669' : '#9ca3af' }}>
+                                              {u.active ? 'Active' : 'Inactive'}
+                                            </span>
+                                          </div>
+                                          {u.active && (
+                                            <div style={styles.userCardActions}>
+                                              <button
+                                                style={{ ...styles.userImpersonateBtn, ...(busy ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                                                onClick={() => handleImpersonate(c, u.id)}
+                                                disabled={busy}
+                                              >
+                                                {busy ? '…' : 'Login as'}
+                                              </button>
+                                              <button
+                                                style={{ ...styles.userRevokeBtn, ...(revoking === u.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                                                onClick={() => handleRevoke(u)}
+                                                disabled={revoking === u.id}
+                                              >
+                                                {revoking === u.id ? '…' : 'Revoke sessions'}
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </>)}
                           </div>
                         )}
                       </div>
@@ -1052,6 +1128,17 @@ const styles = {
   roleTag: { padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 },
   userImpersonateBtn: { padding: '4px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#1e40af', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
   userRevokeBtn:      { padding: '4px 10px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fff', color: '#b91c1c', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: 6 },
+  // Mobile-only user card layout (CSS .sa-users-mobile/.sa-users-table toggle which renders)
+  userCard: { border: '1px solid #f0f0f0', borderRadius: 8, marginBottom: 6, overflow: 'hidden' },
+  userCardHeader: {
+    width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+    padding: '10px 12px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
+  },
+  userCardName: { flex: 1, fontWeight: 600, fontSize: 14, color: '#111827' },
+  userCardBody: { padding: '4px 12px 12px', borderTop: '1px solid #f3f4f6', display: 'flex', flexDirection: 'column', gap: 6 },
+  userCardRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, color: '#374151', gap: 10 },
+  userCardLabel: { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  userCardActions: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   impersonationModal: { background: '#fff', borderRadius: 12, padding: 24, maxWidth: 820, width: '90%', maxHeight: '80vh', overflow: 'auto' },
   diagnosticsRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 16, flexWrap: 'wrap' },
   diagnosticsBtn: { padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' },

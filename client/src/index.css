@@ -59,6 +59,12 @@ select:focus-visible {
 .header-clock-timer-mobile { display: none; }
 .header-clock-timer-desktop { display: inline-flex; align-items: center; }
 
+/* SuperAdmin users list — desktop shows the table, mobile shows the
+   collapsible card list. Both render in the DOM; CSS picks which is
+   visible based on viewport. */
+.sa-users-table { display: table; width: 100%; }
+.sa-users-mobile { display: none; }
+
 /* Prevent iOS Safari from zooming in when tapping inputs */
 @media (max-width: 768px) {
   input, select, textarea {
@@ -69,6 +75,9 @@ select:focus-visible {
   .sa-header-username {
     display: none !important;
   }
+  /* Swap table for cards on narrow screens. */
+  .sa-users-table { display: none !important; }
+  .sa-users-mobile { display: block !important; }
 }
 
 /* Touch-friendly inputs and buttons */
