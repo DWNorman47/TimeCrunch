@@ -64,6 +64,13 @@ select:focus-visible {
   input, select, textarea {
     font-size: 16px !important;
   }
+  /* Hide the user's name in the top header on tablets + phones. The
+     company band below the header already shows who's logged in via
+     context; adding the name on a narrow screen crowds the header-right
+     actions. Applied at 768px so landscape phones and tablets pick it up. */
+  .header-username {
+    display: none !important;
+  }
 }
 
 /* Touch-friendly inputs and buttons */
