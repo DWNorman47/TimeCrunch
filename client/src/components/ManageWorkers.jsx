@@ -176,6 +176,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
 
   const [editInfoForm, setEditInfoForm] = useState({});
   const [editInfoSaving, setEditInfoSaving] = useState(false);
+  const [originalRoleId, setOriginalRoleId] = useState(null);
 
   const [editUsernameVal, setEditUsernameVal] = useState('');
   const [editUsernameTaken, setEditUsernameTaken] = useState(false);
@@ -212,6 +213,16 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       .then(r => setClassifications(r.data.active || []))
       .catch(silentError('manageworkers'));
   }, [trackClassifications]);
+
+  // Phase B: company roles for the role picker on the worker edit form.
+  // Falls back to an empty list if the endpoint 403s (admin without
+  // assign_roles can't see them; legacy admin-only role select still shows).
+  const [availableRoles, setAvailableRoles] = useState([]);
+  useEffect(() => {
+    api.get('/admin/roles')
+      .then(r => setAvailableRoles(r.data || []))
+      .catch(silentError('manageworkers-roles'));
+  }, []);
 
   // ── Add form helpers ────────────────────────────────────────────────────────
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -317,7 +328,10 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const startEditInfo = w => {
     setEditingId(w.id); setEditSection('info');
     setEditWorkerUpdatedAt(w.updated_at || null);
-    setEditInfoForm({ full_name: w.full_name, invoice_name: w.invoice_name || '', email: w.email || '', role: w.role, language: w.language || 'English', worker_type: w.worker_type || 'employee', classification: w.classification || '' });
+    setEditInfoForm({ full_name: w.full_name, invoice_name: w.invoice_name || '', email: w.email || '', role: w.role, role_id: w.role_id ?? null, language: w.language || 'English', worker_type: w.worker_type || 'employee', classification: w.classification || '' });
+    // Snapshot the original role_id so saveInfo knows whether to fire the
+    // separate /admin/workers/:id/role call (which has the last-Owner check).
+    setOriginalRoleId(w.role_id ?? null);
   };
 
   const startEditUsername = w => {
@@ -352,7 +366,17 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const saveInfo = async id => {
     setEditInfoSaving(true);
     try {
-      const r = await api.patch(`/admin/workers/${id}`, { ...editInfoForm, updated_at: editWorkerUpdatedAt });
+      // If role_id changed, send it to the dedicated endpoint first — that's
+      // the one with the last-Owner guard. If that fails (e.g., last-Owner),
+      // we abort before mutating any other fields.
+      if (editInfoForm.role_id != null && editInfoForm.role_id !== originalRoleId) {
+        await api.patch(`/admin/workers/${id}/role`, { role_id: editInfoForm.role_id });
+      }
+      // Strip role_id and the legacy role from the bulk update — the role
+      // endpoint above already set both. Sending role here would re-overwrite
+      // role_id with whatever we computed from the parent.
+      const { role_id: _omit1, role: _omit2, ...rest } = editInfoForm;
+      const r = await api.patch(`/admin/workers/${id}`, { ...rest, updated_at: editWorkerUpdatedAt });
       onWorkerUpdated(r.data);
       cancelEdit();
     } catch (err) {
@@ -693,9 +717,16 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                               </div>
                               <div style={s.fieldGroup}>
                                 <label htmlFor="mw-edit-role" style={s.label}>{t.role}</label>
-                                <select id="mw-edit-role" style={s.input} value={editInfoForm.role} onChange={e => setEditInfoForm(f => ({ ...f, role: e.target.value }))}>
-                                  <option value="worker">{t.workerRole}</option>
-                                  <option value="admin">{t.adminRole}</option>
+                                <select
+                                  id="mw-edit-role"
+                                  style={s.input}
+                                  value={editInfoForm.role_id ?? ''}
+                                  onChange={e => setEditInfoForm(f => ({ ...f, role_id: e.target.value ? parseInt(e.target.value) : null }))}
+                                >
+                                  {availableRoles.length === 0 && <option value="">—</option>}
+                                  {availableRoles.map(r => (
+                                    <option key={r.id} value={r.id}>{r.name}{r.is_builtin ? '' : ` (${r.parent_role})`}</option>
+                                  ))}
                                 </select>
                               </div>
                               <div style={s.fieldGroup}>

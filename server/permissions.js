@@ -257,6 +257,41 @@ function requirePerm(key) {
 }
 
 /**
+ * Return the user's full effective permission set as a Set<string>.
+ * Used by the roles management endpoints to (a) display what permissions
+ * a role grants and (b) prevent a non-Owner with manage_roles from
+ * escalating by granting permissions they don't themselves hold.
+ *
+ * super_admin gets the entire catalog (matches hasPerm's short-circuit).
+ * Falls back to the legacy admin_permissions translation when role_id
+ * is null, same as hasPerm.
+ */
+async function getUserPermissions(user) {
+  if (!user) return new Set();
+  if (user.role === 'super_admin') return new Set(PERMISSIONS.map(p => p.key));
+  if (user.role_id) {
+    const { rows } = await pool.query(
+      'SELECT permission FROM role_permissions WHERE role_id = $1',
+      [user.role_id]
+    );
+    return new Set(rows.map(r => r.permission));
+  }
+  // Legacy: admin with null admin_permissions → all legacy keys are granted
+  // (which translates to the new keys via LEGACY_TO_NEW).
+  if (user.role === 'admin') {
+    if (!user.admin_permissions) {
+      return new Set(Object.values(LEGACY_TO_NEW));
+    }
+    const granted = new Set();
+    for (const [legacyKey, newKey] of Object.entries(LEGACY_TO_NEW)) {
+      if (user.admin_permissions[legacyKey] === true) granted.add(newKey);
+    }
+    return granted;
+  }
+  return new Set();
+}
+
+/**
  * Seed the three built-in roles (Worker / Admin / Owner) and their
  * permissions for a newly-created company. Idempotent — safe to call on a
  * company that already has them. Runs in whatever client/transaction is
@@ -301,4 +336,5 @@ module.exports = {
   hasPerm,
   requirePerm,
   seedBuiltinRoles,
+  getUserPermissions,
 };

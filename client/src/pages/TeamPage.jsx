@@ -18,6 +18,7 @@ import RetryBanner from '../components/RetryBanner';
 import { silentError } from '../errorReporter';
 
 const ManageWorkers = lazy(() => import('../components/ManageWorkers'));
+const ManageRoles   = lazy(() => import('../components/ManageRoles'));
 
 function TabLoader() {
   return <div style={{ padding: '40px 0', textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading…</div>;
@@ -116,7 +117,7 @@ export default function TeamPage() {
   const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
-  const TEAM_TABS = isAdmin ? ['directory', 'manage'] : ['directory'];
+  const TEAM_TABS = isAdmin ? ['directory', 'manage', 'roles'] : ['directory'];
   const hashTab = window.location.hash.replace('#', '');
   const [teamTab, setTeamTab] = useState(TEAM_TABS.includes(hashTab) ? hashTab : 'directory');
   const switchTab = t => { setTeamTab(t); history.replaceState(null, '', '#' + t); };
@@ -190,6 +191,7 @@ export default function TeamPage() {
             tabs={[
               { id: 'directory', label: t.teamDirectoryTab },
               { id: 'manage',    label: t.teamManageTab },
+              { id: 'roles',     label: t.teamRolesTab || 'Roles' },
             ]}
           />
         )}
@@ -222,6 +224,11 @@ export default function TeamPage() {
                 </Suspense>
               )}
             </>
+          )}
+          {teamTab === 'roles' && isAdmin && (
+            <Suspense fallback={<TabLoader />}>
+              <ManageRoles />
+            </Suspense>
           )}
         </ErrorBoundary>
       </main>

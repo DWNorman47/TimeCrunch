@@ -16,7 +16,7 @@
 
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
-import { renderWithProviders, makeUser, DEFAULT_SETTINGS } from './test-helpers';
+import { renderWithProviders, makeUser, DEFAULT_SETTINGS, OFFLINE_VALUE } from './test-helpers';
 
 // ── Global mocks ──────────────────────────────────────────────────────────────
 // Every page hits the network on mount. Return benign empty responses so
@@ -283,6 +283,27 @@ describe('smoke: populated list views (catches sub-component bugs)', () => {
     await smokeRender(<Dashboard />, { user: makeUser('worker') });
   });
 
+  test('TeamPage Roles tab (admin) renders with built-in roles populated', async () => {
+    const api = (await import('../api')).default;
+    const builtins = [
+      { id: 1, name: 'Worker', is_builtin: true, parent_role: 'worker', user_count: 5, permission_count: 18, description: 'Standard worker' },
+      { id: 2, name: 'Admin',  is_builtin: true, parent_role: 'admin',  user_count: 2, permission_count: 38, description: 'Company admin' },
+      { id: 3, name: 'Owner',  is_builtin: true, parent_role: 'admin',  user_count: 1, permission_count: 41, description: 'Company owner' },
+    ];
+    api.get.mockImplementation((url) => {
+      if (url.startsWith('/admin/roles') && !url.match(/\/admin\/roles\/\d/)) return Promise.resolve({ data: builtins });
+      if (url.startsWith('/admin/permissions/catalog')) return Promise.resolve({ data: [
+        { key: 'approve_entries', group: 'time', label: 'Approve entries' },
+        { key: 'manage_billing',  group: 'money', label: 'Manage billing' },
+      ]});
+      if (url.startsWith('/team')) return Promise.resolve({ data: { team: [] } });
+      return Promise.resolve({ data: [] });
+    });
+    window.location.hash = '#roles';
+    const { default: TeamPage } = await import('../pages/TeamPage');
+    await smokeRender(<TeamPage />, { user: makeUser('admin') });
+  });
+
   test('AdminDashboard renders with KPIs + active clocks + pending entries', async () => {
     const api = (await import('../api')).default;
     const workers = [
@@ -337,6 +358,75 @@ describe('smoke: populated list views (catches sub-component bugs)', () => {
     // Force an extra tick so the project list effect resolves and ProjectCard renders
     await act(async () => { await new Promise(r => setTimeout(r, 0)); });
     expect(view).toBeTruthy();
+  });
+});
+
+// ── Offline mode ─────────────────────────────────────────────────────────────
+// Render core pages with isOffline=true so the OfflineBanner / queued-state
+// UI paths are exercised. These paths are easy to break — e.g. a component
+// reading queueCount could TypeError if it expected a number but got
+// undefined when destructuring useOffline().
+
+describe('smoke: offline mode', () => {
+  test('Dashboard (worker, offline)', async () => {
+    const { default: Dashboard } = await import('../pages/Dashboard');
+    await smokeRender(<Dashboard />, { user: makeUser('worker'), offlineValue: OFFLINE_VALUE });
+  });
+
+  test('AdminDashboard (admin, offline)', async () => {
+    const { default: AdminDashboard } = await import('../pages/AdminDashboard');
+    await smokeRender(<AdminDashboard />, { user: makeUser('admin'), offlineValue: OFFLINE_VALUE });
+  });
+
+  test('FieldPage (worker, offline)', async () => {
+    const { default: FieldPage } = await import('../pages/FieldPage');
+    await smokeRender(<FieldPage />, { user: makeUser('worker'), offlineValue: OFFLINE_VALUE });
+  });
+});
+
+// ── API error states ─────────────────────────────────────────────────────────
+// When the API rejects (500, network error, timeout), pages should show an
+// error UI instead of crashing. These tests reject every request and assert
+// the page still renders without tripping the ErrorBoundary. Catches
+// missing try/catch around .then chains, components that assume responses
+// always resolve, and silently-thrown promises.
+
+describe('smoke: API error states', () => {
+  beforeEach(async () => {
+    const api = (await import('../api')).default;
+    const fail = () => Promise.reject(Object.assign(new Error('mock 500'), {
+      response: { status: 500, data: { error: 'mock 500' } },
+    }));
+    api.get.mockImplementation(fail);
+    api.post.mockImplementation(fail);
+    api.patch.mockImplementation(fail);
+    api.put.mockImplementation(fail);
+    api.delete.mockImplementation(fail);
+  });
+
+  test('Dashboard (worker, all requests reject)', async () => {
+    const { default: Dashboard } = await import('../pages/Dashboard');
+    await smokeRender(<Dashboard />, { user: makeUser('worker') });
+  });
+
+  test('AdminDashboard (admin, all requests reject)', async () => {
+    const { default: AdminDashboard } = await import('../pages/AdminDashboard');
+    await smokeRender(<AdminDashboard />, { user: makeUser('admin') });
+  });
+
+  test('ProjectsPage (admin, all requests reject)', async () => {
+    const { default: ProjectsPage } = await import('../pages/ProjectsPage');
+    await smokeRender(<ProjectsPage />, { user: makeUser('admin') });
+  });
+
+  test('TeamPage (admin, all requests reject)', async () => {
+    const { default: TeamPage } = await import('../pages/TeamPage');
+    await smokeRender(<TeamPage />, { user: makeUser('admin') });
+  });
+
+  test('AnalyticsPage (admin, all requests reject)', async () => {
+    const { default: AnalyticsPage } = await import('../pages/AnalyticsPage');
+    await smokeRender(<AnalyticsPage />, { user: makeUser('admin') });
   });
 });
 
