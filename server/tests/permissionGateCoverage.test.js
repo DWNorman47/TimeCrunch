@@ -100,9 +100,11 @@ describe('Permission gate coverage', () => {
 
   test('Stripe routes are gated on manage_billing', () => {
     const routes = gatedRoutes(stripeRouter);
-    // status, checkout, portal — three async billing-action routes.
+    // checkout + portal are actual billing actions — both gated.
+    // /stripe/status is read-only and intentionally NOT gated; every admin
+    // needs to read subscription state to render trial-expired banners.
     const billingRoutes = routes.filter(r => r.key === 'manage_billing');
-    expect(billingRoutes.length).toBeGreaterThanOrEqual(3);
+    expect(billingRoutes.length).toBeGreaterThanOrEqual(2);
   });
 
   test('Clock-in / clock-out gated on the worker-tier permissions', () => {
