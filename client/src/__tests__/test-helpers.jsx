@@ -57,6 +57,15 @@ const FAKE_OFFLINE_VALUE = {
   onSync: () => () => {},
 };
 
+// Variant for the offline-mode smoke tests — flips isOffline true and
+// reports a queued count so OfflineBanner / queued-state UI is exercised.
+export const OFFLINE_VALUE = {
+  isOffline: true,
+  queueCount: 3,
+  sendToSW: () => {},
+  onSync: () => () => {},
+};
+
 export const DEFAULT_SETTINGS = {
   module_timeclock: true,
   module_field: true,
@@ -91,13 +100,14 @@ export const DEFAULT_SETTINGS = {
   company_timezone: 'America/Los_Angeles',
 };
 
-export function renderWithProviders(ui, { user = null, route = '/' } = {}) {
+export function renderWithProviders(ui, { user = null, route = '/', offlineValue } = {}) {
   const authValue = { ...FAKE_AUTH_VALUE, user };
+  const offline = offlineValue || FAKE_OFFLINE_VALUE;
   return render(
     <MemoryRouter initialEntries={[route]}>
       <AuthContext.Provider value={authValue}>
         <ToastProvider>
-          <OfflineContext.Provider value={FAKE_OFFLINE_VALUE}>
+          <OfflineContext.Provider value={offline}>
             {ui}
           </OfflineContext.Provider>
         </ToastProvider>

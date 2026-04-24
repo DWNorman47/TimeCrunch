@@ -96,22 +96,54 @@ async function handleOfflineableRequest(event, type) {
 
 // ── Replay queue ───────────────────────────────────────────────────────────────
 
+// Ask the first available page client for the user's current auth header.
+// Falls back to null if no client is open or the request times out, in which
+// case the caller uses whatever was captured at enqueue time. This prevents
+// queued requests from being permanently bound to a token that has since
+// expired or been replaced — the original failure mode where re-logging in
+// didn't help because the queue still carried the dead header.
+async function getFreshAuth() {
+  const clients = await self.clients.matchAll({ includeUncontrolled: true });
+  if (clients.length === 0) return null;
+  return new Promise(resolve => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => resolve(null), 1500);
+    channel.port1.onmessage = (event) => {
+      clearTimeout(timer);
+      resolve(event.data?.auth || null);
+    };
+    clients[0].postMessage({ type: 'GET_AUTH' }, [channel.port2]);
+  });
+}
+
 async function replayQueue() {
   const items = await getAllQueued();
   let replayed = 0;
   let authFailed = false;
   let partialFailure = false;
+
+  // Refresh the auth header once per replay batch. If a page is open, use
+  // its current token; otherwise fall back to whatever was captured at
+  // enqueue. Faster than asking per-item and good enough — the user can't
+  // really log out and back in mid-replay.
+  const freshAuth = await getFreshAuth();
+
   for (const item of items) {
     try {
+      const auth = freshAuth || item.auth;
       const res = await fetch(item.url, {
         method: item.method || 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(item.auth ? { Authorization: item.auth } : {}),
+          ...(auth ? { Authorization: auth } : {}),
         },
         body: JSON.stringify(item.body),
       });
       if (res.status === 401) {
+        // Even the fresh token (or fallback) was rejected. Drop the request
+        // rather than retrying forever — at this point the user needs to
+        // re-authenticate, and the request body is probably stale anyway.
+        await dequeue(item.id);
         authFailed = true;
         continue;
       }
@@ -131,12 +163,13 @@ async function replayQueue() {
   const clients = await self.clients.matchAll();
   if (authFailed) {
     clients.forEach(c => c.postMessage({ type: 'REPLAY_AUTH_FAILED' }));
-  } else {
-    if (partialFailure) {
-      clients.forEach(c => c.postMessage({ type: 'REPLAY_PARTIAL_FAILURE' }));
-    }
-    clients.forEach(c => c.postMessage({ type: 'QUEUE_REPLAYED', count: replayed }));
   }
+  if (partialFailure) {
+    clients.forEach(c => c.postMessage({ type: 'REPLAY_PARTIAL_FAILURE' }));
+  }
+  // Always emit QUEUE_REPLAYED so listeners (e.g. ClockInOut) refresh
+  // /clock/status, even when nothing succeeded.
+  clients.forEach(c => c.postMessage({ type: 'QUEUE_REPLAYED', count: replayed }));
 }
 
 // ── Service worker lifecycle ───────────────────────────────────────────────────
