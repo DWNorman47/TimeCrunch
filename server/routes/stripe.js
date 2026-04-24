@@ -55,8 +55,11 @@ router.get('/plans', requireAdmin, (req, res) => {
   });
 });
 
-// GET /stripe/status
-router.get('/status', requireAdmin, requirePerm('manage_billing'), async (req, res) => {
+// GET /stripe/status — read-only subscription info. Every admin reads this
+// to render the trial-expired banner, the plan label, the QBO add-on flag,
+// etc. Don't gate on manage_billing; only the actual billing actions
+// (checkout, portal) need that perm.
+router.get('/status', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT subscription_status, trial_ends_at, plan, addon_qbo, billing_cycle, stripe_customer_id, stripe_subscription_id FROM companies WHERE id = $1',
