@@ -618,8 +618,13 @@ function DayMark({ t, onEntryAdded }) {
   const handleMark = async () => {
     setSaving(true); setError('');
     try {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
       const r = await api.post('/clock/mark-day', {
         local_work_date: todayLocal(),
+        // Send the worker's actual local time — server is UTC and would
+        // otherwise record a UTC-offset time string.
+        local_time: `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       setMarked(true);

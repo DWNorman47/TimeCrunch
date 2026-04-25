@@ -350,7 +350,7 @@ router.get('/notifications', requireAdmin, async (req, res) => {
 // time entry with start=end=now.
 router.post('/mark-day', requireAdmin, requirePerm('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
-  const { user_id, local_work_date } = req.body;
+  const { user_id, local_work_date, local_time } = req.body;
   if (!user_id) return res.status(400).json({ error: 'user_id required' });
   try {
     const worker = await pool.query(
@@ -373,9 +373,17 @@ router.post('/mark-day', requireAdmin, requirePerm('manage_workers'), async (req
     if (existing.rowCount > 0) {
       return res.status(409).json({ error: 'Already marked for today', code: 'already_marked', entry_id: existing.rows[0].id });
     }
-    const now = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    // Use admin's local time if supplied; server clock is UTC so the
+    // fallback would mis-record. (Same caveat as /clock/mark-day.)
+    const validLocalTime = typeof local_time === 'string' && /^\d{2}:\d{2}(:\d{2})?$/.test(local_time);
+    let timeStr;
+    if (validLocalTime) {
+      timeStr = local_time.length === 5 ? `${local_time}:00` : local_time;
+    } else {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    }
     const result = await pool.query(
       `INSERT INTO time_entries
          (company_id, user_id, project_id, work_date, start_time, end_time,

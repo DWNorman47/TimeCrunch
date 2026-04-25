@@ -180,9 +180,12 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
     setClockInSaving(true);
     try {
       if (isDayMarkSelected) {
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
         await api.post('/admin/mark-day', {
           user_id: clockInUserId,
-          local_work_date: new Date().toLocaleDateString('en-CA'),
+          local_work_date: now.toLocaleDateString('en-CA'),
+          local_time: `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
         });
       } else {
         await api.post('/admin/clock-in', { user_id: clockInUserId, project_id: clockInProjectId || null, notes: clockInNotes || null });

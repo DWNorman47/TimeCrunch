@@ -421,7 +421,7 @@ router.post('/location', requireAuth, async (req, res) => {
 // for today, with same dedup semantics as any other time entry.
 // Gated on clock_self since it's the equivalent operation for day-mark workers.
 router.post('/mark-day', requireAuth, requirePerm('clock_self'), clockLimiter, async (req, res) => {
-  const { local_work_date, timezone } = req.body || {};
+  const { local_work_date, local_time, timezone } = req.body || {};
   try {
     const userResult = await pool.query(
       'SELECT rate_type, day_mark_mode FROM users WHERE id = $1',
@@ -452,12 +452,19 @@ router.post('/mark-day', requireAuth, requirePerm('clock_self'), clockLimiter, a
       });
     }
 
-    // Start = end = the current local time (HH:MM:SS). hoursWorked will
-    // return 0 but the daily pay calc only looks at distinct work_date, so
-    // the zero-hour entry counts as a full day's pay.
-    const now = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    // Start = end = the worker's current local time (HH:MM:SS). Server runs
+    // in UTC so we can't use new Date().getHours() — it'd record 06:00
+    // instead of 23:00 for a US worker. The client sends local_time
+    // explicitly; fall back to UTC only if it's missing or malformed.
+    const validLocalTime = typeof local_time === 'string' && /^\d{2}:\d{2}(:\d{2})?$/.test(local_time);
+    let timeStr;
+    if (validLocalTime) {
+      timeStr = local_time.length === 5 ? `${local_time}:00` : local_time;
+    } else {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    }
 
     const result = await pool.query(
       `INSERT INTO time_entries
