@@ -415,4 +415,84 @@ router.post('/location', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/clock/mark-day — daily-rate workers with day_mark_mode=true
+// record a single "I worked today" entry instead of clocking in/out.
+// Creates a finished time entry (start=end=now, wage_type=regular, status=pending)
+// for today, with same dedup semantics as any other time entry.
+// Gated on clock_self since it's the equivalent operation for day-mark workers.
+router.post('/mark-day', requireAuth, requirePerm('clock_self'), clockLimiter, async (req, res) => {
+  const { local_work_date, timezone } = req.body || {};
+  try {
+    const userResult = await pool.query(
+      'SELECT rate_type, day_mark_mode FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    if (userResult.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    const { rate_type, day_mark_mode } = userResult.rows[0];
+    if (rate_type !== 'daily' || !day_mark_mode) {
+      return res.status(400).json({
+        error: 'Mark Day is only available to daily-rate workers in day-mark mode',
+        code: 'not_day_mark_worker',
+      });
+    }
+
+    // Today's date — use client-supplied local date if provided, else server date.
+    const workDate = local_work_date || new Date().toISOString().substring(0, 10);
+
+    // Dedup: one marked day per work_date per worker.
+    const existing = await pool.query(
+      'SELECT id FROM time_entries WHERE user_id = $1 AND work_date = $2',
+      [req.user.id, workDate]
+    );
+    if (existing.rowCount > 0) {
+      return res.status(409).json({
+        error: 'Already marked for today',
+        code: 'already_marked',
+        entry_id: existing.rows[0].id,
+      });
+    }
+
+    // Start = end = the current local time (HH:MM:SS). hoursWorked will
+    // return 0 but the daily pay calc only looks at distinct work_date, so
+    // the zero-hour entry counts as a full day's pay.
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+    const result = await pool.query(
+      `INSERT INTO time_entries
+         (company_id, user_id, project_id, work_date, start_time, end_time,
+          wage_type, status, timezone, clock_source, clocked_in_by)
+       VALUES ($1, $2, NULL, $3, $4, $4, 'regular', 'pending', $5, 'worker', NULL)
+       RETURNING *`,
+      [req.user.company_id, req.user.id, workDate, timeStr, timezone || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    logger.error({ err }, 'catch block error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/clock/today-marked — has today already been recorded for this
+// worker? Used by the client to decide whether to show the Mark Day button
+// or the "already marked" state.
+router.get('/today-marked', requireAuth, async (req, res) => {
+  try {
+    const { local_work_date } = req.query;
+    const workDate = local_work_date || new Date().toISOString().substring(0, 10);
+    const r = await pool.query(
+      'SELECT id, status, start_time FROM time_entries WHERE user_id = $1 AND work_date = $2 LIMIT 1',
+      [req.user.id, workDate]
+    );
+    res.json({
+      marked: r.rowCount > 0,
+      entry: r.rows[0] || null,
+    });
+  } catch (err) {
+    logger.error({ err }, 'catch block error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

@@ -169,17 +169,30 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
     }
   };
 
+  // Day-mark workers don't clock in/out — they get a separate "Mark Day"
+  // action that creates a finished pending entry. Detect and route to the
+  // right endpoint based on the selected worker's day_mark_mode flag.
+  const selectedClockInWorker = allWorkers.find(w => String(w.id) === String(clockInUserId));
+  const isDayMarkSelected = selectedClockInWorker?.rate_type === 'daily' && !!selectedClockInWorker?.day_mark_mode;
+
   const handleAdminClockIn = async () => {
     if (!clockInUserId) return;
     setClockInSaving(true);
     try {
-      await api.post('/admin/clock-in', { user_id: clockInUserId, project_id: clockInProjectId || null, notes: clockInNotes || null });
+      if (isDayMarkSelected) {
+        await api.post('/admin/mark-day', {
+          user_id: clockInUserId,
+          local_work_date: new Date().toLocaleDateString('en-CA'),
+        });
+      } else {
+        await api.post('/admin/clock-in', { user_id: clockInUserId, project_id: clockInProjectId || null, notes: clockInNotes || null });
+      }
       setShowClockInModal(false);
       setClockInUserId(''); setClockInProjectId(''); setClockInNotes('');
       setActionError('');
       fetchActive();
-    } catch {
-      setActionError(t.actionFailed);
+    } catch (err) {
+      setActionError(err?.response?.data?.error || t.actionFailed);
     } finally {
       setClockInSaving(false);
     }
@@ -415,38 +428,53 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                   ))}
               </select>
             </div>
-            <div style={styles.modalField}>
-              <label style={styles.modalLabel}>{t.projectOptionalLabel}</label>
-              <select
-                style={styles.modalSelect}
-                value={clockInProjectId}
-                onChange={e => setClockInProjectId(e.target.value)}
-              >
-                <option value="">{t.noProject}</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-            <div style={styles.modalField}>
-              <label style={styles.modalLabel}>{t.notesOptional}</label>
-              <textarea
-                style={styles.modalTextarea}
-                value={clockInNotes}
-                onChange={e => setClockInNotes(e.target.value)}
-                rows={3}
-                placeholder={t.lwAddNotePlaceholder}
-                maxLength={500}
-              />
-              <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{clockInNotes.length}/500</div>
-            </div>
+            {isDayMarkSelected ? (
+              <div style={{ ...styles.modalField, padding: '12px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8 }}>
+                <div style={{ fontSize: 13, color: '#166534', fontWeight: 600, marginBottom: 4 }}>
+                  {t.lwDayMarkInfoTitle || 'This worker uses Mark Day mode'}
+                </div>
+                <div style={{ fontSize: 12, color: '#166534' }}>
+                  {t.lwDayMarkInfoBody || 'Marking will create a pending day entry — no clock-out, no project required.'}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={styles.modalField}>
+                  <label style={styles.modalLabel}>{t.projectOptionalLabel}</label>
+                  <select
+                    style={styles.modalSelect}
+                    value={clockInProjectId}
+                    onChange={e => setClockInProjectId(e.target.value)}
+                  >
+                    <option value="">{t.noProject}</option>
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={styles.modalField}>
+                  <label style={styles.modalLabel}>{t.notesOptional}</label>
+                  <textarea
+                    style={styles.modalTextarea}
+                    value={clockInNotes}
+                    onChange={e => setClockInNotes(e.target.value)}
+                    rows={3}
+                    placeholder={t.lwAddNotePlaceholder}
+                    maxLength={500}
+                  />
+                  <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{clockInNotes.length}/500</div>
+                </div>
+              </>
+            )}
             <div style={styles.modalActions}>
               <button
                 style={{ ...styles.modalClockInBtn, ...((!clockInUserId || clockInSaving) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                 onClick={handleAdminClockIn}
                 disabled={!clockInUserId || clockInSaving}
               >
-                {clockInSaving ? t.clockingIn : t.clockIn}
+                {clockInSaving
+                  ? (isDayMarkSelected ? (t.saving || 'Saving…') : t.clockingIn)
+                  : (isDayMarkSelected ? (t.lwMarkDayBtn || 'Mark Day') : t.clockIn)}
               </button>
               <button
                 style={styles.modalCancelBtn}

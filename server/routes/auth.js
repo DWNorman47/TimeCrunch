@@ -171,7 +171,7 @@ router.get('/me', requireAuth, async (req, res) => {
     const { getUserPermissions } = require('../permissions');
     const [companyRes, userRes] = await Promise.all([
       pool.query('SELECT plan, subscription_status, addon_qbo, addon_certified_payroll, trial_ends_at, slug, accepts_service_requests, client_portal_pro_interest FROM companies WHERE id = $1', [req.user.company_id]),
-      pool.query('SELECT mfa_enabled, language, admin_permissions, role_id, hourly_rate, rate_type, guaranteed_weekly_hours FROM users WHERE id = $1', [req.user.id]),
+      pool.query('SELECT mfa_enabled, language, admin_permissions, role_id, hourly_rate, rate_type, day_mark_mode, guaranteed_weekly_hours FROM users WHERE id = $1', [req.user.id]),
     ]);
     const company = companyRes.rows[0] || {};
     const userRow = userRes.rows[0] || {};
@@ -207,6 +207,7 @@ router.get('/me', requireAuth, async (req, res) => {
         permissions: [...permissions],
         hourly_rate: userRow.hourly_rate != null ? parseFloat(userRow.hourly_rate) : null,
         rate_type: userRow.rate_type || 'hourly',
+        day_mark_mode: !!userRow.day_mark_mode,
         guaranteed_weekly_hours: userRow.guaranteed_weekly_hours != null ? parseFloat(userRow.guaranteed_weekly_hours) : null,
       },
     });

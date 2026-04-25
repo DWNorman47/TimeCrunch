@@ -203,7 +203,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   const [editUsernameChecking, setEditUsernameChecking] = useState(false);
   const [editUsernameSaving, setEditUsernameSaving] = useState(false);
 
-  const [editRateForm, setEditRateForm] = useState({ rate: '', rate_type: 'hourly', overtime_rule: 'daily', guaranteed_weekly_hours: '', guarantee_enabled: false });
+  const [editRateForm, setEditRateForm] = useState({ rate: '', rate_type: 'hourly', overtime_rule: 'daily', guaranteed_weekly_hours: '', guarantee_enabled: false, day_mark_mode: false });
   const [editRateSaving, setEditRateSaving] = useState(false);
 
   const [editPermForm, setEditPermForm] = useState({ full_access: true, keys: {} });
@@ -370,6 +370,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       overtime_rule: w.overtime_rule || 'daily',
       guarantee_enabled: gwh != null && gwh > 0,
       guaranteed_weekly_hours: gwh != null ? String(gwh) : '40',
+      day_mark_mode: !!w.day_mark_mode,
     });
   };
 
@@ -427,6 +428,8 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
         guaranteed_weekly_hours: editRateForm.guarantee_enabled
           ? (parseFloat(editRateForm.guaranteed_weekly_hours) || 40)
           : null,
+        // day_mark_mode only meaningful for daily workers; harmless for hourly
+        day_mark_mode: editRateForm.rate_type === 'daily' ? editRateForm.day_mark_mode : false,
         updated_at: editWorkerUpdatedAt,
       });
       onWorkerUpdated(r.data);
@@ -907,6 +910,21 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 </select>
                               </div>
                             </div>
+                            {editRateForm.rate_type === 'daily' && (
+                              <div style={{ marginBottom: 10 }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#374151', userSelect: 'none' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={editRateForm.day_mark_mode}
+                                    onChange={e => setEditRateForm(f => ({ ...f, day_mark_mode: e.target.checked }))}
+                                  />
+                                  <span style={{ fontWeight: 600 }}>{t.mwDayMarkMode || 'Clock-in marks full day'}</span>
+                                </label>
+                                <div style={{ fontSize: 12, color: '#6b7280', marginLeft: 24, marginTop: 4 }}>
+                                  {t.mwDayMarkModeHint || 'Worker taps once per day — no clock-out. The entry counts as a full day immediately.'}
+                                </div>
+                              </div>
+                            )}
                             <div style={{ marginBottom: 10 }}>
                               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#374151', userSelect: 'none' }}>
                                 <input

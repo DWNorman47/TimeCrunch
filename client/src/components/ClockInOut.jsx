@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
+import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useFormPersist } from '../hooks/useFormPersist';
 
@@ -26,6 +27,12 @@ function formatElapsed(seconds) {
 const HINT_DISMISSED_KEY = 'opsfloa_clockin_hint_dismissed';
 
 export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geolocationEnabled = true, projectsEnabled = true }) {
+  // Detect day-mark workers up front — the actual switch to the DayMark
+  // UI happens at the return statement (after all hook calls) so React's
+  // hook-order rule isn't violated when the same component renders the
+  // hourly/clock-in flow for everyone else.
+  const { user } = useAuth();
+  const isDayMark = user?.rate_type === 'daily' && user?.day_mark_mode;
   // One-time hint shown until the user either dismisses it or clocks in once.
   // We show it based on whether they've ever dismissed or clocked in — the
   // server will return status=clocked-in-before on load if they have past
@@ -458,6 +465,10 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   // We just hide the project picker below and render the rest of the form.
   const hasProjects = projects && projects.length > 0;
 
+  if (isDayMark) {
+    return <DayMark t={t} onEntryAdded={onEntryAdded} />;
+  }
+
   return (
     <div style={styles.card}>
       {offlineBanner}
@@ -580,6 +591,92 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
             {loading ? t.clockingIn : t.clockIn}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Day-mark UI (alternative to Clock In/Out for daily-rate workers in
+// day_mark_mode). Single tap creates today's pending entry; once marked
+// the button is replaced by a confirmation card so the worker can't
+// re-mark the same day.
+
+function DayMark({ t, onEntryAdded }) {
+  const [marked, setMarked] = useState(null); // null=loading, true/false
+  const [entry, setEntry] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const todayLocal = () => new Date().toLocaleDateString('en-CA');
+
+  useEffect(() => {
+    api.get('/clock/today-marked', { params: { local_work_date: todayLocal() } })
+      .then(r => { setMarked(!!r.data.marked); setEntry(r.data.entry || null); })
+      .catch(silentError('daymark-status'));
+  }, []);
+
+  const handleMark = async () => {
+    setSaving(true); setError('');
+    try {
+      const r = await api.post('/clock/mark-day', {
+        local_work_date: todayLocal(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+      setMarked(true);
+      setEntry(r.data);
+      onEntryAdded?.(r.data);
+    } catch (err) {
+      if (err.response?.data?.code === 'already_marked') {
+        setMarked(true);
+        setEntry(err.response.data.entry || null);
+      } else {
+        setError(err.response?.data?.error || (t.dayMarkFailed || 'Failed to mark day'));
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (marked === null) {
+    return <div style={styles.card}><p style={{ color: '#6b7280', textAlign: 'center', margin: 0 }}>{t.loading || 'Loading…'}</p></div>;
+  }
+
+  if (marked) {
+    return (
+      <div style={{ ...styles.card, background: '#f0fdf4', border: '1px solid #86efac' }}>
+        <div style={{ textAlign: 'center', padding: '12px 0' }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>✓</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#166534', marginBottom: 4 }}>
+            {t.dayMarkAlreadyMarked || 'Marked for today'}
+          </div>
+          <div style={{ fontSize: 13, color: '#166534', opacity: 0.85 }}>
+            {(t.dayMarkPendingApproval || 'Pending admin approval')}
+            {entry?.status && entry.status !== 'pending' && ` · ${entry.status}`}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.card}>
+      <div style={{ textAlign: 'center', padding: '20px 0' }}>
+        <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 16 }}>
+          {t.dayMarkIntro || 'Tap to record today as a full work day. No clock-out needed.'}
+        </div>
+        <button
+          type="button"
+          onClick={handleMark}
+          disabled={saving}
+          style={{
+            padding: '16px 32px', background: '#1a56db', color: '#fff', border: 'none',
+            borderRadius: 10, fontSize: 18, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer',
+            opacity: saving ? 0.6 : 1, minWidth: 220,
+          }}
+        >
+          {saving ? (t.saving || 'Saving…') : (t.dayMarkButton || 'Mark Day Worked')}
+        </button>
+        {error && <p role="alert" style={{ color: '#991b1b', fontSize: 13, marginTop: 14 }}>{error}</p>}
       </div>
     </div>
   );

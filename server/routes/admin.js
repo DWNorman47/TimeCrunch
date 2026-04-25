@@ -344,6 +344,54 @@ router.get('/notifications', requireAdmin, async (req, res) => {
   }
 });
 
+// POST /admin/mark-day — admin marks a day-mark worker present for today.
+// Same rules as the worker-side /clock/mark-day: must be rate_type=daily
+// with day_mark_mode=true, one entry per work_date, creates a pending
+// time entry with start=end=now.
+router.post('/mark-day', requireAdmin, requirePerm('manage_workers'), async (req, res) => {
+  const companyId = req.user.company_id;
+  const { user_id, local_work_date } = req.body;
+  if (!user_id) return res.status(400).json({ error: 'user_id required' });
+  try {
+    const worker = await pool.query(
+      'SELECT id, full_name, rate_type, day_mark_mode FROM users WHERE id = $1 AND company_id = $2 AND active = true',
+      [user_id, companyId]
+    );
+    if (worker.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
+    const w = worker.rows[0];
+    if (w.rate_type !== 'daily' || !w.day_mark_mode) {
+      return res.status(400).json({
+        error: 'Worker is not configured for day-mark mode',
+        code: 'not_day_mark_worker',
+      });
+    }
+    const workDate = local_work_date || new Date().toISOString().substring(0, 10);
+    const existing = await pool.query(
+      'SELECT id FROM time_entries WHERE user_id = $1 AND work_date = $2',
+      [user_id, workDate]
+    );
+    if (existing.rowCount > 0) {
+      return res.status(409).json({ error: 'Already marked for today', code: 'already_marked', entry_id: existing.rows[0].id });
+    }
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const result = await pool.query(
+      `INSERT INTO time_entries
+         (company_id, user_id, project_id, work_date, start_time, end_time,
+          wage_type, status, clock_source, clocked_in_by)
+       VALUES ($1, $2, NULL, $3, $4, $4, 'regular', 'pending', 'admin', $5)
+       RETURNING *`,
+      [companyId, user_id, workDate, timeStr, req.user.id]
+    );
+    await logAudit(companyId, req.user.id, req.user.full_name, 'worker.day_marked_by_admin', 'user', parseInt(user_id), w.full_name);
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    logger.error({ err }, 'catch block error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /admin/clock-in — admin clocks in a worker on their behalf
 router.post('/clock-in', requireAdmin, requirePerm('manage_workers'), async (req, res) => {
   const companyId = req.user.company_id;
@@ -679,7 +727,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
         FROM daily_regular
         GROUP BY user_id, ${weekBucketSql}
       )
-      SELECT u.id, u.full_name, u.invoice_name, u.username, u.role, u.role_id, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification,
+      SELECT u.id, u.full_name, u.invoice_name, u.username, u.role, u.role_id, u.language, u.hourly_rate, u.rate_type, u.day_mark_mode, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification,
         COUNT(te.id) as total_entries,
         COALESCE(SUM(EXTRACT(EPOCH FROM (CASE WHEN te.end_time < te.start_time THEN te.end_time + INTERVAL '1 day' - te.start_time ELSE te.end_time - te.start_time END)) / 3600), 0) as total_hours,
         COALESCE(
@@ -702,7 +750,7 @@ router.get('/workers', requireAdmin, async (req, res) => {
       LEFT JOIN time_entries te ON te.user_id = u.id
         AND te.work_date >= CURRENT_DATE - INTERVAL '365 days'
       WHERE ${roleFilter} AND u.active = true AND u.company_id = $1 ${accessParamSql}
-      GROUP BY u.id, u.full_name, u.invoice_name, u.username, u.role, u.role_id, u.language, u.hourly_rate, u.rate_type, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification
+      GROUP BY u.id, u.full_name, u.invoice_name, u.username, u.role, u.role_id, u.language, u.hourly_rate, u.rate_type, u.day_mark_mode, u.overtime_rule, u.email, u.admin_permissions, u.worker_access_ids, u.worker_type, u.must_change_password, u.qbo_employee_id, u.qbo_vendor_id, u.classification
       ORDER BY u.role DESC, u.full_name
       LIMIT 500`,
       queryParams
@@ -1180,7 +1228,7 @@ function computeGuaranteeShortfall(totalHours, guaranteedWeeklyHours, fromDate, 
 router.patch('/workers/:id', requireAdmin, requirePerm('manage_workers'),
   coerceBody({ float: ['hourly_rate', 'guaranteed_weekly_hours'] }),
   async (req, res) => {
-  const { role, language, hourly_rate, rate_type, overtime_rule, worker_type } = req.body;
+  const { role, language, hourly_rate, rate_type, overtime_rule, worker_type, day_mark_mode } = req.body;
   const full_name = req.body.full_name?.trim();
   const first_name = req.body.first_name !== undefined ? (req.body.first_name?.trim() || null) : undefined;
   const middle_name = req.body.middle_name !== undefined ? (req.body.middle_name?.trim() || null) : undefined;
@@ -1188,7 +1236,7 @@ router.patch('/workers/:id', requireAdmin, requirePerm('manage_workers'),
   const username = req.body.username?.trim();
   const email = req.body.email !== undefined ? (req.body.email?.trim() || null) : undefined;
   const hasGuarantee = 'guaranteed_weekly_hours' in req.body;
-  if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && rate_type === undefined && overtime_rule === undefined && email === undefined && worker_type === undefined && !hasGuarantee) {
+  if (!full_name && !first_name && !last_name && !username && !role && !language && hourly_rate === undefined && rate_type === undefined && overtime_rule === undefined && email === undefined && worker_type === undefined && !hasGuarantee && day_mark_mode === undefined) {
     return res.status(400).json({ error: 'At least one field required' });
   }
   if (email && !isValidEmail(email)) return res.status(400).json({ error: 'Invalid email address' });
@@ -1232,6 +1280,7 @@ router.patch('/workers/:id', requireAdmin, requirePerm('manage_workers'),
       fields.push(`hourly_rate = $${idx++}`); values.push(rv);
     }
     if (rate_type !== undefined) { fields.push(`rate_type = $${idx++}`); values.push(rate_type); }
+    if (day_mark_mode !== undefined) { fields.push(`day_mark_mode = $${idx++}`); values.push(!!day_mark_mode); }
     if (overtime_rule !== undefined) { fields.push(`overtime_rule = $${idx++}`); values.push(overtime_rule); }
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email || null); }
     if (worker_type !== undefined) { fields.push(`worker_type = $${idx++}`); values.push(worker_type); }
@@ -1267,7 +1316,7 @@ router.patch('/workers/:id', requireAdmin, requirePerm('manage_workers'),
     values.push(req.params.id);
     values.push(companyId);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, invoice_name, role, language, hourly_rate, rate_type, overtime_rule, email, worker_type, classification, guaranteed_weekly_hours, updated_at`,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} AND company_id = $${idx + 1} RETURNING id, username, full_name, invoice_name, role, language, hourly_rate, rate_type, day_mark_mode, overtime_rule, email, worker_type, classification, guaranteed_weekly_hours, updated_at`,
       values
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
