@@ -65,6 +65,11 @@ select:focus-visible {
 .sa-users-table { display: table; width: 100%; }
 .sa-users-mobile { display: none; }
 
+/* KPI cells: hairline divider between adjacent cells in the 1x4 desktop
+   layout. The mobile @media block overrides this for the 2x2 wrap so the
+   leftmost cell of each row has no left border. */
+.kpi-grid > .kpi-cell + .kpi-cell { border-left: 1px solid #f3f4f6; }
+
 /* Prevent iOS Safari from zooming in when tapping inputs */
 @media (max-width: 768px) {
   input, select, textarea {
@@ -153,10 +158,16 @@ input, select, textarea {
     scroll-margin-top: calc(104px + env(safe-area-inset-top));
   }
 
-  /* KPI cards: 2x2 grid on mobile instead of 1x4 */
+  /* KPI cards: 2x2 grid on mobile instead of 1x4. Cell dividers override
+     the desktop "every cell after the first gets a left border" rule —
+     the leftmost cell of each row should have no left border, and the
+     second row should have a top border. */
   .kpi-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }
+  .kpi-grid > .kpi-cell:nth-child(odd) { border-left: none !important; }
+  .kpi-grid > .kpi-cell:nth-child(even) { border-left: 1px solid #f3f4f6 !important; }
+  .kpi-grid > .kpi-cell:nth-child(n+3) { border-top: 1px solid #f3f4f6 !important; }
 
   /* App header — safe-area on iOS, nothing extra on non-notch devices */
   .app-header {
