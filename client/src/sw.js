@@ -245,6 +245,11 @@ self.addEventListener('fetch', event => {
 
 // ── Message handler (page → SW) ────────────────────────────────────────────────
 
+// Injected by Vite's `define` config. Both the SW and the app bundle pick up
+// the SAME version string, so the page can compare them to tell whether a
+// just-activated SW is actually newer than the JS already running in the tab.
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown';
+
 self.addEventListener('message', event => {
   if (event.data?.type === 'REPLAY_QUEUE') {
     event.waitUntil(replayQueue());
@@ -258,6 +263,9 @@ self.addEventListener('message', event => {
       for (const item of items) await dequeue(item.id);
       await broadcastQueueCount();
     })());
+  }
+  if (event.data?.type === 'GET_VERSION') {
+    event.source?.postMessage({ type: 'SW_VERSION', version: APP_VERSION });
   }
 });
 

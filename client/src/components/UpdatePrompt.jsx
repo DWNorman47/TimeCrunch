@@ -21,18 +21,34 @@ export default function UpdatePrompt() {
     let cancelled = false;
     let reg = null;
 
-    const markReady = () => { if (!cancelled) setUpdateReady(true); };
-
-    // Track the currently-controlling SW so we can ignore the first-ever
-    // controllerchange (which fires on initial page load, not on an update).
-    const initialController = navigator.serviceWorker.controller;
-
-    const onControllerChange = () => {
-      if (initialController) markReady();
+    // Compare the controlling SW's version against the version baked into
+    // the running JS bundle. They only differ when a NEW SW has activated
+    // while the tab is still running OLD bundle code — which is the only
+    // moment a "reload to upgrade" prompt is actually useful. After a
+    // refresh the bundle is already current, so the versions match and we
+    // stay silent (which is what users were complaining about).
+    const checkVersion = () => {
+      if (cancelled) return;
+      const ctrl = navigator.serviceWorker.controller;
+      if (!ctrl) return;
+      ctrl.postMessage({ type: 'GET_VERSION' });
     };
+
+    const onMessage = evt => {
+      if (cancelled) return;
+      if (evt.data?.type !== 'SW_VERSION') return;
+      // eslint-disable-next-line no-undef
+      const bundleVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : null;
+      if (bundleVersion && evt.data.version && evt.data.version !== bundleVersion) {
+        setUpdateReady(true);
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+
+    const onControllerChange = () => checkVersion();
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
 
-    // Also hook the registration path — catches the case where the new SW
+    // Hook the registration path too — catches the case where the new SW
     // finishes installing but hasn't taken control yet (if skipWaiting were
     // ever disabled in the future).
     navigator.serviceWorker.getRegistration().then(r => {
@@ -42,7 +58,7 @@ export default function UpdatePrompt() {
         const installing = reg.installing;
         if (!installing) return;
         installing.addEventListener('statechange', () => {
-          if (installing.state === 'activated' && initialController) markReady();
+          if (installing.state === 'activated') checkVersion();
         });
       };
       reg.addEventListener('updatefound', onUpdateFound);
@@ -51,6 +67,7 @@ export default function UpdatePrompt() {
     return () => {
       cancelled = true;
       navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      navigator.serviceWorker.removeEventListener('message', onMessage);
     };
   }, []);
 
