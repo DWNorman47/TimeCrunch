@@ -7,6 +7,7 @@ const { sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem, createInboxItemBatch } = require('./inbox');
 const { applySettingsRows, SETTINGS_DEFAULTS } = require('../settingsDefaults');
 const { sendEmail } = require('../email');
+const { wallClockInTZ, validLocalTime } = require('../utils/timeFormat');
 const rateLimit = require('express-rate-limit');
 
 // Per-user limiter for clock actions (keyed by user ID once authenticated)
@@ -452,19 +453,10 @@ router.post('/mark-day', requireAuth, requirePerm('clock_self'), clockLimiter, a
       });
     }
 
-    // Start = end = the worker's current local time (HH:MM:SS). Server runs
-    // in UTC so we can't use new Date().getHours() — it'd record 06:00
-    // instead of 23:00 for a US worker. The client sends local_time
-    // explicitly; fall back to UTC only if it's missing or malformed.
-    const validLocalTime = typeof local_time === 'string' && /^\d{2}:\d{2}(:\d{2})?$/.test(local_time);
-    let timeStr;
-    if (validLocalTime) {
-      timeStr = local_time.length === 5 ? `${local_time}:00` : local_time;
-    } else {
-      const now = new Date();
-      const pad = n => String(n).padStart(2, '0');
-      timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    }
+    // Start = end = the worker's current local time (HH:MM:SS). Use the
+    // client-supplied value if valid; otherwise fall back to the worker's
+    // timezone-aware now() rather than the server's UTC.
+    const timeStr = validLocalTime(local_time) || wallClockInTZ(new Date(), timezone);
 
     const result = await pool.query(
       `INSERT INTO time_entries
