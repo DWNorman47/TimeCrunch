@@ -1,4 +1,4 @@
-const FEATURE_KEYS = ['feature_scheduling', 'feature_analytics', 'feature_chat', 'feature_prevailing_wage', 'feature_reimbursements', 'feature_pto', 'module_field', 'module_timeclock', 'module_projects', 'module_inventory', 'module_analytics', 'module_team', 'feature_project_integration', 'feature_overtime', 'feature_geolocation', 'feature_inactive_alerts', 'feature_overtime_alerts', 'feature_broadcast', 'feature_media_gallery', 'show_worker_wages', 'notification_use_work_hours', 'media_delete_on_project_archive', 'notify_timeoff_requests', 'notify_budget_alerts', 'notify_entry_submitted', 'report_weekly_payroll', 'report_weekly_low_stock', 'report_monthly_valuation', 'qbo_auto_push', 'qbo_auto_push_expenses', 'qbo_auto_create_customers', 'notify_qbo_disconnect', 'cp_track_classifications', 'cp_track_fringes', 'cp_collect_ssn', 'cp_require_signature', 'cp_compute_deductions', 'cp_wh347_format'];
+const FEATURE_KEYS = ['feature_scheduling', 'feature_analytics', 'feature_chat', 'feature_prevailing_wage', 'feature_reimbursements', 'feature_pto', 'module_field', 'module_timeclock', 'module_projects', 'module_inventory', 'module_analytics', 'module_team', 'feature_project_integration', 'feature_overtime', 'feature_geolocation', 'feature_inactive_alerts', 'feature_overtime_alerts', 'feature_broadcast', 'feature_media_gallery', 'feature_admin_edit_time', 'feature_worker_edit_time', 'show_worker_wages', 'notification_use_work_hours', 'media_delete_on_project_archive', 'notify_timeoff_requests', 'notify_budget_alerts', 'notify_entry_submitted', 'report_weekly_payroll', 'report_weekly_low_stock', 'report_monthly_valuation', 'qbo_auto_push', 'qbo_auto_push_expenses', 'qbo_auto_create_customers', 'notify_qbo_disconnect', 'cp_track_classifications', 'cp_track_fringes', 'cp_collect_ssn', 'cp_require_signature', 'cp_compute_deductions', 'cp_wh347_format'];
 const STRING_KEYS = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id', 'cycle_count_reconcile_threshold_type', 'qbo_expense_account_id', 'qbo_bank_account_id', 'qbo_labor_item_id'];
 
 // Defaults available to all authenticated users
@@ -19,6 +19,12 @@ const SETTINGS_DEFAULTS = {
   // digest noisy out of the box. Migration 0094 backfilled '1' for existing
   // companies so this default flip is a no-op for them.
   feature_project_integration: true, feature_overtime: true, feature_geolocation: true, feature_inactive_alerts: false, feature_overtime_alerts: true, feature_broadcast: false, feature_media_gallery: false,
+  // Time-edit gates — both default ON. feature_admin_edit_time controls
+  // /admin/entries/:id/edit, /times, and /split. feature_worker_edit_time
+  // controls a worker's PATCH /time-entries/:id. Per-admin restrictions
+  // should still go through the role-permission system; these toggles are
+  // a company-wide policy switch on top of that.
+  feature_admin_edit_time: true, feature_worker_edit_time: true,
   show_worker_wages: false, notification_use_work_hours: true, media_delete_on_project_archive: false,
   notify_timeoff_requests: false, notify_budget_alerts: false, notify_entry_submitted: false,
   report_weekly_payroll: false, report_weekly_low_stock: false, report_monthly_valuation: false,

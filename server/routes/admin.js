@@ -526,6 +526,10 @@ router.patch('/entries/:id/times', requireAdmin, requirePerm('manage_workers'), 
   const { start_time, end_time } = req.body;
   if (!start_time || !end_time) return res.status(400).json({ error: 'start_time and end_time required' });
   try {
+    const s = await getSettings(companyId);
+    if (s.feature_admin_edit_time === false) {
+      return res.status(403).json({ error: 'Admin time editing is disabled in Company Settings.' });
+    }
     const result = await pool.query(
       `UPDATE time_entries SET start_time = $1, end_time = $2
        WHERE id = $3 AND company_id = $4
@@ -553,6 +557,10 @@ router.patch('/entries/:id/edit', requireAdmin, requirePerm('approve_entries'),
     return res.status(400).json({ error: 'overtime_hours_override must be non-negative' });
   }
   try {
+    const s = await getSettings(companyId);
+    if (s.feature_admin_edit_time === false) {
+      return res.status(403).json({ error: 'Admin time editing is disabled in Company Settings.' });
+    }
     if (clientUpdatedAt) {
       const cur = await pool.query('SELECT updated_at FROM time_entries WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
       if (!cur.rows.length) return res.status(404).json({ error: 'Entry not found' });
@@ -613,6 +621,10 @@ router.post('/entries/:id/split', requireAdmin, requirePerm('approve_entries'), 
     if (!seg.start_time || !seg.end_time) return res.status(400).json({ error: 'Each segment needs start_time and end_time' });
   }
   try {
+    const s = await getSettings(companyId);
+    if (s.feature_admin_edit_time === false) {
+      return res.status(403).json({ error: 'Admin time editing is disabled in Company Settings.' });
+    }
     const orig = await pool.query(
       'SELECT * FROM time_entries WHERE id=$1 AND company_id=$2',
       [req.params.id, companyId]

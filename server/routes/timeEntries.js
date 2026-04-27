@@ -8,7 +8,17 @@ const { sendEmail } = require('../email');
 const { logAudit } = require('../auditLog');
 const { coerceBody } = require('../middleware/coerce');
 const { logFailure } = require('../failureLog');
+const { SETTINGS_DEFAULTS, applySettingsRows } = require('../settingsDefaults');
 const rateLimit = require('express-rate-limit');
+
+// Returns the company-wide feature_worker_edit_time flag (defaults to true).
+async function workerEditAllowed(companyId) {
+  const r = await pool.query(
+    `SELECT key, value FROM settings WHERE company_id = $1 AND key = 'feature_worker_edit_time'`,
+    [companyId]
+  );
+  return applySettingsRows(r.rows, SETTINGS_DEFAULTS).feature_worker_edit_time !== false;
+}
 
 const entryWriteLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -146,6 +156,9 @@ router.patch('/:id', requireAuth, async (req, res) => {
   if (notes && notes.length > 500) return res.status(400).json({ error: 'Notes must be 500 characters or fewer' });
   // Allow midnight-crossing shifts (end_time < start_time is valid, e.g. 23:00–00:30)
   try {
+    if (!(await workerEditAllowed(req.user.company_id))) {
+      return res.status(403).json({ error: 'Editing your own time is disabled by your administrator. Ask an admin to make the change.' });
+    }
     const existing = await pool.query(
       'SELECT * FROM time_entries WHERE id = $1 AND user_id = $2',
       [req.params.id, req.user.id]
