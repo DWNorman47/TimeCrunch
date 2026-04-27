@@ -5,7 +5,13 @@ const STRING_KEYS = ['overtime_rule', 'currency', 'company_timezone', 'invoice_s
 const SETTINGS_DEFAULTS = {
   prevailing_wage_rate: 45, default_hourly_rate: 30, overtime_multiplier: 1.5,
   overtime_rule: 'daily', overtime_threshold: 8,
-  feature_scheduling: true, feature_analytics: true, feature_chat: true, feature_prevailing_wage: true, feature_reimbursements: true, feature_pto: true, module_field: true, module_timeclock: true, module_projects: true, module_inventory: true, module_analytics: true, module_team: true, feature_project_integration: true, feature_overtime: true, feature_geolocation: true, feature_inactive_alerts: true, feature_overtime_alerts: true, feature_broadcast: true, feature_media_gallery: false,
+  feature_scheduling: true, feature_analytics: true, feature_chat: true, feature_prevailing_wage: true, feature_reimbursements: true, feature_pto: true,
+  // Module defaults — minimal setup for new companies. Field, Inventory,
+  // and Analytics start OFF; admin can flip them on from Company Settings.
+  // Migration 0093 backfilled '1' rows for every existing company so this
+  // default change is a no-op for them.
+  module_field: false, module_timeclock: true, module_projects: true, module_inventory: false, module_analytics: false, module_team: true,
+  feature_project_integration: true, feature_overtime: true, feature_geolocation: true, feature_inactive_alerts: true, feature_overtime_alerts: true, feature_broadcast: true, feature_media_gallery: false,
   show_worker_wages: false, notification_use_work_hours: true, media_delete_on_project_archive: false,
   notify_timeoff_requests: false, notify_budget_alerts: false, notify_entry_submitted: false,
   report_weekly_payroll: false, report_weekly_low_stock: false, report_monthly_valuation: false,
