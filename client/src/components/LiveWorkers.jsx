@@ -275,10 +275,13 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
             <div>
               <div style={styles.inactiveBannerTitle}>{t.inactiveWorkers}</div>
               <div style={styles.inactiveBannerList}>
-                {inactiveWorkers.map(w => (
-                  <span key={w.id} style={styles.inactivePill}>
-                    {w.full_name} <span style={styles.inactiveDays}>({w.days_inactive}d)</span>
-                  </span>
+                {inactiveWorkers.map((w, i) => (
+                  <React.Fragment key={w.id}>
+                    {i > 0 && <span style={styles.inactiveSep}>, </span>}
+                    <span style={styles.inactiveName}>
+                      {w.full_name} <span style={styles.inactiveDays}>({w.days_inactive}d)</span>
+                    </span>
+                  </React.Fragment>
                 ))}
               </div>
             </div>
@@ -554,8 +557,12 @@ const styles = {
   inactiveBannerLeft: { display: 'flex', alignItems: 'flex-start', gap: 10 },
   inactiveIcon: { fontSize: 18, lineHeight: 1.4 },
   inactiveBannerTitle: { fontWeight: 700, fontSize: 14, color: '#92400e', marginBottom: 6 },
-  inactiveBannerList: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  inactivePill: { background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 13, color: '#78350f', fontWeight: 500 },
+  // Flat comma-separated text — earlier rendering used pill-shaped chips
+  // that read as buttons, so admins kept tapping the names expecting a
+  // drilldown.
+  inactiveBannerList: { fontSize: 13, color: '#78350f', lineHeight: 1.5 },
+  inactiveName: { fontWeight: 600 },
+  inactiveSep: { color: '#b45309' },
   inactiveDays: { color: '#b45309', fontWeight: 700 },
   dismissBtn: { background: 'none', border: 'none', color: '#6b7280', fontSize: 16, cursor: 'pointer', padding: '0 4px', lineHeight: 1 },
   clockInWorkerBtn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
