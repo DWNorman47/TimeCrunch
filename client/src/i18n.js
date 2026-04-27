@@ -1815,6 +1815,7 @@ const translations = {
 
     // ── Clients ───────────────────────────────────────────────────────────────
     address: 'Address',
+    phone: 'Phone',
     deleteDocConfirm: 'Delete this document?',
     removeClientConfirm: 'Remove this client? This cannot be undone.',
     expiryExpired: 'Expired',
@@ -4577,6 +4578,7 @@ const translations = {
 
     // ── Clients ───────────────────────────────────────────────────────────────
     address: 'Dirección',
+    phone: 'Teléfono',
     deleteDocConfirm: '¿Eliminar este documento?',
     removeClientConfirm: '¿Eliminar este cliente? Esta acción no se puede deshacer.',
     expiryExpired: 'Vencido',

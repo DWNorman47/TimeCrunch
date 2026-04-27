@@ -98,25 +98,16 @@ function CompanyTab() {
 
   const si = statusInfo[company?.subscription_status] || statusInfo.trial;
 
-  // Flat (non-collapsible) info card. One Edit button at the top-right
-  // edge that puts the whole card (name + address + phone + email) into
-  // edit mode at once. Subscription details sit in their own section
-  // below since they're driven by Stripe, not editable here.
+  // Flat (non-collapsible) info card. The company name acts as the card's
+  // visual title with an Edit button across from it; that button puts the
+  // whole card (name + address + phone + email) into edit mode at once.
+  // Subscription details sit in their own section below — Stripe drives
+  // those, not this form.
   return (
     <div style={styles.companyCard}>
-      <div style={styles.companyCardHeader}>
-        <div style={styles.companyCardTitle}>{t.companyName}</div>
-        {!editing && (
-          <button style={styles.companyCardEditBtn} onClick={startEdit} aria-label={t.edit}>
-            {t.edit}
-          </button>
-        )}
-      </div>
-
       <div style={styles.companyCardBody}>
-        {/* Company name */}
-        <div style={styles.companyField}>
-          <div style={styles.companyFieldLabel}>{t.companyName}</div>
+        {/* Company name acts as the card title — Edit sits across from it */}
+        <div style={styles.companyTitleRow}>
           {editing ? (
             <input
               style={{ ...styles.input, fontSize: 18, fontWeight: 700, padding: '8px 12px' }}
@@ -127,11 +118,16 @@ function CompanyTab() {
           ) : (
             <div style={styles.companyNameValue}>{company?.name || '—'}</div>
           )}
+          {!editing && (
+            <button style={styles.companyCardEditBtn} onClick={startEdit} aria-label={t.edit}>
+              {t.edit}
+            </button>
+          )}
         </div>
 
         {/* Address */}
         <div style={styles.companyField}>
-          <div style={styles.companyFieldLabel}>{t.adminAddressPh || 'Address'}</div>
+          <div style={styles.companyFieldLabel}>{t.address}</div>
           {editing ? (
             <input
               style={styles.input}
@@ -149,7 +145,7 @@ function CompanyTab() {
         {/* Phone + Email side by side */}
         <div style={styles.companyFieldRow}>
           <div style={{ ...styles.companyField, flex: 1 }}>
-            <div style={styles.companyFieldLabel}>{t.adminPhonePh || 'Phone'}</div>
+            <div style={styles.companyFieldLabel}>{t.phone}</div>
             {editing ? (
               <input
                 style={styles.input}
@@ -588,19 +584,17 @@ const styles = {
   },
   // Cards
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
-  // Flat (non-collapsible) Company info card. Edit button sits in the
-  // top-right header so it visually scopes to the entire card.
+  // Flat (non-collapsible) Company info card. The company name acts as the
+  // visual title; Edit button sits across from it on the same row so it
+  // scopes to the whole card.
   companyCard: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)' },
-  companyCardHeader: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '14px 20px', borderBottom: '1px solid #f3f4f6',
-  },
-  companyCardTitle: { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' },
   companyCardEditBtn: {
     background: 'none', border: '1px solid #d1d5db', color: '#1a56db',
     padding: '5px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+    flexShrink: 0,
   },
   companyCardBody: { padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 },
+  companyTitleRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   companyField: { display: 'flex', flexDirection: 'column', gap: 4 },
   companyFieldRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   companyFieldLabel: { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' },
