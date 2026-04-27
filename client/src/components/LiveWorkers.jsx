@@ -52,6 +52,10 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   const [inactiveWorkers, setInactiveWorkers] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  // Brief visual ping right after a refresh resolves, so a click that
+  // returns the same data still has a visible "I did something" beat.
+  const [justRefreshed, setJustRefreshed] = useState(false);
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedWorker, setSelectedWorker] = useState('');
   const [dismissedInactive, setDismissedInactive] = useState(false);
@@ -66,11 +70,27 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   const [allWorkers, setAllWorkers] = useState([]);
   const [todayShifts, setTodayShifts] = useState([]);
 
-  const fetchActive = (isInitial = false) => {
+  const fetchActive = (opts = {}) => {
+    // Distinguish three callers: the initial mount (show skeleton),
+    // the polling tick (silent), and a manual click (show a "Refreshing…"
+    // state on the button so the user gets feedback even when the data
+    // hasn't changed). `opts` is an object so an event handler that
+    // hands us a synthetic event as the first arg doesn't accidentally
+    // flip these flags.
+    const isInitial = opts.isInitial === true;
+    const isManual = opts.isManual === true;
+    if (isManual) setRefreshing(true);
     api.get('/admin/active-clocks')
       .then(r => { setWorkers(r.data); setLastUpdated(new Date()); })
       .catch(silentError('liveworkers'))
-      .finally(() => { if (isInitial) setInitialLoading(false); });
+      .finally(() => {
+        if (isInitial) setInitialLoading(false);
+        if (isManual) {
+          setRefreshing(false);
+          setJustRefreshed(true);
+          setTimeout(() => setJustRefreshed(false), 900);
+        }
+      });
   };
 
   const fetchTodayShifts = () => {
@@ -87,7 +107,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   };
 
   useEffect(() => {
-    fetchActive(true);
+    fetchActive({ isInitial: true });
     fetchInactive();
     fetchTodayShifts();
 
@@ -277,9 +297,18 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
           <span style={styles.liveDot} />
           <span style={styles.liveText}>{t.liveLabel}</span>
           {lastUpdated && (
-            <span style={styles.updated}>Updated {formatInTz(lastUpdated.toISOString(), timezone, undefined, locale)}</span>
+            <span style={{ ...styles.updated, ...(justRefreshed ? styles.updatedFlash : null) }}>
+              Updated {formatInTz(lastUpdated.toISOString(), timezone, undefined, locale)}
+            </span>
           )}
-          <button style={styles.refreshBtn} onClick={fetchActive}>{t.refresh}</button>
+          <button
+            style={{ ...styles.refreshBtn, ...(refreshing ? styles.refreshBtnBusy : null) }}
+            onClick={() => fetchActive({ isManual: true })}
+            disabled={refreshing}
+            aria-busy={refreshing}
+          >
+            {refreshing ? t.refreshing : t.refresh}
+          </button>
           <button style={styles.clockInWorkerBtn} onClick={() => setShowClockInModal(true)}>{t.lwClockInWorkerBtn}</button>
         </div>
       </div>
@@ -500,8 +529,10 @@ const styles = {
   liveIndicator: { display: 'flex', alignItems: 'center', gap: 8 },
   liveDot: { width: 10, height: 10, borderRadius: '50%', background: '#16a34a', animation: 'pulse 2s infinite' },
   liveText: { fontWeight: 700, color: '#16a34a', fontSize: 14 },
-  updated: { fontSize: 12, color: '#6b7280' },
+  updated: { fontSize: 12, color: '#6b7280', transition: 'background 0.3s, color 0.3s', borderRadius: 4, padding: '1px 4px' },
+  updatedFlash: { background: '#dcfce7', color: '#166534', fontWeight: 600 },
   refreshBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: '#6b7280', cursor: 'pointer' },
+  refreshBtnBusy: { opacity: 0.6, cursor: 'wait' },
   filters: { display: 'flex', gap: 10, flexWrap: 'wrap' },
   filterSelect: { padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#374151', background: '#fff', cursor: 'pointer', minWidth: 200 },
   empty: { background: '#fff', borderRadius: 12, padding: 32, textAlign: 'center', color: '#6b7280', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
