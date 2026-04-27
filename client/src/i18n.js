@@ -330,6 +330,9 @@ const translations = {
     mrCompanyTimezone: 'Company Timezone',
     mrCompanyTimezoneDesc: "Used for scheduled reports and notification timing. Leave blank to use each user's browser timezone.",
     mrUseBrowserTimezone: '(Use browser timezone)',
+    mrWorkHoursWindow: 'Work hours window',
+    mrWorkHoursWindowDesc: "The company's normal operating hours. Inactive-worker alerts, after-hours clock-in alerts, and scheduled email digests only fire inside this window.",
+    mrHoursRange: 'Hours range',
     // ManageRates — Wages / Overtime
     mrAllowOvertime: 'Allow Overtime',
     mrAllowOvertimeDesc: 'Track and display overtime hours and pay',
@@ -3104,6 +3107,9 @@ const translations = {
     mrCompanyTimezone: 'Zona horaria de la empresa',
     mrCompanyTimezoneDesc: 'Usada para reportes programados y horarios de notificaciones. Dejar en blanco para usar la zona horaria del navegador de cada usuario.',
     mrUseBrowserTimezone: '(Usar zona horaria del navegador)',
+    mrWorkHoursWindow: 'Horario laboral',
+    mrWorkHoursWindowDesc: 'Las horas normales de operación de la empresa. Las alertas de trabajadores inactivos, las alertas de fichaje fuera de horario y los resúmenes programados por correo solo se envían dentro de este horario.',
+    mrHoursRange: 'Rango de horas',
     // ManageRates — Wages / Overtime
     mrAllowOvertime: 'Permitir horas extras',
     mrAllowOvertimeDesc: 'Rastrear y mostrar horas extras y su paga',

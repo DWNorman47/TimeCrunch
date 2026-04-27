@@ -603,6 +603,38 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               </select>
             </div>
           </div>
+          {/* Work hours window — used by inactive-worker alerts, after-hours
+              clock-in alerts, and the scheduled report digests. Lives here
+              (not under "Track Inactive Workers") so toggling that off
+              doesn't also disable the after-hours / report timing. */}
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.mrWorkHoursWindow}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrWorkHoursWindowDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.notification_use_work_hours ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.notification_use_work_hours} onChange={e => set('notification_use_work_hours', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.notification_use_work_hours ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          {form.notification_use_work_hours && (
+            <div style={styles.row}>
+              <label style={styles.label}>{t.mrHoursRange}</label>
+              <div style={styles.inputGroup}>
+                <select style={styles.input} value={form.notification_start_hour} onChange={e => set('notification_start_hour', e.target.value)}>
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
+                  ))}
+                </select>
+                <span style={styles.suffix}>–</span>
+                <select style={styles.input} value={form.notification_end_hour} onChange={e => set('notification_end_hour', e.target.value)}>
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
         </div>}
         {!collapsed.standards && <SectionFooter section="standards" />}
       </div>
@@ -865,34 +897,6 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={styles.suffix}>{t.ratesDays}</span>
             </div>
           </div>}
-          {form.feature_inactive_alerts && <div style={styles.row}>
-            <div>
-              <div style={styles.label}>Work hours window</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Only send inactive alerts during these hours</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.notification_use_work_hours ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.notification_use_work_hours} onChange={e => set('notification_use_work_hours', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.notification_use_work_hours ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>}
-          {form.feature_inactive_alerts && form.notification_use_work_hours && (
-            <div style={styles.row}>
-              <label style={styles.label}>Hours range</label>
-              <div style={styles.inputGroup}>
-                <select style={styles.input} value={form.notification_start_hour} onChange={e => set('notification_start_hour', e.target.value)}>
-                  {Array.from({ length: 24 }, (_, h) => (
-                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
-                  ))}
-                </select>
-                <span style={styles.suffix}>–</span>
-                <select style={styles.input} value={form.notification_end_hour} onChange={e => set('notification_end_hour', e.target.value)}>
-                  {Array.from({ length: 24 }, (_, h) => (
-                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Overtime Alerts</div>
