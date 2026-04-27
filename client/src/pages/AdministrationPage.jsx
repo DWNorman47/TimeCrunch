@@ -39,8 +39,6 @@ function CompanyTab() {
   const [contactEmail, setContactEmail] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
-  const [showContact, setShowContact] = useState(false);
-  const [showSubscription, setShowSubscription] = useState(false);
 
   useEffect(() => {
     api.get('/admin/company').then(r => {
@@ -51,6 +49,24 @@ function CompanyTab() {
       setContactEmail(r.data.contact_email || '');
     }).catch(silentError('administrationpage'));
   }, []);
+
+  const startEdit = () => {
+    setName(company?.name || '');
+    setAddress(company?.address || '');
+    setPhone(company?.phone || '');
+    setContactEmail(company?.contact_email || '');
+    setMsg('');
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setName(company?.name || '');
+    setAddress(company?.address || '');
+    setPhone(company?.phone || '');
+    setContactEmail(company?.contact_email || '');
+    setMsg('');
+    setEditing(false);
+  };
 
   const save = async () => {
     if (!name.trim()) return;
@@ -82,76 +98,135 @@ function CompanyTab() {
 
   const si = statusInfo[company?.subscription_status] || statusInfo.trial;
 
+  // Flat (non-collapsible) info card. One Edit button at the top-right
+  // edge that puts the whole card (name + address + phone + email) into
+  // edit mode at once. Subscription details sit in their own section
+  // below since they're driven by Stripe, not editable here.
   return (
-    <div style={styles.card}>
-        {/* Company name row */}
-        <div style={{ padding: '20px 20px 0' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t.companyName}</div>
+    <div style={styles.companyCard}>
+      <div style={styles.companyCardHeader}>
+        <div style={styles.companyCardTitle}>{t.companyName}</div>
+        {!editing && (
+          <button style={styles.companyCardEditBtn} onClick={startEdit} aria-label={t.edit}>
+            {t.edit}
+          </button>
+        )}
+      </div>
+
+      <div style={styles.companyCardBody}>
+        {/* Company name */}
+        <div style={styles.companyField}>
+          <div style={styles.companyFieldLabel}>{t.companyName}</div>
           {editing ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input style={{ ...styles.input, flex: 1, fontSize: 18, fontWeight: 700, padding: '8px 12px' }} value={name} onChange={e => setName(e.target.value)} autoFocus />
-              <button style={styles.saveBtn} onClick={save} disabled={saving}>{saving ? '...' : t.save}</button>
-              <button style={styles.ghostBtn} onClick={() => { setEditing(false); setName(company.name); setAddress(company.address || ''); setPhone(company.phone || ''); setContactEmail(company.contact_email || ''); }}>{t.cancel}</button>
-            </div>
+            <input
+              style={{ ...styles.input, fontSize: 18, fontWeight: 700, padding: '8px 12px' }}
+              value={name}
+              onChange={e => setName(e.target.value)}
+              autoFocus
+            />
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 22, fontWeight: 800, color: '#111827' }}>{company?.name || '—'}</span>
-              <button style={styles.editLink} onClick={() => setEditing(true)}>{t.edit}</button>
-            </div>
+            <div style={styles.companyNameValue}>{company?.name || '—'}</div>
           )}
-          {msg && <p style={{ fontSize: 13, margin: '6px 0 0', color: msg.includes('Failed') || msg.includes('taken') ? '#dc2626' : '#059669' }}>{msg}</p>}
         </div>
 
-        {/* Contact info */}
-        <div style={{ borderTop: '1px solid #f3f4f6', marginTop: 14 }}>
-          <button style={styles.accordionTrigger} onClick={() => setShowContact(o => !o)}>
-            <span style={styles.accordionLabel}>{t.contactInfoHeading}</span>
-            <span style={{ ...styles.accordionChevron, transform: showContact ? 'rotate(180deg)' : 'none' }}>▾</span>
-          </button>
-          {showContact && (
-            <div style={{ ...styles.accordionBody, gap: 10 }}>
-              {editing ? (
-                <>
-                  <input style={styles.input} placeholder={t.adminAddressPh} value={address} onChange={e => setAddress(e.target.value)} />
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <input style={{ ...styles.input, flex: 1 }} placeholder={t.adminPhonePh} value={phone} onChange={e => setPhone(e.target.value)} />
-                    <input style={{ ...styles.input, flex: 2 }} type="email" placeholder={t.email} value={contactEmail} onChange={e => setContactEmail(e.target.value)} />
-                  </div>
-                </>
-              ) : (
-                <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.7 }}>
-                  {company?.address ? <div>{company.address}</div> : <div style={{ color: '#d1d5db' }}>{t.adminNoAddress}</div>}
-                  <div style={{ display: 'flex', gap: 20 }}>
-                    {company?.phone ? <span>{company.phone}</span> : <span style={{ color: '#d1d5db' }}>{t.adminNoPhone}</span>}
-                    {company?.contact_email ? <span>{company.contact_email}</span> : <span style={{ color: '#d1d5db' }}>{t.adminNoEmail}</span>}
-                  </div>
-                </div>
-              )}
+        {/* Address */}
+        <div style={styles.companyField}>
+          <div style={styles.companyFieldLabel}>{t.adminAddressPh || 'Address'}</div>
+          {editing ? (
+            <input
+              style={styles.input}
+              placeholder={t.adminAddressPh}
+              value={address}
+              onChange={e => setAddress(e.target.value)}
+            />
+          ) : (
+            <div style={company?.address ? styles.companyFieldValue : styles.companyFieldEmpty}>
+              {company?.address || t.adminNoAddress}
             </div>
           )}
         </div>
 
-        {/* Subscription info */}
-        <div style={{ borderTop: '1px solid #f3f4f6' }}>
-          <button style={styles.accordionTrigger} onClick={() => setShowSubscription(o => !o)}>
-            <span style={styles.accordionLabel}>{t.subscriptionLabel}</span>
-            <span style={{ ...styles.accordionChevron, transform: showSubscription ? 'rotate(180deg)' : 'none' }}>▾</span>
-          </button>
-          {showSubscription && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 20px 16px' }}>
-              <span style={{ ...styles.planBadge, background: si.bg, color: si.color }}>{si.label}</span>
-              {company?.plan && (
-                <span style={styles.planName}>{company.plan.charAt(0).toUpperCase() + company.plan.slice(1)} {t.planSuffix}</span>
-              )}
-              {company?.subscription_status === 'trial' && trialDaysLeft !== null && (
-                <span style={{ fontSize: 13, color: trialDaysLeft <= 3 ? '#dc2626' : '#6b7280', marginLeft: 'auto' }}>
-                  {trialDaysLeft > 0 ? (trialDaysLeft === 1 ? t.trialDayLeft.replace('{n}', trialDaysLeft) : t.trialDaysLeft.replace('{n}', trialDaysLeft)) : t.trialExpired}
-                </span>
-              )}
-            </div>
+        {/* Phone + Email side by side */}
+        <div style={styles.companyFieldRow}>
+          <div style={{ ...styles.companyField, flex: 1 }}>
+            <div style={styles.companyFieldLabel}>{t.adminPhonePh || 'Phone'}</div>
+            {editing ? (
+              <input
+                style={styles.input}
+                placeholder={t.adminPhonePh}
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+              />
+            ) : (
+              <div style={company?.phone ? styles.companyFieldValue : styles.companyFieldEmpty}>
+                {company?.phone || t.adminNoPhone}
+              </div>
+            )}
+          </div>
+          <div style={{ ...styles.companyField, flex: 2 }}>
+            <div style={styles.companyFieldLabel}>{t.email}</div>
+            {editing ? (
+              <input
+                style={styles.input}
+                type="email"
+                placeholder={t.email}
+                value={contactEmail}
+                onChange={e => setContactEmail(e.target.value)}
+              />
+            ) : (
+              <div style={company?.contact_email ? styles.companyFieldValue : styles.companyFieldEmpty}>
+                {company?.contact_email || t.adminNoEmail}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {editing && (
+          <div style={styles.companyEditActions}>
+            <button style={styles.saveBtn} onClick={save} disabled={saving || !name.trim()}>
+              {saving ? '...' : t.save}
+            </button>
+            <button style={styles.ghostBtn} onClick={cancelEdit}>{t.cancel}</button>
+          </div>
+        )}
+
+        {msg && (
+          <p style={{
+            fontSize: 13,
+            margin: '8px 0 0',
+            color: msg.includes('Failed') || msg.includes('taken') ? '#dc2626' : '#059669',
+          }}>
+            {msg}
+          </p>
+        )}
+      </div>
+
+      {/* Subscription — read-only, separate section. Stripe drives this. */}
+      <div style={styles.companySubscriptionSection}>
+        <div style={styles.companyFieldLabel}>{t.subscriptionLabel}</div>
+        <div style={styles.companySubscriptionRow}>
+          <span style={{ ...styles.planBadge, background: si.bg, color: si.color }}>{si.label}</span>
+          {company?.plan && (
+            <span style={styles.planName}>
+              {company.plan.charAt(0).toUpperCase() + company.plan.slice(1)} {t.planSuffix}
+            </span>
+          )}
+          {company?.subscription_status === 'trial' && trialDaysLeft !== null && (
+            <span style={{
+              fontSize: 13,
+              color: trialDaysLeft <= 3 ? '#dc2626' : '#6b7280',
+              marginLeft: 'auto',
+            }}>
+              {trialDaysLeft > 0
+                ? (trialDaysLeft === 1
+                    ? t.trialDayLeft.replace('{n}', trialDaysLeft)
+                    : t.trialDaysLeft.replace('{n}', trialDaysLeft))
+                : t.trialExpired}
+            </span>
           )}
         </div>
       </div>
+    </div>
   );
 }
 
@@ -513,6 +588,32 @@ const styles = {
   },
   // Cards
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
+  // Flat (non-collapsible) Company info card. Edit button sits in the
+  // top-right header so it visually scopes to the entire card.
+  companyCard: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)' },
+  companyCardHeader: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '14px 20px', borderBottom: '1px solid #f3f4f6',
+  },
+  companyCardTitle: { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  companyCardEditBtn: {
+    background: 'none', border: '1px solid #d1d5db', color: '#1a56db',
+    padding: '5px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+  },
+  companyCardBody: { padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 },
+  companyField: { display: 'flex', flexDirection: 'column', gap: 4 },
+  companyFieldRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
+  companyFieldLabel: { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  companyNameValue: { fontSize: 22, fontWeight: 800, color: '#111827' },
+  companyFieldValue: { fontSize: 14, color: '#374151' },
+  companyFieldEmpty: { fontSize: 14, color: '#d1d5db', fontStyle: 'italic' },
+  companyEditActions: { display: 'flex', gap: 8, marginTop: 4 },
+  companySubscriptionSection: {
+    padding: '14px 20px', borderTop: '1px solid #f3f4f6',
+    background: '#fafafa', borderRadius: '0 0 12px 12px',
+    display: 'flex', flexDirection: 'column', gap: 6,
+  },
+  companySubscriptionRow: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   cardRow: { display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px', borderBottom: '1px solid #f3f4f6' },
   cardLabel: { fontSize: 13, color: '#6b7280', fontWeight: 600, minWidth: 120 },
   cardValue: { fontSize: 14, color: '#111827', fontWeight: 500 },
