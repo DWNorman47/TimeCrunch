@@ -23,7 +23,7 @@ async function checkInactiveWorkers() {
              ) as inactive_days,
              COALESCE(
                (SELECT value FROM settings WHERE company_id = c.id AND key = 'feature_inactive_alerts'),
-               '1'
+               '0'
              ) as feature_inactive_alerts
       FROM companies c
       WHERE c.subscription_status IN ('trial', 'active')

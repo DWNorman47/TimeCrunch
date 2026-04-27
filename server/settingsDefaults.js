@@ -11,7 +11,10 @@ const SETTINGS_DEFAULTS = {
   // Migration 0093 backfilled '1' rows for every existing company so this
   // default change is a no-op for them.
   module_field: false, module_timeclock: true, module_projects: true, module_inventory: false, module_analytics: false, module_team: true,
-  feature_project_integration: true, feature_overtime: true, feature_geolocation: true, feature_inactive_alerts: true, feature_overtime_alerts: true, feature_broadcast: true, feature_media_gallery: false,
+  // feature_inactive_alerts starts OFF — most teams find the daily inactive
+  // digest noisy out of the box. Migration 0094 backfilled '1' for existing
+  // companies so this default flip is a no-op for them.
+  feature_project_integration: true, feature_overtime: true, feature_geolocation: true, feature_inactive_alerts: false, feature_overtime_alerts: true, feature_broadcast: true, feature_media_gallery: false,
   show_worker_wages: false, notification_use_work_hours: true, media_delete_on_project_archive: false,
   notify_timeoff_requests: false, notify_budget_alerts: false, notify_entry_submitted: false,
   report_weekly_payroll: false, report_weekly_low_stock: false, report_monthly_valuation: false,
