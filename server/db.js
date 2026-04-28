@@ -8,9 +8,15 @@ require('dotenv').config();
 // in v3. We pass `ssl` explicitly below, so the URL hint is redundant.
 const { stripSslMode } = require('./utils/dbConnString');
 
+// Default SSL on — Neon and Render-hosted Postgres both require it, and
+// the URL we used to receive carried `?sslmode=require` to express that.
+// Stripping sslmode (above) means the SSL signal has to come from this
+// option instead. Local Postgres without TLS can opt out via DATABASE_SSL=false.
+const ssl = process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false };
+
 const pool = new Pool({
   connectionString: stripSslMode(process.env.DATABASE_URL),
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl,
   max: 20,                    // max concurrent connections (default is 10)
   idleTimeoutMillis: 30000,   // close idle connections after 30s
   connectionTimeoutMillis: 3000, // fail fast if no connection available within 3s
