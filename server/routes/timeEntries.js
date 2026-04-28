@@ -10,6 +10,7 @@ const { coerceBody } = require('../middleware/coerce');
 const { logFailure } = require('../failureLog');
 const { SETTINGS_DEFAULTS, applySettingsRows } = require('../settingsDefaults');
 const rateLimit = require('express-rate-limit');
+const { userOrIpKey } = require('../middleware/rateLimitKey');
 
 // Returns the company-wide feature_worker_edit_time flag (defaults to true).
 async function workerEditAllowed(companyId) {
@@ -23,7 +24,7 @@ async function workerEditAllowed(companyId) {
 const entryWriteLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 120, // generous — manual entry is rare, but admins can bulk-add
-  keyGenerator: req => String(req.user?.id || req.ip),
+  keyGenerator: userOrIpKey,
   message: { error: 'Too many requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,

@@ -4,6 +4,7 @@ const logger = require('../logger');
 const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const rateLimit = require('express-rate-limit');
+const { userOrIpKey } = require('../middleware/rateLimitKey');
 const pool = require('../db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -970,7 +971,7 @@ router.get('/workers/check-username', requireAdmin, async (req, res) => {
 const inviteLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 50,
-  keyGenerator: req => String(req.user?.id || req.ip),
+  keyGenerator: userOrIpKey,
   standardHeaders: true,
   legacyHeaders: false,
 });

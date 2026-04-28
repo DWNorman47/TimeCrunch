@@ -108,12 +108,17 @@ WHERE r.company_id = u.company_id
   AND u.role = 'worker'
   AND u.role_id IS NULL;
 
--- ── Step 6: Oldest admin per company → Owner ─────────────────────────────────
+-- ── Step 6: Oldest UNRESTRICTED admin per company → Owner ───────────────────
+-- The filter on admin_permissions IS NULL is critical: an admin with legacy
+-- per-permission restrictions should never auto-promote to Owner. They fall
+-- through to step 8 (custom role rebuilt from their signature) instead.
+-- Without the filter, the oldest restricted admin in a company would silently
+-- get full Owner perms, including manage_billing — a privilege escalation.
 
 WITH oldest_admin AS (
   SELECT DISTINCT ON (company_id) id, company_id
   FROM users
-  WHERE role = 'admin' AND role_id IS NULL
+  WHERE role = 'admin' AND role_id IS NULL AND admin_permissions IS NULL
   ORDER BY company_id, created_at, id
 )
 UPDATE users u

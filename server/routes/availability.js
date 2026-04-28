@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool = require('../db');
 const rateLimit = require('express-rate-limit');
+const { userOrIpKey } = require('../middleware/rateLimitKey');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 // Availability changes rarely — 30/hour is orders of magnitude above any
@@ -8,7 +9,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const availWriteLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 30,
-  keyGenerator: req => String(req.user?.id || req.ip),
+  keyGenerator: userOrIpKey,
   message: { error: 'Too many availability updates. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,

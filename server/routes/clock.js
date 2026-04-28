@@ -9,12 +9,13 @@ const { applySettingsRows, SETTINGS_DEFAULTS } = require('../settingsDefaults');
 const { sendEmail } = require('../email');
 const { wallClockInTZ, validLocalTime } = require('../utils/timeFormat');
 const rateLimit = require('express-rate-limit');
+const { userOrIpKey } = require('../middleware/rateLimitKey');
 
 // Per-user limiter for clock actions (keyed by user ID once authenticated)
 const clockLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 60, // 60 clock-in/out actions per hour is far beyond any real usage
-  keyGenerator: req => String(req.user?.id || req.ip),
+  keyGenerator: userOrIpKey,
   message: { error: 'Too many clock requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,

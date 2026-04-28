@@ -14,6 +14,7 @@
 const router = require('express').Router();
 const publicRouter = require('express').Router();
 const rateLimit = require('express-rate-limit');
+const { userOrIpKey } = require('../middleware/rateLimitKey');
 const pool = require('../db');
 const logger = require('../logger');
 const { requireAdmin } = require('../middleware/auth');
@@ -41,6 +42,7 @@ async function loadActiveCategories(companyId) {
 const publicSubmitLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5,
+  keyGenerator: userOrIpKey,
   message: { error: 'Too many submissions. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,

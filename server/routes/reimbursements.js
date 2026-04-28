@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../logger');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
+const { userOrIpKey } = require('../middleware/rateLimitKey');
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadBase64, deleteByUrl } = require('../r2');
@@ -60,7 +61,7 @@ router.get('/', async (req, res) => {
 const reimbLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 50,
-  keyGenerator: req => String(req.user?.id || req.ip),
+  keyGenerator: userOrIpKey,
   standardHeaders: true,
   legacyHeaders: false,
 });

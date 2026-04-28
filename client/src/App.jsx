@@ -93,15 +93,6 @@ function PrivateRoute({ children, adminOnly = false, superAdminOnly = false, mod
   return children;
 }
 
-function adminHome(userId) {
-  const key = `admin_welcomed_${userId}`;
-  if (!localStorage.getItem(key)) {
-    localStorage.setItem(key, '1');
-    return '/administration';
-  }
-  return '/workforce';
-}
-
 // Preserves the URL hash (and search) when redirecting from a renamed legacy
 // path. The default `<Navigate>` strips both, which would break tab deep
 // links like `/dashboard#schedule` or `/admin#approvals` that show up in
@@ -116,14 +107,17 @@ function HashRedirect({ to }) {
 // time users still get the welcoming /administration nudge. Everyone else
 // falls through to pickLandingPath which chooses the first module their
 // permissions actually unlock.
+//
+// Pure — only reads localStorage, never writes. The "I've welcomed this
+// admin" mark is set inside AdministrationPage via useEffect when the page
+// actually mounts. Writing it here meant the flag flipped during a render
+// pass, which React strict-mode can call twice and which makes the function
+// non-idempotent during route resolution.
 function landingFor(user) {
   if (user.role === 'super_admin') return '/superadmin';
   if (user.role === 'admin') {
     const key = `admin_welcomed_${user.id}`;
-    if (!localStorage.getItem(key)) {
-      localStorage.setItem(key, '1');
-      return '/administration';
-    }
+    if (!localStorage.getItem(key)) return '/administration';
   }
   return pickLandingPath(user);
 }
