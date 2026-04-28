@@ -2,6 +2,7 @@ const router = require('express').Router();
 const pool = require('../db');
 const logger = require('../logger');
 const rateLimit = require('express-rate-limit');
+const { userOrIpKey } = require('../middleware/rateLimitKey');
 const { requireAuth } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 
@@ -11,7 +12,7 @@ const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 const chatWriteLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
-  keyGenerator: req => String(req.user?.id || req.ip),
+  keyGenerator: userOrIpKey,
   message: { error: 'Too many messages. Please slow down and try again shortly.' },
   standardHeaders: true,
   legacyHeaders: false,

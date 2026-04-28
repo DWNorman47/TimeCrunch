@@ -2,10 +2,11 @@ require('dotenv').config();
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
+const { stripSslMode } = require('./utils/dbConnString');
 
 async function migrate() {
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: stripSslMode(process.env.DATABASE_URL),
     ssl: { rejectUnauthorized: false },
   });
 

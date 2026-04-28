@@ -9,9 +9,10 @@ require('dotenv').config();
 const { Pool } = require('pg');
 const https = require('https');
 const http = require('http');
+const { stripSslMode } = require('./utils/dbConnString');
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: stripSslMode(process.env.DATABASE_URL),
   ssl: { rejectUnauthorized: false },
 });
 

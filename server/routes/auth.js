@@ -7,6 +7,7 @@ const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
 const sgMail = require('@sendgrid/mail');
 const rateLimit = require('express-rate-limit');
+const { userOrIpKey } = require('../middleware/rateLimitKey');
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { seedBuiltinRoles } = require('../permissions');
@@ -20,6 +21,7 @@ const isValidEmail = email => EMAIL_RE.test(String(email).trim());
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 15,
+  keyGenerator: userOrIpKey,
   message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -28,6 +30,7 @@ const loginLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 10,
+  keyGenerator: userOrIpKey,
   message: { error: 'Too many requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,

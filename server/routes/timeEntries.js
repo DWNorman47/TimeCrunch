@@ -9,7 +9,9 @@ const { logAudit } = require('../auditLog');
 const { coerceBody } = require('../middleware/coerce');
 const { logFailure } = require('../failureLog');
 const { SETTINGS_DEFAULTS, applySettingsRows } = require('../settingsDefaults');
+const { entryInstants } = require('../utils/timeFormat');
 const rateLimit = require('express-rate-limit');
+const { userOrIpKey } = require('../middleware/rateLimitKey');
 
 // Returns the company-wide feature_worker_edit_time flag (defaults to true).
 async function workerEditAllowed(companyId) {
@@ -23,7 +25,7 @@ async function workerEditAllowed(companyId) {
 const entryWriteLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 120, // generous — manual entry is rare, but admins can bulk-add
-  keyGenerator: req => String(req.user?.id || req.ip),
+  keyGenerator: userOrIpKey,
   message: { error: 'Too many requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -110,12 +112,14 @@ router.post('/', requireAuth, entryWriteLimiter,
     }
     const mileageVal = (mileage != null && mileage >= 0) ? mileage : null;
     const cid = (typeof client_id === 'string' && client_id.length <= 36) ? client_id : null;
+    // Phase 2 dual-write: derive matching UTC instants from wall-clock + tz.
+    const { start_ts, end_ts } = entryInstants(work_date, start_time, end_time, timezone);
     const result = await pool.query(
-      `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes, break_minutes, mileage, timezone, client_id, clock_source)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      `INSERT INTO time_entries (company_id, user_id, project_id, work_date, start_time, end_time, start_ts, end_ts, wage_type, notes, break_minutes, mileage, timezone, client_id, clock_source)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        ON CONFLICT (user_id, client_id) WHERE client_id IS NOT NULL DO NOTHING
        RETURNING *`,
-      [companyId, req.user.id, project_id, work_date, start_time, end_time, wage_type, notesTrimmed,
+      [companyId, req.user.id, project_id, work_date, start_time, end_time, start_ts, end_ts, wage_type, notesTrimmed,
        bm, mileageVal, timezone || null, cid, 'log_entry']
     );
     if (result.rowCount === 0) {
@@ -178,10 +182,16 @@ router.patch('/:id', requireAuth, async (req, res) => {
     if (bm < 0) return res.status(400).json({ error: 'break_minutes must be non-negative' });
     const mileageParsed = mileage != null ? parseFloat(mileage) : null;
     const mileageVal = (mileageParsed != null && !isNaN(mileageParsed) && mileageParsed >= 0) ? mileageParsed : null;
+    // Phase 2 dual-write: derive new instants from the new wall-clock + the
+    // entry's stored timezone (the same TZ the original write used).
+    const workDateStr = new Date(entry.work_date).toISOString().substring(0, 10);
+    const { start_ts, end_ts } = entryInstants(workDateStr, start_time, end_time, entry.timezone);
     const result = await pool.query(
-      `UPDATE time_entries SET start_time = $1, end_time = $2, notes = $3, break_minutes = $4, mileage = $5,
-       status = 'pending', approval_note = NULL WHERE id = $6 RETURNING *`,
-      [start_time, end_time, notes?.trim() || null, bm, mileageVal, req.params.id]
+      `UPDATE time_entries SET start_time = $1, end_time = $2, start_ts = $3, end_ts = $4,
+         notes = $5, break_minutes = $6, mileage = $7,
+         status = 'pending', approval_note = NULL
+       WHERE id = $8 RETURNING *`,
+      [start_time, end_time, start_ts, end_ts, notes?.trim() || null, bm, mileageVal, req.params.id]
     );
     logAudit(req.user.company_id, req.user.id, req.user.full_name, 'entry.edited', 'time_entry', req.params.id, null,
       { from: { start_time: entry.start_time, end_time: entry.end_time }, to: { start_time, end_time } });
@@ -420,7 +430,7 @@ router.post('/copy-last-week', requireAuth, async (req, res) => {
     const lastWk = weekRange(ws, -1);
 
     const lastWeek = await pool.query(
-      `SELECT start_time, end_time, break_minutes, project_id, notes, wage_type, work_date
+      `SELECT start_time, end_time, break_minutes, project_id, notes, wage_type, work_date, timezone
        FROM time_entries
        WHERE user_id=$1 AND company_id=$2 AND work_date BETWEEN $3 AND $4
        ORDER BY work_date`,
@@ -443,11 +453,14 @@ router.post('/copy-last-week', requireAuth, async (req, res) => {
       thisDate.setDate(lastDate.getDate() + 7);
       const thisDateStr = toISO(thisDate);
       if (existingDates.has(thisDateStr)) continue;
+      // Phase 2 dual-write: copy the source row's timezone for the new
+      // wall-clock + derive matching instants.
+      const { start_ts, end_ts } = entryInstants(thisDateStr, e.start_time, e.end_time, e.timezone);
       const result = await pool.query(
-        `INSERT INTO time_entries (user_id, company_id, work_date, start_time, end_time, break_minutes, project_id, notes, wage_type, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'submitted') RETURNING *`,
-        [req.user.id, companyId, thisDateStr, e.start_time, e.end_time, e.break_minutes || 0,
-         e.project_id || null, e.notes || null, e.wage_type || 'regular']
+        `INSERT INTO time_entries (user_id, company_id, work_date, start_time, end_time, start_ts, end_ts, break_minutes, project_id, notes, wage_type, status, timezone)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'submitted',$12) RETURNING *`,
+        [req.user.id, companyId, thisDateStr, e.start_time, e.end_time, start_ts, end_ts,
+         e.break_minutes || 0, e.project_id || null, e.notes || null, e.wage_type || 'regular', e.timezone || null]
       );
       created.push(result.rows[0]);
       existingDates.add(thisDateStr);
