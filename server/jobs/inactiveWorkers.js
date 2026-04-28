@@ -23,7 +23,7 @@ async function checkInactiveWorkers() {
              ) as inactive_days,
              COALESCE(
                (SELECT value FROM settings WHERE company_id = c.id AND key = 'feature_inactive_alerts'),
-               '1'
+               '0'
              ) as feature_inactive_alerts
       FROM companies c
       WHERE c.subscription_status IN ('trial', 'active')
@@ -56,7 +56,7 @@ async function checkInactiveWorkers() {
       await sendPushToCompanyAdmins(companyId, {
         title: alertTitle,
         body: alertBody,
-        url: '/admin#reports',
+        url: '/workforce#reports',
       });
 
       // Inbox for all company admins
@@ -66,7 +66,7 @@ async function checkInactiveWorkers() {
       );
       const adminIds = adminRows.rows.map(a => a.id);
       if (adminIds.length > 0) {
-        createInboxItemBatch(adminIds, companyId, 'inactive_workers', alertTitle, alertBody, '/admin#reports');
+        createInboxItemBatch(adminIds, companyId, 'inactive_workers', alertTitle, alertBody, '/workforce#reports');
       }
 
       // Email to first admin with an email address
@@ -107,7 +107,7 @@ async function checkInactiveWorkers() {
               <tbody>${rows}</tbody>
             </table>
             <p style="margin-top:20px">
-              <a href="${process.env.APP_URL}/admin#reports" style="color:#1a56db;font-weight:600">View reports in OpsFloa →</a>
+              <a href="${process.env.APP_URL}/workforce#reports" style="color:#1a56db;font-weight:600">View reports in OpsFloa →</a>
             </p>
           </div>`
         );

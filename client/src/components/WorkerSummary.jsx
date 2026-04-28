@@ -145,19 +145,19 @@ export default function WorkerSummary({ entries, hourlyRate, rateType = 'hourly'
               <div style={styles.statLabel}>{t.regularLabel}</div>
             </div>
             {overtimeEnabled && overtimeHours > 0 && (
-              <div style={{ ...styles.stat, borderColor: '#fbbf24' }}>
+              <div style={styles.stat}>
                 <div style={{ ...styles.statValue, color: '#d97706' }}>{fmtHours(overtimeHours)}</div>
                 <div style={styles.statLabel}>{t.overtimeLabel}</div>
               </div>
             )}
             {prevailingHours > 0 && (
-              <div style={{ ...styles.stat, borderColor: '#a78bfa' }}>
+              <div style={styles.stat}>
                 <div style={{ ...styles.statValue, color: '#8b5cf6' }}>{fmtHours(prevailingHours)}</div>
                 <div style={styles.statLabel}>{t.prevailingLabel}</div>
               </div>
             )}
             {showWages && (
-              <div style={{ ...styles.stat, borderColor: '#6ee7b7' }}>
+              <div style={styles.stat}>
                 <div style={{ ...styles.statValue, color: '#059669' }}>{formatCurrency(estimatedPay, currency)}</div>
                 <div style={styles.statLabel}>{t.estEarnings}</div>
               </div>
@@ -191,8 +191,10 @@ const styles = {
   rangeTabs: { display: 'flex', gap: 4, flexWrap: 'nowrap' },
   rangeBtn: { padding: '5px 10px', background: '#f3f4f6', border: 'none', borderRadius: 6, fontSize: 12, color: '#6b7280', cursor: 'pointer', fontWeight: 500 },
   rangeActive: { padding: '5px 10px', background: '#1a56db', border: 'none', borderRadius: 6, fontSize: 12, color: '#fff', cursor: 'pointer', fontWeight: 700 },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 12, marginBottom: 20 },
-  stat: { background: '#f9fafb', borderRadius: 10, padding: '14px 16px', border: '2px solid #e5e7eb' },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 16, marginBottom: 20 },
+  // Flat labeled numbers — no border/background/radius. The previous
+  // bordered tiles read as buttons and admins/workers were tapping them.
+  stat: { padding: '4px 0' },
   statValue: { fontSize: 22, fontWeight: 800, color: '#1a1a1a', marginBottom: 2 },
   statLabel: { fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' },
   empty: { color: '#6b7280', fontSize: 14 },

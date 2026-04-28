@@ -4,6 +4,7 @@ const translations = {
     changePassword: 'Change Password',
     logout: 'Logout',
     refresh: 'Refresh',
+    refreshing: 'Refreshing…',
     loadingEntries: 'Loading entries...',
     loadError: 'Failed to load data.',
     retry: 'Retry',
@@ -330,6 +331,9 @@ const translations = {
     mrCompanyTimezone: 'Company Timezone',
     mrCompanyTimezoneDesc: "Used for scheduled reports and notification timing. Leave blank to use each user's browser timezone.",
     mrUseBrowserTimezone: '(Use browser timezone)',
+    mrWorkHoursWindow: 'Work hours window',
+    mrWorkHoursWindowDesc: "The company's normal operating hours. Inactive-worker alerts, after-hours clock-in alerts, and scheduled email digests only fire inside this window.",
+    mrHoursRange: 'Hours range',
     // ManageRates — Wages / Overtime
     mrAllowOvertime: 'Allow Overtime',
     mrAllowOvertimeDesc: 'Track and display overtime hours and pay',
@@ -376,6 +380,18 @@ const translations = {
     mwInvoiceName: 'Invoice Name',
     mwWeeklyMinGuarantee: 'Weekly minimum hour guarantee',
     mwWeeklyMinHint: 'hrs/week — invoice will include shortfall to reach this minimum',
+    mwDayMarkMode: 'Clock-in marks full day',
+    mwDayMarkModeHint: 'Worker taps once per day — no clock-out. The entry counts as a full day immediately.',
+    // ClockInOut DayMark UI
+    dayMarkIntro: 'Tap to record today as a full work day. No clock-out needed.',
+    dayMarkButton: 'Mark Day Worked',
+    dayMarkAlreadyMarked: 'Marked for today',
+    dayMarkPendingApproval: 'Pending admin approval',
+    dayMarkFailed: 'Failed to mark day',
+    // LiveWorkers admin Mark Day UI
+    lwDayMarkInfoTitle: 'This worker uses Mark Day mode',
+    lwDayMarkInfoBody: 'Marking will create a pending day entry — no clock-out, no project required.',
+    lwMarkDayBtn: 'Mark Day',
     mwPermissions: 'Permissions',
     mwFullAccessNoRestrictions: 'Full access (no restrictions)',
     mwFullAccess: 'Full access',
@@ -1803,6 +1819,7 @@ const translations = {
 
     // ── Clients ───────────────────────────────────────────────────────────────
     address: 'Address',
+    phone: 'Phone',
     deleteDocConfirm: 'Delete this document?',
     removeClientConfirm: 'Remove this client? This cannot be undone.',
     expiryExpired: 'Expired',
@@ -2765,6 +2782,7 @@ const translations = {
     changePassword: 'Cambiar Contraseña',
     logout: 'Cerrar Sesión',
     refresh: 'Actualizar',
+    refreshing: 'Actualizando…',
     loadingEntries: 'Cargando entradas...',
     loadError: 'Error al cargar los datos.',
     retry: 'Reintentar',
@@ -3091,6 +3109,9 @@ const translations = {
     mrCompanyTimezone: 'Zona horaria de la empresa',
     mrCompanyTimezoneDesc: 'Usada para reportes programados y horarios de notificaciones. Dejar en blanco para usar la zona horaria del navegador de cada usuario.',
     mrUseBrowserTimezone: '(Usar zona horaria del navegador)',
+    mrWorkHoursWindow: 'Horario laboral',
+    mrWorkHoursWindowDesc: 'Las horas normales de operación de la empresa. Las alertas de trabajadores inactivos, las alertas de fichaje fuera de horario y los resúmenes programados por correo solo se envían dentro de este horario.',
+    mrHoursRange: 'Rango de horas',
     // ManageRates — Wages / Overtime
     mrAllowOvertime: 'Permitir horas extras',
     mrAllowOvertimeDesc: 'Rastrear y mostrar horas extras y su paga',
@@ -3137,6 +3158,18 @@ const translations = {
     mwInvoiceName: 'Nombre para factura',
     mwWeeklyMinGuarantee: 'Garantía mínima de horas semanales',
     mwWeeklyMinHint: 'h/semana — la factura incluirá el faltante para llegar a este mínimo',
+    mwDayMarkMode: 'Marcar el día completo al iniciar sesión',
+    mwDayMarkModeHint: 'El trabajador marca una vez al día — sin salida. La entrada cuenta como un día completo de inmediato.',
+    // ClockInOut DayMark UI
+    dayMarkIntro: 'Marca hoy como un día completo de trabajo. No es necesario salir.',
+    dayMarkButton: 'Marcar día trabajado',
+    dayMarkAlreadyMarked: 'Marcado para hoy',
+    dayMarkPendingApproval: 'Pendiente de aprobación del administrador',
+    dayMarkFailed: 'Error al marcar el día',
+    // LiveWorkers admin Mark Day UI
+    lwDayMarkInfoTitle: 'Este trabajador usa el modo Marcar día',
+    lwDayMarkInfoBody: 'Al marcar se creará una entrada de día pendiente — sin salida, sin proyecto requerido.',
+    lwMarkDayBtn: 'Marcar día',
     mwPermissions: 'Permisos',
     mwFullAccessNoRestrictions: 'Acceso completo (sin restricciones)',
     mwFullAccess: 'Acceso completo',
@@ -4553,6 +4586,7 @@ const translations = {
 
     // ── Clients ───────────────────────────────────────────────────────────────
     address: 'Dirección',
+    phone: 'Teléfono',
     deleteDocConfirm: '¿Eliminar este documento?',
     removeClientConfirm: '¿Eliminar este cliente? Esta acción no se puede deshacer.',
     expiryExpired: 'Vencido',

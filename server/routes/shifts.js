@@ -70,8 +70,8 @@ router.post('/admin', requireAdmin, shiftWriteLimiter, async (req, res) => {
     logAudit(companyId, req.user.id, req.user.full_name, 'shift.created', 'shift', shift.id, shift.worker_name,
       { user_id, shift_date, start_time, end_time, project_id: project_id || null });
     const shiftBody = `${shift.shift_date} · ${shift.start_time.substring(0, 5)}–${shift.end_time.substring(0, 5)}${shift.project_name ? ' · ' + shift.project_name : ''}`;
-    sendPushToUser(user_id, { title: 'New shift assigned', body: shiftBody, url: '/dashboard' });
-    createInboxItem(user_id, companyId, 'shift_assigned', 'New shift assigned', shiftBody, '/dashboard#schedule');
+    sendPushToUser(user_id, { title: 'New shift assigned', body: shiftBody, url: '/timeclock' });
+    createInboxItem(user_id, companyId, 'shift_assigned', 'New shift assigned', shiftBody, '/timeclock#schedule');
     res.status(201).json(shift);
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
@@ -109,8 +109,8 @@ router.patch('/admin/:id', requireAdmin, shiftWriteLimiter, async (req, res) => 
     logAudit(companyId, req.user.id, req.user.full_name, 'shift.edited', 'shift', shift.id, shift.worker_name,
       { shift_date, start_time, end_time, project_id: project_id || null });
     const updBody = `${shift.shift_date?.toString().substring(0,10)} · ${start_time.substring(0,5)}–${end_time.substring(0,5)}`;
-    sendPushToUser(shift.user_id, { title: 'Shift updated', body: updBody, url: '/dashboard' });
-    createInboxItem(shift.user_id, req.user.company_id, 'shift_updated', 'Shift updated', updBody, '/dashboard#schedule');
+    sendPushToUser(shift.user_id, { title: 'Shift updated', body: updBody, url: '/timeclock' });
+    createInboxItem(shift.user_id, req.user.company_id, 'shift_updated', 'Shift updated', updBody, '/timeclock#schedule');
     res.json(shift);
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
@@ -130,8 +130,8 @@ router.delete('/admin/:id', requireAdmin, shiftWriteLimiter, async (req, res) =>
     logAudit(req.user.company_id, req.user.id, req.user.full_name, 'shift.deleted', 'shift', req.params.id, shift.worker_name,
       { shift_date: shift.shift_date, user_id: shift.user_id });
     const cancelBody = `${shift.shift_date?.toString().substring(0, 10)} · ${shift.start_time.substring(0, 5)}–${shift.end_time.substring(0, 5)}${shift.project_name ? ' · ' + shift.project_name : ''}`;
-    sendPushToUser(shift.user_id, { title: 'Shift cancelled', body: cancelBody, url: '/dashboard' });
-    createInboxItem(shift.user_id, req.user.company_id, 'shift_cancelled', 'Shift cancelled', cancelBody, '/dashboard#schedule');
+    sendPushToUser(shift.user_id, { title: 'Shift cancelled', body: cancelBody, url: '/timeclock' });
+    createInboxItem(shift.user_id, req.user.company_id, 'shift_cancelled', 'Shift cancelled', cancelBody, '/timeclock#schedule');
     res.json({ deleted: true });
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
@@ -155,14 +155,14 @@ router.patch('/:id/cant-make-it', requireAuth, shiftWriteLimiter, async (req, re
       sendPushToCompanyAdmins(req.user.company_id, {
         title: `${req.user.full_name} can't make their shift`,
         body: `${dateStr} · ${timeStr}`,
-        url: '/timeclock#manage',
+        url: '/workforce#manage',
       });
       const adminIds = await pool.query(
         `SELECT id FROM users WHERE company_id = $1 AND role = 'admin' AND active = true`,
         [req.user.company_id]
       );
       createInboxItemBatch(adminIds.rows.map(a => a.id), req.user.company_id, 'shift_cantmake',
-        'Worker unavailable for shift', cantBody, '/timeclock#manage');
+        'Worker unavailable for shift', cantBody, '/workforce#manage');
     }
     res.json(shift);
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
@@ -188,9 +188,9 @@ router.delete('/admin/series/:groupId', requireAdmin, shiftWriteLimiter, async (
     for (const shift of result.rows) {
       if (notified.has(shift.user_id)) continue;
       notified.add(shift.user_id);
-      sendPushToUser(shift.user_id, { title: 'Recurring shifts cancelled', body: 'A series of your scheduled shifts has been cancelled.', url: '/dashboard' });
+      sendPushToUser(shift.user_id, { title: 'Recurring shifts cancelled', body: 'A series of your scheduled shifts has been cancelled.', url: '/timeclock' });
       createInboxItemBatch([shift.user_id], companyId, 'shift_cancelled', 'Recurring shifts cancelled',
-        'A series of your scheduled shifts has been cancelled.', '/dashboard#schedule');
+        'A series of your scheduled shifts has been cancelled.', '/timeclock#schedule');
     }
     res.json({ deleted: result.rowCount });
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }

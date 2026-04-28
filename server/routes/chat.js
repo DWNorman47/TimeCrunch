@@ -135,14 +135,14 @@ router.post('/', requireAuth, chatWriteLimiter, async (req, res) => {
       sendPushToUser(targetWorkerId, {
         title: `Message from ${req.user.full_name}`,
         body: snippet,
-        url: '/dashboard',
+        url: '/timeclock',
       });
     } else {
       // Worker sending — notify all company admins
       sendPushToCompanyAdmins(req.user.company_id, {
         title: `Message from ${req.user.full_name}`,
         body: snippet,
-        url: '/admin#live',
+        url: '/workforce#live',
       });
     }
 

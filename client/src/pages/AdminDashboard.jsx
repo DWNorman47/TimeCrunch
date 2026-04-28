@@ -141,7 +141,7 @@ export default function AdminDashboard() {
 
   return (
     <div style={styles.page}>
-      <AppHeader currentApp="timeclock" features={settings} />
+      <AppHeader currentApp="workforce" features={settings} />
 
       {billing?.subscription_status === 'trial_expired' && (
         <div style={{ ...styles.trialBanner, background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' }}>

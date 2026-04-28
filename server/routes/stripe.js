@@ -110,8 +110,8 @@ router.post('/checkout', requireAdmin, requirePerm('manage_billing'), async (req
       mode: 'subscription',
       customer: customerId,
       line_items: lineItems,
-      success_url: `${process.env.APP_URL}/admin#billing`,
-      cancel_url: `${process.env.APP_URL}/admin#billing`,
+      success_url: `${process.env.APP_URL}/administration#billing`,
+      cancel_url: `${process.env.APP_URL}/administration#billing`,
       subscription_data: {
         metadata: { company_id: String(req.user.company_id) },
         ...(trialEnd ? { trial_end: trialEnd } : {}),
@@ -131,7 +131,7 @@ router.post('/portal', requireAdmin, requirePerm('manage_billing'), async (req, 
 
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${process.env.APP_URL}/admin#billing`,
+      return_url: `${process.env.APP_URL}/administration#billing`,
     });
     res.json({ url: session.url });
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Failed to open billing portal' }); }

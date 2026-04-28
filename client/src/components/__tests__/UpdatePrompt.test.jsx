@@ -1,8 +1,11 @@
 /**
- * UpdatePrompt smoke — guards the "silent swallow" failure mode where the
- * banner never renders (and the user keeps running a stale bundle forever).
- * We can't easily simulate a service-worker update in jsdom, so we drive the
- * "controllerchange" path directly.
+ * UpdatePrompt smoke — guards two failure modes:
+ *  1. Banner never shows when an update truly is available (stale forever).
+ *  2. Banner shows after a manual refresh, when the bundle and the new SW
+ *     are already the same version (annoying false positive).
+ *
+ * jsdom has no real service-worker stack, so we drive the listeners directly
+ * and post fake SW_VERSION replies.
  */
 
 import { describe, test, expect, vi, beforeEach } from 'vitest';
@@ -16,10 +19,29 @@ vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { language: 'English' } }),
 }));
 
-function setupSW({ initialController }) {
+// __APP_VERSION__ is normally injected by Vite's `define`. Vitest doesn't
+// run that step, so the prompt code falls back to `null` and skips its
+// version comparison entirely. Define it here so the gate exercises the
+// real comparison path the prompt uses in production.
+globalThis.__APP_VERSION__ = '1.0.0+test';
+
+function setupSW({ initialController, postedVersion }) {
   const listeners = {};
+  const controller = initialController
+    ? {
+        ...initialController,
+        postMessage: vi.fn(() => {
+          // Simulate the SW replying with its version. Default to a
+          // different version (i.e. there really IS an update). Tests
+          // that want the "same version" case override `postedVersion`.
+          const version = postedVersion ?? '2.0.0+newer';
+          queueMicrotask(() => listeners.message?.({ data: { type: 'SW_VERSION', version } }));
+        }),
+      }
+    : null;
+
   const sw = {
-    get controller() { return initialController; },
+    get controller() { return controller; },
     addEventListener: (evt, cb) => { listeners[evt] = cb; },
     removeEventListener: () => {},
     getRegistration: () => Promise.resolve({
@@ -49,20 +71,20 @@ describe('<UpdatePrompt />', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  test('first-ever load does not show the banner', async () => {
-    // No initial controller = this is the very first page load.
+  test('first-ever load (no controller) does not show the banner', async () => {
     const listeners = setupSW({ initialController: null });
     render(<UpdatePrompt />);
-    // Fire controllerchange anyway — it should be ignored because the user
-    // wasn't previously controlled (would happen naturally on first SW boot).
-    listeners.controllerchange?.();
+    await act(async () => { listeners.controllerchange?.(); });
     expect(screen.queryByText(/new version/i)).not.toBeInTheDocument();
   });
 
-  test('controllerchange after a prior controller shows the prompt with What\'s new link', async () => {
+  test('controllerchange with a NEWER SW version shows the prompt', async () => {
     const listeners = setupSW({ initialController: { state: 'activated' } });
     render(<UpdatePrompt />);
-    await act(async () => { listeners.controllerchange(); });
+    await act(async () => {
+      listeners.controllerchange();
+      await Promise.resolve(); // flush the queued microtask reply
+    });
     expect(screen.getByText(/new version of OpsFloa is ready/i)).toBeInTheDocument();
     const link = screen.getByText(/what's new/i).closest('a');
     expect(link).toHaveAttribute('href', '/changelog');
@@ -70,10 +92,26 @@ describe('<UpdatePrompt />', () => {
     expect(screen.getByRole('button', { name: /reload/i })).toBeInTheDocument();
   });
 
+  test('controllerchange after a refresh (same version) does NOT show the prompt', async () => {
+    const listeners = setupSW({
+      initialController: { state: 'activated' },
+      postedVersion: '1.0.0+test', // matches the bundle version above
+    });
+    render(<UpdatePrompt />);
+    await act(async () => {
+      listeners.controllerchange();
+      await Promise.resolve();
+    });
+    expect(screen.queryByText(/new version of OpsFloa is ready/i)).not.toBeInTheDocument();
+  });
+
   test('dismiss button hides the banner', async () => {
     const listeners = setupSW({ initialController: { state: 'activated' } });
     render(<UpdatePrompt />);
-    await act(async () => { listeners.controllerchange(); });
+    await act(async () => {
+      listeners.controllerchange();
+      await Promise.resolve();
+    });
     fireEvent.click(screen.getByLabelText(/dismiss/i));
     expect(screen.queryByText(/new version of OpsFloa is ready/i)).not.toBeInTheDocument();
   });

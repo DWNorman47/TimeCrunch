@@ -126,10 +126,14 @@ describe('applySettingsRows — dirty data', () => {
   });
 
   test('feature flag value "0" turns a defaulted-true flag off', () => {
-    expect(SETTINGS_DEFAULTS.feature_chat).toBe(true);
-    const rows = [{ key: 'feature_chat', value: '0' }];
+    // feature_overtime_alerts defaults to true; an explicit '0' row should
+    // flip it to false. (feature_chat used to be true-by-default but
+    // migration 0095 flipped it; using a still-true flag here keeps the
+    // test asserting what it claims to.)
+    expect(SETTINGS_DEFAULTS.feature_overtime_alerts).toBe(true);
+    const rows = [{ key: 'feature_overtime_alerts', value: '0' }];
     const result = applySettingsRows(rows, SETTINGS_DEFAULTS);
-    expect(result.feature_chat).toBe(false);
+    expect(result.feature_overtime_alerts).toBe(false);
   });
 
   test('string key with null value is applied (and becomes null)', () => {

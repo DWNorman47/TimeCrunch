@@ -8,6 +8,7 @@ import { invalidateCache } from '../offlineDb';
 import { silentError } from '../errorReporter';
 import HelpTip from './HelpTip';
 import MileageRateEditor from './MileageRateEditor';
+import { EXPERIMENTAL_SETTINGS_ENABLED } from '../experimentalSettings';
 const TIMEZONES = [
   { value: 'America/New_York',    label: 'Eastern Time (ET)' },
   { value: 'America/Chicago',     label: 'Central Time (CT)' },
@@ -87,7 +88,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     module_field: settings?.module_field ?? false,
     feature_scheduling: settings?.feature_scheduling ?? true,
     feature_analytics: settings?.feature_analytics ?? true,
-    feature_chat: settings?.feature_chat ?? true,
+    feature_chat: settings?.feature_chat ?? false,
     feature_geolocation: settings?.feature_geolocation ?? true,
     module_timeclock: settings?.module_timeclock ?? true,
     module_projects: settings?.module_projects ?? true,
@@ -95,10 +96,12 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
     module_analytics: settings?.module_analytics ?? false,
     module_team: settings?.module_team ?? true,
     feature_project_integration: settings?.feature_project_integration ?? true,
-    feature_inactive_alerts: settings?.feature_inactive_alerts ?? true,
+    feature_inactive_alerts: settings?.feature_inactive_alerts ?? false,
     feature_overtime_alerts: settings?.feature_overtime_alerts ?? true,
-    feature_broadcast: settings?.feature_broadcast ?? true,
+    feature_broadcast: settings?.feature_broadcast ?? false,
     feature_media_gallery: settings?.feature_media_gallery ?? false,
+    feature_admin_edit_time: settings?.feature_admin_edit_time ?? true,
+    feature_worker_edit_time: settings?.feature_worker_edit_time ?? true,
     feature_reimbursements: settings?.feature_reimbursements ?? true,
     feature_pto: settings?.feature_pto ?? true,
     cp_track_classifications: settings?.cp_track_classifications ?? true,
@@ -134,7 +137,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
   useEffect(() => {
     api.get('/safety-checklists/templates').then(r => setChecklistTemplates(r.data)).catch(silentError('managerates'));
   }, []);
-  const DEFAULT_COLLAPSED = { wages: true, overtime: true, pto: true, reimbursements: true, inventoryCount: true, notifications: true, reports: true, access: true, standards: true, modules: true, features: true, storage: true, certifiedPayroll: true };
+  const DEFAULT_COLLAPSED = { wages: true, overtime: true, pto: true, reimbursements: true, inventoryCount: true, notifications: true, reports: true, access: true, standards: true, modules: true, features: true, storage: true, certifiedPayroll: true, experimental: true };
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem('opsfloa_company_sections');
@@ -170,7 +173,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       module_field: settings.module_field ?? false,
       feature_scheduling: settings.feature_scheduling ?? true,
       feature_analytics: settings.feature_analytics ?? true,
-      feature_chat: settings.feature_chat ?? true,
+      feature_chat: settings.feature_chat ?? false,
       feature_geolocation: settings.feature_geolocation ?? true,
       module_timeclock: settings.module_timeclock ?? true,
       module_projects: settings.module_projects ?? true,
@@ -178,10 +181,12 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
       module_analytics: settings.module_analytics ?? false,
       module_team: settings.module_team ?? true,
       feature_project_integration: settings.feature_project_integration ?? true,
-      feature_inactive_alerts: settings.feature_inactive_alerts ?? true,
+      feature_inactive_alerts: settings.feature_inactive_alerts ?? false,
       feature_overtime_alerts: settings.feature_overtime_alerts ?? true,
-      feature_broadcast: settings.feature_broadcast ?? true,
+      feature_broadcast: settings.feature_broadcast ?? false,
       feature_media_gallery: settings.feature_media_gallery ?? false,
+      feature_admin_edit_time: settings.feature_admin_edit_time ?? true,
+      feature_worker_edit_time: settings.feature_worker_edit_time ?? true,
       feature_reimbursements: settings.feature_reimbursements ?? true,
       feature_pto: settings.feature_pto ?? true,
       cp_track_classifications: settings.cp_track_classifications ?? true,
@@ -244,6 +249,8 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         feature_overtime_alerts: form.feature_overtime_alerts,
         feature_broadcast: form.feature_broadcast,
         feature_media_gallery: form.feature_media_gallery,
+        feature_admin_edit_time: form.feature_admin_edit_time,
+        feature_worker_edit_time: form.feature_worker_edit_time,
         feature_reimbursements: form.feature_reimbursements,
         feature_pto: form.feature_pto,
         cp_track_classifications: form.cp_track_classifications,
@@ -510,6 +517,48 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         {!collapsed.features && <SectionFooter section="features" />}
       </div>
 
+      {/* ── Experimental (UI gated by experimentalSettings.js — not built
+              by default, flip ENABLED there to expose the section) ── */}
+      {EXPERIMENTAL_SETTINGS_ENABLED && (
+        <div style={styles.section}>
+          <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('experimental')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('experimental')}>
+            <span style={styles.sectionIcon}>🧪</span>
+            <div style={{ flex: 1 }}>
+              <div style={styles.sectionTitle}>Experimental</div>
+              <div style={styles.sectionSub}>Toggles whose UX hasn't been finalized. May be removed without notice.</div>
+            </div>
+            <span style={styles.collapseChevron}>{collapsed.experimental ? '▶' : '▼'}</span>
+          </div>
+          {!collapsed.experimental && <div style={styles.sectionBody}>
+            <div style={styles.row}>
+              <div>
+                <div style={styles.label}>Admin can edit / split worker time</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                  When OFF, admins cannot edit a worker's start/end times or split an entry across projects. Server returns 403 on those endpoints. Per-admin restrictions still go through Roles &amp; Permissions; this is a company-wide kill switch.
+                </div>
+              </div>
+              <label style={{ ...styles.toggle, background: form.feature_admin_edit_time ? '#1a56db' : '#d1d5db' }}>
+                <input type="checkbox" checked={form.feature_admin_edit_time} onChange={e => set('feature_admin_edit_time', e.target.checked)} style={{ display: 'none' }} />
+                <span style={{ ...styles.toggleKnob, transform: form.feature_admin_edit_time ? 'translateX(46px)' : 'translateX(0)' }} />
+              </label>
+            </div>
+            <div style={styles.row}>
+              <div>
+                <div style={styles.label}>Workers can edit their own time</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                  When OFF, workers can't change a saved entry's times — they have to ask an admin to make the change. The 7-day window and pay-period locks still apply on top of this.
+                </div>
+              </div>
+              <label style={{ ...styles.toggle, background: form.feature_worker_edit_time ? '#1a56db' : '#d1d5db' }}>
+                <input type="checkbox" checked={form.feature_worker_edit_time} onChange={e => set('feature_worker_edit_time', e.target.checked)} style={{ display: 'none' }} />
+                <span style={{ ...styles.toggleKnob, transform: form.feature_worker_edit_time ? 'translateX(46px)' : 'translateX(0)' }} />
+              </label>
+            </div>
+          </div>}
+          {!collapsed.experimental && <SectionFooter section="experimental" />}
+        </div>
+      )}
+
       {/* ── Worker Access ── */}
       <div style={styles.section}>
         <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('access')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('access')}>
@@ -603,6 +652,38 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               </select>
             </div>
           </div>
+          {/* Work hours window — used by inactive-worker alerts, after-hours
+              clock-in alerts, and the scheduled report digests. Lives here
+              (not under "Track Inactive Workers") so toggling that off
+              doesn't also disable the after-hours / report timing. */}
+          <div style={styles.row}>
+            <div>
+              <div style={styles.label}>{t.mrWorkHoursWindow}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.mrWorkHoursWindowDesc}</div>
+            </div>
+            <label style={{ ...styles.toggle, background: form.notification_use_work_hours ? '#1a56db' : '#d1d5db' }}>
+              <input type="checkbox" checked={form.notification_use_work_hours} onChange={e => set('notification_use_work_hours', e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ ...styles.toggleKnob, transform: form.notification_use_work_hours ? 'translateX(46px)' : 'translateX(0)' }} />
+            </label>
+          </div>
+          {form.notification_use_work_hours && (
+            <div style={styles.row}>
+              <label style={styles.label}>{t.mrHoursRange}</label>
+              <div style={styles.inputGroup}>
+                <select style={styles.input} value={form.notification_start_hour} onChange={e => set('notification_start_hour', e.target.value)}>
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
+                  ))}
+                </select>
+                <span style={styles.suffix}>–</span>
+                <select style={styles.input} value={form.notification_end_hour} onChange={e => set('notification_end_hour', e.target.value)}>
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
         </div>}
         {!collapsed.standards && <SectionFooter section="standards" />}
       </div>
@@ -865,34 +946,6 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
               <span style={styles.suffix}>{t.ratesDays}</span>
             </div>
           </div>}
-          {form.feature_inactive_alerts && <div style={styles.row}>
-            <div>
-              <div style={styles.label}>Work hours window</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Only send inactive alerts during these hours</div>
-            </div>
-            <label style={{ ...styles.toggle, background: form.notification_use_work_hours ? '#1a56db' : '#d1d5db' }}>
-              <input type="checkbox" checked={form.notification_use_work_hours} onChange={e => set('notification_use_work_hours', e.target.checked)} style={{ display: 'none' }} />
-              <span style={{ ...styles.toggleKnob, transform: form.notification_use_work_hours ? 'translateX(46px)' : 'translateX(0)' }} />
-            </label>
-          </div>}
-          {form.feature_inactive_alerts && form.notification_use_work_hours && (
-            <div style={styles.row}>
-              <label style={styles.label}>Hours range</label>
-              <div style={styles.inputGroup}>
-                <select style={styles.input} value={form.notification_start_hour} onChange={e => set('notification_start_hour', e.target.value)}>
-                  {Array.from({ length: 24 }, (_, h) => (
-                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
-                  ))}
-                </select>
-                <span style={styles.suffix}>–</span>
-                <select style={styles.input} value={form.notification_end_hour} onChange={e => set('notification_end_hour', e.target.value)}>
-                  {Array.from({ length: 24 }, (_, h) => (
-                    <option key={h} value={h}>{h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
           <div style={styles.row}>
             <div>
               <div style={styles.label}>Overtime Alerts</div>

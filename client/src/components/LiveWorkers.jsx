@@ -52,6 +52,10 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   const [inactiveWorkers, setInactiveWorkers] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  // Brief visual ping right after a refresh resolves, so a click that
+  // returns the same data still has a visible "I did something" beat.
+  const [justRefreshed, setJustRefreshed] = useState(false);
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedWorker, setSelectedWorker] = useState('');
   const [dismissedInactive, setDismissedInactive] = useState(false);
@@ -66,11 +70,27 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   const [allWorkers, setAllWorkers] = useState([]);
   const [todayShifts, setTodayShifts] = useState([]);
 
-  const fetchActive = (isInitial = false) => {
+  const fetchActive = (opts = {}) => {
+    // Distinguish three callers: the initial mount (show skeleton),
+    // the polling tick (silent), and a manual click (show a "Refreshing…"
+    // state on the button so the user gets feedback even when the data
+    // hasn't changed). `opts` is an object so an event handler that
+    // hands us a synthetic event as the first arg doesn't accidentally
+    // flip these flags.
+    const isInitial = opts.isInitial === true;
+    const isManual = opts.isManual === true;
+    if (isManual) setRefreshing(true);
     api.get('/admin/active-clocks')
       .then(r => { setWorkers(r.data); setLastUpdated(new Date()); })
       .catch(silentError('liveworkers'))
-      .finally(() => { if (isInitial) setInitialLoading(false); });
+      .finally(() => {
+        if (isInitial) setInitialLoading(false);
+        if (isManual) {
+          setRefreshing(false);
+          setJustRefreshed(true);
+          setTimeout(() => setJustRefreshed(false), 900);
+        }
+      });
   };
 
   const fetchTodayShifts = () => {
@@ -87,7 +107,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   };
 
   useEffect(() => {
-    fetchActive(true);
+    fetchActive({ isInitial: true });
     fetchInactive();
     fetchTodayShifts();
 
@@ -169,17 +189,33 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
     }
   };
 
+  // Day-mark workers don't clock in/out — they get a separate "Mark Day"
+  // action that creates a finished pending entry. Detect and route to the
+  // right endpoint based on the selected worker's day_mark_mode flag.
+  const selectedClockInWorker = allWorkers.find(w => String(w.id) === String(clockInUserId));
+  const isDayMarkSelected = selectedClockInWorker?.rate_type === 'daily' && !!selectedClockInWorker?.day_mark_mode;
+
   const handleAdminClockIn = async () => {
     if (!clockInUserId) return;
     setClockInSaving(true);
     try {
-      await api.post('/admin/clock-in', { user_id: clockInUserId, project_id: clockInProjectId || null, notes: clockInNotes || null });
+      if (isDayMarkSelected) {
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        await api.post('/admin/mark-day', {
+          user_id: clockInUserId,
+          local_work_date: now.toLocaleDateString('en-CA'),
+          local_time: `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
+        });
+      } else {
+        await api.post('/admin/clock-in', { user_id: clockInUserId, project_id: clockInProjectId || null, notes: clockInNotes || null });
+      }
       setShowClockInModal(false);
       setClockInUserId(''); setClockInProjectId(''); setClockInNotes('');
       setActionError('');
       fetchActive();
-    } catch {
-      setActionError(t.actionFailed);
+    } catch (err) {
+      setActionError(err?.response?.data?.error || t.actionFailed);
     } finally {
       setClockInSaving(false);
     }
@@ -239,10 +275,13 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
             <div>
               <div style={styles.inactiveBannerTitle}>{t.inactiveWorkers}</div>
               <div style={styles.inactiveBannerList}>
-                {inactiveWorkers.map(w => (
-                  <span key={w.id} style={styles.inactivePill}>
-                    {w.full_name} <span style={styles.inactiveDays}>({w.days_inactive}d)</span>
-                  </span>
+                {inactiveWorkers.map((w, i) => (
+                  <React.Fragment key={w.id}>
+                    {i > 0 && <span style={styles.inactiveSep}>, </span>}
+                    <span style={styles.inactiveName}>
+                      {w.full_name} <span style={styles.inactiveDays}>({w.days_inactive}d)</span>
+                    </span>
+                  </React.Fragment>
                 ))}
               </div>
             </div>
@@ -261,9 +300,18 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
           <span style={styles.liveDot} />
           <span style={styles.liveText}>{t.liveLabel}</span>
           {lastUpdated && (
-            <span style={styles.updated}>Updated {formatInTz(lastUpdated.toISOString(), timezone, undefined, locale)}</span>
+            <span style={{ ...styles.updated, ...(justRefreshed ? styles.updatedFlash : null) }}>
+              Updated {formatInTz(lastUpdated.toISOString(), timezone, undefined, locale)}
+            </span>
           )}
-          <button style={styles.refreshBtn} onClick={fetchActive}>{t.refresh}</button>
+          <button
+            style={{ ...styles.refreshBtn, ...(refreshing ? styles.refreshBtnBusy : null) }}
+            onClick={() => fetchActive({ isManual: true })}
+            disabled={refreshing}
+            aria-busy={refreshing}
+          >
+            {refreshing ? t.refreshing : t.refresh}
+          </button>
           <button style={styles.clockInWorkerBtn} onClick={() => setShowClockInModal(true)}>{t.lwClockInWorkerBtn}</button>
         </div>
       </div>
@@ -415,38 +463,53 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                   ))}
               </select>
             </div>
-            <div style={styles.modalField}>
-              <label style={styles.modalLabel}>{t.projectOptionalLabel}</label>
-              <select
-                style={styles.modalSelect}
-                value={clockInProjectId}
-                onChange={e => setClockInProjectId(e.target.value)}
-              >
-                <option value="">{t.noProject}</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-            <div style={styles.modalField}>
-              <label style={styles.modalLabel}>{t.notesOptional}</label>
-              <textarea
-                style={styles.modalTextarea}
-                value={clockInNotes}
-                onChange={e => setClockInNotes(e.target.value)}
-                rows={3}
-                placeholder={t.lwAddNotePlaceholder}
-                maxLength={500}
-              />
-              <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{clockInNotes.length}/500</div>
-            </div>
+            {isDayMarkSelected ? (
+              <div style={{ ...styles.modalField, padding: '12px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8 }}>
+                <div style={{ fontSize: 13, color: '#166534', fontWeight: 600, marginBottom: 4 }}>
+                  {t.lwDayMarkInfoTitle || 'This worker uses Mark Day mode'}
+                </div>
+                <div style={{ fontSize: 12, color: '#166534' }}>
+                  {t.lwDayMarkInfoBody || 'Marking will create a pending day entry — no clock-out, no project required.'}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={styles.modalField}>
+                  <label style={styles.modalLabel}>{t.projectOptionalLabel}</label>
+                  <select
+                    style={styles.modalSelect}
+                    value={clockInProjectId}
+                    onChange={e => setClockInProjectId(e.target.value)}
+                  >
+                    <option value="">{t.noProject}</option>
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={styles.modalField}>
+                  <label style={styles.modalLabel}>{t.notesOptional}</label>
+                  <textarea
+                    style={styles.modalTextarea}
+                    value={clockInNotes}
+                    onChange={e => setClockInNotes(e.target.value)}
+                    rows={3}
+                    placeholder={t.lwAddNotePlaceholder}
+                    maxLength={500}
+                  />
+                  <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{clockInNotes.length}/500</div>
+                </div>
+              </>
+            )}
             <div style={styles.modalActions}>
               <button
                 style={{ ...styles.modalClockInBtn, ...((!clockInUserId || clockInSaving) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                 onClick={handleAdminClockIn}
                 disabled={!clockInUserId || clockInSaving}
               >
-                {clockInSaving ? t.clockingIn : t.clockIn}
+                {clockInSaving
+                  ? (isDayMarkSelected ? (t.saving || 'Saving…') : t.clockingIn)
+                  : (isDayMarkSelected ? (t.lwMarkDayBtn || 'Mark Day') : t.clockIn)}
               </button>
               <button
                 style={styles.modalCancelBtn}
@@ -469,8 +532,10 @@ const styles = {
   liveIndicator: { display: 'flex', alignItems: 'center', gap: 8 },
   liveDot: { width: 10, height: 10, borderRadius: '50%', background: '#16a34a', animation: 'pulse 2s infinite' },
   liveText: { fontWeight: 700, color: '#16a34a', fontSize: 14 },
-  updated: { fontSize: 12, color: '#6b7280' },
+  updated: { fontSize: 12, color: '#6b7280', transition: 'background 0.3s, color 0.3s', borderRadius: 4, padding: '1px 4px' },
+  updatedFlash: { background: '#dcfce7', color: '#166534', fontWeight: 600 },
   refreshBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: '#6b7280', cursor: 'pointer' },
+  refreshBtnBusy: { opacity: 0.6, cursor: 'wait' },
   filters: { display: 'flex', gap: 10, flexWrap: 'wrap' },
   filterSelect: { padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#374151', background: '#fff', cursor: 'pointer', minWidth: 200 },
   empty: { background: '#fff', borderRadius: 12, padding: 32, textAlign: 'center', color: '#6b7280', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' },
@@ -492,8 +557,12 @@ const styles = {
   inactiveBannerLeft: { display: 'flex', alignItems: 'flex-start', gap: 10 },
   inactiveIcon: { fontSize: 18, lineHeight: 1.4 },
   inactiveBannerTitle: { fontWeight: 700, fontSize: 14, color: '#92400e', marginBottom: 6 },
-  inactiveBannerList: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  inactivePill: { background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', fontSize: 13, color: '#78350f', fontWeight: 500 },
+  // Flat comma-separated text — earlier rendering used pill-shaped chips
+  // that read as buttons, so admins kept tapping the names expecting a
+  // drilldown.
+  inactiveBannerList: { fontSize: 13, color: '#78350f', lineHeight: 1.5 },
+  inactiveName: { fontWeight: 600 },
+  inactiveSep: { color: '#b45309' },
   inactiveDays: { color: '#b45309', fontWeight: 700 },
   dismissBtn: { background: 'none', border: 'none', color: '#6b7280', fontSize: 16, cursor: 'pointer', padding: '0 4px', lineHeight: 1 },
   clockInWorkerBtn: { background: '#1a56db', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
