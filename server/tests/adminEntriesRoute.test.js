@@ -62,6 +62,9 @@ describe('PATCH /admin/entries/:id/edit — optimistic lock', () => {
   beforeEach(() => {
     pool.query.mockReset();
     setUser();
+    // The route calls getSettings(companyId) first to gate on
+    // feature_admin_edit_time. Empty rows → default true → handler proceeds.
+    pool.query.mockResolvedValueOnce({ rows: [] });
   });
 
   test('accepts edit when client updated_at matches DB', async () => {
@@ -88,8 +91,8 @@ describe('PATCH /admin/entries/:id/edit — optimistic lock', () => {
 
     expect(res.status).toBe(409);
     expect(res.body.error).toBe('conflict');
-    // UPDATE must not have run
-    expect(pool.query).toHaveBeenCalledTimes(1);
+    // settings + version check; UPDATE must NOT have run
+    expect(pool.query).toHaveBeenCalledTimes(2);
   });
 
   test('returns 404 when entry does not exist', async () => {

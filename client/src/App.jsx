@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import InstallPrompt from './components/InstallPrompt';
 import UpdatePrompt from './components/UpdatePrompt';
@@ -62,7 +62,7 @@ function PrivateRoute({ children, adminOnly = false, superAdminOnly = false, mod
   if (loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f6f9', color: '#6b7280', fontSize: 15 }}>Loading…</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (superAdminOnly && user.role !== 'super_admin') return <Navigate to="/" replace />;
-  if (adminOnly && user.role !== 'admin' && user.role !== 'super_admin') return <Navigate to="/dashboard" replace />;
+  if (adminOnly && user.role !== 'admin' && user.role !== 'super_admin') return <Navigate to="/timeclock" replace />;
 
   // Subscription gate — block access when trial expired or canceled
   if (BLOCKED_STATUSES.includes(user.subscription_status)) {
@@ -99,7 +99,16 @@ function adminHome(userId) {
     localStorage.setItem(key, '1');
     return '/administration';
   }
-  return '/timeclock';
+  return '/workforce';
+}
+
+// Preserves the URL hash (and search) when redirecting from a renamed legacy
+// path. The default `<Navigate>` strips both, which would break tab deep
+// links like `/dashboard#schedule` or `/admin#approvals` that show up in
+// stored push notifications and inbox rows.
+function HashRedirect({ to }) {
+  const { hash, search } = useLocation();
+  return <Navigate to={`${to}${search}${hash}`} replace />;
 }
 
 // Phase D: choose where a logged-in user lands when they hit / or *.
@@ -137,9 +146,14 @@ function AppRoutes() {
       <Route path="/r/:slug" element={<ServiceRequest />} />
       <Route path="/team" element={<PrivateRoute moduleId="team"><TeamPage /></PrivateRoute>} />
       <Route path="/__tests__" element={<Tests />} />
-      <Route path="/dashboard" element={<PrivateRoute moduleId="timeclock"><Dashboard /></PrivateRoute>} />
-      <Route path="/timeclock" element={<PrivateRoute adminOnly moduleId="timeclock"><AdminDashboard /></PrivateRoute>} />
-      <Route path="/admin" element={<Navigate to="/timeclock" replace />} />
+      {/* New canonical routes: /timeclock = the participating page (worker
+          and admin self-time), /workforce = the admin oversight page. */}
+      <Route path="/timeclock" element={<PrivateRoute moduleId="timeclock"><Dashboard /></PrivateRoute>} />
+      <Route path="/workforce" element={<PrivateRoute adminOnly moduleId="workforce"><AdminDashboard /></PrivateRoute>} />
+      {/* Legacy redirects — keep indefinitely so stored push/inbox URLs and
+          old PWA bookmarks still work. HashRedirect preserves the #tab. */}
+      <Route path="/dashboard" element={<HashRedirect to="/timeclock" />} />
+      <Route path="/admin" element={<HashRedirect to="/workforce" />} />
       <Route path="/field" element={<PrivateRoute moduleId="field"><FieldPage /></PrivateRoute>} />
       <Route path="/projects" element={<PrivateRoute adminOnly moduleId="projects"><ProjectsPage /></PrivateRoute>} />
       <Route path="/administration" element={<PrivateRoute adminOnly moduleId="administration"><AdministrationPage /></PrivateRoute>} />

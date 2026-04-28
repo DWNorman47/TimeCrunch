@@ -47,7 +47,7 @@ router.post('/', requireAuth, async (req, res) => {
         createInboxItemBatch(admins.rows.map(a => a.id), companyId, 'timeoff_request',
           `Time off request: ${req.user.full_name}`,
           `${typeLabel} · ${start_date} – ${end_date}`,
-          '/timeclock#timeoff');
+          '/workforce#timeoff');
       } catch (err) { console.error('Time off request notification error:', err); }
     });
     res.status(201).json(result.rows[0]);
@@ -119,10 +119,10 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
         sendPushToUser(row.user_id, {
           title: 'Time off approved ✓',
           body: `${startStr} – ${endStr}${review_note ? ': ' + review_note : ''}`,
-          url: '/dashboard#time-off',
+          url: '/timeclock#timeoff',
         });
         createInboxItem(row.user_id, companyId, 'timeoff_approved', 'Time off approved ✓',
-          `${startStr} – ${endStr}${review_note ? ' · ' + review_note : ''}`, '/dashboard#timeoff');
+          `${startStr} – ${endStr}${review_note ? ' · ' + review_note : ''}`, '/timeclock#timeoff');
 
         // Flag any scheduled shifts during the approved time-off period
         const conflictResult = await pool.query(
@@ -176,10 +176,10 @@ router.patch('/:id/deny', requireAdmin, async (req, res) => {
         sendPushToUser(row.user_id, {
           title: 'Time off request denied',
           body: `${denyStartStr} – ${denyEndStr}${review_note ? ': ' + review_note : ''}`,
-          url: '/dashboard#time-off',
+          url: '/timeclock#timeoff',
         });
         createInboxItem(row.user_id, companyId, 'timeoff_denied', 'Time off request denied',
-          `${denyStartStr} – ${denyEndStr}${review_note ? ' · ' + review_note : ''}`, '/dashboard#timeoff');
+          `${denyStartStr} – ${denyEndStr}${review_note ? ' · ' + review_note : ''}`, '/timeclock#timeoff');
       } catch (err) { console.error('Time off denial notification error:', err); }
     });
     res.json(row);

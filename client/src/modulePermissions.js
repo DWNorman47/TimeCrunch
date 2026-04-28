@@ -15,11 +15,15 @@
  */
 
 export const MODULE_PERMISSIONS = {
+  // Time Clock = the participating page (clock-in, my timesheet, my schedule,
+  // my time off, my expenses, messages). Both workers and admins use this.
   timeclock: [
-    // Worker-tier
     'clock_self', 'submit_time_entry_self',
     'edit_own_pending_entry', 'view_own_entries',
-    // Admin-tier (Live tab, approvals)
+  ],
+  // Workforce = the admin oversight page (Live, Approvals, Reports, etc.).
+  // Admin-tier perms only — a user with no oversight perms doesn't see it.
+  workforce: [
     'clock_in_others', 'edit_any_entry', 'approve_entries',
     'manage_pay_periods', 'view_workers_list',
   ],
@@ -66,25 +70,22 @@ export const ADMINISTRATION_TAB_PERMS = {
  * user with any real access doesn't get dumped on Account by default.
  */
 const LANDING_PRIORITY = [
-  { id: 'timeclock',      path: '/timeclock' },        // admin live tab default
-  { id: 'timeclock',      path: '/dashboard',  worker: true }, // worker view
+  { id: 'workforce',      path: '/workforce' },      // admin oversight (admins land here)
+  { id: 'timeclock',      path: '/timeclock' },      // participating (workers + admin self-time)
   { id: 'projects',       path: '/projects' },
   { id: 'team',           path: '/team' },
   { id: 'field',          path: '/field' },
   { id: 'inventory',      path: '/inventory' },
   { id: 'analytics',      path: '/analytics' },
   { id: 'administration', path: '/administration' },
-  { id: 'account',        path: '/account' },          // always-fallback
+  { id: 'account',        path: '/account' },        // always-fallback
 ];
 
 import { userHasAnyPerm } from './hooks/usePerm';
 
 export function pickLandingPath(user) {
   if (!user) return '/login';
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
   for (const cand of LANDING_PRIORITY) {
-    if (cand.worker && isAdmin) continue;
-    if (!cand.worker && cand.id === 'timeclock' && !isAdmin) continue;
     if (cand.id === 'account') return cand.path; // always-fallback
     const required = MODULE_PERMISSIONS[cand.id] || [];
     if (required.length === 0) continue;

@@ -168,7 +168,7 @@ async function sendWeeklyPayrollReport(companyId, companyName) {
       <tbody>${rows}</tbody>
     </table>
     <p style="margin-top:12px">
-      <a href="${APP_URL}/admin#reports" style="color:#92400e;font-weight:600">View full reports in OpsFloa →</a>
+      <a href="${APP_URL}/workforce#reports" style="color:#92400e;font-weight:600">View full reports in OpsFloa →</a>
     </p>` +
     emailFooter()
   );
