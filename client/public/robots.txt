@@ -16,6 +16,7 @@ Disallow: /accept-invite
 Disallow: /confirm-email
 Disallow: /dashboard
 Disallow: /timeclock
+Disallow: /workforce
 Disallow: /admin
 Disallow: /administration
 Disallow: /analytics
@@ -48,6 +49,7 @@ Disallow: /login
 Disallow: /register
 Disallow: /dashboard
 Disallow: /timeclock
+Disallow: /workforce
 Disallow: /admin
 Disallow: /administration
 Disallow: /superadmin
@@ -61,6 +63,7 @@ Disallow: /login
 Disallow: /register
 Disallow: /dashboard
 Disallow: /timeclock
+Disallow: /workforce
 Disallow: /admin
 Disallow: /administration
 Disallow: /superadmin
@@ -74,6 +77,7 @@ Disallow: /login
 Disallow: /register
 Disallow: /dashboard
 Disallow: /timeclock
+Disallow: /workforce
 Disallow: /admin
 Disallow: /administration
 Disallow: /superadmin

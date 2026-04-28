@@ -2397,8 +2397,8 @@ router.post('/entries/bulk-approve', requireAdmin, requirePerm('approve_entries'
       const pushBody = count === 1
         ? `Your entry for ${rows[0].work_date?.toString().substring(0,10)} (${rows[0].start_time}–${rows[0].end_time}) was approved.`
         : `${count} time entries were approved.`;
-      sendPushToUser(parseInt(userId), { title: 'Time entry approved', body: pushBody, url: '/dashboard' });
-      createInboxItem(parseInt(userId), companyId, 'approval', 'Time entry approved ✓', pushBody, '/dashboard');
+      sendPushToUser(parseInt(userId), { title: 'Time entry approved', body: pushBody, url: '/timeclock' });
+      createInboxItem(parseInt(userId), companyId, 'approval', 'Time entry approved ✓', pushBody, '/timeclock');
     }
     await logAudit(companyId, req.user.id, req.user.full_name, 'entries.bulk_approved', 'time_entry', null, null, { count: result.rowCount, ids });
     res.json({ approved: result.rowCount });
@@ -2459,9 +2459,9 @@ router.patch('/entries/:id/approve', requireAdmin, requirePerm('approve_entries'
         `<p>Hi ${worker.rows[0].full_name},</p><p>Your time entry for <b>${work_date?.toString().substring(0,10)}</b> (${start_time}–${end_time}) has been <b style="color:#059669">approved</b>.</p><p>— OpsFloa</p>`);
     }
     const entry = result.rows[0];
-    sendPushToUser(entry.user_id, { title: 'Time entry approved', body: 'An admin approved your time entry.', url: '/dashboard' });
+    sendPushToUser(entry.user_id, { title: 'Time entry approved', body: 'An admin approved your time entry.', url: '/timeclock' });
     createInboxItem(entry.user_id, companyId, 'approval', 'Time entry approved ✓',
-      `Your entry for ${entry.work_date?.toString().substring(0,10)} (${entry.start_time}–${entry.end_time}) was approved.`, '/dashboard');
+      `Your entry for ${entry.work_date?.toString().substring(0,10)} (${entry.start_time}–${entry.end_time}) was approved.`, '/timeclock');
     res.json(entry);
 
     // QBO auto-sync — fire-and-forget, never blocks the response
@@ -2595,10 +2595,10 @@ router.patch('/entries/:id/reject', requireAdmin, requirePerm('approve_entries')
     sendPushToUser(rejEntry.user_id, {
       title: 'Time entry rejected',
       body: note ? `Reason: ${note}` : 'An admin rejected your time entry.',
-      url: '/dashboard',
+      url: '/timeclock',
     });
     createInboxItem(rejEntry.user_id, companyId, 'rejection', 'Time entry rejected',
-      `Your entry for ${rejEntry.work_date?.toString().substring(0,10)} was rejected.${note ? ` Reason: ${note}` : ''}`, '/dashboard');
+      `Your entry for ${rejEntry.work_date?.toString().substring(0,10)} was rejected.${note ? ` Reason: ${note}` : ''}`, '/timeclock');
     res.json(rejEntry);
 
     // QBO cleanup — void the time activity if already synced
@@ -2994,7 +2994,7 @@ router.post('/broadcast', requireAdmin, requirePerm('manage_settings'), requireP
   await sendPushToAllWorkers(companyId, {
     title: `📢 ${req.user.company_name || 'Announcement'}`,
     body: message.trim(),
-    url: '/dashboard',
+    url: '/timeclock',
   });
   // Create inbox item for every active worker (single batch insert)
   const broadcastWorkers = await pool.query(
@@ -3005,7 +3005,7 @@ router.post('/broadcast', requireAdmin, requirePerm('manage_settings'), requireP
     broadcastWorkers.rows.map(w => w.id),
     companyId, 'announcement',
     `📢 ${req.user.company_name || 'Announcement'}`,
-    message.trim(), '/dashboard'
+    message.trim(), '/timeclock'
   );
   await logAudit(companyId, req.user.id, req.user.full_name, 'broadcast.sent', null, null, null, { message: message.trim() });
   res.json({ sent: true });

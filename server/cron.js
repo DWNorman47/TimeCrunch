@@ -77,7 +77,7 @@ async function sendShiftReminders() {
         await sendPushToUser(shift.user_id, {
           title: 'Shift reminder — tomorrow',
           body,
-          url: '/dashboard#schedule',
+          url: '/timeclock#schedule',
         });
       }
 
@@ -141,7 +141,7 @@ async function sendSignoffReminders() {
         await sendPushToUser(user_id, {
           title: 'Sign off your timesheet',
           body: 'You have unsigned time entries this week.',
-          url: '/dashboard',
+          url: '/timeclock',
         });
       }
 
@@ -205,7 +205,7 @@ async function sweepStaleActiveClock() {
 
       // Push to all admins; don't await per-admin so a slow push doesn't
       // block the rest of the sweep.
-      sendPushToCompanyAdmins(row.company_id, { title, body, url: '/timeclock#live' })
+      sendPushToCompanyAdmins(row.company_id, { title, body, url: '/workforce#live' })
         .catch(err => console.error('[cron] sweepStaleActiveClock push:', err));
 
       // Inbox item too, so the alert is visible after the push notification expires.
@@ -220,7 +220,7 @@ async function sweepStaleActiveClock() {
           'stale_active_clock',
           title,
           body,
-          '/timeclock#live'
+          '/workforce#live'
         );
       }
 

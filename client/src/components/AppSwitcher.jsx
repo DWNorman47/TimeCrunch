@@ -4,7 +4,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { userCanSeeModule } from '../modulePermissions';
 
 // Workers see: Time Clock, Field, Inventory, Account
-// Admins see: Time Clock, Field, Inventory, Projects, Administration, Analytics
+// Admins see:  Time Clock, Workforce, Field, Inventory, Projects, Administration, Analytics
+//   (Time Clock = the participating page — admins use it to clock themselves
+//    in. Workforce = the oversight page — Live, Approvals, Reports, etc.)
 export const APPS = [
   {
     id: 'timeclock',
@@ -16,7 +18,22 @@ export const APPS = [
         <polyline points="10,5.5 10,10 13,12" />
       </svg>
     ),
-    path: '/',
+    path: '/timeclock',
+  },
+  {
+    id: 'workforce',
+    name: 'Workforce',
+    bg: '#0f3a8a',
+    adminOnly: true,
+    icon: (
+      <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+        <circle cx="6.5" cy="7" r="2.4" />
+        <circle cx="13.5" cy="7" r="2.4" />
+        <path d="M2 16c0-2.2 2-4 4.5-4S11 13.8 11 16" />
+        <path d="M9 16c0-2.2 2-4 4.5-4S18 13.8 18 16" />
+      </svg>
+    ),
+    path: '/workforce',
   },
   {
     id: 'field',
@@ -128,8 +145,10 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
     if (a.id === 'inventory' && features?.module_inventory === false) return false;
     if (a.id === 'analytics' && features?.module_analytics === false) return false;
     if (a.id === 'team' && features?.module_team === false) return false;
-    // Only hide Time Clock from admins when toggle is off (workers always need it)
-    if (a.id === 'timeclock' && features?.module_timeclock === false && isAdmin) return false;
+    // module_timeclock now gates the admin oversight page (Workforce). Time
+    // Clock itself stays visible to everyone — workers always need it, and
+    // admins use it for their own time-tracking even if oversight is off.
+    if (a.id === 'workforce' && features?.module_timeclock === false) return false;
     // Phase D: per-user permission gate. A user with zero perms inside a
     // module shouldn't see it at all. Account is always shown.
     if (!userCanSeeModule(user, a.id)) return false;
@@ -146,12 +165,7 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
   const navigate = app => {
     setOpen(false);
     if (app.soon) return;
-    // Time Clock routes differently for admin vs worker
-    if (app.id === 'timeclock') {
-      window.location.href = userRole === 'admin' || userRole === 'super_admin' ? '/timeclock' : '/dashboard';
-    } else {
-      window.location.href = app.path;
-    }
+    window.location.href = app.path;
   };
 
   return (

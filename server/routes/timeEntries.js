@@ -236,23 +236,23 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
       sendPushToCompanyAdmins(req.user.company_id, {
         title: `Comment from ${req.user.full_name}`,
         body: snippet,
-        url: '/admin#approvals',
+        url: '/workforce#approvals',
       });
       const admins = await pool.query(
         `SELECT id FROM users WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true`,
         [req.user.company_id]
       );
       for (const a of admins.rows) {
-        createInboxItem(a.id, req.user.company_id, 'comment', `Comment from ${req.user.full_name}`, snippet, '/admin#approvals');
+        createInboxItem(a.id, req.user.company_id, 'comment', `Comment from ${req.user.full_name}`, snippet, '/workforce#approvals');
       }
     } else if (ownerId && ownerId !== req.user.id) {
       // Admin commented — notify the entry's worker
       sendPushToUser(ownerId, {
         title: `Comment from ${req.user.full_name}`,
         body: snippet,
-        url: '/dashboard',
+        url: '/timeclock',
       });
-      createInboxItem(ownerId, req.user.company_id, 'comment', `Comment from ${req.user.full_name}`, snippet, '/dashboard');
+      createInboxItem(ownerId, req.user.company_id, 'comment', `Comment from ${req.user.full_name}`, snippet, '/timeclock');
     }
     res.status(201).json(msg);
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
@@ -401,8 +401,8 @@ router.post('/sign-off', requireAuth, async (req, res) => {
       const adminId = admin.rows[0].id;
       const signTitle = `${req.user.full_name} signed their timesheet`;
       const signBody = `${result.rowCount} entr${result.rowCount === 1 ? 'y' : 'ies'} ready for review`;
-      sendPushToUser(adminId, { title: signTitle, body: signBody, url: '/admin#approvals' });
-      createInboxItem(adminId, req.user.company_id, 'signoff', signTitle, signBody, '/admin#approvals');
+      sendPushToUser(adminId, { title: signTitle, body: signBody, url: '/workforce#approvals' });
+      createInboxItem(adminId, req.user.company_id, 'signoff', signTitle, signBody, '/workforce#approvals');
     }
     res.json({ signed: result.rowCount });
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }

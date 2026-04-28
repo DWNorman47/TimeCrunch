@@ -178,12 +178,12 @@ router.post('/in', requireAuth, requirePerm('clock_self'), clockLimiter, coerceB
           const workerName = req.user.full_name || req.user.username;
           const title = `Location denied: ${workerName}`;
           const body = `${workerName} clocked in but their browser blocked location access. Their location was not recorded.`;
-          await sendPushToCompanyAdmins(companyId, { title, body, url: '/admin#live' });
+          await sendPushToCompanyAdmins(companyId, { title, body, url: '/workforce#live' });
           const adminRows = await pool.query(
             `SELECT id FROM users WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true`,
             [companyId]
           );
-          createInboxItemBatch(adminRows.rows.map(a => a.id), companyId, 'location_denied', title, body, '/admin#live');
+          createInboxItemBatch(adminRows.rows.map(a => a.id), companyId, 'location_denied', title, body, '/workforce#live');
         }
 
         // Outside-hours notification
@@ -372,13 +372,13 @@ async function _sendOvertimeAlert(worker, companyId, projectName, totalHours, th
   const title = `Overtime: ${workerName}`;
   const body = `${workerName} has worked ${totalHours.toFixed(1)}h today${projectName ? ` on ${projectName}` : ''} — ${extra}h over the ${threshold}h ${rule} threshold`;
 
-  await sendPushToCompanyAdmins(companyId, { title, body, url: '/admin#reports' });
+  await sendPushToCompanyAdmins(companyId, { title, body, url: '/workforce#reports' });
 
   const adminRows = await pool.query(
     `SELECT id FROM users WHERE company_id = $1 AND role IN ('admin','super_admin') AND active = true`,
     [companyId]
   );
-  createInboxItemBatch(adminRows.rows.map(a => a.id), companyId, 'overtime_alert', title, body, '/admin#reports');
+  createInboxItemBatch(adminRows.rows.map(a => a.id), companyId, 'overtime_alert', title, body, '/workforce#reports');
 }
 
 // DELETE /api/clock/cancel — discard an active clock-in without creating a time entry
