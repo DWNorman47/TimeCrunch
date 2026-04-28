@@ -44,24 +44,20 @@ export default function ManageRoles() {
   const load = async () => {
     setLoading(true); setError('');
     try {
-      const [rolesRes, catalogRes, meRes] = await Promise.all([
+      const [rolesRes, catalogRes] = await Promise.all([
         api.get('/admin/roles'),
         api.get('/admin/permissions/catalog'),
-        // Resolve the current user's effective permissions so we can
-        // disable checkboxes the server would reject anyway.
-        user?.role_id ? api.get(`/admin/roles/${user.role_id}`) : Promise.resolve({ data: { permissions: [] } }),
       ]);
       setRoles(rolesRes.data);
       setCatalog(catalogRes.data);
-      // super_admin gets every permission; admin with null role_id falls back
-      // to the legacy mapping, which the server-side check honors. UI
-      // approximates by allowing everything for these two cases — the server
-      // is authoritative.
-      if (user?.role === 'super_admin' || !user?.role_id) {
-        setMyPerms(new Set(catalogRes.data.map(p => p.key)));
-      } else {
-        setMyPerms(new Set(meRes.data.permissions || []));
-      }
+      // /auth/me already resolved this user's effective permissions —
+      // super_admin gets the full catalog, role_id users get their role's
+      // perms, legacy admins get their admin_permissions translated. Use
+      // that authoritative list directly so checkboxes never advertise a
+      // grant the server would reject. (Old code granted ALL perms to
+      // role_id=NULL users, which was misleading for legacy restricted
+      // admins.)
+      setMyPerms(new Set(user?.permissions || []));
     } catch (err) {
       setError(err.response?.data?.error || t.mrolesLoadFailed || 'Failed to load roles');
     } finally {

@@ -4,6 +4,8 @@ const logger = require('../logger');
 const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const rateLimit = require('express-rate-limit');
+const { userOrIpKey } = require('../middleware/rateLimitKey');
+const { entryInstants } = require('../utils/timeFormat');
 const pool = require('../db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -356,7 +358,7 @@ router.post('/mark-day', requireAdmin, requirePerm('manage_workers'), async (req
   if (!user_id) return res.status(400).json({ error: 'user_id required' });
   try {
     const worker = await pool.query(
-      'SELECT id, full_name, rate_type, day_mark_mode FROM users WHERE id = $1 AND company_id = $2 AND active = true',
+      'SELECT id, full_name, rate_type, day_mark_mode, timezone FROM users WHERE id = $1 AND company_id = $2 AND active = true',
       [user_id, companyId]
     );
     if (worker.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
@@ -386,13 +388,16 @@ router.post('/mark-day', requireAdmin, requirePerm('manage_workers'), async (req
       const pad = n => String(n).padStart(2, '0');
       timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     }
+    // Phase 2 dual-write: derive matching UTC instant from the resolved
+    // wall-clock + the worker's stored timezone.
+    const ts = entryInstants(workDate, timeStr, timeStr, w.timezone).start_ts;
     const result = await pool.query(
       `INSERT INTO time_entries
-         (company_id, user_id, project_id, work_date, start_time, end_time,
-          wage_type, status, clock_source, clocked_in_by)
-       VALUES ($1, $2, NULL, $3, $4, $4, 'regular', 'pending', 'admin', $5)
+         (company_id, user_id, project_id, work_date, start_time, end_time, start_ts, end_ts,
+          wage_type, status, timezone, clock_source, clocked_in_by)
+       VALUES ($1, $2, NULL, $3, $4, $4, $5, $5, 'regular', 'pending', $6, 'admin', $7)
        RETURNING *`,
-      [companyId, user_id, workDate, timeStr, req.user.id]
+      [companyId, user_id, workDate, timeStr, ts, w.timezone || null, req.user.id]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'worker.day_marked_by_admin', 'user', parseInt(user_id), w.full_name);
     res.status(201).json(result.rows[0]);
@@ -468,15 +473,17 @@ router.post('/clock-out/:user_id', requireAdmin, requirePerm('manage_workers'), 
     let entryResult;
     try {
       await client.query('BEGIN');
+      // Phase 2 dual-write: clockInTime / clockOutTime are real UTC instants
+      // — write them straight to start_ts / end_ts.
       entryResult = await client.query(
         `INSERT INTO time_entries
-           (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
+           (company_id, user_id, project_id, work_date, start_time, end_time, start_ts, end_ts, wage_type, notes,
             clock_in_lat, clock_in_lng, break_minutes, mileage, timezone, clock_source, clocked_in_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
          RETURNING *`,
         [
           companyId, clock.user_id, clock.project_id, clock.work_date,
-          start_time, end_time, clock.wage_type || 'regular', clock.notes || null,
+          start_time, end_time, clockInTime, clockOutTime, clock.wage_type || 'regular', clock.notes || null,
           clock.clock_in_lat, clock.clock_in_lng,
           parseInt(break_minutes) || 0, mileageVal,
           clock.timezone || null,
@@ -530,11 +537,21 @@ router.patch('/entries/:id/times', requireAdmin, requirePerm('manage_workers'), 
     if (s.feature_admin_edit_time === false) {
       return res.status(403).json({ error: 'Admin time editing is disabled in Company Settings.' });
     }
+    // Phase 2 dual-write: fetch the entry's work_date + timezone so we can
+    // populate the new start_ts / end_ts columns alongside the legacy
+    // start_time / end_time.
+    const cur = await pool.query(
+      'SELECT work_date, timezone FROM time_entries WHERE id = $1 AND company_id = $2',
+      [req.params.id, companyId]
+    );
+    if (cur.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    const workDateStr = new Date(cur.rows[0].work_date).toISOString().substring(0, 10);
+    const { start_ts, end_ts } = entryInstants(workDateStr, start_time, end_time, cur.rows[0].timezone);
     const result = await pool.query(
-      `UPDATE time_entries SET start_time = $1, end_time = $2
-       WHERE id = $3 AND company_id = $4
+      `UPDATE time_entries SET start_time = $1, end_time = $2, start_ts = $3, end_ts = $4
+       WHERE id = $5 AND company_id = $6
        RETURNING *`,
-      [start_time, end_time, req.params.id, companyId]
+      [start_time, end_time, start_ts, end_ts, req.params.id, companyId]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.times_edited', 'time_entry', parseInt(req.params.id), null);
@@ -561,13 +578,21 @@ router.patch('/entries/:id/edit', requireAdmin, requirePerm('approve_entries'),
     if (s.feature_admin_edit_time === false) {
       return res.status(403).json({ error: 'Admin time editing is disabled in Company Settings.' });
     }
+    // Phase 2 dual-write: always fetch the existing entry so we have the
+    // work_date + timezone needed to derive start_ts / end_ts. This SELECT
+    // also serves the optimistic-lock check.
+    const cur = await pool.query(
+      'SELECT updated_at, work_date, timezone FROM time_entries WHERE id=$1 AND company_id=$2',
+      [req.params.id, companyId]
+    );
+    if (!cur.rows.length) return res.status(404).json({ error: 'Entry not found' });
     if (clientUpdatedAt) {
-      const cur = await pool.query('SELECT updated_at FROM time_entries WHERE id=$1 AND company_id=$2', [req.params.id, companyId]);
-      if (!cur.rows.length) return res.status(404).json({ error: 'Entry not found' });
       if (new Date(cur.rows[0].updated_at).getTime() !== new Date(clientUpdatedAt).getTime()) {
         return res.status(409).json({ error: 'conflict' });
       }
     }
+    const workDateStr = new Date(cur.rows[0].work_date).toISOString().substring(0, 10);
+    const { start_ts, end_ts } = entryInstants(workDateStr, start_time, end_time, cur.rows[0].timezone);
     // Derive wage_type from new project if provided
     let wage_type = 'regular';
     if (project_id) {
@@ -582,15 +607,16 @@ router.patch('/entries/:id/edit', requireAdmin, requirePerm('approve_entries'),
     const result = touchOvertimeOverride
       ? await pool.query(
           `UPDATE time_entries
-              SET start_time=$1, end_time=$2, project_id=$3, wage_type=$4,
-                  overtime_hours_override=$5, updated_at=NOW()
-            WHERE id=$6 AND company_id=$7 RETURNING *`,
-          [start_time, end_time, project_id || null, wage_type, overtime_hours_override, req.params.id, companyId]
+              SET start_time=$1, end_time=$2, start_ts=$3, end_ts=$4, project_id=$5, wage_type=$6,
+                  overtime_hours_override=$7, updated_at=NOW()
+            WHERE id=$8 AND company_id=$9 RETURNING *`,
+          [start_time, end_time, start_ts, end_ts, project_id || null, wage_type, overtime_hours_override, req.params.id, companyId]
         )
       : await pool.query(
-          `UPDATE time_entries SET start_time=$1, end_time=$2, project_id=$3, wage_type=$4, updated_at=NOW()
-            WHERE id=$5 AND company_id=$6 RETURNING *`,
-          [start_time, end_time, project_id || null, wage_type, req.params.id, companyId]
+          `UPDATE time_entries SET start_time=$1, end_time=$2, start_ts=$3, end_ts=$4,
+             project_id=$5, wage_type=$6, updated_at=NOW()
+            WHERE id=$7 AND company_id=$8 RETURNING *`,
+          [start_time, end_time, start_ts, end_ts, project_id || null, wage_type, req.params.id, companyId]
         );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
     // Return with project name joined
@@ -639,23 +665,26 @@ router.post('/entries/:id/split', requireAdmin, requirePerm('approve_entries'), 
       // Delete original
       await client.query('DELETE FROM time_entries WHERE id=$1', [req.params.id]);
 
-      // Insert new segments
+      // Insert new segments. Phase 2 dual-write: each segment derives its
+      // own start_ts / end_ts from the original entry's work_date + tz.
       const created = [];
+      const workDateStr = new Date(o.work_date).toISOString().substring(0, 10);
       for (const seg of segments) {
         let wage_type = 'regular';
         if (seg.project_id) {
           const proj = await client.query('SELECT wage_type FROM projects WHERE id=$1 AND company_id=$2', [seg.project_id, companyId]);
           if (proj.rowCount > 0) wage_type = proj.rows[0].wage_type;
         }
+        const { start_ts, end_ts } = entryInstants(workDateStr, seg.start_time, seg.end_time, o.timezone);
         const r = await client.query(
           `INSERT INTO time_entries
-             (company_id, user_id, project_id, work_date, start_time, end_time, wage_type,
-              notes, break_minutes, mileage, clock_source, clocked_in_by, status)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending') RETURNING *`,
+             (company_id, user_id, project_id, work_date, start_time, end_time, start_ts, end_ts, wage_type,
+              notes, break_minutes, mileage, timezone, clock_source, clocked_in_by, status)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'pending') RETURNING *`,
           [
             companyId, o.user_id, seg.project_id || null, o.work_date,
-            seg.start_time, seg.end_time, wage_type,
-            o.notes, o.break_minutes || 0, o.mileage,
+            seg.start_time, seg.end_time, start_ts, end_ts, wage_type,
+            o.notes, o.break_minutes || 0, o.mileage, o.timezone || null,
             'admin', req.user.id,
           ]
         );
@@ -829,7 +858,7 @@ router.post('/workers/:id/entries', requireAdmin, requirePerm('manage_workers'),
   if (entryMileageVal !== null && isNaN(entryMileageVal)) return res.status(400).json({ error: 'mileage must be a number' });
   try {
     const workerRow = await pool.query(
-      'SELECT id FROM users WHERE id = $1 AND company_id = $2 AND active = true',
+      'SELECT id, timezone FROM users WHERE id = $1 AND company_id = $2 AND active = true',
       [req.params.id, companyId]
     );
     if (workerRow.rowCount === 0) return res.status(404).json({ error: 'Worker not found' });
@@ -841,16 +870,19 @@ router.post('/workers/:id/entries', requireAdmin, requirePerm('manage_workers'),
       wage_type = proj.rows[0].wage_type;
     }
 
+    // Phase 2 dual-write: derive instants from the wall-clock + the worker's tz.
+    const { start_ts, end_ts } = entryInstants(work_date, start_time, end_time, workerRow.rows[0].timezone);
     const result = await pool.query(
       `INSERT INTO time_entries
-         (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
-          break_minutes, mileage, clock_source, clocked_in_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'log_entry', $11)
+         (company_id, user_id, project_id, work_date, start_time, end_time, start_ts, end_ts, wage_type, notes,
+          break_minutes, mileage, timezone, clock_source, clocked_in_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'log_entry', $14)
        RETURNING *`,
       [
         companyId, req.params.id, project_id || null, work_date,
-        start_time, end_time, wage_type, notes || null,
+        start_time, end_time, start_ts, end_ts, wage_type, notes || null,
         parseInt(break_minutes) || 0, entryMileageVal,
+        workerRow.rows[0].timezone || null,
         req.user.id,
       ]
     );
@@ -970,7 +1002,7 @@ router.get('/workers/check-username', requireAdmin, async (req, res) => {
 const inviteLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 50,
-  keyGenerator: req => String(req.user?.id || req.ip),
+  keyGenerator: userOrIpKey,
   standardHeaders: true,
   legacyHeaders: false,
 });

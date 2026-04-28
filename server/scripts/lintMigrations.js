@@ -20,6 +20,7 @@ require('dotenv').config();
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
+const { stripSslMode } = require('../utils/dbConnString');
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
 const SCHEMA_PATH    = path.join(__dirname, '..', 'schema.sql');
@@ -68,7 +69,7 @@ async function lint() {
   }
 
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: stripSslMode(process.env.DATABASE_URL),
     ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
   });
 

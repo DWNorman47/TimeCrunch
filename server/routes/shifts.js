@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool = require('../db');
 const rateLimit = require('express-rate-limit');
+const { userOrIpKey } = require('../middleware/rateLimitKey');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem, createInboxItemBatch } = require('./inbox');
@@ -13,7 +14,7 @@ const { weekRange } = require('../utils/weekBounds');
 const shiftWriteLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
-  keyGenerator: req => String(req.user?.id || req.ip),
+  keyGenerator: userOrIpKey,
   message: { error: 'Too many shift writes. Please wait a moment and try again.' },
   standardHeaders: true,
   legacyHeaders: false,

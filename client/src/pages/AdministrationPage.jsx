@@ -392,6 +392,17 @@ export default function AdministrationPage() {
   const canSeeRequests        = useHasAnyPerm(['manage_settings', 'manage_advanced_settings']);
   const canSeeLog             = useHasAnyPerm(['manage_settings', 'view_reports']);
 
+  // First-time admin welcome: landingFor() routes admins here on first
+  // login, then we mark them as welcomed so subsequent logins land on
+  // /workforce instead. Done in an effect (not during render) so the side
+  // effect happens once, after the page actually renders.
+  useEffect(() => {
+    if (user?.role === 'admin' && user?.id) {
+      const key = `admin_welcomed_${user.id}`;
+      if (!localStorage.getItem(key)) localStorage.setItem(key, '1');
+    }
+  }, [user?.id, user?.role]);
+
   // #team used to be the Team admin tab; it's now the /team module. Any
   // bookmark or link still using #team lands in the right place.
   const hashTab = window.location.hash.replace('#', '');
