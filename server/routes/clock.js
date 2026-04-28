@@ -7,7 +7,7 @@ const { sendPushToCompanyAdmins } = require('../push');
 const { createInboxItem, createInboxItemBatch } = require('./inbox');
 const { applySettingsRows, SETTINGS_DEFAULTS } = require('../settingsDefaults');
 const { sendEmail } = require('../email');
-const { wallClockInTZ, validLocalTime } = require('../utils/timeFormat');
+const { wallClockInTZ, validLocalTime, entryInstants } = require('../utils/timeFormat');
 const rateLimit = require('express-rate-limit');
 const { userOrIpKey } = require('../middleware/rateLimitKey');
 
@@ -268,16 +268,19 @@ router.post('/out', requireAuth, requirePerm('clock_self'), clockLimiter, coerce
     let entryResult;
     try {
       await txClient.query('BEGIN');
+      // Phase 2 dual-write: clockInTime / clockOutTime are already real UTC
+      // instants, so we can write them straight to start_ts / end_ts without
+      // round-tripping through wall-clock + TZ.
       entryResult = await txClient.query(
         `INSERT INTO time_entries
-           (company_id, user_id, project_id, work_date, start_time, end_time, wage_type, notes,
+           (company_id, user_id, project_id, work_date, start_time, end_time, start_ts, end_ts, wage_type, notes,
             clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, break_minutes, mileage, timezone,
             clock_source, clocked_in_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
          RETURNING *`,
         [
           companyId, req.user.id, clock.project_id, clock.work_date,
-          start_time, end_time, wage_type, clock.notes || null,
+          start_time, end_time, clockInTime, clockOutTime, wage_type, clock.notes || null,
           clock.clock_in_lat, clock.clock_in_lng, lat || null, lng || null,
           parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
           clock.timezone || null,
@@ -458,14 +461,18 @@ router.post('/mark-day', requireAuth, requirePerm('clock_self'), clockLimiter, a
     // client-supplied value if valid; otherwise fall back to the worker's
     // timezone-aware now() rather than the server's UTC.
     const timeStr = validLocalTime(local_time) || wallClockInTZ(new Date(), timezone);
+    // Phase 2 dual-write: derive the matching UTC instant from the wall-clock
+    // we just resolved + the worker's TZ. start_ts === end_ts since mark-day
+    // is a zero-duration entry.
+    const ts = entryInstants(workDate, timeStr, timeStr, timezone).start_ts;
 
     const result = await pool.query(
       `INSERT INTO time_entries
-         (company_id, user_id, project_id, work_date, start_time, end_time,
+         (company_id, user_id, project_id, work_date, start_time, end_time, start_ts, end_ts,
           wage_type, status, timezone, clock_source, clocked_in_by)
-       VALUES ($1, $2, NULL, $3, $4, $4, 'regular', 'pending', $5, 'worker', NULL)
+       VALUES ($1, $2, NULL, $3, $4, $4, $5, $5, 'regular', 'pending', $6, 'worker', NULL)
        RETURNING *`,
-      [req.user.company_id, req.user.id, workDate, timeStr, timezone || null]
+      [req.user.company_id, req.user.id, workDate, timeStr, ts, timezone || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

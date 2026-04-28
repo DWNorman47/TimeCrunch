@@ -67,23 +67,33 @@ describe('PATCH /admin/entries/:id/edit — optimistic lock', () => {
     pool.query.mockResolvedValueOnce({ rows: [] });
   });
 
+  // Phase 2 dual-write changed the route flow: the entry row is now ALWAYS
+  // fetched up-front (for work_date + timezone, used to derive start_ts /
+  // end_ts), so the SELECT always runs whether or not the client sent
+  // updated_at. The optimistic-lock check just becomes a no-op when the
+  // client didn't send a timestamp.
+  const FETCH_ROW = {
+    updated_at: new Date('2026-04-10T10:00:00.000Z'),
+    work_date:  new Date('2026-04-10T00:00:00.000Z'),
+    timezone:   'America/New_York',
+  };
+
   test('accepts edit when client updated_at matches DB', async () => {
-    const ts = '2026-04-10T10:00:00.000Z';
     pool.query
-      .mockResolvedValueOnce({ rows: [{ updated_at: ts }] })                 // version check
+      .mockResolvedValueOnce({ rows: [FETCH_ROW] })                          // entry fetch
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 42 }] })            // UPDATE
-      .mockResolvedValueOnce({ rows: [{ id: 42, worker_name: 'X', project_name: 'P' }] }); // return fetch
+      .mockResolvedValueOnce({ rows: [{ id: 42, worker_name: 'X', project_name: 'P' }] }); // joined return
 
     const res = await request(makeApp())
       .patch('/api/admin/entries/42/edit')
-      .send({ start_time: '08:00', end_time: '16:00', updated_at: ts });
+      .send({ start_time: '08:00', end_time: '16:00', updated_at: FETCH_ROW.updated_at.toISOString() });
 
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(42);
   });
 
   test('returns 409 when client updated_at is stale', async () => {
-    pool.query.mockResolvedValueOnce({ rows: [{ updated_at: '2026-04-10T10:05:00.000Z' }] });
+    pool.query.mockResolvedValueOnce({ rows: [{ ...FETCH_ROW, updated_at: '2026-04-10T10:05:00.000Z' }] });
 
     const res = await request(makeApp())
       .patch('/api/admin/entries/42/edit')
@@ -91,7 +101,7 @@ describe('PATCH /admin/entries/:id/edit — optimistic lock', () => {
 
     expect(res.status).toBe(409);
     expect(res.body.error).toBe('conflict');
-    // settings + version check; UPDATE must NOT have run
+    // settings + entry fetch; UPDATE must NOT have run
     expect(pool.query).toHaveBeenCalledTimes(2);
   });
 
@@ -115,9 +125,11 @@ describe('PATCH /admin/entries/:id/edit — optimistic lock', () => {
   });
 
   test('skips optimistic-lock check when updated_at is absent (legacy client)', async () => {
-    // Old clients that don't send updated_at shouldn't hit the version check —
-    // just update the row. This is intentional backward-compat.
+    // Old clients that don't send updated_at don't get the version check,
+    // but the entry fetch still runs (we need work_date + timezone for
+    // dual-write).
     pool.query
+      .mockResolvedValueOnce({ rows: [FETCH_ROW] })                          // entry fetch
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 42 }] })            // UPDATE
       .mockResolvedValueOnce({ rows: [{ id: 42, worker_name: 'X', project_name: 'P' }] });
 
@@ -131,9 +143,8 @@ describe('PATCH /admin/entries/:id/edit — optimistic lock', () => {
   test('treats equal timestamps expressed in different formats as a match', async () => {
     // Postgres returns Date objects, clients send ISO strings — both should
     // normalize via .getTime() to the same millisecond value.
-    const dbDate = new Date('2026-04-10T10:00:00.000Z');
     pool.query
-      .mockResolvedValueOnce({ rows: [{ updated_at: dbDate }] })
+      .mockResolvedValueOnce({ rows: [FETCH_ROW] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 42 }] })
       .mockResolvedValueOnce({ rows: [{ id: 42, worker_name: 'X', project_name: 'P' }] });
 
