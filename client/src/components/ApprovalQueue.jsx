@@ -108,6 +108,7 @@ export default function ApprovalQueue({ onCountChange }) {
   const [otThreshold, setOtThreshold] = useState(8);
   // Edit state
   const [editingId, setEditingId] = useState(null);
+  const [editDate, setEditDate] = useState('');
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
   const [editProject, setEditProject] = useState('');
@@ -195,6 +196,7 @@ export default function ApprovalQueue({ onCountChange }) {
 
   const startEdit = (e) => {
     setEditingId(e.id);
+    setEditDate((e.work_date || '').toString().substring(0, 10));
     setEditStart(e.start_time.substring(0, 5));
     setEditEnd(e.end_time.substring(0, 5));
     setEditProject(e.project_id ? String(e.project_id) : '');
@@ -223,6 +225,7 @@ export default function ApprovalQueue({ onCountChange }) {
     setEditSaving(true);
     try {
       const updated = await api.patch(`/admin/entries/${id}/edit`, {
+        work_date: editDate,
         start_time: editStart,
         end_time: editEnd,
         project_id: editProject ? parseInt(editProject) : null,
@@ -573,6 +576,10 @@ export default function ApprovalQueue({ onCountChange }) {
                   {editingId === e.id ? (
                     <div style={styles.editTimesForm}>
                       <div style={styles.editTimesRow}>
+                        <div>
+                          <div style={styles.editTimesLabel}>{t.aqEditDateLabel || 'Date'}</div>
+                          <input type="date" style={styles.editTimeInput} value={editDate} onChange={ev => setEditDate(ev.target.value)} />
+                        </div>
                         <div>
                           <div style={styles.editTimesLabel}>{t.start}</div>
                           <input type="time" style={styles.editTimeInput} value={editStart} onChange={ev => setEditStart(ev.target.value)} />

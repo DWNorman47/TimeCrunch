@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const rateLimit = require('express-rate-limit');
 const { userOrIpKey } = require('../middleware/rateLimitKey');
-const { entryInstants } = require('../utils/timeFormat');
+const { entryInstants, validLocalDate } = require('../utils/timeFormat');
 const pool = require('../db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -569,6 +569,15 @@ router.patch('/entries/:id/edit', requireAdmin, requirePerm('approve_entries'),
   const companyId = req.user.company_id;
   const { start_time, end_time, project_id, overtime_hours_override } = req.body;
   const clientUpdatedAt = req.body.updated_at || null;
+  // work_date is optional — admins occasionally need to fix an entry that
+  // landed on the wrong day (e.g. midnight clock-out got recorded as the
+  // wrong calendar date). When present we move the row, recompute start_ts /
+  // end_ts against the new date, and check pay-period locks for both the
+  // origin and destination dates.
+  const newWorkDate = req.body.work_date ? validLocalDate(req.body.work_date) : null;
+  if (req.body.work_date && !newWorkDate) {
+    return res.status(400).json({ error: 'work_date must be YYYY-MM-DD' });
+  }
   if (!start_time || !end_time) return res.status(400).json({ error: 'start_time and end_time required' });
   if (overtime_hours_override != null && overtime_hours_override < 0) {
     return res.status(400).json({ error: 'overtime_hours_override must be non-negative' });
@@ -591,7 +600,22 @@ router.patch('/entries/:id/edit', requireAdmin, requirePerm('approve_entries'),
         return res.status(409).json({ error: 'conflict' });
       }
     }
-    const workDateStr = new Date(cur.rows[0].work_date).toISOString().substring(0, 10);
+    const oldWorkDateStr = new Date(cur.rows[0].work_date).toISOString().substring(0, 10);
+    const workDateStr = newWorkDate || oldWorkDateStr;
+    // If the date changed, ensure neither origin nor destination is locked.
+    if (newWorkDate && newWorkDate !== oldWorkDateStr) {
+      const lockCheck = await pool.query(
+        `SELECT 1 FROM pay_periods
+          WHERE company_id = $1
+            AND (period_start <= $2::date AND period_end >= $2::date)
+             OR (period_start <= $3::date AND period_end >= $3::date)
+          LIMIT 1`,
+        [companyId, oldWorkDateStr, newWorkDate]
+      );
+      if (lockCheck.rowCount > 0) {
+        return res.status(403).json({ error: 'Cannot move an entry into or out of a locked pay period' });
+      }
+    }
     const { start_ts, end_ts } = entryInstants(workDateStr, start_time, end_time, cur.rows[0].timezone);
     // Derive wage_type from new project if provided
     let wage_type = 'regular';
@@ -607,16 +631,17 @@ router.patch('/entries/:id/edit', requireAdmin, requirePerm('approve_entries'),
     const result = touchOvertimeOverride
       ? await pool.query(
           `UPDATE time_entries
-              SET start_time=$1, end_time=$2, start_ts=$3, end_ts=$4, project_id=$5, wage_type=$6,
-                  overtime_hours_override=$7, updated_at=NOW()
-            WHERE id=$8 AND company_id=$9 RETURNING *`,
-          [start_time, end_time, start_ts, end_ts, project_id || null, wage_type, overtime_hours_override, req.params.id, companyId]
+              SET work_date=$1, start_time=$2, end_time=$3, start_ts=$4, end_ts=$5,
+                  project_id=$6, wage_type=$7,
+                  overtime_hours_override=$8, updated_at=NOW()
+            WHERE id=$9 AND company_id=$10 RETURNING *`,
+          [workDateStr, start_time, end_time, start_ts, end_ts, project_id || null, wage_type, overtime_hours_override, req.params.id, companyId]
         )
       : await pool.query(
-          `UPDATE time_entries SET start_time=$1, end_time=$2, start_ts=$3, end_ts=$4,
-             project_id=$5, wage_type=$6, updated_at=NOW()
-            WHERE id=$7 AND company_id=$8 RETURNING *`,
-          [start_time, end_time, start_ts, end_ts, project_id || null, wage_type, req.params.id, companyId]
+          `UPDATE time_entries SET work_date=$1, start_time=$2, end_time=$3,
+             start_ts=$4, end_ts=$5, project_id=$6, wage_type=$7, updated_at=NOW()
+            WHERE id=$8 AND company_id=$9 RETURNING *`,
+          [workDateStr, start_time, end_time, start_ts, end_ts, project_id || null, wage_type, req.params.id, companyId]
         );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
     // Return with project name joined
@@ -628,7 +653,10 @@ router.patch('/entries/:id/edit', requireAdmin, requirePerm('approve_entries'),
        WHERE te.id=$1`,
       [req.params.id]
     );
-    await logAudit(companyId, req.user.id, req.user.full_name, 'entry.edited', 'time_entry', parseInt(req.params.id), null);
+    const auditDetails = (newWorkDate && newWorkDate !== oldWorkDateStr)
+      ? { from_work_date: oldWorkDateStr, to_work_date: newWorkDate }
+      : null;
+    await logAudit(companyId, req.user.id, req.user.full_name, 'entry.edited', 'time_entry', parseInt(req.params.id), null, auditDetails);
     res.json(full.rows[0]);
   } catch (err) {
     logger.error({ err }, 'catch block error');
