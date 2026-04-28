@@ -1,4 +1,4 @@
--- Time Clock / Workforce route rename: rewrite stored inbox_items URLs so
+-- Time Clock / Workforce route rename: rewrite stored inbox.link URLs so
 -- pre-rename notifications still deep-link to the right tab after the deploy.
 --
 -- Worker rows had /dashboard; admin rows had /timeclock or /admin. The new
@@ -16,13 +16,13 @@
 
 BEGIN;
 
-UPDATE inbox_items SET url = REPLACE(url, '/timeclock', '/workforce')
-WHERE url LIKE '/timeclock%';
+UPDATE inbox SET link = REPLACE(link, '/timeclock', '/workforce')
+WHERE link LIKE '/timeclock%';
 
-UPDATE inbox_items SET url = REPLACE(url, '/admin#', '/workforce#')
-WHERE url LIKE '/admin#%';
+UPDATE inbox SET link = REPLACE(link, '/admin#', '/workforce#')
+WHERE link LIKE '/admin#%';
 
-UPDATE inbox_items SET url = REPLACE(url, '/dashboard', '/timeclock')
-WHERE url LIKE '/dashboard%';
+UPDATE inbox SET link = REPLACE(link, '/dashboard', '/timeclock')
+WHERE link LIKE '/dashboard%';
 
 COMMIT;
