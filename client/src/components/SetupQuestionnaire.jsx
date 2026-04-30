@@ -85,11 +85,11 @@ const QUESTIONS = [
   },
   {
     id: 'geolocation',
-    question: 'Do workers need to be at a job site to clock in?',
-    explanation: "Geolocation prevents workers from clocking in without being physically near the job. It's anti-spoof: distance is calculated server-side from their phone's GPS. Leave off if your work is remote or office-based.",
+    question: 'Do you want to record where workers clock in from?',
+    explanation: "Tracking captures the worker's GPS coordinates at clock-in and clock-out so admins can see them on the Live tab and on time entries. This is separate from REQUIRING a worker to be at a specific spot — that's a per-project geofence you set up later under Projects → [project] → Geofence. Per-project geofences keep working even if tracking is off here.",
     options: [
-      { value: 'yes',  label: 'Yes (require location)',  settings: { feature_geolocation: true } },
-      { value: 'no',   label: 'No',                       settings: { feature_geolocation: false } },
+      { value: 'yes',  label: 'Yes, record their location',  settings: { feature_geolocation: true } },
+      { value: 'no',   label: "No, don't track location",    settings: { feature_geolocation: false } },
     ],
   },
   {
@@ -120,7 +120,7 @@ const SETTING_LABELS = {
   feature_scheduling:     'Scheduling',
   feature_reimbursements: 'Expenses',
   feature_pto:            'Time off',
-  feature_geolocation:    'Geolocation on clock-in',
+  feature_geolocation:    'Location tracking on clock-in',
   feature_chat:           'Company chat',
   feature_broadcast:      'Announce to all workers',
 };
