@@ -1797,11 +1797,64 @@ router.patch('/projects/:id', requireAdmin, requirePerm('manage_projects'),
   }
 });
 
+// GET /admin/geocode?q=<address>
+// Forward an address to OpenStreetMap Nominatim and return { lat, lng,
+// display_name } for the top hit, or 404 if there's no match. Used by
+// the project Create / Edit forms to auto-fill the geofence center
+// from a typed address.
+//
+// Why proxy rather than call Nominatim from the client: their terms of
+// service ask for a real User-Agent identifying the calling app, and a
+// browser fetch can't set that header reliably. Going through the
+// server also keeps our usage trackable and rate-limit-able.
+const geocodeLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30,             // generous — a typing admin won't realistically exceed
+  keyGenerator: userOrIpKey,
+  message: { error: 'Too many geocode requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+router.get('/geocode', requireAdmin, requirePerm('manage_projects'), geocodeLimiter, async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (!q || q.length < 5) return res.status(400).json({ error: 'Address too short' });
+  if (q.length > 200)     return res.status(400).json({ error: 'Address too long' });
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/search');
+    url.searchParams.set('q', q);
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('limit', '1');
+    const r = await fetch(url.toString(), {
+      headers: {
+        // Nominatim ToS requires a meaningful User-Agent identifying the app.
+        'User-Agent': `OpsFloa/1.0 (${process.env.APP_URL || 'https://opsfloa.com'})`,
+      },
+    });
+    if (!r.ok) {
+      logger.warn({ status: r.status }, 'geocode upstream error');
+      return res.status(502).json({ error: 'Geocoding service unavailable' });
+    }
+    const results = await r.json();
+    if (!Array.isArray(results) || results.length === 0) {
+      return res.status(404).json({ error: 'Address not found' });
+    }
+    const { lat, lon, display_name } = results[0];
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lon);
+    if (isNaN(latNum) || isNaN(lngNum)) return res.status(502).json({ error: 'Invalid coordinates' });
+    res.json({ lat: latNum, lng: lngNum, display_name });
+  } catch (err) {
+    logger.error({ err }, 'geocode error');
+    res.status(500).json({ error: 'Geocoding failed' });
+  }
+});
+
 // Create a project
 router.post('/projects', requireAdmin, requirePerm('manage_projects'),
-  coerceBody({ float: ['prevailing_wage_rate'] }),
+  coerceBody({ float: ['prevailing_wage_rate', 'geo_lat', 'geo_lng'], int: ['geo_radius_ft'] }),
   async (req, res) => {
-  const { wage_type, prevailing_wage_rate, client_id, job_number, address, start_date, end_date, status, description } = req.body;
+  const { wage_type, prevailing_wage_rate, client_id, job_number, address, start_date, end_date, status, description,
+          geo_lat, geo_lng, geo_radius_ft } = req.body;
   const name = req.body.name?.trim();
   if (!name) {
     logFailure(req, 'admin.projects.create', 'name_required');
@@ -1814,6 +1867,15 @@ router.post('/projects', requireAdmin, requirePerm('manage_projects'),
     logFailure(req, 'admin.projects.create', 'negative_wage_rate', { pwr });
     return res.status(400).json({ error: 'prevailing_wage_rate must be non-negative' });
   }
+  // Geofence: all three fields required together, or none. radius must be
+  // positive when present.
+  const geoFieldsPresent = [geo_lat, geo_lng, geo_radius_ft].filter(v => v !== undefined && v !== null && v !== '').length;
+  if (geoFieldsPresent > 0 && geoFieldsPresent < 3) {
+    return res.status(400).json({ error: 'geofence requires geo_lat, geo_lng, and geo_radius_ft together' });
+  }
+  if (geo_radius_ft !== undefined && geo_radius_ft !== null && geo_radius_ft <= 0) {
+    return res.status(400).json({ error: 'geo_radius_ft must be a positive number' });
+  }
   const validStatuses = PROJECT_STATUSES;
   const st = validStatuses.includes(status) ? status : 'in_progress';
   try {
@@ -1823,11 +1885,14 @@ router.post('/projects', requireAdmin, requirePerm('manage_projects'),
       if (cr.rows.length) resolvedClientName = cr.rows[0].name;
     }
     const result = await pool.query(
-      `INSERT INTO projects (company_id, name, wage_type, prevailing_wage_rate, client_id, client_name, job_number, address, start_date, end_date, status, description)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      `INSERT INTO projects (company_id, name, wage_type, prevailing_wage_rate, client_id, client_name, job_number, address, start_date, end_date, status, description, geo_lat, geo_lng, geo_radius_ft)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [companyId, name, wt, pwr,
        client_id || null, resolvedClientName, job_number?.trim() || null,
-       address?.trim() || null, start_date || null, end_date || null, st, description?.trim() || null]
+       address?.trim() || null, start_date || null, end_date || null, st, description?.trim() || null,
+       geoFieldsPresent === 3 ? geo_lat : null,
+       geoFieldsPresent === 3 ? geo_lng : null,
+       geoFieldsPresent === 3 ? geo_radius_ft : null]
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'project.created', 'project', result.rows[0].id, name, { wage_type: wt });
     const newProject = result.rows[0];

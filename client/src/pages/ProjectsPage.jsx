@@ -139,6 +139,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const [editMsg, setEditMsg] = useState('');
   const [geoLocating, setGeoLocating] = useState(false);
   const [geoError, setGeoError] = useState('');
+  const [geocoding, setGeocoding] = useState(false);
   const [entries, setEntries] = useState([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [entriesError, setEntriesError] = useState(null);
@@ -1239,8 +1240,35 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
               </div>
 
               <div style={pf.field}>
-                <label style={pf.label}>{t.address}</label>
-                <input style={pf.input} value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder={t.adminAddressPh} />
+                <label style={pf.label}>
+                  {t.address}
+                  {geocoding && <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: 8, fontSize: 12 }}>· Looking up address…</span>}
+                </label>
+                <input
+                  style={pf.input}
+                  value={editForm.address}
+                  onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))}
+                  onBlur={async () => {
+                    // Auto-geocode the address into the empty geofence,
+                    // matching the create form's behaviour. Skip if any
+                    // geofence field is already populated so we never
+                    // overwrite a deliberate value.
+                    if (!editForm.address.trim()) return;
+                    if (editForm.geo_lat || editForm.geo_lng || editForm.geo_radius_ft) return;
+                    setGeocoding(true);
+                    const geo = await geocodeAddress(editForm.address);
+                    setGeocoding(false);
+                    if (geo) {
+                      setEditForm(f => ({
+                        ...f,
+                        geo_lat: geo.lat.toFixed(6),
+                        geo_lng: geo.lng.toFixed(6),
+                        geo_radius_ft: String(DEFAULT_GEOFENCE_RADIUS_FT),
+                      }));
+                    }
+                  }}
+                  placeholder={t.adminAddressPh}
+                />
               </div>
 
               <div style={pf.row}>
@@ -1518,25 +1546,105 @@ function ProjectRow({ project, metrics, settings, onClick }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-const BLANK_PROJECT = { name: '', client_id: '', job_number: '', address: '', start_date: '', end_date: '', status: 'in_progress', description: '', wage_type: 'regular' };
+const BLANK_PROJECT = { name: '', client_id: '', job_number: '', address: '', start_date: '', end_date: '', status: 'in_progress', description: '', wage_type: 'regular', geo_lat: '', geo_lng: '', geo_radius_ft: '' };
+
+// Default geofence radius (in feet) when the address-based auto-fill kicks in.
+// 300 ft is large enough that GPS jitter on a phone won't false-reject a
+// worker who's actually on site, small enough that it's a meaningful gate
+// for typical residential / commercial job sites.
+const DEFAULT_GEOFENCE_RADIUS_FT = 300;
+
+// Geocode an address via the server proxy. Returns { lat, lng, display_name }
+// on a hit, null on a miss or any error. Designed to be called from a blur
+// handler — failures must be silent so they don't block the form.
+async function geocodeAddress(addr) {
+  const trimmed = String(addr || '').trim();
+  if (trimmed.length < 5) return null;
+  try {
+    const r = await api.get('/admin/geocode', { params: { q: trimmed } });
+    return r.data;
+  } catch {
+    return null;
+  }
+}
 
 function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
   const t = useT();
   const [form, setForm] = useState(BLANK_PROJECT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [geocoding, setGeocoding] = useState(false);
+  const [geoLocating, setGeoLocating] = useState(false);
+  const [geoError, setGeoError] = useState('');
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const showPrevailing = (settings?.prevailing_wage_rate ?? 0) > 0;
+
+  // When the address loses focus, try to fill the geofence from it — but
+  // only if the user hasn't already entered any geofence values manually.
+  // Silent on failure: if geocoding misses, the form is still valid and
+  // the admin can keep typing.
+  const tryAutoGeocode = async () => {
+    if (!form.address.trim()) return;
+    if (form.geo_lat || form.geo_lng || form.geo_radius_ft) return;
+    setGeocoding(true);
+    const geo = await geocodeAddress(form.address);
+    setGeocoding(false);
+    if (geo) {
+      setForm(f => ({
+        ...f,
+        geo_lat: geo.lat.toFixed(6),
+        geo_lng: geo.lng.toFixed(6),
+        geo_radius_ft: String(DEFAULT_GEOFENCE_RADIUS_FT),
+      }));
+    }
+  };
+
+  const useMyLocationCreate = () => {
+    if (!navigator.geolocation) {
+      setGeoError("Your browser doesn't support geolocation.");
+      return;
+    }
+    setGeoLocating(true); setGeoError('');
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setForm(f => ({
+          ...f,
+          geo_lat: pos.coords.latitude.toFixed(6),
+          geo_lng: pos.coords.longitude.toFixed(6),
+          geo_radius_ft: f.geo_radius_ft || String(DEFAULT_GEOFENCE_RADIUS_FT),
+        }));
+        setGeoLocating(false);
+      },
+      err => {
+        setGeoError(err.code === 1 ? 'Location permission denied.' : "Couldn't get your location.");
+        setGeoLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   const handleSubmit = async e => {
     e.preventDefault();
     if (!form.name.trim()) { setError(t.projectNameRequired); return; }
+    // Geofence: enforce all-or-none on the client too so the server's
+    // friendlier 400 doesn't surprise an admin mid-create.
+    const lat = form.geo_lat.trim();
+    const lng = form.geo_lng.trim();
+    const radius = form.geo_radius_ft.trim();
+    const geoCount = [lat, lng, radius].filter(Boolean).length;
+    if (geoCount > 0 && geoCount < 3) {
+      setError('Geofence needs latitude, longitude, AND radius — or leave all three blank.');
+      return;
+    }
     setSaving(true); setError('');
     try {
       const r = await api.post('/admin/projects', {
         ...form,
         client_id: form.client_id || null,
         prevailing_wage_rate: form.wage_type === 'prevailing' && settings?.prevailing_wage_rate ? settings.prevailing_wage_rate : null,
+        geo_lat:        geoCount === 3 ? parseFloat(lat) : null,
+        geo_lng:        geoCount === 3 ? parseFloat(lng) : null,
+        geo_radius_ft:  geoCount === 3 ? parseInt(radius, 10) : null,
       });
       onSaved(r.data);
     } catch (err) {
@@ -1579,8 +1687,77 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
         </div>
 
         <div style={pf.field}>
-          <label style={pf.label}>{t.addressLocation}</label>
-          <input style={pf.input} value={form.address} onChange={e => set('address', e.target.value)} placeholder={t.adminAddressPh} />
+          <label style={pf.label}>
+            {t.addressLocation}
+            {geocoding && <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: 8, fontSize: 12 }}>· Looking up address…</span>}
+          </label>
+          <input
+            style={pf.input}
+            value={form.address}
+            onChange={e => set('address', e.target.value)}
+            onBlur={tryAutoGeocode}
+            placeholder={t.adminAddressPh}
+          />
+        </div>
+
+        {/* Geofence — auto-filled from the address blur above when blank.
+            Visible always; admins can also tap "Use my location" or paste
+            coordinates manually. Server enforces all-or-none. */}
+        <div style={pf.field}>
+          <label style={pf.label}>📍 Geofence (optional)</label>
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, lineHeight: 1.5 }}>
+            Require workers to be physically near the job site to clock in.
+            Leave all three fields blank to allow clock-in from anywhere.
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input
+              style={{ ...pf.input, flex: '1 1 130px', minWidth: 0 }}
+              type="number" step="0.000001"
+              placeholder="Latitude"
+              value={form.geo_lat}
+              onChange={e => set('geo_lat', e.target.value)}
+            />
+            <input
+              style={{ ...pf.input, flex: '1 1 130px', minWidth: 0 }}
+              type="number" step="0.000001"
+              placeholder="Longitude"
+              value={form.geo_lng}
+              onChange={e => set('geo_lng', e.target.value)}
+            />
+            <input
+              style={{ ...pf.input, flex: '1 1 110px', minWidth: 0 }}
+              type="number" min="50" step="50"
+              placeholder="Radius (ft)"
+              value={form.geo_radius_ft}
+              onChange={e => set('geo_radius_ft', e.target.value)}
+            />
+            <button
+              type="button"
+              style={{
+                background: '#eef2ff', border: '1px solid #c7d2fe', color: '#4338ca',
+                padding: '8px 12px', borderRadius: 7, fontSize: 13, fontWeight: 600,
+                cursor: geoLocating ? 'wait' : 'pointer',
+                opacity: geoLocating ? 0.6 : 1, whiteSpace: 'nowrap',
+              }}
+              onClick={useMyLocationCreate}
+              disabled={geoLocating}
+            >
+              {geoLocating ? 'Locating…' : 'Use my location'}
+            </button>
+            {(form.geo_lat || form.geo_lng || form.geo_radius_ft) && (
+              <button
+                type="button"
+                style={{
+                  background: 'none', border: 'none', color: '#6b7280',
+                  fontSize: 13, cursor: 'pointer', padding: '8px 4px', whiteSpace: 'nowrap',
+                }}
+                onClick={() => setForm(f => ({ ...f, geo_lat: '', geo_lng: '', geo_radius_ft: '' }))}
+              >
+                ✕ Clear
+              </button>
+            )}
+          </div>
+          {geoError && <p style={{ fontSize: 12, color: '#dc2626', margin: '6px 0 0' }}>{geoError}</p>}
         </div>
 
         <div style={pf.row}>
