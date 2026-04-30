@@ -460,14 +460,19 @@ export default function AdministrationPage() {
       setProjects(p.data);
       setSettings(s.data);
       setQboConnected(qbo.data?.connected && !qbo.data?.disconnected);
-      // Pop the first-run questionnaire if this company hasn't seen it yet,
-      // OR if the admin explicitly opted to re-run it via ?setup=1 (the
-      // "Run setup again" button on /help). Don't pop for super_admin
-      // (likely impersonating) — they shouldn't be making setup decisions
-      // on behalf of a real customer.
+      // Two ways to surface the questionnaire:
+      //   1. Auto-pop on first run, ONLY for real admins of the company.
+      //      Skipped for super_admin because they're usually impersonating
+      //      and shouldn't be making setup decisions on a customer's behalf.
+      //   2. Explicit ?setup=1 trigger from the "Run setup again" button
+      //      on /help. This is opt-in by the human at the keyboard, so we
+      //      honor it for super_admin too (e.g. dev testing the flow on
+      //      stage as themselves).
       const params = new URLSearchParams(window.location.search);
       const forceSetup = params.get('setup') === '1';
-      if (user?.role === 'admin' && (forceSetup || !s.data?.setup_questionnaire_completed_at)) {
+      const isAdminish = user?.role === 'admin' || user?.role === 'super_admin';
+      const autoPop = user?.role === 'admin' && !s.data?.setup_questionnaire_completed_at;
+      if (autoPop || (forceSetup && isAdminish)) {
         setShowSetup(true);
       }
       if (forceSetup) {
