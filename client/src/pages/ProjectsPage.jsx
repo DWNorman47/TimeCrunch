@@ -115,9 +115,14 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
   const [tab, setTab] = useState('overview');
+  // Coerce any unknown status (e.g. from old data where the conversion
+  // path wrote 'active') to a valid dropdown option so the user can save
+  // edits without first manually picking a status.
+  const VALID_PROJECT_STATUSES = ['planning', 'in_progress', 'on_hold', 'completed'];
+  const initialStatus = VALID_PROJECT_STATUSES.includes(project.status) ? project.status : 'in_progress';
   const [editForm, setEditForm] = useState({
     name: project.name,
-    status: project.status || 'in_progress',
+    status: initialStatus,
     client_name: project.client_name || '',
     job_number: project.job_number || '',
     address: project.address || '',

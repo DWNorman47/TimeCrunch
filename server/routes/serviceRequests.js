@@ -325,9 +325,14 @@ router.post('/:id/convert', requireAdmin, async (req, res) => {
     const addr = String(address || '').trim() || r.requester_address || null;
     const sd = start_date && /^\d{4}-\d{2}-\d{2}$/.test(start_date) ? start_date : null;
 
+    // Status must match the project-status enum used by the rest of the app
+    // (see admin.js VALID_STATUSES). 'in_progress' is the right default for
+    // a freshly converted request — the work was just accepted, treat it as
+    // active. Using 'active' here was a bug — admins couldn't save edits on
+    // these projects because the status didn't match the dropdown options.
     const proj = await pool.query(
       `INSERT INTO projects (company_id, name, address, start_date, status, description)
-       VALUES ($1, $2, $3, $4, 'active', $5)
+       VALUES ($1, $2, $3, $4, 'in_progress', $5)
        RETURNING id, name`,
       [req.user.company_id, name.slice(0, 200), addr, sd, `Converted from client request #${r.id}:\n\n${r.description}`]
     );
