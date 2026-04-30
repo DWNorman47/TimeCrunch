@@ -22,8 +22,7 @@ const { logAudit } = require('../auditLog');
 const { createInboxItemBatch } = require('./inbox');
 const { sendEmail } = require('../email');
 const { getAdvancedSettings } = require('./admin');
-
-const VALID_STATUSES = ['new', 'in_review', 'converted', 'declined', 'spam'];
+const { SERVICE_REQUEST_STATUSES: VALID_STATUSES } = require('../constants/serviceRequestEnums');
 
 // Resolve the active (default ∖ suppressed ∪ custom) category list for a company
 async function loadActiveCategories(companyId) {

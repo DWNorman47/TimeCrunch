@@ -10,6 +10,7 @@ const { getAdvancedSettings, ADVANCED_DEFAULTS } = require('./admin');
 const { applySettingsRows, ADMIN_SETTINGS_DEFAULTS } = require('../settingsDefaults');
 const { logAudit } = require('../auditLog');
 const { coerceBody } = require('../middleware/coerce');
+const { INVENTORY_COUNT_TYPES } = require('../constants/inventoryEnums');
 
 const TXN_COERCE = coerceBody({
   int: ['item_id', 'from_location_id', 'to_location_id', 'uom_id', 'to_uom_id',
@@ -921,8 +922,7 @@ router.get('/cycle-counts', requireAdmin, async (req, res) => {
 router.post('/cycle-counts', requireAdmin, async (req, res) => {
   const { location_id, notes, count_type = 'cycle' } = req.body;
   const companyId = req.user.company_id;
-  const VALID_TYPES = ['cycle', 'full', 'audit', 'reconcile'];
-  if (!VALID_TYPES.includes(count_type)) return res.status(400).json({ error: 'Invalid count_type' });
+  if (!INVENTORY_COUNT_TYPES.includes(count_type)) return res.status(400).json({ error: 'Invalid count_type' });
 
   // Full counts don't need a location; all others do
   if (count_type !== 'full' && !location_id) return res.status(400).json({ error: 'location_id required' });

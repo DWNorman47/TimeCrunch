@@ -6,6 +6,7 @@ const sgMail = require('@sendgrid/mail');
 const rateLimit = require('express-rate-limit');
 const { userOrIpKey } = require('../middleware/rateLimitKey');
 const { entryInstants, validLocalDate } = require('../utils/timeFormat');
+const { PROJECT_STATUSES } = require('../constants/projectEnums');
 const pool = require('../db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1676,7 +1677,7 @@ router.patch('/projects/:id', requireAdmin, requirePerm('manage_projects'),
   async (req, res) => {
   const { wage_type, name, geo_lat, geo_lng, geo_radius_ft, clear_geofence, budget_hours, budget_dollars, prevailing_wage_rate, required_checklist_template_id,
           client_name, job_number, address, start_date, end_date, description, status, progress_pct, active } = req.body;
-  const VALID_STATUSES = ['planning', 'in_progress', 'on_hold', 'completed'];
+  const VALID_STATUSES = PROJECT_STATUSES;
   if (status !== undefined && !VALID_STATUSES.includes(status)) {
     logFailure(req, 'admin.projects.update', 'invalid_status', { status });
     return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
@@ -1813,7 +1814,7 @@ router.post('/projects', requireAdmin, requirePerm('manage_projects'),
     logFailure(req, 'admin.projects.create', 'negative_wage_rate', { pwr });
     return res.status(400).json({ error: 'prevailing_wage_rate must be non-negative' });
   }
-  const validStatuses = ['planning', 'in_progress', 'on_hold', 'completed'];
+  const validStatuses = PROJECT_STATUSES;
   const st = validStatuses.includes(status) ? status : 'in_progress';
   try {
     let resolvedClientName = null;
