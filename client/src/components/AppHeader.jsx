@@ -48,6 +48,15 @@ export default function AppHeader({
           )}
         </div>
         <div style={s.headerRight} className="header-right">
+          <a
+            href="/help"
+            style={s.helpLink}
+            className="header-help-link"
+            title={t.helpAndFaq || 'Help & FAQ'}
+            aria-label={t.helpAndFaq || 'Help & FAQ'}
+          >
+            ?
+          </a>
           <NotificationBell />
           {user?.full_name && (
             <span style={s.userName} className="header-username">{user.full_name}</span>
@@ -105,5 +114,19 @@ const s = {
     fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
+  },
+  helpLink: {
+    width: 26,
+    height: 26,
+    borderRadius: '50%',
+    background: 'rgba(255,255,255,0.18)',
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 700,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textDecoration: 'none',
+    flexShrink: 0,
   },
 };
