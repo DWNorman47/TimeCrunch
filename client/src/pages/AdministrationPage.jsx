@@ -460,11 +460,21 @@ export default function AdministrationPage() {
       setProjects(p.data);
       setSettings(s.data);
       setQboConnected(qbo.data?.connected && !qbo.data?.disconnected);
-      // Pop the first-run questionnaire if this company hasn't seen it yet.
-      // Don't pop for super_admin (likely impersonating) — they shouldn't
-      // be making setup decisions on behalf of a real customer.
-      if (user?.role === 'admin' && !s.data?.setup_questionnaire_completed_at) {
+      // Pop the first-run questionnaire if this company hasn't seen it yet,
+      // OR if the admin explicitly opted to re-run it via ?setup=1 (the
+      // "Run setup again" button on /help). Don't pop for super_admin
+      // (likely impersonating) — they shouldn't be making setup decisions
+      // on behalf of a real customer.
+      const params = new URLSearchParams(window.location.search);
+      const forceSetup = params.get('setup') === '1';
+      if (user?.role === 'admin' && (forceSetup || !s.data?.setup_questionnaire_completed_at)) {
         setShowSetup(true);
+      }
+      if (forceSetup) {
+        // Drop the query param so a refresh doesn't re-trigger.
+        params.delete('setup');
+        const qs = params.toString();
+        window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
       }
     }).catch(silentError('administrationpage'));
   }, []);

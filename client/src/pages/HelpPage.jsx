@@ -106,6 +106,21 @@ export default function HelpPage() {
           </div>
         )}
 
+        {/* Admin-only: re-run the first-run setup questionnaire. Hidden
+            from workers because they can't run setup. */}
+        {(user?.role === 'admin' || user?.role === 'super_admin') && !q && (
+          <div style={styles.actionCard}>
+            <div>
+              <div style={styles.actionTitle}>Run setup again</div>
+              <div style={styles.actionSub}>
+                Walk through the setup questions again to revise which modules and
+                features your company uses. Your existing data won&apos;t be touched.
+              </div>
+            </div>
+            <a href="/administration?setup=1" style={styles.actionBtn}>Run setup</a>
+          </div>
+        )}
+
         {filtered.map(section => {
           const isOpen = q ? true : open.has(section.id);
           return (
@@ -210,5 +225,28 @@ const styles = {
     fontSize: 14,
     textAlign: 'center',
     boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
+  },
+  actionCard: {
+    background: '#fff',
+    borderRadius: 12,
+    padding: '16px 20px',
+    boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+    flexWrap: 'wrap',
+  },
+  actionTitle: { fontSize: 14, fontWeight: 600, color: '#111827' },
+  actionSub: { fontSize: 13, color: '#6b7280', marginTop: 4, lineHeight: 1.5 },
+  actionBtn: {
+    background: '#1a56db',
+    color: '#fff',
+    padding: '8px 16px',
+    borderRadius: 7,
+    fontSize: 13,
+    fontWeight: 600,
+    textDecoration: 'none',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
   },
 };
