@@ -3,9 +3,10 @@ const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToCompanyAdmins } = require('../push');
 const { logAudit } = require('../auditLog');
-
-const VALID_INCIDENT_TYPES = ['near_miss', 'first_aid', 'recordable', 'lost_time', 'property_damage', 'other'];
-const VALID_INCIDENT_STATUSES = ['open', 'under_review', 'closed'];
+const {
+  INCIDENT_TYPES: VALID_INCIDENT_TYPES,
+  INCIDENT_STATUSES: VALID_INCIDENT_STATUSES,
+} = require('../constants/incidentEnums');
 
 const INCIDENT_COLS = `
   i.*, u.full_name AS reporter_name, p.name AS project_name`;

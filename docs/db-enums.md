@@ -1,0 +1,170 @@
+# DB Enum Reference
+
+Single source of truth for every database column that holds a fixed
+set of values. **Consult this file every time you write or review code
+that validates against a fixed list, and update it whenever you add or
+change one.**
+
+For each column we record:
+- Allowed values
+- DB enforcement state — `enforced` means a CHECK constraint or PG ENUM
+  rejects bad values at write time no matter the path; `app-only` means
+  a bypass write (raw SQL, migration, Stripe webhook, future endpoint,
+  manual `psql`) can corrupt the row.
+- Where validation lives in code.
+- A short note on stakes.
+
+> **History.** First populated 2026-04-30 after the
+> `projects.status='active'` bug. Revised same day after a full-codebase
+> audit revealed (a) migration 0071 had quietly enforced many columns
+> I'd marked app-only, and (b) three CHECK constraints had drifted from
+> the route code (daily_reports / field_reports / incident_reports
+> `.status`) — fixed in migration 0100. Migration 0101 added CHECK
+> constraints to most of the remaining app-only columns and centralised
+> the canonical lists in `server/constants/`.
+
+## Quick rules when touching a fixed-value field
+
+1. **Look it up here first.** If the column isn't listed, grep the
+   codebase for hardcoded lists (`VALID_*`, `].includes(`,
+   `<option value=`) and add an entry.
+2. **Use one shared constant in code**, not a literal in every file.
+   Server: `server/constants/<name>.js` exporting both the array and a
+   `Default`. Client: import the same constant when feasible.
+3. **Add a CHECK constraint** if the column doesn't have one. The
+   constraint is the unbypassable backstop — application validators
+   only protect paths that remember to call them. (See `0249ac4` for
+   the cost of skipping this.)
+4. **When extending an enum**, drop and re-add the CHECK in the same
+   migration — don't expect 0071-style historical constraints to
+   silently accept the new value. (See `0100` for an example.)
+5. **Update this file in the same PR** so the registry doesn't drift.
+
+---
+
+## High-stakes columns (payroll, billing, security, auth)
+
+| Table.column | Allowed values | DB enforcement | App validation | Stakes |
+|---|---|---|---|---|
+| `companies.subscription_status` | `trial`, `active`, `past_due`, `canceled`, `trial_expired`, `exempt` | **app-only** | `server/routes/superadmin.js:74` | Billing gate. Stripe webhook (`stripe.js:166-197`) writes `obj.status` directly with no app-side validation, relying on Stripe's API to send only known values. A future Stripe-side change could land an unknown value; CHECK constraint would catch it. |
+| `companies.plan` | `free`, `starter`, `business` | **app-only** | `server/routes/superadmin.js:75` | Feature gating (worker limits, storage caps, plan-gated features). |
+| `users.role` | `worker`, `admin`, `super_admin` | **app-only** | `server/permissions.js`, scattered checks | Auth boundary. Permission system is allow-list, so a bad value can't escalate — but it can lock a user out of every module. |
+| `users.role_id` (FK) | references `roles.id` | enforced (FK) | n/a | The new permission system. FK is the constraint. |
+| `time_entries.status` | `pending`, `approved`, `rejected` | **enforced** (CHECK) | scattered UPDATEs in `server/routes/admin.js` | Approval workflow + payroll inclusion. |
+| `time_entries.clock_source` | `worker`, `admin`, `log_entry` | **enforced** (CHECK in `0071`) | scattered INSERTs | Audit trail; the constraint blocks any unknown source from being recorded. |
+| `active_clock.clock_source` | `worker`, `admin` | **enforced** (CHECK in `0071`) | `server/routes/clock.js`, `server/routes/admin.js` clock-in paths | Same idea; tighter set because admin/worker are the only callers that create active_clock rows. |
+| `projects.wage_type` | `regular`, `prevailing` | **enforced** (CHECK) | `server/routes/admin.js:1684` | Payroll calculation. `time_entries.wage_type` inherits this. |
+| `users.rate_type` | `hourly`, `daily` | **enforced** (CHECK in `0101`) | `server/constants/userEnums.js`, `server/routes/admin.js:1331` | Daily-rate pay calc + `day_mark_mode` gate. |
+| `users.overtime_rule` (per-user) | `daily`, `weekly`, `none` | **enforced** (CHECK in `0101`) | `server/constants/userEnums.js`, `server/routes/admin.js:1214` | Overtime calculation. |
+| `users.worker_type` | `employee`, `contractor`, `subcontractor`, `owner` | **enforced** (CHECK in `0071`) | `server/routes/admin.js:1217` | Display + report filtering on worker profile. |
+| `reimbursements.status` | `pending`, `approved`, `rejected` | **enforced** (CHECK in `0071`) | `server/routes/reimbursements.js` | Financial workflow. |
+| `settings.value` (key=`overtime_rule`) | `daily`, `weekly` | **app-only** | `server/routes/admin.js` PATCH validation | Company-wide overtime calc. |
+| `settings.value` (key=`invoice_signature`) | `none`, `optional`, `required` | **app-only** | `server/routes/admin.js` PATCH validation | Whether workers must sign invoices before exporting. |
+
+## Medium-stakes columns (workflow / business logic)
+
+| Table.column | Allowed values | DB enforcement | App validation | Stakes |
+|---|---|---|---|---|
+| `projects.status` | `planning`, `in_progress`, `on_hold`, `completed` | **enforced** (CHECK in `0101`) | `server/constants/projectEnums.js`, `server/routes/admin.js:1679` | Project tracking dashboards. Caused the `0249ac4` bug — column is nullable, so the CHECK is `IS NULL OR ...`. |
+| `daily_reports.status` | `draft`, `submitted`, `reviewed` | **enforced** (CHECK in `0100`, was wrong in `0071`) | `server/routes/dailyReports.js:199` | Daily-report workflow + edit lock. `0071` had `approved` instead; `0100` corrects to `reviewed`. |
+| `field_reports.status` | `draft`, `submitted`, `reviewed` | **enforced** (CHECK in `0100`, was missing `draft` in `0071`) | `server/routes/fieldReports.js:30` | Field-report workflow + edit lock. |
+| `incident_reports.status` | `open`, `under_review`, `closed` | **enforced** (CHECK in `0100`, was missing `under_review` in `0071`) | `server/routes/incidents.js:8` | Incident workflow. |
+| `incident_reports.type` | `near_miss`, `first_aid`, `recordable`, `lost_time`, `property_damage`, `other` | **enforced** (CHECK in `0101`) | `server/constants/incidentEnums.js`, `server/routes/incidents.js` | Safety / OSHA-style metrics. |
+| `punchlist_items.status` | `open`, `in_progress`, `resolved`, `verified` | **enforced** (CHECK in `0101`) | `server/constants/punchlistEnums.js`, `server/routes/punchlist.js` | Punchlist filtering + closure tracking. |
+| `punchlist_items.priority` | `low`, `normal`, `high`, `urgent` | **enforced** (CHECK in `0101`) | `server/constants/punchlistEnums.js`, `server/routes/punchlist.js` | Priority filter dropdown. |
+| `rfis.status` | `open`, `answered`, `closed` | **enforced** (CHECK in `0071`) | `server/routes/rfis.js:80` | RFI workflow + reply gating. |
+| `inspections.status` | `pass`, `fail`, `pending` | **enforced** (CHECK) | `server/routes/inspections.js:102` | Inspection results. |
+| `service_requests.status` | `new`, `in_review`, `converted`, `declined`, `spam` | **enforced** (CHECK in `0101`) | `server/constants/serviceRequestEnums.js`, `server/routes/serviceRequests.js` | Public-intake triage. |
+| `time_off_requests.status` | `pending`, `approved`, `denied` | **enforced** (CHECK in `0071`) | `server/routes/timeOff.js:101,159` | PTO approval workflow. |
+| `time_off_requests.type` | `vacation`, `sick`, `personal`, `other` | **enforced** (CHECK in `0071`) | `server/routes/timeOff.js:9` | PTO categorization for reports. |
+| `qbo_sync_errors.entity_type` | `time_entry`, `reimbursement` | **enforced** (CHECK in `0071`) | `server/services/qbo.js` (writes only) | Discriminator for the QBO error log. |
+| `project_invoices.payment_status` | `unknown`, `paid`, `partial`, `unpaid` | **enforced** (CHECK in `0071`) | (verify route) | Invoice payment tracking. |
+
+## Cosmetic / UI columns
+
+| Table.column | Allowed values | DB enforcement | App validation | Stakes |
+|---|---|---|---|---|
+| `users.language` | `English`, `Spanish` | **enforced** (CHECK in `0101`) | `server/constants/userEnums.js`, `server/routes/admin.js:1045` | Default UI language. Note values are full names, not ISO codes — keep in sync with the top-level keys in `client/src/i18n.js`. |
+| `inbox.type` | open-ended (see note) | **app-only** | scattered `createInboxItem` calls — no central list | Drives notification icon / routing. New types added casually; treating it as a closed enum would require a refactor first. |
+| `inventory_items.locations[].type` | `warehouse`, `job_site`, `truck`, `other` | **app-only** (JSON column) | `server/constants/inventoryEnums.js`, `server/routes/inventory.js:534` | JSON-shaped column; CHECKs on JSON contents are awkward. App-side constant lives in inventoryEnums.js. |
+| `inventory_cycle_counts.count_type` | `cycle`, `full`, `audit`, `reconcile` | **enforced** (CHECK in `0101`) | `server/constants/inventoryEnums.js`, `server/routes/inventory.js:924` | Inventory audit type. (Note: the column name is `count_type`, not `type` — the doc had this wrong before `0101`.) |
+
+### `inbox.type` — the unfinished one
+
+`inbox.type` is the most-written, least-constrained enum-like column in
+the codebase. Every `createInboxItem(...)` and `createInboxItemBatch(...)`
+call uses a free-form string. Currently observed values across the
+server (probably incomplete):
+
+`approval`, `rejection`, `comment`, `announcement`, `inactive_workers`,
+`stale_active_clock`, `timeoff_request`, `timeoff_approved`,
+`timeoff_denied`, `shift_assigned`, `shift_updated`, `shift_cancelled`,
+`shift_cantmake`, `signoff`, `location_denied`, `overtime_alert`,
+`service_request`, `low_stock`, `equipment_maintenance`.
+
+Before constraining: collect the canonical list into
+`server/constants/inboxTypes.js`, route every existing call through it,
+THEN add a CHECK constraint that matches.
+
+## Settings keys (`settings.key` allow-list)
+
+`settings.key` is itself an enum-like column — only known keys should be
+written. The allow-list lives in `server/settingsDefaults.js`:
+
+- `FEATURE_KEYS` — boolean flags (`feature_*`, `module_*`).
+- `STRING_KEYS` — string-valued settings.
+- Everything else is treated as numeric.
+
+No DB CHECK on `settings.key`. PATCH `/admin/settings` validates against
+the allowlist; raw INSERTs would not. Update `settingsDefaults.js`
+**and** this file when adding a new key.
+
+## Boolean-flag columns
+
+These are fixed-value but Postgres enforces them via the `BOOLEAN` type.
+Listed for completeness so they're not flagged as gaps:
+
+`users.active`, `users.day_mark_mode`, `users.mfa_enabled`,
+`projects.active`, `time_entries.locked`, `shifts.cant_make_it`,
+`companies.is_exempt`, etc.
+
+---
+
+## Open follow-ups
+
+Three columns remain on app-only protection, each blocked by a
+non-trivial precondition:
+
+1. **`companies.subscription_status` + `companies.plan`.** Both are
+   driven by Stripe webhooks (`server/routes/stripe.js:180`,
+   `planFromPrice()`). Stripe sends statuses we don't model
+   (`incomplete`, `unpaid`, `paused`, etc) and price IDs that aren't in
+   our map. Adding a CHECK without first writing a Stripe-status →
+   app-status mapper would 500 the webhook on real Stripe events.
+   Right next step: a small mapper at the top of the webhook
+   (`STRIPE_TO_APP = { trialing: 'trial', ... }`) plus a fallback to
+   the closest "needs attention" value, then a CHECK once the mapping
+   is exhaustive.
+
+2. **`inbox.type`.** The doc lists ~19 distinct values seen across the
+   server, written via `createInboxItem(...)` calls scattered through
+   every route file. Centralise the call sites (single
+   `createInboxItem(type, ...)` wrapper that imports a constants
+   array) BEFORE adding a CHECK — otherwise every new feature breaks
+   the constraint.
+
+3. **`inventory_items.locations[].type`.** JSON-shaped column. PG can
+   constrain JSON contents but it's brittle. Lower urgency given the
+   small set and infrequent writes.
+
+Other structural follow-ups:
+
+- The client side has its own copies of some enum lists
+  (`client/src/pages/ProjectsPage.jsx` has `VALID_PROJECT_STATUSES`,
+  dropdowns hardcode option values). Consider exposing a
+  `/admin/enums` endpoint or a generated client constants file so the
+  client stays in sync without manual duplication.
+- Some columns the registry references rely on a single literal write
+  site rather than a validation array (e.g. `clock_source` is set per
+  call). Those were verified manually during the audit but a future
+  refactor could route them through the constants too.

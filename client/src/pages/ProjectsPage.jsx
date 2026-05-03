@@ -115,9 +115,14 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
   const [tab, setTab] = useState('overview');
+  // Coerce any unknown status (e.g. from old data where the conversion
+  // path wrote 'active') to a valid dropdown option so the user can save
+  // edits without first manually picking a status.
+  const VALID_PROJECT_STATUSES = ['planning', 'in_progress', 'on_hold', 'completed'];
+  const initialStatus = VALID_PROJECT_STATUSES.includes(project.status) ? project.status : 'in_progress';
   const [editForm, setEditForm] = useState({
     name: project.name,
-    status: project.status || 'in_progress',
+    status: initialStatus,
     client_name: project.client_name || '',
     job_number: project.job_number || '',
     address: project.address || '',
@@ -126,9 +131,15 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     description: project.description || '',
     progress_pct: project.progress_pct != null ? String(project.progress_pct) : '',
     wage_type: project.wage_type || 'regular',
+    geo_lat: project.geo_lat != null ? String(project.geo_lat) : '',
+    geo_lng: project.geo_lng != null ? String(project.geo_lng) : '',
+    geo_radius_ft: project.geo_radius_ft != null ? String(project.geo_radius_ft) : '',
   });
   const [editSaving, setEditSaving] = useState(false);
   const [editMsg, setEditMsg] = useState('');
+  const [geoLocating, setGeoLocating] = useState(false);
+  const [geoError, setGeoError] = useState('');
+  const [geocoding, setGeocoding] = useState(false);
   const [entries, setEntries] = useState([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [entriesError, setEntriesError] = useState(null);
@@ -403,9 +414,20 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 
   const handleEditSave = async () => {
     if (!editForm.name.trim()) return;
+    // Geofence: a complete fence needs all three values. Either send all or
+    // none — partial values are confusing and the server would store them
+    // anyway, leaving the project in a bad half-state.
+    const lat = editForm.geo_lat.trim();
+    const lng = editForm.geo_lng.trim();
+    const radius = editForm.geo_radius_ft.trim();
+    const geoCount = [lat, lng, radius].filter(Boolean).length;
+    if (geoCount > 0 && geoCount < 3) {
+      setEditMsg('Geofence needs latitude, longitude, AND radius — or leave all three blank.');
+      return;
+    }
     setEditSaving(true); setEditMsg('');
     try {
-      const r = await api.patch(`/admin/projects/${project.id}`, {
+      const payload = {
         name: editForm.name.trim(),
         status: editForm.status,
         client_name: editForm.client_name || null,
@@ -417,13 +439,47 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
         progress_pct: editForm.progress_pct !== '' ? parseInt(editForm.progress_pct, 10) : null,
         wage_type: editForm.wage_type,
         updated_at: project.updated_at,
-      });
+      };
+      if (geoCount === 3) {
+        payload.geo_lat = parseFloat(lat);
+        payload.geo_lng = parseFloat(lng);
+        payload.geo_radius_ft = parseInt(radius, 10);
+      } else if (project.geo_radius_ft != null) {
+        // User cleared all three fields on a project that had a geofence —
+        // explicit clear so the server drops it.
+        payload.clear_geofence = true;
+      }
+      const r = await api.patch(`/admin/projects/${project.id}`, payload);
       onProjectUpdated?.(r.data);
       setEditMsg('Saved');
       setTimeout(() => setEditMsg(''), 2000);
     } catch (err) {
       setEditMsg(err.response?.status === 409 ? 'Modified by someone else — refresh first' : 'Failed to save');
     } finally { setEditSaving(false); }
+  };
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) {
+      setGeoError('Your browser doesn\'t support geolocation.');
+      return;
+    }
+    setGeoLocating(true); setGeoError('');
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setEditForm(f => ({
+          ...f,
+          geo_lat: pos.coords.latitude.toFixed(6),
+          geo_lng: pos.coords.longitude.toFixed(6),
+          geo_radius_ft: f.geo_radius_ft || '300',
+        }));
+        setGeoLocating(false);
+      },
+      err => {
+        setGeoError(err.code === 1 ? 'Location permission denied.' : 'Could not get your location.');
+        setGeoLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   const handleMarkComplete = async () => {
@@ -484,7 +540,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 
         <div style={styles.detailTabs}>
           {['overview', 'billing', 'entries', 'edit'].map(t => (
-            <button key={t} style={{ ...styles.detailTab, ...(tab === t ? styles.detailTabActive : {}) }} onClick={() => setTab(t)}>
+            <button key={t} className="project-detail-tab" style={{ ...styles.detailTab, ...(tab === t ? styles.detailTabActive : {}) }} onClick={() => setTab(t)}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
@@ -1184,8 +1240,35 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
               </div>
 
               <div style={pf.field}>
-                <label style={pf.label}>{t.address}</label>
-                <input style={pf.input} value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder={t.adminAddressPh} />
+                <label style={pf.label}>
+                  {t.address}
+                  {geocoding && <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: 8, fontSize: 12 }}>· Looking up address…</span>}
+                </label>
+                <input
+                  style={pf.input}
+                  value={editForm.address}
+                  onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))}
+                  onBlur={async () => {
+                    // Auto-geocode the address into the empty geofence,
+                    // matching the create form's behaviour. Skip if any
+                    // geofence field is already populated so we never
+                    // overwrite a deliberate value.
+                    if (!editForm.address.trim()) return;
+                    if (editForm.geo_lat || editForm.geo_lng || editForm.geo_radius_ft) return;
+                    setGeocoding(true);
+                    const geo = await geocodeAddress(editForm.address);
+                    setGeocoding(false);
+                    if (geo) {
+                      setEditForm(f => ({
+                        ...f,
+                        geo_lat: geo.lat.toFixed(6),
+                        geo_lng: geo.lng.toFixed(6),
+                        geo_radius_ft: String(DEFAULT_GEOFENCE_RADIUS_FT),
+                      }));
+                    }
+                  }}
+                  placeholder={t.adminAddressPh}
+                />
               </div>
 
               <div style={pf.row}>
@@ -1202,6 +1285,68 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
               <div style={pf.field}>
                 <label style={pf.label}>{t.descriptionLabel}</label>
                 <textarea style={pf.textarea} rows={3} value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder={t.scopeOfWorkPh} />
+              </div>
+
+              {/* Geofence — when filled in, workers can only clock in to this
+                  project from within the radius. Server enforces; spoofed
+                  client coords don't help. Leaving all three blank means
+                  no geofence (clock in from anywhere). */}
+              <div style={pf.field}>
+                <label style={pf.label}>📍 Geofence (optional)</label>
+                <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, lineHeight: 1.5 }}>
+                  Require workers to be physically near the job site to clock in.
+                  Distance is calculated server-side from their phone&apos;s GPS.
+                  Leave all three fields blank to allow clock-in from anywhere.
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input
+                    style={{ ...pf.input, flex: '1 1 130px', minWidth: 0 }}
+                    type="number" step="0.000001"
+                    placeholder="Latitude"
+                    value={editForm.geo_lat}
+                    onChange={e => setEditForm(f => ({ ...f, geo_lat: e.target.value }))}
+                  />
+                  <input
+                    style={{ ...pf.input, flex: '1 1 130px', minWidth: 0 }}
+                    type="number" step="0.000001"
+                    placeholder="Longitude"
+                    value={editForm.geo_lng}
+                    onChange={e => setEditForm(f => ({ ...f, geo_lng: e.target.value }))}
+                  />
+                  <input
+                    style={{ ...pf.input, flex: '1 1 110px', minWidth: 0 }}
+                    type="number" min="50" step="50"
+                    placeholder="Radius (ft)"
+                    value={editForm.geo_radius_ft}
+                    onChange={e => setEditForm(f => ({ ...f, geo_radius_ft: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    style={{
+                      background: '#eef2ff', border: '1px solid #c7d2fe', color: '#4338ca',
+                      padding: '8px 12px', borderRadius: 7, fontSize: 13, fontWeight: 600,
+                      cursor: geoLocating ? 'wait' : 'pointer',
+                      opacity: geoLocating ? 0.6 : 1, whiteSpace: 'nowrap',
+                    }}
+                    onClick={useMyLocation}
+                    disabled={geoLocating}
+                  >
+                    {geoLocating ? 'Locating…' : 'Use my location'}
+                  </button>
+                  {(editForm.geo_lat || editForm.geo_lng || editForm.geo_radius_ft) && (
+                    <button
+                      type="button"
+                      style={{
+                        background: 'none', border: 'none', color: '#6b7280',
+                        fontSize: 13, cursor: 'pointer', padding: '8px 4px', whiteSpace: 'nowrap',
+                      }}
+                      onClick={() => setEditForm(f => ({ ...f, geo_lat: '', geo_lng: '', geo_radius_ft: '' }))}
+                    >
+                      ✕ Clear
+                    </button>
+                  )}
+                </div>
+                {geoError && <p style={{ fontSize: 12, color: '#dc2626', margin: '6px 0 0' }}>{geoError}</p>}
               </div>
 
               {editMsg && (
@@ -1401,25 +1546,105 @@ function ProjectRow({ project, metrics, settings, onClick }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-const BLANK_PROJECT = { name: '', client_id: '', job_number: '', address: '', start_date: '', end_date: '', status: 'in_progress', description: '', wage_type: 'regular' };
+const BLANK_PROJECT = { name: '', client_id: '', job_number: '', address: '', start_date: '', end_date: '', status: 'in_progress', description: '', wage_type: 'regular', geo_lat: '', geo_lng: '', geo_radius_ft: '' };
+
+// Default geofence radius (in feet) when the address-based auto-fill kicks in.
+// 300 ft is large enough that GPS jitter on a phone won't false-reject a
+// worker who's actually on site, small enough that it's a meaningful gate
+// for typical residential / commercial job sites.
+const DEFAULT_GEOFENCE_RADIUS_FT = 300;
+
+// Geocode an address via the server proxy. Returns { lat, lng, display_name }
+// on a hit, null on a miss or any error. Designed to be called from a blur
+// handler — failures must be silent so they don't block the form.
+async function geocodeAddress(addr) {
+  const trimmed = String(addr || '').trim();
+  if (trimmed.length < 5) return null;
+  try {
+    const r = await api.get('/admin/geocode', { params: { q: trimmed } });
+    return r.data;
+  } catch {
+    return null;
+  }
+}
 
 function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
   const t = useT();
   const [form, setForm] = useState(BLANK_PROJECT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [geocoding, setGeocoding] = useState(false);
+  const [geoLocating, setGeoLocating] = useState(false);
+  const [geoError, setGeoError] = useState('');
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const showPrevailing = (settings?.prevailing_wage_rate ?? 0) > 0;
+
+  // When the address loses focus, try to fill the geofence from it — but
+  // only if the user hasn't already entered any geofence values manually.
+  // Silent on failure: if geocoding misses, the form is still valid and
+  // the admin can keep typing.
+  const tryAutoGeocode = async () => {
+    if (!form.address.trim()) return;
+    if (form.geo_lat || form.geo_lng || form.geo_radius_ft) return;
+    setGeocoding(true);
+    const geo = await geocodeAddress(form.address);
+    setGeocoding(false);
+    if (geo) {
+      setForm(f => ({
+        ...f,
+        geo_lat: geo.lat.toFixed(6),
+        geo_lng: geo.lng.toFixed(6),
+        geo_radius_ft: String(DEFAULT_GEOFENCE_RADIUS_FT),
+      }));
+    }
+  };
+
+  const useMyLocationCreate = () => {
+    if (!navigator.geolocation) {
+      setGeoError("Your browser doesn't support geolocation.");
+      return;
+    }
+    setGeoLocating(true); setGeoError('');
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setForm(f => ({
+          ...f,
+          geo_lat: pos.coords.latitude.toFixed(6),
+          geo_lng: pos.coords.longitude.toFixed(6),
+          geo_radius_ft: f.geo_radius_ft || String(DEFAULT_GEOFENCE_RADIUS_FT),
+        }));
+        setGeoLocating(false);
+      },
+      err => {
+        setGeoError(err.code === 1 ? 'Location permission denied.' : "Couldn't get your location.");
+        setGeoLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   const handleSubmit = async e => {
     e.preventDefault();
     if (!form.name.trim()) { setError(t.projectNameRequired); return; }
+    // Geofence: enforce all-or-none on the client too so the server's
+    // friendlier 400 doesn't surprise an admin mid-create.
+    const lat = form.geo_lat.trim();
+    const lng = form.geo_lng.trim();
+    const radius = form.geo_radius_ft.trim();
+    const geoCount = [lat, lng, radius].filter(Boolean).length;
+    if (geoCount > 0 && geoCount < 3) {
+      setError('Geofence needs latitude, longitude, AND radius — or leave all three blank.');
+      return;
+    }
     setSaving(true); setError('');
     try {
       const r = await api.post('/admin/projects', {
         ...form,
         client_id: form.client_id || null,
         prevailing_wage_rate: form.wage_type === 'prevailing' && settings?.prevailing_wage_rate ? settings.prevailing_wage_rate : null,
+        geo_lat:        geoCount === 3 ? parseFloat(lat) : null,
+        geo_lng:        geoCount === 3 ? parseFloat(lng) : null,
+        geo_radius_ft:  geoCount === 3 ? parseInt(radius, 10) : null,
       });
       onSaved(r.data);
     } catch (err) {
@@ -1462,8 +1687,77 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
         </div>
 
         <div style={pf.field}>
-          <label style={pf.label}>{t.addressLocation}</label>
-          <input style={pf.input} value={form.address} onChange={e => set('address', e.target.value)} placeholder={t.adminAddressPh} />
+          <label style={pf.label}>
+            {t.addressLocation}
+            {geocoding && <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: 8, fontSize: 12 }}>· Looking up address…</span>}
+          </label>
+          <input
+            style={pf.input}
+            value={form.address}
+            onChange={e => set('address', e.target.value)}
+            onBlur={tryAutoGeocode}
+            placeholder={t.adminAddressPh}
+          />
+        </div>
+
+        {/* Geofence — auto-filled from the address blur above when blank.
+            Visible always; admins can also tap "Use my location" or paste
+            coordinates manually. Server enforces all-or-none. */}
+        <div style={pf.field}>
+          <label style={pf.label}>📍 Geofence (optional)</label>
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, lineHeight: 1.5 }}>
+            Require workers to be physically near the job site to clock in.
+            Leave all three fields blank to allow clock-in from anywhere.
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input
+              style={{ ...pf.input, flex: '1 1 130px', minWidth: 0 }}
+              type="number" step="0.000001"
+              placeholder="Latitude"
+              value={form.geo_lat}
+              onChange={e => set('geo_lat', e.target.value)}
+            />
+            <input
+              style={{ ...pf.input, flex: '1 1 130px', minWidth: 0 }}
+              type="number" step="0.000001"
+              placeholder="Longitude"
+              value={form.geo_lng}
+              onChange={e => set('geo_lng', e.target.value)}
+            />
+            <input
+              style={{ ...pf.input, flex: '1 1 110px', minWidth: 0 }}
+              type="number" min="50" step="50"
+              placeholder="Radius (ft)"
+              value={form.geo_radius_ft}
+              onChange={e => set('geo_radius_ft', e.target.value)}
+            />
+            <button
+              type="button"
+              style={{
+                background: '#eef2ff', border: '1px solid #c7d2fe', color: '#4338ca',
+                padding: '8px 12px', borderRadius: 7, fontSize: 13, fontWeight: 600,
+                cursor: geoLocating ? 'wait' : 'pointer',
+                opacity: geoLocating ? 0.6 : 1, whiteSpace: 'nowrap',
+              }}
+              onClick={useMyLocationCreate}
+              disabled={geoLocating}
+            >
+              {geoLocating ? 'Locating…' : 'Use my location'}
+            </button>
+            {(form.geo_lat || form.geo_lng || form.geo_radius_ft) && (
+              <button
+                type="button"
+                style={{
+                  background: 'none', border: 'none', color: '#6b7280',
+                  fontSize: 13, cursor: 'pointer', padding: '8px 4px', whiteSpace: 'nowrap',
+                }}
+                onClick={() => setForm(f => ({ ...f, geo_lat: '', geo_lng: '', geo_radius_ft: '' }))}
+              >
+                ✕ Clear
+              </button>
+            )}
+          </div>
+          {geoError && <p style={{ fontSize: 12, color: '#dc2626', margin: '6px 0 0' }}>{geoError}</p>}
         </div>
 
         <div style={pf.row}>
@@ -1557,6 +1851,7 @@ export default function ProjectsPage() {
         <div style={styles.tabBar}>
           <button
             aria-current={mainTab === 'projects' ? 'page' : undefined}
+            className="project-detail-tab"
             style={{ ...styles.tabBtn, ...(mainTab === 'projects' ? styles.tabBtnActive : {}) }}
             onClick={() => setMainTab('projects')}
           >
@@ -1564,6 +1859,7 @@ export default function ProjectsPage() {
           </button>
           <button
             aria-current={mainTab === 'clients' ? 'page' : undefined}
+            className="project-detail-tab"
             style={{ ...styles.tabBtn, ...(mainTab === 'clients' ? styles.tabBtnActive : {}) }}
             onClick={() => setMainTab('clients')}
           >

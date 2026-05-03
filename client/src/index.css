@@ -70,6 +70,14 @@ select:focus-visible {
    leftmost cell of each row has no left border. */
 .kpi-grid > .kpi-cell + .kpi-cell { border-left: 1px solid #f3f4f6; }
 
+/* Project tabs (top-level + project drawer): suppress the lingering black
+   focus outline that the browser adds after a click. The active tab's
+   purple underline already shows which one is selected; the focus ring
+   only confuses things. Keyboard users still see a visible focus via
+   :focus-visible. */
+.project-detail-tab:focus { outline: none; }
+.project-detail-tab:focus-visible { outline: 2px solid #8b5cf6; outline-offset: -2px; }
+
 /* Prevent iOS Safari from zooming in when tapping inputs */
 @media (max-width: 768px) {
   input, select, textarea {
