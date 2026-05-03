@@ -13,6 +13,7 @@ import AuditLog from '../components/AuditLog';
 import ServiceRequestsAdmin from '../components/ServiceRequestsAdmin';
 import QuickBooks from '../components/QuickBooks';
 import MFASetup from '../components/MFASetup';
+import SetupQuestionnaire from '../components/SetupQuestionnaire';
 import { usePlan } from '../hooks/usePlan';
 
 import { silentError } from '../errorReporter';
@@ -420,6 +421,11 @@ export default function AdministrationPage() {
   const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState(null);
   const [qboConnected, setQboConnected] = useState(false);
+  // First-run setup questionnaire shows when settings load with an empty
+  // setup_questionnaire_completed_at. Admins only — workers don't reach
+  // this page anyway. Tracked separately from settings so a dismiss in
+  // this session takes effect immediately.
+  const [showSetup, setShowSetup] = useState(false);
 
   // Integrations sub-view: 'list' or 'quickbooks' — persists for the session
   const [integrationView, setIntegrationView] = useState(() => sessionStorage.getItem('admin_integration_view') || 'list');
@@ -454,6 +460,27 @@ export default function AdministrationPage() {
       setProjects(p.data);
       setSettings(s.data);
       setQboConnected(qbo.data?.connected && !qbo.data?.disconnected);
+      // Two ways to surface the questionnaire:
+      //   1. Auto-pop on first run, ONLY for real admins of the company.
+      //      Skipped for super_admin because they're usually impersonating
+      //      and shouldn't be making setup decisions on a customer's behalf.
+      //   2. Explicit ?setup=1 trigger from the "Run setup again" button
+      //      on /help. This is opt-in by the human at the keyboard, so we
+      //      honor it for super_admin too (e.g. dev testing the flow on
+      //      stage as themselves).
+      const params = new URLSearchParams(window.location.search);
+      const forceSetup = params.get('setup') === '1';
+      const isAdminish = user?.role === 'admin' || user?.role === 'super_admin';
+      const autoPop = user?.role === 'admin' && !s.data?.setup_questionnaire_completed_at;
+      if (autoPop || (forceSetup && isAdminish)) {
+        setShowSetup(true);
+      }
+      if (forceSetup) {
+        // Drop the query param so a refresh doesn't re-trigger.
+        params.delete('setup');
+        const qs = params.toString();
+        window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+      }
     }).catch(silentError('administrationpage'));
   }, []);
 
@@ -465,6 +492,20 @@ export default function AdministrationPage() {
   return (
     <div style={styles.page}>
       <AppHeader currentApp="administration" features={settings} />
+      {showSetup && (
+        <SetupQuestionnaire
+          onComplete={(applied) => {
+            // Reflect the just-saved settings locally so the rest of the
+            // page (and other tabs) sees the new toggles without a reload.
+            setSettings(prev => ({ ...(prev || {}), ...applied }));
+            setShowSetup(false);
+          }}
+          onDismiss={() => {
+            setSettings(prev => ({ ...(prev || {}), setup_questionnaire_completed_at: new Date().toISOString() }));
+            setShowSetup(false);
+          }}
+        />
+      )}
 
       <main id="main-content" style={styles.main}>
         <TabBar active={safeTab} onChange={switchTab} tabs={tabs} />

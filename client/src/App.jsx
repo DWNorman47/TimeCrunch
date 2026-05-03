@@ -32,6 +32,7 @@ const PrivacyPolicy     = lazy(() => import('./pages/PrivacyPolicy'));
 const EULA              = lazy(() => import('./pages/EULA'));
 const Tests             = lazy(() => import('./pages/Tests'));
 const Changelog         = lazy(() => import('./pages/Changelog'));
+const HelpPage          = lazy(() => import('./pages/HelpPage'));
 
 function PageLoader() {
   return (
@@ -154,6 +155,7 @@ function AppRoutes() {
       <Route path="/analytics" element={<PrivateRoute adminOnly moduleId="analytics"><AnalyticsPage /></PrivateRoute>} />
       <Route path="/inventory" element={<PrivateRoute moduleId="inventory"><InventoryPage /></PrivateRoute>} />
       <Route path="/account" element={<PrivateRoute><AccountPage /></PrivateRoute>} />
+      <Route path="/help" element={<PrivateRoute><HelpPage /></PrivateRoute>} />
       <Route path="/superadmin" element={<PrivateRoute superAdminOnly><SuperAdmin /></PrivateRoute>} />
       <Route path="/" element={user ? <Navigate to={landingFor(user)} replace /> : <Landing />} />
       <Route path="*" element={<Navigate to={user ? landingFor(user) : '/'} replace />} />

@@ -2,6 +2,10 @@ const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { sendPushToUser } = require('../push');
+const {
+  PUNCHLIST_STATUSES: VALID_STATUSES,
+  PUNCHLIST_PRIORITIES: VALID_PRIORITIES,
+} = require('../constants/punchlistEnums');
 
 // GET /punchlist
 router.get('/', requireAuth, async (req, res) => {
@@ -54,7 +58,6 @@ router.post('/', requireAuth, async (req, res) => {
   const title = req.body.title?.trim();
   const description = req.body.description?.trim() || null;
   const location = req.body.location?.trim() || null;
-  const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
   if (!title) return res.status(400).json({ error: 'title required' });
   if (title.length > 255) return res.status(400).json({ error: 'title too long (max 255 characters)' });
   if (description && description.length > 1000) return res.status(400).json({ error: 'description too long (max 1000 characters)' });
@@ -102,8 +105,6 @@ router.patch('/:id', requireAuth, async (req, res) => {
   const description = req.body.description !== undefined ? (req.body.description?.trim() || null) : undefined;
   const location = req.body.location !== undefined ? (req.body.location?.trim() || null) : undefined;
 
-  const VALID_STATUSES  = ['open', 'in_progress', 'resolved', 'verified'];
-  const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
   if (status   !== undefined && !VALID_STATUSES.includes(status))   return res.status(400).json({ error: 'Invalid status value' });
   if (priority !== undefined && !VALID_PRIORITIES.includes(priority)) return res.status(400).json({ error: 'Invalid priority value' });
 
