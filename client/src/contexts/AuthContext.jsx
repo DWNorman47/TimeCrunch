@@ -4,6 +4,13 @@ import { clearCache } from '../offlineDb';
 
 export const AuthContext = createContext(null);
 
+function clearOfflineQueue() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.ready
+    .then(reg => reg.active?.postMessage({ type: 'CLEAR_QUEUE' }))
+    .catch(() => {});
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +41,7 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password, company_name) => {
     await clearCache();
+    clearOfflineQueue();
     const r = await api.post('/auth/login', { username, password, company_name }, { suppressToast: true });
     if (r.data.mfa_required) {
       return { mfa_required: true, mfa_token: r.data.mfa_token };
@@ -50,6 +58,7 @@ export function AuthProvider({ children }) {
 
   const loginWithToken = async token => {
     await clearCache();
+    clearOfflineQueue();
     localStorage.setItem('tc_token', token);
     const me = await api.get('/auth/me');
     setUser(me.data.user);
@@ -59,6 +68,7 @@ export function AuthProvider({ children }) {
 
   const confirmMfa = async (mfa_token, code) => {
     await clearCache();
+    clearOfflineQueue();
     const r = await api.post('/auth/mfa/confirm', { mfa_token, code });
     localStorage.setItem('tc_token', r.data.token);
     const me = await api.get('/auth/me');
@@ -68,6 +78,7 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     clearCache();
+    clearOfflineQueue();
     // Clear both stores so an impersonation tab logging out doesn't leave
     // the super admin's localStorage token alive for a future page load,
     // and a normal logout clears any stray sessionStorage too.

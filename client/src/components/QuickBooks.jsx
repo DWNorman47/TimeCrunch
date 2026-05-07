@@ -899,8 +899,8 @@ export default function QuickBooks({ workers, projects, onWorkersImported, onPro
                 style={{ marginRight: 8 }}
               />
               <span>
-                <span style={{ fontWeight: 600, color: '#1a202c', fontSize: 14 }}>Auto-create QB Customer when project is created</span>
-                <span style={{ display: 'block', fontSize: 12, color: '#6b7280', marginTop: 1 }}>Automatically creates a matching Customer in QuickBooks when you add a new project.</span>
+                <span style={{ fontWeight: 600, color: '#1a202c', fontSize: 14 }}>Auto-create QB Customer when work is created</span>
+                <span style={{ display: 'block', fontSize: 12, color: '#6b7280', marginTop: 1 }}>Automatically creates a matching Customer in QuickBooks when you add new work.</span>
               </span>
             </label>
 

@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
-import AppHeader from '../components/AppHeader';
+import { PageIntro, PageShell } from '../components/PageShell';
 import TabBar from '../components/TabBar';
 import InventoryStock from '../components/inventory/InventoryStock';
 import InventoryItems from '../components/inventory/InventoryItems';
@@ -31,15 +31,30 @@ export default function InventoryPage() {
   const INV_TABS = isAdmin
     ? ['stock', 'items', 'transactions', 'orders', 'cycle', 'valuation', 'conversions', 'setup']
     : ['stock', 'transactions', 'mycount'];
+  const normalizeInventoryTab = value => ({ counts: 'cycle' }[value] || value);
   const [poLowStockTrigger, setPoLowStockTrigger] = useState(false);
 
   const handleReorderClick = () => {
     setPoLowStockTrigger(true);
     switchTab('orders');
   };
-  const hashTab = window.location.hash.replace('#', '');
+  const hashTab = normalizeInventoryTab(window.location.hash.replace('#', ''));
   const [tab, setTab] = useState(INV_TABS.includes(hashTab) ? hashTab : 'stock');
-  const switchTab = t => { setTab(t); history.replaceState(null, '', '#' + t); };
+  const switchTab = t => {
+    const nextTab = normalizeInventoryTab(t);
+    setTab(nextTab);
+    history.replaceState(null, '', '#' + nextTab);
+  };
+
+  useEffect(() => {
+    const syncFromHash = () => {
+      const nextHashTab = normalizeInventoryTab(window.location.hash.replace('#', ''));
+      if (INV_TABS.includes(nextHashTab)) setTab(nextHashTab);
+    };
+    syncFromHash();
+    window.addEventListener('hashchange', syncFromHash);
+    return () => window.removeEventListener('hashchange', syncFromHash);
+  }, [INV_TABS.join('|')]);
 
   useEffect(() => {
     const init = async () => {
@@ -69,42 +84,51 @@ export default function InventoryPage() {
   const refreshLowStock    = () => isAdmin && api.get('/inventory/stock/low').then(r => setLowStockCount(r.data.length)).catch(silentError('inventorypage'));
   const refreshConversions = () => isAdmin && api.get('/inventory/uom-conversions').then(r => setPendingConversions(r.data.filter(u => parseFloat(u.factor) === 1).length)).catch(silentError('inventorypage'));
 
-  if (loading) return <div style={styles.loading}>Loading…</div>;
+  if (loading) return <div style={styles.loading}>Loading...</div>;
 
   if (!features.module_inventory) {
     return (
-      <div style={styles.page}>
-        <AppHeader currentApp="inventory" features={features} />
-        <div style={styles.disabled}>
-          <div style={styles.disabledIcon}>📦</div>
+      <PageShell currentApp="inventory" features={features} maxWidth={760}>
+        <div style={styles.disabled}>
           <h2 style={styles.disabledTitle}>{t.invNotEnabled}</h2>
           <p style={styles.disabledBody}>{t.invNotEnabledBody}</p>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div style={styles.page}>
-      <AppHeader currentApp="inventory" features={features} />
-
-      <main id="main-content" style={styles.main}>
+    <PageShell currentApp="inventory" features={features} maxWidth={1040}>
+        <PageIntro
+          introId="inventory"
+          kicker="Inventory"
+          title={isAdmin ? 'Keep stock, counts, and orders in one place.' : 'Inventory work for today.'}
+          description={isAdmin
+            ? 'Start with stock and transactions. Setup, valuation, conversions, and purchase orders stay nearby when you need deeper tools.'
+            : 'See stock, record movement, and complete count assignments without digging through admin tools.'}
+          meta={isAdmin && (
+            <>
+              <span className={`ops-pill ${lowStockCount > 0 ? 'attention' : 'good'}`}>{lowStockCount} low stock</span>
+              <span className={`ops-pill ${pendingConversions > 0 ? 'attention' : ''}`}>{pendingConversions} conversions to review</span>
+            </>
+          )}
+        />
         <TabBar
           active={tab}
           onChange={switchTab}
           tabs={[
-            { id: 'stock',        label: '📦 Stock', dot: lowStockCount > 0 ? '#f59e0b' : null },
-            { id: 'transactions', label: '↔️ Transactions' },
+            { id: 'stock',        label: 'Stock', dot: lowStockCount > 0 ? '#f59e0b' : null },
+            { id: 'transactions', label: 'Transactions' },
             ...(!isAdmin ? [
-              { id: 'mycount',    label: '📋 My Count' },
+              { id: 'mycount',    label: 'My Count' },
             ] : []),
             ...(isAdmin ? [
-              { id: 'items',      label: '🗂 Items' },
-              { id: 'orders',     label: '🛒 Orders' },
-              { id: 'cycle',        label: '📋 Count' },
-              { id: 'valuation',    label: '💰 Valuation' },
-              { id: 'conversions',  label: '🔄 Conversions', dot: pendingConversions > 0 ? '#d97706' : null },
-              { id: 'setup',        label: '⚙️ Setup' },
+              { id: 'items',      label: 'Items' },
+              { id: 'orders',     label: 'Orders' },
+              { id: 'cycle',        label: 'Counts' },
+              { id: 'valuation',    label: 'Valuation' },
+              { id: 'conversions',  label: 'Conversions', dot: pendingConversions > 0 ? '#d97706' : null },
+              { id: 'setup',        label: 'Setup' },
             ] : []),
           ]}
         />
@@ -114,6 +138,7 @@ export default function InventoryPage() {
             isAdmin={isAdmin}
             locations={locations}
             projects={projects}
+            settings={features}
             onStockChange={refreshLowStock}
             onReorderClick={isAdmin ? handleReorderClick : null}
           />
@@ -126,6 +151,7 @@ export default function InventoryPage() {
             isAdmin={isAdmin}
             locations={locations}
             projects={projects}
+            settings={features}
             onTransaction={refreshLowStock}
             onConversionSaved={refreshConversions}
           />
@@ -133,6 +159,7 @@ export default function InventoryPage() {
         {tab === 'cycle' && isAdmin && (
           <InventoryCycleCounts
             locations={locations}
+            settings={features}
             onComplete={refreshLowStock}
           />
         )}
@@ -150,31 +177,20 @@ export default function InventoryPage() {
           <InventoryConversions onConversionChange={refreshConversions} />
         )}
         {tab === 'setup' && isAdmin && (
-          <InventorySetup projects={projects} />
+          <InventorySetup projects={projects} settings={features} />
         )}
         {tab === 'mycount' && !isAdmin && (
           <MyCount />
         )}
-      </main>
-    </div>
+    </PageShell>
   );
 }
 
 const HEADER_BG = '#92400e';
 
 const styles = {
-  page:          { minHeight: '100vh', background: '#f9fafb', fontFamily: 'system-ui, sans-serif' },
   loading:       { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#6b7280' },
-  header:        { display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, minHeight: 'calc(56px + env(safe-area-inset-top))', background: HEADER_BG, color: '#fff', position: 'sticky', top: 0, zIndex: 100 },
-  headerTopRow:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
-  logoGroup:     { display: 'flex', alignItems: 'center', gap: 10 },
-  companyName:   { fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' },
-  headerRight:   { display: 'flex', alignItems: 'center', gap: 10 },
-  userName:      { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
-  headerBtn:     { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  main:          { maxWidth: 960, margin: '24px auto 0', padding: '0 16px 80px' },
   disabled:      { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 12, padding: 24 },
-  disabledIcon:  { fontSize: 48 },
   disabledTitle: { fontSize: 20, fontWeight: 700, color: '#374151', margin: 0 },
   disabledBody:  { fontSize: 14, color: '#6b7280', textAlign: 'center', maxWidth: 340, margin: 0 },
 };

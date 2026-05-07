@@ -5,6 +5,7 @@ import { langToLocale } from '../utils';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
+import FieldFilters from './FieldFilters';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
 
@@ -14,13 +15,20 @@ const STATUS_STYLES = {
   pending: { color: '#92400e', background: '#fef3c7' },
 };
 
+function parseInspectionName(name = '') {
+  const text = String(name || '').trim();
+  const match = text.match(/^(.*?)\s+-\s+([A-Z0-9-]+)(?:\s+\d{4}-\d{2}-\d{2})?$/);
+  if (!match) return { title: text || 'Inspection', ref: '' };
+  return { title: match[1], ref: match[2] };
+}
+
 // ITEM_TYPES is built inside TemplateBuilder using t keys
 
 // ── Preset Templates ───────────────────────────────────────────────────────────
 
 const PRESET_TEMPLATES = [
   {
-    name: 'Daily Site Safety',
+    name: 'Daily Workplace Safety',
     items: [
       { label: 'PPE available and in use', type: 'pass_fail' },
       { label: 'First aid kit stocked', type: 'pass_fail' },
@@ -32,15 +40,14 @@ const PRESET_TEMPLATES = [
     ],
   },
   {
-    name: 'Scaffold Inspection',
+    name: 'Equipment / Platform Inspection',
     items: [
-      { label: 'Base plates / mudsills in place', type: 'pass_fail' },
-      { label: 'Frames plumb and secure', type: 'pass_fail' },
-      { label: 'Cross bracing installed correctly', type: 'pass_fail' },
-      { label: 'Guardrails on all open sides (>10 ft)', type: 'pass_fail' },
-      { label: 'Planking secure and full coverage', type: 'pass_fail' },
-      { label: 'Access ladder or stairway provided', type: 'pass_fail' },
-      { label: 'Load capacity posted', type: 'pass_fail' },
+      { label: 'Equipment or platform is stable and secure', type: 'pass_fail' },
+      { label: 'Work surface is clear and usable', type: 'pass_fail' },
+      { label: 'Guards, rails, or barriers are in place where needed', type: 'pass_fail' },
+      { label: 'Access path is safe and unobstructed', type: 'pass_fail' },
+      { label: 'Load or capacity limits are understood', type: 'pass_fail' },
+      { label: 'Team knows who to report issues to', type: 'pass_fail' },
       { label: 'Inspector notes', type: 'text' },
     ],
   },
@@ -172,7 +179,7 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
 
 // ── Inspection Form (fill out an inspection) ──────────────────────────────────
 
-function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
+function InspectionForm({ templates, projects, initial, onSaved, onCancel, workLabel = 'Work' }) {
   const t = useT();
   const isEdit = !!initial?.id;
   const [form, setForm] = useState({
@@ -273,9 +280,9 @@ function InspectionForm({ templates, projects, initial, onSaved, onCancel }) {
 
       {projects.length > 0 && (
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.project} <span style={styles.optional}>{t.inspOptional}</span></label>
+          <label style={styles.label}>{workLabel} <span style={styles.optional}>{t.inspOptional}</span></label>
           <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-            <option value="">{t.inspNoProject}</option>
+            <option value="">{`No ${workLabel.toLowerCase()}`}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
@@ -382,6 +389,7 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
 
   const statusStyle = STATUS_STYLES[ins.status] || STATUS_STYLES.pending;
   const fmtDate = d => d ? new Date(d).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const displayName = parseInspectionName(ins.name);
 
   // Build a label lookup map from the template this inspection was based on
   const template = templates?.find(tpl => tpl.id === ins.template_id);
@@ -402,17 +410,18 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
       <div style={styles.cardHeader} onClick={() => setExpanded(e => !e)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setExpanded(prev => !prev)}>
         <div style={styles.cardMiddle}>
           <div style={styles.cardName}>
-            {ins.name}
+            {displayName.title}
+            {displayName.ref && <span style={styles.refTag}>{displayName.ref}</span>}
             {ins.pending && <span style={styles.pendingBadge}>{t.inspPendingSync}</span>}
           </div>
           <div style={styles.cardMeta}>
             <span>{fmtDate(ins.inspected_at)}</span>
             {ins.project_name && <span style={styles.projectTag}>{ins.project_name}</span>}
-            {ins.inspector && <span>👤 {ins.inspector}</span>}
-            {ins.location && <span>📍 {ins.location}</span>}
+            {ins.inspector && <span>By {ins.inspector}</span>}
+            {ins.location && <span>At {ins.location}</span>}
             {hasItems && (
               <span style={styles.scoreChip}>
-                {passCount}✓ {failCount}✗
+                {passCount} pass - {failCount} fail
               </span>
             )}
           </div>
@@ -473,11 +482,13 @@ function InspectionCard({ ins, isAdmin, templates, onEdit, onDeleted }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function InspectionChecklists({ projects }) {
+export default function InspectionChecklists({ projects, settings = null }) {
   const t = useT();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
 
   const [inspections, setInspections] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -519,6 +530,7 @@ export default function InspectionChecklists({ projects }) {
 
   const passCount = inspections.filter(i => i.status === 'pass').length;
   const failCount = inspections.filter(i => i.status === 'fail').length;
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   return (
     <div>
@@ -563,6 +575,7 @@ export default function InspectionChecklists({ projects }) {
             <InspectionForm
               templates={templates}
               projects={projects}
+              workLabel={workLabel}
               initial={editing || null}
               onSaved={handleSaved}
               onCancel={() => { setShowForm(false); setEditing(null); }}
@@ -572,7 +585,7 @@ export default function InspectionChecklists({ projects }) {
       )}
 
       {view === 'inspections' && (
-        <div style={styles.filterBar}>
+        <FieldFilters activeCount={activeFilterCount}>
           <select style={styles.filterSelect} value={filters.status || ''} onChange={e => setFilter('status', e.target.value)}>
             <option value="">{t.inspAllStatuses}</option>
             <option value="pass">{t.inspStatusPass}</option>
@@ -581,7 +594,7 @@ export default function InspectionChecklists({ projects }) {
           </select>
           {projects.length > 0 && (
             <select style={styles.filterSelect} value={filters.project_id || ''} onChange={e => setFilter('project_id', e.target.value)}>
-              <option value="">{t.inspAllProjects}</option>
+              <option value="">{`All ${workLabelPlural}`}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           )}
@@ -593,7 +606,7 @@ export default function InspectionChecklists({ projects }) {
           )}
           <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title={t.fromDate} />
           <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title={t.toDate} />
-        </div>
+        </FieldFilters>
       )}
 
       {loading ? (
@@ -601,7 +614,6 @@ export default function InspectionChecklists({ projects }) {
       ) : view === 'templates' ? (
         templates.length === 0 ? (
           <div style={styles.empty}>
-            <div style={styles.emptyIcon}>📋</div>
             <p style={styles.emptyText}>{t.inspNoTemplates}</p>
           </div>
         ) : (
@@ -636,7 +648,6 @@ export default function InspectionChecklists({ projects }) {
         )
       ) : inspections.length === 0 ? (
         <div style={styles.empty}>
-          <div style={styles.emptyIcon}>✅</div>
           <p style={styles.emptyText}>{isAdmin ? t.inspNoInspectionsAdmin : t.inspNoInspectionsWorker}</p>
         </div>
       ) : (
@@ -686,8 +697,9 @@ const styles = {
   cardFail: { boxShadow: '0 1px 6px rgba(0,0,0,0.07), inset 3px 0 0 #ef4444' },
   cardHeader: { display: 'flex', alignItems: 'flex-start', padding: '13px 16px', cursor: 'pointer', gap: 12 },
   cardMiddle: { flex: 1, minWidth: 0 },
-  cardName: { fontWeight: 700, fontSize: 14, color: '#111827', marginBottom: 4 },
+  cardName: { display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', fontWeight: 700, fontSize: 14, color: '#111827', marginBottom: 4 },
   cardMeta: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: '#6b7280' },
+  refTag: { color: '#475569', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 999, padding: '1px 7px', fontSize: 11, fontWeight: 800 },
   projectTag: { background: '#ede9fe', color: '#6d28d9', padding: '1px 7px', borderRadius: 10, fontWeight: 600 },
   scoreChip: { background: '#f3f4f6', color: '#374151', padding: '1px 7px', borderRadius: 10, fontWeight: 600, fontSize: 11 },
   cardRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },

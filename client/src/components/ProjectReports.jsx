@@ -26,11 +26,15 @@ function defaultDates() {
   return { from: fmt(sun), to: fmt(sat) };
 }
 
-export default function ProjectReports({ currency = 'USD' }) {
+export default function ProjectReports({ currency = 'USD', settings = null }) {
   const t = useT();
   const { user } = useAuth();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelLower = workerLabel.toLowerCase();
 
   useEffect(() => {
     api.get('/admin/projects/metrics')
@@ -39,16 +43,16 @@ export default function ProjectReports({ currency = 'USD' }) {
   }, []);
 
   if (loading) return <SkeletonList count={4} rows={3} />;
-  if (projects.length === 0) return <p style={{ color: '#666' }}>{t.noProjectsMsg}</p>;
+  if (projects.length === 0) return <p style={{ color: '#666' }}>{`No ${workLabelPlural.toLowerCase()} yet.`}</p>;
 
   return (
     <div style={styles.list}>
-      {projects.map(p => <ProjectCard key={p.id} project={p} currency={currency} />)}
+      {projects.map(p => <ProjectCard key={p.id} project={p} currency={currency} workerLabel={workerLabel} workerLabelLower={workerLabelLower} />)}
     </div>
   );
 }
 
-function ProjectCard({ project: p, currency = 'USD' }) {
+function ProjectCard({ project: p, currency = 'USD', workerLabel = 'Worker', workerLabelLower = 'worker' }) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [from, setFrom] = useState(defaultDates().from);
@@ -77,7 +81,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
       import('@react-pdf/renderer'),
       import('./ProjectBillPDF'),
     ]);
-    const el = React.createElement(ProjectBillPDF, { data: billData, currency, t, language: user?.language });
+    const el = React.createElement(ProjectBillPDF, { data: billData, currency, t, language: user?.language, settings });
     return { pdf, el };
   };
 
@@ -114,7 +118,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
         <div style={styles.cardHeader}>
           <span style={styles.name}>{p.name}</span>
           <div style={styles.headerRight}>
-            <span style={styles.sub}>{p.worker_count} worker{p.worker_count !== 1 ? 's' : ''} · {p.total_entries} entr{p.total_entries !== 1 ? 'ies' : 'y'}</span>
+            <span style={styles.sub}>{p.worker_count} {p.worker_count === 1 ? workerLabelLower : `${workerLabelLower}s`} · {p.total_entries} entr{p.total_entries !== 1 ? 'ies' : 'y'}</span>
             <span style={styles.expandBtn}>{expanded ? '▲' : '▼'}</span>
           </div>
         </div>
@@ -168,7 +172,7 @@ function ProjectCard({ project: p, currency = 'USD' }) {
                   {pdfGenerating ? t.preparing : showPreview ? t.hidePreview : t.previewBill}
                 </button>
                 <button style={styles.csvBtn} onClick={() => {
-                  const headers = ['Date', 'Worker', 'Wage Type', 'Start', 'End', 'Hours'];
+                  const headers = ['Date', workerLabel, 'Wage Type', 'Start', 'End', 'Hours'];
                   const rows = billData.entries.map(e => {
                     const h = ((new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000).toFixed(2);
                     return [e.work_date?.toString().substring(0,10), e.worker_name, e.wage_type, e.start_time, e.end_time, h];

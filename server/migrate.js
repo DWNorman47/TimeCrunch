@@ -1,13 +1,16 @@
 require('dotenv').config();
 const { Pool } = require('pg');
+const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { stripSslMode } = require('./utils/dbConnString');
 
+const ssl = process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false };
+
 async function migrate() {
   const pool = new Pool({
     connectionString: stripSslMode(process.env.DATABASE_URL),
-    ssl: { rejectUnauthorized: false },
+    ssl,
   });
 
   try {
@@ -50,7 +53,30 @@ async function migrate() {
   }
 }
 
-migrate().catch(err => {
+async function seedDemoDataIfEnabled() {
+  if (process.env.DEMO_SEED_AUTO !== 'true') return;
+
+  const companyName = process.env.DEMO_COMPANY_NAME || 'Demo Operations';
+  console.log(`[demo-seed] auto seed enabled for "${companyName}"`);
+
+  const result = spawnSync(process.execPath, [path.join(__dirname, 'scripts', 'seed-demo-data.js')], {
+    cwd: __dirname,
+    env: process.env,
+    stdio: 'inherit',
+  });
+
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`Demo seed failed with exit code ${result.status ?? 'unknown'}`);
+  }
+}
+
+async function main() {
+  await migrate();
+  await seedDemoDataIfEnabled();
+}
+
+main().catch(err => {
   console.error('[migrate] FAILED:', err.message);
   process.exit(1);
 });

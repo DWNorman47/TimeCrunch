@@ -246,6 +246,57 @@ describe.each([['English'], ['Spanish']])('smoke: admin pages (%s)', (language) 
 // only renders when there are projects). These targeted tests feed each
 // list view enough data to exercise the item-renderer path.
 
+describe('smoke: FieldPage hash routes', () => {
+  const fieldSettings = {
+    ...DEFAULT_SETTINGS,
+    feature_media_gallery: true,
+    module_inventory: true,
+    label_work: 'Work',
+    label_worker: 'Team Member',
+  };
+  const projects = [{ id: 1, name: 'Demo Work', job_number: 'DW-1' }];
+  const pagedEmpty = { items: [], pages: 1, total: 0 };
+
+  test.each([
+    'notes',
+    'daily',
+    'reports',
+    'gallery',
+    'punchlist',
+    'incidents',
+    'incident',
+    'rfi',
+    'rfis',
+    'safety',
+    'checklists',
+    'inspect',
+    'equipment',
+    'equip',
+    'subs',
+  ])('FieldPage boots at #%s', async (hash) => {
+    const api = (await import('../api')).default;
+    api.get.mockImplementation((url) => {
+      if (url.startsWith('/settings')) return Promise.resolve({ data: fieldSettings });
+      if (url.startsWith('/projects')) return Promise.resolve({ data: projects });
+      if (url.startsWith('/field-reports/photos')) return Promise.resolve({ data: pagedEmpty });
+      if (url.startsWith('/field-reports')) return Promise.resolve({ data: pagedEmpty });
+      if (url.startsWith('/daily-reports')) return Promise.resolve({ data: pagedEmpty });
+      if (url.startsWith('/incidents')) return Promise.resolve({ data: pagedEmpty });
+      if (url.startsWith('/rfis')) return Promise.resolve({ data: pagedEmpty });
+      if (url.startsWith('/sub-reports')) return Promise.resolve({ data: pagedEmpty });
+      if (url.startsWith('/equipment')) return Promise.resolve({ data: [] });
+      if (url.startsWith('/safety-talks')) return Promise.resolve({ data: pagedEmpty });
+      if (url.startsWith('/safety-checklists')) return Promise.resolve({ data: [] });
+      if (url.startsWith('/inspections')) return Promise.resolve({ data: pagedEmpty });
+      if (url.startsWith('/company-info')) return Promise.resolve({ data: { name: 'Test Co' } });
+      return Promise.resolve({ data: [] });
+    });
+    window.history.replaceState(null, '', `/field#${hash}`);
+    const { default: FieldPage } = await import('../pages/FieldPage');
+    await smokeRender(<FieldPage />, { user: makeUser('admin') });
+  });
+});
+
 describe('smoke: populated list views (catches sub-component bugs)', () => {
   test('TeamPage Directory renders with multiple members', async () => {
     const api = (await import('../api')).default;

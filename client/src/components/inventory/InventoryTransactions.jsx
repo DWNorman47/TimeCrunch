@@ -4,6 +4,7 @@ import UomConversionModal from './UomConversionModal';
 import { useT } from '../../hooks/useT';
 import { SkeletonList } from '../Skeleton';
 import ModalShell from '../ModalShell';
+import ColumnHeaderMenu from './ColumnHeaderMenu';
 import { silentError } from '../../errorReporter';
 const TYPE_COLORS = {
   receive:  { color: '#059669', bg: '#d1fae5' },
@@ -12,9 +13,36 @@ const TYPE_COLORS = {
   adjust:   { color: '#6b7280', bg: '#f3f4f6' },
   convert:  { color: '#8b5cf6', bg: '#ede9fe' },
 };
+const TX_PAGE_SIZE_PREF_KEY = 'inventory_transactions_page_size';
+const TX_MOBILE_VIEW_PREF_KEY = 'inventory_transactions_mobile_view';
+const TX_PAGE_SIZE_OPTIONS = [25, 50, 100, 250];
 
-function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onConversionSaved }) {
+function readNumberPref(key, fallback, allowed) {
+  try {
+    const value = parseInt(localStorage.getItem(key), 10);
+    return allowed.includes(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function readMobileViewPref(key) {
+  try {
+    return localStorage.getItem(key) === 'list' ? 'list' : 'card';
+  } catch {
+    return 'card';
+  }
+}
+
+function formatQty(value) {
+  const qty = parseFloat(value);
+  if (Number.isNaN(qty)) return '-';
+  return qty % 1 === 0 ? String(parseInt(qty, 10)) : qty.toFixed(2);
+}
+
+function TransactionForm({ isAdmin, locations, projects, settings, onSave, onCancel, onConversionSaved }) {
   const t = useT();
+  const workLabel = settings?.label_work || 'Work';
   const TYPE_LABELS = {
     receive:  t.invTxTypeReceive,
     issue:    t.invTxTypeIssue,
@@ -198,8 +226,13 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
   })();
 
   return (
-    <form onSubmit={submit} style={f.form}>
-      <h3 style={f.title}>{t.invTxLogMovement}</h3>
+    <form className="inventory-transaction-form" onSubmit={submit} style={f.form}>
+      <div className="inventory-transaction-title-row" style={f.titleRow}>
+        <h3 style={f.title}>{t.invTxLogMovement}</h3>
+        <button type="button" className="inventory-transaction-close" style={f.closeBtn} onClick={onCancel} aria-label={t.labelModalClose || 'Close'}>
+          X
+        </button>
+      </div>
       {error   && <div style={f.error}>{error}</div>}
       {warning && <div style={f.warning}>{warning}</div>}
 
@@ -216,7 +249,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
         </div>
       )}
 
-      <div style={f.row}>
+      <div className="inventory-transaction-grid" style={f.row}>
         <div style={f.field}>
           <label htmlFor="itx-item" style={f.label}>{t.invTxColItem} *</label>
           <select id="itx-item" style={f.input} value={form.item_id} onChange={e => {
@@ -258,7 +291,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
       </div>
 
       {isConvert && (
-        <div style={f.row}>
+        <div className="inventory-transaction-grid" style={f.row}>
           <div style={f.field}>
             <label htmlFor="itx-to-uom" style={f.label}>{t.invTxConvertToUom}</label>
             <select id="itx-to-uom" style={f.input} value={form.to_uom_id} onChange={e => set('to_uom_id', e.target.value)}>
@@ -320,7 +353,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
             </select>
           </div>
           {binOpts.areas.length > 0 && (
-            <div style={f.binRow}>
+            <div className="inventory-transaction-bin-grid" style={f.binRow}>
               <div style={f.binField}>
                 <label htmlFor="itx-bin-area" style={f.label}>{t.binLabelArea}</label>
                 <select id="itx-bin-area" style={f.input} value={form.area_id} onChange={e => set('area_id', e.target.value)}>
@@ -362,7 +395,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
 
       {(form.type === 'issue' || form.type === 'receive') && (
         <div style={f.field}>
-          <label htmlFor="itx-project" style={f.label}>{t.project}</label>
+          <label htmlFor="itx-project" style={f.label}>{workLabel}</label>
           <select id="itx-project" style={f.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
             <option value="">{t.none}</option>
             {projects.filter(p => p.active !== false).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -372,7 +405,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
 
       {isAdmin && (
         <>
-          <div style={f.row}>
+          <div className="inventory-transaction-grid" style={f.row}>
             <div style={f.field}>
               <label htmlFor="itx-unit-cost" style={f.label}>{t.invTxUnitCost}</label>
               <input id="itx-unit-cost" style={f.input} type="number" min="0" step="0.01" value={form.unit_cost} onChange={e => set('unit_cost', e.target.value)} placeholder={t.optional} />
@@ -382,7 +415,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
               <input id="itx-ref-po" style={f.input} maxLength={100} value={form.reference_no} onChange={e => set('reference_no', e.target.value)} placeholder={t.optional} />
             </div>
           </div>
-          <div style={f.row}>
+          <div className="inventory-transaction-grid" style={f.row}>
             {form.type === 'receive' && suppliers.length > 0 && (
               <div style={f.field}>
                 <label htmlFor="itx-supplier" style={f.label}>{t.invPOSupplier}</label>
@@ -408,7 +441,7 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
         <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 }}>{(form.notes || '').length}/1000</div>
       </div>
 
-      <div style={f.actions}>
+      <div className="inventory-transaction-actions" style={f.actions}>
         <button type="button" style={f.cancelBtn} onClick={onCancel}>{t.cancel}</button>
         <button type="submit" style={{ ...f.saveBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={saving}>{saving ? t.saving : t.invTxLogTx}</button>
       </div>
@@ -430,8 +463,9 @@ function TransactionForm({ isAdmin, locations, projects, onSave, onCancel, onCon
   );
 }
 
-export default function InventoryTransactions({ isAdmin, locations, projects, onTransaction, onConversionSaved }) {
+export default function InventoryTransactions({ isAdmin, locations, projects, settings, onTransaction, onConversionSaved }) {
   const t = useT();
+  const workLabel = settings?.label_work || 'Work';
   const TYPE_LABELS = {
     receive:  t.invTxTypeReceive,
     issue:    t.invTxTypeIssue,
@@ -444,35 +478,74 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [filters, setFilters] = useState({ type: '', location_id: '', from: '', to: '', supplier_id: '', lot_number: '' });
+  const [filters, setFilters] = useState({
+    type: '',
+    from_location_id: '',
+    to_location_id: '',
+    project_id: '',
+    from: '',
+    to: '',
+    supplier_id: '',
+    lot_number: '',
+    item_search: '',
+    by_search: '',
+    notes_search: '',
+  });
+  const [sortBy, setSortBy] = useState('date');
+  const [sortDir, setSortDir] = useState('desc');
   const [suppliers, setSuppliers] = useState([]);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(() => readNumberPref(TX_PAGE_SIZE_PREF_KEY, 50, TX_PAGE_SIZE_OPTIONS));
+  const [mobileView, setMobileView] = useState(() => readMobileViewPref(TX_MOBILE_VIEW_PREF_KEY));
 
   useEffect(() => {
     if (isAdmin) api.get('/inventory/suppliers').then(r => setSuppliers(r.data)).catch(silentError('inventory-transactions fetch'));
   }, [isAdmin]);
-  const [offset, setOffset] = useState(0);
-  const LIMIT = 50;
 
-  const load = useCallback(async (off = 0) => {
+  useEffect(() => {
+    try {
+      localStorage.setItem(TX_PAGE_SIZE_PREF_KEY, String(pageSize));
+    } catch {
+      // Storage is best-effort only.
+    }
+  }, [pageSize]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TX_MOBILE_VIEW_PREF_KEY, mobileView);
+    } catch {
+      // Storage is best-effort only.
+    }
+  }, [mobileView]);
+
+  const load = useCallback(async (nextPage = 0) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: LIMIT, offset: off });
+      const offset = nextPage * pageSize;
+      const params = new URLSearchParams({ limit: pageSize, offset });
       if (filters.type) params.set('type', filters.type);
-      if (filters.location_id) params.set('location_id', filters.location_id);
+      if (filters.from_location_id) params.set('from_location_id', filters.from_location_id);
+      if (filters.to_location_id) params.set('to_location_id', filters.to_location_id);
+      if (filters.project_id) params.set('project_id', filters.project_id);
       if (filters.from) params.set('from', filters.from);
       if (filters.to) params.set('to', filters.to);
       if (filters.supplier_id) params.set('supplier_id', filters.supplier_id);
       if (filters.lot_number) params.set('lot_number', filters.lot_number);
+      if (filters.item_search) params.set('item_search', filters.item_search);
+      if (filters.by_search) params.set('by_search', filters.by_search);
+      if (filters.notes_search) params.set('notes_search', filters.notes_search);
+      params.set('sort', sortBy);
+      params.set('dir', sortDir);
       const r = await api.get(`/inventory/transactions?${params}`);
       setTransactions(r.data.transactions);
       setTotal(r.data.total);
-      setOffset(off);
+      setPage(nextPage);
     } catch {
       setError(t.invTxFailedLoad);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, pageSize, sortBy, sortDir]);
 
   useEffect(() => { load(0); }, [load]);
 
@@ -482,9 +555,49 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
     onTransaction?.();
   };
 
-  const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
+  const setFilter = (k, v) => {
+    setPage(0);
+    setFilters(f => ({ ...f, [k]: v }));
+  };
+  const setColumnSort = (key, dir) => {
+    setPage(0);
+    setSortBy(key);
+    setSortDir(dir);
+  };
 
   const activeLocations = locations.filter(l => l.active);
+  const txSuggestions = {
+    items: transactions.flatMap(row => [row.item_name, row.sku]),
+    by: transactions.map(row => row.performed_by_name),
+    notes: transactions.flatMap(row => [row.notes, row.reference_no]),
+    lots: transactions.map(row => row.lot_number),
+  };
+  const resetFilters = () => {
+    setPage(0);
+    setFilters({
+      type: '',
+      from_location_id: '',
+      to_location_id: '',
+      project_id: '',
+      from: '',
+      to: '',
+      supplier_id: '',
+      lot_number: '',
+      item_search: '',
+      by_search: '',
+      notes_search: '',
+    });
+  };
+  const hasFilters = !!(
+    filters.item_search || filters.by_search || filters.notes_search || filters.type ||
+    filters.from_location_id || filters.to_location_id || filters.project_id || filters.from ||
+    filters.to || filters.supplier_id || filters.lot_number
+  );
+  const pageStart = total === 0 ? 0 : page * pageSize + 1;
+  const pageEnd = Math.min((page + 1) * pageSize, total);
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const canPrevPage = page > 0;
+  const canNextPage = pageEnd < total;
 
   return (
     <div style={s.wrap}>
@@ -493,12 +606,14 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
           <ModalShell
             onClose={() => setShowForm(false)}
             ariaLabel={t.invTxLogMovement}
+            className="inventory-transaction-modal"
             style={s.formModal}
           >
             <TransactionForm
               isAdmin={isAdmin}
               locations={locations}
               projects={projects}
+              settings={settings}
               onSave={handleSave}
               onCancel={() => setShowForm(false)}
               onConversionSaved={onConversionSaved}
@@ -507,42 +622,25 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
         </div>
       )}
       <>
-        <div style={s.toolbar}>
-            {isAdmin && (
-              <select style={s.select} value={filters.type} onChange={e => setFilter('type', e.target.value)}>
-                <option value="">{t.invTxAllTypes}</option>
-                {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-            )}
-            <select style={s.select} value={filters.location_id} onChange={e => setFilter('location_id', e.target.value)}>
-              <option value="">{t.invCycAllLocations}</option>
-              {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-            <div style={s.dateWrap}>
+        <div className="inventory-transaction-toolbar" style={s.toolbar}>
+            <div className="inventory-transaction-date" style={s.dateWrap}>
               <span style={s.dateLabel}>{t.invTxColFrom}</span>
               <input style={s.dateInput} type="date" value={filters.from} onChange={e => setFilter('from', e.target.value)} />
             </div>
-            <div style={s.dateWrap}>
+            <div className="inventory-transaction-date" style={s.dateWrap}>
               <span style={s.dateLabel}>{t.invTxColTo}</span>
               <input style={s.dateInput} type="date" value={filters.to} onChange={e => setFilter('to', e.target.value)} />
             </div>
             {(filters.from || filters.to) && (
-              <button style={s.clearDates} onClick={() => setFilters(f => ({ ...f, from: '', to: '' }))} title={t.invTxClearDates}>{t.invTxClearDates}</button>
+              <button style={s.clearDates} onClick={() => { setPage(0); setFilters(f => ({ ...f, from: '', to: '' })); }} title={t.invTxClearDates}>{t.invTxClearDates}</button>
             )}
-            {isAdmin && suppliers.length > 0 && (
-              <select style={s.select} value={filters.supplier_id} onChange={e => setFilter('supplier_id', e.target.value)}>
-                <option value="">{t.invTxAllSuppliers}</option>
-                {suppliers.map(sup => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
-              </select>
-            )}
-            {isAdmin && (
-              <input
-                style={{ ...s.dateInput, minWidth: 120 }}
-                type="text"
-                placeholder={t.invTxLotFilter}
-                value={filters.lot_number}
-                onChange={e => setFilter('lot_number', e.target.value)}
-              />
+            {hasFilters && (
+              <button
+                style={s.clearDates}
+                onClick={resetFilters}
+              >
+                Clear
+              </button>
             )}
             <button
               style={s.addBtn}
@@ -552,32 +650,71 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
             </button>
           </div>
 
+          <div style={s.mobileControls} className="inventory-mobile-controls">
+            <div style={s.mobileViewToggle} aria-label="Mobile inventory view">
+              {['card', 'list'].map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  style={{ ...s.mobileViewBtn, ...(mobileView === mode ? s.mobileViewBtnActive : {}) }}
+                  onClick={() => setMobileView(mode)}
+                >
+                  {mode === 'card' ? 'Cards' : 'List'}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {error && <div role="alert" style={s.error}>{error}</div>}
 
           {loading ? (
             <SkeletonList count={4} rows={2} />
           ) : transactions.length === 0 ? (
             <div style={s.empty}>
-              <div style={s.emptyIcon}>↔️</div>
               <p>{t.invTxNoTx}</p>
             </div>
           ) : (
             <>
-              <div style={s.tableWrap}>
+              <div
+                className={`inventory-table-wrap inventory-transaction-table-wrap ${mobileView === 'list' ? 'inventory-mobile-table-active' : ''}`}
+                style={s.tableWrap}
+              >
                 <table style={s.table}>
                   <thead>
                     <tr style={s.thead}>
-                      <th style={s.th}>{t.invTxColDate}</th>
-                      <th style={s.th}>{t.invTxColType}</th>
-                      <th style={s.th}>{t.invTxColItem}</th>
-                      <th style={{ ...s.th, textAlign: 'right' }}>{t.invTxColQty}</th>
-                      <th style={s.th}>{t.invTxColFrom}</th>
-                      <th style={s.th}>{t.invTxColTo}</th>
-                      <th style={s.th}>{t.project}</th>
-                      {isAdmin && <th style={s.th}>{t.invTxColSupplier}</th>}
-                      {isAdmin && <th style={s.th}>{t.invTxColLot}</th>}
-                      {isAdmin && <th style={s.th}>{t.invTxColBy}</th>}
-                      <th style={s.th}>{t.notes}</th>
+                      <th style={s.th}>
+                        <ColumnHeaderMenu label={t.invTxColDate} sortKey="date" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} />
+                      </th>
+                      <th style={s.th}>
+                        <ColumnHeaderMenu label={t.invTxColType} sortKey="type" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} filterType={isAdmin ? 'select' : null} filterValue={filters.type} onFilter={v => setFilter('type', v)} options={[{ value: '', label: t.invTxAllTypes }, ...Object.entries(TYPE_LABELS).map(([value, label]) => ({ value, label }))]} />
+                      </th>
+                      <th style={s.th}>
+                        <ColumnHeaderMenu label={t.invTxColItem} sortKey="item" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} filterType="text" filterValue={filters.item_search} onFilter={v => setFilter('item_search', v)} suggestions={txSuggestions.items} placeholder="Item or SKU" />
+                      </th>
+                      <th style={{ ...s.th, textAlign: 'right' }}>
+                        <ColumnHeaderMenu label={t.invTxColQty} align="right" sortKey="quantity" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} />
+                      </th>
+                      <th style={s.th}>
+                        <ColumnHeaderMenu label={t.invTxColFrom} sortKey="from" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} filterType="select" filterValue={filters.from_location_id} onFilter={v => setFilter('from_location_id', v)} options={[{ value: '', label: t.invCycAllLocations }, ...activeLocations.map(l => ({ value: String(l.id), label: l.name }))]} />
+                      </th>
+                      <th style={s.th}>
+                        <ColumnHeaderMenu label={t.invTxColTo} sortKey="to" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} filterType="select" filterValue={filters.to_location_id} onFilter={v => setFilter('to_location_id', v)} options={[{ value: '', label: t.invCycAllLocations }, ...activeLocations.map(l => ({ value: String(l.id), label: l.name }))]} />
+                      </th>
+                      <th style={s.th}>
+                        <ColumnHeaderMenu label={workLabel} sortKey="project" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} filterType={projects?.length > 0 ? 'select' : null} filterValue={filters.project_id} onFilter={v => setFilter('project_id', v)} options={[{ value: '', label: `All ${workLabel.toLowerCase()}` }, ...(projects || []).filter(p => p.active !== false).map(p => ({ value: String(p.id), label: p.name }))]} />
+                      </th>
+                      {isAdmin && <th style={s.th}>
+                        <ColumnHeaderMenu label={t.invTxColSupplier} sortKey="supplier" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} filterType={suppliers.length > 0 ? 'select' : null} filterValue={filters.supplier_id} onFilter={v => setFilter('supplier_id', v)} options={[{ value: '', label: t.invTxAllSuppliers }, ...suppliers.map(sup => ({ value: String(sup.id), label: sup.name }))]} />
+                      </th>}
+                      {isAdmin && <th style={s.th}>
+                        <ColumnHeaderMenu label={t.invTxColLot} sortKey="lot" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} filterType="text" filterValue={filters.lot_number} onFilter={v => setFilter('lot_number', v)} suggestions={txSuggestions.lots} placeholder={t.invTxLotFilter} />
+                      </th>}
+                      {isAdmin && <th style={s.th}>
+                        <ColumnHeaderMenu label={t.invTxColBy} sortKey="by" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} filterType="text" filterValue={filters.by_search} onFilter={v => setFilter('by_search', v)} suggestions={txSuggestions.by} placeholder="Person" />
+                      </th>}
+                      <th style={s.th}>
+                        <ColumnHeaderMenu label={t.notes} sortKey={null} activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} filterType="text" filterValue={filters.notes_search} onFilter={v => setFilter('notes_search', v)} suggestions={txSuggestions.notes} placeholder="Notes or ref" />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -593,7 +730,7 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
                           </td>
                           <td style={{ ...s.td, fontWeight: 600 }}>{t.item_name}</td>
                           <td style={{ ...s.td, textAlign: 'right', fontWeight: 700 }}>
-                            {parseFloat(t.quantity) % 1 === 0 ? parseInt(t.quantity) : parseFloat(t.quantity).toFixed(2)} {t.unit}
+                            {formatQty(t.quantity)} {t.unit}
                           </td>
                           <td style={{ ...s.td, color: '#6b7280', fontSize: 13 }}>{t.from_location_name || '—'}</td>
                           <td style={{ ...s.td, color: '#6b7280', fontSize: 13 }}>{t.to_location_name || '—'}</td>
@@ -608,12 +745,92 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
                   </tbody>
                 </table>
               </div>
-              {total > transactions.length + offset && (
-                <div style={s.loadMore}>
-                  <button style={s.loadMoreBtn} onClick={() => load(offset + LIMIT)}>{t.invTxLoadMore}</button>
+              <div
+                style={s.mobileCards}
+                className={`inventory-mobile-cards ${mobileView === 'list' ? 'inventory-mobile-cards-hidden' : ''}`}
+              >
+                {transactions.map(tx => {
+                  const tc = TYPE_COLORS[tx.type] || TYPE_COLORS.adjust;
+                  const movement = [tx.from_location_name || 'Origin', tx.to_location_name || 'Destination'].join(' -> ');
+                  const details = [tx.supplier_name, tx.lot_number, tx.performed_by_name].filter(Boolean).join(' - ');
+                  return (
+                    <article key={tx.id} style={s.mobileCard}>
+                      <div style={s.mobileCardTop}>
+                        <span style={{ ...s.badge, color: tc.color, background: tc.bg }}>{TYPE_LABELS[tx.type]}</span>
+                        <span style={s.mobileDate}>
+                          {new Date(tx.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </div>
+                      <div style={s.mobileTitleRow}>
+                        <strong style={s.mobileCardTitle}>{tx.item_name}</strong>
+                        <strong style={s.mobileQty}>{formatQty(tx.quantity)} {tx.unit}</strong>
+                      </div>
+                      <div style={s.mobileDetailGrid}>
+                        <div>
+                          <span style={s.mobileLabel}>Movement</span>
+                          <span style={s.mobileText}>{movement}</span>
+                        </div>
+                        {tx.project_name && (
+                          <div>
+                            <span style={s.mobileLabel}>{workLabel}</span>
+                            <span style={s.mobileText}>{tx.project_name}</span>
+                          </div>
+                        )}
+                        {isAdmin && details && (
+                          <div>
+                            <span style={s.mobileLabel}>Details</span>
+                            <span style={s.mobileText}>{details}</span>
+                          </div>
+                        )}
+                        {(tx.notes || tx.reference_no) && (
+                          <div>
+                            <span style={s.mobileLabel}>Notes</span>
+                            <span style={s.mobileText}>{tx.notes || `Ref: ${tx.reference_no}`}</span>
+                          </div>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              <div style={s.pagination}>
+                <div style={s.paginationMeta}>
+                  <span style={s.pageInfo}>Showing {pageStart}-{pageEnd} of {total}</span>
+                  <span style={s.pageInfo}>Page {page + 1} of {pageCount}</span>
                 </div>
-              )}
-              <p style={s.count}>{t.invTxShowing.replace('{n}', Math.min(transactions.length, total)).replace('{total}', total)}</p>
+                <div style={s.paginationControls}>
+                  <label style={s.pageSizeLabel}>
+                    <select
+                      style={s.pageSizeSelect}
+                      value={pageSize}
+                      onChange={e => {
+                        setPageSize(parseInt(e.target.value, 10));
+                        setPage(0);
+                      }}
+                    >
+                      {TX_PAGE_SIZE_OPTIONS.map(size => (
+                        <option key={size} value={size}>{size}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <div style={s.pageButtons}>
+                    <button
+                      style={{ ...s.pageBtn, ...(!canPrevPage ? s.pageBtnDisabled : {}) }}
+                      disabled={!canPrevPage}
+                      onClick={() => load(Math.max(0, page - 1))}
+                    >
+                      Prev
+                    </button>
+                    <button
+                      style={{ ...s.pageBtn, ...(!canNextPage ? s.pageBtnDisabled : {}) }}
+                      disabled={!canNextPage}
+                      onClick={() => load(page + 1)}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
             </>
           )}
         </>
@@ -623,7 +840,9 @@ export default function InventoryTransactions({ isAdmin, locations, projects, on
 
 const f = {
   form:      { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 24, margin: 16 },
-  title:     { fontSize: 17, fontWeight: 700, color: '#111827', marginBottom: 20 },
+  titleRow:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 20 },
+  title:     { fontSize: 17, fontWeight: 700, color: '#111827', margin: 0 },
+  closeBtn:  { border: '1px solid #d1d5db', background: '#fff', color: '#64748b', borderRadius: 8, width: 34, height: 34, fontSize: 16, cursor: 'pointer', flexShrink: 0 },
   error:     { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 14 },
   warning:   { background: '#fef3c7', color: '#92400e', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 14 },
   row:       { display: 'flex', gap: 12, flexWrap: 'wrap' },
@@ -640,20 +859,26 @@ const f = {
 };
 
 const s = {
-  wrap:        { padding: 16 },
+  wrap:        { padding: 16, minWidth: 0, maxWidth: '100%', overflowX: 'hidden' },
   formOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 150, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 16, overflowY: 'auto' },
   formModal:   { background: '#fff', borderRadius: 12, width: '100%', maxWidth: 720, marginTop: 24, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', maxHeight: 'calc(100vh - 48px)', overflowY: 'auto' },
-  toolbar:     { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 },
+  toolbar:     { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16, minWidth: 0, maxWidth: '100%' },
   select:      { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151' },
+  searchInput: { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#374151', background: '#fff', minWidth: 220, flex: '1 1 240px' },
+  dirBtn:      { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   dateWrap:    { display: 'flex', alignItems: 'center', gap: 5 },
   dateLabel:   { fontSize: 12, fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap' },
   dateInput:   { padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#374151', background: '#fff' },
   clearDates:  { padding: '7px 11px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fee2e2', color: '#dc2626', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
   addBtn:      { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginLeft: 'auto', whiteSpace: 'nowrap' },
+  mobileControls: { display: 'none' },
+  mobileViewToggle: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, padding: 4, border: '1px solid #d1d5db', borderRadius: 9, background: '#f8fafc' },
+  mobileViewBtn: { border: 'none', borderRadius: 7, padding: '8px 10px', background: 'transparent', color: '#64748b', fontSize: 13, fontWeight: 800, cursor: 'pointer' },
+  mobileViewBtnActive: { background: '#fff', color: '#111827', boxShadow: '0 1px 3px rgba(15,23,42,0.12)' },
   error:       { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },
   empty:       { textAlign: 'center', padding: '60px 24px', color: '#6b7280', fontSize: 15 },
   emptyIcon:   { fontSize: 40, marginBottom: 12 },
-  tableWrap:   { overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb' },
+  tableWrap:   { overflowX: 'auto', maxWidth: '100%', minWidth: 0, borderRadius: 10, border: '1px solid #e5e7eb', paddingBottom: 12, scrollbarGutter: 'stable' },
   table:       { width: '100%', borderCollapse: 'collapse', minWidth: 700 },
   thead:       { background: '#f9fafb' },
   th:          { padding: '10px 12px', fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left', borderBottom: '2px solid #e5e7eb' },
@@ -661,7 +886,23 @@ const s = {
   rowEven:     { background: '#fafafa', borderBottom: '1px solid #f3f4f6' },
   td:          { padding: '10px 12px', fontSize: 14, color: '#374151' },
   badge:       { display: 'inline-block', padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700 },
-  loadMore:    { textAlign: 'center', padding: '16px 0' },
-  loadMoreBtn: { padding: '8px 20px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
-  count:       { textAlign: 'center', fontSize: 13, color: '#6b7280', marginTop: 8 },
+  mobileCards: { display: 'none' },
+  mobileCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, boxShadow: '0 1px 4px rgba(15,23,42,0.04)' },
+  mobileCardTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
+  mobileDate: { fontSize: 12, color: '#64748b', fontWeight: 700, whiteSpace: 'nowrap' },
+  mobileTitleRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'start', marginBottom: 12 },
+  mobileCardTitle: { fontSize: 16, color: '#111827', lineHeight: 1.25 },
+  mobileQty: { fontSize: 16, color: '#111827', textAlign: 'right', whiteSpace: 'nowrap' },
+  mobileDetailGrid: { display: 'grid', gridTemplateColumns: '1fr', gap: 8, paddingTop: 10, borderTop: '1px solid #f1f5f9' },
+  mobileLabel: { display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 },
+  mobileText: { display: 'block', fontSize: 13, color: '#334155', lineHeight: 1.35 },
+  pagination:  { display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 8, padding: '10px 0 14px', minWidth: 0, maxWidth: '100%' },
+  paginationMeta: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  paginationControls: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%', minWidth: 0 },
+  pageButtons: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, minWidth: 0 },
+  pageInfo:    { fontSize: 13, color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap' },
+  pageSizeLabel: { display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap' },
+  pageSizeSelect: { padding: '6px 9px', borderRadius: 7, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 13, fontWeight: 700 },
+  pageBtn:     { padding: '7px 12px', borderRadius: 7, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  pageBtnDisabled: { opacity: 0.5, cursor: 'not-allowed' },
 };

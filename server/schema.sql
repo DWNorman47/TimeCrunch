@@ -200,7 +200,7 @@ CREATE TABLE IF NOT EXISTS field_reports (
   id          SERIAL PRIMARY KEY,
   company_id  UUID         NOT NULL REFERENCES companies(id),
   project_id  INTEGER      REFERENCES projects(id) ON DELETE SET NULL,
-  worker_id   INTEGER      NOT NULL REFERENCES users(id),
+  user_id     INTEGER      NOT NULL REFERENCES users(id),
   title       VARCHAR(255),
   notes       TEXT,
   lat         DECIMAL(10,7),
@@ -303,6 +303,19 @@ CREATE TABLE IF NOT EXISTS safety_talk_signoffs (
   signed_at   TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
+-- Compatibility for databases created before field reports used user_id.
+ALTER TABLE field_reports ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'field_reports' AND column_name = 'worker_id'
+  ) THEN
+    EXECUTE 'UPDATE field_reports SET user_id = worker_id WHERE user_id IS NULL';
+  END IF;
+END $$;
+
 -- =============================================================================
 -- Indexes
 -- =============================================================================
@@ -332,7 +345,7 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id   ON push_subscription
 CREATE INDEX IF NOT EXISTS idx_audit_log_company_id         ON audit_log(company_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_created_at         ON audit_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_field_reports_company_id     ON field_reports(company_id);
-CREATE INDEX IF NOT EXISTS idx_field_reports_worker_id      ON field_reports(worker_id);
+CREATE INDEX IF NOT EXISTS idx_field_reports_user_id        ON field_reports(user_id);
 CREATE INDEX IF NOT EXISTS idx_daily_reports_company_id     ON daily_reports(company_id);
 CREATE INDEX IF NOT EXISTS idx_daily_reports_report_date    ON daily_reports(report_date);
 CREATE INDEX IF NOT EXISTS idx_daily_report_manpower_report ON daily_report_manpower(report_id);

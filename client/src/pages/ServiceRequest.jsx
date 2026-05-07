@@ -1,6 +1,6 @@
 /**
- * Public intake form for a contractor's clients. Unauthenticated —
- * reached at /r/:slug where :slug is the company slug. Includes a
+ * Public intake form for customer requests. Unauthenticated and reached at
+ * /r/:slug where :slug is the company slug. Includes a
  * hidden honeypot field and relies on server-side rate limiting.
  */
 
@@ -31,7 +31,7 @@ export default function ServiceRequest() {
 
   useDocumentMeta({
     title: companyName ? `Request work from ${companyName}` : 'Request work',
-    description: `Submit a service or project request to ${companyName || 'this contractor'} via OpsFloa.`,
+    description: `Submit a service, support, or work request to ${companyName || 'this business'} via OpsFloa.`,
     robots: 'noindex',
   });
 
@@ -68,14 +68,14 @@ export default function ServiceRequest() {
     }
   };
 
-  if (loading) return <div style={styles.loading}>Loading…</div>;
+  if (loading) return <div style={styles.loading}>Loading...</div>;
 
   if (notFound) {
     return (
       <div style={styles.page}>
         <div style={styles.card}>
-          <h1 style={styles.title}>We couldn't find that contractor.</h1>
-          <p style={styles.bodyText}>The link you used may be outdated. Please contact the contractor directly.</p>
+          <h1 style={styles.title}>We couldn't find that business.</h1>
+          <p style={styles.bodyText}>The link you used may be outdated. Please contact them directly.</p>
         </div>
       </div>
     );
@@ -85,8 +85,8 @@ export default function ServiceRequest() {
     return (
       <div style={styles.page}>
         <div style={styles.card}>
-          <div style={{ fontSize: 48, textAlign: 'center', marginBottom: 12 }}>✓</div>
-          <h1 style={styles.title}>Thanks — your request was sent.</h1>
+          <div style={{ fontSize: 48, textAlign: 'center', marginBottom: 12 }}>OK</div>
+          <h1 style={styles.title}>Thanks - your request was sent.</h1>
           <p style={styles.bodyText}>
             {companyName} has been notified and will follow up with you directly. If you included an
             email address, they may reply that way; if not, expect a phone call.
@@ -105,7 +105,7 @@ export default function ServiceRequest() {
         <div style={styles.header}>
           <div style={styles.logo}>OpsFloa</div>
           <h1 style={styles.title}>{companyName}</h1>
-          <p style={styles.subtitle}>Request service or a project estimate</p>
+          <p style={styles.subtitle}>Request service, support, or an estimate</p>
         </div>
 
         {!accepting ? (
@@ -114,7 +114,7 @@ export default function ServiceRequest() {
           </p>
         ) : (
           <form onSubmit={submit} style={styles.form}>
-            {/* Honeypot — visually hidden, labeled to help accessibility tools */}
+            {/* Honeypot, visually hidden and labeled for accessibility tools. */}
             <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', height: 0, width: 0, overflow: 'hidden' }}>
               <label>Website <input type="text" tabIndex={-1} autoComplete="off" value={form.website} onChange={e => set('website', e.target.value)} /></label>
             </div>
@@ -158,7 +158,7 @@ export default function ServiceRequest() {
             <div style={styles.row}>
               <label style={styles.field}>
                 <span style={styles.label}>Describe the work *</span>
-                <textarea style={{ ...styles.input, minHeight: 120, resize: 'vertical' }} required maxLength={5000} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Tell the contractor what you need done, including any relevant details (timing, access, conditions)." />
+                <textarea style={{ ...styles.input, minHeight: 120, resize: 'vertical' }} required maxLength={5000} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Tell the team what you need done, including any relevant details (timing, access, conditions)." />
                 <span style={styles.counter}>{form.description.length} / 5000</span>
               </label>
             </div>
@@ -166,7 +166,7 @@ export default function ServiceRequest() {
             {error && <div role="alert" style={styles.error}>{error}</div>}
 
             <button type="submit" style={{ ...styles.submit, ...(submitting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} disabled={submitting}>
-              {submitting ? 'Sending…' : 'Send request'}
+              {submitting ? 'Sending...' : 'Send request'}
             </button>
             <p style={styles.note}>
               By submitting you agree that OpsFloa may share the above with {companyName}.

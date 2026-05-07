@@ -18,7 +18,11 @@ const WEATHER_KEYS = [
 ];
 
 function fmtDate(str, locale = 'en-US') {
-  return new Date(str + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  if (!str) return '';
+  const dateText = String(str);
+  const date = dateText.includes('T') ? new Date(dateText) : new Date(`${dateText}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateText;
+  return date.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function emptyRow(type) {
@@ -42,7 +46,7 @@ function RowInput({ value, onChange, type = 'text', placeholder, style, min, max
 
 // ── Report Editor ──────────────────────────────────────────────────────────────
 
-function ReportEditor({ report: initial, projects, onSaved, onCancel, companyName, fieldPhotos }) {
+function ReportEditor({ report: initial, projects, onSaved, onCancel, companyName, fieldPhotos, settings = null, workLabel = 'Work', workerLabelPlural = 'Workers' }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
@@ -80,7 +84,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
         import('@react-pdf/renderer'),
         import('./DailyReportPDF'),
       ]);
-      const blob = await pdf(React.createElement(DailyReportDocument, { report: reportData, companyName, fieldPhotos: fieldPhotos || [], language: user?.language })).toBlob();
+      const blob = await pdf(React.createElement(DailyReportDocument, { report: reportData, companyName, fieldPhotos: fieldPhotos || [], t, language: user?.language, settings })).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = `daily-report-${reportData.report_date || 'report'}.pdf`; a.click();
@@ -200,9 +204,9 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
           <input style={styles.input} type="date" value={form.report_date} onChange={e => set('report_date', e.target.value)} max={new Date().toLocaleDateString('en-CA')} />
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>{t.project}</label>
+          <label style={styles.label}>{workLabel}</label>
           <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-            <option value="">{t.noProjectOpt}</option>
+            <option value="">{`No ${workLabel.toLowerCase()}`}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
@@ -239,7 +243,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
           <thead>
             <tr>
               <th style={styles.th}>{t.tradeOrName}</th>
-              <th style={{ ...styles.th, width: 70 }}>{t.workers}</th>
+              <th style={{ ...styles.th, width: 70 }}>{workerLabelPlural}</th>
               <th style={{ ...styles.th, width: 70 }}>{t.hours}</th>
               <th style={{ ...styles.th, flex: 2 }}>{t.notes}</th>
               <th style={{ ...styles.th, width: 30 }}></th>
@@ -374,9 +378,10 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
 
 // ── Report list row ────────────────────────────────────────────────────────────
 
-function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyName, fieldPhotos }) {
+function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyName, fieldPhotos, settings = null, workLabel = 'Work' }) {
   const t = useT();
   const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [report, setReport] = useState(initialReport);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -392,7 +397,7 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
         import('@react-pdf/renderer'),
         import('./DailyReportPDF'),
       ]);
-      const blob = await pdf(React.createElement(DailyReportDocument, { report, companyName, fieldPhotos: fieldPhotos || [], language: user?.language })).toBlob();
+      const blob = await pdf(React.createElement(DailyReportDocument, { report, companyName, fieldPhotos: fieldPhotos || [], t, language: user?.language, settings })).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = `daily-report-${report.report_date || 'report'}.pdf`; a.click();
@@ -428,7 +433,7 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
     <div style={styles.reportRow}>
       <div style={styles.rowLeft} onClick={() => !report.pending && onEdit(report)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && !report.pending && onEdit(report)}>
         <div style={styles.rowDate}>{fmtDate(report.report_date, locale)}{report.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
-        <div style={styles.rowProject}>{report.project_name || t.noProjectOpt}</div>
+        <div style={styles.rowProject}>{report.project_name || `No ${workLabel.toLowerCase()}`}</div>
         {weather && <div style={styles.rowMeta}>{weather}{report.weather_temp != null ? ` · ${report.weather_temp}°F` : ''}</div>}
         {report.manpower_count > 0 && <div style={styles.rowMeta}>{report.manpower_count} {report.manpower_count !== 1 ? t.crewEntries : t.crewEntry}</div>}
         {isReviewed && report.reviewed_by && (
@@ -472,9 +477,12 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
 
 // ── Main DailyReports component ────────────────────────────────────────────────
 
-export default function DailyReports({ projects }) {
+export default function DailyReports({ projects, settings = null }) {
   const { user } = useAuth();
   const t = useT();
+  const workLabel = settings?.label_work || 'Work';
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
   const locale = langToLocale(user?.language);
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
@@ -549,6 +557,9 @@ export default function DailyReports({ projects }) {
         onCancel={() => setEditing(null)}
         companyName={user?.company_name}
         fieldPhotos={editing && editing !== 'new' ? getPhotos(editing) : []}
+        settings={settings}
+        workLabel={workLabel}
+        workerLabelPlural={workerLabelPlural}
       />
     );
   }
@@ -557,7 +568,7 @@ export default function DailyReports({ projects }) {
     <div>
       <div className="filter-row" style={styles.listHeader}>
         <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
-          <option value="">{t.allProjects}</option>
+          <option value="">{`All ${workLabel.endsWith('s') ? workLabel : `${workLabel}s`}`}</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <button style={styles.newBtn} onClick={() => setEditing('new')}>{t.newReport}</button>
@@ -566,7 +577,6 @@ export default function DailyReports({ projects }) {
       {loading ? <SkeletonList count={3} rows={2} /> :
         reports.length === 0 ? (
           <div style={styles.empty}>
-            <div style={styles.emptyIcon}>📋</div>
             <p style={styles.emptyText}>{t.noDailyReports}</p>
           </div>
         ) : (
@@ -581,6 +591,8 @@ export default function DailyReports({ projects }) {
                   isAdmin={isAdmin}
                   companyName={user?.company_name}
                   fieldPhotos={getPhotos(r)}
+                  settings={settings}
+                  workLabel={workLabel}
                 />
               ))}
             </div>

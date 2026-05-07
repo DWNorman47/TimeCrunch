@@ -1,11 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { langToLocale } from '../utils';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
 import { SkeletonList, SkeletonBlock } from './Skeleton';
 
 function today() { return new Date().toLocaleDateString('en-CA'); }
+
+function fmtEquipmentDate(value, locale = 'en-US') {
+  if (!value) return '';
+  const raw = value.toString().substring(0, 10);
+  const parsed = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return parsed.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 // ── Equipment Item Form (admin) ────────────────────────────────────────────────
 
@@ -78,7 +87,7 @@ function ItemForm({ initial, onSaved, onCancel }) {
 
 // ── Log Hours Form ─────────────────────────────────────────────────────────────
 
-function LogHoursForm({ item, projects, onLogged, onCancel }) {
+function LogHoursForm({ item, projects, onLogged, onCancel, workLabel = 'Work' }) {
   const t = useT();
   const { user } = useAuth();
   const [form, setForm] = useState({
@@ -124,9 +133,9 @@ function LogHoursForm({ item, projects, onLogged, onCancel }) {
       <div style={styles.row}>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label htmlFor="eq-project" style={styles.label}>{t.project}</label>
+            <label htmlFor="eq-project" style={styles.label}>{workLabel}</label>
             <select id="eq-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">{t.noProjectOpt}</option>
+              <option value="">{`No ${workLabel.toLowerCase()}`}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -151,8 +160,10 @@ function LogHoursForm({ item, projects, onLogged, onCancel }) {
 
 // ── Equipment Card ─────────────────────────────────────────────────────────────
 
-function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogged }) {
+function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogged, workLabel = 'Work' }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [expanded, setExpanded] = useState(false);
   const [loggingHours, setLoggingHours] = useState(false);
   const [hours, setHours] = useState([]);
@@ -209,7 +220,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
           <div style={styles.itemMeta}>
             {item.type && <span>{item.type}</span>}
             {item.unit_number && <span style={styles.unitTag}>{item.unit_number}</span>}
-            {item.last_logged && <span>{t.lastLogged} {item.last_logged?.toString().substring(0, 10)}</span>}
+            {item.last_logged && <span>{t.lastLogged} {fmtEquipmentDate(item.last_logged, locale)}</span>}
           </div>
         </div>
         <div style={styles.cardRight}>
@@ -245,6 +256,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
                 setLoggingHours(false);
               }}
               onCancel={() => setLoggingHours(false)}
+              workLabel={workLabel}
             />
           ) : (
             <div style={styles.bodyActions}>
@@ -280,7 +292,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
                       <th style={styles.hth}>{t.date}</th>
                       <th style={styles.hth}>{t.hours}</th>
                       <th style={styles.hth}>{t.operatorField}</th>
-                      <th style={styles.hth}>{t.project}</th>
+                      <th style={styles.hth}>{workLabel}</th>
                       <th style={styles.hth}>{t.notes}</th>
                       <th style={styles.hth}></th>
                     </tr>
@@ -288,7 +300,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
                   <tbody>
                     {hours.map(h => (
                       <tr key={h.id}>
-                        <td style={styles.htd}>{h.log_date?.toString().substring(0, 10)}</td>
+                        <td style={styles.htd}>{fmtEquipmentDate(h.log_date, locale)}</td>
                         <td style={{ ...styles.htd, fontWeight: 700 }}>
                           {parseFloat(h.hours).toFixed(1)}
                           {h.pending && <span style={styles.pendingBadge}>⏳</span>}
@@ -322,9 +334,10 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function EquipmentLog({ projects }) {
+export default function EquipmentLog({ projects, settings = null }) {
   const { user } = useAuth();
   const t = useT();
+  const workLabel = settings?.label_work || 'Work';
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
 
@@ -388,8 +401,9 @@ export default function EquipmentLog({ projects }) {
         <SkeletonList count={4} rows={2} />
       ) : items.length === 0 ? (
         <div style={styles.empty}>
-          <div style={styles.emptyIcon}>🚜</div>
+          <p style={styles.emptyTitle}>No equipment yet</p>
           <p style={styles.emptyText}>{isAdmin ? t.noEquipmentAdmin : t.noEquipmentWorker}</p>
+          {isAdmin && !showForm && !editing && <button type="button" style={styles.emptyCtaBtn} onClick={() => setShowForm(true)}>{t.addEquipment}</button>}
         </div>
       ) : (
         <div style={styles.list}>
@@ -402,6 +416,7 @@ export default function EquipmentLog({ projects }) {
               onEdit={i => { setEditing(i); setShowForm(false); }}
               onDeleted={id => setItems(prev => prev.filter(i => i.id !== id))}
               onHoursLogged={handleHoursLogged}
+              workLabel={workLabel}
             />
           ))}
         </div>
@@ -413,7 +428,7 @@ export default function EquipmentLog({ projects }) {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = {
-  topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12 },
+  topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' },
   heading: { fontSize: 22, fontWeight: 800, color: '#111827', margin: 0 },
   summary: { fontSize: 13, color: '#6b7280', margin: '4px 0 0' },
   overdueNote: { color: '#ef4444', fontWeight: 700 },
@@ -423,7 +438,9 @@ const styles = {
   hint: { color: '#6b7280', fontSize: 14 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
+  emptyTitle: { margin: '0 0 6px', fontSize: 18, fontWeight: 800, color: '#111827' },
   emptyText: { color: '#6b7280', fontSize: 15 },
+  emptyCtaBtn: { marginTop: 14, background: '#059669', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer' },
   // Card
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
   cardWarning: { boxShadow: '0 1px 6px rgba(0,0,0,0.07), inset 3px 0 0 #f59e0b' },

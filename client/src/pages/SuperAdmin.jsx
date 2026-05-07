@@ -132,6 +132,11 @@ export default function SuperAdmin() {
   const [errExpandedId, setErrExpandedId] = useState(null);
   const [errError, setErrError]         = useState('');
 
+  // ── Demo workspace state ──
+  const [demoWorking, setDemoWorking] = useState(false);
+  const [demoResult, setDemoResult] = useState(null);
+  const [demoError, setDemoError] = useState('');
+
   useEffect(() => {
     Promise.all([
       api.get('/superadmin/companies'),
@@ -168,6 +173,21 @@ export default function SuperAdmin() {
     if (tab === 'errors') loadClientErrors();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, errSinceHours]);
+
+  const resetDemoWorkspace = async () => {
+    setDemoWorking(true);
+    setDemoError('');
+    try {
+      const r = await api.post('/superadmin/demo-workspace');
+      setDemoResult(r.data);
+      const cr = await api.get('/superadmin/companies');
+      setCompanies(cr.data);
+    } catch (err) {
+      setDemoError(err.response?.data?.error || 'Could not reset demo workspace');
+    } finally {
+      setDemoWorking(false);
+    }
+  };
 
   // ── Companies handlers ──
   const patchCompany = async (id, patch) => {
@@ -398,7 +418,70 @@ export default function SuperAdmin() {
           <button aria-current={tab === 'errors' ? 'page' : undefined} style={{ ...styles.tabBtn, ...(tab === 'errors' ? styles.tabActive : {}) }} onClick={() => setTab('errors')}>
             Client Errors {errList.length > 0 && <span style={styles.tabCount}>{errList.length}</span>}
           </button>
+          <button aria-current={tab === 'demo' ? 'page' : undefined} style={{ ...styles.tabBtn, ...(tab === 'demo' ? styles.tabActive : {}) }} onClick={() => setTab('demo')}>
+            Demo Workspace
+          </button>
         </div>
+
+        {/* ── Demo Workspace tab ── */}
+        {tab === 'demo' && (
+          <div style={styles.demoGrid}>
+            <section style={styles.demoHero}>
+              <div>
+                <p style={styles.demoKicker}>Development sandbox</p>
+                <h2 style={styles.demoTitle}>Reset one realistic tenant whenever you need a clean test run.</h2>
+                <p style={styles.demoText}>
+                  This creates a fake business with workers, clients, work items, approvals,
+                  inventory, reports, and one worker count assignment. It is meant for UI design,
+                  onboarding, support, and mobile testing.
+                </p>
+              </div>
+              <button style={styles.demoBtn} onClick={resetDemoWorkspace} disabled={demoWorking}>
+                {demoWorking ? 'Resetting...' : 'Reset demo workspace'}
+              </button>
+            </section>
+
+            {demoError && <div role="alert" style={styles.deleteErrorBox}>{demoError}</div>}
+
+            <section style={styles.card}>
+              <div style={{ padding: 20 }}>
+                <h3 style={styles.afFormTitle}>What gets seeded</h3>
+                <div style={styles.demoSeedGrid}>
+                  {[
+                    ['People', '1 admin, 4 team members'],
+                    ['Work', '3 customers, 3 jobs/routes'],
+                    ['Time', 'Approved, pending, and active shifts'],
+                    ['Field', 'Daily report and checklist submission'],
+                    ['Inventory', 'Items, locations, stock, count assignment'],
+                    ['Settings', 'All core modules enabled'],
+                  ].map(([label, detail]) => (
+                    <div key={label} style={styles.demoSeedItem}>
+                      <strong>{label}</strong>
+                      <span>{detail}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {demoResult && (
+              <section style={styles.card}>
+                <div style={{ padding: 20 }}>
+                  <h3 style={styles.afFormTitle}>Demo credentials</h3>
+                  <div style={styles.demoCreds}>
+                    <div style={styles.demoCredItem}><span style={styles.demoCredLabel}>Company</span><code>{demoResult.credentials.company_name}</code></div>
+                    <div style={styles.demoCredItem}><span style={styles.demoCredLabel}>Admin</span><code>{demoResult.credentials.admin_username}</code></div>
+                    <div style={styles.demoCredItem}><span style={styles.demoCredLabel}>Team member</span><code>{demoResult.credentials.worker_username}</code></div>
+                    <div style={styles.demoCredItem}><span style={styles.demoCredLabel}>Password</span><code>{demoResult.credentials.password}</code></div>
+                  </div>
+                  <p style={styles.demoText}>
+                    Use “Login as” from the Companies tab, or sign in directly with the company name above.
+                  </p>
+                </div>
+              </section>
+            )}
+          </div>
+        )}
 
         {/* ── Companies tab ── */}
         {tab === 'companies' && (
@@ -492,7 +575,7 @@ export default function SuperAdmin() {
                           </>}
                         </div>
                         <div style={styles.stats}>
-                          <span style={styles.stat}><strong>{c.worker_count}</strong> workers</span>
+                          <span style={styles.stat}><strong>{c.worker_count}</strong> team members</span>
                           <span style={styles.stat}><strong>{c.admin_count}</strong> admins</span>
                           <span style={styles.stat}><strong>{c.entry_count}</strong> entries</span>
                           {c.last_entry_at && <span style={styles.stat}>Last entry: {formatDate(c.last_entry_at, locale)}</span>}
@@ -1143,6 +1226,17 @@ const styles = {
   diagnosticsRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 16, flexWrap: 'wrap' },
   diagnosticsBtn: { padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   diagnosticsHint: { fontSize: 12, color: '#6b7280' },
+  demoGrid: { display: 'grid', gap: 16 },
+  demoHero: { background: '#111827', color: '#fff', borderRadius: 14, padding: 24, display: 'flex', justifyContent: 'space-between', gap: 20, alignItems: 'center', flexWrap: 'wrap', boxShadow: '0 10px 30px rgba(15,23,42,0.14)' },
+  demoKicker: { margin: '0 0 8px', color: '#d9f99d', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' },
+  demoTitle: { margin: '0 0 10px', fontSize: 24, lineHeight: 1.15, maxWidth: 660 },
+  demoText: { margin: 0, color: '#64748b', fontSize: 14, lineHeight: 1.65, maxWidth: 720 },
+  demoBtn: { background: '#d9f99d', color: '#16351f', border: 'none', borderRadius: 9, padding: '12px 18px', fontSize: 14, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' },
+  demoSeedGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 },
+  demoSeedItem: { border: '1px solid #e5e7eb', borderRadius: 10, padding: 14, background: '#f9fafb', display: 'grid', gap: 6 },
+  demoCreds: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 14 },
+  demoCredItem: { border: '1px solid #e5e7eb', borderRadius: 10, padding: 14, background: '#f8fafc', display: 'grid', gap: 6, overflowWrap: 'anywhere' },
+  demoCredLabel: { color: '#64748b', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' },
   // Delete modal
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modal: { background: '#fff', borderRadius: 12, padding: 28, maxWidth: 440, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' },

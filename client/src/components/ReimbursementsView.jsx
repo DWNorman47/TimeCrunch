@@ -27,10 +27,11 @@ function StatusBadge({ status }) {
   );
 }
 
-export default function ReimbursementsView() {
+export default function ReimbursementsView({ settings = null }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
+  const workLabel = settings?.label_work || 'Work';
   const [items, setItems] = useState([]);
   const [mileageRate, setMileageRate] = useState(0.67);
   const [loading, setLoading] = useState(true);
@@ -165,9 +166,9 @@ export default function ReimbursementsView() {
             )}
             {projects.length > 0 && (
               <div style={s.field}>
-                <label htmlFor="rv-project" style={s.label}>{t.project}</label>
+                <label htmlFor="rv-project" style={s.label}>{workLabel}</label>
                 <select id="rv-project" style={s.input} value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))} disabled={saving}>
-                  <option value="">{t.noProject}</option>
+                  <option value="">{`No ${workLabel.toLowerCase()}`}</option>
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>

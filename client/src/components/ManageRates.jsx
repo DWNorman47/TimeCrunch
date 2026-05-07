@@ -480,7 +480,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
           <div style={styles.row}>
             <div>
               <div style={styles.label}>{t.featReimbursements || 'Reimbursements'}</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.featReimbursementsDesc || 'Workers submit mileage and expense reimbursements for admin approval'}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.featReimbursementsDesc || 'Team members submit mileage and expense reimbursements for admin approval'}</div>
             </div>
             <label style={{ ...styles.toggle, background: form.feature_reimbursements ? '#1a56db' : '#d1d5db' }}>
               <input type="checkbox" checked={form.feature_reimbursements} onChange={e => set('feature_reimbursements', e.target.checked)} style={{ display: 'none' }} />
@@ -544,9 +544,9 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
             </div>
             <div style={styles.row}>
               <div>
-                <div style={styles.label}>Workers can edit their own time</div>
+            <div style={styles.label}>Team members can edit their own time</div>
                 <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                  When OFF, workers can't change a saved entry's times — they have to ask an admin to make the change. The 7-day window and pay-period locks still apply on top of this.
+            When OFF, team members can't change a saved entry's times — they have to ask an admin to make the change. The 7-day window and pay-period locks still apply on top of this.
                 </div>
               </div>
               <label style={{ ...styles.toggle, background: form.feature_worker_edit_time ? '#1a56db' : '#d1d5db' }}>
@@ -559,7 +559,7 @@ export default function ManageRates({ settings, onSettingsUpdated }) {
         </div>
       )}
 
-      {/* ── Worker Access ── */}
+      {/* ── Team Member Access ── */}
       <div style={styles.section}>
         <div style={{ ...styles.sectionHeader, cursor: 'pointer' }} onClick={() => toggleCollapse('access')} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleCollapse('access')}>
           <span style={styles.sectionIcon}>👁️</span>

@@ -5,13 +5,41 @@ import { langToLocale } from '../utils';
 import { useT } from '../hooks/useT';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
+import FieldFilters from './FieldFilters';
 
 const today = () => new Date().toLocaleDateString('en-CA');
 
+function formatChecklistDate(value, locale = 'en-US') {
+  if (!value) return '';
+  const dateText = String(value);
+  const date = dateText.includes('T') ? new Date(dateText) : new Date(`${dateText}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateText;
+  return date.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function normalizeChecklistItem(item = {}) {
+  return {
+    ...item,
+    label: item.label ?? item.text ?? item.name ?? '',
+    type: item.type === 'checkbox' ? 'check' : (item.type || 'check'),
+  };
+}
+
+function normalizeTemplate(template = {}) {
+  return {
+    ...template,
+    items: Array.isArray(template.items) ? template.items.map(normalizeChecklistItem) : [],
+  };
+}
+
+function checklistAnswer(answers, item, index) {
+  return answers?.[index] ?? answers?.[item?.id] ?? answers?.[item?.label] ?? answers?.[item?.text];
+}
+
 const PRESETS = [
   {
-    name: 'Daily Site Safety',
-    description: 'General daily site safety walkthrough',
+    name: 'Daily Workplace Safety',
+    description: 'General daily workplace safety walkthrough',
     items: [
       { label: 'PPE available and in use', type: 'check' },
       { label: 'First aid kit stocked', type: 'check' },
@@ -26,7 +54,7 @@ const PRESETS = [
     name: 'Pre-Task Hazard Assessment',
     description: 'Fill out before starting any new task',
     items: [
-      { label: 'Task and work area explained to crew', type: 'check' },
+      { label: 'Task and work area explained to the team', type: 'check' },
       { label: 'Hazards identified and communicated', type: 'check' },
       { label: 'Required PPE confirmed', type: 'check' },
       { label: 'Emergency exit routes known', type: 'check' },
@@ -35,8 +63,8 @@ const PRESETS = [
     ],
   },
   {
-    name: 'End-of-Day Site Shutdown',
-    description: 'Before leaving the site each day',
+    name: 'End-of-Day Closeout',
+    description: 'Before wrapping up each day',
     items: [
       { label: 'All tools secured or stored', type: 'check' },
       { label: 'Materials stacked and secured', type: 'check' },
@@ -92,7 +120,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
         <h3 style={styles.formTitle}>{isEdit ? t.editTemplate : t.newChecklistTemplate}</h3>
         {!isEdit && (
           <button type="button" style={styles.presetBtn} onClick={() => setShowPresets(s => !s)}>
-            📋 {showPresets ? t.hidePresets : t.fromPreset}
+            {showPresets ? t.hidePresets : t.fromPreset}
           </button>
         )}
       </div>
@@ -159,7 +187,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
 
 // ── Fill Out Form ─────────────────────────────────────────────────────────────
 
-function FillForm({ templates, projects, onSubmitted, onCancel }) {
+function FillForm({ templates, projects, onSubmitted, onCancel, workLabel = 'Work' }) {
   const t = useT();
   const [templateId, setTemplateId] = useState('');
   const [projectId, setProjectId] = useState('');
@@ -214,9 +242,9 @@ function FillForm({ templates, projects, onSubmitted, onCancel }) {
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.project}</label>
+            <label style={styles.label}>{workLabel}</label>
             <select style={styles.input} value={projectId} onChange={e => setProjectId(e.target.value)}>
-              <option value="">{t.noProjectOpt}</option>
+              <option value="">{`No ${workLabel.toLowerCase()}`}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -293,7 +321,7 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
   const checkItems = items.filter(i => i.type === 'check');
   const checkedCount = checkItems.filter((_, i) => {
     const globalIdx = items.indexOf(checkItems[i]);
-    return sub.answers?.[globalIdx] === true;
+    return checklistAnswer(sub.answers, checkItems[i], globalIdx) === true;
   }).length;
 
   const handleDelete = async () => {
@@ -310,7 +338,7 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
         <div style={styles.cardLeft}>
           <div style={styles.cardTitle}>{sub.template_name}</div>
           <div style={styles.cardMeta}>
-            {new Date(sub.check_date + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+            {formatChecklistDate(sub.check_date, locale)}
             {sub.project_name && <span style={styles.projectTag}>{sub.project_name}</span>}
             {sub.submitted_by_name && <span style={styles.submittedBy}>{t.submittedBy} {sub.submitted_by_name}</span>}
           </div>
@@ -318,7 +346,7 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
         <div style={styles.cardRight}>
           {checkItems.length > 0 && (
             <span style={{ ...styles.progressBadge, ...(checkedCount === checkItems.length ? styles.progressDone : {}) }}>
-              ☑ {checkedCount}/{checkItems.length}
+              {checkedCount}/{checkItems.length} done
             </span>
           )}
           <span style={styles.chevron}>{expanded ? '▲' : '▼'}</span>
@@ -333,15 +361,15 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
                 <div key={i} style={styles.answerRow}>
                   {item.type === 'check' ? (
                     <>
-                      <span style={sub.answers?.[i] ? styles.checkYes : styles.checkNo}>
-                        {sub.answers?.[i] ? '✓' : '✗'}
+                      <span style={checklistAnswer(sub.answers, item, i) ? styles.checkYes : styles.checkNo}>
+                        {checklistAnswer(sub.answers, item, i) ? 'Yes' : 'No'}
                       </span>
                       <span style={styles.answerLabel}>{item.label}</span>
                     </>
                   ) : (
                     <div style={{ flex: 1 }}>
                       <div style={styles.answerLabel}>{item.label}</div>
-                      {sub.answers?.[i] && <div style={styles.answerText}>{sub.answers[i]}</div>}
+                      {checklistAnswer(sub.answers, item, i) && <div style={styles.answerText}>{checklistAnswer(sub.answers, item, i)}</div>}
                     </div>
                   )}
                 </div>
@@ -370,10 +398,12 @@ function SubmissionCard({ sub, isAdmin, onDeleted }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function SafetyChecklists({ projects }) {
+export default function SafetyChecklists({ projects, settings = null }) {
   const t = useT();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
   const [view, setView] = useState('list'); // 'list' | 'fill' | 'templates'
   const [templates, setTemplates] = useState([]);
   const [submissions, setSubmissions] = useState([]);
@@ -403,7 +433,7 @@ export default function SafetyChecklists({ projects }) {
         api.get('/safety-checklists/templates'),
         api.get('/safety-checklists', { params }),
       ]);
-      setTemplates(t.data);
+      setTemplates((t.data || []).map(normalizeTemplate));
       setSubmissions(s.data.items);
       setTotalPages(s.data.pages);
     } finally { setLoading(false); }
@@ -418,6 +448,7 @@ export default function SafetyChecklists({ projects }) {
         <FillForm
           templates={templates}
           projects={projects}
+          workLabel={workLabel}
           onSubmitted={sub => { setSubmissions(prev => [sub, ...prev]); setView('list'); }}
           onCancel={() => setView('list')}
         />
@@ -441,7 +472,8 @@ export default function SafetyChecklists({ projects }) {
             <TemplateForm
               initial={editingTemplate}
               onSaved={(t, isEdit) => {
-                setTemplates(prev => isEdit ? prev.map(x => x.id === t.id ? t : x) : [t, ...prev]);
+                const normalized = normalizeTemplate(t);
+                setTemplates(prev => isEdit ? prev.map(x => x.id === normalized.id ? normalized : x) : [normalized, ...prev]);
                 setShowTemplateForm(false);
                 setEditingTemplate(null);
               }}
@@ -452,7 +484,6 @@ export default function SafetyChecklists({ projects }) {
 
         {templates.length === 0 && !showTemplateForm ? (
           <div style={styles.empty}>
-            <div style={styles.emptyIcon}>📋</div>
             <p style={styles.emptyText}>{t.noTemplatesAdmin}</p>
             <button style={styles.emptyCtaBtn} onClick={() => setShowTemplateForm(true)}>
               + Create Template
@@ -508,19 +539,18 @@ export default function SafetyChecklists({ projects }) {
       </div>
 
       {projects.length > 0 && (
-        <div className="filter-row" style={styles.filters}>
+        <FieldFilters activeCount={filterProject ? 1 : 0}>
           <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
-            <option value="">{t.allProjectsOpt}</option>
+            <option value="">{`All ${workLabelPlural}`}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-        </div>
+        </FieldFilters>
       )}
 
       {loading ? (
         <SkeletonList count={4} rows={2} />
       ) : submissions.length === 0 ? (
         <div style={styles.empty}>
-          <div style={styles.emptyIcon}>☑️</div>
           <p style={styles.emptyText}>
             {templates.length === 0
               ? isAdmin ? t.noTemplatesAdmin : t.noTemplatesWorker

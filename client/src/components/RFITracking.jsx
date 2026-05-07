@@ -3,11 +3,21 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import { langToLocale } from '../utils';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
+import FieldFilters from './FieldFilters';
 
 import { silentError } from '../errorReporter';
 function today() { return new Date().toLocaleDateString('en-CA'); }
+
+function fmtRfiDate(value, locale = 'en-US') {
+  if (!value) return '';
+  const raw = value.toString().substring(0, 10);
+  const parsed = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return parsed.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 const STATUS_STYLES = {
   open:     { color: '#92400e', background: '#fef3c7' },
@@ -17,7 +27,7 @@ const STATUS_STYLES = {
 
 // ── RFI Form ──────────────────────────────────────────────────────────────────
 
-function RFIForm({ initial, projects, onSaved, onCancel }) {
+function RFIForm({ initial, projects, onSaved, onCancel, workLabel = 'Work' }) {
   const t = useT();
   const STATUS_LABELS = useMemo(() => ({ open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed }), [t]);
   const isEdit = !!initial?.id;
@@ -64,9 +74,9 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
       <div style={styles.row}>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label htmlFor="rfi-project" style={styles.label}>{t.project}</label>
+            <label htmlFor="rfi-project" style={styles.label}>{workLabel}</label>
             <select id="rfi-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">{t.noProjectOpt}</option>
+              <option value="">{`No ${workLabel.toLowerCase()}`}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -133,8 +143,10 @@ function RFIForm({ initial, projects, onSaved, onCancel }) {
 
 // ── RFI Card ──────────────────────────────────────────────────────────────────
 
-function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
+function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted, settings = null }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const STATUS_LABELS = useMemo(() => ({ open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed }), [t]);
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -149,7 +161,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
         import('@react-pdf/renderer'),
         import('./RFIPdf'),
       ]);
-      const blob = await pdf(React.createElement(RFIDocument, { rfi, companyName })).toBlob();
+      const blob = await pdf(React.createElement(RFIDocument, { rfi, companyName, t, language: user?.language, settings })).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -167,7 +179,7 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
     finally { setDeleting(false); }
   };
 
-  const isOverdue = rfi.date_due && rfi.status === 'open' && new Date(rfi.date_due) < new Date();
+  const isOverdue = rfi.date_due && rfi.status === 'open' && new Date(`${rfi.date_due.toString().substring(0, 10)}T23:59:59`) < new Date();
   const statusStyle = STATUS_STYLES[rfi.status] || STATUS_STYLES.open;
 
   return (
@@ -182,10 +194,10 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
           <div style={styles.meta}>
             {rfi.project_name && <span style={styles.projectTag}>{rfi.project_name}</span>}
             {rfi.directed_to && <span>→ {rfi.directed_to}</span>}
-            <span>{rfi.date_submitted?.toString().substring(0, 10)}</span>
+            <span>{fmtRfiDate(rfi.date_submitted, locale)}</span>
             {rfi.date_due && (
               <span style={isOverdue ? styles.overdueDate : styles.dueDate}>
-                {isOverdue ? '⚠ ' : ''}{t.dueDateLabel} {rfi.date_due?.toString().substring(0, 10)}
+                {isOverdue ? 'Overdue: ' : ''}{t.dueDateLabel} {fmtRfiDate(rfi.date_due, locale)}
               </span>
             )}
           </div>
@@ -249,11 +261,13 @@ function RFICard({ rfi, isAdmin, companyName, onEdit, onDeleted }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function RFITracking({ projects }) {
+export default function RFITracking({ projects, settings = null }) {
   const { user } = useAuth();
   const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
 
   const [rfis, setRfis] = useState([]);
   const [page, setPage] = useState(1);
@@ -295,6 +309,7 @@ export default function RFITracking({ projects }) {
 
   const openCount = rfis.filter(r => r.status === 'open').length;
   const overdueCount = rfis.filter(r => r.date_due && r.status === 'open' && new Date(r.date_due) < new Date()).length;
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   return (
     <div>
@@ -316,13 +331,14 @@ export default function RFITracking({ projects }) {
           <RFIForm
             initial={editing || null}
             projects={projects}
+            workLabel={workLabel}
             onSaved={handleSaved}
             onCancel={() => { setShowForm(false); setEditing(null); }}
           />
         </div>
       )}
 
-      <div className="filter-row" style={styles.filterBar}>
+      <FieldFilters activeCount={activeFilterCount}>
         <select style={styles.filterSelect} value={filters.status || ''} onChange={e => setFilter('status', e.target.value)}>
           <option value="">{t.allStatuses}</option>
           <option value="open">{t.statusOpen}</option>
@@ -331,20 +347,21 @@ export default function RFITracking({ projects }) {
         </select>
         {projects.length > 0 && (
           <select style={styles.filterSelect} value={filters.project_id || ''} onChange={e => setFilter('project_id', e.target.value)}>
-            <option value="">{t.allProjects}</option>
+            <option value="">{`All ${workLabelPlural}`}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
         <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title={t.fromDate} />
         <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title={t.toDate} />
-      </div>
+      </FieldFilters>
 
       {loading ? (
         <SkeletonList count={4} rows={2} />
       ) : rfis.length === 0 ? (
         <div style={styles.empty}>
-          <div style={styles.emptyIcon}>📋</div>
+          <p style={styles.emptyTitle}>No RFIs</p>
           <p style={styles.emptyText}>{isAdmin ? t.noRFIsAdmin : t.noRFIsWorker}</p>
+          {isAdmin && !showForm && !editing && <button type="button" style={styles.emptyCtaBtn} onClick={() => setShowForm(true)}>{t.newRFI}</button>}
         </div>
       ) : (
         <>
@@ -355,6 +372,7 @@ export default function RFITracking({ projects }) {
                 rfi={r}
                 isAdmin={isAdmin}
                 companyName={companyName}
+                settings={settings}
                 onEdit={r => { setEditing(r); setShowForm(false); }}
                 onDeleted={id => setRfis(prev => prev.filter(r => r.id !== id))}
               />
@@ -370,7 +388,7 @@ export default function RFITracking({ projects }) {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = {
-  topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12 },
+  topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' },
   heading: { fontSize: 22, fontWeight: 800, color: '#111827', margin: 0 },
   summary: { fontSize: 13, color: '#6b7280', margin: '4px 0 0' },
   overdueNote: { color: '#ef4444', fontWeight: 700 },
@@ -383,7 +401,9 @@ const styles = {
   hint: { color: '#6b7280', fontSize: 14 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
+  emptyTitle: { margin: '0 0 6px', fontSize: 18, fontWeight: 800, color: '#111827' },
   emptyText: { color: '#6b7280', fontSize: 15 },
+  emptyCtaBtn: { marginTop: 14, background: '#059669', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer' },
   // Card
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
   cardOverdue: { boxShadow: '0 1px 6px rgba(0,0,0,0.07), inset 3px 0 0 #ef4444' },

@@ -11,7 +11,7 @@ const pool = require('../db');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function isValidEmail(email) { return EMAIL_RE.test(String(email).trim()); }
-const { requireAdmin, requirePlan, requireProAddon, requirePerm } = require('../middleware/auth');
+const { requireAdmin, requirePlan, requireCertifiedPayrollAddon, requirePerm } = require('../middleware/auth');
 const { PERMISSIONS, PERMISSION_KEYS, BUILTIN_ROLES, getUserPermissions } = require('../permissions');
 const { coerceBody } = require('../middleware/coerce');
 const { logFailure } = require('../failureLog');
@@ -26,6 +26,7 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // Worker limits per plan (null = unlimited). Trial always gets unlimited.
 const WORKER_LIMITS = { free: 3, starter: 10, business: null };
+const ENTRY_HAS_ENDED_SQL = `end_ts IS NOT NULL AND end_ts <= NOW()`;
 
 async function checkWorkerLimit(companyId) {
   const company = await pool.query(
@@ -157,7 +158,7 @@ router.patch('/settings', requireAdmin, requirePerm('manage_settings'), async (r
   const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
   const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour', 'chat_retention_days'];
   const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold', 'media_retention_days', 'qbo_bill_terms_days', 'week_start'];
-  const stringKeys = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id', 'qbo_expense_account_id', 'qbo_bank_account_id', 'qbo_labor_item_id', 'setup_questionnaire_completed_at'];
+  const stringKeys = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id', 'qbo_expense_account_id', 'qbo_bank_account_id', 'qbo_labor_item_id', 'setup_questionnaire_completed_at', 'label_work', 'label_client', 'label_worker', 'label_field'];
   const allowed = [...numericKeys, ...stringKeys, ...FEATURE_KEYS];
   const companyId = req.user.company_id;
   try {
@@ -183,6 +184,8 @@ router.patch('/settings', requireAdmin, requirePerm('manage_settings'), async (r
             return res.status(400).json({ error: 'Invalid timezone' });
           if (key === 'invoice_signature' && !['none', 'optional', 'required'].includes(val))
             return res.status(400).json({ error: 'invoice_signature must be none, optional, or required' });
+          if (key.startsWith('label_') && (!String(val).trim() || String(val).length > 32))
+            return res.status(400).json({ error: 'Labels must be 1-32 characters' });
           if (key === 'global_required_checklist_template_id' && val !== '') {
             const id = parseInt(val);
             if (isNaN(id)) return res.status(400).json({ error: 'Invalid checklist template ID' });
@@ -1412,7 +1415,7 @@ router.patch('/workers/:id', requireAdmin, requirePerm('manage_workers'),
 });
 
 // Update admin permissions for another admin (full-access admins only)
-router.patch('/workers/:id/permissions', requireAdmin, async (req, res) => {
+router.patch('/workers/:id/permissions', requireAdmin, requirePerm('manage_roles'), async (req, res) => {
   // Only admins with null admin_permissions (full access) may manage others' permissions
   if (req.user.admin_permissions != null) {
     return res.status(403).json({ error: 'Only full-access admins can manage permissions' });
@@ -1442,7 +1445,7 @@ router.patch('/workers/:id/permissions', requireAdmin, async (req, res) => {
 });
 
 // PATCH /admin/workers/:id/worker-access — set which workers a partial admin can access (full-access admins only)
-router.patch('/workers/:id/worker-access', requireAdmin, async (req, res) => {
+router.patch('/workers/:id/worker-access', requireAdmin, requirePerm('manage_roles'), async (req, res) => {
   if (req.user.admin_permissions != null) {
     return res.status(403).json({ error: 'Only full-access admins can manage worker access' });
   }
@@ -2506,9 +2509,21 @@ router.post('/entries/bulk-approve', requireAdmin, requirePerm('approve_entries'
     ? [req.user.id, ids, companyId, accessIds]
     : [req.user.id, ids, companyId];
   try {
+    const blockedFilter = accessIds && accessIds.length ? `AND user_id = ANY($3)` : '';
+    const blockedParams = accessIds && accessIds.length ? [ids, companyId, accessIds] : [ids, companyId];
+    const blocked = await pool.query(
+      `SELECT COUNT(*)::int AS count
+       FROM time_entries
+       WHERE id = ANY($1::int[]) AND company_id = $2 AND status = 'pending'
+         AND NOT (${ENTRY_HAS_ENDED_SQL}) ${blockedFilter}`,
+      blockedParams
+    );
+    if ((blocked.rows[0]?.count || 0) > 0) {
+      return res.status(409).json({ error: 'Time entries cannot be approved until their end time has passed.' });
+    }
     const result = await pool.query(
       `UPDATE time_entries SET status = 'approved', locked = true, approved_by = $1, approved_at = NOW()
-       WHERE id = ANY($2::int[]) AND company_id = $3 AND status = 'pending' ${accessFilter}
+       WHERE id = ANY($2::int[]) AND company_id = $3 AND status = 'pending' AND ${ENTRY_HAS_ENDED_SQL} ${accessFilter}
        RETURNING id, user_id, work_date, start_time, end_time`,
       params
     );
@@ -2540,7 +2555,7 @@ router.post('/entries/approve-all', requireAdmin, requirePerm('approve_entries')
     const params = accessIds && accessIds.length ? [req.user.id, companyId, accessIds] : [req.user.id, companyId];
     const result = await pool.query(
       `UPDATE time_entries SET status = 'approved', locked = true, approved_by = $1, approved_at = NOW()
-       WHERE company_id = $2 AND status = 'pending' ${workerFilter} RETURNING id`,
+       WHERE company_id = $2 AND status = 'pending' AND ${ENTRY_HAS_ENDED_SQL} ${workerFilter} RETURNING id`,
       params
     );
     await logAudit(companyId, req.user.id, req.user.full_name, 'entries.approved_all', 'time_entry', null, null, { count: result.rowCount });
@@ -2573,10 +2588,16 @@ router.patch('/entries/:id/approve', requireAdmin, requirePerm('approve_entries'
     const params = accessIds && accessIds.length ? [...baseParams, accessIds] : baseParams;
     const result = await pool.query(
       `UPDATE time_entries SET status = 'approved', locked = true, approval_note = $1, approved_by = $2, approved_at = NOW()${setOverride}
-       WHERE id = $3 AND company_id = $4 ${workerFilter} RETURNING *`,
+       WHERE id = $3 AND company_id = $4 AND status = 'pending' AND ${ENTRY_HAS_ENDED_SQL} ${workerFilter} RETURNING *`,
       params
     );
-    if (result.rowCount === 0) return res.status(404).json({ error: 'Entry not found' });
+    if (result.rowCount === 0) {
+      const existing = await pool.query('SELECT id, status, end_ts FROM time_entries WHERE id = $1 AND company_id = $2', [req.params.id, companyId]);
+      if (existing.rows[0]?.status === 'pending' && (!existing.rows[0].end_ts || new Date(existing.rows[0].end_ts) > new Date())) {
+        return res.status(409).json({ error: 'Time entries cannot be approved until their end time has passed.' });
+      }
+      return res.status(404).json({ error: 'Entry not found' });
+    }
     await logAudit(companyId, req.user.id, req.user.full_name, 'entry.approved', 'time_entry', parseInt(req.params.id), null);
     const worker = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [result.rows[0].user_id]);
     if (worker.rows[0]?.email) {
@@ -3081,7 +3102,7 @@ router.patch('/company', requireAdmin, async (req, res) => {
 });
 
 // Audit log
-router.get('/audit-log', requireAdmin, async (req, res) => {
+router.get('/audit-log', requireAdmin, requirePerm('view_reports'), async (req, res) => {
   const companyId = req.user.company_id;
   const limit = parseInt(req.query.limit) || 30;
   const offset = parseInt(req.query.offset) || 0;
@@ -3139,7 +3160,7 @@ router.post('/broadcast', requireAdmin, requirePerm('manage_settings'), requireP
 
 // GET /admin/certified-payroll?week_end=YYYY-MM-DD&project_id=N
 // Returns prevailing-wage hours by worker broken down by day of week for a 7-day window
-router.get('/certified-payroll', requireAdmin, requirePerm('view_reports'), requireProAddon, async (req, res) => {
+router.get('/certified-payroll', requireAdmin, requirePerm('view_reports'), requireCertifiedPayrollAddon, async (req, res) => {
   const { week_end, project_id } = req.query;
   if (!week_end) return res.status(400).json({ error: 'week_end required' });
   const companyId = req.user.company_id;
@@ -3268,93 +3289,6 @@ router.get('/certified-payroll', requireAdmin, requirePerm('view_reports'), requ
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
-// Analytics dashboard — summary, weekly trend, by-project, top workers
-router.get('/analytics', requireAdmin, async (req, res) => {
-  const companyId = req.user.company_id;
-  const hoursExpr = `EXTRACT(EPOCH FROM (CASE WHEN end_time < start_time THEN end_time + INTERVAL '1 day' - start_time ELSE end_time - start_time END))/3600`;
-  try {
-    const settings2 = await getSettings(companyId);
-    const ws2 = parseInt(settings2.week_start ?? 1, 10);
-    const weekBucketSql2 = `(work_date - ((EXTRACT(DOW FROM work_date)::int - ${ws2} + 7) % 7))::date`;
-    const [summaryRes, weeklyRes, byProjectRes, topWorkersRes, statusRes] = await Promise.all([
-      pool.query(`
-        SELECT
-          ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN ${hoursExpr} END), 0)::numeric, 1) AS month_hours,
-          ROUND(COALESCE(SUM(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
-                                   AND work_date < date_trunc('month', CURRENT_DATE) THEN ${hoursExpr} END), 0)::numeric, 1) AS prev_month_hours,
-          COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN user_id END) AS month_workers,
-          COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
-                               AND work_date < date_trunc('month', CURRENT_DATE) THEN user_id END) AS prev_month_workers,
-          COUNT(DISTINCT CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN project_id END) AS month_projects,
-          COUNT(CASE WHEN work_date >= date_trunc('month', CURRENT_DATE) THEN 1 END) AS month_entries
-        FROM time_entries
-        WHERE company_id = $1 AND status = 'approved'
-          AND work_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
-      `, [companyId]),
-
-      pool.query(`
-        SELECT
-          ${weekBucketSql2} AS week_start,
-          ROUND(COALESCE(SUM(${hoursExpr}), 0)::numeric, 1) AS hours,
-          COUNT(DISTINCT user_id) AS workers,
-          COUNT(*) AS entries
-        FROM time_entries
-        WHERE company_id = $1 AND status = 'approved'
-          AND work_date >= CURRENT_DATE - INTERVAL '56 days'
-        GROUP BY week_start
-        ORDER BY week_start
-      `, [companyId]),
-
-      pool.query(`
-        SELECT
-          p.name AS project_name,
-          ROUND(COALESCE(SUM(${hoursExpr}), 0)::numeric, 1) AS hours,
-          COUNT(DISTINCT te.user_id) AS workers
-        FROM time_entries te
-        JOIN projects p ON te.project_id = p.id
-        WHERE te.company_id = $1 AND te.status = 'approved'
-          AND te.work_date >= date_trunc('month', CURRENT_DATE)
-          AND te.project_id IS NOT NULL
-        GROUP BY p.id, p.name
-        ORDER BY hours DESC
-        LIMIT 10
-      `, [companyId]),
-
-      pool.query(`
-        SELECT
-          COALESCE(u.invoice_name, u.full_name) AS worker_name,
-          ROUND(COALESCE(SUM(${hoursExpr}), 0)::numeric, 1) AS hours,
-          COUNT(*) AS entries
-        FROM time_entries te
-        JOIN users u ON te.user_id = u.id
-        WHERE te.company_id = $1 AND te.status = 'approved'
-          AND te.work_date >= date_trunc('month', CURRENT_DATE)
-        GROUP BY u.id, u.invoice_name, u.full_name
-        ORDER BY hours DESC
-        LIMIT 10
-      `, [companyId]),
-
-      pool.query(`
-        SELECT status, COUNT(*) AS count
-        FROM projects
-        WHERE company_id = $1 AND active = true
-        GROUP BY status
-      `, [companyId]),
-    ]);
-
-    res.json({
-      summary: summaryRes.rows[0],
-      weekly: weeklyRes.rows,
-      by_project: byProjectRes.rows,
-      top_workers: topWorkersRes.rows,
-      project_statuses: statusRes.rows,
-    });
-  } catch (err) {
-    logger.error({ err }, 'catch block error');
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
 router.post('/support', requireAdmin, async (req, res) => {
   const { subject, message } = req.body;
   if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
@@ -3369,32 +3303,6 @@ router.post('/support', requireAdmin, async (req, res) => {
     '<p>' + message.trim().replace(/\n/g, '<br/>') + '</p>';
   await sendEmail('support@opsfloa.com', '[OpsFloa Support] ' + subjectLine + ' — ' + companyName, body);
   res.json({ ok: true });
-});
-
-// GET /admin/audit-log — recent audit events for this company
-router.get('/audit-log', requireAdmin, async (req, res) => {
-  const { limit = 25, offset = 0, group = '', from = '', to = '' } = req.query;
-  const companyId = req.user.company_id;
-  try {
-    const safeLimit = Math.min(parseInt(limit) || 25, 100);
-    const safeOffset = parseInt(offset) || 0;
-    const conditions = ['company_id = $1'];
-    const params = [companyId];
-    if (group) { params.push(`${group}.%`); conditions.push(`action LIKE $${params.length}`); }
-    if (from)  { params.push(from); conditions.push(`created_at >= $${params.length}::date`); }
-    if (to)    { params.push(to);   conditions.push(`created_at < ($${params.length}::date + INTERVAL '1 day')`); }
-    const where = conditions.join(' AND ');
-    const [dataRes, countRes] = await Promise.all([
-      pool.query(
-        `SELECT id, actor_name, action, entity_type, entity_name, details, created_at
-         FROM audit_log WHERE ${where}
-         ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-        [...params, safeLimit, safeOffset]
-      ),
-      pool.query(`SELECT COUNT(*) FROM audit_log WHERE ${where}`, params),
-    ]);
-    res.json({ entries: dataRes.rows, total: parseInt(countRes.rows[0].count) });
-  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /admin/projects/:id/rfis — create a new RFI

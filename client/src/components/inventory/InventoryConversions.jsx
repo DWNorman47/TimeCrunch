@@ -23,6 +23,7 @@ export default function InventoryConversions({ onConversionChange }) {
   const [units, setUnits]     = useState({ active: DEFAULT_UNITS, known: DEFAULT_UNITS });
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
+  const [conversionSearch, setConversionSearch] = useState('');
 
   // Add form state
   const [addOpen, setAddOpen]         = useState(false);
@@ -109,8 +110,19 @@ export default function InventoryConversions({ onConversionChange }) {
   };
 
   // ── Split into pending (factor=1) vs configured ──────────────────────────────
-  const pending    = rows.filter(r => parseFloat(r.factor) === 1);
-  const configured = rows.filter(r => parseFloat(r.factor) !== 1);
+  const conversionQuery = conversionSearch.trim().toLowerCase();
+  const filteredRows = conversionQuery
+    ? rows.filter(r => [
+        r.item_name,
+        r.sku,
+        r.base_unit,
+        r.unit,
+        r.unit_spec,
+        String(r.factor ?? ''),
+      ].some(value => String(value || '').toLowerCase().includes(conversionQuery)))
+    : rows;
+  const pending    = filteredRows.filter(r => parseFloat(r.factor) === 1);
+  const configured = filteredRows.filter(r => parseFloat(r.factor) !== 1);
 
   const renderRow = (row, i, isPending) => {
     const isEditing = editingId === row.uom_id;
@@ -146,7 +158,7 @@ export default function InventoryConversions({ onConversionChange }) {
           {isEditing
             ? (parseFloat(editFactor) > 0
                 ? `1 ${row.unit} = ${parseFloat(editFactor) % 1 === 0 ? parseFloat(editFactor).toFixed(0) : parseFloat(editFactor)} ${row.base_unit}`
-                : '—')
+                : '-')
             : (meaning || <span style={{ color: '#d97706' }}>{t.invConvNeedsFactor}</span>)}
         </td>
         <td style={{ ...s.td, whiteSpace: 'nowrap' }}>
@@ -158,7 +170,7 @@ export default function InventoryConversions({ onConversionChange }) {
             </>
           ) : (
             <button style={{ ...s.editBtn, ...(isPending ? s.editBtnPending : {}) }} onClick={() => startEdit(row)}>
-              {isPending ? t.invConvSetFactor : '✏️'}
+              {isPending ? t.invConvSetFactor : 'Edit'}
             </button>
           )}
         </td>
@@ -240,6 +252,23 @@ export default function InventoryConversions({ onConversionChange }) {
 
       {!loading && !error && (
         <>
+          <div style={s.filterBar}>
+            <input
+              type="search"
+              style={s.searchInput}
+              value={conversionSearch}
+              onChange={e => setConversionSearch(e.target.value)}
+              placeholder="Search conversions..."
+            />
+            {conversionQuery && (
+              <button style={s.clearBtn} onClick={() => setConversionSearch('')}>Clear</button>
+            )}
+          </div>
+          <div style={s.filterMeta}>
+            {conversionQuery
+              ? `Showing ${filteredRows.length} of ${rows.length} matching conversions`
+              : `${rows.length} conversions`}
+          </div>
           {/* ── Needs Setup ───────────────────────────────────────────────── */}
           {pending.length > 0 && (
             <div style={s.section}>
@@ -269,9 +298,14 @@ export default function InventoryConversions({ onConversionChange }) {
 
           {rows.length === 0 && (
             <div style={s.emptyState}>
-              <div style={s.emptyIcon}>🔄</div>
               <p style={s.emptyTitle}>{t.invConvEmptyTitle}</p>
               <p style={s.emptySub}>{t.invConvEmptySub}</p>
+            </div>
+          )}
+          {rows.length > 0 && filteredRows.length === 0 && (
+            <div style={s.emptyState}>
+              <p style={s.emptyTitle}>No conversions match that search.</p>
+              <p style={s.emptySub}>Try an item name, unit, or factor.</p>
             </div>
           )}
         </>
@@ -294,6 +328,10 @@ const s = {
   addInput:       { padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#111827', background: '#fff', width: '100%', boxSizing: 'border-box' },
   baseUomNote:    { fontSize: 12, color: '#6b7280', marginTop: 4 },
   addActions:     { display: 'flex', gap: 10, justifyContent: 'flex-end' },
+  filterBar:      { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', margin: '0 0 6px' },
+  searchInput:    { flex: '1 1 260px', minWidth: 220, padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#111827' },
+  clearBtn:       { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 700, color: '#374151', cursor: 'pointer' },
+  filterMeta:     { margin: '0 0 14px', fontSize: 13, color: '#6b7280' },
   section:        { marginBottom: 28 },
   sectionHeader:  { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 },
   sectionTitle:   { fontSize: 14, fontWeight: 700, color: '#374151' },

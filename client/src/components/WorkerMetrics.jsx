@@ -26,9 +26,11 @@ function defaultDates() {
   return { from: fmt(sun), to: fmt(sat) };
 }
 
-export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = {}, overtimeEnabled = true, projectsEnabled = true, projects = [] }) {
+export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = {}, overtimeEnabled = true, projectsEnabled = true, projects = [], settings = null }) {
   const t = useT();
   const { user } = useAuth();
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelLower = workLabel.toLowerCase();
   const [expanded, setExpanded] = useState(false);
   const [from, setFrom] = useState(defaultDates().from);
   const [to, setTo] = useState(defaultDates().to);
@@ -85,7 +87,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
       import('@react-pdf/renderer'),
       import('./BillPDF'),
     ]);
-    const el = React.createElement(BillPDF, { data: billData, currency, companyInfo, overtimeEnabled, showProject: projectsEnabled, showRateType: (companyInfo?.prevailing_wage_rate ?? 0) > 0, t, language: user?.language });
+    const el = React.createElement(BillPDF, { data: billData, currency, companyInfo, overtimeEnabled, showProject: projectsEnabled, showRateType: (companyInfo?.prevailing_wage_rate ?? 0) > 0, t, language: user?.language, settings });
     return { pdf, el };
   };
 
@@ -164,9 +166,9 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
               </div>
               {projectsEnabled && projects.length > 0 && (
                 <div style={styles.addField}>
-                  <label style={styles.label}>{t.project}</label>
+                  <label style={styles.label}>{workLabel}</label>
                   <select style={styles.input} value={addForm.project_id} onChange={e => setAddForm(f => ({ ...f, project_id: e.target.value }))} disabled={addSaving}>
-                    <option value="">{t.noProject}</option>
+                    <option value="">{`No ${workLabelLower}`}</option>
                     {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
@@ -217,7 +219,7 @@ export default function WorkerMetrics({ worker, currency = 'USD', companyInfo = 
                   {pdfGenerating ? t.preparing : showPreview ? t.hideBill : t.previewBill}
                 </button>
                 <button style={styles.csvBtn} onClick={() => {
-                  const headers = ['Date', 'Type', 'Project', 'Category / Wage Type', 'Start', 'End', 'Hours', 'Amount'];
+                  const headers = ['Date', 'Type', workLabel, 'Category / Wage Type', 'Start', 'End', 'Hours', 'Amount'];
                   const timeRows = billData.entries.map(e => {
                     const h = ((new Date(`1970-01-01T${e.end_time}`) - new Date(`1970-01-01T${e.start_time}`)) / 3600000).toFixed(2);
                     return [e.work_date?.toString().substring(0,10), 'Time', e.project_name || '', e.wage_type, e.start_time, e.end_time, h, ''];

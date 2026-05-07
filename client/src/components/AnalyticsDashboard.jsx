@@ -69,10 +69,14 @@ function presetLabel(days, t) {
   return `${days}d`;
 }
 
-export default function AnalyticsDashboard({ weekStart = 1 }) {
+export default function AnalyticsDashboard({ weekStart = 1, settings = null }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
+  const workerLabelPluralLower = workerLabelPlural.toLowerCase();
+  const workLabel = settings?.label_work || 'Work';
   const formatDay = dateStr => new Date(dateStr + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric' });
   const formatWeek = dateStr => new Date(dateStr + 'T00:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric' });
   const [data, setData] = useState(null);
@@ -195,13 +199,13 @@ export default function AnalyticsDashboard({ weekStart = 1 }) {
         <StatCard
           label={t.hoursThisWeek}
           value={`${summary.hours_this_week}h`}
-          sub={`${summary.active_workers_this_week} ${t.workersActive}`}
+          sub={`${summary.active_workers_this_week} ${workerLabelPluralLower} active`}
           color={BLUE}
         />
         <StatCard
           label={t.hoursThisMonth}
           value={`${summary.hours_this_month}h`}
-          sub={`${summary.active_workers_this_month} ${t.workersActive}`}
+          sub={`${summary.active_workers_this_month} ${workerLabelPluralLower} active`}
           color={GREEN}
         />
         <StatCard
@@ -300,11 +304,11 @@ export default function AnalyticsDashboard({ weekStart = 1 }) {
       {/* Project and worker breakdown */}
       <div style={styles.twoCol}>
         <div style={styles.card}>
-          <SectionTitle>{t.hoursByProject} <span style={styles.rangeTag}>{rangeLabel}</span></SectionTitle>
+          <SectionTitle>{`Hours by ${workLabel.toLowerCase()}`} <span style={styles.rangeTag}>{rangeLabel}</span></SectionTitle>
           <HorizontalBars data={project_hours} color={BLUE} noDataLabel={t.noDataYet} />
         </div>
         <div style={styles.card}>
-          <SectionTitle>{t.hoursByWorker} <span style={styles.rangeTag}>{rangeLabel}</span></SectionTitle>
+          <SectionTitle>{`Hours by ${workerLabel.toLowerCase()}`} <span style={styles.rangeTag}>{rangeLabel}</span></SectionTitle>
           <HorizontalBars data={worker_hours} color={GREEN} noDataLabel={t.noDataYet} />
         </div>
       </div>

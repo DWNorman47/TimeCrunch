@@ -175,7 +175,7 @@ async function processPhotos(photos, companyId) {
 // Paginated when ?limit=N&offset=M → returns { items, total }
 // Without limit → returns array (capped at 500, for dropdowns)
 router.get('/items', requireAuth, async (req, res) => {
-  const { search, category, active = 'true', limit, offset } = req.query;
+  const { search, name_search, sku_search, category, active = 'true', limit, offset, sort = 'name', dir = 'asc' } = req.query;
   const paginate = limit !== undefined;
   const pageLimit = Math.min(Math.max(parseInt(limit) || 100, 1), 500);
   const pageOffset = Math.max(parseInt(offset) || 0, 0);
@@ -194,16 +194,32 @@ router.get('/items', requireAuth, async (req, res) => {
       conditions.push(`(name ILIKE $${idx} OR sku ILIKE $${idx} OR category ILIKE $${idx})`);
       values.push(`%${search}%`); idx++;
     }
-    const cols = `id, name, sku, description, category, unit, ${admin ? 'unit_cost,' : ''} reorder_point, reorder_qty, active, created_at`;
+    if (name_search) { conditions.push(`name ILIKE $${idx++}`); values.push(`%${name_search}%`); }
+    if (sku_search) { conditions.push(`sku ILIKE $${idx++}`); values.push(`%${sku_search}%`); }
+    const cols = `id, name, sku, description, category, unit, unit_spec, ${admin ? 'unit_cost,' : ''} reorder_point, reorder_qty, active, created_at`;
     const where = `FROM inventory_items WHERE ${conditions.join(' AND ')}`;
+    const sortCols = {
+      name: 'name',
+      sku: 'sku',
+      category: 'category',
+      unit: 'unit',
+      unit_cost: 'unit_cost',
+      reorder_point: 'reorder_point',
+      reorder_qty: 'reorder_qty',
+      status: 'active',
+      created_at: 'created_at',
+    };
+    const sortCol = sortCols[sort] || sortCols.name;
+    const sortDir = String(dir).toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    const orderBy = `ORDER BY ${sortCol} ${sortDir} NULLS LAST, name ASC`;
     if (paginate) {
       const [countRes, result] = await Promise.all([
         pool.query(`SELECT COUNT(*) ${where}`, values),
-        pool.query(`SELECT ${cols} ${where} ORDER BY name LIMIT $${idx} OFFSET $${idx + 1}`, [...values, pageLimit, pageOffset]),
+        pool.query(`SELECT ${cols} ${where} ${orderBy} LIMIT $${idx} OFFSET $${idx + 1}`, [...values, pageLimit, pageOffset]),
       ]);
       return res.json({ items: result.rows, total: parseInt(countRes.rows[0].count) });
     }
-    const result = await pool.query(`SELECT ${cols} ${where} ORDER BY name LIMIT 500`, values);
+    const result = await pool.query(`SELECT ${cols} ${where} ${orderBy} LIMIT 500`, values);
     res.json(result.rows);
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
@@ -398,6 +414,7 @@ router.get('/uom-conversions', requireAdmin, async (req, res) => {
       JOIN inventory_items i ON u.item_id = i.id
       WHERE i.company_id = $1
         AND u.is_base = false
+        AND u.active = true
         AND i.active  = true
       ORDER BY i.name, u.factor, u.unit
     `, [companyId]);
@@ -610,7 +627,11 @@ router.delete('/locations/:id', requireAdmin, async (req, res) => {
 
 // GET /api/inventory/stock
 router.get('/stock', requireAuth, async (req, res) => {
-  const { location_id, item_id, limit = 500, offset = 0 } = req.query;
+  const {
+    location_id, item_id, search, item_search, sku_search,
+    area_search, rack_search, bay_search, compartment_search, bin_search,
+    category, status, sort = 'location', dir = 'asc', limit = 500, offset = 0
+  } = req.query;
   const companyId = req.user.company_id;
   const admin = isAdmin(req);
   try {
@@ -618,7 +639,59 @@ router.get('/stock', requireAuth, async (req, res) => {
     const values = [companyId]; let idx = 2;
     if (location_id) { conditions.push(`s.location_id = $${idx++}`); values.push(location_id); }
     if (item_id) { conditions.push(`s.item_id = $${idx++}`); values.push(item_id); }
+    if (category) { conditions.push(`i.category = $${idx++}`); values.push(category); }
+    if (search) {
+      conditions.push(`(
+        i.name ILIKE $${idx}
+        OR i.sku ILIKE $${idx}
+        OR i.category ILIKE $${idx}
+        OR l.name ILIKE $${idx}
+        OR ia.name ILIKE $${idx}
+        OR ir.name ILIKE $${idx}
+        OR ib.name ILIKE $${idx}
+        OR ic.name ILIKE $${idx}
+      )`);
+      values.push(`%${search}%`); idx++;
+    }
+    if (item_search) { conditions.push(`i.name ILIKE $${idx++}`); values.push(`%${item_search}%`); }
+    if (sku_search) { conditions.push(`i.sku ILIKE $${idx++}`); values.push(`%${sku_search}%`); }
+    if (area_search) { conditions.push(`ia.name ILIKE $${idx++}`); values.push(`%${area_search}%`); }
+    if (rack_search) { conditions.push(`ir.name ILIKE $${idx++}`); values.push(`%${rack_search}%`); }
+    if (bay_search) { conditions.push(`ib.name ILIKE $${idx++}`); values.push(`%${bay_search}%`); }
+    if (compartment_search) { conditions.push(`ic.name ILIKE $${idx++}`); values.push(`%${compartment_search}%`); }
+    if (bin_search) {
+      conditions.push(`(ia.name ILIKE $${idx} OR ir.name ILIKE $${idx} OR ib.name ILIKE $${idx} OR ic.name ILIKE $${idx})`);
+      values.push(`%${bin_search}%`); idx++;
+    }
+    if (status === 'out') conditions.push('s.quantity <= 0');
+    if (status === 'low') conditions.push('s.quantity > 0 AND i.reorder_point > 0 AND s.quantity <= i.reorder_point');
+    if (status === 'in') conditions.push('s.quantity > 0 AND (i.reorder_point <= 0 OR s.quantity > i.reorder_point)');
     const whereClause = `${conditions.join(' AND ')} AND i.active = true AND l.active = true`;
+    const statusExpr = `(CASE
+      WHEN s.quantity <= 0 THEN 0
+      WHEN i.reorder_point > 0 AND s.quantity <= i.reorder_point THEN 1
+      ELSE 2
+    END)`;
+    const sortCols = {
+      item: 'i.name',
+      sku: 'i.sku',
+      category: 'i.category',
+      location: 'l.name',
+      bin: 'ia.name',
+      area: 'ia.name',
+      rack: 'ir.name',
+      bay: 'ib.name',
+      compartment: 'ic.name',
+      quantity: 's.quantity',
+      unit: 'COALESCE(u.unit, i.unit)',
+      unit_cost: 'i.unit_cost',
+      value: '(s.quantity * COALESCE(i.unit_cost, 0))',
+      status: statusExpr,
+      updated_at: 's.updated_at',
+    };
+    const sortCol = sortCols[sort] || sortCols.location;
+    const sortDir = String(dir).toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    const orderBy = `ORDER BY ${sortCol} ${sortDir} NULLS LAST, l.name ASC, ia.name ASC, ir.name ASC, ib.name ASC, i.name ASC`;
     const result = await pool.query(
       `SELECT s.id, s.item_id, i.name as item_name, i.sku, i.category,
               COALESCE(u.unit, i.unit)           as unit,
@@ -640,7 +713,7 @@ router.get('/stock', requireAuth, async (req, res) => {
        LEFT JOIN inventory_bays         ib ON s.bay_id         = ib.id
        LEFT JOIN inventory_compartments ic ON s.compartment_id = ic.id
        WHERE ${whereClause}
-       ORDER BY l.name, ia.name, ir.name, ib.name, i.name
+       ${orderBy}
        LIMIT $${idx} OFFSET $${idx + 1}`,
       [...values, parseInt(limit), parseInt(offset)]
     );
@@ -648,6 +721,10 @@ router.get('/stock', requireAuth, async (req, res) => {
       `SELECT COUNT(*) FROM inventory_stock s
        JOIN inventory_items i ON s.item_id = i.id
        JOIN inventory_locations l ON s.location_id = l.id
+       LEFT JOIN inventory_areas        ia ON s.area_id        = ia.id
+       LEFT JOIN inventory_racks        ir ON s.rack_id        = ir.id
+       LEFT JOIN inventory_bays         ib ON s.bay_id         = ib.id
+       LEFT JOIN inventory_compartments ic ON s.compartment_id = ic.id
        WHERE ${whereClause}`,
       values
     );
@@ -833,7 +910,11 @@ router.post('/transactions', requireAuth, TXN_COERCE, async (req, res) => {
 
 // GET /api/inventory/transactions
 router.get('/transactions', requireAuth, async (req, res) => {
-  const { item_id, location_id, type, project_id, from, to, supplier_id, lot_number, limit = 50, offset = 0 } = req.query;
+  const {
+    item_id, location_id, from_location_id, to_location_id, type, project_id, from, to,
+    supplier_id, lot_number, search, item_search, by_search, notes_search,
+    sort = 'date', dir = 'desc', limit = 50, offset = 0,
+  } = req.query;
   const companyId = req.user.company_id;
   const admin = isAdmin(req);
   try {
@@ -842,12 +923,50 @@ router.get('/transactions', requireAuth, async (req, res) => {
     if (!admin) { conditions.push(`t.performed_by = $${idx++}`); values.push(req.user.id); }
     if (item_id) { conditions.push(`t.item_id = $${idx++}`); values.push(item_id); }
     if (location_id) { conditions.push(`(t.from_location_id = $${idx} OR t.to_location_id = $${idx})`); values.push(location_id); idx++; }
+    if (from_location_id) { conditions.push(`t.from_location_id = $${idx++}`); values.push(from_location_id); }
+    if (to_location_id) { conditions.push(`t.to_location_id = $${idx++}`); values.push(to_location_id); }
     if (type) { conditions.push(`t.type = $${idx++}`); values.push(type); }
     if (project_id) { conditions.push(`t.project_id = $${idx++}`); values.push(project_id); }
     if (from) { conditions.push(`t.created_at >= $${idx++}`); values.push(from); }
     if (to) { conditions.push(`t.created_at < ($${idx++}::date + interval '1 day')`); values.push(to); }
     if (supplier_id) { conditions.push(`t.supplier_id = $${idx++}`); values.push(supplier_id); }
     if (lot_number) { conditions.push(`t.lot_number ILIKE $${idx++}`); values.push(`%${lot_number}%`); }
+    if (search) {
+      conditions.push(`(
+        i.name ILIKE $${idx}
+        OR i.sku ILIKE $${idx}
+        OR fl.name ILIKE $${idx}
+        OR tl.name ILIKE $${idx}
+        OR p.name ILIKE $${idx}
+        OR u.full_name ILIKE $${idx}
+        OR sup.name ILIKE $${idx}
+        OR t.lot_number ILIKE $${idx}
+        OR t.reference_no ILIKE $${idx}
+        OR t.notes ILIKE $${idx}
+      )`);
+      values.push(`%${search}%`); idx++;
+    }
+    if (item_search) { conditions.push(`(i.name ILIKE $${idx} OR i.sku ILIKE $${idx})`); values.push(`%${item_search}%`); idx++; }
+    if (by_search) { conditions.push(`u.full_name ILIKE $${idx++}`); values.push(`%${by_search}%`); }
+    if (notes_search) {
+      conditions.push(`(t.notes ILIKE $${idx} OR t.reference_no ILIKE $${idx})`);
+      values.push(`%${notes_search}%`); idx++;
+    }
+    const sortCols = {
+      date: 't.created_at',
+      type: 't.type',
+      item: 'i.name',
+      quantity: 't.quantity',
+      from: 'fl.name',
+      to: 'tl.name',
+      project: 'p.name',
+      supplier: 'sup.name',
+      lot: 't.lot_number',
+      by: 'u.full_name',
+    };
+    const sortCol = sortCols[sort] || sortCols.date;
+    const sortDir = String(dir).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    const orderBy = `ORDER BY ${sortCol} ${sortDir} NULLS LAST, t.created_at DESC`;
     const result = await pool.query(
       `SELECT t.*,
               i.name as item_name,
@@ -867,11 +986,21 @@ router.get('/transactions', requireAuth, async (req, res) => {
        JOIN users u ON t.performed_by = u.id
        LEFT JOIN inventory_suppliers sup ON t.supplier_id = sup.id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY t.created_at DESC
+       ${orderBy}
        LIMIT $${idx} OFFSET $${idx + 1}`,
       [...values, parseInt(limit), parseInt(offset)]
     );
-    const total = await pool.query(`SELECT COUNT(*) FROM inventory_transactions t WHERE ${conditions.join(' AND ')}`, values);
+    const total = await pool.query(
+      `SELECT COUNT(*) FROM inventory_transactions t
+       JOIN inventory_items i ON t.item_id = i.id
+       LEFT JOIN inventory_locations fl ON t.from_location_id = fl.id
+       LEFT JOIN inventory_locations tl ON t.to_location_id = tl.id
+       LEFT JOIN projects p ON t.project_id = p.id
+       JOIN users u ON t.performed_by = u.id
+       LEFT JOIN inventory_suppliers sup ON t.supplier_id = sup.id
+       WHERE ${conditions.join(' AND ')}`,
+      values
+    );
     res.json({ transactions: result.rows, total: parseInt(total.rows[0].count) });
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
 });
@@ -880,7 +1009,7 @@ router.get('/transactions', requireAuth, async (req, res) => {
 
 // GET /api/inventory/cycle-counts
 router.get('/cycle-counts', requireAdmin, async (req, res) => {
-  const { location_id, status, count_type, limit = 100, offset = 0 } = req.query;
+  const { location_id, status, count_type, q, limit = 100, offset = 0 } = req.query;
   const companyId = req.user.company_id;
   try {
     const conditions = ['cc.company_id = $1'];
@@ -888,6 +1017,17 @@ router.get('/cycle-counts', requireAdmin, async (req, res) => {
     if (location_id) { conditions.push(`cc.location_id = $${idx++}`); values.push(location_id); }
     if (status) { conditions.push(`cc.status = $${idx++}`); values.push(status); }
     if (count_type) { conditions.push(`cc.count_type = $${idx++}`); values.push(count_type); }
+    if (q?.trim()) {
+      conditions.push(`(
+        COALESCE(l.name, 'All Locations') ILIKE $${idx}
+        OR cc.count_type ILIKE $${idx}
+        OR cc.status ILIKE $${idx}
+        OR u.full_name ILIKE $${idx}
+        OR cu.full_name ILIKE $${idx}
+      )`);
+      values.push(`%${q.trim()}%`);
+      idx++;
+    }
     const result = await pool.query(
       `SELECT cc.*, COALESCE(l.name, 'All Locations') as location_name,
               u.full_name as started_by_name,
@@ -911,7 +1051,12 @@ router.get('/cycle-counts', requireAdmin, async (req, res) => {
       [...values, parseInt(limit), parseInt(offset)]
     );
     const totalResult = await pool.query(
-      `SELECT COUNT(*) FROM inventory_cycle_counts cc WHERE ${conditions.join(' AND ')}`,
+      `SELECT COUNT(*)
+       FROM inventory_cycle_counts cc
+       LEFT JOIN inventory_locations l ON cc.location_id = l.id
+       JOIN users u ON cc.started_by = u.id
+       LEFT JOIN users cu ON cc.completed_by = cu.id
+       WHERE ${conditions.join(' AND ')}`,
       values
     );
     res.json({ counts: result.rows, total: parseInt(totalResult.rows[0].count) });
@@ -2016,13 +2161,26 @@ async function nextPONumber(client, companyId) {
 
 // GET /api/inventory/purchase-orders
 router.get('/purchase-orders', requireAdmin, async (req, res) => {
-  const { status, supplier_id, limit = 100, offset = 0 } = req.query;
+  const { status, supplier_id, q, limit = 100, offset = 0 } = req.query;
   const companyId = req.user.company_id;
   try {
     const conditions = ['po.company_id = $1'];
     const values = [companyId]; let idx = 2;
     if (status) { conditions.push(`po.status = $${idx++}`); values.push(status); }
     if (supplier_id) { conditions.push(`po.supplier_id = $${idx++}`); values.push(supplier_id); }
+    if (q?.trim()) {
+      conditions.push(`(
+        po.po_number ILIKE $${idx}
+        OR po.reference_no ILIKE $${idx}
+        OR po.notes ILIKE $${idx}
+        OR po.status ILIKE $${idx}
+        OR sup.name ILIKE $${idx}
+        OR loc.name ILIKE $${idx}
+        OR u.full_name ILIKE $${idx}
+      )`);
+      values.push(`%${q.trim()}%`);
+      idx++;
+    }
     // Aggregate line stats in a single pre-joined subquery instead of 3 correlated subqueries per PO row
     const result = await pool.query(
       `SELECT po.*,
@@ -2050,7 +2208,12 @@ router.get('/purchase-orders', requireAdmin, async (req, res) => {
       [...values, parseInt(limit), parseInt(offset)]
     );
     const totalResult = await pool.query(
-      `SELECT COUNT(*) FROM purchase_orders po WHERE ${conditions.join(' AND ')}`,
+      `SELECT COUNT(*)
+       FROM purchase_orders po
+       LEFT JOIN inventory_suppliers sup ON po.supplier_id    = sup.id
+       LEFT JOIN inventory_locations loc ON po.to_location_id = loc.id
+       JOIN  users u ON po.created_by = u.id
+       WHERE ${conditions.join(' AND ')}`,
       values
     );
     res.json({ orders: result.rows, total: parseInt(totalResult.rows[0].count) });
@@ -2512,13 +2675,32 @@ router.post('/purchase-orders/:id/email', requireAdmin, async (req, res) => {
 // GET /api/inventory/valuation
 router.get('/valuation', requireAdmin, async (req, res) => {
   const companyId = req.user.company_id;
-  const { location_id, limit = 200, offset = 0 } = req.query;
+  const { location_id, search, name_search, sku_search, category_search, sort = 'name', dir = 'asc', limit = 200, offset = 0 } = req.query;
   try {
     const conditions = ['i.company_id = $1', 'i.active = true'];
     const values = [companyId]; let idx = 2;
     if (location_id) { conditions.push(`s.location_id = $${idx++}`); values.push(location_id); }
+    if (search) {
+      conditions.push(`(i.name ILIKE $${idx} OR i.sku ILIKE $${idx} OR i.category ILIKE $${idx} OR l.name ILIKE $${idx})`);
+      values.push(`%${search}%`); idx++;
+    }
+    if (name_search) { conditions.push(`i.name ILIKE $${idx++}`); values.push(`%${name_search}%`); }
+    if (sku_search) { conditions.push(`i.sku ILIKE $${idx++}`); values.push(`%${sku_search}%`); }
+    if (category_search) { conditions.push(`i.category ILIKE $${idx++}`); values.push(`%${category_search}%`); }
 
     const whereClause = conditions.join(' AND ');
+    const sortCols = {
+      name: 'i.name',
+      sku: 'i.sku',
+      category: 'i.category',
+      unit: 'i.unit',
+      on_hand: 'COALESCE(SUM(s.quantity), 0)',
+      unit_cost: 'i.unit_cost',
+      total_value: '(COALESCE(SUM(s.quantity), 0) * COALESCE(i.unit_cost, 0))',
+    };
+    const sortCol = sortCols[sort] || sortCols.name;
+    const sortDir = String(dir).toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    const orderBy = `ORDER BY ${sortCol} ${sortDir} NULLS LAST, i.name ASC`;
 
     // Grand total via dedicated aggregation — avoids shipping all rows to Node just to sum
     const totalResult = await pool.query(
@@ -2547,7 +2729,7 @@ router.get('/valuation', requireAdmin, async (req, res) => {
        LEFT JOIN inventory_locations l ON s.location_id = l.id AND l.active = true
        WHERE ${whereClause}
        GROUP BY i.id
-       ORDER BY i.name
+       ${orderBy}
        LIMIT $${idx} OFFSET $${idx + 1}`,
       [...values, parseInt(limit), parseInt(offset)]
     );

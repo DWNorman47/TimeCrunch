@@ -117,9 +117,10 @@ const pg = {
 
 // ── Entity Edit Form ──────────────────────────────────────────────────────────
 
-function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) {
+function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel, settings }) {
   const t = useT();
   const isLocation = level.key === 'locations';
+  const workLabel = settings?.label_work || 'Work';
 
   const LEVEL_SGl = {
     locations:    t.invSetupLocationSgl,
@@ -205,7 +206,7 @@ function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel }) 
           style={ef.input}
           value={form.name}
           onChange={e => set('name', e.target.value)}
-          placeholder={`e.g. ${level.key === 'locations' ? 'Main Warehouse' : level.key === 'areas' ? 'Zone A' : level.key === 'racks' ? 'Rack 3' : level.key === 'bays' ? 'Bay 2' : 'C1'}`}
+          placeholder={`e.g. ${level.key === 'locations' ? `${workLabel} Storage` : level.key === 'areas' ? 'Zone A' : level.key === 'racks' ? 'Rack 3' : level.key === 'bays' ? 'Bay 2' : 'C1'}`}
           required
         />
       </div>
@@ -280,6 +281,7 @@ function SupplierPanel() {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState('');
   const [showAll, setShowAll]     = useState(false);
+  const [supplierSearch, setSupplierSearch] = useState('');
   const [editing, setEditing]     = useState(null); // null=list, false=new, obj=editing
   const [form, setForm]           = useState({ name: '', contact_name: '', phone: '', email: '', website: '', notes: '' });
   const [saving, setSaving]       = useState(false);
@@ -353,6 +355,19 @@ function SupplierPanel() {
     } catch { setRestoreError(t.invSetupFailedRestore); }
   };
 
+  const supplierQuery = supplierSearch.trim().toLowerCase();
+  const visibleSuppliers = supplierQuery
+    ? suppliers.filter(sup => [
+        sup.name,
+        sup.contact_name,
+        sup.phone,
+        sup.email,
+        sup.website,
+        sup.notes,
+        sup.active ? 'active' : 'archived',
+      ].some(value => String(value || '').toLowerCase().includes(supplierQuery)))
+    : suppliers;
+
   if (editing !== null) {
     return (
       <div style={sp.formWrap}>
@@ -398,23 +413,41 @@ function SupplierPanel() {
   return (
     <div>
       <div style={sp.toolbar}>
+        <input
+          type="search"
+          style={sp.searchInput}
+          value={supplierSearch}
+          onChange={e => setSupplierSearch(e.target.value)}
+          placeholder="Search suppliers..."
+        />
         <label style={sp.toggle}>
           <input type="checkbox" checked={showAll} onChange={e => setShowAll(e.target.checked)} />
           {t.invSetupShowArchived}
         </label>
+        {supplierQuery && <button style={sp.clearBtn} onClick={() => setSupplierSearch('')}>Clear</button>}
         <button style={sp.addBtn} onClick={openNew}>{t.invSetupAddSupplierBtn}</button>
       </div>
+      {!loading && !error && (
+        <div style={sp.filterMeta}>
+          {supplierQuery
+            ? `Showing ${visibleSuppliers.length} of ${suppliers.length} matching suppliers`
+            : `${suppliers.length} suppliers`}
+        </div>
+      )}
       {error && <div role="alert" style={sp.error}>{error}</div>}
       {loading ? (
         <SkeletonList count={3} rows={2} />
       ) : suppliers.length === 0 ? (
         <div style={sp.empty}>
-          <div style={sp.emptyIcon}>🏭</div>
           <p>{t.invSetupNoSuppliers}</p>
+        </div>
+      ) : visibleSuppliers.length === 0 ? (
+        <div style={sp.empty}>
+          <p>No suppliers match that search.</p>
         </div>
       ) : (
         <div style={sp.list}>
-          {suppliers.map(sup => (
+          {visibleSuppliers.map(sup => (
             <div key={sup.id} style={{ ...sp.card, opacity: sup.active ? 1 : 0.6 }}>
               <div style={sp.cardMain}>
                 <div style={sp.cardInfo}>
@@ -431,20 +464,20 @@ function SupplierPanel() {
                   {sup.active ? (
                     <>
                       <span style={{ ...sp.badge, color: '#059669', background: '#d1fae5' }}>{t.invSetupActiveStatus}</span>
-                      <button style={sp.iconBtn} onClick={() => openEdit(sup)} title={t.edit}>✏️</button>
+                      <button style={sp.iconBtn} onClick={() => openEdit(sup)} title={t.edit}>Edit</button>
                       {pendingArchiveSupId === sup.id ? (
                         <>
                           <button style={sp.confirmArchiveBtn} onClick={() => archive(sup)}>{t.confirm}</button>
-                          <button style={sp.iconBtn} aria-label={t.cancelArchive} onClick={() => setPendingArchiveSupId(null)}>✕</button>
+                          <button style={sp.iconBtn} aria-label={t.cancelArchive} onClick={() => setPendingArchiveSupId(null)}>X</button>
                         </>
                       ) : (
-                        <button style={sp.iconBtn} onClick={() => setPendingArchiveSupId(sup.id)} title={t.archive}>🗄️</button>
+                        <button style={sp.iconBtn} onClick={() => setPendingArchiveSupId(sup.id)} title={t.archive}>Archive</button>
                       )}
                     </>
                   ) : (
                     <>
                       <span style={{ ...sp.badge, color: '#6b7280', background: '#f3f4f6' }}>{t.invSetupArchivedStatus}</span>
-                      <button style={sp.iconBtn} onClick={() => restore(sup)} title={t.restore}>↩️</button>
+                      <button style={sp.iconBtn} onClick={() => restore(sup)} title={t.restore}>Restore</button>
                     </>
                   )}
                 </div>
@@ -460,9 +493,12 @@ function SupplierPanel() {
 }
 
 const sp = {
-  toolbar:     { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  toolbar:     { display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  searchInput: { flex: '1 1 240px', minWidth: 200, padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#111827' },
   toggle:      { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer' },
+  clearBtn:    { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 700, color: '#374151', cursor: 'pointer' },
   addBtn:      { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  filterMeta:  { margin: '0 0 12px', fontSize: 13, color: '#6b7280' },
   error:       { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13 },
   empty:       { textAlign: 'center', padding: '48px 24px', color: '#6b7280', fontSize: 14 },
   emptyIcon:   { fontSize: 36, marginBottom: 10 },
@@ -494,7 +530,7 @@ const sp = {
 
 // ── Main Setup Component ───────────────────────────────────────────────────────
 
-export default function InventorySetup({ projects }) {
+export default function InventorySetup({ projects, settings }) {
   const t = useT();
 
   const LEVEL_LABELS = {
@@ -517,6 +553,7 @@ export default function InventorySetup({ projects }) {
   const [items,     setItems]     = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState('');
+  const [setupSearch, setSetupSearch] = useState('');
   const [editing,   setEditing]   = useState(null); // null=list, false=new, obj=edit
   const [printItem, setPrintItem] = useState(null); // item to print label for
   const [pendingArchiveItemId, setPendingArchiveItemId] = useState(null);
@@ -612,6 +649,10 @@ export default function InventorySetup({ projects }) {
     load();
   }, [levelKey, parentSels.location_id, parentSels.area_id, parentSels.rack_id, parentSels.bay_id]);
 
+  useEffect(() => {
+    setSetupSearch('');
+  }, [levelKey]);
+
   const handleSave = () => {
     setEditing(null);
     load();
@@ -662,6 +703,18 @@ export default function InventorySetup({ projects }) {
     }
     return filters;
   };
+
+  const setupQuery = setupSearch.trim().toLowerCase();
+  const visibleItems = setupQuery
+    ? items.filter(item => [
+        item.name,
+        item.parent_name,
+        item.address,
+        item.notes,
+        item.type,
+        item.active ? 'active' : 'archived',
+      ].some(value => String(value || '').toLowerCase().includes(setupQuery)))
+    : items;
 
   return (
     <div style={s.wrap}>
@@ -717,14 +770,31 @@ export default function InventorySetup({ projects }) {
           onSave={handleSave}
           onCancel={() => setEditing(null)}
           projects={projects}
+          settings={settings}
         />
       )}
 
       {/* List */}
       {editing === null && (
         <>
+          <div style={s.searchBar}>
+            <input
+              type="search"
+              style={s.searchInput}
+              value={setupSearch}
+              onChange={e => setSetupSearch(e.target.value)}
+              placeholder={`Search ${(LEVEL_LABELS[level.key] || level.label).toLowerCase()}...`}
+            />
+            {setupQuery && (
+              <button style={s.clearBtn} onClick={() => setSetupSearch('')}>Clear</button>
+            )}
+          </div>
           <div style={s.toolbar}>
-            <span style={s.count}>{items.length} {(LEVEL_LABELS[level.key] || level.label).toLowerCase()}</span>
+            <span style={s.count}>
+              {setupQuery
+                ? `Showing ${visibleItems.length} of ${items.length} ${(LEVEL_LABELS[level.key] || level.label).toLowerCase()}`
+                : `${items.length} ${(LEVEL_LABELS[level.key] || level.label).toLowerCase()}`}
+            </span>
             <button style={s.addBtn} onClick={() => setEditing(false)}>
               + {t.add} {LEVEL_LABELS_SGl[level.key] || level.label}
             </button>
@@ -736,12 +806,15 @@ export default function InventorySetup({ projects }) {
             <SkeletonList count={3} rows={1} />
           ) : items.length === 0 ? (
             <div style={s.empty}>
-              <div style={s.emptyIcon}>📍</div>
               <p>{t.invSetupNoPrefix} {(LEVEL_LABELS[level.key] || level.label).toLowerCase()} {t.invSetupNoSuffix}</p>
+            </div>
+          ) : visibleItems.length === 0 ? (
+            <div style={s.empty}>
+              <p>No {(LEVEL_LABELS[level.key] || level.label).toLowerCase()} match that search.</p>
             </div>
           ) : (
             <div style={s.list}>
-              {items.map(item => (
+              {visibleItems.map(item => (
                 <div key={item.id} style={{ ...s.card, opacity: item.active ? 1 : 0.55 }}>
                   <div style={s.cardMain}>
                     <div style={s.cardInfo}>
@@ -777,20 +850,20 @@ export default function InventorySetup({ projects }) {
                         {item.active ? (
                           <>
                             {level.key !== 'locations' && (
-                              <button style={s.iconBtn} onClick={() => setPrintItem(item)} title={t.printQRLabel}>🏷</button>
+                              <button style={s.iconBtn} onClick={() => setPrintItem(item)} title={t.printQRLabel}>Label</button>
                             )}
-                            <button style={s.iconBtn} onClick={() => setEditing(item)} title={t.edit}>✏️</button>
+                            <button style={s.iconBtn} onClick={() => setEditing(item)} title={t.edit}>Edit</button>
                             {pendingArchiveItemId === item.id ? (
                               <>
                                 <button style={s.confirmArchiveBtn} onClick={() => archive(item)}>{t.confirm}</button>
-                                <button style={s.iconBtn} aria-label={t.cancelArchive} onClick={() => setPendingArchiveItemId(null)}>✕</button>
+                                <button style={s.iconBtn} aria-label={t.cancelArchive} onClick={() => setPendingArchiveItemId(null)}>X</button>
                               </>
                             ) : (
-                              <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(item.id)} title={t.archive}>🗄️</button>
+                              <button style={s.iconBtn} onClick={() => setPendingArchiveItemId(item.id)} title={t.archive}>Archive</button>
                             )}
                           </>
                         ) : (
-                          <button style={s.iconBtn} onClick={() => restore(item)} title={t.restore}>↩️</button>
+                          <button style={s.iconBtn} onClick={() => restore(item)} title={t.restore}>Restore</button>
                         )}
                       </div>
                     </div>
@@ -806,7 +879,7 @@ export default function InventorySetup({ projects }) {
       {printItem && (
         <BinLabelModal
           item={printItem}
-          binType={level.key.slice(0, -1)} // 'areas' → 'area'
+          binType={level.key.slice(0, -1)} // 'areas' to 'area'
           onClose={() => setPrintItem(null)}
         />
       )}
@@ -825,6 +898,9 @@ const s = {
   filterGroup:   { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 150 },
   filterLabel:   { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' },
   filterSelect:  { padding: '6px 10px', borderRadius: 7, border: '1px solid #d1d5db', fontSize: 13, background: '#fff', color: '#374151' },
+  searchBar:     { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 },
+  searchInput:   { flex: '1 1 240px', minWidth: 200, padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#111827' },
+  clearBtn:      { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 700, color: '#374151', cursor: 'pointer' },
   toolbar:       { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   count:         { fontSize: 13, color: '#6b7280' },
   addBtn:        { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },

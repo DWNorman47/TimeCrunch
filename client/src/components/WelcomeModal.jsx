@@ -4,29 +4,38 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import { useModalA11y } from '../hooks/useModalA11y';
 
-// Inner component: only rendered when we actually need the modal.
-// All hooks live here so they're called unconditionally.
-function WelcomeModalInner({ user, isAdmin, firstName, handleStart, t }) {
+const adminSteps = ['Add work or a route', 'Invite your team', 'Review your first timesheet'];
+const workerSteps = ['Open the time clock', 'Check your schedule', 'Submit notes when work changes'];
+
+function WelcomeModalInner({ isAdmin, firstName, handleStart, t }) {
   const modalRef = useModalA11y(handleStart);
+  const steps = isAdmin ? adminSteps : workerSteps;
+
   return (
     <div style={styles.overlay} onClick={e => { if (e.target === e.currentTarget) handleStart(); }}>
       <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="welcome-modal-title" style={styles.modal}>
-        <div style={styles.brand}>{t.welcomeBrand}</div>
-        <div style={styles.emoji}>{isAdmin ? '🏗️' : '👷'}</div>
-        <h2 id="welcome-modal-title" style={styles.title}>{t.welcome}, {firstName}!</h2>
-        {isAdmin ? (
-          <>
-            <p style={styles.body}><strong>Ops Flow Assist</strong> {t.welcomeAdminBody1}</p>
-            <p style={styles.body}>{t.welcomeAdminBody2}</p>
-          </>
-        ) : (
-          <>
-            <p style={styles.body}><strong>Ops Flow Assist</strong> {t.welcomeWorkerBody1}</p>
-            <p style={styles.body}>{t.welcomeWorkerBody2}</p>
-          </>
-        )}
+        <div style={styles.markRow}>
+          <span style={styles.mark}>OF</span>
+          <span style={styles.brand}>OpsFloa</span>
+        </div>
+        <h2 id="welcome-modal-title" style={styles.title}>
+          {isAdmin ? `Welcome, ${firstName}. Let's set up the flow.` : `Welcome, ${firstName}. You're ready for the day.`}
+        </h2>
+        <p style={styles.body}>
+          {isAdmin
+            ? 'Start with the few pieces that make the rest of the app useful: work or a route, your team, and the first approval loop.'
+            : 'Your time clock, schedule, messages, and work updates are in one place. Keep it simple: clock in, do the work, and submit what changed.'}
+        </p>
+        <div style={styles.steps}>
+          {steps.map((step, index) => (
+            <div key={step} style={styles.step}>
+              <span style={styles.stepNum}>{index + 1}</span>
+              <span>{step}</span>
+            </div>
+          ))}
+        </div>
         <button style={styles.btn} onClick={handleStart}>
-          {isAdmin ? t.welcomeLetsGo : t.welcomeGotIt}
+          {isAdmin ? 'Start setup' : t.welcomeGotIt}
         </button>
       </div>
     </div>
@@ -49,7 +58,6 @@ export default function WelcomeModal() {
 
   return (
     <WelcomeModalInner
-      user={user}
       isAdmin={isAdmin}
       firstName={firstName}
       handleStart={handleStart}
@@ -59,11 +67,15 @@ export default function WelcomeModal() {
 }
 
 const styles = {
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  modal: { background: '#fff', borderRadius: 16, padding: '36px 32px', maxWidth: 440, width: '100%', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'center' },
-  brand: { fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b7280' },
-  emoji: { fontSize: 48, lineHeight: 1 },
-  title: { fontSize: 24, fontWeight: 800, color: '#111827', margin: 0 },
-  body: { fontSize: 14, color: '#4b5563', lineHeight: 1.7, margin: 0, textAlign: 'left' },
-  btn: { marginTop: 8, padding: '12px 28px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 9, fontWeight: 700, fontSize: 15, cursor: 'pointer', alignSelf: 'center' },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.72)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modal: { background: '#f8fafc', borderRadius: 14, padding: '30px', maxWidth: 460, width: '100%', boxShadow: '0 26px 80px rgba(0,0,0,0.32)', display: 'flex', flexDirection: 'column', gap: 16, border: '1px solid rgba(148,163,184,0.35)' },
+  markRow: { display: 'flex', alignItems: 'center', gap: 10 },
+  mark: { width: 34, height: 34, borderRadius: 8, background: '#0f172a', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, letterSpacing: '0.04em' },
+  brand: { fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.12em' },
+  title: { fontSize: 25, fontWeight: 850, color: '#0f172a', margin: 0, lineHeight: 1.15 },
+  body: { fontSize: 14, color: '#475569', lineHeight: 1.7, margin: 0 },
+  steps: { display: 'grid', gap: 8 },
+  step: { display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 9, padding: '10px 12px', fontSize: 14, color: '#1e293b', fontWeight: 650 },
+  stepNum: { width: 24, height: 24, borderRadius: 6, background: '#d9f99d', color: '#365314', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 850, flexShrink: 0 },
+  btn: { marginTop: 2, padding: '12px 18px', background: '#14532d', color: '#fff', border: 'none', borderRadius: 9, fontWeight: 800, fontSize: 15, cursor: 'pointer', alignSelf: 'flex-start' },
 };

@@ -58,7 +58,7 @@ export function reportClientError({ kind, message, stack }) {
     // Prefer fetch via the api client so the Authorization header is included
     // when the user is logged in — lets the server associate the error with
     // the user + company without extra work.
-    api.post('/client-errors', payload).catch(() => {
+    api.post('/client-errors', payload, { suppressToast: true }).catch(() => {
       // Absolute last-resort fallback: beacon with no auth header.
       try {
         if (navigator.sendBeacon) {

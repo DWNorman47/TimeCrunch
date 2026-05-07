@@ -8,6 +8,7 @@ import { useT } from '../hooks/useT';
 import { useAuth } from '../contexts/AuthContext';
 import { formatInTz, langToLocale } from '../utils';
 import ModalShell from './ModalShell';
+import EmptyState from './EmptyState';
 
 import { silentError } from '../errorReporter';
 // SVG divIcon — avoids all CDN/bundler PNG loading issues
@@ -44,10 +45,17 @@ function ElapsedTimer({ clockInTime }) {
   return <span style={styles.elapsed}>{formatElapsed(clockInTime)}</span>;
 }
 
-export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, projects = [] }) {
+export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, projects = [], settings = null }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
+  const workerLabelLower = workerLabel.toLowerCase();
+  const workerLabelPluralLower = workerLabelPlural.toLowerCase();
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelLower = workLabel.toLowerCase();
+  const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
   const [workers, setWorkers] = useState([]);
   const [inactiveWorkers, setInactiveWorkers] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -273,7 +281,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
           <div style={styles.inactiveBannerLeft}>
             <span style={styles.inactiveIcon}>⚠️</span>
             <div>
-              <div style={styles.inactiveBannerTitle}>{t.inactiveWorkers}</div>
+              <div style={styles.inactiveBannerTitle}>Inactive {workerLabelPluralLower}</div>
               <div style={styles.inactiveBannerList}>
                 {inactiveWorkers.map((w, i) => (
                   <React.Fragment key={w.id}>
@@ -294,9 +302,9 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
           {actionError}
         </div>
       )}
-      <div style={styles.header}>
-        <h2 style={styles.title}>{t.liveWorkers}</h2>
-        <div style={styles.liveIndicator}>
+      <div style={styles.header} className="live-workers-header">
+        <h2 style={styles.title}>Live {workerLabelPlural}</h2>
+        <div style={styles.liveIndicator} className="live-workers-actions">
           <span style={styles.liveDot} />
           <span style={styles.liveText}>{t.liveLabel}</span>
           {lastUpdated && (
@@ -312,14 +320,14 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
           >
             {refreshing ? t.refreshing : t.refresh}
           </button>
-          <button style={styles.clockInWorkerBtn} onClick={() => setShowClockInModal(true)}>{t.lwClockInWorkerBtn}</button>
+          <button style={styles.clockInWorkerBtn} onClick={() => setShowClockInModal(true)}>+ Clock In {workerLabel}</button>
         </div>
       </div>
 
       {workers.length > 0 && (
-        <div style={styles.filters}>
+        <div style={styles.filters} className="live-worker-filters">
           <select style={styles.filterSelect} value={selectedProject} onChange={handleProjectSelect}>
-            <option value="">{t.allProjects} ({workers.length})</option>
+            <option value="">All {workLabelPlural} ({workers.length})</option>
             {activeProjects.map(p => (
               <option key={p} value={p}>
                 {p} ({workers.filter(w => w.project_name === p).length})
@@ -327,7 +335,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
             ))}
           </select>
           <select style={styles.filterSelect} value={selectedWorker} onChange={handleWorkerSelect}>
-            <option value="">{t.findWorker}</option>
+            <option value="">Find {workerLabelLower}...</option>
             {workers.map(w => (
               <option key={w.user_id} value={w.user_id}>{w.full_name}</option>
             ))}
@@ -336,9 +344,9 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
       )}
 
       {workers.length === 0 ? (
-        <div style={styles.empty}>{t.noClockedIn}</div>
+        <EmptyState mark="L" title={`No ${workerLabelPluralLower} currently clocked in`} body={`Active ${workerLabelPluralLower} will appear here as they start their day.`} tone="good" />
       ) : filtered.length === 0 ? (
-        <div style={styles.empty}>{t.noWorkersOnProject}</div>
+        <EmptyState mark="L" title={`No ${workerLabelPluralLower} on this ${workLabelLower} right now`} body={`Try another ${workLabelLower} or clear the filter.`} />
       ) : (
         <>
           {(() => {
@@ -364,8 +372,8 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
           })()}
           <div style={styles.workerList}>
             {filtered.map(w => (
-              <div key={w.user_id} style={styles.workerCard}>
-                <div style={styles.workerTop}>
+              <div key={w.user_id} style={styles.workerCard} className="live-worker-card">
+                <div style={styles.workerTop} className="live-worker-card-top">
                   <div>
                     <div style={styles.workerName}>{w.full_name}</div>
                     <div style={styles.workerProject}>{w.project_name}</div>
@@ -385,7 +393,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                     <span style={styles.adminBadge}>{t.lwClockedInBy} {w.clocked_in_by_name}</span>
                   )}
                 </div>
-                <div style={styles.cardActions}>
+                <div style={styles.cardActions} className="live-worker-card-actions">
                   {editingClockInId === w.user_id ? (
                     <>
                       <input
@@ -416,7 +424,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
 
           {mapped.length > 0 && (
             <div style={styles.mapWrap}>
-              <h3 style={styles.mapTitle}>{t.lwWorkerLocations}</h3>
+              <h3 style={styles.mapTitle}>{workerLabel} locations</h3>
               <MapContainer center={center} zoom={mapped.length === 1 ? 13 : 5} style={styles.map}>
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -442,20 +450,21 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
       )}
       {showClockInModal && (
         <div style={styles.modalOverlay}>
-          <ModalShell
-            onClose={() => { setShowClockInModal(false); setClockInUserId(''); setClockInProjectId(''); setClockInNotes(''); }}
-            titleId="lw-clockin-title"
-            style={styles.modal}
-          >
-            <h3 id="lw-clockin-title" style={styles.modalTitle}>{t.lwClockInWorkerTitle}</h3>
+            <ModalShell
+              onClose={() => { setShowClockInModal(false); setClockInUserId(''); setClockInProjectId(''); setClockInNotes(''); }}
+              titleId="lw-clockin-title"
+              className="live-worker-clockin-modal"
+              style={styles.modal}
+            >
+            <h3 id="lw-clockin-title" style={styles.modalTitle}>Clock In {workerLabel}</h3>
             <div style={styles.modalField}>
-              <label style={styles.modalLabel}>{t.worker}</label>
+              <label style={styles.modalLabel}>{workerLabel}</label>
               <select
                 style={styles.modalSelect}
                 value={clockInUserId}
                 onChange={e => setClockInUserId(e.target.value)}
               >
-                <option value="">{t.lwSelectWorkerOpt}</option>
+                <option value="">Select a {workerLabelLower}...</option>
                 {allWorkers
                   .filter(w => !workers.some(aw => String(aw.user_id) === String(w.id)))
                   .map(w => (
@@ -466,22 +475,22 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
             {isDayMarkSelected ? (
               <div style={{ ...styles.modalField, padding: '12px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8 }}>
                 <div style={{ fontSize: 13, color: '#166534', fontWeight: 600, marginBottom: 4 }}>
-                  {t.lwDayMarkInfoTitle || 'This worker uses Mark Day mode'}
+                  {t.lwDayMarkInfoTitle ? t.lwDayMarkInfoTitle.replace(/worker/gi, workerLabelLower) : `This ${workerLabelLower} uses Mark Day mode`}
                 </div>
                 <div style={{ fontSize: 12, color: '#166534' }}>
-                  {t.lwDayMarkInfoBody || 'Marking will create a pending day entry — no clock-out, no project required.'}
+                  {t.lwDayMarkInfoBody ? t.lwDayMarkInfoBody.replace(/project/gi, workLabelLower) : `Marking will create a pending day entry — no clock-out, no ${workLabelLower} required.`}
                 </div>
               </div>
             ) : (
               <>
                 <div style={styles.modalField}>
-                  <label style={styles.modalLabel}>{t.projectOptionalLabel}</label>
+                  <label style={styles.modalLabel}>{workLabel} (optional)</label>
                   <select
                     style={styles.modalSelect}
                     value={clockInProjectId}
                     onChange={e => setClockInProjectId(e.target.value)}
                   >
-                    <option value="">{t.noProject}</option>
+                    <option value="">No {workLabelLower}</option>
                     {projects.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
@@ -501,7 +510,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
                 </div>
               </>
             )}
-            <div style={styles.modalActions}>
+            <div style={styles.modalActions} className="ops-modal-actions">
               <button
                 style={{ ...styles.modalClockInBtn, ...((!clockInUserId || clockInSaving) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                 onClick={handleAdminClockIn}

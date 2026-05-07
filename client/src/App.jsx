@@ -19,6 +19,7 @@ const AcceptInvite      = lazy(() => import('./pages/AcceptInvite'));
 const ConfirmEmail      = lazy(() => import('./pages/ConfirmEmail'));
 const ServiceRequest    = lazy(() => import('./pages/ServiceRequest'));
 const TeamPage          = lazy(() => import('./pages/TeamPage'));
+const HomePage          = lazy(() => import('./pages/HomePage'));
 const Dashboard         = lazy(() => import('./pages/Dashboard'));
 const AdminDashboard    = lazy(() => import('./pages/AdminDashboard'));
 const FieldPage         = lazy(() => import('./pages/FieldPage'));
@@ -47,8 +48,7 @@ const BLOCKED_STATUSES = ['trial_expired', 'canceled'];
 function WorkerSubscriptionWall() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f6f9', padding: 24 }}>
-      <div style={{ background: '#fff', borderRadius: 12, padding: '40px 32px', maxWidth: 400, textAlign: 'center', boxShadow: '0 2px 16px rgba(0,0,0,0.08)' }}>
-        <div style={{ fontSize: 40, marginBottom: 16 }}>⏸</div>
+      <div style={{ background: '#fff', borderRadius: 12, padding: '40px 32px', maxWidth: 400, textAlign: 'center', boxShadow: '0 2px 16px rgba(0,0,0,0.08)' }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: '#111827', marginBottom: 8 }}>Subscription ended</h2>
         <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6 }}>
           Your company's subscription has ended. Please contact your administrator to restore access.
@@ -104,10 +104,8 @@ function HashRedirect({ to }) {
 }
 
 // Phase D: choose where a logged-in user lands when they hit / or *.
-// super_admin keeps the /superadmin tools page (cross-tenant). Admin first-
-// time users still get the welcoming /administration nudge. Everyone else
-// falls through to pickLandingPath which chooses the first module their
-// permissions actually unlock.
+// super_admin keeps the /superadmin tools page (cross-tenant). Everyone else
+// starts on Time Clock, while /home remains available as a direct URL.
 //
 // Pure — only reads localStorage, never writes. The "I've welcomed this
 // admin" mark is set inside AdministrationPage via useEffect when the page
@@ -116,11 +114,7 @@ function HashRedirect({ to }) {
 // non-idempotent during route resolution.
 function landingFor(user) {
   if (user.role === 'super_admin') return '/superadmin';
-  if (user.role === 'admin') {
-    const key = `admin_welcomed_${user.id}`;
-    if (!localStorage.getItem(key)) return '/administration';
-  }
-  return pickLandingPath(user);
+  return '/timeclock';
 }
 
 function AppRoutes() {
@@ -140,6 +134,7 @@ function AppRoutes() {
       <Route path="/confirm-email" element={<ConfirmEmail />} />
       <Route path="/r/:slug" element={<ServiceRequest />} />
       <Route path="/team" element={<PrivateRoute moduleId="team"><TeamPage /></PrivateRoute>} />
+      <Route path="/home" element={<PrivateRoute><HomePage /></PrivateRoute>} />
       <Route path="/__tests__" element={<Tests />} />
       {/* New canonical routes: /timeclock = the participating page (worker
           and admin self-time), /workforce = the admin oversight page. */}
@@ -222,7 +217,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <ToastProvider>
           <OfflineProvider>
             <SkipLink />

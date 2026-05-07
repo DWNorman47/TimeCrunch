@@ -7,19 +7,31 @@ import { useT } from '../hooks/useT';
 import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
 import Pagination from './Pagination';
+import FieldFilters from './FieldFilters';
 
 const STATUS_COLORS = {
   open: { color: '#92400e', bg: '#fef3c7' },
+  in_progress: { color: '#1e40af', bg: '#dbeafe' },
+  resolved: { color: '#1e40af', bg: '#dbeafe' },
   done: { color: '#1e40af', bg: '#dbeafe' },
   verified: { color: '#065f46', bg: '#d1fae5' },
 };
+
+const PUNCHLIST_STATUSES = ['open', 'in_progress', 'resolved', 'verified'];
 
 function statusStyle(status) {
   const c = STATUS_COLORS[status] || STATUS_COLORS.open;
   return { color: c.color, background: c.bg };
 }
 
-function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPhases }) {
+function statusLabel(status, t) {
+  if (status === 'in_progress') return t.statusInProgress || 'In Progress';
+  if (status === 'resolved' || status === 'done') return t.statusDone;
+  if (status === 'verified') return `${t.statusVerified} ✓`;
+  return t.statusOpen;
+}
+
+function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPhases, workLabel = 'Work', workerLabel = 'Worker' }) {
   const t = useT();
   const PRIORITIES = [
     { value: 'high', label: `🔴 ${t.priorityHigh}` },
@@ -57,9 +69,9 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label htmlFor="pl-project" style={styles.label}>Project</label>
+            <label htmlFor="pl-project" style={styles.label}>{workLabel}</label>
             <select id="pl-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">{t.noProjectOpt}</option>
+              <option value="">{`No ${workLabel.toLowerCase()}`}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -72,7 +84,7 @@ function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPh
         </div>
         {isAdmin && workers.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label htmlFor="pl-assign-to" style={styles.label}>{t.assignTo}</label>
+            <label htmlFor="pl-assign-to" style={styles.label}>{`${t.assignTo} ${workerLabel.toLowerCase()}`}</label>
             <select id="pl-assign-to" style={styles.input} value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)}>
               <option value="">{t.unassigned}</option>
               {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
@@ -110,11 +122,6 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
   const toast = useToast();
-  const STATUSES = [
-    { value: 'open', label: t.statusOpen },
-    { value: 'done', label: t.statusDone },
-    { value: 'verified', label: `${t.statusVerified} ✓` },
-  ];
   const [item, setItem] = useState(initialItem);
   const [expanded, setExpanded] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -126,8 +133,8 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
 
   useEffect(() => { setItem(initialItem); setEditPhase(initialItem.phase || ''); }, [initialItem]);
 
-  const nextStatus = { open: 'done', done: 'verified', verified: 'open' };
-  const nextLabel = { open: t.markDone, done: t.verify, verified: t.reopen };
+  const nextStatus = { open: 'resolved', in_progress: 'resolved', resolved: 'verified', done: 'verified', verified: 'open' };
+  const nextLabel = { open: t.markDone, in_progress: t.markDone, resolved: t.verify, done: t.verify, verified: t.reopen };
 
   const handleExpand = () => {
     if (item.pending) return;
@@ -139,9 +146,10 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
   };
 
   const advance = async () => {
+    const status = nextStatus[item.status] || 'resolved';
     setUpdating(true);
     try {
-      const r = await api.patch(`/punchlist/${item.id}`, { status: nextStatus[item.status] });
+      const r = await api.patch(`/punchlist/${item.id}`, { status });
       onUpdated(r.data);
     } catch { toast(t.failedUpdateStatus, 'error'); }
     finally { setUpdating(false); }
@@ -200,14 +208,14 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
     finally { setAddingCheck(false); }
   };
 
-  const priorityDot = { high: '🔴', normal: '🟡', low: '⚪' }[item.priority] || '🟡';
+  const priorityDot = { high: 'High', normal: 'Normal', low: 'Low' }[item.priority] || 'Normal';
   const checkTotal = parseInt(item.checklist_total || 0);
   const checkDone = parseInt(item.checked_count || 0);
 
   return (
     <div style={{ ...styles.item, opacity: item.status === 'verified' ? 0.65 : 1 }}>
       <div style={styles.itemRow} onClick={handleExpand} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleExpand()}>
-        <span style={styles.priorityDot} title={`Priority: ${item.priority}`}>{priorityDot}</span>
+        <span style={{ ...styles.priorityDot, ...styles[`priority_${item.priority}`] }} title={`Priority: ${item.priority}`}>{priorityDot}</span>
         <div style={styles.itemMain}>
           <span style={{ ...styles.itemTitle, textDecoration: item.status === 'verified' ? 'line-through' : 'none' }}>
             {item.title}
@@ -216,18 +224,18 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
           <div style={styles.itemMeta}>
             {item.project_name && <span style={styles.metaTag}>{item.project_name}</span>}
             {item.phase && <span style={styles.phaseTag}>{item.phase}</span>}
-            {item.location && <span style={styles.metaLoc}>📍 {item.location}</span>}
-            {item.assigned_to_name && <span style={styles.metaAssign}>👤 {item.assigned_to_name}</span>}
+            {item.location && <span style={styles.metaLoc}>At {item.location}</span>}
+            {item.assigned_to_name && <span style={styles.metaAssign}>Assigned to {item.assigned_to_name}</span>}
             {checkTotal > 0 && (
               <span style={{ ...styles.checkProgress, ...(checkDone === checkTotal ? styles.checkProgressDone : {}) }}>
-                ☑ {checkDone}/{checkTotal}
+                {checkDone}/{checkTotal} done
               </span>
             )}
           </div>
         </div>
         <div style={styles.itemRight}>
           <span style={{ ...styles.statusBadge, ...statusStyle(item.status) }}>
-            {STATUSES.find(s => s.value === item.status)?.label || item.status}
+            {statusLabel(item.status, t)}
           </span>
           <span style={styles.chevron}>{expanded ? '▲' : '▼'}</span>
         </div>
@@ -325,11 +333,14 @@ function PunchItem({ item: initialItem, isAdmin, workers, onUpdated, onDeleted, 
   );
 }
 
-export default function Punchlist({ projects }) {
+export default function Punchlist({ projects, settings = null }) {
   const t = useT();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelPlural = /s$/i.test(workLabel) ? workLabel : `${workLabel}s`;
+  const workerLabel = settings?.label_worker || 'Team Member';
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -345,7 +356,7 @@ export default function Punchlist({ projects }) {
         import('@react-pdf/renderer'),
         import('./PunchlistPDF'),
       ]);
-      const blob = await pdf(React.createElement(PunchlistDocument, { items, companyName: user?.company_name })).toBlob();
+      const blob = await pdf(React.createElement(PunchlistDocument, { items, companyName: user?.company_name, t, language: user?.language, settings })).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = 'punchlist.pdf'; a.click();
@@ -372,8 +383,12 @@ export default function Punchlist({ projects }) {
   useEffect(() => {
     const init = async () => {
       if (isAdmin) {
-        const w = await api.get('/admin/workers');
-        setWorkers(w.data);
+        try {
+          const w = await api.get('/admin/workers');
+          setWorkers(w.data);
+        } catch {
+          setWorkers([]);
+        }
       }
       await load();
     };
@@ -383,24 +398,26 @@ export default function Punchlist({ projects }) {
   useEffect(() => { if (!loading) load(filterProject, filterStatus, filterPhase, 1); }, [filterProject, filterStatus, filterPhase]);
   useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(filterProject, filterStatus, filterPhase, page); }); }, [onSync]);
 
-  const { openCount, doneCount, verifiedCount } = useMemo(() => ({
+  const { openCount, inProgressCount, doneCount, verifiedCount } = useMemo(() => ({
     openCount: items.filter(i => i.status === 'open').length,
-    doneCount: items.filter(i => i.status === 'done').length,
+    inProgressCount: items.filter(i => i.status === 'in_progress').length,
+    doneCount: items.filter(i => i.status === 'resolved' || i.status === 'done').length,
     verifiedCount: items.filter(i => i.status === 'verified').length,
   }), [items]);
 
   // All unique phases across current items (for datalist + filter dropdown)
   const allPhases = useMemo(() => [...new Set(items.map(i => i.phase).filter(Boolean))].sort(), [items]);
+  const hasPhases = useMemo(() => items.some(i => i.phase), [items]);
+  const activeFilterCount = [filterProject, filterStatus, filterPhase].filter(Boolean).length;
 
   // Group items by phase when any have a phase set
   const grouped = useMemo(() => {
-    const hasPhases = items.some(i => i.phase);
     if (!hasPhases) return [{ phase: null, items }];
     return [
       ...allPhases.map(ph => ({ phase: ph, items: items.filter(i => i.phase === ph) })),
       ...(items.some(i => !i.phase) ? [{ phase: null, items: items.filter(i => !i.phase) }] : []),
     ];
-  }, [items, allPhases]);
+  }, [items, allPhases, hasPhases]);
 
   return (
     <div>
@@ -409,7 +426,7 @@ export default function Punchlist({ projects }) {
           <h2 style={styles.heading}>{t.punchlistTitle}</h2>
           {items.length > 0 && (
             <p style={styles.summary}>
-              {openCount} {t.statusOpen} · {doneCount} {t.statusDone} · {verifiedCount} {t.statusVerified}
+              {openCount} {t.statusOpen} · {inProgressCount} {t.statusInProgress || 'In Progress'} · {doneCount} {t.statusDone} · {verifiedCount} {t.statusVerified}
             </p>
           )}
         </div>
@@ -426,22 +443,24 @@ export default function Punchlist({ projects }) {
             workers={workers}
             isAdmin={isAdmin}
             existingPhases={allPhases}
+            workLabel={workLabel}
+            workerLabel={workerLabel}
             onAdded={item => { setItems(prev => [item, ...prev]); setShowForm(false); }}
             onCancel={() => setShowForm(false)}
           />
         </div>
       )}
 
-      <div style={styles.filters}>
+      <FieldFilters activeCount={activeFilterCount}>
         <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
-          <option value="">{t.allProjectsOpt}</option>
+          <option value="">{`All ${workLabelPlural}`}</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <select style={styles.filterSelect} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="">{t.allStatuses}</option>
-          <option value="open">{t.statusOpen}</option>
-          <option value="done">{t.statusDone}</option>
-          <option value="verified">{t.statusVerified} ✓</option>
+          {PUNCHLIST_STATUSES.map(status => (
+            <option key={status} value={status}>{statusLabel(status, t)}</option>
+          ))}
         </select>
         {allPhases.length > 0 && (
           <select style={styles.filterSelect} value={filterPhase} onChange={e => setFilterPhase(e.target.value)}>
@@ -449,13 +468,12 @@ export default function Punchlist({ projects }) {
             {allPhases.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         )}
-      </div>
+      </FieldFilters>
 
       {loading ? (
         <SkeletonList count={4} rows={2} />
       ) : items.length === 0 ? (
         <div style={styles.empty}>
-          <div style={styles.emptyIcon}>✅</div>
           <p style={styles.emptyText}>{t.noPunchlistItems} {t.punchlistEmptyDesc}</p>
         </div>
       ) : (
@@ -491,7 +509,7 @@ export default function Punchlist({ projects }) {
 }
 
 const styles = {
-  topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12 },
+  topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' },
   heading: { fontSize: 22, fontWeight: 800, color: '#111827', margin: 0 },
   summary: { fontSize: 13, color: '#6b7280', margin: '4px 0 0' },
   newBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
@@ -501,7 +519,10 @@ const styles = {
   list: { display: 'flex', flexDirection: 'column', gap: 8 },
   item: { background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflow: 'hidden' },
   itemRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', cursor: 'pointer' },
-  priorityDot: { fontSize: 14, flexShrink: 0 },
+  priorityDot: { fontSize: 10, flexShrink: 0, minWidth: 48, textAlign: 'center', borderRadius: 999, padding: '3px 7px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0 },
+  priority_high: { background: '#fee2e2', color: '#991b1b' },
+  priority_normal: { background: '#fef3c7', color: '#92400e' },
+  priority_low: { background: '#f1f5f9', color: '#475569' },
   itemMain: { flex: 1, minWidth: 0 },
   itemTitle: { fontWeight: 600, fontSize: 14, color: '#111827', display: 'block', marginBottom: 4 },
   itemMeta: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },

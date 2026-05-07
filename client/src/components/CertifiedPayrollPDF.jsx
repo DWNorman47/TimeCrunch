@@ -65,9 +65,11 @@ const styles = StyleSheet.create({
   footer: { marginTop: 16, fontSize: 7, color: '#777', textAlign: 'center' },
 });
 
-export default function CertifiedPayrollPDF({ report }) {
+export default function CertifiedPayrollPDF({ report, settings }) {
   if (!report) return null;
   const { contractor, project, week_start, week_end, workers = [], signature } = report;
+  const workLabel = settings?.label_work || 'Work';
+  const workerLabel = settings?.label_worker || 'Team Member';
 
   return (
     <Document>
@@ -81,8 +83,8 @@ export default function CertifiedPayrollPDF({ report }) {
             <Text style={styles.metaValue}>{contractor}</Text>
           </View>
           <View style={styles.metaCell}>
-            <Text style={styles.metaLabel}>PROJECT</Text>
-            <Text style={styles.metaValue}>{project || 'All Projects'}</Text>
+            <Text style={styles.metaLabel}>{workLabel.toUpperCase()}</Text>
+            <Text style={styles.metaValue}>{project || `All ${workLabel.toLowerCase()}`}</Text>
           </View>
           <View style={styles.metaCell}>
             <Text style={styles.metaLabel}>WEEK ENDING</Text>
@@ -97,7 +99,7 @@ export default function CertifiedPayrollPDF({ report }) {
         <View style={styles.table}>
           {/* Header */}
           <View style={styles.headerRow}>
-            <Text style={styles.cellName}>NAME OF WORKER</Text>
+            <Text style={styles.cellName}>NAME OF {workerLabel.toUpperCase()}</Text>
             <Text style={styles.cellSsn}>SSN</Text>
             <Text style={styles.cellClass}>CLASSIFICATION</Text>
             <Text style={styles.cellOtSt}>O/S</Text>

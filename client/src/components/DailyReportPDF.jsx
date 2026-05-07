@@ -69,8 +69,11 @@ function TextBlock({ text, noneLabel }) {
   return <Text style={pdf.textBlock}>{text}</Text>;
 }
 
-export function DailyReportDocument({ report, companyName, fieldPhotos = [], t, language }) {
+export function DailyReportDocument({ report, companyName, fieldPhotos = [], t = {}, language, settings = null }) {
   const locale = langToLocale(language);
+  const workLabel = settings?.label_work || t.project || 'Work';
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelPlural = /s$/i.test(workerLabel) ? workerLabel : `${workerLabel}s`;
   const WEATHER_LABELS = {
     sunny: t.weatherSunny, partly_cloudy: t.weatherPartlyCloudy, cloudy: t.weatherCloudy,
     rainy: t.weatherRainy, stormy: t.weatherStormy, snow: t.weatherSnow, windy: t.weatherWindy,
@@ -94,7 +97,7 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [], t, 
           </View>
           <View style={pdf.headerRight}>
             <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>{t.date}: </Text>{dateStr}</Text>
-            {report.project_name && <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>{t.project}: </Text>{report.project_name}</Text>}
+            {report.project_name && <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>{workLabel}: </Text>{report.project_name}</Text>}
             {report.superintendent && <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>{t.superintendent}: </Text>{report.superintendent}</Text>}
             {weatherStr && <Text style={pdf.headerMeta}><Text style={pdf.headerMetaBold}>{t.weather}: </Text>{weatherStr}</Text>}
             <View style={{ ...pdf.statusBadge, backgroundColor: isReviewed ? '#1a56db' : isSubmitted ? '#d1fae5' : '#fef3c7' }}>
@@ -116,7 +119,7 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [], t, 
         {(totalWorkers > 0 || report.manpower?.length > 0) && (
           <View style={pdf.summaryBar}>
             <View style={pdf.summaryCard}>
-              <Text style={pdf.summaryLabel}>{t.pdfTotalWorkers}</Text>
+              <Text style={pdf.summaryLabel}>{`Total ${workerLabelPlural}`}</Text>
               <Text style={pdf.summaryValue}>{totalWorkers}</Text>
             </View>
             <View style={pdf.summaryCard}>
@@ -141,7 +144,7 @@ export function DailyReportDocument({ report, companyName, fieldPhotos = [], t, 
             <View style={pdf.table}>
               <View style={pdf.tableHeader}>
                 <Text style={{ ...pdf.thText, ...pdf.colTrade }}>{t.tradeOrName}</Text>
-                <Text style={{ ...pdf.thText, ...pdf.colCount }}>{t.workers}</Text>
+                <Text style={{ ...pdf.thText, ...pdf.colCount }}>{workerLabelPlural}</Text>
                 <Text style={{ ...pdf.thText, ...pdf.colHours }}>{t.pdfHoursCol}</Text>
                 <Text style={{ ...pdf.thText, ...pdf.colNotes }}>{t.notesSection}</Text>
               </View>

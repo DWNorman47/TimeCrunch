@@ -2,7 +2,7 @@ const router = require('express').Router();
 const pool = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendPushToCompanyAdmins } = require('../push');
-const { uploadBase64, getPresignedUploadUrl } = require('../r2');
+const { uploadBase64, getPresignedUploadUrl, deleteByUrl } = require('../r2');
 const { checkStorageLimit, incrementStorage, decrementStorage } = require('../storage');
 const { logAudit } = require('../auditLog');
 
@@ -225,6 +225,38 @@ router.delete('/:id', requireAuth, async (req, res) => {
 });
 
 // GET /field-reports/photos — aggregated photo gallery for the company
+// DELETE /field-reports/photos/:photoId - delete one field report image/video
+router.delete('/photos/:photoId', requireAuth, async (req, res) => {
+  const companyId = req.user.company_id;
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
+  try {
+    const existing = await pool.query(
+      `SELECT ph.id, ph.url, ph.size_bytes, ph.media_type,
+              r.id AS report_id, r.user_id, r.status, r.project_id
+       FROM field_report_photos ph
+       JOIN field_reports r ON ph.report_id = r.id
+       WHERE ph.id = $1 AND r.company_id = $2`,
+      [req.params.photoId, companyId]
+    );
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'Image not found' });
+
+    const photo = existing.rows[0];
+    if (!isAdmin && photo.user_id !== req.user.id) return res.status(403).json({ error: 'Not your image' });
+    if (!isAdmin && photo.status === 'reviewed') return res.status(403).json({ error: 'Reviewed reports cannot be edited' });
+
+    await pool.query('DELETE FROM field_report_photos WHERE id = $1', [photo.id]);
+
+    deleteByUrl(photo.url).catch(() => {});
+    const sizeBytes = parseInt(photo.size_bytes || 0);
+    if (sizeBytes > 0) decrementStorage(companyId, sizeBytes).catch(() => {});
+
+    logAudit(companyId, req.user.id, req.user.full_name, 'field_report_photo.deleted', 'field_report_photo', photo.id, null,
+      { report_id: photo.report_id, project_id: photo.project_id, media_type: photo.media_type });
+
+    res.json({ deleted: true });
+  } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
+});
+
 router.get('/photos', requireAuth, async (req, res) => {
   const companyId = req.user.company_id;
   const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';

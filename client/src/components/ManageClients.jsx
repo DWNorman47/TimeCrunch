@@ -3,6 +3,7 @@ import api from '../api';
 import { useT } from '../hooks/useT';
 import { useToast } from '../contexts/ToastContext';
 import { SkeletonList, SkeletonBlock } from './Skeleton';
+import EmptyState from './EmptyState';
 
 // Document type metadata
 const DOC_TYPES = [
@@ -341,8 +342,10 @@ function ClientCard({ client, onEdit, onDeleted }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function ManageClients() {
+export default function ManageClients({ settings = null }) {
   const t = useT();
+  const clientLabel = settings?.label_client || 'Customer';
+  const clientLabelPlural = /s$/i.test(clientLabel) ? clientLabel : `${clientLabel}s`;
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -382,7 +385,7 @@ export default function ManageClients() {
     <div>
       <div style={s.topRow}>
         <div>
-          <h2 style={s.heading}>{t.clientsHeading}</h2>
+          <h2 style={s.heading}>{clientLabelPlural}</h2>
           {(expiredCount > 0 || expiringSoon > 0) && (
             <div style={s.summary}>
               {expiredCount > 0 && <span style={s.summaryChip}>⚠ {expiredCount} {t.expiredCOI}{expiredCount !== 1 ? 's' : ''}</span>}
@@ -391,7 +394,7 @@ export default function ManageClients() {
           )}
         </div>
         {!showForm && !editing && (
-          <button style={s.newBtn} onClick={() => setShowForm(true)}>{t.addClient}</button>
+          <button style={s.newBtn} onClick={() => setShowForm(true)}>Add {clientLabel}</button>
         )}
       </div>
 
@@ -417,10 +420,13 @@ export default function ManageClients() {
       {loading ? (
         <SkeletonList count={4} rows={2} />
       ) : clients.length === 0 ? (
-        <div style={s.empty}>
-          <div style={s.emptyIcon}>🏢</div>
-          <p style={s.emptyText}>{t.noClientsYet}</p>
-        </div>
+        <EmptyState
+          mark="C"
+          title={`No ${clientLabelPlural.toLowerCase()} yet`}
+          body="Add the people, companies, or accounts connected to your work. You can attach documents and contact details as you go."
+          actionLabel={`Add ${clientLabel}`}
+          onAction={() => setShowForm(true)}
+        />
       ) : filtered.length === 0 ? (
         <p style={s.hint}>{t.noClientsMatch}</p>
       ) : (
@@ -451,9 +457,6 @@ const s = {
   search: { width: '100%', padding: '9px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, background: '#fff', marginBottom: 12, boxSizing: 'border-box' },
   list: { display: 'flex', flexDirection: 'column', gap: 10 },
   hint: { color: '#6b7280', fontSize: 14 },
-  empty: { textAlign: 'center', padding: '60px 20px' },
-  emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { color: '#6b7280', fontSize: 15 },
   // Card
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '14px 16px', cursor: 'pointer', gap: 12 },

@@ -36,7 +36,7 @@ router.get('/classifications', requireAuth, async (req, res) => {
 const FRINGE_CATEGORIES = ['health', 'pension', 'vacation', 'apprenticeship', 'other'];
 
 // GET /api/certified-payroll/workers/:id/fringes — per-worker fringe rates
-router.get('/workers/:id/fringes', requireAdmin, async (req, res) => {
+router.get('/workers/:id/fringes', requireAdmin, requireCertifiedPayrollAddon, async (req, res) => {
   try {
     // Make sure the target user belongs to this company before returning PII-adjacent data.
     const ok = await pool.query('SELECT 1 FROM users WHERE id = $1 AND company_id = $2', [req.params.id, req.user.company_id]);
@@ -54,7 +54,7 @@ router.get('/workers/:id/fringes', requireAdmin, async (req, res) => {
 });
 
 // PUT /api/certified-payroll/workers/:id/fringes — upsert the full set
-router.put('/workers/:id/fringes', requireAdmin, async (req, res) => {
+router.put('/workers/:id/fringes', requireAdmin, requireCertifiedPayrollAddon, async (req, res) => {
   const companyId = req.user.company_id;
   const userId = req.params.id;
   const incoming = Array.isArray(req.body.fringes) ? req.body.fringes : [];
@@ -110,7 +110,7 @@ router.put('/workers/:id/fringes', requireAdmin, async (req, res) => {
 // never log it. To change the value, admins re-enter the last 4 digits.
 
 // GET /api/certified-payroll/workers/:id/ssn — presence check only
-router.get('/workers/:id/ssn', requireAdmin, async (req, res) => {
+router.get('/workers/:id/ssn', requireAdmin, requireCertifiedPayrollAddon, async (req, res) => {
   try {
     const { rows } = await pool.query(
       'SELECT ssn_last4_enc FROM users WHERE id = $1 AND company_id = $2',
@@ -125,7 +125,7 @@ router.get('/workers/:id/ssn', requireAdmin, async (req, res) => {
 });
 
 // PUT /api/certified-payroll/workers/:id/ssn { ssn_last4 } — set or clear
-router.put('/workers/:id/ssn', requireAdmin, async (req, res) => {
+router.put('/workers/:id/ssn', requireAdmin, requireCertifiedPayrollAddon, async (req, res) => {
   const raw = String(req.body.ssn_last4 || '').replace(/\D/g, '');
   try {
     const ok = await pool.query('SELECT id FROM users WHERE id = $1 AND company_id = $2', [req.params.id, req.user.company_id]);
@@ -186,7 +186,7 @@ const DEFAULT_COMPLIANCE_TEXT = [
 ].join('\n\n');
 
 // GET /api/certified-payroll/signatures?project_id=&week_ending= — most recent signature for this report, if any
-router.get('/signatures', requireAdmin, async (req, res) => {
+router.get('/signatures', requireAdmin, requireCertifiedPayrollAddon, async (req, res) => {
   const { project_id, week_ending } = req.query;
   if (!week_ending || !/^\d{4}-\d{2}-\d{2}$/.test(week_ending)) {
     return res.status(400).json({ error: 'week_ending (YYYY-MM-DD) is required' });
@@ -211,7 +211,7 @@ router.get('/signatures', requireAdmin, async (req, res) => {
 });
 
 // POST /api/certified-payroll/signatures { project_id?, week_ending, signer_name, signer_title?, signature_data }
-router.post('/signatures', requireAdmin, async (req, res) => {
+router.post('/signatures', requireAdmin, requireCertifiedPayrollAddon, async (req, res) => {
   const { project_id, week_ending, signer_name, signer_title, signature_data } = req.body;
   if (!week_ending || !/^\d{4}-\d{2}-\d{2}$/.test(week_ending)) {
     return res.status(400).json({ error: 'week_ending (YYYY-MM-DD) is required' });

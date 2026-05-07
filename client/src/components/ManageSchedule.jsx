@@ -74,8 +74,8 @@ function DroppableDay({ date, isToday, children }) {
   );
 }
 
-function exportCSV(shifts, days) {
-  const header = ['Date', 'Worker', 'Project', 'Start', 'End', 'Notes', "Can't Make It", 'Reason', 'Series ID'];
+function exportCSV(shifts, days, workerLabel = 'Worker', workLabel = 'Work') {
+  const header = ['Date', workerLabel, workLabel, 'Start', 'End', 'Notes', "Can't Make It", 'Reason', 'Series ID'];
   const rows = shifts.map(s => [
     s.shift_date.substring(0, 10),
     s.worker_name,
@@ -94,7 +94,7 @@ function exportCSV(shifts, days) {
   a.click();
 }
 
-function SummaryView({ shifts, days }) {
+function SummaryView({ shifts, days, workerLabel = 'Worker' }) {
   const t = useT();
   const [cantOnly, setCantOnly] = useState(false);
 
@@ -132,7 +132,7 @@ function SummaryView({ shifts, days }) {
       <table style={styles.summaryTable}>
         <thead>
           <tr>
-            <th style={styles.summaryThWorker}>Worker</th>
+            <th style={styles.summaryThWorker}>{workerLabel}</th>
             {days.map(day => {
               const isToday = toISO(day) === toISO(new Date());
               return (
@@ -184,11 +184,15 @@ function SummaryView({ shifts, days }) {
   );
 }
 
-export default function ManageSchedule({ workers, projects, weekStart: companyWeekStart = 1 }) {
+export default function ManageSchedule({ workers, projects, weekStart: companyWeekStart = 1, settings = null }) {
   const toast = useToast();
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workLabel = settings?.label_work || 'Work';
+  const workerLabelLower = workerLabel.toLowerCase();
+  const workLabelLower = workLabel.toLowerCase();
   const [weekStart, setWeekStart] = useState(() => startOfWeekFor(new Date(), companyWeekStart));
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -282,7 +286,7 @@ export default function ManageSchedule({ workers, projects, weekStart: companyWe
 
   const addShift = async e => {
     e.preventDefault();
-    if (!form.user_id) { setError(t.selectAWorker); return; }
+    if (!form.user_id) { setError(`Select a ${workerLabelLower}.`); return; }
 
     // Check worker availability
     const shiftDay = new Date(form.shift_date + 'T00:00:00').getDay();
@@ -480,16 +484,16 @@ export default function ManageSchedule({ workers, projects, weekStart: companyWe
       <form onSubmit={addShift} style={styles.form}>
         <div style={styles.formRow}>
           <div style={styles.field}>
-            <label htmlFor="ms-worker" style={styles.label}>{t.worker}</label>
+            <label htmlFor="ms-worker" style={styles.label}>{workerLabel}</label>
             <select id="ms-worker" style={styles.input} value={form.user_id} onChange={e => set('user_id', e.target.value)} required>
-              <option value="">{t.selectWorker}</option>
+              <option value="">{`Select ${workerLabelLower}`}</option>
               {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
             </select>
           </div>
           <div style={styles.field}>
-            <label htmlFor="ms-project" style={styles.label}>{t.project}</label>
+            <label htmlFor="ms-project" style={styles.label}>{workLabel}</label>
             <select id="ms-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">{t.noProject}</option>
+              <option value="">{`No ${workLabelLower}`}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -533,7 +537,7 @@ export default function ManageSchedule({ workers, projects, weekStart: companyWe
         <span style={styles.weekLabel}>{fmtDay(days[0], locale)} – {fmtDay(days[6], locale)}</span>
         <button style={styles.navBtn} onClick={() => setWeekStart(d => addDays(d, 7))}>{t.nextWeek}</button>
         <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeekFor(new Date(), companyWeekStart))}>{t.today}</button>
-        <button style={styles.exportBtn} onClick={() => exportCSV(shifts, days)} title={t.exportWeekCSV}>⬇ CSV</button>
+        <button style={styles.exportBtn} onClick={() => exportCSV(shifts, days, workerLabel, workLabel)} title={t.exportWeekCSV}>⬇ CSV</button>
         {shifts.length > 0 && (
           <button style={{ ...styles.copyWeekBtn, ...(copyingWeek ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={copyWeek} disabled={copyingWeek} title={t.msCopyWeek}>
             {copyingWeek ? t.msCopying : '⧉ ' + t.msCopyWeek}
@@ -560,7 +564,7 @@ export default function ManageSchedule({ workers, projects, weekStart: companyWe
       </div>
 
       {loading ? <SkeletonList count={4} rows={2} /> : viewMode === 'summary' ? (
-        <SummaryView shifts={shifts} days={days} />
+        <SummaryView shifts={shifts} days={days} workerLabel={workerLabel} />
       ) : (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={styles.grid}>
@@ -611,9 +615,9 @@ export default function ManageSchedule({ workers, projects, weekStart: companyWe
               <input id="ms-edit-end" style={styles.editInput} type="time" value={editForm.end_time} onChange={ev => setEditForm(f => ({ ...f, end_time: ev.target.value }))} />
             </div>
             <div style={styles.editField}>
-              <label htmlFor="ms-edit-project" style={styles.editLabel}>{t.project}</label>
+              <label htmlFor="ms-edit-project" style={styles.editLabel}>{workLabel}</label>
               <select id="ms-edit-project" style={styles.editInput} value={editForm.project_id} onChange={ev => setEditForm(f => ({ ...f, project_id: ev.target.value }))}>
-                <option value="">{t.none}</option>
+                <option value="">{`No ${workLabelLower}`}</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>

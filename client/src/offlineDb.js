@@ -93,8 +93,9 @@ export async function getOrFetch(key, fetchFn) {
     const data = await fetchFn();
     await setCached(key, data);
     return data;
-  } catch {
+  } catch (err) {
     if (cached) return cached.data;
+    if (err?.response) throw err;
     throw new Error('Offline and no cached data');
   }
 }

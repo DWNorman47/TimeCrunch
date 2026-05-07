@@ -25,10 +25,12 @@ function lastSunday() {
   return d.toLocaleDateString('en-CA');
 }
 
-export default function CertifiedPayroll({ projects, requireSignature = false, wh347Format = false }) {
+export default function CertifiedPayroll({ projects, settings, requireSignature = false, wh347Format = false }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
+  const workLabel = settings?.label_work || 'Work';
+  const workerLabel = settings?.label_worker || 'Team Member';
   const [showSignModal, setShowSignModal] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -42,7 +44,7 @@ export default function CertifiedPayroll({ projects, requireSignature = false, w
         import('@react-pdf/renderer'),
         import('./CertifiedPayrollPDF'),
       ]);
-      const blob = await pdf(<CertifiedPayrollPDF report={data} />).toBlob();
+      const blob = await pdf(<CertifiedPayrollPDF report={data} settings={settings} />).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -80,7 +82,7 @@ export default function CertifiedPayroll({ projects, requireSignature = false, w
   const printReport = () => {
     if (!data) return;
     const win = window.open('', '_blank');
-    const headerRow = `<tr><th>Worker</th><th>Classification</th>${DAY_LABELS.map(d => `<th>${d}</th>`).join('')}<th>Total</th><th>Rate</th><th>Gross</th></tr>`;
+    const headerRow = `<tr><th>${workerLabel}</th><th>Classification</th>${DAY_LABELS.map(d => `<th>${d}</th>`).join('')}<th>Total</th><th>Rate</th><th>Gross</th></tr>`;
 
     const workerRows = data.workers.flatMap(w => {
       const rows = [];
@@ -129,7 +131,7 @@ export default function CertifiedPayroll({ projects, requireSignature = false, w
       <div class="meta">
         <div><strong>Contractor:</strong> ${data.contractor}</div>
         <div><strong>Week ending:</strong> ${fmtDate(data.week_end, locale)}</div>
-        <div><strong>Project:</strong> ${data.project || t.allProjectsOpt}</div>
+        <div><strong>${workLabel}:</strong> ${data.project || `All ${workLabel.toLowerCase()}`}</div>
         <div><strong>Week starting:</strong> ${fmtDate(data.week_start, locale)}</div>
       </div>
       <table>
@@ -155,9 +157,9 @@ export default function CertifiedPayroll({ projects, requireSignature = false, w
           <input id="cp-week-end" style={styles.input} type="date" value={weekEnd} onChange={e => { setWeekEnd(e.target.value); setData(null); }} />
         </div>
         <div style={styles.field}>
-          <label htmlFor="cp-project" style={styles.label}>{t.projectOptional}</label>
+          <label htmlFor="cp-project" style={styles.label}>{workLabel} optional</label>
           <select id="cp-project" style={styles.input} value={projectId} onChange={e => { setProjectId(e.target.value); setData(null); }}>
-            <option value="">{t.allProjectsOpt}</option>
+            <option value="">All {workLabel.toLowerCase()}</option>
             {(projects || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
@@ -173,7 +175,7 @@ export default function CertifiedPayroll({ projects, requireSignature = false, w
           <div style={styles.reportHeader}>
             <div>
               <div style={styles.metaLine}><strong>{t.contractorLabel}</strong> {data.contractor}</div>
-              <div style={styles.metaLine}><strong>{t.project}:</strong> {data.project || t.allProjectsOpt}</div>
+              <div style={styles.metaLine}><strong>{workLabel}:</strong> {data.project || `All ${workLabel.toLowerCase()}`}</div>
               <div style={styles.metaLine}><strong>Period:</strong> {fmtDate(data.week_start, locale)} – {fmtDate(data.week_end, locale)}</div>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -210,7 +212,7 @@ export default function CertifiedPayroll({ projects, requireSignature = false, w
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>{t.worker}</th>
+                    <th style={styles.th}>{workerLabel}</th>
                     <th style={styles.th}>{t.classLabel}</th>
                     {DAY_LABELS.map(d => <th key={d} style={{ ...styles.th, ...styles.dayTh }}>{d}</th>)}
                     <th style={styles.th}>Total</th>

@@ -8,6 +8,7 @@ import LiveKPIs from '../components/LiveKPIs';
 import { SkeletonStatRow, SkeletonList } from '../components/Skeleton';
 import BroadcastMessage from '../components/BroadcastMessage';
 import AppHeader from '../components/AppHeader';
+import { PageIntro } from '../components/PageShell';
 import TabBar from '../components/TabBar';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import api from '../api';
@@ -138,6 +139,10 @@ export default function AdminDashboard() {
   const handleProjectUpdated = p  => setProjects(prev => prev.map(x => x.id === p.id ? p : x));
   const handleProjectRestored= p  => setProjects(prev => [...prev, p]);
 
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
 
   return (
     <div style={styles.page}>
@@ -161,6 +166,20 @@ export default function AdminDashboard() {
       })()}
 
       <main id="main-content" style={styles.main} className="admin-main">
+        <PageIntro
+          introId="workforce"
+          kicker="Workforce"
+          title="Run the day from the exceptions first."
+          description="Live status, approvals, reports, and scheduling stay together, while the tabs keep the daily view from feeling crowded."
+          meta={
+            <>
+              <span className={`ops-pill ${pendingCount > 0 ? 'attention' : 'good'}`}>{pendingCount} approvals</span>
+              {settings?.feature_reimbursements !== false && (
+                <span className={`ops-pill ${pendingReimbursements > 0 ? 'attention' : ''}`}>{pendingReimbursements} expenses</span>
+              )}
+            </>
+          }
+        />
         <TabBar
           breakpoint={720}
           active={tab}
@@ -169,8 +188,8 @@ export default function AdminDashboard() {
             { id: 'live', label: t.tabLive, dot: chatUnread && settings?.feature_chat !== false ? '#3b82f6' : null },
             ...(canDo('approve_entries') ? [{ id: 'approvals', label: t.tabApprovals, dot: pendingCount > 0 ? '#f59e0b' : null }] : []),
             ...(canDo('view_reports') ? [{ id: 'reports', label: t.tabReports }] : []),
-            ...(settings?.feature_pto !== false ? [{ id: 'timeoff', label: '🌴 Time Off' }] : []),
-            ...(settings?.feature_reimbursements !== false ? [{ id: 'expenses', label: '💳 Expenses', dot: pendingReimbursements > 0 ? '#f59e0b' : null }] : []),
+            ...(settings?.feature_pto !== false ? [{ id: 'timeoff', label: 'Time Off' }] : []),
+            ...(settings?.feature_reimbursements !== false ? [{ id: 'expenses', label: 'Expenses', dot: pendingReimbursements > 0 ? '#f59e0b' : null }] : []),
             ...(settings?.feature_scheduling !== false ? [{ id: 'manage', label: t.tabManage }] : []),
           ]}
         />
@@ -198,40 +217,40 @@ export default function AdminDashboard() {
               <div style={styles.liveLayout} className="live-layout">
                 <div style={styles.liveMain}>
                   <Suspense fallback={<TabLoader />}>
-                    <LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} />
+                    <LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} settings={settings} />
                   </Suspense>
                 </div>
-                <div style={styles.liveChat}><CompanyChat workers={workers} /></div>
+                <div style={styles.liveChat}><CompanyChat workers={workers} settings={settings} /></div>
               </div>
             ) : (
               <Suspense fallback={<TabLoader />}>
-                <LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} />
+                <LiveWorkers timezone={settings?.company_timezone ?? ''} showInactiveAlerts={settings?.feature_inactive_alerts !== false} projects={projects} settings={settings} />
               </Suspense>
             )}
           </>
         ) : tab === 'approvals' ? (
           <Suspense fallback={<TabLoader />}>
             <h2 style={styles.heading}>{t.tabApprovals}</h2>
-            <ApprovalQueue onCountChange={setPendingCount} />
+            <ApprovalQueue onCountChange={setPendingCount} settings={settings} />
             {canDo('approve_entries') && <ManagePayPeriods />}
           </Suspense>
         ) : tab === 'reports' ? (
           <Suspense fallback={<TabLoader />}>
             <h2 style={styles.heading}>{t.tabReports}</h2>
             <button style={styles.sectionToggle} onClick={() => toggleSection('workers')}>
-              <span>{t.workerReports}</span>
+              <span>{`${workerLabel} reports`}</span>
               <span style={styles.chevron}>{collapsedSections.workers ? '▶' : '▼'}</span>
             </button>
             {!collapsedSections.workers && (workers.length === 0
-              ? <p style={{ color: '#666' }}>{t.noWorkersYet}</p>
-              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} overtimeEnabled={settings?.feature_overtime !== false} projectsEnabled={settings?.feature_project_integration !== false} projects={projects} />)
+              ? <p style={{ color: '#666' }}>{`No ${workerLabelPlural.toLowerCase()} yet.`}</p>
+              : workers.map(w => <WorkerMetrics key={w.id} worker={w} currency={settings?.currency ?? 'USD'} companyInfo={companyInfo} overtimeEnabled={settings?.feature_overtime !== false} projectsEnabled={settings?.feature_project_integration !== false} projects={projects} settings={settings} />)
             )}
             {settings?.feature_project_integration !== false && <>
               <button style={styles.sectionToggle} onClick={() => toggleSection('projects')}>
-                <span>{t.projectReports}</span>
+                <span>{`${workLabelPlural} reports`}</span>
                 <span style={styles.chevron}>{collapsedSections.projects ? '▶' : '▼'}</span>
               </button>
-              {!collapsedSections.projects && <ProjectReports currency={settings?.currency ?? 'USD'} />}
+              {!collapsedSections.projects && <ProjectReports currency={settings?.currency ?? 'USD'} settings={settings} />}
             </>}
             {settings?.feature_overtime !== false && <>
               <button style={styles.sectionToggle} onClick={() => toggleSection('overtime')}>
@@ -244,12 +263,12 @@ export default function AdminDashboard() {
               <span>{t.payrollLabel}</span>
               <span style={styles.chevron}>{collapsedSections.payroll ? '▶' : '▼'}</span>
             </button>
-            {!collapsedSections.payroll && (plan.hasQbo ? <CertifiedPayroll projects={projects} requireSignature={plan.hasCertifiedPayroll && settings?.cp_require_signature !== false} wh347Format={plan.hasCertifiedPayroll && settings?.cp_wh347_format !== false} /> : <UpgradePrompt requiredPlan="qbo" feature={t.payrollLabel} />)}
+            {!collapsedSections.payroll && (plan.hasQbo ? <CertifiedPayroll projects={projects} settings={settings} requireSignature={plan.hasCertifiedPayroll && settings?.cp_require_signature !== false} wh347Format={plan.hasCertifiedPayroll && settings?.cp_wh347_format !== false} /> : <UpgradePrompt requiredPlan="qbo" feature={t.payrollLabel} />)}
             <button style={styles.sectionToggle} onClick={() => toggleSection('export')}>
               <span>{t.export}</span>
               <span style={styles.chevron}>{collapsedSections.export ? '▶' : '▼'}</span>
             </button>
-            {!collapsedSections.export && (plan.isStarter ? <ExportPanel workers={workers} projects={projects} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />)}
+            {!collapsedSections.export && (plan.isStarter ? <ExportPanel workers={workers} projects={projects} settings={settings} /> : <UpgradePrompt requiredPlan="starter" feature={t.export} />)}
           </Suspense>
         ) : tab === 'timeoff' && settings?.feature_pto !== false ? (
           <Suspense fallback={<TabLoader />}>
@@ -257,11 +276,11 @@ export default function AdminDashboard() {
           </Suspense>
         ) : tab === 'expenses' && settings?.feature_reimbursements !== false ? (
           <Suspense fallback={<TabLoader />}>
-            <ReimbursementsAdmin />
+            <ReimbursementsAdmin settings={settings} />
           </Suspense>
         ) : tab === 'manage' ? (
           <Suspense fallback={<TabLoader />}>
-            {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} weekStart={settings?.week_start ?? 1} />}
+            {settings?.feature_scheduling !== false && <ManageSchedule workers={workers} projects={projects} weekStart={settings?.week_start ?? 1} settings={settings} />}
           </Suspense>
         ) : null}
           </ErrorBoundary>
@@ -272,14 +291,14 @@ export default function AdminDashboard() {
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: '#f4f6f9' },
+  page: { minHeight: '100vh', background: '#f4f6f9', '--ops-page-accent': '#1d4ed8' },
   header: { background: '#1a56db', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, minHeight: 'calc(56px + env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', top: 0, zIndex: 100 },
   headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
   companyName: { fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' },
   headerRight: { display: 'flex', gap: 10 },
   headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  main: { maxWidth: 900, margin: '32px auto', padding: '0 16px' },
+  main: { maxWidth: 900, margin: '18px auto 32px', padding: '0 16px' },
   tabs: { display: 'flex', gap: 4, marginBottom: 24, background: '#e8edf5', borderRadius: 10, padding: 4, width: '100%', overflowX: 'auto', flexWrap: 'nowrap', scrollbarWidth: 'none' },
   tab: { flex: 1, padding: '9px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#666', cursor: 'pointer', whiteSpace: 'nowrap', textAlign: 'center' },
   tabActive: { flex: 1, padding: '9px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', whiteSpace: 'nowrap', textAlign: 'center' },

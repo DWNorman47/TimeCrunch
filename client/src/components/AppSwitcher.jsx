@@ -11,7 +11,7 @@ export const APPS = [
   {
     id: 'timeclock',
     name: 'Time Clock',
-    bg: '#1a56db',
+    bg: '#2563eb',
     icon: (
       <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
         <circle cx="10" cy="10" r="7.5" />
@@ -23,7 +23,7 @@ export const APPS = [
   {
     id: 'workforce',
     name: 'Workforce',
-    bg: '#0f3a8a',
+    bg: '#1d4ed8',
     adminOnly: true,
     icon: (
       <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
@@ -50,7 +50,7 @@ export const APPS = [
   {
     id: 'inventory',
     name: 'Inventory',
-    bg: '#d97706',
+    bg: '#b45309',
     icon: (
       <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
         <polyline points="2,6 10,11 18,6" />
@@ -63,7 +63,7 @@ export const APPS = [
   {
     id: 'account',
     name: 'Account',
-    bg: '#64748b',
+    bg: '#475569',
     workerOnly: true,
     icon: (
       <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
@@ -76,7 +76,7 @@ export const APPS = [
   {
     id: 'team',
     name: 'Team',
-    bg: '#0ea5e9',
+    bg: '#0284c7',
     icon: (
       <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
         <circle cx="7" cy="7.5" r="2.6" />
@@ -90,7 +90,7 @@ export const APPS = [
   {
     id: 'projects',
     name: 'Projects',
-    bg: '#8b5cf6',
+    bg: '#7c3aed',
     adminOnly: true,
     icon: (
       <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
@@ -105,7 +105,7 @@ export const APPS = [
   {
     id: 'administration',
     name: 'Administration',
-    bg: '#64748b',
+    bg: '#475569',
     adminOnly: true,
     icon: (
       <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
@@ -117,7 +117,7 @@ export const APPS = [
   {
     id: 'analytics',
     name: 'Analytics',
-    bg: '#0891b2',
+    bg: '#0e7490',
     adminOnly: true,
     icon: (
       <svg viewBox="0 0 20 20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
@@ -135,6 +135,11 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const labelFor = app => {
+    if (app.id === 'field') return features?.label_field || app.name;
+    if (app.id === 'projects') return features?.label_work || app.name;
+    return app.name;
+  };
   const visibleApps = APPS.filter(a => {
     if (a.adminOnly && !isAdmin) return false;
     if (a.workerOnly && isAdmin) return false;
@@ -172,7 +177,7 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
     <div ref={ref} style={styles.wrap}>
       <button style={styles.trigger} onClick={() => setOpen(o => !o)}>
         <div style={{ ...styles.appIcon, background: current.bg }}>{current.icon}</div>
-        <span style={styles.appName} className="app-switcher-name">{current.name}</span>
+        <span style={styles.appName} className="app-switcher-name">{labelFor(current)}</span>
         <svg style={{ ...styles.chevron, transform: open ? 'rotate(180deg)' : 'none' }}
           viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="12" height="12">
           <polyline points="2,4 6,8 10,4" />
@@ -194,7 +199,7 @@ export default function AppSwitcher({ currentApp = 'timeclock', userRole, featur
               <div style={{ ...styles.itemIcon, background: app.soon ? '#e5e7eb' : app.bg }}>
                 {app.icon}
               </div>
-              <span style={{ ...styles.itemName, color: app.soon ? '#9ca3af' : '#111827' }}>{app.name}</span>
+              <span style={{ ...styles.itemName, color: app.soon ? '#9ca3af' : '#111827' }}>{labelFor(app)}</span>
               {app.soon && <span style={styles.soonBadge}>{t.comingSoon}</span>}
             </button>
           ))}
@@ -208,20 +213,20 @@ const styles = {
   wrap: { position: 'relative' },
   trigger: {
     display: 'flex', alignItems: 'center', gap: 8,
-    background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
-    borderRadius: 20, padding: '5px 12px 5px 6px',
-    color: '#fff', cursor: 'pointer', transition: 'background 0.15s',
+    background: '#f8fafc', border: '1px solid #cbd5e1',
+    borderRadius: 999, padding: '5px 12px 5px 6px',
+    color: '#0f172a', cursor: 'pointer', transition: 'background 0.15s, border-color 0.15s',
   },
   appIcon: {
     width: 28, height: 28, borderRadius: 8,
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  appName: { fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' },
-  chevron: { opacity: 0.8, transition: 'transform 0.2s', color: '#fff' },
+  appName: { fontWeight: 800, fontSize: 15, letterSpacing: 0 },
+  chevron: { opacity: 0.8, transition: 'transform 0.2s', color: '#475569' },
   dropdown: {
     position: 'absolute', top: 'calc(100% + 8px)', left: 0,
-    background: '#fff', borderRadius: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-    padding: 6, minWidth: 200, zIndex: 1000,
+    background: '#fff', borderRadius: 10, boxShadow: '0 16px 42px rgba(15,23,42,0.14)',
+    border: '1px solid #e2e8f0', padding: 6, minWidth: 220, zIndex: 1000,
   },
   item: {
     display: 'flex', alignItems: 'center', gap: 12,
@@ -229,7 +234,7 @@ const styles = {
     background: 'none', borderRadius: 9, cursor: 'pointer',
     textAlign: 'left', transition: 'background 0.1s',
   },
-  itemActive: { background: '#f0f4ff' },
+  itemActive: { background: '#f1f5f9' },
   itemSoon: { cursor: 'default' },
   itemIcon: {
     width: 36, height: 36, borderRadius: 10,

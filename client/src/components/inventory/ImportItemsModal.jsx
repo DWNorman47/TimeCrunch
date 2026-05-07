@@ -19,10 +19,10 @@ const TEMPLATE_COLUMNS = [
 
 const TEMPLATE_SAMPLE = [
   {
-    name: '2x4 Stud 8ft',
-    sku: 'LUM-2X4-8',
-    description: 'Standard dimensional lumber',
-    category: 'Lumber',
+    name: 'Disposable Gloves',
+    sku: 'SUP-GLV-M',
+    description: 'Medium nitrile gloves',
+    category: 'Supplies',
     unit: 'each',
     unit_spec: '',
     unit_cost: 4.25,
@@ -30,10 +30,10 @@ const TEMPLATE_SAMPLE = [
     reorder_qty: 200,
   },
   {
-    name: 'Drywall Screws',
-    sku: 'SCR-DW-125',
-    description: '1-1/4" coarse-thread',
-    category: 'Fasteners',
+    name: 'Printer Paper',
+    sku: 'OFF-PAPER-LTR',
+    description: 'Letter size copy paper',
+    category: 'Office',
     unit: 'box',
     unit_spec: '1 lb',
     unit_cost: 8.5,
@@ -159,14 +159,14 @@ export default function ImportItemsModal({ onClose, onDone }) {
 
   return (
     <div style={s.overlay} onClick={onClose}>
-      <ModalShell onClose={onClose} titleId="imp-title" style={s.modal} onClick={e => e.stopPropagation()}>
+      <ModalShell onClose={onClose} titleId="imp-title" className="inventory-import-modal" style={s.modal} onClick={e => e.stopPropagation()}>
         <div style={s.header}>
           <div id="imp-title" style={s.title}>{t.invImportTitle || 'Import Items'}</div>
           <button style={s.close} aria-label={t.labelModalClose || 'Close'} onClick={onClose}>✕</button>
         </div>
 
         {!result && (
-          <div style={s.body}>
+          <div className="inventory-import-body" style={s.body}>
             {error && <div role="alert" style={s.error}>{error}</div>}
 
             {!rows && (
@@ -177,7 +177,7 @@ export default function ImportItemsModal({ onClose, onDone }) {
                 <button type="button" style={s.linkBtn} onClick={downloadTemplate}>
                   {t.invImportDownloadTemplate || 'Download template'}
                 </button>
-                <div style={s.dropzone} onClick={() => fileRef.current?.click()}>
+                <div className="inventory-import-dropzone" style={s.dropzone} onClick={() => fileRef.current?.click()}>
                   <div style={s.dropIcon}>📄</div>
                   <div style={s.dropText}>{t.invImportChooseFile || 'Click to choose a file'}</div>
                   <div style={s.dropHint}>.xlsx or .csv</div>
@@ -194,7 +194,7 @@ export default function ImportItemsModal({ onClose, onDone }) {
 
             {rows && (
               <>
-                <div style={s.previewHeader}>
+                <div className="inventory-import-preview-header" style={s.previewHeader}>
                   <div>
                     <div style={s.fileName}>{fileName}</div>
                     <div style={s.rowCount}>
@@ -251,7 +251,7 @@ export default function ImportItemsModal({ onClose, onDone }) {
                   </span>
                 </label>
 
-                <div style={s.actions}>
+                <div className="inventory-import-actions" style={s.actions}>
                   <button type="button" style={s.cancel} onClick={onClose} disabled={submitting}>
                     {t.cancel || 'Cancel'}
                   </button>
@@ -267,10 +267,10 @@ export default function ImportItemsModal({ onClose, onDone }) {
         )}
 
         {result && (
-          <div style={s.body}>
+          <div className="inventory-import-body" style={s.body}>
             <div style={s.successIcon}>✓</div>
             <div style={s.resultTitle}>{t.invImportDone || 'Import complete'}</div>
-            <div style={s.resultStats}>
+            <div className="inventory-import-result-stats" style={s.resultStats}>
               <div style={s.stat}>
                 <div style={s.statNum}>{result.imported.length}</div>
                 <div style={s.statLabel}>{t.invImportAddedLabel || 'added'}</div>
@@ -290,7 +290,7 @@ export default function ImportItemsModal({ onClose, onDone }) {
                 <div style={s.skippedHeader}>{t.invImportSkippedHeader || 'Skipped rows'}</div>
                 <div style={s.skippedList}>
                   {result.skipped.map((r, i) => (
-                    <div key={i} style={s.skippedRow}>
+                    <div key={i} className="inventory-import-skipped-row" style={s.skippedRow}>
                       <span style={s.skippedNum}>#{r.row}</span>
                       <span style={s.skippedName}>{r.name || '(no name)'}</span>
                       <span style={s.skippedReason}>{r.reason}</span>
@@ -300,7 +300,7 @@ export default function ImportItemsModal({ onClose, onDone }) {
               </div>
             )}
 
-            <div style={s.actions}>
+            <div className="inventory-import-actions" style={s.actions}>
               <button type="button" style={s.primary} onClick={finish}>{t.done || 'Done'}</button>
             </div>
           </div>
@@ -320,7 +320,7 @@ const s = {
   intro:   { fontSize: 14, color: '#4b5563', lineHeight: 1.5, marginTop: 0 },
   linkBtn: { background: 'none', border: 'none', color: '#1a56db', fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 16 },
   dropzone: { border: '2px dashed #d1d5db', borderRadius: 10, padding: 40, textAlign: 'center', cursor: 'pointer', background: '#f9fafb' },
-  dropIcon: { fontSize: 36, marginBottom: 8 },
+  dropIcon: { display: 'none' },
   dropText: { fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 4 },
   dropHint: { fontSize: 12, color: '#6b7280' },
   error:   { background: '#fee2e2', color: '#991b1b', padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 12 },
@@ -346,7 +346,7 @@ const s = {
   cancel:  { background: '#fff', color: '#374151', border: '1px solid #d1d5db', padding: '8px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' },
   primary: { background: '#1a56db', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
 
-  successIcon: { fontSize: 44, color: '#059669', textAlign: 'center', marginBottom: 6 },
+  successIcon: { display: 'none' },
   resultTitle: { fontSize: 16, fontWeight: 700, textAlign: 'center', color: '#111827', marginBottom: 16 },
   resultStats: { display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 18 },
   stat:        { flex: 1, textAlign: 'center', background: '#f0fdf4', borderRadius: 10, padding: '14px 8px', border: '1px solid #d1fae5' },

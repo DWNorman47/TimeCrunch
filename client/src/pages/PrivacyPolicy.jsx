@@ -3,21 +3,22 @@ import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 export default function PrivacyPolicy() {
   useDocumentMeta({
-    title: 'Privacy Policy — OpsFloa',
-    description: 'How OpsFloa collects, uses, and protects your data. Construction time tracking and payroll for contractors.',
+    title: 'Privacy Policy - OpsFloa',
+    description: 'How OpsFloa collects, uses, and protects your data for team time tracking, operations, and payroll.',
   });
+
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <a href="/" style={styles.back}>← Back to OpsFloa</a>
+        <a href="/" style={styles.back}>Back to OpsFloa</a>
         <h1 style={styles.h1}>Privacy Policy</h1>
         <p style={styles.updated}>Last updated: March 21, 2025</p>
 
-        <p style={styles.p}>OpsFloa ("we," "our," or "us") operates opsfloa.com and provides workforce management software for construction and field service businesses. This Privacy Policy explains how we collect, use, and protect your information.</p>
+        <p style={styles.p}>OpsFloa ("we," "our," or "us") operates opsfloa.com and provides workforce management software for mobile teams and service businesses. This Privacy Policy explains how we collect, use, and protect your information.</p>
 
         <h2 style={styles.h2}>1. Information We Collect</h2>
         <p style={styles.p}><strong>Account information:</strong> When you register, we collect your company name, name, email address, and password (stored as a secure hash).</p>
-        <p style={styles.p}><strong>Usage data:</strong> Time entries, project assignments, clock-in/out records, GPS coordinates (when location features are used), and field reports submitted through the app.</p>
+        <p style={styles.p}><strong>Usage data:</strong> Time entries, work assignments, clock-in/out records, GPS coordinates (when location features are used), and reports submitted through the app.</p>
         <p style={styles.p}><strong>Device and browser data:</strong> IP address, browser type, and device identifiers for security and session management.</p>
         <p style={styles.p}><strong>Payment information:</strong> Billing is processed by Stripe. We do not store your credit card numbers. We receive billing status and subscription metadata from Stripe.</p>
         <p style={styles.p}><strong>QuickBooks data:</strong> If you connect QuickBooks Online, we store OAuth tokens (encrypted) to sync time entries on your behalf. We only access the data necessary to push time activities.</p>
@@ -26,8 +27,8 @@ export default function PrivacyPolicy() {
         <ul style={styles.ul}>
           <li>Provide, maintain, and improve the OpsFloa service</li>
           <li>Process time entries and generate timesheets and reports</li>
-          <li>Send transactional emails (password resets, invitations, approvals)</li>
-          <li>Sync data with connected third-party services you authorize (e.g., QuickBooks)</li>
+          <li>Send transactional emails such as password resets, invitations, and approvals</li>
+          <li>Sync data with connected third-party services you authorize, such as QuickBooks</li>
           <li>Detect and prevent fraud, abuse, and security incidents</li>
           <li>Comply with legal obligations</li>
         </ul>
@@ -35,13 +36,13 @@ export default function PrivacyPolicy() {
         <h2 style={styles.h2}>3. Data Sharing</h2>
         <p style={styles.p}>We do not sell your personal data. We share data only with:</p>
         <ul style={styles.ul}>
-          <li><strong>Service providers:</strong> Hosting (Render), database (Neon), email (SendGrid), payments (Stripe), and analytics — only as necessary to operate the service.</li>
+          <li><strong>Service providers:</strong> Hosting, database, email, payments, and analytics only as necessary to operate the service.</li>
           <li><strong>Intuit/QuickBooks:</strong> When you connect QuickBooks, we exchange data with Intuit's API per your authorization.</li>
           <li><strong>Legal requirements:</strong> If required by law or to protect the rights and safety of users.</li>
         </ul>
 
         <h2 style={styles.h2}>4. Data Security</h2>
-        <p style={styles.p}>We use industry-standard security measures including AES-256-GCM encryption for sensitive credentials, TLS in transit, hashed passwords (bcrypt), and multi-factor authentication (TOTP). Access to production systems is restricted and logged.</p>
+        <p style={styles.p}>We use industry-standard security measures including encryption for sensitive credentials, TLS in transit, hashed passwords, and multi-factor authentication. Access to production systems is restricted and logged.</p>
 
         <h2 style={styles.h2}>5. Data Retention</h2>
         <p style={styles.p}>We retain your account data for as long as your account is active. You may request deletion of your account and associated data by emailing us. Certain records may be retained as required by law.</p>

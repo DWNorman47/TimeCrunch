@@ -5,12 +5,21 @@ import AppHeader from '../components/AppHeader';
 import ManageClients from '../components/ManageClients';
 import { useT } from '../hooks/useT';
 import { SkeletonList } from '../components/Skeleton';
+import EmptyState from '../components/EmptyState';
+import TabBar from '../components/TabBar';
 import { langToLocale } from '../utils';
 import { silentError, reportClientError } from '../errorReporter';
 import RetryBanner from '../components/RetryBanner';
 
 function punchColor(status) {
   return { open: '#f59e0b', in_progress: '#3b82f6', resolved: '#059669', closed: '#9ca3af' }[status] || '#9ca3af';
+}
+
+function plural(label) {
+  if (!label) return '';
+  if (/s$/i.test(label)) return label;
+  if (/y$/i.test(label)) return `${label.slice(0, -1)}ies`;
+  return `${label}s`;
 }
 
 // ── Project Card ──────────────────────────────────────────────────────────────
@@ -24,6 +33,7 @@ function ProjectCard({ project, metrics, settings, onClick }) {
   const budgetHours = parseFloat(project.budget_hours || 0);
   const budgetDollars = parseFloat(project.budget_dollars || 0);
   const workerCount = parseInt(m.worker_count || 0);
+  const workerLabel = settings?.label_worker || 'Team Member';
 
   const hoursUsedPct = budgetHours > 0 ? Math.min(100, (totalHours / budgetHours) * 100) : 0;
 
@@ -40,7 +50,6 @@ function ProjectCard({ project, metrics, settings, onClick }) {
     if (isNaN(n) || n === 0) return null;
     return new Intl.NumberFormat(locale, { style: 'currency', currency: settings?.currency || 'USD', maximumFractionDigits: 0 }).format(n);
   };
-
   const statusColors = { planning: '#dbeafe|#1d4ed8', in_progress: '#d1fae5|#065f46', on_hold: '#fef3c7|#92400e', completed: '#e5e7eb|#374151' };
   const [statusBg, statusFg] = (statusColors[project.status] || '#f3f4f6|#6b7280').split('|');
   const statusLabel = { planning: 'Planning', in_progress: 'In Progress', on_hold: 'On Hold', completed: 'Completed' }[project.status];
@@ -54,7 +63,7 @@ function ProjectCard({ project, metrics, settings, onClick }) {
         <div style={styles.cardName}>{project.name}</div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0, marginLeft: 8 }}>
           {statusLabel && <span style={{ fontSize: 10, fontWeight: 700, background: statusBg, color: statusFg, padding: '2px 7px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{statusLabel}</span>}
-          <div style={styles.cardBadge}>{workerCount} worker{workerCount !== 1 ? 's' : ''}</div>
+          <div style={styles.cardBadge}>{workerCount} {plural(workerLabel).toLowerCase()}</div>
         </div>
       </div>
       {project.client_name && <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, marginTop: -4 }}>{project.client_name}{project.job_number ? ` · ${project.job_number}` : ''}</div>}
@@ -199,6 +208,12 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     return new Intl.NumberFormat(locale, { style: 'currency', currency: settings?.currency || 'USD', maximumFractionDigits: 0 }).format(n);
   };
 
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelLower = workLabel.toLowerCase();
+  const clientLabel = settings?.label_client || 'Customer';
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelPlural = plural(workerLabel);
+
   useEffect(() => {
     if (tab === 'entries') {
       setEntriesLoading(true);
@@ -339,7 +354,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
         import('@react-pdf/renderer'),
         import('../components/ProjectBillPDF'),
       ]);
-      const el = React.createElement(ProjectBillPDF, { data: billData, currency: settings?.currency || 'USD', companyInfo, project, t, language: user?.language });
+      const el = React.createElement(ProjectBillPDF, { data: billData, currency: settings?.currency || 'USD', companyInfo, project, t, language: user?.language, settings });
       const blob = await pdf(el).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -488,7 +503,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
       const r = await api.patch(`/admin/projects/${project.id}`, { status: 'completed' });
       onProjectUpdated?.(r.data);
       setEditForm(f => ({ ...f, status: 'completed' }));
-      setEditMsg('Project marked as complete');
+      setEditMsg(`${workLabel} marked as complete`);
       setTimeout(() => setEditMsg(''), 2500);
     } catch {
       setEditMsg('Failed to update');
@@ -497,7 +512,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 
   const exportCsv = () => {
     if (!billData?.entries?.length) return;
-    const rows = [['Worker', 'Date', 'Start', 'End', 'Regular Hours', 'Overtime Hours', 'Cost']];
+    const rows = [[workerLabel, 'Date', 'Start', 'End', 'Regular Hours', 'Overtime Hours', 'Cost']];
     billData.entries.forEach(e => {
       rows.push([
         e.worker_name || '',
@@ -525,20 +540,20 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
   const hourColor = hoursUsedPct >= 100 ? '#ef4444' : hoursUsedPct >= 85 ? '#f59e0b' : '#059669';
 
   return (
-    <div style={styles.detailOverlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={styles.detailPanel}>
-        <div style={styles.detailHeader}>
+    <div style={styles.detailOverlay} className="project-detail-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={styles.detailPanel} className="project-detail-panel">
+        <div style={styles.detailHeader} className="project-detail-header">
           <div>
             <h2 style={styles.detailTitle}>{project.name}</h2>
             <p style={styles.detailSub}>
               {project.client_name && <>{project.client_name} · </>}
-              {parseInt(m.worker_count || 0)} workers · {parseInt(m.total_entries || 0)} entries
+              {parseInt(m.worker_count || 0)} {workerLabelPlural.toLowerCase()} · {parseInt(m.total_entries || 0)} entries
             </p>
           </div>
           <button style={styles.closeBtn} onClick={onClose} aria-label="Close">✕</button>
         </div>
 
-        <div style={styles.detailTabs}>
+        <div style={styles.detailTabs} className="project-detail-tabs">
           {['overview', 'billing', 'entries', 'edit'].map(t => (
             <button key={t} className="project-detail-tab" style={{ ...styles.detailTab, ...(tab === t ? styles.detailTabActive : {}) }} onClick={() => setTab(t)}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -546,7 +561,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
           ))}
         </div>
 
-        <div style={styles.detailBody}>
+        <div style={styles.detailBody} className="project-detail-body">
           {tab === 'overview' && (
             <div>
               {/* Project metadata */}
@@ -559,7 +574,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                     const label = { planning: 'Planning', in_progress: 'In Progress', on_hold: 'On Hold', completed: 'Completed' }[project.status];
                     return label ? <span style={{ fontSize: 11, fontWeight: 700, background: bg, color: fg, padding: '2px 9px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'inline-block', marginBottom: 8 }}>{label}</span> : null;
                   })()}
-                  {project.client_name && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Client</span><span style={styles.budgetValue}>{project.client_name}</span></div>}
+                  {project.client_name && <div style={styles.budgetRow}><span style={styles.budgetLabel}>{clientLabel}</span><span style={styles.budgetValue}>{project.client_name}</span></div>}
                   {project.job_number && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Job #</span><span style={styles.budgetValue}>{project.job_number}</span></div>}
                   {project.address && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Address</span><span style={{ ...styles.budgetValue, textAlign: 'right', maxWidth: 220 }}>{project.address}</span></div>}
                   {project.start_date && <div style={styles.budgetRow}><span style={styles.budgetLabel}>Start</span><span style={styles.budgetValue}>{new Date(project.start_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}</span></div>}
@@ -585,7 +600,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 </div>
                 <div style={styles.metricCard}>
                   <div style={styles.metricValue}>{parseInt(m.worker_count || 0)}</div>
-                  <div style={styles.metricLabel}>Workers</div>
+                  <div style={styles.metricLabel}>{workerLabelPlural}</div>
                 </div>
               </div>
 
@@ -613,8 +628,8 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 </div>
               )}
 
-              {/* Visibility — who sees this project in Time Clock */}
-              <ProjectVisibility project={project} onProjectUpdated={onProjectUpdated} toggleStyle={styles.activityToggle} countStyle={styles.activityCount} />
+              {/* Visibility */}
+              <ProjectVisibility project={project} onProjectUpdated={onProjectUpdated} toggleStyle={styles.activityToggle} countStyle={styles.activityCount} workLabel={workLabel} workerLabel={workerLabel} />
 
               {/* Punchlist */}
               <div style={{ marginBottom: 16 }}>
@@ -699,7 +714,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                           onChange={e => setPunchForm(f => ({ ...f, description: e.target.value }))}
                         />
                         {punchError && <p style={{ color: '#dc2626', fontSize: 12, margin: 0 }}>{punchError}</p>}
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        <div style={{ display: 'flex', gap: 6 }} className="project-inline-actions">
                           <button type="submit" style={styles.rfiSubmitBtn} disabled={punchSaving}>
                             {punchSaving ? t.saving : t.punchlistAddItem}
                           </button>
@@ -715,10 +730,10 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 )}
               </div>
 
-              {/* Worker roster */}
+              {/* Roster */}
               {(workersLoading || workers.length > 0) && (
                 <div style={{ ...styles.budgetSection, marginBottom: 16 }}>
-                  <div style={styles.sectionTitle}>Workers ({workers.length})</div>
+                  <div style={styles.sectionTitle}>{workerLabelPlural} ({workers.length})</div>
                   {workersLoading ? (
                     <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>Loading…</p>
                   ) : (
@@ -992,7 +1007,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                           onChange={e => setRfiForm(f => ({ ...f, description: e.target.value }))}
                         />
                         {rfiError && <p role="alert" style={{ color: '#dc2626', fontSize: 12, margin: 0 }}>{rfiError}</p>}
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        <div style={{ display: 'flex', gap: 6 }} className="project-inline-actions">
                           <button type="submit" style={styles.rfiSubmitBtn} disabled={rfiSaving}>
                             {rfiSaving ? 'Saving…' : 'Create RFI'}
                           </button>
@@ -1024,7 +1039,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 
           {tab === 'billing' && (
             <div>
-              <div style={styles.billFilterRow}>
+              <div style={styles.billFilterRow} className="project-bill-filter-row">
                 <div style={styles.fieldGroup}>
                   <label style={styles.filterLabel}>From</label>
                   <input style={styles.filterInput} type="date" value={billFrom} onChange={e => setBillFrom(e.target.value)} />
@@ -1101,7 +1116,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                       {qboItems.length === 0 ? (
                         <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>{t.noQboServiceItems}</p>
                       ) : (
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }} className="project-qbo-service-row">
                           <select style={styles.qboSelect} value={qboItemId} onChange={e => setQboItemId(e.target.value)}>
                             <option value="">{t.selectItemPh}</option>
                             {qboItems.map(item => (
@@ -1169,7 +1184,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
             <div style={styles.entriesTable}>
               <div style={styles.tableHeader}>
                 <span style={styles.thDate}>Date</span>
-                <span style={styles.thWorker}>Worker</span>
+                <span style={styles.thWorker}>{workerLabel}</span>
                 <span style={styles.thHours}>Hours</span>
               </div>
               {entries.slice(0, 200).map(e => {
@@ -1212,7 +1227,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 <input style={pf.input} value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
               </div>
 
-              <div style={pf.row}>
+              <div style={pf.row} className="project-edit-grid">
                 <div style={pf.field}>
                   <label style={pf.label}>{t.status}</label>
                   <select style={pf.input} value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}>
@@ -1228,10 +1243,10 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 </div>
               </div>
 
-              <div style={pf.row}>
+              <div style={pf.row} className="project-edit-grid">
                 <div style={pf.field}>
-                  <label style={pf.label}>{t.clientNameLabel}</label>
-                  <input style={pf.input} value={editForm.client_name} onChange={e => setEditForm(f => ({ ...f, client_name: e.target.value }))} placeholder={t.clientNameShortPlaceholder} />
+                  <label style={pf.label}>{`${clientLabel} name`}</label>
+                  <input style={pf.input} value={editForm.client_name} onChange={e => setEditForm(f => ({ ...f, client_name: e.target.value }))} placeholder={`${clientLabel} name`} />
                 </div>
                 <div style={pf.field}>
                   <label style={pf.label}>{t.jobNumberLabel}</label>
@@ -1271,7 +1286,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 />
               </div>
 
-              <div style={pf.row}>
+              <div style={pf.row} className="project-edit-grid">
                 <div style={pf.field}>
                   <label style={pf.label}>{t.startDate}</label>
                   <input style={pf.input} type="date" value={editForm.start_date} onChange={e => setEditForm(f => ({ ...f, start_date: e.target.value }))} />
@@ -1287,18 +1302,18 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 <textarea style={pf.textarea} rows={3} value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder={t.scopeOfWorkPh} />
               </div>
 
-              {/* Geofence — when filled in, workers can only clock in to this
+          {/* Geofence — when filled in, team members can only clock in to this
                   project from within the radius. Server enforces; spoofed
                   client coords don't help. Leaving all three blank means
                   no geofence (clock in from anywhere). */}
               <div style={pf.field}>
                 <label style={pf.label}>📍 Geofence (optional)</label>
                 <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, lineHeight: 1.5 }}>
-                  Require workers to be physically near the job site to clock in.
+                  Require {workerLabelPlural.toLowerCase()} to be physically near the {workLabelLower} location to clock in.
                   Distance is calculated server-side from their phone&apos;s GPS.
                   Leave all three fields blank to allow clock-in from anywhere.
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }} className="project-geofence-row">
                   <input
                     style={{ ...pf.input, flex: '1 1 130px', minWidth: 0 }}
                     type="number" step="0.000001"
@@ -1353,7 +1368,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
                 <p style={{ fontSize: 13, margin: 0, color: editMsg === 'Saved' || editMsg.includes('complete') ? '#059669' : '#dc2626', fontWeight: 600 }}>{editMsg}</p>
               )}
 
-              <div style={pf.actions}>
+              <div style={pf.actions} className="project-form-actions">
                 <button style={pf.saveBtn} onClick={handleEditSave} disabled={editSaving || !editForm.name.trim()}>
                   {editSaving ? t.saving : t.saveChanges}
                 </button>
@@ -1372,8 +1387,12 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 // match the overview tab's other panels (budgetSection look). Collapsed by
 // default; header is clickable. Empty selection = visible to everyone.
 
-function ProjectVisibility({ project, onProjectUpdated, toggleStyle, countStyle }) {
+function ProjectVisibility({ project, onProjectUpdated, toggleStyle, countStyle, workLabel = 'Work', workerLabel = 'Worker' }) {
   const t = useT();
+  const workerLabelPlural = plural(workerLabel);
+  const workLabelLower = workLabel.toLowerCase();
+  const workerLabelLower = workerLabel.toLowerCase();
+  const workerLabelPluralLower = workerLabelPlural.toLowerCase();
   const [open, setOpen] = useState(false);
   const [workers, setWorkers] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1439,7 +1458,7 @@ function ProjectVisibility({ project, onProjectUpdated, toggleStyle, countStyle 
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {restricted && (
             <span style={{ ...countStyle, background: '#3b82f6' }}>
-              {selected.size} {selected.size === 1 ? 'worker' : 'workers'}
+              {selected.size} {selected.size === 1 ? workerLabelLower : workerLabelPluralLower}
             </span>
           )}
           {!restricted && <span style={countStyle}>Everyone</span>}
@@ -1449,8 +1468,8 @@ function ProjectVisibility({ project, onProjectUpdated, toggleStyle, countStyle 
       {open && (
         <div style={{ marginTop: 8 }}>
           <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 12px' }}>
-            Choose which workers see this project in their Time Clock dropdown. Leave empty to make it visible to
-            everyone. Admins always see every project regardless of this setting.
+            Choose which {workerLabelPluralLower} see this {workLabelLower} in their Time Clock dropdown. Leave empty to make it visible to
+            everyone. Admins always see every {workLabelLower} regardless of this setting.
           </p>
           {loading && <p style={{ fontSize: 13, color: '#6b7280' }}>{t.ppLoadingWorkers}</p>}
           {workers && workers.length === 0 && <p style={{ fontSize: 13, color: '#6b7280' }}>{t.ppNoWorkersYet}</p>}
@@ -1511,6 +1530,8 @@ const pvStyles = {
 function ProjectRow({ project, metrics, settings, onClick }) {
   const t = useT();
   const m = metrics || {};
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelPlural = plural(workerLabel);
   const totalHours = parseFloat(m.total_hours || 0);
   const fmtHours = h => { const n = parseFloat(h); return isNaN(n) || n === 0 ? '0h' : n % 1 === 0 ? `${n}h` : `${n.toFixed(1)}h`; };
   const statusColors = { planning: '#dbeafe|#1d4ed8', in_progress: '#d1fae5|#065f46', on_hold: '#fef3c7|#92400e', completed: '#e5e7eb|#374151' };
@@ -1537,7 +1558,7 @@ function ProjectRow({ project, metrics, settings, onClick }) {
           </div>
         )}
         {budgetHours === 0 && totalHours > 0 && <span style={{ fontSize: 12, color: '#6b7280', flexShrink: 0 }}>{fmtHours(totalHours)}</span>}
-        <span style={{ fontSize: 12, color: '#6b7280', flexShrink: 0 }}>{parseInt(m.worker_count || 0)} worker{parseInt(m.worker_count || 0) !== 1 ? 's' : ''}</span>
+        <span style={{ fontSize: 12, color: '#6b7280', flexShrink: 0 }}>{parseInt(m.worker_count || 0)} {(parseInt(m.worker_count || 0) === 1 ? workerLabel : workerLabelPlural).toLowerCase()}</span>
         {project.active === false && <span style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>{t.archivedLabel}</span>}
       </div>
     </div>
@@ -1550,8 +1571,8 @@ const BLANK_PROJECT = { name: '', client_id: '', job_number: '', address: '', st
 
 // Default geofence radius (in feet) when the address-based auto-fill kicks in.
 // 300 ft is large enough that GPS jitter on a phone won't false-reject a
-// worker who's actually on site, small enough that it's a meaningful gate
-// for typical residential / commercial job sites.
+// person who's actually at the work location, small enough that it's a meaningful
+// gate for typical service, field, or facilities work.
 const DEFAULT_GEOFENCE_RADIUS_FT = 300;
 
 // Geocode an address via the server proxy. Returns { lat, lng, display_name }
@@ -1568,16 +1589,24 @@ async function geocodeAddress(addr) {
   }
 }
 
-function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
+function ProjectCreateForm({ clients, settings, onSaved, onCancel, onClientCreated }) {
   const t = useT();
   const [form, setForm] = useState(BLANK_PROJECT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [quickClientOpen, setQuickClientOpen] = useState(false);
+  const [quickClientName, setQuickClientName] = useState('');
+  const [quickClientSaving, setQuickClientSaving] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   const [geoLocating, setGeoLocating] = useState(false);
   const [geoError, setGeoError] = useState('');
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const showPrevailing = (settings?.prevailing_wage_rate ?? 0) > 0;
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelLower = workLabel.toLowerCase();
+  const clientLabel = settings?.label_client || 'Customer';
+  const clientLabelLower = clientLabel.toLowerCase();
+  const workerLabel = settings?.label_worker || 'Team Member';
 
   // When the address loses focus, try to fill the geofence from it — but
   // only if the user hasn't already entered any geofence values manually.
@@ -1623,9 +1652,29 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
     );
   };
 
+  const handleQuickClientCreate = async () => {
+    const name = quickClientName.trim();
+    if (!name) {
+      setError(`${clientLabel} name is required.`);
+      return;
+    }
+    setQuickClientSaving(true); setError('');
+    try {
+      const r = await api.post('/admin/clients', { name });
+      onClientCreated?.(r.data);
+      set('client_id', String(r.data.id));
+      setQuickClientName('');
+      setQuickClientOpen(false);
+    } catch (err) {
+      setError(err.response?.data?.error || `Failed to add ${clientLabelLower}.`);
+    } finally {
+      setQuickClientSaving(false);
+    }
+  };
+
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!form.name.trim()) { setError(t.projectNameRequired); return; }
+    if (!form.name.trim()) { setError(`${workLabel} name is required.`); return; }
     // Geofence: enforce all-or-none on the client too so the server's
     // friendlier 400 doesn't surprise an admin mid-create.
     const lat = form.geo_lat.trim();
@@ -1653,13 +1702,13 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
   };
 
   return (
-    <div style={pf.card}>
-      <h3 style={pf.title}>{t.newProject}</h3>
+    <div style={pf.card} className="project-create-card">
+      <h3 style={pf.title}>New {workLabel}</h3>
       <form onSubmit={handleSubmit} style={pf.form}>
-        <div style={pf.row}>
+        <div style={pf.row} className="project-form-grid">
           <div style={pf.field}>
-            <label style={pf.label}>{t.projectNameLabel} *</label>
-            <input style={pf.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder={t.projectNamePlaceholder} required autoFocus />
+            <label style={pf.label}>{workLabel} name *</label>
+            <input style={pf.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder={`${workLabel} name`} required autoFocus />
           </div>
           <div style={pf.field}>
             <label style={pf.label}>{t.jobNumberLabel}</label>
@@ -1667,13 +1716,50 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
           </div>
         </div>
 
-        <div style={pf.row}>
+        <div style={pf.row} className="project-form-grid">
           <div style={pf.field}>
-            <label style={pf.label}>{t.client}</label>
-            <select style={pf.input} value={form.client_id} onChange={e => set('client_id', e.target.value)}>
-              <option value="">{t.noClient}</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <div style={pf.labelRow}>
+              <label style={pf.label}>{clientLabel}</label>
+              <button
+                type="button"
+                style={pf.linkBtn}
+                onClick={() => {
+                  setQuickClientOpen(open => !open);
+                  setError('');
+                }}
+              >
+                {quickClientOpen ? 'Use existing' : `+ Quick add ${clientLabelLower}`}
+              </button>
+            </div>
+            {quickClientOpen ? (
+              <div style={pf.quickAddBox} className="project-quick-add-box">
+                <input
+                  style={pf.input}
+                  value={quickClientName}
+                  onChange={e => setQuickClientName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleQuickClientCreate();
+                    }
+                  }}
+                  placeholder={`${clientLabel} name`}
+                />
+                <button
+                  type="button"
+                  style={{ ...pf.quickAddBtn, ...(quickClientSaving || !quickClientName.trim() ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                  onClick={handleQuickClientCreate}
+                  disabled={quickClientSaving || !quickClientName.trim()}
+                >
+                  {quickClientSaving ? 'Adding...' : 'Add'}
+                </button>
+              </div>
+            ) : (
+              <select style={pf.input} value={form.client_id} onChange={e => set('client_id', e.target.value)}>
+                <option value="">No {clientLabelLower}</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            )}
           </div>
           <div style={pf.field}>
             <label style={pf.label}>{t.status}</label>
@@ -1706,10 +1792,10 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
         <div style={pf.field}>
           <label style={pf.label}>📍 Geofence (optional)</label>
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, lineHeight: 1.5 }}>
-            Require workers to be physically near the job site to clock in.
+            Require {plural(workerLabel).toLowerCase()} to be physically near the work location to clock in.
             Leave all three fields blank to allow clock-in from anywhere.
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }} className="project-geofence-row">
             <input
               style={{ ...pf.input, flex: '1 1 130px', minWidth: 0 }}
               type="number" step="0.000001"
@@ -1760,7 +1846,7 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
           {geoError && <p style={{ fontSize: 12, color: '#dc2626', margin: '6px 0 0' }}>{geoError}</p>}
         </div>
 
-        <div style={pf.row}>
+        <div style={pf.row} className="project-form-grid">
           <div style={pf.field}>
             <label style={pf.label}>{t.startDate}</label>
             <input style={pf.input} type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} />
@@ -1782,13 +1868,13 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel }) {
 
         <div style={pf.field}>
           <label style={pf.label}>{t.descriptionLabel} <span style={{ fontWeight: 400, color: '#6b7280' }}>{t.optionalHint}</span></label>
-          <textarea style={pf.textarea} rows={2} value={form.description} onChange={e => set('description', e.target.value)} placeholder={t.scopeOfWorkPh} />
+          <textarea style={pf.textarea} rows={2} value={form.description} onChange={e => set('description', e.target.value)} placeholder={`Notes or scope for this ${workLabelLower}`} />
         </div>
 
         {error && <p style={pf.error}>{error}</p>}
 
-        <div style={pf.actions}>
-          <button style={pf.saveBtn} type="submit" disabled={saving}>{saving ? t.creating : t.createProjectBtn}</button>
+        <div style={pf.actions} className="project-form-actions">
+          <button style={pf.saveBtn} type="submit" disabled={saving}>{saving ? t.creating : `Create ${workLabel}`}</button>
           <button style={pf.cancelBtn} type="button" onClick={onCancel}>{t.cancel}</button>
         </div>
       </form>
@@ -1841,44 +1927,38 @@ export default function ProjectsPage() {
 
   const activeProjects = projects.filter(p => p.active).length;
   const totalHours = Object.values(metrics).reduce((s, m) => s + parseFloat(m.total_hours || 0), 0);
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelLower = workLabel.toLowerCase();
+  const workLabelPlural = plural(workLabel);
+  const clientLabelPlural = plural(settings?.label_client || 'Customer');
 
   return (
     <div style={styles.page}>
       <AppHeader currentApp="projects" features={features} />
 
       <main id="main-content" style={styles.main}>
-        {/* Top-level tab bar */}
-        <div style={styles.tabBar}>
-          <button
-            aria-current={mainTab === 'projects' ? 'page' : undefined}
-            className="project-detail-tab"
-            style={{ ...styles.tabBtn, ...(mainTab === 'projects' ? styles.tabBtnActive : {}) }}
-            onClick={() => setMainTab('projects')}
-          >
-            {t.projectsTabLabel}
-          </button>
-          <button
-            aria-current={mainTab === 'clients' ? 'page' : undefined}
-            className="project-detail-tab"
-            style={{ ...styles.tabBtn, ...(mainTab === 'clients' ? styles.tabBtnActive : {}) }}
-            onClick={() => setMainTab('clients')}
-          >
-            {t.clientsTabLabel}
-          </button>
-        </div>
+        <TabBar
+          active={mainTab}
+          onChange={setMainTab}
+          tabs={[
+            { id: 'projects', label: workLabelPlural },
+            { id: 'clients', label: clientLabelPlural },
+          ]}
+          breakpoint={520}
+        />
 
         {mainTab === 'projects' && (
           <>
-            <div style={styles.pageHeader}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                <div>
-                  <h1 style={styles.pageTitle}>Projects</h1>
+            <div style={styles.pageHeader} className="projects-page-header">
+              <div style={styles.pageHeaderRow} className="projects-page-header-row">
+                <div style={styles.pageHeaderCopy}>
+                  <h1 style={styles.pageTitle}>{workLabelPlural}</h1>
                   <p style={styles.pageSub}>
-                    {activeProjects} active project{activeProjects !== 1 ? 's' : ''}
+                    {activeProjects} active {activeProjects === 1 ? workLabelLower : workLabelPlural.toLowerCase()}
                     {totalHours > 0 && ` · ${totalHours.toFixed(0)} total hours`}
                   </p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+                <div style={styles.pageHeaderControls} className="projects-page-header-controls">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer' }}>
                     <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} style={{ cursor: 'pointer' }} />
                     Show archived
@@ -1896,8 +1976,8 @@ export default function ProjectsPage() {
                     >☰</button>
                   </div>
                   {!showCreateForm && (
-                    <button style={styles.newProjectBtn} onClick={() => setShowCreateForm(true)}>
-                      + New Project
+                    <button style={styles.newProjectBtn} className="projects-new-btn" onClick={() => setShowCreateForm(true)}>
+                      + New {workLabel}
                     </button>
                   )}
                 </div>
@@ -1908,6 +1988,9 @@ export default function ProjectsPage() {
               <ProjectCreateForm
                 clients={clients}
                 settings={settings}
+                onClientCreated={client => {
+                  setClients(prev => [...prev, client].sort((a, b) => a.name.localeCompare(b.name)));
+                }}
                 onSaved={p => {
                   setProjects(prev => [...prev, p]);
                   setShowCreateForm(false);
@@ -1918,21 +2001,24 @@ export default function ProjectsPage() {
 
             {!loading && projects.length >= 500 && (
               <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 13, color: '#92400e' }}>
-                Showing the first 500 projects. Use search or filters to find others.
+                Showing the first 500 {workLabelPlural.toLowerCase()}. Use search or filters to find others.
               </div>
             )}
             {loading ? (
               <SkeletonList count={5} rows={3} />
             ) : loadError ? (
               <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '16px 20px', color: '#991b1b', fontSize: 14 }}>
-                Failed to load projects.{' '}
+                Failed to load {workLabelPlural.toLowerCase()}.{' '}
                 <button style={{ background: 'none', border: 'none', color: '#1a56db', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: 0 }} onClick={() => { setLoadError(false); loadProjects(showArchived); }}>{t.ppTryAgainLink}</button>
               </div>
             ) : projects.length === 0 ? (
-              <div style={styles.empty}>
-                <div style={styles.emptyIcon}>📁</div>
-                <p style={styles.emptyText}>{t.ppNoProjectsYet}</p>
-              </div>
+              <EmptyState
+                mark="W"
+                title={`No ${settings?.label_work?.toLowerCase() || 'work'} yet`}
+                body={`Create your first ${settings?.label_work?.toLowerCase() || 'work item'} so time, notes, billing, and reports have somewhere to land.`}
+                actionLabel={`Add ${settings?.label_work || 'Work'}`}
+                onAction={() => setShowCreateForm(true)}
+              />
             ) : viewMode === 'grid' ? (
               <div style={styles.grid}>
                 {projects.map(p => (
@@ -1977,7 +2063,7 @@ export default function ProjectsPage() {
 
         {mainTab === 'clients' && (
           <div style={{ marginTop: 24 }}>
-            <ManageClients />
+            <ManageClients settings={settings} />
           </div>
         )}
       </main>
@@ -1988,23 +2074,26 @@ export default function ProjectsPage() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = {
-  page: { minHeight: '100vh', background: '#f4f6f9', display: 'flex', flexDirection: 'column' },
+  page: { minHeight: '100vh', background: '#f4f6f9', display: 'flex', flexDirection: 'column', '--ops-page-accent': '#7c3aed' },
   header: { background: '#8b5cf6', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', top: 0, zIndex: 100, minHeight: 'calc(56px + env(safe-area-inset-top))' },
   headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
   companyName: { fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' },
   headerRight: { display: 'flex', gap: 12, alignItems: 'center' },
   headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  main: { flex: 1, padding: '24px 20px', maxWidth: 1100, margin: '0 auto', width: '100%' },
+  main: { flex: 1, padding: '18px 20px 24px', maxWidth: 1100, margin: '0 auto', width: '100%' },
   pageHeader: { marginBottom: 24 },
+  pageHeaderRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, minWidth: 0 },
+  pageHeaderCopy: { minWidth: 0, flex: '1 1 auto' },
+  pageHeaderControls: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginTop: 4, flexWrap: 'wrap', flexShrink: 0 },
   pageTitle: { fontSize: 28, fontWeight: 800, color: '#111827', margin: 0 },
   pageSub: { fontSize: 14, color: '#6b7280', margin: '4px 0 0' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 },
   // Card
-  card: { background: '#fff', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', cursor: 'pointer', transition: 'box-shadow 0.15s', borderLeft: '4px solid #8b5cf6' },
+  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '18px 20px', boxShadow: '0 1px 4px rgba(15,23,42,0.04)', cursor: 'pointer', transition: 'box-shadow 0.15s, transform 0.15s' },
   cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   cardName: { fontSize: 16, fontWeight: 700, color: '#111827', lineHeight: 1.3 },
-  cardBadge: { fontSize: 11, fontWeight: 600, background: '#ede9fe', color: '#8b5cf6', padding: '2px 8px', borderRadius: 10, flexShrink: 0, marginLeft: 8 },
+  cardBadge: { fontSize: 11, fontWeight: 700, background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: 10, flexShrink: 0, marginLeft: 8 },
   statsRow: { display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12 },
   statItem: {},
   statValue: { fontSize: 20, fontWeight: 800, color: '#111827' },
@@ -2015,8 +2104,6 @@ const styles = {
   progressLabel: { fontSize: 11, fontWeight: 600 },
   // Loading / empty
   loadingText: { color: '#6b7280', fontSize: 14, marginTop: 20 },
-  empty: { textAlign: 'center', padding: '80px 20px' },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
   emptyText: { color: '#6b7280', fontSize: 15 },
   // Detail panel
   detailOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 500, display: 'flex', justifyContent: 'flex-end' },
@@ -2025,15 +2112,15 @@ const styles = {
   detailTitle: { fontSize: 20, fontWeight: 800, color: '#111827', margin: 0 },
   detailSub: { fontSize: 13, color: '#6b7280', margin: '4px 0 0' },
   closeBtn: { background: '#f3f4f6', border: 'none', borderRadius: 20, width: 32, height: 32, cursor: 'pointer', fontSize: 14, color: '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  detailTabs: { display: 'flex', borderBottom: '1px solid #f3f4f6', padding: '0 20px' },
-  detailTab: { padding: '12px 16px', border: 'none', background: 'none', fontSize: 13, fontWeight: 600, color: '#6b7280', cursor: 'pointer', borderBottom: '2px solid transparent', marginBottom: -1 },
-  detailTabActive: { color: '#8b5cf6', borderBottomColor: '#8b5cf6' },
+  detailTabs: { display: 'flex', gap: 4, margin: '0 20px 12px', padding: 4, border: '1px solid #e2e8f0', borderRadius: 10, background: '#eef2f7', overflowX: 'auto' },
+  detailTab: { flex: '1 0 auto', minHeight: 36, padding: '0 14px', border: 'none', borderRadius: 8, background: 'transparent', fontSize: 13, fontWeight: 800, color: '#64748b', cursor: 'pointer', whiteSpace: 'nowrap' },
+  detailTabActive: { color: '#7c3aed', background: '#fff', boxShadow: '0 1px 5px rgba(15,23,42,0.08)' },
   detailBody: { flex: 1, overflowY: 'auto', padding: 20 },
   metricsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 },
-  metricCard: { background: '#f9fafb', borderRadius: 10, padding: '12px 14px' },
+  metricCard: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' },
   metricValue: { fontSize: 22, fontWeight: 800, color: '#111827' },
   metricLabel: { fontSize: 11, color: '#6b7280', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' },
-  budgetSection: { background: '#f9fafb', borderRadius: 10, padding: '14px 16px', marginBottom: 16 },
+  budgetSection: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '14px 16px', marginBottom: 16 },
   sectionTitle: { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280', marginBottom: 10 },
   budgetRow: { display: 'flex', justifyContent: 'space-between', marginBottom: 6 },
   budgetLabel: { fontSize: 13, color: '#6b7280' },
@@ -2104,15 +2191,15 @@ const styles = {
   lightboxContent: { position: 'relative', maxWidth: '90vw', textAlign: 'center', padding: 16 },
   lightboxClose: { position: 'absolute', top: -8, right: -8, background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   // Tab bar
-  tabBar: { display: 'flex', gap: 4, marginBottom: 24, borderBottom: '2px solid #e5e7eb', paddingBottom: 0 },
-  tabBtn: { background: 'none', border: 'none', padding: '10px 20px', fontSize: 14, fontWeight: 600, color: '#6b7280', cursor: 'pointer', borderBottom: '2px solid transparent', marginBottom: -2, borderRadius: '6px 6px 0 0', transition: 'color 0.15s' },
-  tabBtnActive: { color: '#8b5cf6', borderBottomColor: '#8b5cf6', background: '#faf5ff' },
-  // New project button
-  newProjectBtn: { background: '#8b5cf6', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
+  tabBar: { display: 'flex', gap: 4, marginBottom: 24, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 10, padding: 4 },
+  tabBtn: { flex: 1, background: 'none', border: 'none', padding: '9px 16px', fontSize: 14, fontWeight: 700, color: '#64748b', cursor: 'pointer', borderRadius: 7, transition: 'color 0.15s, background 0.15s' },
+  tabBtnActive: { color: 'var(--ops-page-accent)', background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(15,23,42,0.06)' },
+      // New work button
+  newProjectBtn: { background: 'var(--ops-page-accent)', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: 'pointer' },
   // View toggle
-  viewToggle: { display: 'flex', border: '1px solid #e5e7eb', borderRadius: 7, overflow: 'hidden' },
-  viewToggleBtn: { background: '#fff', border: 'none', padding: '6px 10px', fontSize: 16, cursor: 'pointer', color: '#6b7280', lineHeight: 1 },
-  viewToggleBtnActive: { background: '#ede9fe', color: '#8b5cf6' },
+  viewToggle: { display: 'flex', border: '1px solid #cbd5e1', background: '#f8fafc', borderRadius: 7, overflow: 'hidden' },
+  viewToggleBtn: { background: '#f8fafc', border: 'none', padding: '6px 10px', fontSize: 16, cursor: 'pointer', color: '#64748b', lineHeight: 1 },
+  viewToggleBtnActive: { background: '#fff', color: 'var(--ops-page-accent)' },
   // List view
   rowList: { display: 'flex', flexDirection: 'column', gap: 2 },
   row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#fff', borderRadius: 8, padding: '11px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', cursor: 'pointer', borderLeft: '3px solid #8b5cf6', transition: 'box-shadow 0.15s' },
@@ -2131,8 +2218,12 @@ const pf = {
   form: { display: 'flex', flexDirection: 'column', gap: 16 },
   row: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 },
   field: { display: 'flex', flexDirection: 'column', gap: 4 },
+  labelRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   label: { fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  linkBtn: { background: 'none', border: 'none', color: '#6d28d9', fontSize: 12, fontWeight: 800, cursor: 'pointer', padding: 0, whiteSpace: 'nowrap' },
   input: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, background: '#fff', color: '#111827', width: '100%', boxSizing: 'border-box' },
+  quickAddBox: { display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, marginTop: 6 },
+  quickAddBtn: { background: '#111827', color: '#fff', border: 'none', padding: '9px 14px', borderRadius: 7, fontSize: 13, fontWeight: 800, cursor: 'pointer' },
   textarea: { padding: '9px 11px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14, background: '#fff', color: '#111827', resize: 'vertical', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' },
   actions: { display: 'flex', gap: 10, marginTop: 4 },
   saveBtn: { background: '#8b5cf6', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' },

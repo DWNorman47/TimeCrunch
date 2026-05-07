@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
 import { SkeletonList } from './Skeleton';
+import EmptyState from './EmptyState';
 import MessageThread from './MessageThread';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
@@ -64,6 +65,11 @@ function formatHours(start, end) {
   return fmtHours((e - s) / 3600000);
 }
 
+function entryHasEnded(entry) {
+  if (!entry?.end_ts) return false;
+  return new Date(entry.end_ts).getTime() <= Date.now();
+}
+
 // Default OT override suggestion when the admin opens Edit on an entry that
 // has no override saved yet. Uses the company's overtime rule + threshold
 // applied to *this entry viewed alone*. Prevailing-wage entries never count
@@ -85,10 +91,15 @@ function suggestedOverrideFor(entry, rule, threshold) {
   return { h, m };
 }
 
-export default function ApprovalQueue({ onCountChange }) {
+export default function ApprovalQueue({ onCountChange, settings = null }) {
   const { user } = useAuth();
   const t = useT();
   const locale = langToLocale(user?.language);
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
+  const workerLabelPluralLower = workerLabelPlural.toLowerCase();
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelLower = workLabel.toLowerCase();
   const [entries, setEntries] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -328,6 +339,7 @@ export default function ApprovalQueue({ onCountChange }) {
   }), [entries, workerFilter, dateFrom, dateTo]);
 
   const workerNames = useMemo(() => [...new Set(entries.map(e => e.worker_name))].sort(), [entries]);
+  const approvableVisibleEntries = useMemo(() => visibleEntries.filter(entryHasEnded), [visibleEntries]);
 
   // Group by work_date, sorted most recent first
   const { entriesByDay, sortedDays } = useMemo(() => {
@@ -348,11 +360,11 @@ export default function ApprovalQueue({ onCountChange }) {
     });
   };
 
-  const selectAll = () => setSelectedIds(new Set(visibleEntries.map(e => e.id)));
+  const selectAll = () => setSelectedIds(new Set(approvableVisibleEntries.map(e => e.id)));
   const deselectAll = () => setSelectedIds(new Set());
 
   const approveSelected = async () => {
-    const ids = [...selectedIds];
+    const ids = [...selectedIds].filter(id => entries.some(e => e.id === id && entryHasEnded(e)));
     if (ids.length === 0) return;
     setApprovingSelected(true);
     try {
@@ -364,16 +376,16 @@ export default function ApprovalQueue({ onCountChange }) {
   };
 
   const approveAll = async () => {
-    const targets = visibleEntries;
+    const targets = approvableVisibleEntries;
     setConfirmingApproveAll(false);
     setApprovingAll(true);
     try {
       if (workerFilter) {
         for (const e of targets) await api.patch(`/admin/entries/${e.id}/approve`);
-        setEntries(prev => prev.filter(e => e.worker_name !== workerFilter));
+        setEntries(prev => prev.filter(e => e.worker_name !== workerFilter || !entryHasEnded(e)));
       } else {
         await api.post('/admin/entries/approve-all');
-        setEntries([]);
+        setEntries(prev => prev.filter(e => !entryHasEnded(e)));
       }
     } finally { setApprovingAll(false); }
   };
@@ -393,7 +405,7 @@ export default function ApprovalQueue({ onCountChange }) {
                 value={workerFilter}
                 onChange={e => { setWorkerFilter(e.target.value); setSelectedIds(new Set()); }}
               >
-                <option value="">{t.allWorkers}</option>
+                <option value="">{`All ${workerLabelPlural}`}</option>
                 {workerNames.map(n => (
                   <option key={n} value={n}>{n} ({entries.filter(e => e.worker_name === n).length})</option>
                 ))}
@@ -424,10 +436,10 @@ export default function ApprovalQueue({ onCountChange }) {
                   {selectedIds.size > 0 ? t.aqDeselectAll : t.aqSelectAll}
                 </button>
                 <button
-                  style={{ ...styles.approveAllBtn, ...((approvingAll || visibleEntries.length === 0) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                  style={{ ...styles.approveAllBtn, ...((approvingAll || approvableVisibleEntries.length === 0) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                   onClick={() => setConfirmingApproveAll(true)}
-                  disabled={approvingAll || visibleEntries.length === 0}
-                  title={visibleEntries.length === 0 ? t.aqNoEntriesToApprove : (approvingAll ? t.aqApprovingAll : undefined)}
+                  disabled={approvingAll || approvableVisibleEntries.length === 0}
+                  title={approvableVisibleEntries.length === 0 ? 'No ended entries are ready to approve.' : (approvingAll ? t.aqApprovingAll : undefined)}
                 >
                   {workerFilter ? `${t.approve} ${workerFilter.split(' ')[0]}'s` : t.aqApproveAll}
                 </button>
@@ -464,11 +476,12 @@ export default function ApprovalQueue({ onCountChange }) {
       {fetchError ? (
         <p style={styles.fetchError}>{t.failedLoadPending} <button style={styles.retryBtn} onClick={fetch}>{t.retry}</button></p>
       ) : entries.length === 0 ? (
-        <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>✓</div>
-          <p style={styles.emptyTitle}>{t.allCaughtUp}</p>
-          <p style={styles.emptySubtitle}>No pending time entries to review.</p>
-        </div>
+        <EmptyState
+          mark="A"
+          title={t.allCaughtUp}
+          body={`No pending time entries to review for your ${workerLabelPluralLower}.`}
+          tone="good"
+        />
       ) : (
         <div style={styles.list}>
           {hasMore && (
@@ -494,13 +507,17 @@ export default function ApprovalQueue({ onCountChange }) {
                 {formatDate(day + 'T00:00:00', locale)}
                 <span style={styles.dayCount}>{entriesByDay[day].length}</span>
               </div>
-              {entriesByDay[day].map(e => (
+              {entriesByDay[day].map(e => {
+                const canApprove = entryHasEnded(e);
+                return (
                 <div key={e.id} className="approval-row" style={{ ...styles.row, ...(selectedIds.has(e.id) ? styles.rowSelected : {}) }}>
                   <input
                     type="checkbox"
                     checked={selectedIds.has(e.id)}
-                    onChange={() => toggleSelect(e.id)}
-                    style={styles.rowCheckbox}
+                    onChange={() => canApprove && toggleSelect(e.id)}
+                    disabled={!canApprove}
+                    title={!canApprove ? 'This entry cannot be approved until its end time has passed.' : undefined}
+                    style={{ ...styles.rowCheckbox, ...(!canApprove ? { opacity: 0.35, cursor: 'not-allowed' } : {}) }}
                   />
                   <div style={styles.rowMain}>
                     <div style={styles.worker}>{e.worker_name}</div>
@@ -524,7 +541,10 @@ export default function ApprovalQueue({ onCountChange }) {
                       })()}
                     </div>
                     {e.worker_signed_at && (
-                      <span style={styles.signedTag}>{t.workerSigned}</span>
+                      <span style={styles.signedTag}>{`${workerLabel} signed`}</span>
+                    )}
+                    {!canApprove && (
+                      <span style={styles.waitingTag}>Cannot approve until the entry ends</span>
                     )}
                     {e.notes && <div style={styles.notes}>{e.notes}</div>}
                     {e.clock_source && e.clock_source !== 'worker' && (
@@ -590,9 +610,9 @@ export default function ApprovalQueue({ onCountChange }) {
                         </div>
                       </div>
                       <div style={{ marginTop: 8 }}>
-                        <div style={styles.editTimesLabel}>{t.project}</div>
+                        <div style={styles.editTimesLabel}>{workLabel}</div>
                         <select style={styles.editProjectSelect} value={editProject} onChange={ev => setEditProject(ev.target.value)}>
-                          <option value="">{t.aqNoProject}</option>
+                          <option value="">{`No ${workLabelLower}`}</option>
                           {(projects || []).filter(p => p.active !== false).map(p => (
                             <option key={p.id} value={p.id}>{p.name}</option>
                           ))}
@@ -656,10 +676,10 @@ export default function ApprovalQueue({ onCountChange }) {
                                 onChange={ev => setSplitSegments(prev => prev.map((s, j) => j === i ? { ...s, end_time: ev.target.value } : s))} />
                             </div>
                             <div style={{ flex: 1, minWidth: 120 }}>
-                              <div style={styles.editTimesLabel}>{t.project}</div>
+                              <div style={styles.editTimesLabel}>{workLabel}</div>
                               <select style={styles.editProjectSelect} value={seg.project_id}
                                 onChange={ev => setSplitSegments(prev => prev.map((s, j) => j === i ? { ...s, project_id: ev.target.value } : s))}>
-                                <option value="">{t.aqNoProject}</option>
+                                <option value="">{`No ${workLabelLower}`}</option>
                                 {(projects || []).filter(p => p.active !== false).map(p => (
                                   <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
@@ -693,12 +713,19 @@ export default function ApprovalQueue({ onCountChange }) {
                     <div style={styles.actions}>
                       <button style={styles.editTimesBtn} onClick={() => startEdit(e)}>✏️ Edit</button>
                       <button style={styles.splitBtn} onClick={() => startSplit(e)}>⇌ Split</button>
-                      <button style={{ ...styles.approveBtn, ...(working === e.id ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => approve(e.id)} disabled={working === e.id}>{working === e.id ? t.saving : t.approve}</button>
+                      <button
+                        style={{ ...styles.approveBtn, ...((working === e.id || !canApprove) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+                        onClick={() => canApprove && approve(e.id)}
+                        disabled={working === e.id || !canApprove}
+                        title={!canApprove ? 'This entry cannot be approved until its end time has passed.' : undefined}
+                      >
+                        {working === e.id ? t.saving : t.approve}
+                      </button>
                       <button style={styles.rejectBtn} onClick={() => { setRejectingId(e.id); setRejectNote(''); }}>{t.reject}</button>
                     </div>
                   )}
                 </div>
-              ))}
+              );})}
             </div>
           ))}
         </div>
@@ -818,6 +845,7 @@ const styles = {
   inlineError: { fontSize: 12, color: '#ef4444' },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 6 },
   signedTag: { display: 'inline-block', marginTop: 4, background: '#ede9fe', color: '#5b21b6', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
+  waitingTag: { display: 'inline-block', marginTop: 4, background: '#fef3c7', color: '#92400e', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 },
   locationRow: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 },
   locationBtn: { background: 'none', border: '1px solid #bfdbfe', color: '#1a56db', padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer', alignSelf: 'flex-start' },
   mapWrap: { borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' },
