@@ -3,12 +3,40 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
-import AppHeader from '../components/AppHeader';
+import { PageIntro, PageShell } from '../components/PageShell';
 import TabBar from '../components/TabBar';
 import FieldDayLog from '../components/FieldDayLog';
 import { reportClientError } from '../errorReporter';
 import RetryBanner from '../components/RetryBanner';
 import ErrorBoundary from '../components/ErrorBoundary';
+
+const FIELD_TABS = ['notes', 'daily', 'punchlist', 'safety', 'checklists', 'incident', 'gallery', 'subs', 'equip', 'rfi', 'inspect'];
+const FIELD_HASH_ALIASES = {
+  today: 'notes',
+  'work-notes': 'notes',
+  reports: 'daily',
+  'daily-reports': 'daily',
+  report: 'daily',
+  punch: 'punchlist',
+  incidents: 'incident',
+  media: 'gallery',
+  photos: 'gallery',
+  equipment: 'equip',
+  'sub-reports': 'subs',
+  rfis: 'rfi',
+  inspections: 'inspect',
+  inspection: 'inspect',
+  talks: 'safety',
+  checklist: 'checklists',
+};
+const FIELD_GROUP_DEFAULTS = { daily: 'notes', issues: 'punchlist', safety: 'safety', resources: 'equip' };
+
+function resolveFieldTab(rawHash) {
+  const hash = String(rawHash || '').replace('#', '').trim().toLowerCase();
+  return FIELD_TABS.includes(hash)
+    ? hash
+    : FIELD_HASH_ALIASES[hash] || FIELD_GROUP_DEFAULTS[hash] || 'notes';
+}
 
 // Tab components — lazy-loaded on first visit since only one tab is visible at a time
 const DailyReports        = lazy(() => import('../components/DailyReports'));
@@ -23,7 +51,18 @@ const RFITracking         = lazy(() => import('../components/RFITracking'));
 const InspectionChecklists = lazy(() => import('../components/InspectionChecklists'));
 
 function TabLoader() {
-  return <div style={{ padding: '40px 0', textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading…</div>;
+  return <div className="ops-loading-state">Loading...</div>;
+}
+
+function pageLoadMessage(err) {
+  const status = err?.response?.status;
+  if (status === 502 || status === 503 || status === 504) {
+    return 'Service temporarily unavailable. Please try again shortly.';
+  }
+  if (!err?.response && err?.message === 'Offline and no cached data') {
+    return 'No connection and no saved field data yet.';
+  }
+  return err?.response?.data?.error || err?.message || 'Failed to load page data';
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -37,10 +76,20 @@ export default function FieldPage() {
   const [features, setFeatures] = useState({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
-  const FIELD_TABS = ['notes', 'daily', 'punchlist', 'safety', 'checklists', 'incident', 'gallery', 'subs', 'equip', 'rfi', 'inspect'];
   const hashTab = window.location.hash.replace('#', '');
-  const [fieldTab, setFieldTab] = useState(FIELD_TABS.includes(hashTab) ? hashTab : 'notes');
+  const [fieldTab, setFieldTab] = useState(resolveFieldTab(hashTab));
   const switchTab = t => { setFieldTab(t); history.replaceState(null, '', '#' + t); };
+
+  useEffect(() => {
+    const syncFromHash = () => {
+      const nextHashTab = window.location.hash.replace('#', '');
+      const nextTab = resolveFieldTab(nextHashTab);
+      setFieldTab(prev => (prev === nextTab ? prev : nextTab));
+    };
+    window.addEventListener('hashchange', syncFromHash);
+    syncFromHash();
+    return () => window.removeEventListener('hashchange', syncFromHash);
+  }, []);
 
   const init = useCallback(async () => {
     setLoading(true);
@@ -54,7 +103,7 @@ export default function FieldPage() {
       setProjects(p);
     } catch (err) {
       // Surface to the user AND to Sentry — the page is unusable without these.
-      setLoadError(err?.message || 'Failed to load page data');
+      setLoadError(pageLoadMessage(err));
       reportClientError({ kind: 'unhandled', message: `FieldPage init: ${err?.message || err}`, stack: err?.stack });
     } finally {
       setLoading(false);
@@ -63,66 +112,119 @@ export default function FieldPage() {
 
   useEffect(() => { init(); }, [init]);
 
-  return (
-    <div style={styles.page}>
-      <AppHeader currentApp="field" features={features} />
+  const fieldGroups = [
+    {
+      id: 'daily',
+      label: isAdmin ? 'Daily' : 'Today',
+      items: [
+        { id: 'notes', label: t.fieldTabNotes },
+        ...(isAdmin ? [{ id: 'daily', label: t.fieldTabDaily }] : []),
+        ...(isAdmin && features.feature_media_gallery ? [{ id: 'gallery', label: t.fieldTabMedia }] : []),
+      ],
+    },
+    {
+      id: 'issues',
+      label: 'Issues',
+      items: [
+        { id: 'punchlist', label: t.fieldTabPunch },
+        { id: 'incident', label: t.fieldTabIncidents },
+        ...(isAdmin ? [{ id: 'rfi', label: t.fieldTabRFI }] : []),
+      ],
+    },
+    {
+      id: 'safety',
+      label: t.fieldTabSafety,
+      items: [
+        { id: 'safety', label: 'Talks' },
+        { id: 'checklists', label: t.fieldTabChecklists },
+        ...(isAdmin ? [{ id: 'inspect', label: t.fieldTabInspect }] : []),
+      ],
+    },
+    {
+      id: 'resources',
+      label: isAdmin ? 'Resources' : 'More',
+      items: [
+        { id: 'equip', label: t.fieldTabEquip },
+        ...(isAdmin ? [{ id: 'subs', label: t.fieldTabSubs }] : []),
+      ],
+    },
+  ];
+  const activeGroup = fieldGroups.find(group => group.items.some(item => item.id === fieldTab)) || fieldGroups[0];
+  const activeFieldTab = activeGroup.items.some(item => item.id === fieldTab) ? fieldTab : activeGroup.items[0].id;
+  const switchGroup = groupId => {
+    const nextGroup = fieldGroups.find(group => group.id === groupId);
+    switchTab(nextGroup?.items[0]?.id || 'notes');
+  };
 
-      <main id="main-content" style={styles.main}>
+  return (
+    <PageShell currentApp="field" features={features} maxWidth={980} mainClassName="field-main">
+        <PageIntro
+          introId="field"
+          kicker={features?.label_field || 'Field Work'}
+          title={isAdmin ? 'Capture work as it happens.' : 'Submit the update and move on.'}
+          description={isAdmin
+            ? 'Daily logs, issues, safety, photos, and equipment are grouped here. The common field actions stay first; specialist records stay one tab away.'
+            : 'Notes, photos, issues, and checklists stay lightweight so the field path is quick.'}
+        />
         <RetryBanner message={loadError} onRetry={init} />
 
-        {/* Module tabs */}
-        <TabBar
-          active={fieldTab}
-          onChange={switchTab}
-          tabs={[
-            { id: 'notes', label: t.fieldTabNotes },
-            { id: 'punchlist', label: t.fieldTabPunch },
-            { id: 'safety', label: t.fieldTabSafety },
-            { id: 'checklists', label: t.fieldTabChecklists },
-            { id: 'incident', label: t.fieldTabIncidents },
-            { id: 'equip', label: t.fieldTabEquip },
-            ...(isAdmin ? [
-              { id: 'daily', label: t.fieldTabDaily },
-              { id: 'rfi', label: t.fieldTabRFI },
-              { id: 'inspect', label: t.fieldTabInspect },
-              { id: 'subs', label: t.fieldTabSubs },
-              ...(features.feature_media_gallery ? [{ id: 'gallery', label: t.fieldTabMedia }] : []),
-            ] : []),
-          ]}
-        />
+        <div className="ops-workflow-tabs" role="tablist" aria-label="Field work groups">
+          {fieldGroups.map(group => (
+            <button
+              key={group.id}
+              type="button"
+              role="tab"
+              aria-selected={activeGroup.id === group.id}
+              aria-current={activeGroup.id === group.id ? 'page' : undefined}
+              className={`ops-workflow-tab ${activeGroup.id === group.id ? 'is-active' : ''}`.trim()}
+              onClick={() => switchGroup(group.id)}
+            >
+              {group.label}
+            </button>
+          ))}
+        </div>
+        {activeGroup.items.length > 1 && (
+          <div className="ops-subtabs">
+            <TabBar
+              active={activeFieldTab}
+              onChange={switchTab}
+              tabs={activeGroup.items}
+              breakpoint={420}
+            />
+          </div>
+        )}
 
         {/* Per-tab error boundary — a crash in one tab doesn't take down the page.
             Keyed on fieldTab so switching tabs resets the boundary if the user
             recovered by navigating away from the broken tab. */}
-        <ErrorBoundary key={fieldTab} mode="inline" label={fieldTab}>
+        <ErrorBoundary key={activeFieldTab} mode="inline" label={activeFieldTab}>
           <Suspense fallback={<TabLoader />}>
-            {fieldTab === 'daily' ? (
-              <DailyReports projects={projects} />
-            ) : fieldTab === 'punchlist' ? (
-              <Punchlist projects={projects} />
-            ) : fieldTab === 'safety' ? (
-              <SafetyTalks projects={projects} />
-            ) : fieldTab === 'checklists' ? (
-              <SafetyChecklists projects={projects} />
-            ) : fieldTab === 'incident' ? (
-              <IncidentReports projects={projects} />
-            ) : fieldTab === 'gallery' ? (
-              <PhotoGallery projects={projects} />
-            ) : fieldTab === 'subs' ? (
-              <SubReports projects={projects} />
-            ) : fieldTab === 'equip' ? (
-              <EquipmentLog projects={projects} />
-            ) : fieldTab === 'rfi' ? (
-              <RFITracking projects={projects} />
-            ) : fieldTab === 'inspect' ? (
-              <InspectionChecklists projects={projects} />
+            {activeFieldTab === 'daily' ? (
+              <DailyReports projects={projects} settings={features} />
+            ) : activeFieldTab === 'punchlist' ? (
+              <Punchlist projects={projects} settings={features} />
+            ) : activeFieldTab === 'safety' ? (
+              <SafetyTalks projects={projects} settings={features} />
+            ) : activeFieldTab === 'checklists' ? (
+              <SafetyChecklists projects={projects} settings={features} />
+            ) : activeFieldTab === 'incident' ? (
+              <IncidentReports projects={projects} settings={features} />
+            ) : activeFieldTab === 'gallery' ? (
+              <PhotoGallery projects={projects} settings={features} />
+            ) : activeFieldTab === 'subs' ? (
+              <SubReports projects={projects} settings={features} />
+            ) : activeFieldTab === 'equip' ? (
+              <EquipmentLog projects={projects} settings={features} />
+            ) : activeFieldTab === 'rfi' ? (
+              <RFITracking projects={projects} settings={features} />
+            ) : activeFieldTab === 'inspect' ? (
+              <InspectionChecklists projects={projects} settings={features} />
             ) : (
-              <FieldDayLog projects={projects} isAdmin={isAdmin} />
+              <FieldDayLog projects={projects} isAdmin={isAdmin} settings={features} />
             )}
           </Suspense>
         </ErrorBoundary>
-      </main>
-    </div>
+    </PageShell>
   );
 }
 

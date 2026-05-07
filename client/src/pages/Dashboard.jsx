@@ -7,6 +7,8 @@ import EntryList from '../components/EntryList';
 import UpcomingShifts from '../components/UpcomingShifts';
 import CompanyChat from '../components/CompanyChat';
 import AppHeader from '../components/AppHeader';
+import { PageIntro } from '../components/PageShell';
+import TabBar from '../components/TabBar';
 import { getT } from '../i18n';
 import { langToLocale } from '../utils';
 import api from '../api';
@@ -26,7 +28,7 @@ const WorkerSchedule   = lazy(() => import('../components/WorkerSchedule'));
 const ReimbursementsView = lazy(() => import('../components/ReimbursementsView'));
 
 function TabLoader() {
-  return <div style={{ padding: '32px 0', textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading…</div>;
+  return <div className="ops-loading-state">Loading...</div>;
 }
 
 export default function Dashboard() {
@@ -55,6 +57,7 @@ export default function Dashboard() {
   const [entryView, setEntryView] = useState('list');
   const [shiftPrefill, setShiftPrefill] = useState(null);
   const [chatUnread, setChatUnread] = useState(false);
+  const workLabel = settings?.label_work || 'Work';
 
   const handleFillFromShift = shift => {
     setShiftPrefill(shift);
@@ -347,7 +350,7 @@ tr:last-child td{border-bottom:none}
 
 <table>
   <thead><tr>
-    <th>${t.date}</th>${showProject ? `<th>${t.project}</th>` : ''}<th>${t.descriptionLabel}</th><th>${t.clockIn}</th><th>${t.clockOut}</th>${showRateType ? `<th>${t.rateTypeLabel}</th>` : ''}<th style="text-align:right">${t.hours}</th>
+    <th>${t.date}</th>${showProject ? `<th>${workLabel}</th>` : ''}<th>${t.descriptionLabel}</th><th>${t.clockIn}</th><th>${t.clockOut}</th>${showRateType ? `<th>${t.rateTypeLabel}</th>` : ''}<th style="text-align:right">${t.hours}</th>
   </tr></thead>
   <tbody>${rows}</tbody>
 </table>
@@ -390,14 +393,34 @@ ${signatureDataUrl ? `
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
 
+  const switchTab = nextTab => {
+    setTab(nextTab);
+    history.replaceState(null, '', `#${nextTab}`);
+    if (nextTab === 'messages') {
+      setChatUnread(false);
+      localStorage.setItem('chatLastRead', new Date().toISOString());
+    }
+  };
+
+  const timeTabs = [
+    ...(settings?.module_timeclock !== false ? [
+      { id: 'clock', label: t.tabClock },
+      { id: 'messages', label: t.tabMessages, dot: chatUnread ? '#ef4444' : null },
+      { id: 'timesheet', label: t.tabTimesheet },
+    ] : []),
+    ...(settings?.feature_pto !== false ? [{ id: 'timeoff', label: t.tabTimeOff }] : []),
+    ...(settings?.feature_scheduling !== false ? [{ id: 'schedule', label: t.tabSchedule }] : []),
+    ...(settings?.feature_reimbursements !== false ? [{ id: 'reimbursements', label: t.tabExpenses }] : []),
+  ];
+
   return (
     <div style={styles.page}>
       <OfflineBanner />
       <AppHeader
         currentApp="timeclock"
         features={settings}
-        rightExtras={headerClock && <span style={styles.headerTimer} className="header-clock-timer-desktop">⏱ {fmtHeaderElapsed(headerElapsed)}</span>}
-        companyBandExtras={headerClock && <span className="header-clock-timer-mobile" style={styles.headerTimerMobile}>⏱ {fmtHeaderElapsed(headerElapsed)}</span>}
+        rightExtras={headerClock && <span style={styles.headerTimer} className="header-clock-timer-desktop">Live {fmtHeaderElapsed(headerElapsed)}</span>}
+        companyBandExtras={headerClock && <span className="header-clock-timer-mobile" style={styles.headerTimerMobile}>Live {fmtHeaderElapsed(headerElapsed)}</span>}
       />
 
       {showSignatureModal && (
@@ -409,42 +432,28 @@ ${signatureDataUrl ? `
       )}
 
       <main id="main-content" style={styles.main} className="mobile-main">
-        <div style={styles.tabs} className="tab-bar">
-          {settings?.module_timeclock !== false && <button aria-current={tab === 'clock' ? 'page' : undefined} style={tab === 'clock' ? styles.tabActive : styles.tab} onClick={() => { setTab('clock'); history.replaceState(null, '', '#clock'); }}>{t.tabClock}</button>}
-          {settings?.module_timeclock !== false && (
-            <button
-              aria-current={tab === 'messages' ? 'page' : undefined}
-              style={tab === 'messages' ? styles.tabActive : styles.tab}
-              onClick={() => {
-                setTab('messages');
-                history.replaceState(null, '', '#messages');
-                setChatUnread(false);
-                localStorage.setItem('chatLastRead', new Date().toISOString());
-              }}
-            >
-              {t.tabMessages}
-              {chatUnread && <span style={styles.unreadDot} aria-label={t.unreadMessages || 'unread messages'} role="status" />}
-            </button>
-          )}
-          {settings?.module_timeclock !== false && <button aria-current={tab === 'timesheet' ? 'page' : undefined} style={tab === 'timesheet' ? styles.tabActive : styles.tab} onClick={() => { setTab('timesheet'); history.replaceState(null, '', '#timesheet'); }}>{t.tabTimesheet}</button>}
-          {settings?.feature_pto !== false && <button aria-current={tab === 'timeoff' ? 'page' : undefined} style={tab === 'timeoff' ? styles.tabActive : styles.tab} onClick={() => { setTab('timeoff'); history.replaceState(null, '', '#timeoff'); }}>{t.tabTimeOff}</button>}
-          {settings?.feature_scheduling !== false && <button aria-current={tab === 'schedule' ? 'page' : undefined} style={tab === 'schedule' ? styles.tabActive : styles.tab} onClick={() => { setTab('schedule'); history.replaceState(null, '', '#schedule'); }}>{t.tabSchedule}</button>}
-          {settings?.feature_reimbursements !== false && <button aria-current={tab === 'reimbursements' ? 'page' : undefined} style={tab === 'reimbursements' ? styles.tabActive : styles.tab} onClick={() => { setTab('reimbursements'); history.replaceState(null, '', '#reimbursements'); }}>{t.tabExpenses}</button>}
-        </div>
+        <PageIntro
+          introId="timeclock"
+          kicker="Today"
+          title={`Keep the day simple${user?.full_name ? `, ${user.full_name.split(' ')[0]}` : ''}.`}
+          description="The daily actions are first. Timesheets, schedule, time off, and expenses stay close without crowding the clock-in flow."
+          meta={headerClock ? <span className="ops-pill good">Clocked in</span> : <span className="ops-pill">Ready</span>}
+        />
+        <TabBar active={tab} onChange={switchTab} tabs={timeTabs} breakpoint={720} />
 
-        {tab === 'messages' && <CompanyChat onRead={() => { setChatUnread(false); localStorage.setItem('chatLastRead', new Date().toISOString()); }} />}
+        {tab === 'messages' && <CompanyChat settings={settings} onRead={() => { setChatUnread(false); localStorage.setItem('chatLastRead', new Date().toISOString()); }} />}
 
         {tab === 'clock' && (
           <>
-            <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} onClockedIn={handleClockedIn} t={t} geolocationEnabled={settings?.feature_geolocation ?? false} projectsEnabled={settings?.feature_project_integration !== false} />
-            <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} prefill={shiftPrefill} projectsEnabled={settings?.feature_project_integration !== false} />
+            <ClockInOut projects={projects} onEntryAdded={handleEntryAdded} onClockedIn={handleClockedIn} t={t} geolocationEnabled={settings?.feature_geolocation ?? false} projectsEnabled={settings?.feature_project_integration !== false} workLabel={workLabel} />
+            <TimeEntryForm projects={projects} onEntryAdded={handleEntryAdded} t={t} prefill={shiftPrefill} projectsEnabled={settings?.feature_project_integration !== false} workLabel={workLabel} />
           </>
         )}
 
         {tab === 'timesheet' && (
           <ErrorBoundary key="timesheet" mode="inline" label="Timesheet">
           <Suspense fallback={<TabLoader />}>
-            <UpcomingShifts onFillEntry={handleFillFromShift} />
+            <UpcomingShifts onFillEntry={handleFillFromShift} workLabel={workLabel} />
             {!loading && <WorkerSummary entries={entries} hourlyRate={user?.hourly_rate} rateType={user?.rate_type ?? 'hourly'} overtimeMultiplier={settings?.overtime_multiplier ?? 1.5} prevailingRate={settings?.prevailing_wage_rate ?? 0} overtimeEnabled={settings?.feature_overtime ?? true} overtimeRule={settings?.overtime_rule ?? 'daily'} overtimeThreshold={settings?.overtime_threshold ?? 8} weekStart={settings?.week_start ?? 1} showWages={settings?.show_worker_wages ?? false} currency={settings?.currency ?? 'USD'} />}
             <TimesheetSignOff t={t} />
             <div style={styles.timesheetToolbar}>
@@ -456,14 +465,14 @@ ${signatureDataUrl ? `
                 <button style={styles.exportBtn} onClick={() => {
                   if ((settings?.invoice_signature ?? 'optional') === 'none') handleExportPDF(null);
                   else setShowSignatureModal(true);
-                }}>⬇ {t.exportPDF}</button>
+                }}>{t.exportPDF}</button>
               )}
             </div>
             {refreshError && <p style={{ color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 12px', fontSize: 13, margin: '0 0 8px' }}>{t.loadError} <button onClick={() => { setRefreshError(false); refreshEntries(); }} style={{ textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: '#b45309' }}>{t.retry}</button></p>}
             {loadError ? <p style={{ color: '#dc2626', padding: '12px' }}>{t.loadError} <button onClick={fetchData} style={{ textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}>{t.retry}</button></p> : loading ? <p>{t.loadingEntries}</p> : entryView === 'timesheet' ? (
               <TimesheetView entries={entries} language={user?.language} projects={projects} onRefresh={refreshEntries} weekStart={settings?.week_start ?? 1} />
             ) : (
-              <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} currentUserId={user?.id} projects={projects} onRefresh={refreshEntries} />
+              <EntryList entries={entries} onDeleted={handleEntryDeleted} onUpdated={handleEntryUpdated} t={t} language={user?.language} currentUserId={user?.id} projects={projects} onRefresh={refreshEntries} workLabel={workLabel} />
             )}
           </Suspense>
           </ErrorBoundary>
@@ -473,22 +482,18 @@ ${signatureDataUrl ? `
 
         {tab === 'schedule' && (
           <div>
-            <div style={styles.subtabBar}>
-              <button
-                aria-current={scheduleSubtab === 'schedule' ? 'page' : undefined}
-                style={scheduleSubtab === 'schedule' ? styles.subtabActive : styles.subtab}
-                onClick={() => { setScheduleSubtab('schedule'); history.replaceState(null, '', '#schedule'); }}
-              >
-                {t.tabSchedule}
-              </button>
-              <button
-                aria-current={scheduleSubtab === 'availability' ? 'page' : undefined}
-                style={scheduleSubtab === 'availability' ? styles.subtabActive : styles.subtab}
-                onClick={() => { setScheduleSubtab('availability'); history.replaceState(null, '', '#availability'); }}
-              >
-                {t.tabAvailability}
-              </button>
-            </div>
+            <TabBar
+              active={scheduleSubtab}
+              onChange={next => {
+                setScheduleSubtab(next);
+                history.replaceState(null, '', next === 'availability' ? '#availability' : '#schedule');
+              }}
+              tabs={[
+                { id: 'schedule', label: t.tabSchedule },
+                { id: 'availability', label: t.tabAvailability },
+              ]}
+              breakpoint={420}
+            />
             {scheduleSubtab === 'schedule' && (
               <Suspense fallback={<TabLoader />}><WorkerSchedule /></Suspense>
             )}
@@ -500,7 +505,7 @@ ${signatureDataUrl ? `
           </div>
         )}
 
-        {tab === 'reimbursements' && settings?.feature_reimbursements !== false && <Suspense fallback={<TabLoader />}><ReimbursementsView /></Suspense>}
+        {tab === 'reimbursements' && settings?.feature_reimbursements !== false && <Suspense fallback={<TabLoader />}><ReimbursementsView settings={settings} /></Suspense>}
 
       </main>
     </div>
@@ -508,7 +513,7 @@ ${signatureDataUrl ? `
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: '#f4f6f9' },
+  page: { minHeight: '100vh', background: '#f4f6f9', '--ops-page-accent': '#2563eb' },
   header: { background: '#1a56db', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, minHeight: 'calc(56px + env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', top: 0, zIndex: 100 },
   headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 10 },
@@ -518,19 +523,19 @@ const styles = {
   userName: { fontSize: 14 },
   langSelect: { background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', padding: '5px 8px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   headerBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  headerTimer: { fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)', background: 'rgba(255,255,255,0.15)', padding: '4px 10px', borderRadius: 6, fontVariantNumeric: 'tabular-nums' },
-  headerTimerMobile: { fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.9)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 },
-  main: { maxWidth: 700, margin: '24px auto', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 20 },
-  tabs: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 10, padding: 4, width: '100%' },
-  tab: { flex: 1, padding: '14px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#666', cursor: 'pointer', textAlign: 'center' },
-  tabActive: { flex: 1, padding: '14px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 14, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', textAlign: 'center', position: 'relative' },
-  subtabBar: { display: 'flex', gap: 6, background: '#e8edf5', padding: 4, borderRadius: 10, marginBottom: 16 },
-  subtab: { flex: 1, padding: '9px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, color: '#6b7280', cursor: 'pointer' },
-  subtabActive: { flex: 1, padding: '9px 0', background: '#fff', border: 'none', borderRadius: 7, fontWeight: 700, fontSize: 13, color: '#111827', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' },
+  headerTimer: { fontSize: 13, fontWeight: 800, color: '#0f766e', background: '#ecfdf5', border: '1px solid #bbf7d0', padding: '4px 10px', borderRadius: 7, fontVariantNumeric: 'tabular-nums' },
+  headerTimerMobile: { fontSize: 12, fontWeight: 800, color: '#0f766e', fontVariantNumeric: 'tabular-nums', flexShrink: 0 },
+  main: { maxWidth: 760, margin: '16px auto 24px', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 14 },
+  tabs: { display: 'flex', gap: 4, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 10, padding: 4, width: '100%' },
+  tab: { flex: 1, padding: '12px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 700, fontSize: 14, color: '#64748b', cursor: 'pointer', textAlign: 'center' },
+  tabActive: { flex: 1, padding: '12px 0', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 7, fontWeight: 800, fontSize: 14, color: 'var(--ops-page-accent)', cursor: 'pointer', boxShadow: '0 1px 4px rgba(15,23,42,0.06)', textAlign: 'center', position: 'relative' },
+  subtabBar: { display: 'flex', gap: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', padding: 4, borderRadius: 10, marginBottom: 16 },
+  subtab: { flex: 1, padding: '9px 0', background: 'none', border: 'none', borderRadius: 7, fontWeight: 700, fontSize: 13, color: '#64748b', cursor: 'pointer' },
+  subtabActive: { flex: 1, padding: '9px 0', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 7, fontWeight: 800, fontSize: 13, color: 'var(--ops-page-accent)', cursor: 'pointer', boxShadow: '0 1px 4px rgba(15,23,42,0.06)' },
   unreadDot: { display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#ef4444', marginLeft: 4, verticalAlign: 'middle', flexShrink: 0 },
   timesheetToolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
-  viewToggle: { display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 8, padding: 3, width: 'fit-content' },
+  viewToggle: { display: 'flex', gap: 4, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, padding: 3, width: 'fit-content' },
   exportBtn: { background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '6px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  toggleBtn: { padding: '6px 14px', background: 'none', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#666', cursor: 'pointer' },
-  toggleActive: { padding: '6px 14px', background: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, color: '#1a56db', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+  toggleBtn: { padding: '6px 14px', background: 'none', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 13, color: '#64748b', cursor: 'pointer' },
+  toggleActive: { padding: '6px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, fontWeight: 800, fontSize: 13, color: 'var(--ops-page-accent)', cursor: 'pointer', boxShadow: '0 1px 3px rgba(15,23,42,0.08)' },
 };

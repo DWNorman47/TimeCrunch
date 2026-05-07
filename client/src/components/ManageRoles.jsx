@@ -203,7 +203,7 @@ export default function ManageRoles() {
                   {role.is_builtin && <span style={styles.builtinBadge}>{t.mrolesBuiltinBadge || 'Built-in'}</span>}
                   {isOwn && <span style={styles.ownBadge}>{t.mrolesYouBadge || 'You'}</span>}
                   <span style={styles.roleParent}>
-                    {role.parent_role === 'worker' ? (t.mrolesParentWorkerShort || 'Worker') : (t.mrolesParentAdminShort || 'Admin')}
+                    {role.parent_role === 'worker' ? (t.mrolesParentWorkerShort || 'Team Member') : (t.mrolesParentAdminShort || 'Admin')}
                   </span>
                 </div>
                 <div style={styles.roleHeaderRight}>
@@ -237,7 +237,7 @@ export default function ManageRoles() {
                             {role.user_count > 0
                               ? (t.mrolesDeleteWarnUsers || 'Delete? {n} user(s) will fall back to {parent}.')
                                   .replace('{n}', role.user_count)
-                                  .replace('{parent}', role.parent_role === 'worker' ? (t.mrolesParentWorkerShort || 'Worker') : (t.mrolesParentAdminShort || 'Admin'))
+                    .replace('{parent}', role.parent_role === 'worker' ? (t.mrolesParentWorkerShort || 'Team Member') : (t.mrolesParentAdminShort || 'Admin'))
                               : (t.mrolesDeleteWarnEmpty || 'Delete this role?')}
                           </span>
                           <button style={styles.deleteConfirmBtn} onClick={() => handleDelete(role.id)}>{t.confirm || 'Confirm'}</button>

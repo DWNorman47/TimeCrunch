@@ -70,6 +70,45 @@ cd client && npm install && npm run dev
 
 Open http://localhost:5173
 
+Local development notes:
+- The service worker is off during `npm run dev` so Vite does not try to load the production `/sw.js` file. To test the PWA locally, set `VITE_ENABLE_SERVICE_WORKER=true`.
+- Vercel Speed Insights is also off during local development. To test it locally, set `VITE_ENABLE_SPEED_INSIGHTS=true`.
+
+## Demo data
+
+The fictional company data used for visual testing lives in `server/scripts/seed-demo-data.js`.
+Run it against a dev or stage database:
+
+```bash
+cd server
+DEMO_COMPANY_NAME="Demo Operations" npm run seed:demo
+```
+
+On Windows PowerShell:
+
+```powershell
+cd server
+$env:DEMO_COMPANY_NAME = "Demo Operations"
+npm run seed:demo
+```
+
+Use the exact company name you want to fill. The script is idempotent: it creates the fictional
+company if missing, reuses existing demo records where possible, and fills in missing clients,
+projects, Field Work, Inventory, schedules, requests, and sample activity.
+
+To make dev or stage fill automatically after deploy migrations, set these environment variables
+on that environment:
+
+```bash
+DEMO_SEED_AUTO=true
+DEMO_COMPANY_NAME=Demo Operations
+DEMO_ADMIN_USERNAME=Admin
+DEMO_ADMIN_PASSWORD=Admin123
+```
+
+`npm start` runs `node migrate.js && node index.js`, and `migrate.js` will run the demo seed after
+schema migrations only when `DEMO_SEED_AUTO=true`. Leave `DEMO_SEED_AUTO=false` or unset on production.
+
 ## Deployment (Render.com recommended)
 
 1. Push this repo to GitHub

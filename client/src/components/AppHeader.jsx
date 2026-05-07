@@ -3,11 +3,11 @@
  * strip is identical across modules and screen sizes.
  *
  * Mobile (≤768px, via app-switcher-name / header-username / header-right CSS):
- *   [icon-only AppSwitcher] ... [Bell] [↻] [EN] [Logout]
+ *   [icon-only AppSwitcher] ... [Bell] [↻] [EN] [Logout] [?]
  *   [company name band below]
  *
  * Desktop (>768px):
- *   [icon+name AppSwitcher] [Company name] ... [Bell] [User's name] [↻] [EN] [Logout]
+ *   [icon+name AppSwitcher] [Company name] ... [Bell] [User's name] [↻] [EN] [Logout] [?]
  *
  * Background color tracks the currentApp (derived from AppSwitcher's APPS
  * table) so module identity is preserved.
@@ -36,10 +36,10 @@ export default function AppHeader({
   const { user, logout } = useAuth();
   const t = useT();
   const app = APPS.find(a => a.id === currentApp);
-  const bg = app?.bg || '#1a56db';
+  const accent = app?.bg || '#2563eb';
 
   return (
-    <header style={{ ...s.header, background: bg }} className="app-header">
+    <header style={{ ...s.header, '--app-accent': accent }} className="app-header">
       <div style={s.headerTopRow}>
         <div style={s.logoGroup}>
           <AppSwitcher currentApp={currentApp} userRole={userRole || user?.role} features={features} />
@@ -48,15 +48,6 @@ export default function AppHeader({
           )}
         </div>
         <div style={s.headerRight} className="header-right">
-          <a
-            href="/help"
-            style={s.helpLink}
-            className="header-help-link"
-            title={t.helpAndFaq || 'Help & FAQ'}
-            aria-label={t.helpAndFaq || 'Help & FAQ'}
-          >
-            ?
-          </a>
           <NotificationBell />
           {user?.full_name && (
             <span style={s.userName} className="header-username">{user.full_name}</span>
@@ -67,6 +58,15 @@ export default function AppHeader({
           <button style={s.headerBtn} className="header-btn" onClick={logout}>
             {t.logout}
           </button>
+          <a
+            href="/help"
+            style={s.helpLink}
+            className="header-help-link"
+            title={t.helpAndFaq || 'Help & FAQ'}
+            aria-label={t.helpAndFaq || 'Help & FAQ'}
+          >
+            <span aria-hidden="true">?</span>
+          </a>
         </div>
       </div>
       {below}
@@ -82,8 +82,8 @@ export default function AppHeader({
 
 const s = {
   header: {
-    color: '#fff',
-    padding: '0 24px',
+    color: '#0f172a',
+    padding: '0 6px 0 24px',
     paddingTop: 'env(safe-area-inset-top)',
     paddingBottom: 0,
     display: 'flex',
@@ -93,6 +93,10 @@ const s = {
     position: 'sticky',
     top: 0,
     zIndex: 100,
+    background: 'rgba(255,255,255,0.96)',
+    borderBottom: '1px solid #e2e8f0',
+    boxShadow: '0 1px 10px rgba(15,23,42,0.05)',
+    backdropFilter: 'blur(12px)',
   },
   headerTopRow: {
     display: 'flex',
@@ -102,13 +106,13 @@ const s = {
     height: 56,
   },
   logoGroup: { display: 'flex', alignItems: 'center', gap: 12 },
-  companyName: { fontSize: 15, fontWeight: 600, opacity: 0.9 },
+  companyName: { fontSize: 15, fontWeight: 700, color: '#334155' },
   headerRight: { display: 'flex', alignItems: 'center', gap: 10 },
-  userName: { fontSize: 14, opacity: 0.9, whiteSpace: 'nowrap' },
+  userName: { fontSize: 14, color: '#475569', whiteSpace: 'nowrap' },
   headerBtn: {
-    background: 'rgba(255,255,255,0.15)',
-    color: '#fff',
-    border: 'none',
+    background: '#f8fafc',
+    color: '#334155',
+    border: '1px solid #cbd5e1',
     padding: '6px 14px',
     borderRadius: 7,
     fontSize: 13,
@@ -116,17 +120,19 @@ const s = {
     cursor: 'pointer',
   },
   helpLink: {
-    width: 26,
-    height: 26,
-    borderRadius: '50%',
-    background: 'rgba(255,255,255,0.18)',
-    color: '#fff',
-    fontSize: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    background: 'transparent',
+    border: '1px solid transparent',
+    color: '#64748b',
+    fontSize: 13,
     fontWeight: 700,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
     textDecoration: 'none',
     flexShrink: 0,
+    opacity: 0.72,
   },
 };

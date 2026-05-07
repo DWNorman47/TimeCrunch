@@ -3,9 +3,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import { usePerm, useHasAnyPerm } from '../hooks/usePerm';
 import api from '../api';
-import AppHeader from '../components/AppHeader';
 import PasswordInput from '../components/PasswordInput';
 import TabBar from '../components/TabBar';
+import { PageIntro, PageShell } from '../components/PageShell';
 import BillingPanel from '../components/BillingPanel';
 import ManageRates from '../components/ManageRates';
 import AdvancedSettings from '../components/AdvancedSettings';
@@ -144,7 +144,7 @@ function CompanyTab() {
         </div>
 
         {/* Phone + Email side by side */}
-        <div style={styles.companyFieldRow}>
+        <div style={styles.companyFieldRow} className="company-field-row">
           <div style={{ ...styles.companyField, flex: 1 }}>
             <div style={styles.companyFieldLabel}>{t.phone}</div>
             {editing ? (
@@ -179,7 +179,7 @@ function CompanyTab() {
         </div>
 
         {editing && (
-          <div style={styles.companyEditActions}>
+          <div style={styles.companyEditActions} className="company-edit-actions">
             <button style={styles.saveBtn} onClick={save} disabled={saving || !name.trim()}>
               {saving ? '...' : t.save}
             </button>
@@ -236,6 +236,147 @@ function BillingTab() {
       <h2 style={styles.tabTitle}>{t.billing}</h2>
       <BillingPanel />
     </div>
+  );
+}
+
+function WorkspaceLabels({ settings, onUpdated }) {
+  const labelFields = [
+    {
+      key: 'label_work',
+      label: 'Work',
+      note: 'The general word for billable or trackable work.',
+      examples: 'Jobs, routes, cases',
+    },
+    {
+      key: 'label_client',
+      label: 'Customer',
+      note: 'The people or organizations the team serves.',
+      examples: 'Clients, accounts, residents',
+    },
+    {
+      key: 'label_worker',
+      label: 'Team Member',
+      note: 'The people using the app day to day.',
+      examples: 'Staff, workers, techs',
+    },
+    {
+      key: 'label_field',
+      label: 'Field Work',
+      note: 'The mobile or on-site work area.',
+      examples: 'Service, visits, operations',
+    },
+  ];
+  const [form, setForm] = useState({
+    label_work: settings?.label_work || 'Work',
+    label_client: settings?.label_client || 'Customer',
+    label_worker: settings?.label_worker || 'Team Member',
+    label_field: settings?.label_field || 'Field Work',
+  });
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    setForm({
+      label_work: settings?.label_work || 'Work',
+      label_client: settings?.label_client || 'Customer',
+      label_worker: settings?.label_worker || 'Team Member',
+      label_field: settings?.label_field || 'Field Work',
+    });
+  }, [settings]);
+
+  const set = (key, value) => {
+    setForm(prev => ({ ...prev, [key]: value }));
+    setMsg('');
+  };
+  const hasBlankLabel = Object.values(form).some(value => !String(value).trim());
+
+  const save = async () => {
+    if (hasBlankLabel) {
+      setMsg('Labels must be 1-32 characters.');
+      return;
+    }
+    setSaving(true); setMsg('');
+    try {
+      const payload = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, value.trim()]));
+      const r = await api.patch('/admin/settings', payload, { suppressToast: true });
+      onUpdated(r.data);
+      setMsg('Labels saved.');
+    } catch (err) {
+      setMsg(err.response?.data?.error || 'Could not save labels.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section style={styles.languageCard}>
+      <button
+        type="button"
+        style={styles.languageTrigger}
+        aria-expanded={open}
+        onClick={() => setOpen(v => !v)}
+      >
+        <span style={styles.languageTriggerCopy}>
+          <span style={styles.languageTitle}>Company Labels</span>
+          <span style={styles.languageText}>Rename common app words so the workspace matches this company's language.</span>
+        </span>
+        <span style={{ ...styles.accordionChevron, transform: open ? 'rotate(180deg)' : 'none' }}>v</span>
+      </button>
+      {open && (
+        <>
+            <div style={styles.labelEditor} className="workspace-label-editor">
+              {labelFields.map(field => (
+              <label key={field.key} style={styles.labelRow} className="workspace-label-row">
+                <span style={styles.labelRowCopy}>
+                  <span style={styles.labelRowTitle}>{field.label}</span>
+                  <span style={styles.labelRowText}>{field.note}</span>
+                  <span style={styles.labelExamples}>Examples: {field.examples}</span>
+                </span>
+                <input
+                  style={styles.labelInput}
+                  value={form[field.key]}
+                  maxLength={32}
+                  onChange={e => set(field.key, e.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+          <div style={styles.languageActions} className="workspace-label-actions">
+            <button type="button" style={styles.saveBtn} onClick={save} disabled={saving || hasBlankLabel}>
+              {saving ? 'Saving...' : 'Save labels'}
+            </button>
+            {msg && <span style={msg.includes('Could not') ? styles.profileErrorInline : styles.profileSuccessInline}>{msg}</span>}
+          </div>
+        </>
+      )}
+      {!open && msg && (
+        <button type="button" style={styles.languageSavedBtn} onClick={() => setOpen(true)}>
+          {msg}
+        </button>
+      )}
+    </section>
+  );
+}
+
+function WorkspaceSettingGroup({ title, body, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section style={styles.settingGroupCard} className="workspace-setting-card">
+      <button
+        type="button"
+        style={styles.languageTrigger}
+        aria-expanded={open}
+        onClick={() => setOpen(v => !v)}
+      >
+        <span style={styles.languageTriggerCopy}>
+          <span style={styles.languageTitle}>{title}</span>
+          <span style={styles.languageText}>{body}</span>
+        </span>
+        <span style={{ ...styles.accordionChevron, transform: open ? 'rotate(180deg)' : 'none' }}>v</span>
+      </button>
+      {open && <div style={styles.settingGroupBody} className="workspace-setting-body">{children}</div>}
+    </section>
   );
 }
 
@@ -377,7 +518,7 @@ function AccountTab() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const ADMIN_TABS = ['company', 'requests', 'integrations', 'billing', 'log', 'account'];
+const ADMIN_TABS = ['company', 'workspace', 'requests', 'integrations', 'billing', 'log', 'account'];
 
 export default function AdministrationPage() {
   const { user } = useAuth();
@@ -426,6 +567,8 @@ export default function AdministrationPage() {
   // this page anyway. Tracked separately from settings so a dismiss in
   // this session takes effect immediately.
   const [showSetup, setShowSetup] = useState(false);
+  const [profileSaving, setProfileSaving] = useState('');
+  const [profileMsg, setProfileMsg] = useState('');
 
   // Integrations sub-view: 'list' or 'quickbooks' — persists for the session
   const [integrationView, setIntegrationView] = useState(() => sessionStorage.getItem('admin_integration_view') || 'list');
@@ -437,6 +580,7 @@ export default function AdministrationPage() {
   // appear only with the matching perm.
   const tabs = [
     { id: 'company',      label: t.adminTabCompany      },
+    ...(canManageSettings ? [{ id: 'workspace', label: 'Workspace' }] : []),
     ...(canSeeRequests ? [{ id: 'requests', label: 'Requests' }] : []),
     ...((plan.hasQbo && canManageIntegrations) ? [{ id: 'integrations', label: t.adminTabIntegrations }] : []),
     ...(canManageBilling ? [{ id: 'billing', label: t.adminTabBilling }] : []),
@@ -448,6 +592,21 @@ export default function AdministrationPage() {
   // back to Company so we never render a hidden tab's content.
   const visibleIds = new Set(tabs.map(x => x.id));
   const safeTab = visibleIds.has(tab) ? tab : 'company';
+  const visibleTabKey = tabs.map(x => x.id).join('|');
+
+  useEffect(() => {
+    const syncFromHash = () => {
+      const nextHashTab = window.location.hash.replace('#', '');
+      if (nextHashTab === 'team') {
+        window.location.replace('/team');
+        return;
+      }
+      if (tabs.some(x => x.id === nextHashTab)) setTab(nextHashTab);
+    };
+    syncFromHash();
+    window.addEventListener('hashchange', syncFromHash);
+    return () => window.removeEventListener('hashchange', syncFromHash);
+  }, [visibleTabKey]);
 
   useEffect(() => {
     Promise.all([
@@ -488,10 +647,48 @@ export default function AdministrationPage() {
   const handleWorkerDeleted  = id => setWorkers(prev => prev.filter(w => w.id !== id));
   const handleWorkerUpdated  = w  => setWorkers(prev => prev.map(x => x.id === w.id ? { ...x, ...w } : x));
   const handleWorkerRestored = w  => setWorkers(prev => [...prev, w]);
+  const applyWorkspaceProfile = async (profile) => {
+    const profiles = {
+      simple: {
+        module_timeclock: true, module_team: true, module_projects: false, module_field: false,
+        module_inventory: false, module_analytics: false, feature_scheduling: false,
+        feature_reimbursements: false, feature_pto: false, feature_chat: false, feature_broadcast: false,
+      },
+      team: {
+        module_timeclock: true, module_team: true, module_projects: true, module_field: false,
+        module_inventory: false, module_analytics: false, feature_scheduling: true,
+        feature_reimbursements: true, feature_pto: true, feature_chat: false, feature_broadcast: false,
+      },
+      full: {
+        module_timeclock: true, module_team: true, module_projects: true, module_field: true,
+        module_inventory: true, module_analytics: true, feature_scheduling: true,
+        feature_reimbursements: true, feature_pto: true, feature_chat: false, feature_broadcast: false,
+      },
+    };
+    const names = { simple: 'Focused time', team: 'Team operations', full: 'Full operations' };
+    setProfileSaving(profile);
+    setProfileMsg('');
+    try {
+      const r = await api.patch('/admin/settings', profiles[profile]);
+      setSettings(r.data);
+      setProfileMsg(`${names[profile]} profile applied.`);
+    } catch (err) {
+      setProfileMsg(err.response?.data?.error || 'Could not apply profile.');
+    } finally {
+      setProfileSaving('');
+    }
+  };
+  const workspaceSummary = [
+    ['Core modules', ['module_timeclock', 'module_team', 'module_projects', 'module_field', 'module_inventory', 'module_analytics']],
+    ['Daily tools', ['feature_scheduling', 'feature_pto', 'feature_reimbursements', 'feature_chat', 'feature_broadcast']],
+    ['Specialized', ['addon_certified_payroll', 'feature_quickbooks', 'feature_media_gallery', 'feature_geolocation']],
+  ].map(([label, keys]) => {
+    const active = keys.filter(key => settings?.[key] !== false && settings?.[key] != null).length;
+    return { label, active, total: keys.length };
+  });
 
   return (
-    <div style={styles.page}>
-      <AppHeader currentApp="administration" features={settings} />
+    <PageShell currentApp="administration" features={settings} maxWidth={980} mainClassName="admin-main">
       {showSetup && (
         <SetupQuestionnaire
           onComplete={(applied) => {
@@ -507,34 +704,96 @@ export default function AdministrationPage() {
         />
       )}
 
-      <main id="main-content" style={styles.main}>
+      <PageIntro
+        introId="administration"
+        kicker="Administration"
+        title="Tune the workspace without crowding the workday."
+        description="Company details, labels, modules, integrations, billing, and account tools stay here so the daily apps can stay simple."
+      />
+
         <TabBar active={safeTab} onChange={switchTab} tabs={tabs} />
 
         {safeTab === 'company'  && (
           <div style={styles.tabContent}>
             <h2 style={styles.tabTitle}>{t.company}</h2>
             <CompanyTab />
-            {/* Settings sub-section is gated by manage_settings — a user
-                with no settings perm sees just the company info card. */}
-            {canManageSettings && (
-              <>
-                <h3 style={{ ...styles.sectionTitle, marginTop: 8 }}>{t.settings}</h3>
-                <ManageRates settings={settings} onSettingsUpdated={setSettings} />
-                <AdvancedSettings settings={settings} />
-              </>
-            )}
+          </div>
+        )}
+        {safeTab === 'workspace' && canManageSettings && (
+          <div style={styles.tabContent}>
+            <section style={styles.workspaceHero} className="workspace-hero">
+              <div style={styles.workspaceHeroCopy}>
+                <div style={styles.workspaceKicker}>Workspace setup</div>
+                <h2 style={styles.workspaceTitle}>Shape the app around the work people do every day.</h2>
+                <p style={styles.workspaceText}>
+                  Keep common tools visible, tuck specialist controls away, and adjust labels so the app speaks this company's language.
+                </p>
+              </div>
+              <div style={styles.workspaceSide} className="workspace-side">
+                <button type="button" style={styles.workspaceAction} onClick={() => setShowSetup(true)}>
+                  Run quick setup
+                </button>
+                <div style={styles.workspaceSummaryGrid} className="workspace-summary-grid">
+                  {workspaceSummary.map(item => (
+                    <div key={item.label} style={styles.workspaceSummaryItem}>
+                      <strong style={styles.workspaceSummaryValue}>{item.active} of {item.total}</strong>
+                      <span style={styles.workspaceSummaryLabel}>{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+            <section style={styles.profileCard} className="workspace-profile-card">
+              <div>
+                <h3 style={styles.profileTitle}>Choose a starting shape</h3>
+                <p style={styles.profileText}>Profiles change the visible modules. The detailed settings below remain available for fine-tuning.</p>
+              </div>
+              <div style={styles.profileGrid} className="workspace-profile-grid">
+                {[
+                  ['simple', 'Focused time', 'Time clock, team basics, and a quieter app.'],
+                  ['team', 'Team operations', 'Adds work setup, scheduling, PTO, and reimbursements.'],
+                  ['full', 'Full operations', 'Turns on field work, inventory, analytics, and the core team tools.'],
+                ].map(([id, title, body]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    style={styles.profileBtn}
+                    onClick={() => applyWorkspaceProfile(id)}
+                    disabled={!!profileSaving}
+                  >
+                    <strong>{profileSaving === id ? 'Applying...' : title}</strong>
+                    <span>{body}</span>
+                  </button>
+                ))}
+              </div>
+              {profileMsg && <p style={profileMsg.includes('Could not') ? styles.profileError : styles.profileSuccess}>{profileMsg}</p>}
+            </section>
+            <WorkspaceLabels settings={settings} onUpdated={setSettings} />
+            <WorkspaceSettingGroup
+              title="Pay and billing rules"
+              body="Rates, overtime, mileage, payroll periods, and other money-related defaults."
+              defaultOpen
+            >
+              <ManageRates settings={settings} onSettingsUpdated={setSettings} />
+            </WorkspaceSettingGroup>
+            <WorkspaceSettingGroup
+              title="Advanced Controls"
+              body="Detailed feature switches and behavior settings for teams that need extra control."
+            >
+              <AdvancedSettings settings={settings} embedded />
+            </WorkspaceSettingGroup>
           </div>
         )}
         {safeTab === 'requests' && (
           <div style={styles.tabContent}>
             <h2 style={styles.tabTitle}>Requests</h2>
-            <ServiceRequestsAdmin />
+            <ServiceRequestsAdmin settings={settings} />
           </div>
         )}
         {safeTab === 'log'      && (
           <div style={styles.tabContent}>
             <h2 style={styles.tabTitle}>{t.auditLog}</h2>
-            <AuditLog timezone={settings?.company_timezone ?? ''} />
+            <AuditLog timezone={settings?.company_timezone ?? ''} settings={settings} />
           </div>
         )}
         {safeTab === 'integrations' && (
@@ -585,15 +844,14 @@ export default function AdministrationPage() {
         )}
         {safeTab === 'billing'  && <BillingTab />}
         {safeTab === 'account'  && <AccountTab />}
-      </main>
-    </div>
+    </PageShell>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = {
-  page: { minHeight: '100vh', background: '#f4f6f9' },
+  page: { minHeight: '100vh', background: '#f4f6f9', '--ops-page-accent': '#475569' },
   header: {
     background: '#64748b', color: '#fff', padding: '0 24px',
     paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0,
@@ -611,6 +869,56 @@ const styles = {
   tabContent: { display: 'flex', flexDirection: 'column', gap: 16 },
   sectionTitle: { fontSize: 17, fontWeight: 700, margin: '8px 0 0' },
   tabTitle: { fontSize: 22, fontWeight: 800, color: '#111827', margin: '0 0 4px' },
+  workspaceHero: {
+    display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(230px, 360px)', alignItems: 'start', gap: 24,
+    background: '#fff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 10, padding: '22px 28px',
+    boxShadow: '0 1px 4px rgba(15,23,42,0.04)',
+  },
+  workspaceHeroCopy: { minWidth: 0 },
+  workspaceKicker: { fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748b', marginBottom: 6 },
+  workspaceTitle: { fontSize: 20, lineHeight: 1.18, margin: '0 0 6px', maxWidth: 620, letterSpacing: 0 },
+  workspaceText: { fontSize: 13, lineHeight: 1.55, color: '#64748b', margin: 0, maxWidth: 650 },
+  workspaceSide: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 },
+  workspaceAction: {
+    border: 'none', borderRadius: 8, background: '#475569', color: '#fff',
+    padding: '10px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
+  },
+  workspaceSummaryGrid: { display: 'grid', gridTemplateColumns: '1fr', gap: 10, width: '100%', maxWidth: 180, justifyItems: 'end' },
+  workspaceSummaryItem: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, minWidth: 0, textAlign: 'right' },
+  workspaceSummaryValue: { color: '#0f172a', fontSize: 16, lineHeight: 1.1, fontWeight: 900, whiteSpace: 'nowrap' },
+  workspaceSummaryLabel: { color: '#64748b', fontSize: 11, lineHeight: 1.2, fontWeight: 800, whiteSpace: 'normal' },
+  profileCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16, boxShadow: '0 1px 4px rgba(15,23,42,0.04)' },
+  languageCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 0, boxShadow: '0 1px 4px rgba(15,23,42,0.04)', overflow: 'hidden' },
+  settingGroupCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 0, boxShadow: '0 1px 4px rgba(15,23,42,0.04)', overflow: 'hidden' },
+  settingGroupBody: { padding: '0 16px 16px' },
+  languageTrigger: { width: '100%', border: 'none', background: '#fff', padding: 16, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, textAlign: 'left' },
+  languageTriggerCopy: { display: 'flex', flexDirection: 'column', gap: 4 },
+  languageTitle: { fontSize: 17, fontWeight: 800, color: '#111827' },
+  languageText: { fontSize: 13, color: '#64748b', lineHeight: 1.45 },
+  languageSavedBtn: { margin: '0 18px 18px', border: '1px solid #a7f3d0', background: '#ecfdf5', color: '#047857', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  profileTitle: { margin: '0 0 4px', fontSize: 17, fontWeight: 800, color: '#111827' },
+  profileText: { margin: '0 0 14px', fontSize: 13, color: '#64748b', lineHeight: 1.55 },
+  profileGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 },
+  profileBtn: {
+    minHeight: 104, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start',
+    gap: 10, textAlign: 'left', border: '1px solid #dbe2ea', borderRadius: 8, background: '#f8fafc',
+    padding: 14, color: '#0f172a', cursor: 'pointer',
+  },
+  profileSuccess: { margin: '12px 0 0', color: '#047857', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontWeight: 700 },
+  profileError: { margin: '12px 0 0', color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontWeight: 700 },
+  profileSuccessInline: { color: '#047857', fontSize: 13, fontWeight: 700 },
+  profileErrorInline: { color: '#b91c1c', fontSize: 13, fontWeight: 700 },
+  labelEditor: { display: 'flex', flexDirection: 'column', gap: 0, padding: '0 18px' },
+  labelRow: {
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14,
+    alignItems: 'center', padding: '14px 0', borderTop: '1px solid #f1f5f9',
+  },
+  labelRowCopy: { display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
+  labelRowTitle: { fontSize: 14, fontWeight: 800, color: '#111827' },
+  labelRowText: { fontSize: 13, color: '#64748b', lineHeight: 1.35 },
+  labelExamples: { fontSize: 12, color: '#94a3b8', lineHeight: 1.35 },
+  labelInput: { padding: '9px 11px', border: '1px solid #dbe2ea', borderRadius: 8, fontSize: 14, width: '100%', background: '#fff' },
+  languageActions: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '14px 18px 18px' },
   // Integrations
   integrationGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 },
   integrationCard: {

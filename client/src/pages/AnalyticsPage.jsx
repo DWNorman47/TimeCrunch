@@ -4,7 +4,7 @@ import { usePlan } from '../hooks/usePlan';
 import { useT } from '../hooks/useT';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
-import AppHeader from '../components/AppHeader';
+import { PageIntro, PageShell } from '../components/PageShell';
 import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import { SkeletonStatRow, SkeletonList } from '../components/Skeleton';
 
@@ -41,23 +41,21 @@ export default function AnalyticsPage() {
   }, []);
 
   return (
-    <div style={styles.page}>
-      <AppHeader currentApp="analytics" features={features} />
-
-      <main id="main-content" style={styles.main} className="admin-main">
-        <div style={styles.pageHeader}>
-          <h1 style={styles.pageTitle}>{t.analyticsTitle}</h1>
-        </div>
-
+    <PageShell currentApp="analytics" features={features} maxWidth={1100} mainClassName="admin-main">
+        <PageIntro
+          introId="analytics"
+          kicker="Analytics"
+          title={t.analyticsTitle}
+          description="Trends and reports stay here so everyday screens can stay focused on the next action."
+        />
         {loading ? (
           <><SkeletonStatRow count={4} style={{ marginBottom: 16 }} /><SkeletonList count={4} /></>
         ) : plan.isBusiness ? (
-          <AnalyticsDashboard weekStart={features?.week_start ?? 1} />
+          <AnalyticsDashboard weekStart={features?.week_start ?? 1} settings={features} />
         ) : (
           <UpgradePrompt />
         )}
-      </main>
-    </div>
+    </PageShell>
   );
 }
 

@@ -53,13 +53,13 @@ export function LanguageSwitcher() {
 
 const styles = {
   refreshBtn: {
-    background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none',
+    background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1',
     padding: '6px 10px', borderRadius: 7, fontSize: 15, fontWeight: 700, cursor: 'pointer',
     lineHeight: 1,
   },
   langSelect: {
-    background: 'rgba(255,255,255,0.12)', color: '#fff',
-    border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6,
+    background: '#f8fafc', color: '#334155',
+    border: '1px solid #cbd5e1', borderRadius: 7,
     padding: '4px 6px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
   },
 };

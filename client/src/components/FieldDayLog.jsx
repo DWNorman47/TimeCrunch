@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import PhotoCapture from './PhotoCapture';
 import { useOffline } from '../contexts/OfflineContext';
@@ -66,11 +66,12 @@ function getLocation() {
 
 // ── Lightbox ──────────────────────────────────────────────────────────────────
 
-export function Lightbox({ photos, startIndex, onClose }) {
+export function Lightbox({ photos, startIndex, onClose, onDelete, deleting = false }) {
   const t = useT();
   const [idx, setIdx] = useState(startIndex);
   const item = photos[idx];
   const isVid = item.media_type === 'video' || /\.(mp4|mov|webm|avi|m4v)$/i.test(item.url || '');
+  const canDelete = Boolean(item.id && !item.pending && onDelete);
 
   useEffect(() => {
     const onKey = e => {
@@ -84,6 +85,22 @@ export function Lightbox({ photos, startIndex, onClose }) {
 
   return (
     <div style={s.lbBackdrop} onClick={onClose}>
+      <button type="button" style={s.lbCloseBtn} onClick={onClose} aria-label={t.labelModalClose || 'Close image viewer'}>
+        Exit
+      </button>
+      {canDelete && (
+        <button
+          type="button"
+          style={{ ...s.lbDeleteBtn, ...(deleting ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
+          onClick={e => {
+            e.stopPropagation();
+            onDelete(item);
+          }}
+          disabled={deleting}
+        >
+          {deleting ? 'Deleting...' : 'Delete image'}
+        </button>
+      )}
       {isVid ? (
         <video key={item.url} src={item.url} style={s.lbImg} controls autoPlay playsInline onClick={e => e.stopPropagation()} />
       ) : (
@@ -91,9 +108,9 @@ export function Lightbox({ photos, startIndex, onClose }) {
       )}
       {item.caption && <div style={s.lbCaption}>{item.caption}</div>}
       <div style={s.lbNav} onClick={e => e.stopPropagation()}>
-        <button style={{ ...s.lbBtn, ...(idx === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.prevPhoto} onClick={() => setIdx(i => i - 1)} disabled={idx === 0}>‹</button>
+        <button style={{ ...s.lbBtn, ...(idx === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.prevPhoto} onClick={() => setIdx(i => i - 1)} disabled={idx === 0}>{'<'}</button>
         <span style={s.lbCount}>{idx + 1} / {photos.length}</span>
-        <button style={{ ...s.lbBtn, ...(idx === photos.length - 1 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.nextPhoto} onClick={() => setIdx(i => i + 1)} disabled={idx === photos.length - 1}>›</button>
+        <button style={{ ...s.lbBtn, ...(idx === photos.length - 1 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} aria-label={t.nextPhoto} onClick={() => setIdx(i => i + 1)} disabled={idx === photos.length - 1}>{'>'}</button>
       </div>
     </div>
   );
@@ -101,10 +118,12 @@ export function Lightbox({ photos, startIndex, onClose }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function FieldDayLog({ projects, isAdmin }) {
+export default function FieldDayLog({ projects, isAdmin, settings = null }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelPlural = /s$/i.test(workLabel) ? workLabel : `${workLabel}s`;
   const { onSync } = useOffline() || {};
 
   const [project, setProject] = useState('');
@@ -124,14 +143,25 @@ export default function FieldDayLog({ projects, isAdmin }) {
   const [error, setError] = useState('');
 
   const [lightbox, setLightbox] = useState(null); // { photos, index }
+  const [deletingPhoto, setDeletingPhoto] = useState(false);
+  const loadSeqRef = useRef(0);
+  const projectInitializedRef = useRef(false);
 
-  const isToday = date === todayISO();
+  const today = todayISO();
+  const isToday = date === today;
+  const isPastDay = date < today;
 
   // Set default project once projects load
   useEffect(() => {
+    if (projectInitializedRef.current) return;
     if (!projects.length) return;
+    projectInitializedRef.current = true;
+    if (isAdmin) {
+      setProject('');
+      return;
+    }
     const last = localStorage.getItem('field-last-project');
-    if (last && projects.some(p => String(p.id) === last)) {
+    if (last !== null && projects.some(p => String(p.id) === last)) {
       setProject(last);
     } else {
       const sorted = sortProjects(projects);
@@ -140,24 +170,32 @@ export default function FieldDayLog({ projects, isAdmin }) {
   }, [projects]);
 
   const load = async (proj = project, d = date) => {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
+    setError('');
     try {
       const params = { from: d, to: d };
       if (proj) params.project_id = proj;
       const r = await api.get('/field-reports', { params });
-      setDayReports(r.data.items || []);
-    } catch { setError(t.failedLoadFieldReports); } finally { setLoading(false); }
+      if (seq === loadSeqRef.current) setDayReports(r.data.items || []);
+    } catch {
+      if (seq === loadSeqRef.current) setError(t.failedLoadFieldReports);
+    } finally {
+      if (seq === loadSeqRef.current) setLoading(false);
+    }
   };
 
-  useEffect(() => { if (project !== '' || projects.length === 0) load(); }, [project, date]);
-  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(); }); }, [onSync]);
+  useEffect(() => { if (isAdmin || project !== '' || projects.length === 0) load(); }, [project, date, isAdmin]);
+  useEffect(() => { if (!onSync) return; return onSync(count => { if (count > 0) load(project, date); }); }, [onSync, project, date]);
 
   const closeAll = () => { setPhotoOpen(false); setNoteOpen(false); setVideoOpen(false); };
 
   const selectProject = id => {
     setProject(id);
-    localStorage.setItem('field-last-project', id);
-    markProjectUsed(id);
+    if (!isAdmin) {
+      localStorage.setItem('field-last-project', id);
+      markProjectUsed(id);
+    }
     closeAll();
   };
 
@@ -253,6 +291,25 @@ export default function FieldDayLog({ projects, isAdmin }) {
     } catch { setError(t.failedMarkReviewed); }
   };
 
+  const handleDeletePhoto = async (photo) => {
+    if (!photo?.id || deletingPhoto) return;
+    if (!window.confirm('Delete this image?')) return;
+    setDeletingPhoto(true);
+    setError('');
+    try {
+      await api.delete(`/field-reports/photos/${photo.id}`);
+      setDayReports(prev => prev.map(r => ({
+        ...r,
+        photos: (r.photos || []).filter(p => p.id !== photo.id),
+      })));
+      setLightbox(null);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete image.');
+    } finally {
+      setDeletingPhoto(false);
+    }
+  };
+
   // Flatten all photos across the day's reports
   const allPhotos = dayReports.flatMap(r =>
     (r.photos || []).map(p => ({
@@ -277,36 +334,44 @@ export default function FieldDayLog({ projects, isAdmin }) {
           photos={lightbox.photos}
           startIndex={lightbox.index}
           onClose={() => setLightbox(null)}
+          onDelete={handleDeletePhoto}
+          deleting={deletingPhoto}
         />
       )}
 
       {/* Top bar — project + date nav */}
-      <div style={s.topBar}>
-        <select style={s.projectSelect} value={project} onChange={e => selectProject(e.target.value)}>
-          <option value="">{t.allProjectsOpt}</option>
-          {sorted.map(p => (
-            <option key={p.id} value={String(p.id)}>{p.name}</option>
-          ))}
-        </select>
+      <div style={s.topBar} className="field-day-topbar">
+        <label style={s.projectField}>
+          <span style={s.projectLabel}>{workLabel}</span>
+          <select style={s.projectSelect} value={project} onChange={e => selectProject(e.target.value)}>
+            <option value="">{`All ${workLabelPlural}`}</option>
+            {sorted.map(p => (
+              <option key={p.id} value={String(p.id)}>{p.name}</option>
+            ))}
+          </select>
+        </label>
 
-        <div style={s.dateNav}>
-          <button style={s.dateArrow} aria-label={t.prevDay} onClick={prevDay}>‹</button>
-          <span style={s.dateLabel}>{dayLabel(date, t, locale)}</span>
-          <button style={{ ...s.dateArrow, opacity: isToday ? 0.3 : 1, ...(isToday ? { cursor: 'not-allowed' } : {}) }} aria-label={t.nextDay} onClick={nextDay} disabled={isToday}>›</button>
+        <div style={s.dateNav} className="field-day-date-nav">
+          <button style={s.dateArrow} aria-label={t.prevDay} onClick={prevDay}>{'<'}</button>
+          <span style={s.dateLabel}>
+            {dayLabel(date, t, locale)}
+            {isPastDay && <span style={s.readOnlyText}>({t.readOnlyLabel || 'read-only'})</span>}
+          </span>
+          <button style={{ ...s.dateArrow, opacity: isToday ? 0.3 : 1, ...(isToday ? { cursor: 'not-allowed' } : {}) }} aria-label={t.nextDay} onClick={nextDay} disabled={isToday}>{'>'}</button>
         </div>
       </div>
 
       {/* Action row — today only */}
       {isToday && (
-        <div style={s.actionRow}>
+        <div style={s.actionRow} className="field-day-actions">
           <button style={photoOpen ? { ...s.actionBtn, ...s.actionBtnOn } : s.actionBtn} onClick={openPhoto}>
-            📷 {t.photosSection}
+            {t.photosSection}
           </button>
           <button style={videoOpen ? { ...s.actionBtn, ...s.actionBtnOn } : s.actionBtn} onClick={openVideo}>
-            🎥 {t.videoSection}
+            {t.videoSection}
           </button>
           <button style={noteOpen ? { ...s.actionBtn, ...s.actionBtnOn } : s.actionBtn} onClick={openNote}>
-            📝 {t.noteSection}
+            {t.noteSection}
           </button>
         </div>
       )}
@@ -316,7 +381,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
         <div style={s.capturePanel}>
           <PhotoCapture photos={capturePhotos} onChange={setCapturePhotos} />
           {error && <p role="alert" style={s.error}>{error}</p>}
-          <div style={s.captureActions}>
+          <div style={s.captureActions} className="field-day-capture-actions">
             <button style={{ ...s.submitBtn, ...(saving || capturePhotos.length === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitPhotos} disabled={saving || capturePhotos.length === 0}>
               {saving ? t.submitting : capturePhotos.length > 0
                 ? `${t.submitPhotos} (${capturePhotos.length})`
@@ -341,7 +406,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
           />
           <div style={s.charCount}>{captureNote.length}/2000</div>
           {error && <p role="alert" style={s.error}>{error}</p>}
-          <div style={s.captureActions}>
+          <div style={s.captureActions} className="field-day-capture-actions">
             <button style={{ ...s.submitBtn, ...(saving || !captureNote.trim() ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitNote} disabled={saving || !captureNote.trim()}>
               {saving ? t.submitting : t.submitNote}
             </button>
@@ -370,7 +435,6 @@ export default function FieldDayLog({ projects, isAdmin }) {
                   e.target.value = '';
                 }}
               />
-              <span style={s.videoPickerIcon}>🎥</span>
               <span style={s.videoPickerText}>{t.tapToRecord}</span>
             </label>
           )}
@@ -387,7 +451,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
             </div>
           )}
           {error && <p role="alert" style={s.error}>{error}</p>}
-          <div style={s.captureActions}>
+          <div style={s.captureActions} className="field-day-capture-actions">
             <button style={{ ...s.submitBtn, ...(saving || !captureVideo ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={submitVideo} disabled={saving || !captureVideo}>
               {saving ? (uploadProgress > 0 ? `${t.uploading} ${uploadProgress}%` : t.submitting) : t.submitVideo}
             </button>
@@ -401,7 +465,6 @@ export default function FieldDayLog({ projects, isAdmin }) {
         <SkeletonList count={3} rows={2} />
       ) : dayReports.length === 0 ? (
         <div style={s.empty}>
-          <div style={s.emptyIcon}>📋</div>
           <p style={s.emptyText}>
             {isToday ? t.nothingLoggedToday : t.noFieldNotesDay}
           </p>
@@ -423,7 +486,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
                       {vid ? (
                         <>
                           <video src={p.url} style={s.photoThumb} preload="metadata" muted playsInline />
-                          <div style={s.playOverlay}>▶</div>
+                          <div style={s.playOverlay}>Play</div>
                         </>
                       ) : (
                         <img src={p.url} style={s.photoThumb} alt={p.caption || `photo ${i + 1}`} loading="lazy" />
@@ -460,7 +523,7 @@ export default function FieldDayLog({ projects, isAdmin }) {
                       </span>
                       {r.pending && <span style={s.pendingBadge}>⏳ {t.pendingSync}</span>}
                       {r.lat && (
-                        <a href={`https://www.google.com/maps?q=${r.lat},${r.lng}`} target="_blank" rel="noopener noreferrer" style={s.mapLink}>📍</a>
+                        <a href={`https://www.google.com/maps?q=${r.lat},${r.lng}`} target="_blank" rel="noopener noreferrer" style={s.mapLink}>Map</a>
                       )}
                       {isAdmin && !r.pending && r.status !== 'reviewed' && (
                         <button style={s.reviewBtn} onClick={() => handleReview(r.id)}>✓ {t.reviewBtn}</button>
@@ -498,11 +561,14 @@ export default function FieldDayLog({ projects, isAdmin }) {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const s = {
-  topBar: { display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' },
-  projectSelect: { flex: 1, minWidth: 160, padding: '9px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, background: '#fff', fontWeight: 600, color: '#111827' },
+  topBar: { display: 'flex', gap: 10, alignItems: 'end', marginBottom: 16, flexWrap: 'wrap' },
+  projectField: { display: 'flex', flex: 1, minWidth: 180, flexDirection: 'column', gap: 4 },
+  projectLabel: { fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  projectSelect: { width: '100%', padding: '9px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, background: '#fff', fontWeight: 600, color: '#111827' },
   dateNav: { display: 'flex', alignItems: 'center', gap: 2, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '4px 8px' },
   dateArrow: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#374151', padding: '2px 6px', lineHeight: 1 },
-  dateLabel: { fontSize: 14, fontWeight: 700, color: '#111827', minWidth: 96, textAlign: 'center' },
+  dateLabel: { fontSize: 14, fontWeight: 700, color: '#111827', minWidth: 96, textAlign: 'center', display: 'inline-flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.15 },
+  readOnlyText: { fontSize: 11, fontWeight: 700, color: '#64748b', marginTop: 2 },
   actionRow: { display: 'flex', gap: 10, marginBottom: 16 },
   actionBtn: { flex: 1, padding: '13px 0', background: '#fff', border: '2px solid #e5e7eb', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#374151', cursor: 'pointer', textAlign: 'center' },
   actionBtnOn: { borderColor: '#059669', color: '#059669', background: '#f0fdf4' },
@@ -524,12 +590,11 @@ const s = {
   photoCaption: { position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 10, padding: '3px 5px', lineHeight: 1.3 },
   photoWorker: { position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4, textTransform: 'uppercase' },
   pendingDot: { position: 'absolute', top: 4, right: 4, fontSize: 13 },
-  playOverlay: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: '#fff', background: 'rgba(0,0,0,0.3)', pointerEvents: 'none' },
+  playOverlay: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#fff', background: 'rgba(0,0,0,0.3)', pointerEvents: 'none' },
   videoPreviewWrap: { display: 'flex', flexDirection: 'column', gap: 8 },
   videoPreview: { width: '100%', maxHeight: 240, borderRadius: 8, background: '#111', outline: 'none' },
   removeBtnSm: { alignSelf: 'flex-start', background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' },
-  videoPickerLabel: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, border: '2px dashed #d1d5db', borderRadius: 10, padding: '32px 16px', cursor: 'pointer', background: '#fafafa' },
-  videoPickerIcon: { fontSize: 32 },
+  videoPickerLabel: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, border: '2px dashed #d1d5db', borderRadius: 10, padding: '28px 16px', cursor: 'pointer', background: '#fafafa' },
   videoPickerText: { fontSize: 13, color: '#6b7280', textAlign: 'center' },
   progressBar: { position: 'relative', height: 8, background: '#e5e7eb', borderRadius: 4, marginTop: 10, overflow: 'hidden' },
   progressFill: { height: '100%', background: '#059669', borderRadius: 4, transition: 'width 0.2s' },
@@ -540,15 +605,14 @@ const s = {
   noteWorker: { fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.04em' },
   noteTime: { fontSize: 12, color: '#6b7280' },
   pendingBadge: { fontSize: 10, fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 6px', borderRadius: 6 },
-  mapLink: { fontSize: 13, color: '#6b7280', textDecoration: 'none' },
+  mapLink: { fontSize: 11, fontWeight: 800, color: '#1a56db', textDecoration: 'none', background: '#eff6ff', borderRadius: 999, padding: '2px 7px' },
   reviewBtn: { marginLeft: 'auto', background: '#059669', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' },
   reviewedBadge: { marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: '#065f46', background: '#d1fae5', padding: '2px 8px', borderRadius: 10 },
   noteText: { fontSize: 14, color: '#374151', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' },
   notePhotoStrip: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 },
   noteThumb: { width: 72, height: 54, objectFit: 'cover', borderRadius: 6, cursor: 'pointer' },
   hint: { color: '#6b7280', fontSize: 14 },
-  empty: { textAlign: 'center', padding: '60px 20px' },
-  emptyIcon: { fontSize: 40, marginBottom: 12 },
+  empty: { textAlign: 'center', padding: '46px 20px' },
   emptyText: { color: '#6b7280', fontSize: 15 },
   // Lightbox
   lbBackdrop: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16, cursor: 'pointer' },
@@ -557,4 +621,6 @@ const s = {
   lbNav: { display: 'flex', alignItems: 'center', gap: 20, marginTop: 16 },
   lbBtn: { background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 24, width: 44, height: 44, borderRadius: '50%', cursor: 'pointer' },
   lbCount: { color: '#fff', fontSize: 13 },
+  lbCloseBtn: { position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.16)', color: '#fff', border: '1px solid rgba(255,255,255,0.28)', borderRadius: 999, padding: '9px 16px', fontSize: 14, fontWeight: 800, cursor: 'pointer', lineHeight: 1 },
+  lbDeleteBtn: { position: 'absolute', top: 16, left: 16, background: 'rgba(220,38,38,0.9)', color: '#fff', border: '1px solid rgba(255,255,255,0.24)', borderRadius: 999, padding: '9px 16px', fontSize: 14, fontWeight: 800, cursor: 'pointer', lineHeight: 1 },
 };

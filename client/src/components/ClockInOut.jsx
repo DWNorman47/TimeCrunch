@@ -26,7 +26,7 @@ function formatElapsed(seconds) {
 
 const HINT_DISMISSED_KEY = 'opsfloa_clockin_hint_dismissed';
 
-export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geolocationEnabled = true, projectsEnabled = true }) {
+export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geolocationEnabled = true, projectsEnabled = true, workLabel = 'Work' }) {
   // Detect day-mark workers up front — the actual switch to the DayMark
   // UI happens at the return statement (after all hook calls) so React's
   // hook-order rule isn't violated when the same component renders the
@@ -82,7 +82,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
-  // Pre-select last used project when projects load and no project is already chosen.
+  // Pre-select last used work when active work loads and nothing is already chosen.
   // Also scrub any stale selection restored by useFormPersist — if the persisted
   // project id isn't in the current list (project was archived, renumbered, or the
   // user now belongs to a different company), clear it so we don't submit a
@@ -170,11 +170,12 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
 
   const selectedProjectData = projects?.find(p => String(p.id) === String(selectedProject));
   const projectHasGeofence = !!(selectedProjectData?.geo_lat && selectedProjectData?.geo_lng && selectedProjectData?.geo_radius_ft);
+  const workLabelLower = workLabel.toLowerCase();
 
   const handleClockIn = async () => {
-    // When Project Integration is on but the company has zero active projects,
+  // When work selection is on but the company has zero active work,
     // fall back to project-less clock-in instead of blocking the worker.
-    if (projectsEnabled && hasProjects && !selectedProject) { setError(t.selectProjectFirst); return; }
+    if (projectsEnabled && hasProjects && !selectedProject) { setError(`Select ${workLabelLower} first.`); return; }
     setError('');
     setLocationDenied(false);
     setLoading(true);
@@ -296,7 +297,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   };
 
   const handleSwitchProject = async () => {
-    if (!switchProject) { setError(t.selectNewProject); return; }
+    if (!switchProject) { setError(`Select new ${workLabelLower}.`); return; }
     setError('');
     setLoading(true);
     const { lat, lng } = geolocationEnabled ? await getLocation() : { lat: null, lng: null };
@@ -419,7 +420,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                   onChange={e => setSwitchProject(e.target.value)}
                   autoFocus
                 >
-                  <option value="">{t.selectNewProject}</option>
+                  <option value="">{`Select new ${workLabelLower}`}</option>
                   {projects?.filter(p => String(p.id) !== String(status.project_id)).map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
@@ -436,7 +437,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
             ) : (
               projectsEnabled && projects?.length > 1 && (
                 <button style={{ ...styles.switchProjectBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setSwitchingProject(true)} disabled={loading}>
-                  {t.switchProject}
+                  {`Switch ${workLabelLower}`}
                 </button>
               )
             )}
@@ -496,14 +497,14 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
       )}
       <div style={styles.form}>
         {projectsEnabled && hasProjects && <div>
-          <label htmlFor="clockin-project" style={styles.label}>{t.project}</label>
+          <label htmlFor="clockin-project" style={styles.label}>{workLabel}</label>
           <select
             id="clockin-project"
             style={styles.input}
             value={selectedProject}
             onChange={e => setSelectedProject(e.target.value)}
           >
-            <option value="">{t.selectProject}</option>
+            <option value="">{`Select ${workLabelLower}`}</option>
             {projects.map(p => (
               <option key={p.id} value={p.id}>
                 {p.name} ({p.wage_type === 'prevailing' ? t.prevailing : t.regular})

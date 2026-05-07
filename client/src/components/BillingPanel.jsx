@@ -422,8 +422,8 @@ export default function BillingPanel() {
                 {selectedPlan === 'business' && (
                   <span style={{ color: '#6b7280' }}>
                     {annual
-                      ? ` (${workerCount} workers = $${businessAnnualTotal}/yr)`
-                      : ` (${workerCount} workers = $${businessMonthly}/mo)`}
+                      ? ` (${workerCount} team members = $${businessAnnualTotal}/yr)`
+                      : ` (${workerCount} team members = $${businessMonthly}/mo)`}
                   </span>
                 )}
               </div>
@@ -453,7 +453,7 @@ export default function BillingPanel() {
 }
 
 /**
- * Placeholder card for the future Client Portal Pro add-on. Not a buy
+ * Placeholder card for the future Customer Portal Pro add-on. Not a buy
  * button — just a "notify me" flag so we can measure demand before
  * committing build effort. Once the addon is real, this component
  * gets replaced with the real billing widget.
@@ -480,12 +480,12 @@ function ClientPortalProPlaceholder() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ fontSize: 20 }}>🏗️</span>
         <span style={{ ...s.addonTitle, color: '#3730a3' }}>
-          Client Portal Pro &nbsp;
+          Customer Portal Pro &nbsp;
           <span style={{ fontSize: 12, fontWeight: 700, background: '#c7d2fe', color: '#3730a3', padding: '2px 8px', borderRadius: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Coming soon</span>
         </span>
       </div>
       <div style={{ paddingLeft: 30, fontSize: 12, color: '#4338ca', lineHeight: 1.55, marginTop: 6 }}>
-        Branded client portal with project status tracking, online invoicing and payment, scheduling, and custom logos.
+        Branded customer portal with work status tracking, online invoicing and payment, scheduling, and custom logos.
         Not available yet — click below to let us know you're interested.
       </div>
       <div style={{ paddingLeft: 30, marginTop: 10 }}>

@@ -116,7 +116,7 @@ export function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CAT
               </button>
             )}
             {item.status !== 'pending' && (
-              <button style={{ ...s.resetBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => act('pending')} disabled={saving}>
+              <button style={{ ...s.actionResetBtn, ...(saving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => act('pending')} disabled={saving}>
                 {t.resetPending}
               </button>
             )}
@@ -127,10 +127,14 @@ export function ReimbursementRow({ item, onUpdate, knownCategories = DEFAULT_CAT
   );
 }
 
-export default function ReimbursementsAdmin() {
+export default function ReimbursementsAdmin({ settings = null }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
   const [items, setItems] = useState([]);
   const [mileageRate, setMileageRate] = useState(0.67);
   const [loading, setLoading] = useState(true);
@@ -313,7 +317,7 @@ export default function ReimbursementsAdmin() {
           aria-label={t.raSearchAria}
         />
         <select style={s.filterInput} value={filterWorker} onChange={e => setFilterWorker(e.target.value)} aria-label={t.raFilterWorkerAria}>
-          <option value="">{t.raAllWorkers}</option>
+          <option value="">{`All ${workerLabelPlural}`}</option>
           {workersInList.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
         </select>
         <select style={s.filterInput} value={filterCategory} onChange={e => setFilterCategory(e.target.value)} aria-label={t.raFilterCategoryAria}>
@@ -322,7 +326,7 @@ export default function ReimbursementsAdmin() {
         </select>
         {projectsInList.length > 0 && (
           <select style={s.filterInput} value={filterProject} onChange={e => setFilterProject(e.target.value)} aria-label={t.raFilterProjectAria}>
-            <option value="">{t.raAllProjects}</option>
+            <option value="">{`All ${workLabelPlural}`}</option>
             {projectsInList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
@@ -333,7 +337,7 @@ export default function ReimbursementsAdmin() {
           <option value="date_asc">Date ↑ (oldest)</option>
           <option value="amount_desc">Amount ↓</option>
           <option value="amount_asc">Amount ↑</option>
-          <option value="worker_asc">Worker A–Z</option>
+          <option value="worker_asc">{`${workerLabel} A-Z`}</option>
         </select>
         {anyFilterActive && (
           <button type="button" onClick={resetFilters} style={s.resetBtn}>Reset</button>
@@ -346,9 +350,9 @@ export default function ReimbursementsAdmin() {
         <form onSubmit={handleSubmit} style={s.form}>
           <div style={s.formRow}>
             <div style={s.field}>
-              <label style={s.fieldLabel}>{t.workerLabel}</label>
+              <label style={s.fieldLabel}>{workerLabel}</label>
               <select style={s.input} value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))} required>
-                <option value="">{t.selectWorker}</option>
+                <option value="">{`Select ${workerLabel.toLowerCase()}`}</option>
                 {allWorkers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
               </select>
             </div>
@@ -388,9 +392,9 @@ export default function ReimbursementsAdmin() {
             </div>
             {projects.length > 0 && (
               <div style={s.field}>
-                <label style={s.fieldLabel}>{t.project}</label>
+                <label style={s.fieldLabel}>{workLabel}</label>
                 <select style={s.input} value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}>
-                  <option value="">{t.noProject}</option>
+                  <option value="">{`No ${workLabel.toLowerCase()}`}</option>
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
@@ -507,7 +511,7 @@ const s = {
   actions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
   approveBtn: { padding: '8px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
   rejectBtn: { padding: '8px 18px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: 'pointer' },
-  resetBtn: { padding: '8px 18px', background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  actionResetBtn: { padding: '8px 18px', background: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   milesMeta: { fontSize: 13, color: '#059669', fontWeight: 600, background: '#f0fdf4', borderRadius: 6, padding: '5px 10px' },
   mileageCalc: { fontSize: 12, color: '#059669', fontWeight: 600, whiteSpace: 'nowrap' },
   qboBadge: { fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 8, background: '#d1fae5', color: '#065f46', border: '1px solid #6ee7b7' },

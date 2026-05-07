@@ -2,7 +2,211 @@ const router = require('express').Router();
 const pool = require('../db');
 const logger = require('../logger');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { requireSuperAdmin } = require('../middleware/auth');
+const { seedBuiltinRoles } = require('../permissions');
+
+const DEMO_COMPANY_NAME = 'OpsFloa Demo Workspace';
+const DEMO_COMPANY_SLUG = 'opsfloa-demo-workspace';
+const DEMO_PASSWORD = 'DemoPass!2026';
+
+async function insertDemoUser(client, companyId, roleId, role, username, fullName, email, rate = 34, workerType = 'employee') {
+  const hash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  const [firstName, ...rest] = fullName.split(' ');
+  const { rows } = await client.query(
+    `INSERT INTO users
+      (company_id, username, password_hash, full_name, first_name, last_name, role, role_id, email,
+       email_confirmed, hourly_rate, rate_type, overtime_rule, worker_type, welcomed_at, active, timezone)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10,'hourly','daily',$11,NOW(),true,'America/Phoenix')
+     RETURNING id, username, full_name, role`,
+    [companyId, username, hash, fullName, firstName, rest.join(' ') || null, role, roleId, email, rate, workerType]
+  );
+  return rows[0];
+}
+
+async function deleteDemoWorkspace(client) {
+  const { rows } = await client.query('SELECT id FROM companies WHERE slug = $1', [DEMO_COMPANY_SLUG]);
+  for (const { id } of rows) {
+    await client.query(`DELETE FROM inventory_count_assignments WHERE cycle_count_id IN (SELECT id FROM inventory_cycle_counts WHERE company_id = $1)`, [id]);
+    await client.query(`DELETE FROM inventory_count_workers WHERE cycle_count_id IN (SELECT id FROM inventory_cycle_counts WHERE company_id = $1)`, [id]);
+    await client.query(`DELETE FROM inventory_cycle_count_lines WHERE cycle_count_id IN (SELECT id FROM inventory_cycle_counts WHERE company_id = $1)`, [id]);
+    await client.query(`DELETE FROM inventory_cycle_counts WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM inventory_transactions WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM inventory_stock WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM inventory_items WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM inventory_locations WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM safety_checklist_submissions WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM safety_checklist_templates WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM daily_reports WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM active_clock WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM time_entries WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM clients WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM projects WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM settings WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM role_permissions WHERE role_id IN (SELECT id FROM roles WHERE company_id = $1)`, [id]);
+    await client.query(`DELETE FROM users WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM roles WHERE company_id = $1`, [id]);
+    await client.query(`DELETE FROM companies WHERE id = $1`, [id]);
+  }
+}
+
+async function createDemoWorkspace(client) {
+  const { rows } = await client.query(
+    `INSERT INTO companies
+      (name, slug, subscription_status, plan, trial_ends_at, pro_addon, addon_qbo, addon_certified_payroll,
+       address, phone, contact_email, accepts_service_requests, client_portal_pro_interest, registration_ip)
+     VALUES ($1,$2,'exempt','business',NOW() + INTERVAL '90 days',true,true,true,
+       '7427 Innovation Loop, Phoenix, AZ 85004','(602) 555-0198','ops@example.com',true,true,'127.0.0.1')
+     RETURNING id, name, slug, plan, subscription_status, created_at`,
+    [DEMO_COMPANY_NAME, DEMO_COMPANY_SLUG]
+  );
+  const company = rows[0];
+  const { workerId, ownerId } = await seedBuiltinRoles(client, company.id);
+  const admin = await insertDemoUser(client, company.id, ownerId, 'admin', 'demo.admin', 'Taylor Morgan', 'taylor.morgan@example.com', 72);
+  const workers = [
+    await insertDemoUser(client, company.id, workerId, 'worker', 'alex.rivera', 'Alex Rivera', 'alex.rivera@example.com', 32),
+    await insertDemoUser(client, company.id, workerId, 'worker', 'jordan.lee', 'Jordan Lee', 'jordan.lee@example.com', 34),
+    await insertDemoUser(client, company.id, workerId, 'worker', 'priya.singh', 'Priya Singh', 'priya.singh@example.com', 38),
+    await insertDemoUser(client, company.id, workerId, 'worker', 'marcus.chen', 'Marcus Chen', 'marcus.chen@example.com', 36, 'contractor'),
+  ];
+
+  const settings = {
+    prevailing_wage_rate: '45', default_hourly_rate: '34', overtime_multiplier: '1.5',
+    overtime_rule: 'daily', overtime_threshold: '8',
+    module_timeclock: '1', module_field: '1', module_projects: '1', module_inventory: '1', module_analytics: '1', module_team: '1',
+    feature_scheduling: '1', feature_analytics: '1', feature_chat: '1', feature_prevailing_wage: '1',
+    feature_reimbursements: '1', feature_pto: '1', feature_project_integration: '1', feature_overtime: '1',
+    feature_geolocation: '1', feature_overtime_alerts: '1', feature_media_gallery: '1',
+    feature_admin_edit_time: '1', feature_worker_edit_time: '1', show_worker_wages: '1',
+    company_timezone: 'America/Phoenix', setup_questionnaire_completed_at: new Date().toISOString(),
+  };
+  for (const [key, value] of Object.entries(settings)) {
+    await client.query(
+      `INSERT INTO settings (company_id, key, value) VALUES ($1,$2,$3)
+       ON CONFLICT (company_id, key) DO UPDATE SET value = EXCLUDED.value`,
+      [company.id, key, value]
+    );
+  }
+
+  const clients = [];
+  for (const row of [
+    ['North Valley Property Group', 'Mia Carter', 'mia.carter@example.com', '(602) 555-0141', '1200 N Central Ave, Phoenix, AZ'],
+    ['Mesa Facilities Co-op', 'Owen Brooks', 'owen.brooks@example.com', '(480) 555-0182', '88 S Center St, Mesa, AZ'],
+    ['Desert Bloom Hospitality', 'Nina Patel', 'nina.patel@example.com', '(623) 555-0166', '515 W Roosevelt St, Phoenix, AZ'],
+  ]) {
+    const r = await client.query(
+      `INSERT INTO clients (company_id, name, contact_name, contact_email, contact_phone, address, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,'Fake demo client for local development') RETURNING id, name`,
+      [company.id, ...row]
+    );
+    clients.push(r.rows[0]);
+  }
+
+  const projects = [];
+  for (const p of [
+    ['North Valley Route', clients[0].id, clients[0].name, 'NV-2401', 'Phoenix, AZ', 'Recurring service route across three properties', 320, 27500, 42],
+    ['Mesa Service Hub', clients[1].id, clients[1].name, 'MSH-101', 'Mesa, AZ', 'Facility maintenance and inventory staging', 180, 16400, 68],
+    ['Desert Bloom Refresh', clients[2].id, clients[2].name, 'DBH-77', 'Phoenix, AZ', 'Guest-area refresh and checklist-driven closeout', 260, 31800, 35],
+  ]) {
+    const r = await client.query(
+      `INSERT INTO projects
+        (company_id, name, client_id, client_name, job_number, address, description, wage_type, status,
+         budget_hours, budget_dollars, progress_pct, start_date, end_date, active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'regular','in_progress',$8,$9,$10,
+         CURRENT_DATE - INTERVAL '21 days',CURRENT_DATE + INTERVAL '45 days',true)
+       RETURNING id, name`,
+      [company.id, ...p]
+    );
+    projects.push(r.rows[0]);
+  }
+
+  for (const e of [
+    [workers[0].id, projects[0].id, -4, '07:00', '15:30', 'Completed north route inspections and uploaded closeout notes.', 'approved', admin.id, 30],
+    [workers[1].id, projects[0].id, -3, '08:00', '16:45', 'Replaced filters and documented access issue at Gate B.', 'approved', admin.id, 30],
+    [workers[2].id, projects[1].id, -2, '06:30', '14:30', 'Cycle count prep and staging area labels.', 'pending', null, 20],
+    [workers[3].id, projects[2].id, -1, '09:00', '17:15', 'Punch items reviewed with client contact.', 'pending', null, 30],
+    [workers[0].id, projects[1].id, 0, '07:15', '11:45', 'Morning dispatch support and parts transfer.', 'pending', null, 0],
+  ]) {
+    await client.query(
+      `INSERT INTO time_entries
+        (company_id, user_id, project_id, work_date, start_time, end_time, start_ts, end_ts, wage_type, rate,
+         notes, status, approved_by, approved_at, break_minutes, timezone, clock_source)
+       VALUES ($1,$2,$3,CURRENT_DATE + ($4 || ' days')::INTERVAL,$5::time,$6::time,
+         (CURRENT_DATE + ($4 || ' days')::INTERVAL + $5::time) AT TIME ZONE 'America/Phoenix',
+         (CURRENT_DATE + ($4 || ' days')::INTERVAL + $6::time) AT TIME ZONE 'America/Phoenix',
+         'regular',34,$7,$8::varchar,$9,CASE WHEN $8::varchar='approved' THEN NOW() - INTERVAL '1 day' ELSE NULL END,$10,'America/Phoenix','worker')`,
+      [company.id, ...e]
+    );
+  }
+
+  await client.query(
+    `INSERT INTO active_clock (company_id, user_id, project_id, clock_in_time, work_date, notes, timezone, clock_source, current_lat, current_lng, location_updated_at)
+     VALUES ($1,$2,$3,NOW() - INTERVAL '2 hours',CURRENT_DATE,'Live fake shift for local testing','America/Phoenix','worker',33.4484,-112.0740,NOW() - INTERVAL '8 minutes')`,
+    [company.id, workers[1].id, projects[0].id]
+  );
+
+  await client.query(
+    `INSERT INTO daily_reports (company_id, project_id, report_date, superintendent, weather_condition, weather_temp, work_performed, delays_issues, visitor_log, status, created_by)
+     VALUES ($1,$2,CURRENT_DATE,'Taylor Morgan','Sunny',83,'Completed route checks, staged replacement parts, and reviewed open work notes.','One access delay at Gate B; follow-up assigned.','Client contact visited at 10:30 AM.','submitted',$3)`,
+    [company.id, projects[0].id, admin.id]
+  );
+
+  const template = await client.query(
+    `INSERT INTO safety_checklist_templates (company_id, name, description, scope, created_by, items)
+     VALUES ($1,'Daily Readiness Check','General daily checklist for fake demo teams','general',$2,$3::jsonb) RETURNING id`,
+    [company.id, admin.id, JSON.stringify([
+      { id: 'gear', text: 'Required gear checked', type: 'checkbox' },
+      { id: 'kit', text: 'Vehicle or kit inspected', type: 'checkbox' },
+      { id: 'hazards', text: 'Hazards reviewed before work starts', type: 'checkbox' },
+    ])]
+  );
+  await client.query(
+    `INSERT INTO safety_checklist_submissions (company_id, template_id, template_name, project_id, submitted_by, submitted_by_name, check_date, answers, notes)
+     VALUES ($1,$2,'Daily Readiness Check',$3,$4,'Alex Rivera',CURRENT_DATE,$5::jsonb,'Fake checklist submission for local demo data')`,
+    [company.id, template.rows[0].id, projects[0].id, workers[0].id, JSON.stringify({ gear: true, kit: true, hazards: true })]
+  );
+
+  const depot = await client.query(`INSERT INTO inventory_locations (company_id, name, type, notes, address) VALUES ($1,'Phoenix Depot','warehouse','Main fake stock room','7427 Innovation Loop, Phoenix, AZ') RETURNING id`, [company.id]);
+  const van = await client.query(`INSERT INTO inventory_locations (company_id, name, type, project_id, notes, address) VALUES ($1,'North Valley Route Van','vehicle',$2,'Rolling inventory for active route','Phoenix, AZ') RETURNING id`, [company.id, projects[0].id]);
+  const itemRows = [];
+  for (const item of [
+    ['Tablet Mount Kit','TMK-100','Hardware','each',48.50,6,12,18,4],
+    ['Service Gloves','GLV-NTR-M','Safety','box',12.75,10,20,26,8],
+    ['Filter Cartridge','FLT-22A','Maintenance','each',31.20,8,16,14,3],
+    ['Traffic Cones','CONE-28','Safety','each',18.00,12,24,40,10],
+  ]) {
+    const r = await client.query(
+      `INSERT INTO inventory_items (company_id, name, sku, category, unit, unit_cost, reorder_point, reorder_qty, created_by, description)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'Fake inventory item for local development') RETURNING id, name`,
+      [company.id, ...item.slice(0, 7), admin.id]
+    );
+    itemRows.push(r.rows[0]);
+    await client.query(`INSERT INTO inventory_stock (company_id, item_id, location_id, quantity) VALUES ($1,$2,$3,$4)`, [company.id, r.rows[0].id, depot.rows[0].id, item[7]]);
+    await client.query(`INSERT INTO inventory_stock (company_id, item_id, location_id, quantity) VALUES ($1,$2,$3,$4)`, [company.id, r.rows[0].id, van.rows[0].id, item[8]]);
+  }
+
+  const count = await client.query(
+    `INSERT INTO inventory_cycle_counts (company_id, location_id, status, started_by, notes, count_type)
+     VALUES ($1,$2,'in_progress',$3,'Demo count assignment for worker testing','cycle') RETURNING id`,
+    [company.id, depot.rows[0].id, admin.id]
+  );
+  await client.query(
+    `INSERT INTO inventory_count_workers (cycle_count_id, user_id, roles) VALUES ($1,$2,$3)`,
+    [count.rows[0].id, workers[0].id, ['counter']]
+  );
+  const line = await client.query(
+    `INSERT INTO inventory_cycle_count_lines (cycle_count_id, item_id, expected_qty, location_id)
+     VALUES ($1,$2,18,$3) RETURNING id`,
+    [count.rows[0].id, itemRows[0].id, depot.rows[0].id]
+  );
+  await client.query(
+    `INSERT INTO inventory_count_assignments (line_id, cycle_count_id, user_id, role)
+     VALUES ($1,$2,$3,'counter')`,
+    [line.rows[0].id, count.rows[0].id, workers[0].id]
+  );
+
+  return { company, admin, workers };
+}
 
 // GET /superadmin/client-errors — browser-reported errors, newest first
 router.get('/client-errors', requireSuperAdmin, async (req, res) => {
@@ -58,6 +262,42 @@ router.get('/companies', requireSuperAdmin, async (req, res) => {
   } catch (err) {
     logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /superadmin/demo-workspace — create or reset a realistic demo tenant.
+// This is intentionally super-admin only and uses fake, deterministic login
+// credentials so design/support testing never touches a real customer tenant.
+router.post('/demo-workspace', requireSuperAdmin, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await deleteDemoWorkspace(client);
+    const demo = await createDemoWorkspace(client);
+    await client.query('COMMIT');
+    res.status(201).json({
+      company: demo.company,
+      credentials: {
+        company_name: DEMO_COMPANY_NAME,
+        admin_username: 'demo.admin',
+        worker_username: 'alex.rivera',
+        password: DEMO_PASSWORD,
+      },
+      seeded: {
+        admins: 1,
+        workers: demo.workers.length,
+        clients: 3,
+        work_items: 3,
+        inventory_items: 4,
+        pending_count_assignments: 1,
+      },
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    logger.error({ err }, 'demo workspace seed failed');
+    res.status(500).json({ error: 'Demo workspace seed failed' });
+  } finally {
+    client.release();
   }
 });
 

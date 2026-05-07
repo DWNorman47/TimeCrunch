@@ -4,8 +4,18 @@ import { useT } from '../../hooks/useT';
 import { useAuth } from '../../contexts/AuthContext';
 import { langToLocale } from '../../utils';
 import { SkeletonList } from '../Skeleton';
+import ColumnHeaderMenu from './ColumnHeaderMenu';
 
 const VAL_PAGE = 200;
+const VAL_MOBILE_VIEW_PREF_KEY = 'inventory_valuation_mobile_view';
+
+function readMobileViewPref() {
+  try {
+    return localStorage.getItem(VAL_MOBILE_VIEW_PREF_KEY) === 'list' ? 'list' : 'card';
+  } catch {
+    return 'card';
+  }
+}
 
 export default function InventoryValuation({ locations }) {
   const t = useT();
@@ -19,12 +29,23 @@ export default function InventoryValuation({ locations }) {
   const [error, setError] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [showZero, setShowZero] = useState(false);
+  const [nameFilter, setNameFilter] = useState('');
+  const [skuFilter, setSkuFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
+  const [mobileView, setMobileView] = useState(readMobileViewPref);
 
   const load = useCallback(async () => {
     setLoading(true); setError(''); setValOffset(0);
     try {
       const params = new URLSearchParams({ limit: VAL_PAGE, offset: 0 });
       if (locationFilter) params.set('location_id', locationFilter);
+      if (nameFilter) params.set('name_search', nameFilter);
+      if (skuFilter) params.set('sku_search', skuFilter);
+      if (categoryFilter) params.set('category_search', categoryFilter);
+      params.set('sort', sortBy);
+      params.set('dir', sortDir);
       const r = await api.get(`/inventory/valuation?${params}`);
       setData(r.data);
       setValTotal(r.data.total);
@@ -33,7 +54,7 @@ export default function InventoryValuation({ locations }) {
     } finally {
       setLoading(false);
     }
-  }, [locationFilter]);
+  }, [locationFilter, nameFilter, skuFilter, categoryFilter, sortBy, sortDir]);
 
   const loadMoreVal = async () => {
     const nextOffset = valOffset + VAL_PAGE;
@@ -41,6 +62,11 @@ export default function InventoryValuation({ locations }) {
     try {
       const params = new URLSearchParams({ limit: VAL_PAGE, offset: nextOffset });
       if (locationFilter) params.set('location_id', locationFilter);
+      if (nameFilter) params.set('name_search', nameFilter);
+      if (skuFilter) params.set('sku_search', skuFilter);
+      if (categoryFilter) params.set('category_search', categoryFilter);
+      params.set('sort', sortBy);
+      params.set('dir', sortDir);
       const r = await api.get(`/inventory/valuation?${params}`);
       setData(prev => ({
         ...r.data,
@@ -52,6 +78,19 @@ export default function InventoryValuation({ locations }) {
   };
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VAL_MOBILE_VIEW_PREF_KEY, mobileView);
+    } catch {
+      // Storage is best-effort only.
+    }
+  }, [mobileView]);
+
+  const setColumnSort = (key, dir) => {
+    setSortBy(key);
+    setSortDir(dir);
+  };
 
   const downloadCSV = () => {
     if (!data) return;
@@ -79,6 +118,11 @@ export default function InventoryValuation({ locations }) {
   const visibleItems = data
     ? data.items.filter(item => showZero || parseFloat(item.total_qty) !== 0)
     : [];
+  const valuationSuggestions = {
+    names: visibleItems.map(item => item.name),
+    skus: visibleItems.map(item => item.sku),
+    categories: visibleItems.map(item => item.category),
+  };
 
   const fmt = (n) => {
     const v = parseFloat(n || 0);
@@ -94,10 +138,19 @@ export default function InventoryValuation({ locations }) {
     <div style={s.wrap}>
       {/* Toolbar */}
       <div style={s.toolbar}>
-        <select style={s.select} value={locationFilter} onChange={e => setLocationFilter(e.target.value)}>
-          <option value="">{t.invCycAllLocations}</option>
-          {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
+        {(nameFilter || skuFilter || categoryFilter || locationFilter) && (
+          <button
+            style={s.clearBtn}
+            onClick={() => {
+              setNameFilter('');
+              setSkuFilter('');
+              setCategoryFilter('');
+              setLocationFilter('');
+            }}
+          >
+            Clear
+          </button>
+        )}
         <label style={s.toggle}>
           <input type="checkbox" checked={showZero} onChange={e => setShowZero(e.target.checked)} />
           {t.invValIncludeZero}
@@ -107,28 +160,59 @@ export default function InventoryValuation({ locations }) {
         </button>
       </div>
 
+      <div style={s.mobileControls} className="inventory-mobile-controls">
+        <div style={s.mobileViewToggle} aria-label="Mobile valuation view">
+          {['card', 'list'].map(mode => (
+            <button
+              key={mode}
+              type="button"
+              style={{ ...s.mobileViewBtn, ...(mobileView === mode ? s.mobileViewBtnActive : {}) }}
+              onClick={() => setMobileView(mode)}
+            >
+              {mode === 'card' ? 'Cards' : 'List'}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {error && <div role="alert" style={s.error}>{error}</div>}
 
       {loading ? (
         <SkeletonList count={4} rows={2} />
       ) : !data || visibleItems.length === 0 ? (
-        <div style={s.empty}>
-          <div style={s.emptyIcon}>💰</div>
+        <div style={s.empty}>
           <p>{showZero ? t.invValNoItems : t.invValNoStock}</p>
         </div>
       ) : (
         <>
-          <div style={s.tableWrap}>
+          <div
+            className={`inventory-table-wrap inventory-valuation-table-wrap ${mobileView === 'list' ? 'inventory-mobile-table-active' : ''}`}
+            style={s.tableWrap}
+          >
             <table style={s.table}>
               <thead>
                 <tr style={s.thead}>
-                  <th style={s.th}>{t.invValColItem}</th>
-                  <th style={s.th}>{t.colSku}</th>
-                  <th style={s.th}>{t.colCategory}</th>
-                  <th style={s.th}>{t.colUnit}</th>
-                  <th style={{ ...s.th, textAlign: 'right' }}>{t.invValColOnHand}</th>
-                  <th style={{ ...s.th, textAlign: 'right' }}>{t.colUnitCost}</th>
-                  <th style={{ ...s.th, textAlign: 'right' }}>{t.invValColTotalValue}</th>
+                  <th style={s.th}>
+                    <ColumnHeaderMenu label={t.invValColItem} sortKey="name" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} filterType="text" filterValue={nameFilter} onFilter={setNameFilter} suggestions={valuationSuggestions.names} placeholder={t.invValColItem} />
+                  </th>
+                  <th style={s.th}>
+                    <ColumnHeaderMenu label={t.colSku} sortKey="sku" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} filterType="text" filterValue={skuFilter} onFilter={setSkuFilter} suggestions={valuationSuggestions.skus} placeholder={t.colSku} />
+                  </th>
+                  <th style={s.th}>
+                    <ColumnHeaderMenu label={t.colCategory} sortKey="category" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} filterType="text" filterValue={categoryFilter} onFilter={setCategoryFilter} suggestions={valuationSuggestions.categories} placeholder={t.colCategory} />
+                  </th>
+                  <th style={s.th}>
+                    <ColumnHeaderMenu label={t.colUnit} sortKey="unit" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} />
+                  </th>
+                  <th style={{ ...s.th, textAlign: 'right' }}>
+                    <ColumnHeaderMenu label={t.invValColOnHand} align="right" sortKey="on_hand" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} />
+                  </th>
+                  <th style={{ ...s.th, textAlign: 'right' }}>
+                    <ColumnHeaderMenu label={t.colUnitCost} align="right" sortKey="unit_cost" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} />
+                  </th>
+                  <th style={{ ...s.th, textAlign: 'right' }}>
+                    <ColumnHeaderMenu label={t.invValColTotalValue} align="right" sortKey="total_value" activeSort={sortBy} sortDir={sortDir} onSort={setColumnSort} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -163,6 +247,41 @@ export default function InventoryValuation({ locations }) {
                 </tr>
               </tfoot>
             </table>
+          </div>
+          <div
+            style={s.mobileCards}
+            className={`inventory-mobile-cards ${mobileView === 'list' ? 'inventory-mobile-cards-hidden' : ''}`}
+          >
+            <div style={s.mobileTotalCard}>
+              <span style={s.mobileTotalLabel}>{t.invValTotalRow}</span>
+              <strong style={s.mobileTotalValue}>{fmt(data.grand_total)}</strong>
+              <span style={s.mobileMuted}>{visibleItems.length} {visibleItems.length !== 1 ? t.invValItems : t.invValItem}</span>
+            </div>
+            {visibleItems.map(item => (
+              <article key={item.id} style={s.mobileCard}>
+                <div style={s.mobileCardTop}>
+                  <div>
+                    <strong style={s.mobileTitle}>{item.name}</strong>
+                    <span style={s.mobileSub}>{[item.sku, item.category].filter(Boolean).join(' - ') || item.unit}</span>
+                  </div>
+                  <strong style={s.mobileValue}>{fmt(item.total_value)}</strong>
+                </div>
+                <div style={s.mobileMetrics}>
+                  <div>
+                    <span style={s.mobileLabel}>{t.invValColOnHand}</span>
+                    <span style={s.mobileMetric}>{fmtQty(item.total_qty)} {item.unit}</span>
+                  </div>
+                  <div>
+                    <span style={s.mobileLabel}>{t.colUnitCost}</span>
+                    <span style={s.mobileMetric}>{item.unit_cost != null ? fmt(item.unit_cost) : t.invValNotSet}</span>
+                  </div>
+                  <div>
+                    <span style={s.mobileLabel}>{t.invValColTotalValue}</span>
+                    <span style={s.mobileMetric}>{fmt(item.total_value)}</span>
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
           {(data?.items?.length || 0) < valTotal && (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
@@ -216,13 +335,22 @@ export default function InventoryValuation({ locations }) {
 const s = {
   wrap:        { padding: 16 },
   toolbar:     { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 },
+  searchForm:  { display: 'flex', flex: '1 1 260px', minWidth: 220 },
+  searchInput: { flex: 1, padding: '8px 12px', borderRadius: '8px 0 0 8px', border: '1px solid #d1d5db', borderRight: 'none', fontSize: 14, minWidth: 0 },
+  searchBtn:   { padding: '8px 14px', borderRadius: '0 8px 8px 0', border: '1px solid #d1d5db', background: '#f9fafb', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' },
   select:      { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151' },
+  dirBtn:      { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   toggle:      { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer', whiteSpace: 'nowrap' },
+  clearBtn:    { padding: '8px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151', whiteSpace: 'nowrap' },
   csvBtn:      { padding: '8px 16px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginLeft: 'auto', whiteSpace: 'nowrap' },
+  mobileControls: { display: 'none' },
+  mobileViewToggle: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, padding: 4, border: '1px solid #d1d5db', borderRadius: 9, background: '#f8fafc' },
+  mobileViewBtn: { border: 'none', borderRadius: 7, padding: '8px 10px', background: 'transparent', color: '#64748b', fontSize: 13, fontWeight: 800, cursor: 'pointer' },
+  mobileViewBtnActive: { background: '#fff', color: '#111827', boxShadow: '0 1px 3px rgba(15,23,42,0.12)' },
   error:       { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },
   empty:       { textAlign: 'center', padding: '60px 24px', color: '#6b7280', fontSize: 15 },
   emptyIcon:   { fontSize: 40, marginBottom: 12 },
-  tableWrap:   { overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb' },
+  tableWrap:   { overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb', paddingBottom: 12, scrollbarGutter: 'stable' },
   table:       { width: '100%', borderCollapse: 'collapse', minWidth: 560 },
   thead:       { background: '#f9fafb' },
   th:          { padding: '10px 12px', fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left', borderBottom: '2px solid #e5e7eb' },
@@ -230,6 +358,19 @@ const s = {
   rowEven:     { background: '#fafafa', borderBottom: '1px solid #f3f4f6' },
   td:          { padding: '10px 12px', fontSize: 14, color: '#374151' },
   totalRow:    { background: '#f0fdf4', borderTop: '2px solid #d1fae5' },
+  mobileCards: { display: 'none' },
+  mobileTotalCard: { background: '#111827', color: '#fff', borderRadius: 10, padding: 14, display: 'grid', gap: 2 },
+  mobileTotalLabel: { display: 'block', fontSize: 11, fontWeight: 800, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.05em' },
+  mobileTotalValue: { fontSize: 24, lineHeight: 1.15 },
+  mobileMuted: { fontSize: 12, color: '#cbd5e1', fontWeight: 700 },
+  mobileCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, boxShadow: '0 1px 4px rgba(15,23,42,0.04)' },
+  mobileCardTop: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'start', marginBottom: 12 },
+  mobileTitle: { display: 'block', fontSize: 16, color: '#111827', lineHeight: 1.25 },
+  mobileSub: { display: 'block', marginTop: 3, fontSize: 12, color: '#64748b', lineHeight: 1.3 },
+  mobileValue: { fontSize: 16, color: '#111827', textAlign: 'right', whiteSpace: 'nowrap' },
+  mobileMetrics: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, paddingTop: 10, borderTop: '1px solid #f1f5f9' },
+  mobileLabel: { display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 },
+  mobileMetric: { display: 'block', fontSize: 13, color: '#334155', lineHeight: 1.35, fontWeight: 700 },
   details:     { marginTop: 24 },
   detailsSummary: { fontSize: 13, fontWeight: 700, color: '#374151', cursor: 'pointer', marginBottom: 12, padding: '8px 0' },
 };

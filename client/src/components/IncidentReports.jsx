@@ -3,17 +3,27 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import { langToLocale } from '../utils';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
+import FieldFilters from './FieldFilters';
 
 import { silentError } from '../errorReporter';
 function today() {
   return new Date().toLocaleDateString('en-CA');
 }
 
+function fmtIncidentDate(value, locale = 'en-US') {
+  if (!value) return '';
+  const raw = value.toString().substring(0, 10);
+  const parsed = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return parsed.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 // ── Incident Form ─────────────────────────────────────────────────────────────
 
-function IncidentForm({ projects, onSubmitted, onCancel }) {
+function IncidentForm({ projects, onSubmitted, onCancel, workLabel = 'Work' }) {
   const t = useT();
   const TYPE_LABELS = useMemo(() => ({
     'injury': `🤕 ${t.typeInjury}`,
@@ -91,9 +101,9 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label htmlFor="ir-project" style={styles.label}>{t.project} <span style={styles.optional}>{t.quizOptional}</span></label>
+            <label htmlFor="ir-project" style={styles.label}>{workLabel} <span style={styles.optional}>{t.quizOptional}</span></label>
             <select id="ir-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">{t.noProjectOpt}</option>
+              <option value="">{`No ${workLabel.toLowerCase()}`}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -166,6 +176,8 @@ function IncidentForm({ projects, onSubmitted, onCancel }) {
 
 function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const TYPE_LABELS = useMemo(() => ({
     'injury': `🤕 ${t.typeInjury}`,
     'near-miss': `⚠️ ${t.typeNearMiss}`,
@@ -210,7 +222,7 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
           {isAdmin && <div style={styles.workerName}>{incident.reporter_name}</div>}
           <div style={styles.cardTitle}>{typeLabel}{incident.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
           <div style={styles.cardMeta}>
-            <span>{incident.incident_date?.toString().substring(0, 10)}{incident.incident_time ? ` · ${incident.incident_time.substring(0, 5)}` : ''}</span>
+            <span>{fmtIncidentDate(incident.incident_date, locale)}{incident.incident_time ? ` at ${incident.incident_time.substring(0, 5)}` : ''}</span>
             {incident.project_name && <span style={styles.projectTag}>{incident.project_name}</span>}
             {incident.work_stopped && <span style={styles.stoppedTag}>{t.workStoppedTag}</span>}
           </div>
@@ -277,9 +289,10 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function IncidentReports({ projects }) {
+export default function IncidentReports({ projects, settings = null }) {
   const { user } = useAuth();
   const t = useT();
+  const workLabel = settings?.label_work || 'Work';
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
   const TYPE_LABELS = useMemo(() => ({
@@ -330,6 +343,7 @@ export default function IncidentReports({ projects }) {
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
   const openCount = incidents.filter(i => i.status === 'open').length;
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   return (
     <div>
@@ -350,6 +364,7 @@ export default function IncidentReports({ projects }) {
         <div style={styles.formCard}>
           <IncidentForm
             projects={projects}
+            workLabel={workLabel}
             onSubmitted={r => { setIncidents(prev => [r, ...prev]); setShowForm(false); }}
             onCancel={() => setShowForm(false)}
           />
@@ -357,7 +372,7 @@ export default function IncidentReports({ projects }) {
       )}
 
       {isAdmin && (
-        <div className="filter-row" style={styles.filterBar}>
+        <FieldFilters activeCount={activeFilterCount}>
           <select style={styles.filterSelect} value={filters.type || ''} onChange={e => setFilter('type', e.target.value)}>
             <option value="">{t.allTypes}</option>
             {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -369,15 +384,16 @@ export default function IncidentReports({ projects }) {
           </select>
           <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title={t.fromDate} />
           <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title={t.toDate} />
-        </div>
+        </FieldFilters>
       )}
 
       {loading ? (
         <SkeletonList count={4} rows={2} />
       ) : incidents.length === 0 ? (
         <div style={styles.empty}>
-          <div style={styles.emptyIcon}>🦺</div>
+          <p style={styles.emptyTitle}>No incident reports</p>
           <p style={styles.emptyText}>{isAdmin ? t.noIncidents : t.noIncidentsWorker}</p>
+          {!showForm && <button type="button" style={styles.emptyCtaBtn} onClick={() => setShowForm(true)}>{t.newIncident}</button>}
         </div>
       ) : (
         <>
@@ -402,7 +418,7 @@ export default function IncidentReports({ projects }) {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = {
-  topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 12 },
+  topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 12, flexWrap: 'wrap' },
   heading: { fontSize: 22, fontWeight: 800, color: '#111827', margin: 0 },
   openNote: { fontSize: 13, color: '#d97706', fontWeight: 600, margin: '4px 0 0' },
   newBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', flexShrink: 0 },
@@ -414,7 +430,9 @@ const styles = {
   list: { display: 'flex', flexDirection: 'column', gap: 10 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
+  emptyTitle: { margin: '0 0 6px', fontSize: 18, fontWeight: 800, color: '#111827' },
   emptyText: { color: '#6b7280', fontSize: 15 },
+  emptyCtaBtn: { marginTop: 14, background: '#059669', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer' },
   hint: { color: '#6b7280', fontSize: 14 },
   // Card
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },

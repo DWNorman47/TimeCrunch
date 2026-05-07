@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { SkeletonList } from './Skeleton';
 import { langToLocale } from '../utils';
+import EmptyState from './EmptyState';
 
 const TYPE_COLORS = { vacation: '#1d4ed8', sick: '#dc2626', personal: '#8b5cf6', other: '#6b7280' };
 const STATUS_COLORS = { pending: '#d97706', approved: '#059669', denied: '#ef4444' };
@@ -113,11 +114,7 @@ export default function AdminTimeOff({ settings }) {
       ) : loading ? (
         <SkeletonList count={4} rows={2} />
       ) : visible.length === 0 ? (
-        <div style={s.emptyState}>
-          <div style={s.emptyIcon}>📅</div>
-          <p style={s.emptyTitle}>{t.noTimeOffRequests}</p>
-          <p style={s.emptySubtitle}>{t.timeOffEmptySub}</p>
-        </div>
+        <EmptyState mark="T" title={t.noTimeOffRequests} body={t.timeOffEmptySub} tone={filter === 'pending' ? 'good' : 'neutral'} />
       ) : (
         <div style={s.list}>
           {[...pending, ...rest].map(r => {
@@ -224,8 +221,4 @@ const s = {
   meta: { fontSize: 12, color: '#6b7280', marginTop: 8 },
   loadError: { background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: 8, padding: '12px 16px', fontSize: 14 },
   retryBtn: { background: 'none', border: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: 0 },
-  emptyState: { textAlign: 'center', padding: '48px 20px' },
-  emptyIcon: { fontSize: 36, marginBottom: 10 },
-  emptyTitle: { fontSize: 15, fontWeight: 600, color: '#374151', margin: '0 0 4px' },
-  emptySubtitle: { fontSize: 13, color: '#6b7280', margin: 0 },
 };

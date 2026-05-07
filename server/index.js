@@ -24,6 +24,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const pinoHttp = require('pino-http');
 const crypto = require('crypto');
+const v8 = require('v8');
 const { requireAuth, requirePlan, requireProAddon } = require('./middleware/auth');
 const pool = require('./db');
 const logger = require('./logger');
@@ -62,8 +63,11 @@ const ALLOWED_ORIGINS = [
   'https://stage.opsfloa.com',
   // Local development
   'http://localhost:5173',
+  'http://127.0.0.1:5173',
   'http://localhost:4173',
+  'http://127.0.0.1:4173',
   'http://localhost:3000',
+  'http://127.0.0.1:3000',
 ];
 app.use(cors({
   origin: (origin, cb) => {
@@ -216,11 +220,13 @@ app.get('/api/health', async (req, res) => {
 
   // Memory headroom — flag if we're above 90% of Node's heap limit
   const mem = process.memoryUsage();
-  const heapPct = mem.heapUsed / mem.heapTotal;
+  const heapLimit = v8.getHeapStatistics().heap_size_limit;
+  const heapPct = mem.heapUsed / heapLimit;
   checks.memory = {
     ok: heapPct < 0.9,
     heap_used_mb: Math.round(mem.heapUsed / 1024 / 1024),
     heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024),
+    heap_limit_mb: Math.round(heapLimit / 1024 / 1024),
     rss_mb: Math.round(mem.rss / 1024 / 1024),
   };
   if (!checks.memory.ok) healthy = false;
@@ -238,6 +244,9 @@ app.use((err, req, res, _next) => {
   if (process.env.SENTRY_DSN) Sentry.captureException(err);
   (req.log || logger).error({ err }, 'unhandled route error');
   if (res.headersSent) return;
+  if (err.status && err.status < 500) {
+    return res.status(err.status).json({ error: err.message || 'Bad request' });
+  }
   res.status(500).json({ error: 'Server error' });
 });
 

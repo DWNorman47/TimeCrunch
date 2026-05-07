@@ -29,6 +29,13 @@ function StatusBadge({ status }) {
 
 // ── Receive Modal ──────────────────────────────────────────────────────────────
 
+function formatDate(value) {
+  if (!value) return '';
+  const datePart = String(value).slice(0, 10);
+  const date = new Date(`${datePart}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString();
+}
+
 function ReceiveModal({ po, locations, onDone, onClose }) {
   const t = useT();
   const defaultLoc = po.to_location_id ? String(po.to_location_id) : '';
@@ -72,7 +79,7 @@ function ReceiveModal({ po, locations, onDone, onClose }) {
       <ModalShell onClose={onClose} titleId="po-receive-title" style={m.modal}>
         <div style={m.header}>
           <h3 id="po-receive-title" style={m.title}>{t.invPOReceiveTitle} — {po.po_number}</h3>
-          <button style={m.closeBtn} aria-label={t.labelModalClose} onClick={onClose}>✕</button>
+          <button style={m.closeBtn} aria-label={t.labelModalClose} onClick={onClose}>X</button>
         </div>
 
         {error && <div role="alert" style={m.error}>{error}</div>}
@@ -287,8 +294,8 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
           <div>
             <div style={d.poNumber}>{po.po_number}</div>
             <div style={d.poMeta}>
-              {t.invPOCreatedBy} {po.created_by_name} · {new Date(po.created_at).toLocaleDateString()}
-              {po.order_date && ` · ${t.invPOOrderedOn} ${new Date(po.order_date + 'T00:00:00').toLocaleDateString()}`}
+              {t.invPOCreatedBy} {po.created_by_name} · {formatDate(po.created_at)}
+              {po.order_date && ` · ${t.invPOOrderedOn} ${formatDate(po.order_date)}`}
             </div>
           </div>
           <div style={d.headerActions}>
@@ -380,7 +387,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             </div>
             <div style={d.infoItem}>
               <span style={d.infoLabel}>{t.invPOExpected}</span>
-              <span style={d.infoValue}>{po.expected_date ? new Date(po.expected_date + 'T00:00:00').toLocaleDateString() : <em style={{ color: '#6b7280' }}>{t.invPONotSet}</em>}</span>
+              <span style={d.infoValue}>{po.expected_date ? formatDate(po.expected_date) : <em style={{ color: '#6b7280' }}>{t.invPONotSet}</em>}</span>
             </div>
             {po.reference_no && (
               <div style={d.infoItem}>
@@ -419,7 +426,8 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
       {lines.length === 0 ? (
         <div style={d.emptyLines}>{t.invPONoLines}</div>
       ) : (
-        <div style={d.tableWrap}>
+        <>
+        <div className="inventory-table-wrap inventory-po-lines-table-wrap" style={d.tableWrap}>
           <table style={d.table}>
             <thead>
               <tr style={d.thead}>
@@ -447,7 +455,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
                     </td>
                     <td style={{ ...d.td, textAlign: 'right', fontWeight: remaining > 0 ? 700 : 400,
                       color: remaining > 0 ? '#d97706' : '#059669' }}>
-                      {remaining > 0 ? remaining : '✓'}
+                      {remaining > 0 ? remaining : 'Done'}
                     </td>
                     <td style={{ ...d.td, textAlign: 'right', color: '#6b7280' }}>
                       {line.unit_cost != null ? `$${parseFloat(line.unit_cost).toFixed(2)}` : '—'}
@@ -457,10 +465,10 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
                         {pendingRemoveLineId === line.id ? (
                           <>
                             <button style={d.confirmLineRemoveBtn} onClick={() => removeLine(line.id)}>{t.confirm}</button>
-                            <button style={d.removeBtn} aria-label={t.cancelRemoveLine} onClick={() => setPendingRemoveLineId(null)}>✕</button>
+                            <button style={d.removeBtn} aria-label={t.cancelRemoveLine} onClick={() => setPendingRemoveLineId(null)}>X</button>
                           </>
                         ) : (
-                          <button style={d.removeBtn} aria-label={t.removeLine} onClick={() => setPendingRemoveLineId(line.id)}>🗑️</button>
+                          <button style={d.removeBtn} aria-label={t.removeLine} onClick={() => setPendingRemoveLineId(line.id)}>Remove</button>
                         )}
                       </td>
                     )}
@@ -475,7 +483,7 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
                   <td style={{ ...d.td, textAlign: 'right', fontWeight: 700 }}>{totalOrdered}</td>
                   <td style={{ ...d.td, textAlign: 'right', fontWeight: 700, color: '#059669' }}>{totalReceived}</td>
                   <td style={{ ...d.td, textAlign: 'right', fontWeight: 700, color: totalOrdered - totalReceived > 0 ? '#d97706' : '#059669' }}>
-                    {totalOrdered - totalReceived > 0 ? totalOrdered - totalReceived : '✓'}
+                    {totalOrdered - totalReceived > 0 ? totalOrdered - totalReceived : 'Done'}
                   </td>
                   <td style={{ ...d.td, textAlign: 'right', fontWeight: 700 }}>
                     {lines.some(l => l.unit_cost != null)
@@ -488,6 +496,36 @@ function PODetail({ po: initialPo, locations, suppliers, onBack, onUpdate }) {
             )}
           </table>
         </div>
+        <div style={d.mobileLineCards} className="inventory-mobile-cards">
+          <div style={d.mobileLineSummary}>
+            <span style={d.mobileSummaryLabel}>{t.invPOTotal}</span>
+            <strong>{totalReceived}/{totalOrdered} items received</strong>
+          </div>
+          {lines.map(line => {
+            const ordered = parseFloat(line.qty_ordered);
+            const received = parseFloat(line.qty_received);
+            const remaining = ordered - received;
+            return (
+              <article key={line.id} style={d.mobileLineCard}>
+                <div style={d.mobileLineTop}>
+                  <div>
+                    <strong style={d.mobileLineTitle}>{line.item_name}</strong>
+                    <span style={d.mobileLineSub}>{[line.sku, line.unit].filter(Boolean).join(' - ')}</span>
+                  </div>
+                  <strong style={{ ...d.mobileRemaining, color: remaining > 0 ? '#d97706' : '#059669' }}>
+                    {remaining > 0 ? remaining : 'Done'}
+                  </strong>
+                </div>
+                <div style={d.mobileMetrics}>
+                  <div><span style={d.mobileLabel}>{t.invPOColQtyOrdered}</span><span style={d.mobileMetric}>{ordered}</span></div>
+                  <div><span style={d.mobileLabel}>{t.invPOColQtyReceived}</span><span style={d.mobileMetric}>{received}</span></div>
+                  <div><span style={d.mobileLabel}>{t.invPOColUnitCost}</span><span style={d.mobileMetric}>{line.unit_cost != null ? `$${parseFloat(line.unit_cost).toFixed(2)}` : '-'}</span></div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+        </>
       )}
 
       {removeLineErr && <div style={d.lineErr}>{removeLineErr}</div>}
@@ -713,7 +751,7 @@ function POCreateForm({ locations, suppliers, prefillItems, onSaved, onCancel })
                       onChange={e => updateLine(line.key, 'notes', e.target.value)} placeholder={t.optional} maxLength={500} />
                   </td>
                   <td style={c.td}>
-                    <button style={c.removeBtn} aria-label={t.removeLine} onClick={() => removeLine(line.key)}>✕</button>
+                    <button style={c.removeBtn} aria-label={t.removeLine} onClick={() => removeLine(line.key)}>X</button>
                   </td>
                 </tr>
               ))}
@@ -746,6 +784,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState('');
   const [loadDetailError, setLoadDetailError] = useState('');
+  const [poSearch, setPoSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
   const PO_PAGE = 100;
@@ -777,6 +816,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
     setLoading(true); setError(''); setPosOffset(0);
     try {
       const params = new URLSearchParams({ limit: PO_PAGE, offset: 0 });
+      if (poSearch.trim()) params.set('q', poSearch.trim());
       if (filterStatus) params.set('status', filterStatus);
       if (filterSupplier) params.set('supplier_id', filterSupplier);
       const r = await api.get(`/inventory/purchase-orders?${params}`);
@@ -784,13 +824,14 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
       setPosTotal(r.data.total);
     } catch { setError(t.invPOFailedLoad); }
     finally { setLoading(false); }
-  }, [filterStatus, filterSupplier]);
+  }, [poSearch, filterStatus, filterSupplier]);
 
   const loadMorePos = async () => {
     const nextOffset = posOffset + PO_PAGE;
     setLoadingMore(true);
     try {
       const params = new URLSearchParams({ limit: PO_PAGE, offset: nextOffset });
+      if (poSearch.trim()) params.set('q', poSearch.trim());
       if (filterStatus) params.set('status', filterStatus);
       if (filterSupplier) params.set('supplier_id', filterSupplier);
       const r = await api.get(`/inventory/purchase-orders?${params}`);
@@ -798,6 +839,13 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
       setPosOffset(nextOffset);
     } catch { /* non-fatal */ }
     finally { setLoadingMore(false); }
+  };
+
+  const hasPOFilters = Boolean(poSearch.trim() || filterStatus || filterSupplier);
+  const clearPOFilters = () => {
+    setPoSearch('');
+    setFilterStatus('');
+    setFilterSupplier('');
   };
 
   useEffect(() => { if (view === 'list') load(); }, [load, view]);
@@ -851,6 +899,13 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
   return (
     <div style={l.wrap}>
       <div style={l.toolbar}>
+        <input
+          type="search"
+          style={l.searchInput}
+          value={poSearch}
+          onChange={e => setPoSearch(e.target.value)}
+          placeholder="Search orders..."
+        />
         <select style={l.select} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="">{t.invPOAllStatuses}</option>
           {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -861,8 +916,17 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
             {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         )}
+        {hasPOFilters && (
+          <button style={l.clearBtn} onClick={clearPOFilters}>Clear</button>
+        )}
         <button style={l.createBtn} onClick={() => { setPrefillItems([]); setView('create'); }}>{t.invPONewPOBtn}</button>
       </div>
+
+      {!loading && !error && (
+        <div style={l.filterMeta}>
+          {hasPOFilters ? `Showing ${pos.length} of ${posTotal} matching orders` : `${posTotal} orders`}
+        </div>
+      )}
 
       {error && <div role="alert" style={l.error}>{error}</div>}
       {loadDetailError && <div style={l.error}>{loadDetailError}</div>}
@@ -871,8 +935,7 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
         <SkeletonList count={4} rows={2} />
       ) : pos.length === 0 ? (
         <div style={l.empty}>
-          <div style={l.emptyIcon}>📋</div>
-          <p>{t.invPONoPOs}</p>
+          <p>{hasPOFilters ? 'No purchase orders match those filters.' : t.invPONoPOs}</p>
         </div>
       ) : (
         <>
@@ -889,8 +952,8 @@ export default function InventoryPurchaseOrders({ locations, suppliers: supplier
                     <div style={l.cardMeta}>
                       {po.supplier_name || <em style={{ color: '#6b7280' }}>{t.invPONoSupplier}</em>}
                       {' · '}
-                      {new Date(po.created_at).toLocaleDateString()}
-                      {po.expected_date && ` · ${t.invPOExpected} ${new Date(po.expected_date + 'T00:00:00').toLocaleDateString()}`}
+                      {formatDate(po.created_at)}
+                      {po.expected_date && ` · ${t.invPOExpected} ${formatDate(po.expected_date)}`}
                     </div>
                   </div>
                   <div style={l.cardRight}>
@@ -989,6 +1052,17 @@ const d = {
   rowEven:      { background: '#fafafa', borderBottom: '1px solid #f3f4f6' },
   td:           { padding: '10px 12px', fontSize: 14, color: '#374151' },
   totalRow:     { background: '#f0fdf4', borderTop: '2px solid #d1fae5' },
+  mobileLineCards: { display: 'none' },
+  mobileLineSummary: { background: '#111827', color: '#fff', borderRadius: 10, padding: 14, display: 'grid', gap: 3 },
+  mobileSummaryLabel: { display: 'block', fontSize: 11, fontWeight: 800, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 },
+  mobileLineCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, boxShadow: '0 1px 4px rgba(15,23,42,0.04)' },
+  mobileLineTop: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'start', marginBottom: 12 },
+  mobileLineTitle: { display: 'block', fontSize: 16, color: '#111827', lineHeight: 1.25 },
+  mobileLineSub: { display: 'block', marginTop: 3, fontSize: 12, color: '#64748b', lineHeight: 1.3 },
+  mobileRemaining: { fontSize: 16, whiteSpace: 'nowrap', textAlign: 'right' },
+  mobileMetrics: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, paddingTop: 10, borderTop: '1px solid #f1f5f9' },
+  mobileLabel: { display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 },
+  mobileMetric: { display: 'block', fontSize: 13, color: '#334155', lineHeight: 1.35, fontWeight: 700 },
   removeBtn:    { background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '2px 4px' },
   addLineForm:  { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: 14, marginBottom: 16 },
   lineErr:      { background: '#fee2e2', color: '#dc2626', borderRadius: 7, padding: '6px 10px', marginBottom: 10, fontSize: 13 },
@@ -1023,7 +1097,10 @@ const c = {
 const l = {
   wrap:         { padding: 16 },
   toolbar:      { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 },
+  searchInput:  { flex: '1 1 220px', minWidth: 190, padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#111827' },
   select:       { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151' },
+  clearBtn:     { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 700, color: '#374151', cursor: 'pointer' },
+  filterMeta:   { margin: '-6px 0 14px', fontSize: 13, color: '#6b7280' },
   loadMoreBtn:  { padding: '8px 20px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 14, fontWeight: 600, color: '#374151', cursor: 'pointer' },
   createBtn:    { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginLeft: 'auto', whiteSpace: 'nowrap' },
   error:        { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },

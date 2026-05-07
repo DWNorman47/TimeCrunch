@@ -7,6 +7,7 @@ import { SkeletonList } from './Skeleton';
 import ModalShell from './ModalShell';
 import WorkerFringes from './WorkerFringes';
 import WorkerSsn from './WorkerSsn';
+import EmptyState from './EmptyState';
 
 import { silentError } from '../errorReporter';
 function WorkerDocuments({ workerId }) {
@@ -130,7 +131,7 @@ function fmtRate(w, currency = 'USD') {
 // Shows the user's actual role name (Owner / Admin / Worker / custom).
 // Falls back to the legacy worker/admin label if no role data is available.
 // Owner gets a gold badge so it stands out — easy answer to "who owns this account?".
-function RoleBadge({ worker, role, availableRoles }) {
+function RoleBadge({ worker, role, availableRoles, workerLabel }) {
   const t = useT();
   // If we know the role_id and have the catalog, show the actual role name.
   if (worker?.role_id && availableRoles?.length) {
@@ -152,12 +153,12 @@ function RoleBadge({ worker, role, availableRoles }) {
   const isAdmin = r === 'admin' || r === 'super_admin';
   return (
     <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: isAdmin ? '#dbeafe' : '#f3f4f6', color: isAdmin ? '#1e40af' : '#6b7280' }}>
-      {isAdmin ? t.adminRole : t.workerRole}
+      {isAdmin ? t.adminRole : (workerLabel || t.workerRole)}
     </span>
   );
 }
 
-export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, defaultTempPassword = '', showRate = true, identityEditable = true, currency = 'USD', currentUser = null, qboConnected = false, trackClassifications = false, trackFringes = false, collectSsn = false }) {
+export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted, onWorkerUpdated, onWorkerRestored, defaultRate = 0, defaultTempPassword = '', showRate = true, identityEditable = true, currency = 'USD', currentUser = null, qboConnected = false, trackClassifications = false, trackFringes = false, collectSsn = false, workerLabel = 'Worker' }) {
   const toast = useToast();
   const t = useT();
   const rateTypes = [
@@ -521,8 +522,8 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
   };
 
   return (
-    <div style={s.card}>
-      <div style={s.cardHeader}>
+    <div style={s.card} className="manage-workers-card">
+      <div style={s.cardHeader} className="manage-workers-card-header">
         <h3 style={s.cardTitle}>{t.users}</h3>
         <button style={s.addBtn} onClick={() => { setShowForm(v => !v); setError(''); setArchivedConflict(null); setInviteError(''); setInviteSent(''); setForm({ first_name: '', last_name: '', username: '', password: defaultTempPassword, email: '', role: 'worker', worker_type: 'employee', language: 'English', hourly_rate: String(defaultRate), rate_type: 'hourly', overtime_rule: 'daily' }); setInviteForm({ first_name: '', last_name: '', email: '', role: 'worker', language: 'English', hourly_rate: String(defaultRate) }); setUsernameEdited(false); setAddMode('manual'); }}>
           {showForm ? t.cancel : t.addUser}
@@ -530,14 +531,14 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       </div>
 
       {showForm && (
-        <div style={s.addPanel}>
-          <div style={s.modeTabs}>
+        <div style={s.addPanel} className="manage-workers-add-panel">
+          <div style={s.modeTabs} className="manage-workers-mode-tabs">
             <button style={addMode === 'manual' ? s.modeTabActive : s.modeTab} onClick={() => setAddMode('manual')}>{t.addManually}</button>
             <button style={addMode === 'invite' ? s.modeTabActive : s.modeTab} onClick={() => setAddMode('invite')}>{t.inviteByEmail}</button>
           </div>
 
           {addMode === 'manual' ? (
-            <form onSubmit={handleAdd} style={s.addForm} autoComplete="off">
+            <form onSubmit={handleAdd} style={s.addForm} className="manage-workers-form" autoComplete="off">
               {/* Honeypot fields: some browsers (Chrome in particular) ignore
                   autoComplete="off" on the real username/password and look for
                   the first such fields in the form to autofill. These invisible
@@ -545,7 +546,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   don't end up prefilled into the real fields below. */}
               <input type="text"     name="fake-username" autoComplete="username"      tabIndex={-1} aria-hidden="true" style={{ position: 'absolute', left: -9999, width: 1, height: 1, opacity: 0 }} />
               <input type="password" name="fake-password" autoComplete="current-password" tabIndex={-1} aria-hidden="true" style={{ position: 'absolute', left: -9999, width: 1, height: 1, opacity: 0 }} />
-              <div style={s.formGrid}>
+              <div style={s.formGrid} className="manage-workers-form-grid">
                 <div style={s.fieldGroup}>
                   <label htmlFor="mw-first-name" style={s.label}>{t.firstName}<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></label>
                   <input id="mw-first-name" name="mw-first-name" autoComplete="off" style={s.input} value={form.first_name} onChange={e => handleFirstNameChange(e.target.value)} required />
@@ -595,7 +596,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   >
                     {availableRoles.length === 0 && (
                       <>
-                        <option value="">{t.workerRole}</option>
+                        <option value="">{workerLabel}</option>
                       </>
                     )}
                     {availableRoles.map(r => (
@@ -657,7 +658,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
               <button style={{ ...s.saveBtn, ...((saving || usernameTaken) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} type="submit" disabled={saving || usernameTaken}>{saving ? t.creating : t.createUser}</button>
             </form>
           ) : (
-            <form onSubmit={handleInvite} style={s.addForm}>
+            <form onSubmit={handleInvite} style={s.addForm} className="manage-workers-form">
               {inviteSent ? (
                 <div style={s.inviteSuccess}>
                   {t.inviteSentPrefix} <strong>{inviteSent}</strong>.{' '}
@@ -665,23 +666,23 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                 </div>
               ) : (
                 <>
-                  <div style={s.formGrid}>
+                  <div style={s.formGrid} className="manage-workers-form-grid">
                     <div style={s.fieldGroup}>
-                      <label htmlFor="mw-inv-first-name" style={s.label}>{t.firstName}</label>
+                      <label htmlFor="mw-inv-first-name" style={s.label}>{t.firstName}<span style={s.requiredStar}>*</span></label>
                       <input id="mw-inv-first-name" style={s.input} value={inviteForm.first_name} onChange={e => setInvite('first_name', e.target.value)} required />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label htmlFor="mw-inv-last-name" style={s.label}>{t.lastName}</label>
+                      <label htmlFor="mw-inv-last-name" style={s.label}>{t.lastName}<span style={s.requiredStar}>*</span></label>
                       <input id="mw-inv-last-name" style={s.input} value={inviteForm.last_name} onChange={e => setInvite('last_name', e.target.value)} required />
                     </div>
                     <div style={s.fieldGroup}>
-                      <label htmlFor="mw-inv-email" style={s.label}>{t.email}</label>
+                      <label htmlFor="mw-inv-email" style={s.label}>{t.email}<span style={s.requiredStar}>*</span></label>
                       <input id="mw-inv-email" style={s.input} type="email" value={inviteForm.email} onChange={e => setInvite('email', e.target.value)} required />
                     </div>
                     <div style={s.fieldGroup}>
                       <label htmlFor="mw-inv-role" style={s.label}>{t.role}</label>
                       <select id="mw-inv-role" style={s.input} value={inviteForm.role} onChange={e => setInvite('role', e.target.value)}>
-                        <option value="worker">{t.workerRole}</option>
+                        <option value="worker">{workerLabel}</option>
                         <option value="admin">{t.adminRole}</option>
                       </select>
                     </div>
@@ -708,11 +709,11 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
       )}
 
       {workers.length === 0 ? (
-        <div style={s.emptyState}>
-          <div style={s.emptyStateIcon}>👷</div>
-          <p style={s.emptyStateTitle}>{t.noUsers}</p>
-          <p style={s.emptyStateSubtitle}>Add your first worker using the form above.</p>
-        </div>
+        <EmptyState
+          mark="T"
+          title={`No ${workerLabel.toLowerCase()} records yet`}
+          body={`Add your first ${workerLabel.toLowerCase()} using the form above.`}
+        />
       ) : (
         <div style={s.list}>
           {workers.map(w => {
@@ -724,7 +725,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                   <div style={s.itemLeft}>
                     <span style={s.itemName}>{w.full_name}</span>
                     <span style={s.itemUsername}>@{w.username}</span>
-                    <RoleBadge worker={w} availableRoles={availableRoles} />
+                    <RoleBadge worker={w} availableRoles={availableRoles} workerLabel={workerLabel} />
                   </div>
                   <span style={{ ...s.chevron, transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▾</span>
                 </button>
@@ -743,7 +744,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                         </div>
                         {isEditing && editSection === 'info' ? (
                           <div style={s.editBlock}>
-                            <div style={s.formGrid}>
+                            <div style={s.formGrid} className="manage-workers-form-grid">
                               <div style={s.fieldGroup}>
                                 <label htmlFor="mw-edit-full-name" style={s.label}>{t.fullName}</label>
                                 <input id="mw-edit-full-name" style={s.input} value={editInfoForm.full_name} onChange={e => setEditInfoForm(f => ({ ...f, full_name: e.target.value }))} />
@@ -803,7 +804,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 </div>
                               )}
                             </div>
-                            <div style={s.editActions}>
+                            <div style={s.editActions} className="manage-workers-actions">
                               <button style={{ ...s.saveBtn, ...(editInfoSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveInfo(w.id)} disabled={editInfoSaving}>{editInfoSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
@@ -870,7 +871,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 onBlur={e => checkEditUsername(e.target.value, w.id)}
                               />
                             </div>
-                            <div style={s.editActions}>
+                            <div style={s.editActions} className="manage-workers-actions">
                               <button style={{ ...s.saveBtn, ...((editUsernameSaving || editUsernameTaken) ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveUsername(w.id)} disabled={editUsernameSaving || editUsernameTaken}>{editUsernameSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
@@ -892,7 +893,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                         </div>
                         {isEditing && editSection === 'rate' ? (
                           <div style={s.editBlock}>
-                            <div style={s.formGrid}>
+                            <div style={s.formGrid} className="manage-workers-form-grid">
                               <div style={s.fieldGroup}>
                                 <label htmlFor="mw-edit-rate" style={s.label}>{t.amount}</label>
                                 <input id="mw-edit-rate" style={{ ...s.input, maxWidth: 120 }} type="number" min="0" step="0.01" value={editRateForm.rate} onChange={e => setEditRateForm(f => ({ ...f, rate: e.target.value }))} />
@@ -948,7 +949,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 </div>
                               )}
                             </div>
-                            <div style={s.editActions}>
+                            <div style={s.editActions} className="manage-workers-actions">
                               <button style={{ ...s.saveBtn, ...(editRateSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveRate(w.id)} disabled={editRateSaving}>{editRateSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
@@ -1002,7 +1003,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 ))}
                               </div>
                             )}
-                            <div style={s.editActions}>
+                            <div style={s.editActions} className="manage-workers-actions">
                               <button style={{ ...s.saveBtn, ...(editPermSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => savePermissions(w.id)} disabled={editPermSaving}>{editPermSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
@@ -1027,7 +1028,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                       </div>
                     )}
 
-                    {/* ── Worker access section (admin-role workers only, visible to full-access admins) ── */}
+      {/* ── Team member access section (admin-role users only, visible to full-access admins) ── */}
                     {w.role === 'admin' && !currentUser?.admin_permissions && (
                       <div style={s.section}>
                         <div style={s.sectionHeader}>
@@ -1066,7 +1067,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
                                 ))}
                               </div>
                             )}
-                            <div style={s.editActions}>
+                            <div style={s.editActions} className="manage-workers-actions">
                               <button style={{ ...s.saveBtn, ...(editWorkerAccessSaving ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => saveWorkerAccess(w.id)} disabled={editWorkerAccessSaving}>{editWorkerAccessSaving ? t.loading : t.save}</button>
                               <button style={s.cancelBtn} onClick={cancelEdit}>{t.cancel}</button>
                             </div>
@@ -1172,7 +1173,7 @@ export default function ManageWorkers({ workers, onWorkerAdded, onWorkerDeleted,
             {qboVendorResult === 'error' && (
               <div style={s.qboPromptError}>{t.mwQboVendorFailed}</div>
             )}
-            <div style={s.qboPromptActions}>
+            <div style={s.qboPromptActions} className="ops-modal-actions">
               {!qboVendorResult && (
                 <button style={{ ...s.saveBtn, ...(qboVendorCreating ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={createQboVendor} disabled={qboVendorCreating}>
                   {qboVendorCreating ? t.mwQboCreating : t.mwQboYesCreate}
@@ -1202,6 +1203,7 @@ const s = {
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: 4 },
   label: { fontSize: 12, fontWeight: 600, color: '#6b7280' },
+  requiredStar: { color: '#ef4444', marginLeft: 2, fontWeight: 800 },
   input: { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 7, fontSize: 14 },
   eyeBtn: { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: 0, lineHeight: 1 },
   errorBox: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' },

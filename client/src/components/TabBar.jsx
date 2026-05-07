@@ -12,23 +12,25 @@ export default function TabBar({ tabs, active, onChange, breakpoint = 600 }) {
   if (narrow) {
     const current = tabs.find(t => t.id === active);
     return (
-      <div style={styles.dropdownWrap}>
+      <div className={`ops-tab-select-wrap ${current?.dot ? 'has-dot' : ''}`.trim()}>
+        {current?.dot && <span className="ops-tab-select-dot" style={{ '--tab-dot': current.dot }} aria-hidden="true" />}
         <select
           value={active}
           onChange={e => onChange(e.target.value)}
-          style={styles.dropdown}
+          className="ops-tab-select"
+          aria-label="Choose section"
         >
           {tabs.map(t => (
             <option key={t.id} value={t.id}>{t.label}</option>
           ))}
         </select>
-        <span style={styles.dropdownChevron}>▾</span>
+        <span className="ops-tab-select-chevron" aria-hidden="true">v</span>
       </div>
     );
   }
 
   return (
-    <div role="tablist" style={styles.bar}>
+    <div role="tablist" className="ops-tabbar">
       {tabs.map(t => {
         const isActive = t.id === active;
         return (
@@ -37,11 +39,11 @@ export default function TabBar({ tabs, active, onChange, breakpoint = 600 }) {
             role="tab"
             aria-selected={isActive}
             aria-current={isActive ? 'page' : undefined}
-            style={isActive ? styles.tabActive : styles.tab}
+            className={`ops-tab ${isActive ? 'is-active' : ''}`.trim()}
             onClick={() => onChange(t.id)}
           >
             {t.dot && (
-              <span style={{ ...styles.dot, background: t.dot }} aria-hidden="true" />
+              <span className="ops-tab-dot" style={{ '--tab-dot': t.dot }} aria-hidden="true" />
             )}
             {t.label}
           </button>
@@ -50,38 +52,3 @@ export default function TabBar({ tabs, active, onChange, breakpoint = 600 }) {
     </div>
   );
 }
-
-const styles = {
-  bar: {
-    display: 'flex', gap: 4, background: '#e8edf5', borderRadius: 12,
-    padding: 4, marginBottom: 24,
-  },
-  tab: {
-    flex: 1, padding: '9px 0', background: 'none', border: 'none',
-    borderRadius: 8, fontWeight: 600, fontSize: 13, color: '#6b7280',
-    cursor: 'pointer', whiteSpace: 'nowrap',
-  },
-  tabActive: {
-    flex: 1, padding: '9px 0', background: '#fff', border: 'none',
-    borderRadius: 8, fontWeight: 700, fontSize: 13, color: '#111827',
-    cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', whiteSpace: 'nowrap',
-  },
-  dropdownWrap: {
-    position: 'relative', marginBottom: 24,
-  },
-  dropdown: {
-    width: '100%', padding: '11px 40px 11px 14px',
-    background: '#fff', border: '1px solid #e5e7eb',
-    borderRadius: 10, fontSize: 14, fontWeight: 600,
-    color: '#111827', cursor: 'pointer', appearance: 'none',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-  },
-  dropdownChevron: {
-    position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
-    fontSize: 16, color: '#6b7280', pointerEvents: 'none',
-  },
-  dot: {
-    display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-    marginRight: 5, flexShrink: 0,
-  },
-};

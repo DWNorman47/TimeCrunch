@@ -20,7 +20,7 @@ import { useModalA11y } from '../hooks/useModalA11y';
  * `titleId` should match the id of the heading inside. If there is no
  * heading, pass an `ariaLabel` instead.
  */
-export default function ModalShell({ onClose, titleId, ariaLabel, style, children, ...rest }) {
+export default function ModalShell({ onClose, titleId, ariaLabel, style, className = '', children, ...rest }) {
   const ref = useModalA11y(onClose);
   const labelProps = titleId
     ? { 'aria-labelledby': titleId }
@@ -32,6 +32,7 @@ export default function ModalShell({ onClose, titleId, ariaLabel, style, childre
       ref={ref}
       role="dialog"
       aria-modal="true"
+      className={`ops-modal-shell ${className}`.trim()}
       style={style}
       {...labelProps}
       {...rest}

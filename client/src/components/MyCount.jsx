@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api';
 import { getCached, setCached, isFresh, enqueuePendingSync, getPendingSyncs, removePendingSync } from '../offlineDb';
 import { useT } from '../hooks/useT';
+import EmptyState from './EmptyState';
 
 const CACHE_KEY = 'my-count-assignments';
 
@@ -41,7 +42,10 @@ export default function MyCount() {
   const mounted = useRef(true);
   const drainingRef = useRef(false); // ref-based guard so event handlers always see current value
 
-  useEffect(() => () => { mounted.current = false; }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const load = useCallback(async (forceRefresh = false) => {
     if (!mounted.current) return;
@@ -214,11 +218,7 @@ export default function MyCount() {
       )}
 
       {groups.length === 0 ? (
-        <div style={s.empty}>
-          <div style={s.emptyIcon}>✅</div>
-          <p>{t.myCountEmpty}</p>
-          <p style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{t.myCountEmptyHint}</p>
-        </div>
+        <EmptyState mark="C" title={t.myCountEmpty} body={t.myCountEmptyHint} tone="good" />
       ) : (
         groups.map(group => (
           <div key={group.count_id} style={s.countCard}>
@@ -305,8 +305,6 @@ const s = {
   pendingBanner: { background: '#fef9c3', color: '#713f12', border: '1px solid #fde047', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 },
   syncNowBtn:    { padding: '3px 10px', borderRadius: 6, border: 'none', background: '#d97706', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   loading:       { textAlign: 'center', padding: 40, color: '#6b7280', fontSize: 14 },
-  empty:         { textAlign: 'center', padding: '48px 24px', color: '#6b7280' },
-  emptyIcon:     { fontSize: 36, marginBottom: 10 },
   countCard:     { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, marginBottom: 16, overflow: 'hidden' },
   countHeader:   { display: 'flex', alignItems: 'center', gap: 10, background: '#f9fafb', padding: '10px 16px', borderBottom: '1px solid #e5e7eb' },
   countType:     { fontSize: 12, fontWeight: 700, textTransform: 'capitalize', color: '#374151', background: '#e5e7eb', padding: '2px 8px', borderRadius: 8 },

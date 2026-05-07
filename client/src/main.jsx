@@ -7,6 +7,9 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { installGlobalErrorHandlers, silentError } from './errorReporter';
 
+const enableSpeedInsights = import.meta.env.PROD || import.meta.env.VITE_ENABLE_SPEED_INSIGHTS === 'true';
+const enableServiceWorker = import.meta.env.PROD || import.meta.env.VITE_ENABLE_SERVICE_WORKER === 'true';
+
 // Absent DSN = Sentry is a no-op.
 if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
@@ -28,12 +31,22 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
-    <SpeedInsights />
+    {enableSpeedInsights && <SpeedInsights />}
   </React.StrictMode>
 );
 
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && enableServiceWorker) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(silentError('main'));
+  });
+} else if ('serviceWorker' in navigator && import.meta.env.DEV) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.getRegistrations()
+      .then(registrations => {
+        registrations
+          .filter(registration => registration.scope.startsWith(window.location.origin))
+          .forEach(registration => registration.unregister());
+      })
+      .catch(silentError('main'));
   });
 }

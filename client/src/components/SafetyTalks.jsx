@@ -6,31 +6,44 @@ import { useT } from '../hooks/useT';
 import { langToLocale } from '../utils';
 import Pagination from './Pagination';
 import { SkeletonList, SkeletonBlock } from './Skeleton';
+import FieldFilters from './FieldFilters';
 
 const TALK_LIBRARY = [
   { title: 'Fall Protection', content: 'Key Points:\n• Workers at 6 ft or more must be protected from falls\n• Fall protection methods: guardrails, safety nets, personal fall arrest systems (PFAS)\n• Inspect all harnesses and lanyards before each use — retire any that has been in a fall\n• Keep work areas clear of tripping hazards\n\nHazards to watch for:\n• Unprotected floor openings and roof edges without guardrails\n• Scaffolding without toe boards\n\nAction: Report missing or damaged fall protection immediately. Do not work at heights without protection in place.' },
   { title: 'Ladder Safety', content: 'Key Points:\n• Inspect ladders before each use — discard damaged ladders\n• Set extension ladders at a 4:1 ratio (1 ft out for every 4 ft of height)\n• Ladder must extend 3 ft above the landing\n• Always face the ladder and maintain 3 points of contact\n• Never stand on the top two rungs\n• Do not carry tools in your hands while climbing\n\nHazards:\n• Ladders on unstable or slippery surfaces\n• Overreaching to the side\n• Metal ladders near electrical hazards' },
-  { title: 'Personal Protective Equipment (PPE)', content: 'Required PPE on this site: hard hat, safety glasses, high-vis vest, steel-toed boots.\n\nKey Points:\n• Inspect all PPE before each use — replace damaged equipment\n• Wear the right PPE for the task (gloves, face shields, hearing protection as required)\n• Ensure PPE fits correctly — ill-fitting PPE is ineffective\n\nCommon failures:\n• Hard hats worn backwards (reduces protection)\n• Safety glasses removed in dusty or flying debris areas\n• Gloves worn near rotating machinery — entanglement hazard' },
+  { title: 'Personal Protective Equipment (PPE)', content: 'Required PPE for this work: use the protective equipment assigned for your role and task.\n\nKey Points:\n• Inspect all PPE before each use — replace damaged equipment\n• Wear the right PPE for the task (gloves, face shields, hearing protection as required)\n• Ensure PPE fits correctly — ill-fitting PPE is ineffective\n\nCommon failures:\n• Hard hats worn backwards (reduces protection)\n• Safety glasses removed in dusty or flying debris areas\n• Gloves worn near rotating machinery — entanglement hazard' },
   { title: 'Lockout/Tagout (LOTO)', content: 'NEVER perform maintenance on equipment that could accidentally energize.\n\nSteps:\n1. Notify affected workers\n2. Identify all energy sources\n3. Shut down the equipment\n4. Isolate energy sources\n5. Apply your personal lock and tag\n6. Release/restrain stored energy\n7. Verify zero energy state before starting work\n\nKey rule:\n• Each worker applies their own lock — never rely on someone else\'s\n• Only the worker who applied the lock may remove it\n• Energy types: electrical, hydraulic, pneumatic, mechanical, thermal, chemical' },
   { title: 'Electrical Safety', content: 'Key Points:\n• Treat all electrical wires as live until verified otherwise\n• Maintain at least 10 ft clearance from overhead power lines\n• Use GFCIs on all temporary power cords\n• Inspect extension cords daily — remove any with damaged insulation\n• Do not bypass or remove safety devices\n• Never use electrical equipment in wet conditions\n\nHazards:\n• Overhead and underground power lines\n• Overloaded circuits and extension cords' },
-  { title: 'Struck-By Hazards', content: 'Struck-by incidents are one of the leading causes of construction fatalities.\nFour types: flying, falling, swinging, and rolling objects.\n\nKey Precautions:\n• Wear high-visibility vests near vehicle traffic\n• Never stand under suspended loads\n• Establish exclusion zones around crane and rigging operations\n• Secure all tools and materials at height — use toe boards and tool lanyards\n• Know the blind spots of all heavy equipment\n• Make eye contact with operators before approaching' },
+  { title: 'Struck-By Hazards', content: 'Struck-by incidents are a serious risk anywhere people work around vehicles, tools, equipment, or stored materials.\nFour types: flying, falling, swinging, and rolling objects.\n\nKey Precautions:\n• Wear high-visibility vests near vehicle traffic\n• Never stand under suspended loads\n• Establish exclusion zones around crane and rigging operations\n• Secure all tools and materials at height — use toe boards and tool lanyards\n• Know the blind spots of all heavy equipment\n• Make eye contact with operators before approaching' },
   { title: 'Trenching & Excavation Safety', content: 'Key Points:\n• All excavations 5 ft or deeper require a protective system (shoring, sloping, or trench box)\n• A competent person must inspect the trench daily and after rain\n• Never enter an unprotected trench\n• Test air quality before entry if deeper than 4 ft (O₂, flammable gas, toxic gas)\n\nFatality hazards:\n• Cave-in — most common cause of trench fatalities\n• Flooding — never enter a flooded trench\n• Falling loads — stay away from the edge\n\nEmergency: Know the location of rescue equipment before entering.' },
   { title: 'Heat Illness Prevention', content: 'Heat illness can become life-threatening quickly. Know the warning signs.\n\nPrevention:\n• Drink water frequently — at least 1 cup every 20 minutes\n• Take rest breaks in shade or air conditioning\n• Acclimatize new workers gradually in their first 1-2 weeks\n• Buddy system — watch for signs in coworkers\n\nHeat Exhaustion:\n• Heavy sweating, weakness, cool/pale/clammy skin, headache, nausea\n• Move to cool area, rest, rehydrate\n\nHeat Stroke — call 911 immediately:\n• High body temp (103°F+), hot dry skin, confusion, loss of consciousness\n• Cool the victim while waiting for help' },
   { title: 'Hand & Power Tool Safety', content: 'Key Points:\n• Inspect all tools before use — do not use damaged tools\n• Use the right tool for the job — never modify or improvise\n• Keep guards in place at all times\n• Disconnect power before adjusting, changing blades, or clearing jams\n• Never carry a tool by the cord or yank the cord to disconnect\n\nCutting tools:\n• Keep blades sharp — dull blades require more force and slip more easily\n• Cut away from your body\n\nPower tools:\n• Secure workpieces so they don\'t move\n• Keep bystanders clear of the work area' },
   { title: 'Scaffolding Safety', content: 'Key Points:\n• Scaffolding must be erected by trained workers only\n• Never exceed the scaffold\'s rated load capacity\n• All platforms must be fully planked — no gaps greater than 1 inch\n• Guardrails required when platform is 10 ft or more above ground\n• Toe boards required to prevent tools from falling\n\nBefore each shift:\n• Competent person must inspect the scaffold\n• Check footings, frames, bracing, planks, and guardrails\n\nWeather:\n• Do not work on scaffolding during high winds, ice, or lightning' },
-  { title: 'Hazard Communication (HazCom / GHS)', content: 'Every worker has the right to know about hazardous chemicals on site.\n\nKey Points:\n• Safety Data Sheets (SDS) must be available for all chemicals\n• All containers must be properly labeled — never remove or deface labels\n• GHS label elements: product identifier, signal word, hazard statements, pictograms, precautionary statements\n\nBefore using a new chemical:\n• Read the SDS — Sections 2 (Hazards), 7 (Handling), 8 (PPE)\n\nSpill response:\n• Know the location of spill kits and eyewash stations\n• Follow SDS instructions for cleanup' },
-  { title: 'Fire Prevention & Extinguisher Use', content: 'Know the location of fire extinguishers on site. Keep exits clear.\n\nPrevention:\n• Store flammables in approved containers away from ignition sources\n• No open flames near fueling areas\n\nUsing a fire extinguisher — PASS:\n• Pull the pin\n• Aim at the base of the fire\n• Squeeze the handle\n• Sweep side to side\n\nKnow when to fight vs. evacuate:\n• Only fight small, contained fires\n• If fire blocks your exit, spreads rapidly, or produces heavy smoke — evacuate and call 911' },
-  { title: 'Back Safety & Safe Lifting', content: 'Back injuries are among the most common and costly in construction. Plan the lift first.\n\nProper lifting technique:\n• Stand close to the load\n• Bend at the knees and hips — not the back\n• Get a firm grip\n• Lift with your legs, back straight\n• Keep the load close to your body\n• Turn with your feet — never twist at the waist\n\nTeam lifts:\n• Use a team for loads over 50 lbs or awkward shapes\n• One person calls the movement\n\nMechanical aids:\n• Use dollies, carts, and forklifts whenever possible' },
+  { title: 'Hazard Communication (HazCom / GHS)', content: 'Every worker has the right to know about hazardous chemicals at the work location.\n\nKey Points:\n• Safety Data Sheets (SDS) must be available for all chemicals\n• All containers must be properly labeled — never remove or deface labels\n• GHS label elements: product identifier, signal word, hazard statements, pictograms, precautionary statements\n\nBefore using a new chemical:\n• Read the SDS — Sections 2 (Hazards), 7 (Handling), 8 (PPE)\n\nSpill response:\n• Know the location of spill kits and eyewash stations\n• Follow SDS instructions for cleanup' },
+  { title: 'Fire Prevention & Extinguisher Use', content: 'Know the location of fire extinguishers at the work location. Keep exits clear.\n\nPrevention:\n• Store flammables in approved containers away from ignition sources\n• No open flames near fueling areas\n\nUsing a fire extinguisher — PASS:\n• Pull the pin\n• Aim at the base of the fire\n• Squeeze the handle\n• Sweep side to side\n\nKnow when to fight vs. evacuate:\n• Only fight small, contained fires\n• If fire blocks your exit, spreads rapidly, or produces heavy smoke — evacuate and call 911' },
+  { title: 'Back Safety & Safe Lifting', content: 'Back injuries are among the most common and costly workplace injuries. Plan the lift first.\n\nProper lifting technique:\n• Stand close to the load\n• Bend at the knees and hips — not the back\n• Get a firm grip\n• Lift with your legs, back straight\n• Keep the load close to your body\n• Turn with your feet — never twist at the waist\n\nTeam lifts:\n• Use a team for loads over 50 lbs or awkward shapes\n• One person calls the movement\n\nMechanical aids:\n• Use dollies, carts, and forklifts whenever possible' },
   { title: 'Eye & Face Protection', content: 'Eye injuries can cause permanent vision loss.\n\nChoose the right protection:\n• Flying debris: safety glasses or goggles\n• Chemical splash: chemical splash goggles\n• Grinding/cutting: face shield over safety glasses\n• Welding: welding helmet with appropriate shade\n\nKey rules:\n• Safety glasses required in all designated areas\n• Contact lens wearers must still wear safety glasses or goggles\n• Ensure eyewear fits — gaps allow debris to enter\n\nFirst aid:\n• Flush eyes with clean water for 15-20 minutes for chemical exposure\n• Seek medical attention for penetrating injuries — do not rub the eye' },
   { title: 'Silica Dust Safety', content: 'Crystalline silica is found in concrete, brick, mortar, sand, and stone. Cutting, drilling, grinding, or crushing releases hazardous dust that can cause silicosis — an irreversible and fatal lung disease.\n\nControls (use in order):\n• Water suppression — wet cutting, wet drilling\n• Local exhaust ventilation (LEV) with HEPA filtration\n• Equipment with integrated wet suppression or vacuum systems\n\nPPE (when engineering controls are insufficient):\n• N95 respirator at minimum — must be fit-tested\n\nKey rule:\n• No dry sweeping — use wet methods or HEPA vacuums' },
-  { title: 'Caught-In/Between Hazards', content: 'Caught-in/between is one of the construction "Fatal Four."\nHazards include rotating equipment, pinch points, cave-ins, and compression between equipment and fixed objects.\n\nKey Precautions:\n• Keep all machine guards in place\n• Never reach into moving equipment\n• Stay clear of equipment swing radius\n• Tie back long hair; avoid loose clothing near rotating parts\n• Do not stand between moving equipment and a fixed object\n• Use spotters when equipment operates near workers — spotter stays in operator\'s line of sight' },
+  { title: 'Caught-In/Between Hazards', content: 'Caught-in/between injuries can happen around moving equipment, pinch points, doors, vehicles, shelving, and machinery.\nHazards include rotating equipment, compression points, cave-ins, and tight spaces between equipment and fixed objects.\n\nKey Precautions:\n• Keep all machine guards in place\n• Never reach into moving equipment\n• Stay clear of equipment swing radius\n• Tie back long hair; avoid loose clothing near rotating parts\n• Do not stand between moving equipment and a fixed object\n• Use spotters when equipment operates near people — spotter stays in operator\'s line of sight' },
   { title: 'Confined Space Entry', content: 'A permit-required confined space has: hazardous atmosphere, engulfment hazard, converging internal shape, or another serious hazard.\nExamples: manholes, tanks, vaults, large pipes.\n\nBefore entry:\n• Written entry permit required\n• Test atmosphere: O₂ (19.5–23.5%), flammable gases (<10% LEL), toxic gases\n• Establish ventilation if needed\n• Assign a hole watch (attendant) who stays outside\n• Establish a rescue plan\n\nDuring entry:\n• Continuous atmospheric monitoring\n• Maintain communication with attendant at all times\n\nEmergency: Attendants do not enter — they call for rescue.' },
   { title: 'Forklift Safety', content: 'Only licensed/certified operators may operate forklifts.\n\nKey Points:\n• Inspect the forklift before each shift\n• Never exceed the rated load capacity\n• Carry loads 4-6 inches off the ground while traveling\n• Travel with forks tilted back for stability\n• Slow down and sound horn at intersections and blind corners\n• Never raise or lower loads while traveling\n• Keep pedestrians out of the operating area\n• No passengers unless a designated seat is provided\n\nStability:\n• Overloading or uneven loads can tip the machine\n• If tipping: stay in the seat, hold on, lean away from the fall direction' },
-  { title: 'First Aid & Emergency Response', content: `Emergency number: 911\nSite address: _______________\nNearest hospital: _______________\nSupervisor emergency contact: _______________\nAssembly point: _______________\n\nLocation of:\n• First aid kits: _______________\n• Eyewash stations: _______________\n• AED (if on site): _______________\n\nBasic first aid:\n• Cuts/bleeding: apply direct pressure with clean cloth\n• Burns: cool with running water for 10+ minutes\n• Eye injuries: flush with clean water for 15-20 minutes\n• Suspected fractures: immobilize and wait for EMS\n• Do not move a seriously injured worker\n\nCPR/AED:\n• Begin CPR if trained and victim has no pulse\n• Use AED as soon as available — it guides you through the steps` },
+  { title: 'First Aid & Emergency Response', content: `Emergency number: 911\nWork location address: _______________\nNearest hospital: _______________\nSupervisor emergency contact: _______________\nAssembly point: _______________\n\nLocation of:\n• First aid kits: _______________\n• Eyewash stations: _______________\n• AED (if at the work location): _______________\n\nBasic first aid:\n• Cuts/bleeding: apply direct pressure with clean cloth\n• Burns: cool with running water for 10+ minutes\n• Eye injuries: flush with clean water for 15-20 minutes\n• Suspected fractures: immobilize and wait for EMS\n• Do not move a seriously injured worker\n\nCPR/AED:\n• Begin CPR if trained and victim has no pulse\n• Use AED as soon as available — it guides you through the steps` },
 ];
 
 function fmtDate(str, locale = 'en-US') {
-  return new Date(str + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  if (!str) return 'No date';
+  const datePart = String(str).includes('T') ? String(str).slice(0, 10) : String(str);
+  const date = new Date(`${datePart}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return 'No date';
+  return date.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+const TALK_ACCENTS = ['#059669', '#2563eb', '#7c3aed', '#dc2626', '#d97706', '#0891b2'];
+
+function talkAccent(title = '') {
+  const text = String(title || '');
+  const hash = Array.from(text).reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  return TALK_ACCENTS[hash % TALK_ACCENTS.length];
 }
 
 function formatBytes(bytes) {
@@ -48,7 +61,7 @@ function fileIcon(contentType) {
   return '📎';
 }
 
-function NewTalkForm({ projects, onAdded, onCancel }) {
+function NewTalkForm({ projects, onAdded, onCancel, workLabel = 'Work' }) {
   const t = useT();
   const today = new Date().toLocaleDateString('en-CA');
   const [form, setForm] = useState({ title: '', content: '', given_by: '', talk_date: today, project_id: '' });
@@ -130,9 +143,9 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label htmlFor="st-project" style={styles.label}>{t.project}</label>
+            <label htmlFor="st-project" style={styles.label}>{workLabel}</label>
             <select id="st-project" style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">{t.noProjectOpt}</option>
+              <option value="">{`No ${workLabel.toLowerCase()}`}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -229,7 +242,7 @@ function NewTalkForm({ projects, onAdded, onCancel }) {
   );
 }
 
-function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
+function TalkCard({ talk: initialTalk, isAdmin, onDeleted, workerLabelPlural = 'Workers' }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
@@ -330,23 +343,22 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
   const needed = talk.pass_threshold ?? parseInt(talk.question_count);
 
   return (
-    <div style={styles.card}>
+    <div style={{ ...styles.card, borderLeft: `4px solid ${talkAccent(talk.title)}` }}>
       <div style={styles.cardHeader} onClick={handleExpand} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleExpand()}>
         <div style={styles.cardLeft}>
-          <div style={styles.talkIcon}>🦺</div>
           <div>
             <div style={styles.talkTitle}>{talk.title}{talk.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}</div>
             <div style={styles.talkMeta}>
               {fmtDate(talk.talk_date, locale)}
               {talk.project_name && <span style={styles.projectTag}>{talk.project_name}</span>}
               {talk.given_by && <span style={styles.givenBy}>{t.talkGivenBy} {talk.given_by}</span>}
-              {hasQuiz && <span style={styles.quizBadge}>📝 {talk.question_count} question{talk.question_count !== '1' ? 's' : ''}</span>}
+              {hasQuiz && <span style={styles.quizBadge}>Quiz: {talk.question_count} question{talk.question_count !== '1' ? 's' : ''}</span>}
             </div>
           </div>
         </div>
         <div style={styles.cardRight}>
-          <span style={styles.signoffBadge} title="Workers signed">✍️ {talk.signoff_count}</span>
-          <span style={styles.chevron}>{expanded ? '▲' : '▼'}</span>
+          <span style={styles.signoffBadge} title={`${workerLabelPlural} signed`}>{talk.signoff_count}</span>
+          <span style={styles.chevron}>{expanded ? '^' : 'v'}</span>
         </div>
       </div>
 
@@ -363,7 +375,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                   <div style={styles.adminQuestionText}>{i + 1}. {q.question}</div>
                   {q.options.map((opt, oi) => (
                     <div key={oi} style={{ ...styles.adminOption, ...(oi === q.correct_index ? styles.adminOptionCorrect : {}) }}>
-                      {oi === q.correct_index ? '✓' : '○'} {opt}
+                      {oi === q.correct_index ? 'Correct: ' : ''}{opt}
                     </div>
                   ))}
                 </div>
@@ -374,7 +386,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
           {/* Worker: quiz before sign-off */}
           {!isAdmin && !alreadySigned && questions?.length > 0 && (
             <div style={styles.quizBox}>
-              <div style={styles.quizTitle}>📝 Quiz — answer to sign off ({needed}/{questions.length} correct to pass)</div>
+              <div style={styles.quizTitle}>Quiz - answer to sign off ({needed}/{questions.length} correct to pass)</div>
               {questions.map((q, i) => (
                 <div key={i} style={styles.quizQuestion}>
                   <div style={styles.quizQuestionText}>{i + 1}. {q.question}</div>
@@ -393,14 +405,14 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
               ))}
               {quizResult && !quizResult.passed && (
                 <div style={styles.quizFail}>
-                  ✗ {quizResult.score}/{quizResult.total} {t.quizFailedMsg} {quizResult.needed} {t.quizFailedTryAgain}
+                  {quizResult.score}/{quizResult.total} {t.quizFailedMsg} {quizResult.needed} {t.quizFailedTryAgain}
                 </div>
               )}
             </div>
           )}
 
           {quizResult?.passed && (
-            <div style={styles.quizPass}>✓ {quizResult.score}/{quizResult.total} {t.quizPassedMsg}</div>
+            <div style={styles.quizPass}>{quizResult.score}/{quizResult.total} {t.quizPassedMsg}</div>
           )}
 
           {/* Attachments */}
@@ -455,7 +467,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
                   disabled={signing || (questions?.length > 0 && !allAnswered)}
                   title={questions?.length > 0 && !allAnswered ? t.answerQuestionsFirst : ''}
                 >
-                  {signing ? t.saving : `✍️ ${t.signOff}`}
+                  {signing ? t.saving : t.signOff}
                 </button>
               )}
               {!isAdmin && alreadySigned && (
@@ -500,11 +512,15 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted }) {
   );
 }
 
-export default function SafetyTalks({ projects }) {
+export default function SafetyTalks({ projects, settings = null }) {
   const t = useT();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
   const [talks, setTalks] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -564,6 +580,7 @@ export default function SafetyTalks({ projects }) {
         <div style={styles.formCard}>
           <NewTalkForm
             projects={projects}
+            workLabel={workLabel}
             onAdded={talk => { setTalks(prev => [talk, ...prev]); setShowForm(false); }}
             onCancel={() => setShowForm(false)}
           />
@@ -571,19 +588,18 @@ export default function SafetyTalks({ projects }) {
       )}
 
       {projects.length > 0 && (
-        <div className="filter-row" style={styles.filters}>
+        <FieldFilters activeCount={filterProject ? 1 : 0}>
           <select style={styles.filterSelect} value={filterProject} onChange={e => setFilterProject(e.target.value)}>
-            <option value="">{t.allProjectsOpt}</option>
+            <option value="">{`All ${workLabelPlural}`}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-        </div>
+        </FieldFilters>
       )}
 
       {loading ? (
         <SkeletonList count={4} rows={2} />
       ) : talks.length === 0 ? (
         <div style={styles.empty}>
-          <div style={styles.emptyIcon}>🦺</div>
           <p style={styles.emptyText}>
             {isAdmin ? t.noTalksAdmin : t.noTalksWorker}
           </p>
@@ -596,6 +612,7 @@ export default function SafetyTalks({ projects }) {
                 key={t.id}
                 talk={t}
                 isAdmin={isAdmin}
+                workerLabelPlural={workerLabelPlural}
                 onDeleted={id => setTalks(prev => prev.filter(t => t.id !== id))}
               />
             ))}
@@ -625,7 +642,7 @@ const styles = {
   projectTag: { background: '#ede9fe', color: '#6d28d9', padding: '1px 7px', borderRadius: 10, fontWeight: 600 },
   givenBy: { color: '#6b7280' },
   cardRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
-  signoffBadge: { fontSize: 12, fontWeight: 700, color: '#065f46', background: '#d1fae5', padding: '3px 10px', borderRadius: 10 },
+  signoffBadge: { fontSize: 12, fontWeight: 700, color: '#065f46', background: '#d1fae5', padding: '3px 10px', borderRadius: 10, minWidth: 24, textAlign: 'center' },
   chevron: { fontSize: 10, color: '#6b7280' },
   cardBody: { padding: '0 16px 16px', borderTop: '1px solid #f3f4f6' },
   content: { fontSize: 14, color: '#374151', lineHeight: 1.7, margin: '12px 0 16px', whiteSpace: 'pre-wrap' },

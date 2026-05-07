@@ -1,7 +1,7 @@
 /**
- * Admin view of client-submitted service requests. Shows the public intake
+ * Admin view of customer-submitted service requests. Shows the public intake
  * URL, a toggle to enable/disable submissions, and a paginated list of
- * requests with status filters + conversion-to-Project action.
+ * requests with status filters and conversion-to-work action.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -9,6 +9,7 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import { silentError } from '../errorReporter';
+import EmptyState from './EmptyState';
 
 const STATUS_FILTERS = [
   { key: 'new',       label: 'New' },
@@ -19,9 +20,13 @@ const STATUS_FILTERS = [
   { key: 'all',       label: 'All' },
 ];
 
-export default function ServiceRequestsAdmin() {
+export default function ServiceRequestsAdmin({ settings = null }) {
   const t = useT();
   const { user, updateUser } = useAuth();
+  const clientLabel = settings?.label_client || 'Customer';
+  const workLabel = settings?.label_work || 'Work';
+  const clientLabelLower = clientLabel.toLowerCase();
+  const workLabelLower = workLabel.toLowerCase();
   const [accepting, setAccepting] = useState(!!user?.accepts_service_requests);
   const [savingToggle, setSavingToggle] = useState(false);
   const [filter, setFilter] = useState('new');
@@ -95,7 +100,10 @@ export default function ServiceRequestsAdmin() {
   };
 
   const convert = async (req) => {
-    const projectName = window.prompt(t.srProjectNamePrompt, `${t.srProjectFromRequest || 'Request from'} ${req.requester_name}`);
+    const projectName = window.prompt(
+      `${workLabel} name:`,
+      `${t.srProjectFromRequest || 'Request from'} ${req.requester_name}`,
+    );
     if (!projectName) return;
     setConvertingId(req.id);
     try {
@@ -123,12 +131,12 @@ export default function ServiceRequestsAdmin() {
           ) : (
             <div style={s.hint}>Your company needs a slug. Contact support to have one assigned.</div>
           )}
-          <div style={s.hint}>Share this link with clients to let them submit service or project requests.</div>
+          <div style={s.hint}>Share this link with {clientLabelLower}s so they can submit service, support, or {workLabelLower} requests.</div>
         </div>
         <div style={s.statusGroup}>
           <div style={accepting ? s.statusOn : s.statusOff}>
             <span style={s.statusDot}></span>
-            {accepting ? 'Accepting requests' : 'Paused — form shows a pause message'}
+            {accepting ? 'Accepting requests' : 'Paused - form shows a pause message'}
           </div>
           <button
             type="button"
@@ -136,7 +144,7 @@ export default function ServiceRequestsAdmin() {
             disabled={savingToggle || !publicUrl}
             style={accepting ? s.pauseBtn : s.startBtn}
           >
-            {savingToggle ? '…' : accepting ? 'Pause' : 'Start accepting'}
+            {savingToggle ? 'Saving...' : accepting ? 'Pause' : 'Start accepting'}
           </button>
         </div>
       </div>
@@ -165,13 +173,13 @@ export default function ServiceRequestsAdmin() {
                 {r.email ? (
                   <span style={s.recipientEmail}>{r.email}</span>
                 ) : (
-                  <span style={s.recipientNoEmail}>no email — won't be emailed</span>
+                  <span style={s.recipientNoEmail}>no email - won't be emailed</span>
                 )}
               </label>
             ))}
           </div>
           <div style={s.recipientsFooter}>
-            Edit available categories in Administration → Company → Advanced settings → Service Request Categories.
+            {'Edit available categories in Administration > Workspace > Advanced Controls > Service Request Categories.'}
           </div>
         </div>
       )}
@@ -192,9 +200,14 @@ export default function ServiceRequestsAdmin() {
       {error && <div role="alert" style={s.error}>{error}</div>}
 
       {loading ? (
-        <div style={s.loading}>Loading…</div>
+        <div style={s.loading}>Loading...</div>
       ) : requests.length === 0 ? (
-        <div style={s.empty}>No requests {filter !== 'all' && `in status "${filter}"`} yet.</div>
+        <EmptyState
+          mark="R"
+          title={filter === 'all' ? 'No requests yet' : `No ${filter.replace('_', ' ')} requests`}
+          body={`New ${clientLabelLower} requests will appear here when someone submits your intake form.`}
+          tone={filter === 'new' ? 'good' : 'neutral'}
+        />
       ) : (
         <div style={s.list}>
           {requests.map(r => {
@@ -206,7 +219,7 @@ export default function ServiceRequestsAdmin() {
                   <div style={s.categoryPill}>{r.category || 'Request'}</div>
                   <div style={s.statusPill(r.status)}>{r.status.replace('_', ' ')}</div>
                   <div style={s.created}>{new Date(r.created_at).toLocaleString()}</div>
-                  <span style={s.chevron}>{open ? '▾' : '▸'}</span>
+                  <span style={s.chevron}>{open ? 'v' : '>'}</span>
                 </div>
                 {open && (
                   <div style={s.detail}>
@@ -218,7 +231,7 @@ export default function ServiceRequestsAdmin() {
                     <div style={s.descBlock}>{r.description}</div>
                     {r.converted_project_id && (
                       <div style={s.convertedLabel}>
-                        Converted to project: <strong>{r.converted_project_name || `#${r.converted_project_id}`}</strong>
+                        Converted to {workLabelLower}: <strong>{r.converted_project_name || `#${r.converted_project_id}`}</strong>
                       </div>
                     )}
                     <div style={s.notesBlock}>
@@ -243,7 +256,7 @@ export default function ServiceRequestsAdmin() {
                             disabled={convertingId === r.id}
                             style={s.convertBtn}
                           >
-                            {convertingId === r.id ? 'Converting…' : 'Convert to project'}
+                            {convertingId === r.id ? 'Converting...' : `Convert to ${workLabelLower}`}
                           </button>
                           <button onClick={() => updateStatus(r.id, 'declined')} style={s.declineBtn}>Decline</button>
                           <button onClick={() => updateStatus(r.id, 'spam')} style={s.spamBtn}>Spam</button>
@@ -251,7 +264,7 @@ export default function ServiceRequestsAdmin() {
                       )}
                       {r.reviewed_by_name && (
                         <span style={s.reviewedBy}>
-                          {r.status} by {r.reviewed_by_name} · {new Date(r.reviewed_at).toLocaleDateString()}
+                          {r.status} by {r.reviewed_by_name} - {new Date(r.reviewed_at).toLocaleDateString()}
                         </span>
                       )}
                     </div>
@@ -297,7 +310,6 @@ const s = {
   filterActive:  { padding: '6px 14px', background: '#1a56db', border: '1px solid #1a56db', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer' },
   error:         { color: '#991b1b', background: '#fee2e2', padding: 10, borderRadius: 7, fontSize: 13 },
   loading:       { color: '#6b7280', fontSize: 14, padding: 20, textAlign: 'center' },
-  empty:         { color: '#6b7280', fontSize: 14, padding: 28, textAlign: 'center' },
   list:          { display: 'flex', flexDirection: 'column', gap: 8 },
   card:          { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' },
   row:           { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', cursor: 'pointer', flexWrap: 'wrap' },

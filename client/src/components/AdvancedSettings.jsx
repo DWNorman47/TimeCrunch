@@ -118,9 +118,9 @@ function CollapsibleCategory({ title, children }) {
 // and now lives in Company > Settings > Reimbursements. The storage backend
 // is still /admin/advanced-settings/mileage_rate — only the UI relocated.
 
-export default function AdvancedSettings({ settings }) {
+export default function AdvancedSettings({ settings, embedded = false }) {
   const t = useT();
-  const [open, setOpen]           = useState(false);
+  const [open, setOpen]           = useState(embedded);
   const [config, setConfig]       = useState(null);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState('');
@@ -128,16 +128,16 @@ export default function AdvancedSettings({ settings }) {
 
   useEffect(() => {
     if (open && !config) {
-      api.get('/admin/advanced-settings')
+      api.get('/admin/advanced-settings', { suppressToast: true })
         .then(r => setConfig(r.data))
         .catch(() => setError(t.advSettingsLoadFailed));
     }
-  }, [open, config]);
+  }, [open, config, t.advSettingsLoadFailed]);
 
   const makeSaver = key => async (body) => {
     setSaving(true); setError(''); setSuccess('');
     try {
-      const r = await api.patch(`/admin/advanced-settings/${key}`, body);
+      const r = await api.patch(`/admin/advanced-settings/${key}`, body, { suppressToast: true });
       setConfig(r.data);
       setSuccess(t.advSettingsSaved);
       setTimeout(() => setSuccess(''), 2000);
@@ -149,14 +149,16 @@ export default function AdvancedSettings({ settings }) {
   };
 
   return (
-    <div style={s.wrap}>
-      <button style={s.mainToggle} onClick={() => setOpen(o => !o)}>
-        <span style={s.mainToggleLabel}>{t.advancedSettings}</span>
-        <span style={s.chevron}>{open ? '▲' : '▼'}</span>
-      </button>
+    <div style={embedded ? s.embeddedWrap : s.wrap}>
+      {!embedded && (
+        <button style={s.mainToggle} onClick={() => setOpen(o => !o)}>
+          <span style={s.mainToggleLabel}>{t.advancedSettings}</span>
+          <span style={s.chevron}>{open ? '▲' : '▼'}</span>
+        </button>
+      )}
 
       {open && (
-        <div style={s.body}>
+        <div style={embedded ? s.embeddedBody : s.body}>
           {error && <div role="alert" style={s.errorMsg}>{error}</div>}
           {success && <div style={s.successMsg}>{success}</div>}
           {!config && !error ? (
@@ -209,10 +211,12 @@ export default function AdvancedSettings({ settings }) {
 
 const s = {
   wrap:          { marginTop: 32, borderTop: '1px solid #e5e7eb', paddingTop: 16 },
+  embeddedWrap:  { marginTop: 0 },
   mainToggle:    { width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textAlign: 'left' },
   mainToggleLabel: { fontSize: 15, fontWeight: 700, color: '#374151' },
   chevron:       { fontSize: 12, color: '#6b7280' },
   body:          { marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 },
+  embeddedBody:  { marginTop: 0, display: 'flex', flexDirection: 'column', gap: 8 },
   loading:       { fontSize: 14, color: '#6b7280' },
   innerSection:  { border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' },
   innerToggle:   { width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f9fafb', border: 'none', cursor: 'pointer', padding: '10px 14px', textAlign: 'left', fontSize: 14, fontWeight: 600, color: '#374151' },

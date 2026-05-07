@@ -21,7 +21,7 @@ const HOURS   = 60 * MINUTES;
 
 export const CACHE_REGISTRY = {
   // Projects show up in worker clock-in pickers and admin project lists.
-  // A stale list blocks workers from seeing new projects — keep TTL short.
+  // A stale list blocks team members from seeing new work — keep TTL short.
   projects: {
     ttl: 5 * MINUTES,
     invalidatedBy: [
@@ -29,7 +29,7 @@ export const CACHE_REGISTRY = {
     ],
   },
 
-  // Settings drive feature gating (Project Integration, module toggles).
+  // Settings drive feature gating (work selection, module toggles).
   // Staleness here means admin toggles don't propagate to workers.
   settings: {
     ttl: 5 * MINUTES,

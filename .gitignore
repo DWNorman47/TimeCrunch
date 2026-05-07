@@ -9,3 +9,7 @@ dist/
 # Local test data fixtures (not part of the app, may contain made-up SSNs etc)
 OpsFloa_TestData.txt
 
+# Local Codex/browser run artifacts
+.codex-logs/
+.edge-*-profile/
+

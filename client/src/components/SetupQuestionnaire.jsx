@@ -29,17 +29,17 @@ const QUESTIONS = [
   {
     id: 'work_type',
     question: 'What does your team mostly do?',
-    explanation: 'This helps us pick which modules to show. Field work brings in punchlists, RFIs, daily reports, and safety checklists. Office-only teams usually don\'t need those.',
+    explanation: 'This helps us pick which modules to show. Field, mobile, or service work brings in checklists, reports, punchlists, and other closeout tools. Office-only teams usually do better with a simpler workspace.',
     options: [
       { value: 'office',  label: 'Office work',                          settings: { module_field: false } },
-      { value: 'field',   label: 'Field work (construction, services)',  settings: { module_field: true } },
+      { value: 'field',   label: 'Field, mobile, or service work',       settings: { module_field: true } },
       { value: 'both',    label: 'Both',                                 settings: { module_field: true } },
     ],
   },
   {
     id: 'pay_type',
-    question: 'How are workers paid?',
-    explanation: 'Hourly is standard — workers clock in and out and get paid for elapsed time. Daily flat-rate is common for piece-work or per-diem crews. If you have both, hourly is the default; you can mark individual workers as daily on their profile.',
+    question: 'How are team members paid?',
+    explanation: 'Hourly is standard - team members clock in and out and get paid for elapsed time. Daily flat-rate is common for piece-work, routes, or per-diem teams. If you have both, hourly is the default; you can mark individual team members as daily on their profile.',
     options: [
       { value: 'hourly',  label: 'Hourly',           settings: {} },
       { value: 'daily',   label: 'Daily flat rate',  settings: {} },
@@ -49,7 +49,7 @@ const QUESTIONS = [
   {
     id: 'prevailing_wage',
     question: 'Do you do prevailing-wage or certified-payroll work?',
-    explanation: "If you bid on federal or state public-works projects you probably need certified payroll (form WH-347). If you're not sure, leave it off — turning it on adds compliance fields that get noisy if you don't actually need them.",
+    explanation: "If you work under public contracts or payroll reporting rules, you may need certified payroll (form WH-347). If you're not sure, leave it off for now; turning it on adds compliance fields that get noisy if you don't actually need them.",
     options: [
       { value: 'yes',      label: 'Yes',         settings: { feature_prevailing_wage: true } },
       { value: 'no',       label: 'No',          settings: { feature_prevailing_wage: false } },
@@ -59,16 +59,16 @@ const QUESTIONS = [
   {
     id: 'scheduling',
     question: 'Do you need to schedule shifts ahead of time?',
-    explanation: 'Turn this on if you assign workers to specific shifts in advance. Leave it off if workers just clock in whenever they show up.',
+    explanation: 'Turn this on if you assign team members to specific shifts in advance. Leave it off if people just clock in when they start.',
     options: [
       { value: 'yes',  label: 'Yes',                              settings: { feature_scheduling: true } },
-      { value: 'no',   label: 'No, workers just clock in',        settings: { feature_scheduling: false } },
+      { value: 'no',   label: 'No, the team just clocks in',      settings: { feature_scheduling: false } },
     ],
   },
   {
     id: 'reimbursements',
-    question: 'Do you reimburse workers for expenses (gas, materials, tools)?',
-    explanation: 'If yes, workers can submit expense claims with photos and you can approve or deny them. If you handle expenses outside the app, leave this off.',
+    question: 'Do you reimburse team members for expenses (gas, materials, tools)?',
+    explanation: 'If yes, team members can submit expense claims with photos and you can approve or deny them. If you handle expenses outside the app, leave this off.',
     options: [
       { value: 'yes',  label: 'Yes',  settings: { feature_reimbursements: true } },
       { value: 'no',   label: 'No',   settings: { feature_reimbursements: false } },
@@ -85,8 +85,8 @@ const QUESTIONS = [
   },
   {
     id: 'geolocation',
-    question: 'Do you want to record where workers clock in from?',
-    explanation: "Tracking captures the worker's GPS coordinates at clock-in and clock-out so admins can see them on the Live tab and on time entries. This is separate from REQUIRING a worker to be at a specific spot — that's a per-project geofence you set up later under Projects → [project] → Geofence. Per-project geofences keep working even if tracking is off here.",
+    question: 'Do you want to record where team members clock in from?',
+    explanation: "Tracking captures each team member's GPS coordinates at clock-in and clock-out so admins can see them on the Live tab and on time entries. This is separate from requiring someone to be at a specific spot - that's a per-work geofence you set up later under Work.",
     options: [
       { value: 'yes',  label: 'Yes, record their location',  settings: { feature_geolocation: true } },
       { value: 'no',   label: "No, don't track location",    settings: { feature_geolocation: false } },
@@ -94,8 +94,8 @@ const QUESTIONS = [
   },
   {
     id: 'chat',
-    question: 'Do you want a chat channel for workers and admins?',
-    explanation: "In-app messaging plus the option to broadcast announcements to everyone. Useful for crews that don't already use Slack or Teams. You can always turn it on later.",
+    question: 'Do you want a chat channel for team members and admins?',
+    explanation: "In-app messaging plus the option to broadcast announcements to everyone. Useful for teams that don't already use Slack or Teams. You can always turn it on later.",
     options: [
       { value: 'yes',  label: 'Yes',       settings: { feature_chat: true,  feature_broadcast: true } },
       { value: 'no',   label: 'Not now',   settings: { feature_chat: false, feature_broadcast: false } },
@@ -104,7 +104,7 @@ const QUESTIONS = [
   {
     id: 'inventory',
     question: 'Do you track tools, materials, or inventory?',
-    explanation: "If yes, you get an Inventory module for stock counts, tool checkout, and materials tracking. Most service businesses don't need this; construction companies with shared tools often do.",
+    explanation: "If yes, you get an Inventory module for stock counts, tool checkout, and materials tracking. Leave it off if you do not need shared items, supplies, or location-based counts.",
     options: [
       { value: 'yes',  label: 'Yes',  settings: { module_inventory: true } },
       { value: 'no',   label: 'No',   settings: { module_inventory: false } },
@@ -114,7 +114,7 @@ const QUESTIONS = [
 
 // Pretty-print the keys we touch on the summary screen.
 const SETTING_LABELS = {
-  module_field:           'Field module',
+  module_field:           'Field/service module',
   module_inventory:       'Inventory module',
   feature_prevailing_wage:'Prevailing wage',
   feature_scheduling:     'Scheduling',
@@ -122,7 +122,7 @@ const SETTING_LABELS = {
   feature_pto:            'Time off',
   feature_geolocation:    'Location tracking on clock-in',
   feature_chat:           'Company chat',
-  feature_broadcast:      'Announce to all workers',
+  feature_broadcast:      'Announce to all team members',
 };
 
 export default function SetupQuestionnaire({ onComplete, onDismiss }) {

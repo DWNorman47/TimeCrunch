@@ -37,8 +37,25 @@ function TypeBadge({ type }) {
   );
 }
 
-function CycleCountDetail({ count, onBack, onComplete }) {
+function formatDate(value) {
+  if (!value) return '';
+  const datePart = String(value).slice(0, 10);
+  const date = new Date(`${datePart}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString();
+}
+
+function formatLineStatus(status) {
+  if (!status || status === 'pending') return 'Pending';
+  return status
+    .split('_')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function CycleCountDetail({ count, settings, onBack, onComplete }) {
   const t = useT();
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerPlural = `${workerLabel}s`;
   const COUNT_TYPES = useCountTypes(t);
   const STATUS_COLORS = useStatusColors(t);
   const ROLE_LABELS = {
@@ -67,6 +84,9 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const [workers, setWorkers] = useState(count.workers || []);
   const [assignments, setAssignments] = useState(count.assignments || []);
   const [tab, setTab] = useState('lines'); // 'lines' | 'workers'
+  const [lineSearch, setLineSearch] = useState('');
+  const [lineStatusFilter, setLineStatusFilter] = useState('');
+  const [lineSort, setLineSort] = useState('default');
   const [allWorkers, setAllWorkers] = useState([]);
   const [workersLoaded, setWorkersLoaded] = useState(false);
   const [distributing, setDistributing] = useState(false);
@@ -161,8 +181,22 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   const [currentBin, setCurrentBin] = useState(null); // { type, id, name }
   const [highlightedId, setHighlightedId] = useState(null);
   const [scanFeedback, setScanFeedback] = useState(''); // success/error message
+  const [useMobileLineCards, setUseMobileLineCards] = useState(false);
   const scanInputRef = useRef(null);
   const lineInputRefs = useRef({}); // { [lineId]: inputElement }
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const query = window.matchMedia('(max-width: 768px)');
+    const update = () => setUseMobileLineCards(query.matches);
+    update();
+    if (query.addEventListener) {
+      query.addEventListener('change', update);
+      return () => query.removeEventListener('change', update);
+    }
+    query.addListener(update);
+    return () => query.removeListener(update);
+  }, []);
 
   // Keep scan input focused whenever scan mode is on and nothing else is focused
   useEffect(() => {
@@ -213,6 +247,8 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     if (itemQR) {
       const match = lines.find(l => l.item_id === itemQR.id);
       if (match) {
+        setLineSearch('');
+        setLineStatusFilter('');
         setHighlightedId(match.id);
         showFeedback(`${t.invCycFoundFeedback} ${match.item_name}`);
       } else {
@@ -226,6 +262,8 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       l.sku && l.sku.trim().toLowerCase() === value.toLowerCase()
     );
     if (match) {
+      setLineSearch('');
+      setLineStatusFilter('');
       setHighlightedId(match.id);
       showFeedback(`${t.invCycFoundFeedback} ${match.item_name}`);
     } else {
@@ -235,19 +273,21 @@ function CycleCountDetail({ count, onBack, onComplete }) {
 
   const isAudit = countData.count_type === 'audit';
   const isFull  = countData.count_type === 'full';
+  const isCompleted = countData.status === 'completed';
+  const canShowExpected = !isAudit || isCompleted;
 
   const patchLine = async (line, countedQty, countedUomId) => {
     setSaving(line.id);
     try {
       const payload = { counted_qty: countedQty };
       // Always send counted_uom_id so the server can compute correct variance
-      payload.counted_uom_id = (countedUomId !== undefined ? countedUomId : lineUomSelections[line.id]) ?? null;
+      payload.counted_uom_id = countedUomId !== undefined ? countedUomId : (lineUomSelections[line.id] ?? null);
       const r = await api.patch(`/inventory/cycle-counts/${count.id}/lines/${line.id}`, payload);
-      const updatedLine = r.data.line ?? r.data; // backwards-compat if server ever returns raw line
+      const updatedLine = r.data.line || r.data; // backwards-compat if server ever returns raw line
       setLines(prev => prev.map(l => l.id === line.id ? { ...l, ...updatedLine } : l));
       if (r.data.auto_completed) {
         setCountData(prev => ({ ...prev, status: 'completed' }));
-        setReportLines(prev => (prev ?? lines).map(l => l.id === line.id ? { ...l, ...updatedLine } : l));
+        setReportLines(lines.map(l => l.id === line.id ? { ...l, ...updatedLine } : l));
       }
     } catch (e) {
       setSaveError(e.response?.data?.error || t.invCycFailedSave);
@@ -306,16 +346,65 @@ function CycleCountDetail({ count, onBack, onComplete }) {
 
   const FINAL_LINE_STATUSES = ['accepted', 'reconciled', 'overridden', 'audited'];
   const uncounted = lines.filter(l => !FINAL_LINE_STATUSES.includes(l.line_status)).length;
+  const countedLineCount = Math.max(0, lines.length - uncounted);
+  const progressPct = lines.length > 0 ? Math.round((countedLineCount / lines.length) * 100) : 0;
+  const getLineVariance = (line) => {
+    if (line.counted_qty === null || line.counted_qty === undefined) return null;
+    const fallback = parseFloat(line.counted_qty) - parseFloat(line.expected_qty);
+    const value = parseFloat(line.variance ?? fallback);
+    return Number.isNaN(value) ? null : value;
+  };
+  const lineMatchesFilter = (line) => {
+    const search = lineSearch.trim().toLowerCase();
+    const text = [
+      line.item_name,
+      line.sku,
+      line.unit,
+      line.stock_uom_unit,
+      line.counted_by_name,
+      line.location_name,
+      line.line_status,
+    ].filter(Boolean).join(' ').toLowerCase();
+    const status = line.line_status || 'pending';
+    const isFinal = FINAL_LINE_STATUSES.includes(status);
+    const variance = getLineVariance(line);
+    const statusMatch =
+      !lineStatusFilter ||
+      (lineStatusFilter === 'remaining' && !isFinal) ||
+      (lineStatusFilter === 'finished' && isFinal) ||
+      (lineStatusFilter === 'not_counted' && (line.counted_qty === null || line.counted_qty === undefined)) ||
+      (lineStatusFilter === 'with_variance' && canShowExpected && variance !== null && variance !== 0) ||
+      lineStatusFilter === status;
+
+    return (!search || text.includes(search)) && statusMatch;
+  };
+  const sortLines = (sourceLines) => {
+    if (lineSort === 'default') return sourceLines;
+    const copy = [...sourceLines];
+    copy.sort((a, b) => {
+      if (lineSort === 'item') return (a.item_name || '').localeCompare(b.item_name || '');
+      if (lineSort === 'status') return (a.line_status || 'pending').localeCompare(b.line_status || 'pending') || (a.item_name || '').localeCompare(b.item_name || '');
+      if (lineSort === 'counter') return (a.counted_by_name || '').localeCompare(b.counted_by_name || '') || (a.item_name || '').localeCompare(b.item_name || '');
+      if (lineSort === 'variance') {
+        const av = Math.abs(getLineVariance(a) ?? -1);
+        const bv = Math.abs(getLineVariance(b) ?? -1);
+        return bv - av || (a.item_name || '').localeCompare(b.item_name || '');
+      }
+      return 0;
+    });
+    return copy;
+  };
+  const visibleLines = sortLines(lines.filter(lineMatchesFilter));
+  const hasLineFilter = lineSearch.trim() || lineStatusFilter || lineSort !== 'default';
   const variantLines = lines.filter(l => {
     if (l.counted_qty === null || l.counted_qty === undefined) return false;
-    return parseFloat(l.variance ?? (parseFloat(l.counted_qty) - parseFloat(l.expected_qty))) !== 0;
+    return getLineVariance(l) !== 0;
   });
   const sc = STATUS_COLORS[countData.status] || STATUS_COLORS.draft;
-  const isCompleted = countData.status === 'completed';
 
   // Group lines by location for full counts
   const groupedLines = isFull
-    ? lines.reduce((acc, line) => {
+    ? visibleLines.reduce((acc, line) => {
         const loc = line.location_name || t.invCycUnknownLocation;
         if (!acc[loc]) acc[loc] = [];
         acc[loc].push(line);
@@ -439,7 +528,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
         <td style={d.td}>
           {line.line_status && line.line_status !== 'pending' && (
             <span style={{ ...d.lineStatusBadge, ...lineStatusStyle(line.line_status) }}>
-              {line.line_status.replace(/_/g, ' ')}
+              {formatLineStatus(line.line_status)}
             </span>
           )}
         </td>
@@ -470,7 +559,131 @@ function CycleCountDetail({ count, onBack, onComplete }) {
     </thead>
   );
 
-  const showExpected = !isAudit || isCompleted;
+  const renderLineCard = (line) => {
+    const counted = line.counted_qty !== null && line.counted_qty !== undefined;
+    const variance = line.variance != null ? parseFloat(line.variance) : null;
+    const showExpected = !isAudit || isCompleted;
+    const isHighlighted = highlightedId === line.id;
+    const stockUnit      = line.stock_uom_unit  || line.unit;
+    const stockUomId     = line.stock_uom_id    || null;
+    const stockFactor    = parseFloat(line.stock_uom_factor || 1);
+    const availableUoms  = itemUomCache[line.item_id] || [];
+    const selectedUomId  = lineUomSelections[line.id] !== undefined
+      ? lineUomSelections[line.id] : stockUomId;
+    const selectedUom    = availableUoms.find(u => u.id === selectedUomId);
+    const isDifferentUom = selectedUomId !== stockUomId;
+    const inputVal = lineInputValues[line.id];
+    let conversionHint = null;
+    if (isDifferentUom && inputVal !== undefined && inputVal !== '' && selectedUom) {
+      const n = parseFloat(inputVal);
+      if (!isNaN(n)) {
+        const countedFactor = parseFloat(selectedUom.factor || 1);
+        const inStockUnits = n * (countedFactor / stockFactor);
+        conversionHint = `= ${inStockUnits % 1 === 0 ? inStockUnits.toFixed(0) : inStockUnits.toFixed(3).replace(/\.?0+$/, '')} ${stockUnit}`;
+      }
+    }
+
+    return (
+      <article key={line.id} id={`ccline-card-${line.id}`} style={{ ...d.mobileLineCard, ...(isHighlighted ? d.mobileLineCardHighlighted : {}) }}>
+        <div style={d.mobileLineCardTop}>
+          <div>
+            <strong style={d.mobileLineTitle}>{line.item_name}</strong>
+            <span style={d.mobileLineMeta}>{[line.sku, stockUnit].filter(Boolean).join(' - ') || stockUnit}</span>
+          </div>
+          {line.line_status && line.line_status !== 'pending' && (
+            <span style={{ ...d.lineStatusBadge, ...lineStatusStyle(line.line_status) }}>
+              {formatLineStatus(line.line_status)}
+            </span>
+          )}
+        </div>
+
+        {showExpected && (
+          <div style={d.mobileLineStats}>
+            <div>
+              <span style={d.mobileLineLabel}>{t.invCycColExpected}</span>
+              <strong>{parseFloat(line.expected_qty)} {stockUnit}</strong>
+            </div>
+            <div>
+              <span style={d.mobileLineLabel}>{t.invCycColVariance}</span>
+              <strong style={{
+                color: variance === null ? '#64748b' : variance > 0 ? '#059669' : variance < 0 ? '#dc2626' : '#334155',
+              }}>
+                {variance === null ? '-' : `${variance > 0 ? '+' : ''}${variance % 1 === 0 ? variance.toFixed(0) : variance.toFixed(3).replace(/\.?0+$/, '')} ${stockUnit}`}
+              </strong>
+            </div>
+          </div>
+        )}
+
+        <div style={d.mobileCountField}>
+          <label style={d.mobileLineLabel}>{t.invCycColCounted}</label>
+          {!isCompleted ? (
+            <>
+              <div style={d.mobileCountInputRow}>
+                <input
+                  ref={el => { lineInputRefs.current[line.id] = el; }}
+                  style={{ ...d.countInput, width: '100%', textAlign: 'left', ...(isHighlighted ? { borderColor: '#f59e0b', boxShadow: '0 0 0 2px #fde68a' } : {}) }}
+                  type="number"
+                  min="0"
+                  step="any"
+                  defaultValue={counted ? line.counted_qty : ''}
+                  placeholder="-"
+                  disabled={saving === line.id}
+                  onChange={e => setLineInputValues(prev => ({ ...prev, [line.id]: e.target.value }))}
+                  onFocus={() => { if (!itemUomCache[line.item_id]) fetchItemUoms(line.item_id); }}
+                  onBlur={e => {
+                    const val = e.target.value;
+                    if (val !== '' && val !== String(line.counted_qty)) patchLine(line, parseFloat(val));
+                    if (scanMode) setTimeout(() => scanInputRef.current?.focus(), 50);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.target.blur(); setHighlightedId(null); }
+                  }}
+                />
+                {availableUoms.length > 1 && (
+                  <select
+                    style={{ ...d.uomSelect, minWidth: 104 }}
+                    value={selectedUomId ?? ''}
+                    onChange={e => {
+                      const newUomId = e.target.value ? parseInt(e.target.value) : null;
+                      setLineUomSelections(prev => ({ ...prev, [line.id]: newUomId }));
+                      const newUom = availableUoms.find(u => u.id === newUomId);
+                      if (newUom && !newUom.is_base && parseFloat(newUom.factor) === 1) {
+                        setConversionPrompt({ lineId: line.id, itemId: line.item_id, uom: newUom, baseUnit: stockUnit });
+                      }
+                      const inputEl = lineInputRefs.current[line.id];
+                      if (inputEl && inputEl.value !== '') {
+                        patchLine(line, parseFloat(inputEl.value), newUomId);
+                      }
+                    }}
+                  >
+                    {availableUoms.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.unit}{u.unit_spec ? ` (${u.unit_spec})` : ''}{u.is_base ? ` - ${t.invTxBaseUnit}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              {conversionHint && <span style={d.mobileHint}>{conversionHint}</span>}
+            </>
+          ) : (
+            <strong>{counted ? parseFloat(line.counted_qty) : '-'} {line.counted_uom_unit && line.counted_uom_unit !== stockUnit ? line.counted_uom_unit : stockUnit}</strong>
+          )}
+        </div>
+
+        <div style={d.mobileLineFooter}>
+          <span>{t.invCycColCountedBy}: {line.counted_by_name || '-'}</span>
+          {!isCompleted && (
+            <button style={d.overrideBtn} onClick={() => { setOverrideModal({ line }); setOverrideQty(line.counted_qty != null ? String(line.counted_qty) : ''); setOverrideNotes(''); }}>
+              {t.invCycOverride}
+            </button>
+          )}
+        </div>
+      </article>
+    );
+  };
+
+  const showExpected = canShowExpected;
 
   return (
     <div style={d.wrap}>
@@ -482,14 +695,23 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             <h2 style={d.title}>{COUNT_TYPES[countData.count_type]?.label || t.invCycCountLabel} — {countData.location_name}</h2>
             <TypeBadge type={countData.count_type} />
           </div>
-          <p style={d.sub}>{t.invCycStartedBy} {countData.started_by_name} · {new Date(countData.started_at).toLocaleDateString()}</p>
+          <p style={d.sub}>{t.invCycStartedBy} {countData.started_by_name} - {formatDate(countData.started_at)}</p>
           {isAudit && !isCompleted && (
             <p style={{ ...d.sub, color: '#d97706', fontWeight: 600, marginTop: 4 }}>
               {t.invCycAuditMode}
             </p>
           )}
+          <div style={d.detailProgress}>
+            <div style={d.detailProgressTop}>
+              <strong>{countedLineCount}/{lines.length} {t.invCycItemsCounted}</strong>
+              <span>{isCompleted ? t.invCycCompleted : `${uncounted} remaining`}</span>
+            </div>
+            <div style={d.detailProgressBar}>
+              <div style={{ ...d.detailProgressFill, width: `${progressPct}%` }} />
+            </div>
+          </div>
         </div>
-        <div style={d.headerRight}>
+        <div className="inventory-count-header-actions" style={d.headerRight}>
           <span style={{ ...d.statusBadge, color: sc.color, background: sc.bg }}>{sc.label}</span>
           {countData.status === 'draft' && (
             <button style={d.advanceBtn} onClick={advanceStatus}>{t.invCycStartCounting}</button>
@@ -524,21 +746,21 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       {error && <div role="alert" style={d.error}>{error}</div>}
 
       {/* ── Tab Navigation ── */}
-      <div style={d.tabRow}>
+      <div className="inventory-count-tabs" style={d.tabRow}>
         <button style={{ ...d.tab, ...(tab === 'lines' ? d.tabActive : {}) }} onClick={() => setTab('lines')}>
-          {t.invCycTabLines} ({lines.length})
+          {t.invCycTabLines} ({hasLineFilter ? `${visibleLines.length}/${lines.length}` : lines.length})
         </button>
         <button style={{ ...d.tab, ...(tab === 'workers' ? d.tabActive : {}) }}
           onClick={() => { setTab('workers'); loadAllWorkers(); }}>
-          {t.invCycTabWorkers} ({workers.length})
+          {workerPlural} ({workers.length})
         </button>
       </div>
 
       {/* ── Workers Panel ── */}
       {tab === 'workers' && (
         <div style={d.workersPanel}>
-          <div style={d.workersPanelHeader}>
-            <strong style={{ fontSize: 14 }}>{t.invCycAssignWorkers}</strong>
+          <div className="inventory-count-workers-header" style={d.workersPanelHeader}>
+            <strong style={{ fontSize: 14 }}>Assign {workerPlural.toLowerCase()}</strong>
             {!isCompleted && (
               <button style={{ ...d.distributeBtn, ...(distributing || workers.filter(w => w.roles.includes('counter')).length === 0 ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={distribute} disabled={distributing || workers.filter(w => w.roles.includes('counter')).length === 0}>
                 {distributing ? t.invCycDistributing : t.invCycDistributeLines}
@@ -546,16 +768,16 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             )}
           </div>
           <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 12px' }}>
-            {t.invCycWorkersPanelDesc}
+            Choose who can count, audit, or reconcile this inventory count.
           </p>
 
           {/* Existing assigned workers */}
           {workers.length > 0 && (
             <div style={{ marginBottom: 16 }}>
               {workers.map(w => (
-                <div key={w.user_id} style={d.workerRow}>
+                <div key={w.user_id} className="inventory-count-worker-row" style={d.workerRow}>
                   <span style={d.workerName}>{w.full_name}</span>
-                  <div style={d.rolesRow}>
+                  <div className="inventory-count-roles" style={d.rolesRow}>
                     {['counter', 'auditor', 'reconciler'].map(role => (
                       <label key={role} style={d.roleLabel}>
                         <input type="checkbox" style={{ marginRight: 4 }}
@@ -573,17 +795,17 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                     ))}
                   </div>
                   {!isCompleted && (
-                    <button style={d.removeWorkerBtn} onClick={() => removeWorker(w.user_id)}>{t.invCycRemoveWorker}</button>
+                    <button className="inventory-count-remove-worker" style={d.removeWorkerBtn} onClick={() => removeWorker(w.user_id)}>Remove {workerLabel.toLowerCase()}</button>
                   )}
                 </div>
               ))}
             </div>
           )}
 
-          {/* Add worker from company list */}
+                  {/* Add team member from company list */}
           {!isCompleted && (
             <div>
-              <p style={{ fontSize: 12, fontWeight: 600, color: '#374151', margin: '0 0 6px' }}>{t.invCycAddWorker}</p>
+              <p style={{ fontSize: 12, fontWeight: 600, color: '#374151', margin: '0 0 6px' }}>Add {workerLabel.toLowerCase()}</p>
               <select style={d.workerSelect}
                 value=""
                 onChange={e => {
@@ -592,7 +814,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                   if (workers.find(w => w.user_id === uid)) return;
                   saveWorker(uid, ['counter']);
                 }}>
-                <option value="">{t.invCycSelectWorker}</option>
+                <option value="">Select {workerLabel.toLowerCase()}...</option>
                 {allWorkers
                   .filter(w => !workers.find(x => x.user_id === w.id))
                   .map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
@@ -629,18 +851,18 @@ function CycleCountDetail({ count, onBack, onComplete }) {
       {/* ── Scan Panel ── */}
       {scanMode && (
         <div style={d.scanPanel}>
-          <div style={d.scanBinRow}>
+          <div className="inventory-count-scan-bin-row" style={d.scanBinRow}>
             <span style={d.scanBinLabel}>
-              {currentBin
-                ? <>📍 <strong>{currentBin.name}</strong> <span style={{ color: '#6b7280', fontSize: 12 }}>({currentBin.type})</span></>
-                : <span style={{ color: '#6b7280' }}>📍 {t.invCycNoBinScanned}</span>
-              }
+        {currentBin
+          ? <><strong>{currentBin.name}</strong> <span style={{ color: '#6b7280', fontSize: 12 }}>({currentBin.type})</span></>
+          : <span style={{ color: '#6b7280' }}>{t.invCycNoBinScanned}</span>
+        }
             </span>
             {currentBin && (
               <button style={d.scanClearBtn} onClick={() => setCurrentBin(null)}>{t.invCycClearBin}</button>
             )}
           </div>
-          <div style={d.scanInputRow}>
+          <div className="inventory-count-scan-input-row" style={d.scanInputRow}>
             <input
               ref={scanInputRef}
               style={d.scanInput}
@@ -665,28 +887,99 @@ function CycleCountDetail({ count, onBack, onComplete }) {
         </div>
       )}
 
+      {tab === 'lines' && lines.length > 0 && (
+        <>
+          <div className="inventory-count-line-filters" style={d.lineFilters}>
+            <input
+              type="search"
+              value={lineSearch}
+              onChange={e => setLineSearch(e.target.value)}
+              placeholder="Search item, SKU, location, or counter..."
+              style={d.lineFilterInput}
+            />
+            <select
+              value={lineStatusFilter}
+              onChange={e => setLineStatusFilter(e.target.value)}
+              style={d.lineFilterSelect}
+            >
+              <option value="">All lines</option>
+              <option value="remaining">Remaining</option>
+              <option value="finished">Finished</option>
+              <option value="not_counted">Not counted</option>
+              {showExpected && <option value="with_variance">Has variance</option>}
+              <option value="pending">Pending</option>
+              <option value="counted">Counted</option>
+              <option value="needs_audit">Needs audit</option>
+              <option value="needs_reconcile">Needs reconcile</option>
+              <option value="accepted">Accepted</option>
+              <option value="overridden">Overridden</option>
+              <option value="audited">Audited</option>
+            </select>
+            <select
+              value={lineSort}
+              onChange={e => setLineSort(e.target.value)}
+              style={d.lineFilterSelect}
+            >
+              <option value="default">Original order</option>
+              <option value="item">Item A-Z</option>
+              <option value="status">Status</option>
+              <option value="counter">Counter</option>
+              {showExpected && <option value="variance">Largest variance</option>}
+            </select>
+            {hasLineFilter && (
+              <button
+                type="button"
+                style={d.lineFilterClear}
+                onClick={() => { setLineSearch(''); setLineStatusFilter(''); setLineSort('default'); }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {hasLineFilter && (
+            <p style={d.filterCount}>
+              Showing {visibleLines.length} of {lines.length} count lines
+            </p>
+          )}
+        </>
+      )}
+
       {tab === 'lines' && lines.length === 0 ? (
         <div style={d.empty}>{t.invCycNoItems}</div>
+      ) : tab === 'lines' && visibleLines.length === 0 ? (
+        <div style={d.empty}>No count lines match those filters.</div>
       ) : tab === 'lines' && isFull ? (
-        // Full count: render table grouped by location
+        // Full count: render grouped lines by location
         Object.entries(groupedLines).map(([locName, locLines]) => (
           <div key={locName} style={{ marginBottom: 24 }}>
             <div style={d.locationHeader}>{locName}</div>
-            <div style={d.tableWrap}>
-              <table style={d.table}>
-                {renderTableHead(showExpected)}
-                <tbody>{locLines.map((line, i) => renderLine(line, i))}</tbody>
-              </table>
-            </div>
+            {useMobileLineCards ? (
+              <div style={d.mobileLineList}>
+                {locLines.map(line => renderLineCard(line))}
+              </div>
+            ) : (
+              <div className="inventory-count-table-wrap" style={d.tableWrap}>
+                <table style={d.table}>
+                  {renderTableHead(showExpected)}
+                  <tbody>{locLines.map((line, i) => renderLine(line, i))}</tbody>
+                </table>
+              </div>
+            )}
           </div>
         ))
       ) : tab === 'lines' ? (
-        <div style={d.tableWrap}>
-          <table style={d.table}>
-            {renderTableHead(showExpected)}
-            <tbody>{lines.map((line, i) => renderLine(line, i))}</tbody>
-          </table>
-        </div>
+        useMobileLineCards ? (
+          <div style={d.mobileLineList}>
+            {visibleLines.map(line => renderLineCard(line))}
+          </div>
+        ) : (
+          <div className="inventory-count-table-wrap" style={d.tableWrap}>
+            <table style={d.table}>
+              {renderTableHead(showExpected)}
+              <tbody>{visibleLines.map((line, i) => renderLine(line, i))}</tbody>
+            </table>
+          </div>
+        )
       ) : null}
 
       {tab === 'lines' && uncounted > 0 && countData.status === 'in_progress' && (
@@ -698,6 +991,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
           <ModalShell
             onClose={() => { setReportLines(null); onComplete(); }}
             titleId="cyc-variance-title"
+            className="inventory-count-modal"
             style={{ ...d.modal, maxWidth: 560 }}
           >
             <h3 id="cyc-variance-title" style={d.modalTitle}>{t.invCycVarianceReport}</h3>
@@ -754,7 +1048,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 </>
               );
             })()}
-            <div style={d.modalActions}>
+            <div className="inventory-count-modal-actions" style={d.modalActions}>
               <button style={d.cancelBtn} onClick={() => { setReportLines(null); onComplete(); }}>{t.cancel}</button>
               <button style={{ ...d.confirmBtn, background: '#2563eb' }} onClick={() => downloadVarianceCSV(reportLines)}>
                 {t.invCycDownloadCSV}
@@ -769,6 +1063,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
           <ModalShell
             onClose={() => !completing && setConfirmOpen(false)}
             titleId="cyc-confirm-title"
+            className="inventory-count-modal"
             style={d.modal}
           >
             <h3 id="cyc-confirm-title" style={d.modalTitle}>{t.invCycConfirmComplete} {COUNT_TYPES[countData.count_type]?.label || ''}?</h3>
@@ -789,7 +1084,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
             ) : (
               <p style={d.modalBody}>{t.invCycNoVariancesConfirm}</p>
             )}
-            <div style={d.modalActions}>
+            <div className="inventory-count-modal-actions" style={d.modalActions}>
               <button style={d.cancelBtn} onClick={() => setConfirmOpen(false)}>{t.cancel}</button>
               <button style={{ ...d.confirmBtn, ...(completing ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={complete} disabled={completing}>
                 {completing ? t.invCycCompleting : t.invCycConfirmBtn}
@@ -821,6 +1116,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
           <ModalShell
             onClose={() => setOverrideModal(null)}
             titleId="cyc-override-title"
+            className="inventory-count-modal"
             style={d.modal}
           >
             <h3 id="cyc-override-title" style={d.modalTitle}>{t.invCycOverrideTitle}: {overrideModal.line.item_name}</h3>
@@ -840,7 +1136,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
                 style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
                 value={overrideNotes} onChange={e => setOverrideNotes(e.target.value)} />
             </div>
-            <div style={d.modalActions}>
+            <div className="inventory-count-modal-actions" style={d.modalActions}>
               <button style={d.cancelBtn} onClick={() => setOverrideModal(null)}>{t.cancel}</button>
               <button style={{ ...d.confirmBtn, background: '#7c3aed', ...(overriding || overrideQty === '' ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }}
                 onClick={submitOverride} disabled={overriding || overrideQty === ''}>
@@ -854,7 +1150,7 @@ function CycleCountDetail({ count, onBack, onComplete }) {
   );
 }
 
-export default function InventoryCycleCounts({ locations, onComplete }) {
+export default function InventoryCycleCounts({ locations, settings, onComplete }) {
   const t = useT();
   const COUNT_TYPES = useCountTypes(t);
   const STATUS_COLORS = useStatusColors(t);
@@ -871,6 +1167,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
+  const [countSearch, setCountSearch] = useState('');
   const [createError, setCreateError] = useState('');
   const [loadDetailError, setLoadDetailError] = useState('');
 
@@ -883,12 +1180,13 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
       if (filterStatus) params.set('status', filterStatus);
       if (filterType) params.set('count_type', filterType);
       if (filterLocation) params.set('location_id', filterLocation);
+      if (countSearch.trim()) params.set('q', countSearch.trim());
       const r = await api.get(`/inventory/cycle-counts?${params}`);
       setCounts(r.data.counts);
       setCountsTotal(r.data.total);
     } catch { setError(t.invCycFailedLoad); }
     finally { setLoading(false); }
-  }, [filterStatus, filterType, filterLocation]);
+  }, [filterStatus, filterType, filterLocation, countSearch]);
 
   const loadMoreCounts = async () => {
     const nextOffset = countsOffset + CC_PAGE;
@@ -898,6 +1196,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
       if (filterStatus) params.set('status', filterStatus);
       if (filterType) params.set('count_type', filterType);
       if (filterLocation) params.set('location_id', filterLocation);
+      if (countSearch.trim()) params.set('q', countSearch.trim());
       const r = await api.get(`/inventory/cycle-counts?${params}`);
       setCounts(prev => [...prev, ...r.data.counts]);
       setCountsOffset(nextOffset);
@@ -941,6 +1240,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
     return (
       <CycleCountDetail
         count={selected}
+        settings={settings}
         onBack={() => { setSelected(null); load(); }}
         onComplete={handleComplete}
       />
@@ -949,12 +1249,13 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
 
   const activeLocations = locations.filter(l => l.active);
   const needsLocation = newCountType !== 'full';
+  const hasCountListFilter = countSearch.trim() || filterStatus || filterType || filterLocation;
 
   return (
     <div style={s.wrap}>
       {/* Start new count */}
       <div style={s.startCard}>
-        <div style={s.startRow}>
+        <div className="inventory-count-start-row" style={s.startRow}>
           <select style={s.typeSelect} value={newCountType} onChange={e => { setNewCountType(e.target.value); setNewLocationId(''); }}>
             {Object.entries(COUNT_TYPES).map(([key, ct]) => (
               <option key={key} value={key}>{ct.label}</option>
@@ -977,7 +1278,14 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
       </div>
 
       {/* Filters */}
-      <div style={s.filters}>
+      <div className="inventory-count-filters" style={s.filters}>
+        <input
+          type="search"
+          value={countSearch}
+          onChange={e => setCountSearch(e.target.value)}
+          placeholder="Search counts..."
+          style={s.searchInput}
+        />
         <select style={s.select} value={filterType} onChange={e => setFilterType(e.target.value)}>
           <option value="">{t.invCycAllTypes}</option>
           {Object.entries(COUNT_TYPES).map(([key, ct]) => (
@@ -994,7 +1302,21 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
           <option value="">{t.invCycAllLocations}</option>
           {activeLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
+        {hasCountListFilter && (
+          <button
+            type="button"
+            style={s.clearBtn}
+            onClick={() => { setCountSearch(''); setFilterType(''); setFilterStatus(''); setFilterLocation(''); }}
+          >
+            Clear
+          </button>
+        )}
       </div>
+      {!loading && (
+        <p style={s.filterMeta}>
+          {hasCountListFilter ? `Showing ${counts.length} of ${countsTotal} matching counts` : `${countsTotal} counts`}
+        </p>
+      )}
 
       {error && <div role="alert" style={s.error}>{error}</div>}
       {loadDetailError && <p style={s.inlineError}>{loadDetailError}</p>}
@@ -1003,8 +1325,7 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
         <SkeletonList count={4} rows={2} />
       ) : counts.length === 0 ? (
         <div style={s.empty}>
-          <div style={s.emptyIcon}>📋</div>
-          <p>{t.invCycNoCountsYet}</p>
+          <p>{hasCountListFilter ? 'No counts match those filters.' : t.invCycNoCountsYet}</p>
         </div>
       ) : (
         <>
@@ -1018,8 +1339,8 @@ export default function InventoryCycleCounts({ locations, onComplete }) {
                   <div>
                     <div style={s.cardTitle}>{count.location_name}</div>
                     <div style={s.cardMeta}>
-                      {t.invCycStartedBy} {count.started_by_name} · {new Date(count.started_at).toLocaleDateString()}
-                      {count.completed_at && ` · ${t.invCycCompleted} ${new Date(count.completed_at).toLocaleDateString()}`}
+                      {t.invCycStartedBy} {count.started_by_name} - {formatDate(count.started_at)}
+                      {count.completed_at && ` - ${t.invCycCompleted} ${formatDate(count.completed_at)}`}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -1074,6 +1395,10 @@ const d = {
   title:         { fontSize: 18, fontWeight: 700, color: '#111827', margin: 0 },
   sub:           { fontSize: 13, color: '#6b7280', margin: 0 },
   headerRight:   { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  detailProgress:{ marginTop: 12, maxWidth: 360 },
+  detailProgressTop: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 6, fontSize: 12, color: '#64748b' },
+  detailProgressBar: { height: 7, borderRadius: 999, background: '#e5e7eb', overflow: 'hidden' },
+  detailProgressFill: { height: '100%', borderRadius: 999, background: '#2563eb', transition: 'width 0.25s ease' },
   statusBadge:   { padding: '4px 14px', borderRadius: 12, fontSize: 13, fontWeight: 700 },
   advanceBtn:    { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   completeBtn:   { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
@@ -1089,6 +1414,11 @@ const d = {
   scanHint:      { fontSize: 12, color: '#78716c', lineHeight: 1.5, margin: 0 },
   error:         { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },
   empty:         { textAlign: 'center', padding: 40, color: '#6b7280' },
+  lineFilters:   { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 190px 170px auto', gap: 8, alignItems: 'center', marginBottom: 10 },
+  lineFilterInput: { width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#111827', background: '#fff' },
+  lineFilterSelect: { width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#374151', background: '#fff' },
+  lineFilterClear: { padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 700, color: '#374151', cursor: 'pointer' },
+  filterCount:   { fontSize: 12, color: '#64748b', margin: '-4px 0 12px' },
   tableWrap:     { overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb' },
   table:         { width: '100%', borderCollapse: 'collapse', minWidth: 500 },
   thead:         { background: '#f9fafb' },
@@ -1098,6 +1428,18 @@ const d = {
   td:            { padding: '10px 12px', fontSize: 14, color: '#374151' },
   countInput:    { width: 80, padding: '5px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 14, textAlign: 'right' },
   uomSelect:     { padding: '5px 6px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 12, color: '#374151', background: '#f9fafb', cursor: 'pointer' },
+  mobileLineList:{ display: 'grid', gap: 10 },
+  mobileLineCard:{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, boxShadow: '0 1px 4px rgba(15,23,42,0.04)' },
+  mobileLineCardHighlighted: { borderColor: '#f59e0b', boxShadow: '0 0 0 2px #fde68a' },
+  mobileLineCardTop: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 10, alignItems: 'start', marginBottom: 12 },
+  mobileLineTitle: { display: 'block', fontSize: 15, fontWeight: 800, color: '#111827', lineHeight: 1.25 },
+  mobileLineMeta: { display: 'block', marginTop: 3, fontSize: 12, color: '#64748b', lineHeight: 1.35 },
+  mobileLineStats: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '10px 0', borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', marginBottom: 12, fontSize: 13, color: '#334155' },
+  mobileLineLabel: { display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 },
+  mobileCountField: { display: 'grid', gap: 5, marginBottom: 12 },
+  mobileCountInputRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, alignItems: 'center' },
+  mobileHint: { fontSize: 12, color: '#64748b' },
+  mobileLineFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, fontSize: 12, color: '#64748b' },
   uncountedNote: { textAlign: 'center', fontSize: 13, color: '#d97706', fontWeight: 600, marginTop: 12 },
   locationHeader:{ fontSize: 13, fontWeight: 700, color: '#374151', padding: '8px 0 6px', borderBottom: '2px solid #e5e7eb', marginBottom: 4 },
   modalOverlay:  { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 },
@@ -1114,9 +1456,9 @@ const d = {
   warnMsg:       { color: '#92400e', fontSize: 13, margin: '6px 0 0' },
   inlineError:   { color: '#dc2626', fontSize: 13, margin: '6px 0 0' },
   // Tabs
-  tabRow:        { display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e5e7eb' },
-  tab:           { padding: '8px 16px', background: 'none', border: 'none', fontSize: 14, fontWeight: 600, color: '#6b7280', cursor: 'pointer', borderBottom: '2px solid transparent', marginBottom: -2 },
-  tabActive:     { color: '#2563eb', borderBottom: '2px solid #2563eb' },
+  tabRow:        { display: 'flex', gap: 6, marginBottom: 16, padding: 4, border: '1px solid #e5e7eb', borderRadius: 10, background: '#f8fafc' },
+  tab:           { flex: 1, padding: '9px 12px', background: 'transparent', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, color: '#64748b', cursor: 'pointer' },
+  tabActive:     { color: '#111827', background: '#fff', boxShadow: '0 1px 4px rgba(15,23,42,0.08)' },
   // Workers panel
   workersPanel:  { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginBottom: 16 },
   workersPanelHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
@@ -1139,7 +1481,10 @@ const s = {
   startRow:      { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
   typeSelect:    { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151', minWidth: 160 },
   filters:       { display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' },
+  searchInput:   { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#111827', flex: '1 1 220px', minWidth: 180, boxSizing: 'border-box' },
   select:        { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', color: '#374151', flex: 1, minWidth: 140 },
+  clearBtn:      { padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, fontWeight: 700, color: '#374151', cursor: 'pointer' },
+  filterMeta:    { fontSize: 12, color: '#64748b', margin: '-8px 0 12px' },
   typeDesc:      { margin: '8px 0 0', fontSize: 13, color: '#6b7280' },
   startBtn:      { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#92400e', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
   error:         { background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 14 },

@@ -11,17 +11,18 @@ import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
 import api from '../api';
 import { getOrFetch } from '../offlineDb';
-import AppHeader from '../components/AppHeader';
+import { PageIntro, PageShell } from '../components/PageShell';
 import TabBar from '../components/TabBar';
 import ErrorBoundary from '../components/ErrorBoundary';
 import RetryBanner from '../components/RetryBanner';
+import EmptyState from '../components/EmptyState';
 import { silentError } from '../errorReporter';
 
 const ManageWorkers = lazy(() => import('../components/ManageWorkers'));
 const ManageRoles   = lazy(() => import('../components/ManageRoles'));
 
 function TabLoader() {
-  return <div style={{ padding: '40px 0', textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading…</div>;
+  return <div className="ops-loading-state">Loading...</div>;
 }
 
 const ROLE_META = {
@@ -29,8 +30,8 @@ const ROLE_META = {
   admin:       { bg: '#fef3c7', fg: '#92400e' },
   super_admin: { bg: '#fee2e2', fg: '#991b1b' },
 };
-const roleLabel = (role, t) => ({
-  worker:      t.workerRole,
+const roleLabel = (role, t, workerLabel = null) => ({
+  worker:      workerLabel || t.workerRole,
   admin:       t.adminRole,
   super_admin: t.superAdminRole,
 }[role] || role);
@@ -50,7 +51,7 @@ function initials(name) {
   return (first + last).toUpperCase();
 }
 
-function DirectoryView({ team, loading, search, onSearchChange, t }) {
+function DirectoryView({ team, loading, search, onSearchChange, t, workerLabel }) {
   const lower = search.trim().toLowerCase();
   const filtered = lower
     ? team.filter(m =>
@@ -64,44 +65,46 @@ function DirectoryView({ team, loading, search, onSearchChange, t }) {
 
   return (
     <div>
-      <div style={s.searchRow}>
+      <div className="ops-directory-toolbar">
         <input
           type="search"
           placeholder={t.teamSearchPlaceholder}
           value={search}
           onChange={e => onSearchChange(e.target.value)}
-          style={s.search}
+          className="ops-directory-search"
           aria-label={t.teamSearchAria}
         />
-        <span style={s.counter}>
+        <span className="ops-directory-count">
           {filtered.length} {filtered.length === 1 ? t.teamPersonSingular : t.teamPersonPlural}
           {lower && filtered.length !== team.length && ` ${t.teamOfWord} ${team.length}`}
         </span>
       </div>
       {filtered.length === 0 ? (
-        <div style={s.empty}>
-          {lower ? t.teamNoMatches : t.teamNoMembers}
-        </div>
+        <EmptyState
+          mark="T"
+          title={lower ? t.teamNoMatches : `No ${workerLabel.toLowerCase()} records yet`}
+          body={lower ? 'Try a different name, username, or classification.' : `People added to this company will appear here.`}
+        />
       ) : (
-        <div style={s.grid}>
+        <div className="ops-directory-grid">
           {filtered.map(m => {
             const role = ROLE_META[m.role] || ROLE_META.worker;
             return (
-              <div key={m.id} style={s.card}>
-                <div style={s.avatar}>{initials(m.full_name)}</div>
+              <div key={m.id} className="ops-person-card">
+                <div className="ops-avatar">{initials(m.full_name)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={s.name}>
+                  <div className="ops-person-name">
                     {m.full_name}
                     {m.must_change_password && <span style={s.pendingPill} title={t.teamNotSignedInYet}>{t.teamPendingBadge}</span>}
                   </div>
-                  <div style={s.meta}>
-                    <span style={{ ...s.rolePill, background: role.bg, color: role.fg }}>{roleLabel(m.role, t)}</span>
+                  <div className="ops-person-meta">
+                    <span style={{ ...s.rolePill, background: role.bg, color: role.fg }}>{roleLabel(m.role, t, workerLabel)}</span>
                     {m.worker_type && m.role === 'worker' && (
                       <span style={s.typePill}>{workerTypeLabel(m.worker_type, t)}</span>
                     )}
                     {m.classification && <span style={s.classPill}>{m.classification}</span>}
                   </div>
-                  <div style={s.username}>@{m.username}</div>
+                  <div className="ops-person-username">@{m.username}</div>
                 </div>
               </div>
             );
@@ -133,6 +136,7 @@ export default function TeamPage() {
   const [adminSettings, setAdminSettings] = useState(null);
   const [adminLoaded, setAdminLoaded] = useState(false);
   const [adminLoadError, setAdminLoadError] = useState(null);
+  const workerLabel = features?.label_worker || adminSettings?.label_worker || 'Team Member';
 
   const loadTeam = useCallback(() => {
     setTeamLoading(true);
@@ -180,17 +184,23 @@ export default function TeamPage() {
   const handleWorkerRestored = w  => { setAdminWorkers(prev => [...prev, w]); loadTeam(); };
 
   return (
-    <div style={s.page}>
-      <AppHeader currentApp="team" features={features} />
-
-      <main id="main-content" style={s.main}>
+    <PageShell currentApp="team" features={features} maxWidth={940}>
+        <PageIntro
+          introId="team"
+          kicker="Team"
+          title={isAdmin ? `Manage ${workerLabel.toLowerCase()} access without clutter.` : 'Find the people you work with.'}
+          description={isAdmin
+            ? 'Directory, access, roles, and permissions are separated so daily lookup stays simple and admin setup stays available.'
+            : 'The directory keeps names, roles, and classifications easy to scan.'}
+          meta={<span className="ops-pill">{team.length} {team.length === 1 ? 'person' : 'people'}</span>}
+        />
         {isAdmin && (
           <TabBar
             active={teamTab}
             onChange={switchTab}
             tabs={[
               { id: 'directory', label: t.teamDirectoryTab },
-              { id: 'manage',    label: t.teamManageTab },
+              { id: 'manage',    label: `Manage ${workerLabel}` },
               { id: 'roles',     label: t.teamRolesTab || 'Roles' },
             ]}
           />
@@ -198,7 +208,7 @@ export default function TeamPage() {
 
         <ErrorBoundary key={teamTab} mode="inline" label={teamTab === 'manage' ? `${t.teamManageTab}` : `${t.teamDirectoryTab}`}>
           {teamTab === 'directory' && (
-            <DirectoryView team={team} loading={teamLoading} search={search} onSearchChange={setSearch} t={t} />
+            <DirectoryView team={team} loading={teamLoading} search={search} onSearchChange={setSearch} t={t} workerLabel={workerLabel} />
           )}
           {teamTab === 'manage' && isAdmin && (
             <>
@@ -220,6 +230,7 @@ export default function TeamPage() {
                     trackClassifications={adminSettings?.cp_track_classifications !== false}
                     trackFringes={adminSettings?.cp_track_fringes !== false}
                     collectSsn={adminSettings?.cp_collect_ssn !== false}
+                    workerLabel={workerLabel}
                   />
                 </Suspense>
               )}
@@ -231,22 +242,11 @@ export default function TeamPage() {
             </Suspense>
           )}
         </ErrorBoundary>
-      </main>
-    </div>
+    </PageShell>
   );
 }
 
 const s = {
-  page:    { minHeight: '100vh', background: '#f4f6f9' },
-  header:  { background: '#0ea5e9', color: '#fff', padding: '0 24px', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 'calc(56px + env(safe-area-inset-top))', position: 'sticky', top: 0, zIndex: 100 },
-  headerTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: 56 },
-  logoGroup: { display: 'flex', alignItems: 'center', gap: 12 },
-  companyName: { fontSize: 15, fontWeight: 600, opacity: 0.9 },
-  headerRight: { display: 'flex', alignItems: 'center', gap: 10 },
-  userName: { fontSize: 14, opacity: 0.9 },
-  headerBtn: { background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  main:    { maxWidth: 860, margin: '0 auto', padding: '24px 16px' },
-
   searchRow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' },
   search:    { flex: 1, minWidth: 220, padding: '9px 14px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 },
   counter:   { fontSize: 13, color: '#6b7280', fontWeight: 600 },

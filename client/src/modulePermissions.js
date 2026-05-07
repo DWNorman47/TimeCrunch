@@ -50,7 +50,9 @@ export const MODULE_PERMISSIONS = {
   ],
 };
 
-// Modules every authenticated user can see, perms or not.
+// Modules every authenticated user can see in the app switcher, perms or not.
+// /home remains routable, but is intentionally hidden until the home surface
+// earns its place in the daily navigation again.
 export const ALWAYS_VISIBLE_MODULES = new Set(['account']);
 
 // Per-tab permission gates inside Administration (used by AdministrationPage).
@@ -70,8 +72,8 @@ export const ADMINISTRATION_TAB_PERMS = {
  * user with any real access doesn't get dumped on Account by default.
  */
 const LANDING_PRIORITY = [
-  { id: 'workforce',      path: '/workforce' },      // admin oversight (admins land here)
-  { id: 'timeclock',      path: '/timeclock' },      // participating (workers + admin self-time)
+  { id: 'timeclock',      path: '/timeclock' },      // participating (everyone starts here)
+  { id: 'workforce',      path: '/workforce' },      // admin oversight
   { id: 'projects',       path: '/projects' },
   { id: 'team',           path: '/team' },
   { id: 'field',          path: '/field' },

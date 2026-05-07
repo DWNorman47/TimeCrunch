@@ -10,8 +10,12 @@ function monthStart() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
 }
 
-export default function ExportPanel({ workers, projects }) {
+export default function ExportPanel({ workers, projects, settings = null }) {
   const t = useT();
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(today());
   const [workerId, setWorkerId] = useState('');
@@ -58,16 +62,16 @@ export default function ExportPanel({ workers, projects }) {
           <input id="exp-to" style={styles.input} type="date" value={to} onChange={e => setTo(e.target.value)} />
         </div>
         <div style={styles.filterGroup}>
-          <label htmlFor="exp-worker" style={styles.label}>{t.worker}</label>
+          <label htmlFor="exp-worker" style={styles.label}>{workerLabel}</label>
           <select id="exp-worker" style={styles.input} value={workerId} onChange={e => setWorkerId(e.target.value)}>
-            <option value="">{t.allWorkers}</option>
+            <option value="">{`All ${workerLabelPlural}`}</option>
             {workers.map(w => <option key={w.id} value={w.id}>{w.full_name}</option>)}
           </select>
         </div>
         <div style={styles.filterGroup}>
-          <label htmlFor="exp-project" style={styles.label}>{t.project}</label>
+          <label htmlFor="exp-project" style={styles.label}>{workLabel}</label>
           <select id="exp-project" style={styles.input} value={projectId} onChange={e => setProjectId(e.target.value)}>
-            <option value="">{t.allProjectsOpt}</option>
+            <option value="">{`All ${workLabelPlural}`}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>

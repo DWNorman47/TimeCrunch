@@ -3,12 +3,22 @@ import api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useT } from '../hooks/useT';
+import { langToLocale } from '../utils';
 import Pagination from './Pagination';
 import { SkeletonList } from './Skeleton';
+import FieldFilters from './FieldFilters';
 
 import { silentError } from '../errorReporter';
 function today() {
   return new Date().toLocaleDateString('en-CA');
+}
+
+function fmtSubDate(value, locale = 'en-US') {
+  if (!value) return '';
+  const raw = value.toString().substring(0, 10);
+  const parsed = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return parsed.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 const BLANK = {
@@ -18,7 +28,7 @@ const BLANK = {
 
 // ── Form (create or edit) ─────────────────────────────────────────────────────
 
-function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
+function SubReportForm({ projects, initial = BLANK, onSaved, onCancel, workLabel = 'Work', workerLabelPluralLower = 'workers' }) {
   const t = useT();
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -55,9 +65,9 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
         </div>
         {projects.length > 0 && (
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>{t.project}</label>
+            <label style={styles.label}>{workLabel}</label>
             <select style={styles.input} value={form.project_id} onChange={e => set('project_id', e.target.value)}>
-              <option value="">{t.noProjectOpt}</option>
+              <option value="">{`No ${workLabel.toLowerCase()}`}</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -76,7 +86,7 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
       </div>
 
       <div style={styles.fieldGroup}>
-        <label style={styles.label}>{t.headcount} <span style={styles.optional}>({t.workersOnSite})</span></label>
+        <label style={styles.label}>{t.headcount} <span style={styles.optional}>({workerLabelPluralLower} on location)</span></label>
         <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="1" placeholder="0" value={form.headcount} onChange={e => set('headcount', e.target.value)} />
       </div>
 
@@ -106,9 +116,12 @@ function SubReportForm({ projects, initial = BLANK, onSaved, onCancel }) {
 
 function SubCard({ report, onEdit, onDeleted }) {
   const t = useT();
+  const { user } = useAuth();
+  const locale = langToLocale(user?.language);
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const headcount = Number(report.headcount || 0);
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -127,10 +140,10 @@ function SubCard({ report, onEdit, onDeleted }) {
             {report.pending && <span style={styles.pendingBadge}>⏳ {t.pendingSync}</span>}
           </div>
           <div style={styles.cardMeta}>
-            <span>{report.report_date?.toString().substring(0, 10)}</span>
+            <span>{fmtSubDate(report.report_date, locale)}</span>
             {report.project_name && <span style={styles.projectTag}>{report.project_name}</span>}
-            {report.headcount > 0 && <span style={styles.headcountTag}>👷 {report.headcount}</span>}
-            {report.foreman_name && <span style={styles.foremanTag}>{report.foreman_name}</span>}
+            {headcount > 0 && <span style={styles.headcountTag}>{headcount} {headcount === 1 ? 'person' : 'people'}</span>}
+            {report.foreman_name && <span style={styles.foremanTag}>Lead: {report.foreman_name}</span>}
           </div>
         </div>
         <span style={styles.chevron}>{expanded ? '▲' : '▼'}</span>
@@ -171,9 +184,14 @@ function SubCard({ report, onEdit, onDeleted }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function SubReports({ projects }) {
+export default function SubReports({ projects, settings = null }) {
   const t = useT();
   const { onSync } = useOffline() || {};
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
+  const workerLabelPluralLower = workerLabelPlural.toLowerCase();
   const [reports, setReports] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -210,6 +228,7 @@ export default function SubReports({ projects }) {
 
   // Unique sub company names for filter
   const subNames = useMemo(() => [...new Set(reports.map(r => r.sub_company))].sort(), [reports]);
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   return (
     <div>
@@ -225,16 +244,18 @@ export default function SubReports({ projects }) {
           <SubReportForm
             projects={projects}
             initial={editing || BLANK}
+            workLabel={workLabel}
+            workerLabelPluralLower={workerLabelPluralLower}
             onSaved={handleSaved}
             onCancel={() => { setShowForm(false); setEditing(null); }}
           />
         </div>
       )}
 
-      <div className="filter-row" style={styles.filterBar}>
+      <FieldFilters activeCount={activeFilterCount}>
         {projects.length > 0 && (
           <select style={styles.filterSelect} value={filters.project_id || ''} onChange={e => setFilter('project_id', e.target.value)}>
-            <option value="">{t.allProjects}</option>
+            <option value="">{`All ${workLabelPlural}`}</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
@@ -246,14 +267,15 @@ export default function SubReports({ projects }) {
         )}
         <input style={styles.filterInput} type="date" value={filters.from || ''} onChange={e => setFilter('from', e.target.value)} title={t.fromDate} />
         <input style={styles.filterInput} type="date" value={filters.to || ''} onChange={e => setFilter('to', e.target.value)} title={t.toDate} />
-      </div>
+      </FieldFilters>
 
       {loading ? (
         <SkeletonList count={4} rows={2} />
       ) : reports.length === 0 ? (
         <div style={styles.empty}>
-          <div style={styles.emptyIcon}>🏗️</div>
+          <p style={styles.emptyTitle}>No sub reports</p>
           <p style={styles.emptyText}>{t.noSubReports}</p>
+          {!showForm && !editing && <button type="button" style={styles.emptyCtaBtn} onClick={() => setShowForm(true)}>+ {t.addReport}</button>}
         </div>
       ) : (
         <>
@@ -277,7 +299,7 @@ export default function SubReports({ projects }) {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = {
-  topRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  topRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' },
   heading: { fontSize: 22, fontWeight: 800, color: '#111827', margin: 0 },
   newBtn: { background: '#059669', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' },
   formCard: { background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginBottom: 20 },
@@ -288,7 +310,9 @@ const styles = {
   hint: { color: '#6b7280', fontSize: 14 },
   empty: { textAlign: 'center', padding: '60px 20px' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
+  emptyTitle: { margin: '0 0 6px', fontSize: 18, fontWeight: 800, color: '#111827' },
   emptyText: { color: '#6b7280', fontSize: 15 },
+  emptyCtaBtn: { marginTop: 14, background: '#059669', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer' },
   // Card
   card: { background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '14px 16px', cursor: 'pointer', gap: 12 },
@@ -296,8 +320,8 @@ const styles = {
   subName: { fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 4 },
   cardMeta: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#6b7280', flexWrap: 'wrap' },
   projectTag: { background: '#ede9fe', color: '#6d28d9', padding: '1px 7px', borderRadius: 10, fontWeight: 600 },
-  headcountTag: { background: '#fef3c7', color: '#92400e', padding: '1px 7px', borderRadius: 10, fontWeight: 600 },
-  foremanTag: { color: '#059669', fontWeight: 600 },
+  headcountTag: { color: '#92400e', fontWeight: 700 },
+  foremanTag: { color: '#059669', fontWeight: 700 },
   chevron: { fontSize: 10, color: '#6b7280', flexShrink: 0 },
   cardBody: { padding: '0 16px 14px', borderTop: '1px solid #f3f4f6' },
   section: { marginTop: 12 },

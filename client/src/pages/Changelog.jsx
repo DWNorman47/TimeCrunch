@@ -24,11 +24,11 @@ const ENTRIES = [
     version: '2026-04-21',
     headline: 'Reliability',
     items: [
-      'Live admin changes now reach workers faster (project lists, module toggles).',
+      'Live admin changes now reach team members faster (work lists, module toggles).',
       'Refresh-while-online always returns fresh data; cache stays offline-only.',
       'Worker "Login as" impersonation for any user from SuperAdmin.',
       'SuperAdmin: force-logout any user, impersonation log, company data export, full company delete cleanup.',
-      'Clock-in no longer requires a project when no projects exist.',
+      'Clock-in no longer requires work selection when no work exists.',
       'Username or email both work on login.',
       'Excel/CSV import for inventory items.',
       'Team module with a company-wide directory.',

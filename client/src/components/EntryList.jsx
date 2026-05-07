@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import api from '../api';
 import MessageThread from './MessageThread';
 import EntryPanel from './EntryPanel';
+import EmptyState from './EmptyState';
 import { fmtHours, langToLocale } from '../utils';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -26,7 +27,7 @@ function isMidnightCross(start, end) {
   return end.substring(0, 5) < start.substring(0, 5);
 }
 
-export default function EntryList({ entries, onDeleted, onUpdated, t, language, currentUserId, projects = [], onRefresh }) {
+export default function EntryList({ entries, onDeleted, onUpdated, t, language, currentUserId, projects = [], onRefresh, workLabel = 'Work' }) {
   const [expandedId, setExpandedId] = useState(null);
   const [openMessageId, setOpenMessageId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -68,11 +69,11 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
   }, [entries]);
 
   if (entries.length === 0) return (
-    <div style={styles.emptyState}>
-      <div style={styles.emptyIcon}>📋</div>
-      <p style={styles.emptyTitle}>{t.noEntries}</p>
-      <p style={styles.emptySubtitle}>{t.logFirstEntryHint}</p>
-    </div>
+    <EmptyState
+      mark="T"
+      title={t.noEntries}
+      body={t.logFirstEntryHint}
+    />
   );
 
   const toggleExpand = id => {
@@ -160,6 +161,7 @@ export default function EntryList({ entries, onDeleted, onUpdated, t, language, 
                       <EntryPanel
                         entry={e}
                         projects={projects}
+                        workLabel={workLabel}
                         onRefresh={onRefresh}
                         onDeleted={id => { onDeleted(id); setExpandedId(null); setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s; }); }}
                         onClose={() => setExpandedId(null)}
@@ -213,8 +215,4 @@ const styles = {
   metaTag: { fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '1px 7px', borderRadius: 10 },
   notes: { fontSize: 11, color: '#6b7280', fontStyle: 'italic' },
   msgBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '3px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', marginTop: 8, display: 'block' },
-  emptyState: { textAlign: 'center', padding: '48px 20px', background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' },
-  emptyIcon: { fontSize: 36, marginBottom: 10 },
-  emptyTitle: { fontSize: 15, fontWeight: 600, color: '#374151', margin: '0 0 4px' },
-  emptySubtitle: { fontSize: 13, color: '#6b7280', margin: 0 },
 };

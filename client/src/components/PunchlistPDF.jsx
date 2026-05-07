@@ -33,12 +33,20 @@ const pdf = StyleSheet.create({
   footerText: { fontSize: 7, color: '#6b7280' },
 });
 
-export function PunchlistDocument({ items, companyName, t, language }) {
+export function PunchlistDocument({ items, companyName, t = {}, language, settings = null }) {
   const locale = langToLocale(language);
+  const workLabel = settings?.label_work || t.project || 'Work';
   const PRIORITY_LABEL = { high: t.priorityHigh, normal: t.priorityNormal, low: t.priorityLow };
-  const STATUS_LABEL = { open: t.statusOpen, done: t.statusDone, verified: t.statusVerified };
+  const STATUS_LABEL = {
+    open: t.statusOpen,
+    in_progress: t.statusInProgress || 'In Progress',
+    resolved: t.statusDone,
+    done: t.statusDone,
+    verified: t.statusVerified,
+  };
   const openCount = items.filter(i => i.status === 'open').length;
-  const doneCount = items.filter(i => i.status === 'done').length;
+  const inProgressCount = items.filter(i => i.status === 'in_progress').length;
+  const doneCount = items.filter(i => i.status === 'resolved' || i.status === 'done').length;
   const verifiedCount = items.filter(i => i.status === 'verified').length;
   const dateStr = new Date().toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -64,6 +72,10 @@ export function PunchlistDocument({ items, companyName, t, language }) {
             <Text style={pdf.summaryValue}>{openCount}</Text>
           </View>
           <View style={pdf.summaryCard}>
+            <Text style={pdf.summaryLabel}>{t.statusInProgress || 'In Progress'}</Text>
+            <Text style={pdf.summaryValue}>{inProgressCount}</Text>
+          </View>
+          <View style={pdf.summaryCard}>
             <Text style={pdf.summaryLabel}>{t.statusDone}</Text>
             <Text style={pdf.summaryValue}>{doneCount}</Text>
           </View>
@@ -81,7 +93,7 @@ export function PunchlistDocument({ items, companyName, t, language }) {
         <View style={pdf.table}>
           <View style={pdf.tableHeader}>
             <Text style={{ ...pdf.thText, ...pdf.colTitle }}>{t.pdfItemHeader}</Text>
-            <Text style={{ ...pdf.thText, ...pdf.colProject }}>{t.project}</Text>
+            <Text style={{ ...pdf.thText, ...pdf.colProject }}>{workLabel}</Text>
             <Text style={{ ...pdf.thText, ...pdf.colPriority }}>{t.priorityField}</Text>
             <Text style={{ ...pdf.thText, ...pdf.colStatus }}>{t.statusLabel}</Text>
             <Text style={{ ...pdf.thText, ...pdf.colAssigned }}>{t.pdfAssignedTo}</Text>

@@ -4,6 +4,7 @@ import { formatInTz, langToLocale } from '../utils';
 import { useT } from '../hooks/useT';
 import { useAuth } from '../contexts/AuthContext';
 import { SkeletonList } from './Skeleton';
+import EmptyState from './EmptyState';
 
 function formatDt(str, tz, locale = 'en-US') {
   return {
@@ -21,10 +22,14 @@ function ActionBadge({ action, actionMeta }) {
   );
 }
 
-export default function AuditLog({ timezone = '' }) {
+export default function AuditLog({ timezone = '', settings = null }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
+  const workerLabel = settings?.label_worker || 'Team Member';
+  const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
+  const workLabel = settings?.label_work || 'Work';
+  const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
   const [entries, setEntries] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -53,8 +58,8 @@ export default function AuditLog({ timezone = '' }) {
 
   const ACTION_GROUPS = {
     '': t.filterAllActions,
-    worker: t.filterWorkers,
-    project: t.filterProjects,
+    worker: workerLabelPlural,
+    project: workLabelPlural,
     entry: t.filterEntries,
     pay_period: t.filterPayPeriods,
     settings: t.filterSettings,
@@ -104,11 +109,7 @@ export default function AuditLog({ timezone = '' }) {
       {loading && entries.length === 0 ? (
         <SkeletonList count={5} rows={2} />
       ) : entries.length === 0 ? (
-        <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>📋</div>
-          <p style={styles.emptyTitle}>{t.auditNoActivity}</p>
-          <p style={styles.emptySubtitle}>{t.auditEmptySub}</p>
-        </div>
+        <EmptyState mark="A" title={t.auditNoActivity} body={t.auditEmptySub} />
       ) : (
         <>
           <div style={styles.list}>
@@ -163,10 +164,6 @@ const styles = {
   filterSelect: { padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, background: '#fff' },
   filterDate: { padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 },
   clearBtn: { background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '5px 12px', borderRadius: 7, fontSize: 12, cursor: 'pointer' },
-  emptyState: { textAlign: 'center', padding: '40px 20px' },
-  emptyIcon: { fontSize: 32, marginBottom: 10 },
-  emptyTitle: { fontSize: 14, fontWeight: 600, color: '#374151', margin: '0 0 4px' },
-  emptySubtitle: { fontSize: 13, color: '#6b7280', margin: 0 },
   list: { display: 'flex', flexDirection: 'column', gap: 1 },
   row: { display: 'flex', gap: 16, padding: '12px 4px', borderBottom: '1px solid #f3f4f6', alignItems: 'flex-start' },
   rowTime: { display: 'flex', flexDirection: 'column', minWidth: 90, flexShrink: 0 },

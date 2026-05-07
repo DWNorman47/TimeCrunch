@@ -10,9 +10,10 @@ function formatTime(str, locale = 'en-US') {
 }
 
 // Worker view — shows their own private thread with admin
-function WorkerChat({ onRead }) {
+function WorkerChat({ settings, onRead }) {
   const { user } = useAuth();
   const t = useT();
+  const workerLabel = settings?.label_worker || 'Team Member';
   const locale = langToLocale(user?.language);
   const [messages, setMessages] = useState([]);
   const [body, setBody] = useState('');
@@ -59,7 +60,7 @@ function WorkerChat({ onRead }) {
     <div style={styles.wrap}>
       <div style={styles.header}>
         <span style={styles.title}>💬 {t.chatMessagesWithAdmin}</span>
-        <span style={styles.sub}>{t.chatPrivateNote}</span>
+        <span style={styles.sub}>{t.chatPrivateNote.replace('worker', workerLabel.toLowerCase())}</span>
       </div>
       <Thread messages={messages} loading={loading} currentUserId={user?.id} bottomRef={bottomRef} t={t} locale={locale} />
       <ChatForm body={body} setBody={setBody} sending={sending} onSubmit={send} t={t} />
@@ -68,9 +69,10 @@ function WorkerChat({ onRead }) {
 }
 
 // Admin view — worker picker + thread
-function AdminChat({ workers }) {
+function AdminChat({ workers, settings }) {
   const { user } = useAuth();
   const t = useT();
+  const workerLabel = settings?.label_worker || 'Team Member';
   const locale = langToLocale(user?.language);
   const [selectedId, setSelectedId] = useState('');
   const [threads, setThreads] = useState([]); // workers with recent messages
@@ -143,12 +145,12 @@ function AdminChat({ workers }) {
   return (
     <div style={styles.wrap}>
       <div style={styles.header}>
-        <span style={styles.title}>💬 {t.chatWorkerMessages}</span>
+        <span style={styles.title}>💬 {workerLabel} messages</span>
         <span style={styles.sub}>{t.chatAdminPrivateNote}</span>
       </div>
       <div style={styles.workerPicker}>
         <select style={styles.pickerSelect} value={selectedId} onChange={e => setSelectedId(e.target.value)}>
-          <option value="">{t.chatSelectWorker}</option>
+          <option value="">Select {workerLabel.toLowerCase()}</option>
           {workers.filter(w => w.role !== 'admin').map(w => (
             <option key={w.id} value={w.id}>
               {w.full_name}{workerHasThread(w.id) ? ' 💬' : ''}{unreadByWorker[w.id] ? ' 🔴' : ''}
@@ -217,11 +219,11 @@ function ChatForm({ body, setBody, sending, onSubmit, t }) {
   );
 }
 
-export default function CompanyChat({ workers, onRead }) {
+export default function CompanyChat({ workers, settings, onRead }) {
   const { user } = useAuth();
   if (!user) return null;
-  if (user.role === 'admin') return <AdminChat workers={workers || []} />;
-  return <WorkerChat userId={user.id} onRead={onRead} />;
+  if (user.role === 'admin') return <AdminChat workers={workers || []} settings={settings} />;
+  return <WorkerChat userId={user.id} settings={settings} onRead={onRead} />;
 }
 
 const styles = {
