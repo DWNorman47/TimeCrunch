@@ -55,6 +55,28 @@ async function ensureBy(client, table, key, values, returning = '*') {
   );
 }
 
+async function upsertBy(client, table, key, values, returning = '*') {
+  const keyNames = Object.keys(key);
+  const valueNames = Object.keys(values);
+  const where = keyNames.map((name, index) => `${name} = $${index + 1}`).join(' AND ');
+  const existing = await one(client, `SELECT id FROM ${table} WHERE ${where} LIMIT 1`, Object.values(key));
+
+  if (!existing) {
+    return ensureBy(client, table, key, values, returning);
+  }
+
+  if (valueNames.length === 0) {
+    return one(client, `SELECT ${returning} FROM ${table} WHERE id = $1`, [existing.id]);
+  }
+
+  const setClause = valueNames.map((name, index) => `${name} = $${index + 1}`).join(', ');
+  return one(
+    client,
+    `UPDATE ${table} SET ${setClause} WHERE id = $${valueNames.length + 1} RETURNING ${returning}`,
+    [...Object.values(values), existing.id]
+  );
+}
+
 async function upsertStock(client, stock) {
   await client.query(
     `INSERT INTO inventory_stock
@@ -359,12 +381,19 @@ async function main() {
       ['End of day closeout', 'Cleaned work zones, secured loose materials, and uploaded photos for the gallery.', 'draft'],
       ['Quality check', 'Verified installed labels, room layouts, and inventory kit placement. Two labels need replacement.', 'reviewed'],
     ];
-    for (let i = 0; i < 42; i++) {
+    await client.query(
+      `DELETE FROM field_reports
+       WHERE company_id = $1
+         AND title LIKE ANY($2::text[])`,
+      [companyId, fieldNotes.map(([title]) => `${title} - %`)]
+    );
+    for (let i = 0; i < 14; i++) {
       const [title, notes, status] = fieldNotes[i % fieldNotes.length];
       const project = projectByIndex(i);
       const worker = workerByIndex(i);
-      const reportTitle = `${title} - ${project.job_number || project.name} ${isoDate(-Math.floor(i / 2))}`;
-      const report = await ensureBy(
+      const dayOffset = -Math.floor(i / 2);
+      const reportTitle = `Demo note ${String(i + 1).padStart(2, '0')} - ${title} - ${project.job_number || project.name}`;
+      const report = await upsertBy(
         client,
         'field_reports',
         { company_id: companyId, title: reportTitle },
@@ -375,25 +404,23 @@ async function main() {
           status,
           lat: 33.4484 + (i % 6) / 1000,
           lng: -112.0740 - (i % 6) / 1000,
-          report_date: isoDate(-Math.floor(i / 2)),
-          reported_at: isoTimestamp(-Math.floor(i / 2), 8 + (i % 8), 15),
+          report_date: isoDate(dayOffset),
+          reported_at: isoTimestamp(dayOffset, 8 + (i % 8), 15),
         },
         '*'
       );
-      const photoCount = await one(client, 'SELECT COUNT(*)::int AS count FROM field_report_photos WHERE report_id = $1', [report.id]);
-      if (photoCount.count === 0) {
-        for (let p = 0; p < (i % 4 === 0 ? 3 : i % 3 === 0 ? 2 : 1); p++) {
-          await client.query(
-            `INSERT INTO field_report_photos (report_id, url, caption, media_type, size_bytes)
-             VALUES ($1,$2,$3,'photo',$4)`,
-            [
-              report.id,
-              `https://picsum.photos/seed/opsfloa-field-${i}-${p}/1100/825`,
-              ['Before view', 'Progress detail', 'Closeout photo', 'Material staging', 'Issue detail', 'Owner review'][p % 6],
-              180000 + (i * 1000),
-            ]
-          );
-        }
+      await client.query('DELETE FROM field_report_photos WHERE report_id = $1', [report.id]);
+      for (let p = 0; p < (i % 4 === 0 ? 3 : i % 3 === 0 ? 2 : 1); p++) {
+        await client.query(
+          `INSERT INTO field_report_photos (report_id, url, caption, media_type, size_bytes)
+           VALUES ($1,$2,$3,'photo',$4)`,
+          [
+            report.id,
+            `https://picsum.photos/seed/opsfloa-field-note-${i}-${p}/1100/825`,
+            ['Before view', 'Progress detail', 'Closeout photo', 'Material staging', 'Issue detail', 'Owner review'][p % 6],
+            180000 + (i * 1000),
+          ]
+        );
       }
     }
 
