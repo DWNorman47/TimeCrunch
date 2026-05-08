@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useT } from '../hooks/useT';
@@ -16,6 +16,9 @@ function saveCompany(name) {
 }
 
 const OTHER = '__other__';
+const DEMO_COMPANY_NAME = 'Demo Operations';
+const DEMO_USERNAME = 'Admin';
+const DEMO_PASSWORD = 'Admin123';
 
 export default function Login() {
   const { login, confirmMfa, loginWithToken } = useAuth();
@@ -37,8 +40,28 @@ export default function Login() {
   const mfaInputRef = useRef(null);
   const [setupToken, setSetupToken] = useState(null);
   const [setupForm, setSetupForm] = useState({ password: '', confirm: '' });
+  const demoAutofilledRef = useRef(false);
 
   const companyName = selected === OTHER ? otherText : selected;
+
+  useEffect(() => {
+    const isDemoCompany = companyName.trim().toLowerCase() === DEMO_COMPANY_NAME.toLowerCase();
+
+    if (isDemoCompany) {
+      demoAutofilledRef.current = true;
+      setForm({ username: DEMO_USERNAME, password: DEMO_PASSWORD });
+      return;
+    }
+
+    if (demoAutofilledRef.current) {
+      demoAutofilledRef.current = false;
+      setForm(current => (
+        current.username === DEMO_USERNAME && current.password === DEMO_PASSWORD
+          ? { username: '', password: '' }
+          : current
+      ));
+    }
+  }, [companyName]);
 
   const navigateAfterLogin = user => {
     saveCompany(companyName.trim());
