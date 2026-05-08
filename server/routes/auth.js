@@ -10,7 +10,8 @@ const rateLimit = require('express-rate-limit');
 const { userOrIpKey } = require('../middleware/rateLimitKey');
 const pool = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { seedBuiltinRoles } = require('../permissions');
+const { seedBuiltinRoles, getUserPermissions } = require('../permissions');
+const { effectiveSubscriptionStatus } = require('../utils/subscription');
 
 // Hash a token for safe storage — raw token goes in the email, hash goes in the DB
 const sha256 = str => crypto.createHash('sha256').update(str).digest('hex');
@@ -66,8 +67,60 @@ function signToken(user) {
       tv: user.token_version ?? 0,
     },
     process.env.JWT_SECRET,
-    { expiresIn: '8h' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '14d' }
   );
+}
+
+async function buildSessionUser(baseUser) {
+  const [companyRes, userRes] = await Promise.all([
+    pool.query(
+      `SELECT name, plan, subscription_status, addon_qbo, addon_certified_payroll,
+              trial_ends_at, slug, accepts_service_requests, client_portal_pro_interest
+       FROM companies WHERE id = $1`,
+      [baseUser.company_id]
+    ),
+    pool.query(
+      `SELECT mfa_enabled, language, admin_permissions, worker_access_ids, role_id,
+              hourly_rate, rate_type, day_mark_mode, guaranteed_weekly_hours
+       FROM users WHERE id = $1`,
+      [baseUser.id]
+    ),
+  ]);
+  const company = companyRes.rows[0] || {};
+  const userRow = userRes.rows[0] || {};
+  const permissions = await getUserPermissions({
+    ...baseUser,
+    role_id: userRow.role_id ?? null,
+    admin_permissions: userRow.admin_permissions ?? null,
+  });
+
+  return {
+    id: baseUser.id,
+    username: baseUser.username,
+    role: baseUser.role,
+    full_name: baseUser.full_name,
+    invoice_name: baseUser.invoice_name || null,
+    language: userRow.language || baseUser.language,
+    company_id: baseUser.company_id,
+    company_name: company.name || baseUser.company_name,
+    plan: company.plan || 'free',
+    subscription_status: effectiveSubscriptionStatus(company),
+    addon_qbo: company.addon_qbo || false,
+    addon_certified_payroll: company.addon_certified_payroll || false,
+    company_slug: company.slug || null,
+    accepts_service_requests: !!company.accepts_service_requests,
+    client_portal_pro_interest: !!company.client_portal_pro_interest,
+    trial_ends_at: company.trial_ends_at,
+    mfa_enabled: userRow.mfa_enabled || false,
+    admin_permissions: userRow.admin_permissions || null,
+    worker_access_ids: userRow.worker_access_ids || null,
+    role_id: userRow.role_id ?? null,
+    permissions: [...permissions],
+    hourly_rate: userRow.hourly_rate != null ? parseFloat(userRow.hourly_rate) : null,
+    rate_type: userRow.rate_type || 'hourly',
+    day_mark_mode: !!userRow.day_mark_mode,
+    guaranteed_weekly_hours: userRow.guaranteed_weekly_hours != null ? parseFloat(userRow.guaranteed_weekly_hours) : null,
+  };
 }
 
 // Login
@@ -161,7 +214,7 @@ router.post('/login', loginLimiter, async (req, res) => {
       return res.json({ mfa_required: true, mfa_token: mfaToken });
     }
     const token = signToken(user);
-    res.json({ token, first_login: isFirstLogin, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
+    res.json({ token, first_login: isFirstLogin, user: await buildSessionUser(user) });
   } catch (err) {
     logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
@@ -171,6 +224,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 // Get current user — includes live company billing info for client-side plan gating
 router.get('/me', requireAuth, async (req, res) => {
   try {
+    return res.json({ user: await buildSessionUser(req.user) });
     const { getUserPermissions } = require('../permissions');
     const [companyRes, userRes] = await Promise.all([
       pool.query('SELECT plan, subscription_status, addon_qbo, addon_certified_payroll, trial_ends_at, slug, accepts_service_requests, client_portal_pro_interest FROM companies WHERE id = $1', [req.user.company_id]),
@@ -410,7 +464,7 @@ router.post('/complete-setup', async (req, res) => {
     );
     user.token_version = upd.rows[0].token_version;
     const token = signToken(user);
-    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
+    res.json({ token, user: await buildSessionUser(user) });
   } catch (err) {
     logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
@@ -627,7 +681,7 @@ router.post('/mfa/confirm', loginLimiter, async (req, res) => {
     if (!valid) return res.status(401).json({ error: 'Invalid code. Try again.' });
 
     const token = signToken(user);
-    res.json({ token, user: { id: user.id, username: user.username, role: user.role, full_name: user.full_name, language: user.language, company_id: user.company_id, company_name: user.company_name } });
+    res.json({ token, user: await buildSessionUser(user) });
   } catch (err) {
     logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });

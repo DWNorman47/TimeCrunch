@@ -135,7 +135,12 @@ export default class ErrorBoundary extends React.Component {
       window.location.href = '/';
     };
     const signOut = () => {
-      try { localStorage.removeItem('tc_user'); } catch { /* ignore */ }
+      try {
+        localStorage.removeItem('tc_token');
+        localStorage.removeItem('tc_user');
+        sessionStorage.removeItem('tc_token');
+        sessionStorage.removeItem('tc_user');
+      } catch { /* ignore */ }
       window.location.href = '/login';
     };
     const onHome = window.location.pathname === '/' || window.location.pathname === '';
