@@ -294,76 +294,79 @@ router.post('/out', requireAuth, requirePerm('clock_self'), clockLimiter, coerce
       throw err;
     } finally { txClient.release(); }
 
-    // Overtime alert — fire-and-forget, never block the response
-    try {
-      const settingsRows = await pool.query(
-        'SELECT key, value FROM settings WHERE company_id = $1', [companyId]
-      );
-      const s = applySettingsRows(settingsRows.rows, SETTINGS_DEFAULTS);
+    const clockOutEntry = entryResult.rows[0];
+    res.json({ ...clockOutEntry, project_name });
 
-      if (s.feature_overtime && s.feature_overtime_alerts) {
-        const workDate = clock.work_date;
-        const threshold = parseFloat(s.overtime_threshold) || 8;
-        const rule = s.overtime_rule || 'daily';
+    setImmediate(async () => {
+      // Overtime alert — fire-and-forget, never block the response
+      try {
+        const settingsRows = await pool.query(
+          'SELECT key, value FROM settings WHERE company_id = $1', [companyId]
+        );
+        const s = applySettingsRows(settingsRows.rows, SETTINGS_DEFAULTS);
 
-        // Get all entries for this worker on the relevant period (before this new entry)
-        let prevHours = 0;
-        let totalHours = 0;
+        if (s.feature_overtime && s.feature_overtime_alerts) {
+          const workDate = clock.work_date;
+          const threshold = parseFloat(s.overtime_threshold) || 8;
+          const rule = s.overtime_rule || 'daily';
 
-        if (rule === 'weekly') {
-          // Sum this ISO week (Mon–Sun)
-          const allWeekRows = await pool.query(
-            `SELECT start_time, end_time FROM time_entries
-             WHERE user_id = $1 AND wage_type = 'regular'
-               AND DATE_TRUNC('week', work_date::date) = DATE_TRUNC('week', $2::date)`,
-            [req.user.id, workDate]
-          );
-          const allEntries = allWeekRows.rows;
-          // Subtract the new entry when computing "before"
-          const newEntry = entryResult.rows[0];
-          const calcH = (s, e) => {
-            const start = new Date(`1970-01-01T${s}`);
-            const end = new Date(`1970-01-01T${e}`);
-            let h = (end - start) / 3600000;
-            if (h < 0) h += 24;
-            return h;
-          };
-          const newEntryHours = calcH(newEntry.start_time, newEntry.end_time) - (newEntry.break_minutes || 0) / 60;
-          totalHours = allEntries.reduce((sum, r) => sum + calcH(r.start_time, r.end_time), 0);
-          prevHours = totalHours - newEntryHours;
-          // Weekly threshold is typically 40
-          const weeklyThreshold = threshold <= 10 ? 40 : threshold;
-          if (prevHours < weeklyThreshold && totalHours >= weeklyThreshold && wage_type === 'regular') {
-            await _sendOvertimeAlert(req.user, companyId, project_name, totalHours, weeklyThreshold, 'weekly', s);
-          }
-        } else {
-          // Daily rule — check today's total
-          const dayRows = await pool.query(
-            `SELECT start_time, end_time, break_minutes FROM time_entries
-             WHERE user_id = $1 AND work_date = $2 AND wage_type = 'regular'`,
-            [req.user.id, workDate]
-          );
-          const calcH = (s, e, brk) => {
-            const start = new Date(`1970-01-01T${s}`);
-            const end = new Date(`1970-01-01T${e}`);
-            let h = (end - start) / 3600000;
-            if (h < 0) h += 24;
-            return Math.max(0, h - (brk || 0) / 60);
-          };
-          const newEntry = entryResult.rows[0];
-          const newEntryHours = calcH(newEntry.start_time, newEntry.end_time, newEntry.break_minutes);
-          totalHours = dayRows.rows.reduce((sum, r) => sum + calcH(r.start_time, r.end_time, r.break_minutes), 0);
-          prevHours = totalHours - newEntryHours;
-          if (prevHours < threshold && totalHours >= threshold && wage_type === 'regular') {
-            await _sendOvertimeAlert(req.user, companyId, project_name, totalHours, threshold, 'daily', s);
+          // Get all entries for this worker on the relevant period (before this new entry)
+          let prevHours = 0;
+          let totalHours = 0;
+
+          if (rule === 'weekly') {
+            // Sum this ISO week (Mon–Sun)
+            const allWeekRows = await pool.query(
+              `SELECT start_time, end_time FROM time_entries
+               WHERE user_id = $1 AND wage_type = 'regular'
+                 AND DATE_TRUNC('week', work_date::date) = DATE_TRUNC('week', $2::date)`,
+              [req.user.id, workDate]
+            );
+            const allEntries = allWeekRows.rows;
+            // Subtract the new entry when computing "before"
+            const newEntry = entryResult.rows[0];
+            const calcH = (s, e) => {
+              const start = new Date(`1970-01-01T${s}`);
+              const end = new Date(`1970-01-01T${e}`);
+              let h = (end - start) / 3600000;
+              if (h < 0) h += 24;
+              return h;
+            };
+            const newEntryHours = calcH(newEntry.start_time, newEntry.end_time) - (newEntry.break_minutes || 0) / 60;
+            totalHours = allEntries.reduce((sum, r) => sum + calcH(r.start_time, r.end_time), 0);
+            prevHours = totalHours - newEntryHours;
+            // Weekly threshold is typically 40
+            const weeklyThreshold = threshold <= 10 ? 40 : threshold;
+            if (prevHours < weeklyThreshold && totalHours >= weeklyThreshold && wage_type === 'regular') {
+              await _sendOvertimeAlert(req.user, companyId, project_name, totalHours, weeklyThreshold, 'weekly', s);
+            }
+          } else {
+            // Daily rule — check today's total
+            const dayRows = await pool.query(
+              `SELECT start_time, end_time, break_minutes FROM time_entries
+               WHERE user_id = $1 AND work_date = $2 AND wage_type = 'regular'`,
+              [req.user.id, workDate]
+            );
+            const calcH = (s, e, brk) => {
+              const start = new Date(`1970-01-01T${s}`);
+              const end = new Date(`1970-01-01T${e}`);
+              let h = (end - start) / 3600000;
+              if (h < 0) h += 24;
+              return Math.max(0, h - (brk || 0) / 60);
+            };
+            const newEntry = entryResult.rows[0];
+            const newEntryHours = calcH(newEntry.start_time, newEntry.end_time, newEntry.break_minutes);
+            totalHours = dayRows.rows.reduce((sum, r) => sum + calcH(r.start_time, r.end_time, r.break_minutes), 0);
+            prevHours = totalHours - newEntryHours;
+            if (prevHours < threshold && totalHours >= threshold && wage_type === 'regular') {
+              await _sendOvertimeAlert(req.user, companyId, project_name, totalHours, threshold, 'daily', s);
+            }
           }
         }
+      } catch (alertErr) {
+        logger.warn({ err: alertErr }, 'overtime alert error');
       }
-    } catch (alertErr) {
-      console.error('Overtime alert error:', alertErr);
-    }
-
-    res.json({ ...entryResult.rows[0], project_name });
+    });
   } catch (err) {
     logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });

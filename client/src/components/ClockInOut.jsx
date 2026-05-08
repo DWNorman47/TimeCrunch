@@ -5,13 +5,18 @@ import { useOffline } from '../contexts/OfflineContext';
 import { useFormPersist } from '../hooks/useFormPersist';
 
 import { silentError } from '../errorReporter';
-function getLocation() {
+function getLocation(options = {}) {
+  const {
+    timeout = 2500,
+    maximumAge = 60000,
+    enableHighAccuracy = false,
+  } = options;
   return new Promise(resolve => {
     if (!navigator.geolocation) return resolve({ lat: null, lng: null });
     navigator.geolocation.getCurrentPosition(
       pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       err => resolve({ lat: null, lng: null, permissionDenied: err.code === 1 }),
-      { timeout: 8000 }
+      { timeout, maximumAge, enableHighAccuracy }
     );
   });
 }
@@ -145,7 +150,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     // Also push immediately when the worker opens their phone / switches back to the app
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        navigator.geolocation.getCurrentPosition(pushLocation, () => {});
+        navigator.geolocation.getCurrentPosition(pushLocation, () => {}, { timeout: 2500, maximumAge: 60000, enableHighAccuracy: false });
       }
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -182,7 +187,13 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     // Capture clock-in time immediately before GPS wait — GPS can take several seconds
     const clock_in_time = new Date().toISOString();
     // Always fetch GPS when the selected project has a geofence, even if geolocation feature is off globally
-    const loc = (geolocationEnabled || projectHasGeofence) ? await getLocation() : { lat: null, lng: null };
+    const loc = (geolocationEnabled || projectHasGeofence)
+      ? await getLocation({
+          timeout: projectHasGeofence ? 8000 : 2500,
+          maximumAge: projectHasGeofence ? 0 : 60000,
+          enableHighAccuracy: projectHasGeofence,
+        })
+      : { lat: null, lng: null };
     if (loc.permissionDenied) setLocationDenied(true);
     const { lat, lng } = loc;
     const local_work_date = new Date().toLocaleDateString('en-CA');
@@ -300,7 +311,15 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     if (!switchProject) { setError(`Select new ${workLabelLower}.`); return; }
     setError('');
     setLoading(true);
-    const { lat, lng } = geolocationEnabled ? await getLocation() : { lat: null, lng: null };
+    const nextProject = projects?.find(p => String(p.id) === String(switchProject));
+    const nextProjectHasGeofence = !!(nextProject?.geo_lat && nextProject?.geo_lng && nextProject?.geo_radius_ft);
+    const { lat, lng } = (geolocationEnabled || nextProjectHasGeofence)
+      ? await getLocation({
+          timeout: nextProjectHasGeofence ? 8000 : 2500,
+          maximumAge: nextProjectHasGeofence ? 0 : 60000,
+          enableHighAccuracy: nextProjectHasGeofence,
+        })
+      : { lat: null, lng: null };
     const local_clock_in = status.clock_in_time ? toLocalTime(new Date(status.clock_in_time)) : toLocalTime(new Date());
     const local_clock_out = toLocalTime(new Date());
     try {
