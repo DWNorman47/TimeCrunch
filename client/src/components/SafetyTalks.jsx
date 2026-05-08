@@ -358,7 +358,7 @@ function TalkCard({ talk: initialTalk, isAdmin, onDeleted, workerLabelPlural = '
         </div>
         <div style={styles.cardRight}>
           <span style={styles.signoffBadge} title={`${workerLabelPlural} signed`}>{talk.signoff_count}</span>
-          <span style={styles.chevron}>{expanded ? '^' : 'v'}</span>
+          <span style={styles.chevron}>{expanded ? '▲' : '▼'}</span>
         </div>
       </div>
 

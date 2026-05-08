@@ -321,7 +321,7 @@ function WorkspaceLabels({ settings, onUpdated }) {
           <span style={styles.languageTitle}>Company Labels</span>
           <span style={styles.languageText}>Rename common app words so the workspace matches this company's language.</span>
         </span>
-        <span style={{ ...styles.accordionChevron, transform: open ? 'rotate(180deg)' : 'none' }}>v</span>
+        <span style={{ ...styles.accordionChevron, transform: open ? 'rotate(180deg)' : 'none' }}>▼</span>
       </button>
       {open && (
         <>
@@ -373,7 +373,7 @@ function WorkspaceSettingGroup({ title, body, children, defaultOpen = false }) {
           <span style={styles.languageTitle}>{title}</span>
           <span style={styles.languageText}>{body}</span>
         </span>
-        <span style={{ ...styles.accordionChevron, transform: open ? 'rotate(180deg)' : 'none' }}>v</span>
+        <span style={{ ...styles.accordionChevron, transform: open ? 'rotate(180deg)' : 'none' }}>▼</span>
       </button>
       {open && <div style={styles.settingGroupBody} className="workspace-setting-body">{children}</div>}
     </section>
