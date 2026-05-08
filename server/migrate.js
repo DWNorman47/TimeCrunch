@@ -6,12 +6,39 @@ const path = require('path');
 const { stripSslMode } = require('./utils/dbConnString');
 
 const ssl = process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false };
+const ONE_TIME_DEMO_SEED_MARKER = 'one_time_demo_operations_seed_2026_05_07';
 
-async function migrate() {
-  const pool = new Pool({
+function createPool() {
+  return new Pool({
     connectionString: stripSslMode(process.env.DATABASE_URL),
     ssl,
   });
+}
+
+function runDemoSeed() {
+  const companyName = process.env.DEMO_COMPANY_NAME || 'Demo Operations';
+  console.log(`[demo-seed] seeding "${companyName}"`);
+
+  const result = spawnSync(process.execPath, [path.join(__dirname, 'scripts', 'seed-demo-data.js')], {
+    cwd: __dirname,
+    env: process.env,
+    stdio: 'inherit',
+  });
+
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`Demo seed failed with exit code ${result.status ?? 'unknown'}`);
+  }
+}
+
+function shouldRunOneTimeProductionDemoSeed() {
+  if (process.env.DEMO_SEED_PRODUCTION_ONCE === 'true') return true;
+  if (process.env.DEMO_SEED_PRODUCTION_ONCE === 'false') return false;
+  return process.env.VERCEL_ENV === 'production' || process.env.VERCEL_GIT_COMMIT_REF === 'main';
+}
+
+async function migrate() {
+  const pool = createPool();
 
   try {
     // Create tracking table if it doesn't exist
@@ -56,23 +83,39 @@ async function migrate() {
 async function seedDemoDataIfEnabled() {
   if (process.env.DEMO_SEED_AUTO !== 'true') return;
 
-  const companyName = process.env.DEMO_COMPANY_NAME || 'Demo Operations';
-  console.log(`[demo-seed] auto seed enabled for "${companyName}"`);
+  console.log('[demo-seed] auto seed enabled');
+  runDemoSeed();
+}
 
-  const result = spawnSync(process.execPath, [path.join(__dirname, 'scripts', 'seed-demo-data.js')], {
-    cwd: __dirname,
-    env: process.env,
-    stdio: 'inherit',
-  });
+async function seedDemoDataOnceForProduction() {
+  if (!shouldRunOneTimeProductionDemoSeed()) return;
 
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    throw new Error(`Demo seed failed with exit code ${result.status ?? 'unknown'}`);
+  const pool = createPool();
+  try {
+    const { rows } = await pool.query(
+      'SELECT 1 FROM schema_migrations WHERE filename = $1',
+      [ONE_TIME_DEMO_SEED_MARKER]
+    );
+    if (rows.length > 0) {
+      console.log('[demo-seed] one-time production seed already applied');
+      return;
+    }
+
+    console.log('[demo-seed] one-time production seed pending');
+    runDemoSeed();
+    await pool.query(
+      'INSERT INTO schema_migrations (filename) VALUES ($1)',
+      [ONE_TIME_DEMO_SEED_MARKER]
+    );
+    console.log('[demo-seed] one-time production seed marked complete');
+  } finally {
+    await pool.end();
   }
 }
 
 async function main() {
   await migrate();
+  await seedDemoDataOnceForProduction();
   await seedDemoDataIfEnabled();
 }
 
