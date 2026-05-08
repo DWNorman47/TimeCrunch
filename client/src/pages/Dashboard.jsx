@@ -134,6 +134,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (tab === 'messages') return;
     const check = () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return;
       api.get('/chat').then(r => {
         const lastRead = localStorage.getItem('chatLastRead');
         const hasUnread = r.data.some(
@@ -144,7 +145,13 @@ export default function Dashboard() {
     };
     check();
     const iv = setInterval(check, 60000);
-    return () => clearInterval(iv);
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('online', check);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('online', check);
+    };
   }, [tab, user?.id]);
 
   const handleEntryAdded = entry => {

@@ -86,6 +86,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const fetchPending = () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return;
       api.get('/admin/kpis').then(r => setPendingCount(r.data.pending_approvals ?? 0)).catch(silentError('admindashboard'));
       // Only poll reimbursements when the feature is enabled.
       if (settings?.feature_reimbursements !== false) {
@@ -94,13 +95,20 @@ export default function AdminDashboard() {
     };
     fetchPending();
     const interval = setInterval(fetchPending, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    document.addEventListener('visibilitychange', fetchPending);
+    window.addEventListener('online', fetchPending);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', fetchPending);
+      window.removeEventListener('online', fetchPending);
+    };
+  }, [settings?.feature_reimbursements]);
 
   // Background chat unread check — show dot on Live tab when workers have messaged
   useEffect(() => {
     if (tab === 'live') return; // CompanyChat handles read state when visible
     const check = () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return;
       api.get('/chat').then(r => {
         const hasUnread = r.data.some(thread => {
           const key = `chatLastRead_admin_${thread.worker_id}`;
@@ -112,7 +120,13 @@ export default function AdminDashboard() {
     };
     check();
     const iv = setInterval(check, 60000);
-    return () => clearInterval(iv);
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('online', check);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('online', check);
+    };
   }, [tab]);
 
   // Permission helper — null admin_permissions means full access

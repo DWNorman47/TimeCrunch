@@ -22,11 +22,16 @@ function WorkerChat({ settings, onRead }) {
   const bottomRef = useRef(null);
   const pollRef = useRef(null);
 
-  const load = () =>
-    api.get('/chat').then(r => {
+  const load = () => {
+    if (document.visibilityState !== 'visible' || !navigator.onLine) {
+      setLoading(false);
+      return Promise.resolve();
+    }
+    return api.get('/chat').then(r => {
       setMessages(r.data);
       onRead?.();
     }).catch(silentError('companychat')).finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     load();
@@ -85,8 +90,9 @@ function AdminChat({ workers, settings }) {
   const pollRef = useRef(null);
 
   // Load worker thread list and check for unread
-  const loadThreads = () =>
-    api.get('/chat').then(r => {
+  const loadThreads = () => {
+    if (document.visibilityState !== 'visible' || !navigator.onLine) return Promise.resolve();
+    return api.get('/chat').then(r => {
       setThreads(r.data);
       // Compare thread last_at against per-worker last-read stored in localStorage
       const unread = {};
@@ -99,11 +105,18 @@ function AdminChat({ workers, settings }) {
       });
       setUnreadByWorker(unread);
     }).catch(silentError('companychat'));
+  };
 
   useEffect(() => {
     loadThreads();
     const iv = setInterval(loadThreads, 60000);
-    return () => clearInterval(iv);
+    document.addEventListener('visibilitychange', loadThreads);
+    window.addEventListener('online', loadThreads);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', loadThreads);
+      window.removeEventListener('online', loadThreads);
+    };
   }, []);
 
   // Load selected worker's thread
@@ -111,15 +124,27 @@ function AdminChat({ workers, settings }) {
     if (!selectedId) { setMessages([]); return; }
     setLoading(true);
     clearInterval(pollRef.current);
-    const fetch = () => api.get(`/chat?worker_id=${selectedId}`).then(r => {
-      setMessages(r.data);
-      // Mark as read
-      localStorage.setItem(`chatLastRead_admin_${selectedId}`, new Date().toISOString());
-      setUnreadByWorker(prev => { const n = { ...prev }; delete n[selectedId]; return n; });
-    }).catch(silentError('companychat')).finally(() => setLoading(false));
+    const fetch = () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) {
+        setLoading(false);
+        return Promise.resolve();
+      }
+      return api.get(`/chat?worker_id=${selectedId}`).then(r => {
+        setMessages(r.data);
+        // Mark as read
+        localStorage.setItem(`chatLastRead_admin_${selectedId}`, new Date().toISOString());
+        setUnreadByWorker(prev => { const n = { ...prev }; delete n[selectedId]; return n; });
+      }).catch(silentError('companychat')).finally(() => setLoading(false));
+    };
     fetch();
     pollRef.current = setInterval(fetch, 30000);
-    return () => clearInterval(pollRef.current);
+    document.addEventListener('visibilitychange', fetch);
+    window.addEventListener('online', fetch);
+    return () => {
+      clearInterval(pollRef.current);
+      document.removeEventListener('visibilitychange', fetch);
+      window.removeEventListener('online', fetch);
+    };
   }, [selectedId]);
 
   useEffect(() => {
