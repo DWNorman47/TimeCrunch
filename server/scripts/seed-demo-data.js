@@ -80,6 +80,44 @@ async function upsertStock(client, stock) {
   );
 }
 
+async function upsertActiveClock(client, clock) {
+  await client.query(
+    `INSERT INTO active_clock
+       (company_id, user_id, project_id, clock_in_time, clock_in_lat, clock_in_lng,
+        work_date, notes, timezone, clock_source, current_lat, current_lng,
+        location_updated_at, stale_alert_sent_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NULL)
+     ON CONFLICT (user_id)
+     DO UPDATE SET project_id = EXCLUDED.project_id,
+                   clock_in_time = EXCLUDED.clock_in_time,
+                   clock_in_lat = EXCLUDED.clock_in_lat,
+                   clock_in_lng = EXCLUDED.clock_in_lng,
+                   work_date = EXCLUDED.work_date,
+                   notes = EXCLUDED.notes,
+                   timezone = EXCLUDED.timezone,
+                   clock_source = EXCLUDED.clock_source,
+                   current_lat = EXCLUDED.current_lat,
+                   current_lng = EXCLUDED.current_lng,
+                   location_updated_at = EXCLUDED.location_updated_at,
+                   stale_alert_sent_at = NULL`,
+    [
+      clock.company_id,
+      clock.user_id,
+      clock.project_id,
+      clock.clock_in_time,
+      clock.clock_in_lat || null,
+      clock.clock_in_lng || null,
+      clock.work_date,
+      clock.notes,
+      clock.timezone,
+      clock.clock_source,
+      clock.current_lat || null,
+      clock.current_lng || null,
+      clock.location_updated_at,
+    ]
+  );
+}
+
 async function ensureChildRows(client, table, keyName, keyValue, rows) {
   const count = await one(client, `SELECT COUNT(*)::int AS count FROM ${table} WHERE ${keyName} = $1`, [keyValue]);
   if (count.count > 0) return;
@@ -1087,23 +1125,23 @@ async function main() {
     }
 
     for (let i = 0; i < Math.min(3, workers.length); i++) {
-      await ensureBy(
-        client,
-        'active_clock',
-        { company_id: companyId, user_id: workers[i].id },
-        {
-          project_id: projectByIndex(i).id,
-          clock_in_time: isoTimestamp(0, 7 + i, 15),
-          work_date: isoDate(0),
-          notes: ['Route prep', 'Clinic turnover', 'Inventory staging'][i % 3],
-          timezone: 'America/Phoenix',
-          clock_source: 'worker',
-          current_lat: 33.45 + (i / 100),
-          current_lng: -112.07 - (i / 100),
-          location_updated_at: isoTimestamp(0, 10 + i, 5),
-        },
-        '*'
-      );
+      const lat = 33.45 + (i / 100);
+      const lng = -112.07 - (i / 100);
+      await upsertActiveClock(client, {
+        company_id: companyId,
+        user_id: workers[i].id,
+        project_id: projectByIndex(i).id,
+        clock_in_time: isoTimestamp(0, 7 + i, 15),
+        clock_in_lat: lat,
+        clock_in_lng: lng,
+        work_date: isoDate(0),
+        notes: ['Route prep', 'Clinic turnover', 'Inventory staging'][i % 3],
+        timezone: 'America/Phoenix',
+        clock_source: 'worker',
+        current_lat: lat,
+        current_lng: lng,
+        location_updated_at: isoTimestamp(0, 10 + i, 5),
+      });
     }
 
     for (let i = 0; i < 18; i++) {
