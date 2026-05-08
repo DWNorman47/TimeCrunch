@@ -16,13 +16,18 @@ async function checkEquipmentMaintenance() {
 
       // Find equipment that has reached or exceeded its maintenance interval
       const overdue = await pool.query(`
-        SELECT id, name, total_hours, maintenance_interval_hours
-        FROM equipment_items
-        WHERE company_id = $1
-          AND active = true
-          AND maintenance_interval_hours IS NOT NULL
-          AND maintenance_interval_hours > 0
-          AND total_hours >= maintenance_interval_hours
+        SELECT e.id,
+               e.name,
+               COALESCE(SUM(h.hours), 0)::DECIMAL(10,2) AS total_hours,
+               e.maintenance_interval_hours
+        FROM equipment_items e
+        LEFT JOIN equipment_hours h ON h.equipment_id = e.id
+        WHERE e.company_id = $1
+          AND e.active = true
+          AND e.maintenance_interval_hours IS NOT NULL
+          AND e.maintenance_interval_hours > 0
+        GROUP BY e.id, e.name, e.maintenance_interval_hours
+        HAVING COALESCE(SUM(h.hours), 0) >= e.maintenance_interval_hours
       `, [companyId]);
 
       if (overdue.rowCount === 0) continue;
