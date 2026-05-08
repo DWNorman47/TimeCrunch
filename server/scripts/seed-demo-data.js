@@ -2,12 +2,18 @@ const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const { seedBuiltinRoles } = require('../permissions');
 
-// Manual or opt-in dev/stage seed for visual QA. It creates/fills only the
-// named fictional company and runs automatically only when DEMO_SEED_AUTO=true.
+// Manual or scheduled seed for visual QA. It creates/fills only the named
+// fictional company. Dates roll forward so Demo Operations stays useful as a
+// live demo; set DEMO_SEED_DATE=YYYY-MM-DD for a deterministic refresh.
 const TARGET_COMPANY = process.env.DEMO_COMPANY_NAME || 'Demo Operations';
 const DEMO_ADMIN_USERNAME = process.env.DEMO_ADMIN_USERNAME || 'Admin';
 const DEMO_ADMIN_PASSWORD = process.env.DEMO_ADMIN_PASSWORD || 'Admin123';
-const TODAY = new Date('2026-05-06T12:00:00Z');
+const DEMO_SEED_DATE = process.env.DEMO_SEED_DATE || new Date().toISOString().slice(0, 10);
+const TODAY = new Date(`${DEMO_SEED_DATE}T12:00:00Z`);
+
+if (Number.isNaN(TODAY.getTime())) {
+  throw new Error('DEMO_SEED_DATE must be in YYYY-MM-DD format when provided.');
+}
 
 function slugify(value) {
   return String(value || 'demo-workspace')
@@ -49,6 +55,28 @@ async function ensureBy(client, table, key, values, returning = '*') {
   );
 }
 
+async function upsertBy(client, table, key, values, returning = '*') {
+  const keyNames = Object.keys(key);
+  const valueNames = Object.keys(values);
+  const where = keyNames.map((name, index) => `${name} = $${index + 1}`).join(' AND ');
+  const existing = await one(client, `SELECT id FROM ${table} WHERE ${where} LIMIT 1`, Object.values(key));
+
+  if (!existing) {
+    return ensureBy(client, table, key, values, returning);
+  }
+
+  if (valueNames.length === 0) {
+    return one(client, `SELECT ${returning} FROM ${table} WHERE id = $1`, [existing.id]);
+  }
+
+  const setClause = valueNames.map((name, index) => `${name} = $${index + 1}`).join(', ');
+  return one(
+    client,
+    `UPDATE ${table} SET ${setClause} WHERE id = $${valueNames.length + 1} RETURNING ${returning}`,
+    [...Object.values(values), existing.id]
+  );
+}
+
 async function upsertStock(client, stock) {
   await client.query(
     `INSERT INTO inventory_stock
@@ -70,6 +98,44 @@ async function upsertStock(client, stock) {
       stock.rack_id || null,
       stock.bay_id || null,
       stock.compartment_id || null,
+    ]
+  );
+}
+
+async function upsertActiveClock(client, clock) {
+  await client.query(
+    `INSERT INTO active_clock
+       (company_id, user_id, project_id, clock_in_time, clock_in_lat, clock_in_lng,
+        work_date, notes, timezone, clock_source, current_lat, current_lng,
+        location_updated_at, stale_alert_sent_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NULL)
+     ON CONFLICT (user_id)
+     DO UPDATE SET project_id = EXCLUDED.project_id,
+                   clock_in_time = EXCLUDED.clock_in_time,
+                   clock_in_lat = EXCLUDED.clock_in_lat,
+                   clock_in_lng = EXCLUDED.clock_in_lng,
+                   work_date = EXCLUDED.work_date,
+                   notes = EXCLUDED.notes,
+                   timezone = EXCLUDED.timezone,
+                   clock_source = EXCLUDED.clock_source,
+                   current_lat = EXCLUDED.current_lat,
+                   current_lng = EXCLUDED.current_lng,
+                   location_updated_at = EXCLUDED.location_updated_at,
+                   stale_alert_sent_at = NULL`,
+    [
+      clock.company_id,
+      clock.user_id,
+      clock.project_id,
+      clock.clock_in_time,
+      clock.clock_in_lat || null,
+      clock.clock_in_lng || null,
+      clock.work_date,
+      clock.notes,
+      clock.timezone,
+      clock.clock_source,
+      clock.current_lat || null,
+      clock.current_lng || null,
+      clock.location_updated_at,
     ]
   );
 }
@@ -315,12 +381,19 @@ async function main() {
       ['End of day closeout', 'Cleaned work zones, secured loose materials, and uploaded photos for the gallery.', 'draft'],
       ['Quality check', 'Verified installed labels, room layouts, and inventory kit placement. Two labels need replacement.', 'reviewed'],
     ];
-    for (let i = 0; i < 42; i++) {
+    await client.query(
+      `DELETE FROM field_reports
+       WHERE company_id = $1
+         AND title LIKE ANY($2::text[])`,
+      [companyId, fieldNotes.map(([title]) => `${title} - %`)]
+    );
+    for (let i = 0; i < 14; i++) {
       const [title, notes, status] = fieldNotes[i % fieldNotes.length];
       const project = projectByIndex(i);
       const worker = workerByIndex(i);
-      const reportTitle = `${title} - ${project.job_number || project.name} ${isoDate(-Math.floor(i / 2))}`;
-      const report = await ensureBy(
+      const dayOffset = -Math.floor(i / 2);
+      const reportTitle = `Demo note ${String(i + 1).padStart(2, '0')} - ${title} - ${project.job_number || project.name}`;
+      const report = await upsertBy(
         client,
         'field_reports',
         { company_id: companyId, title: reportTitle },
@@ -331,25 +404,23 @@ async function main() {
           status,
           lat: 33.4484 + (i % 6) / 1000,
           lng: -112.0740 - (i % 6) / 1000,
-          report_date: isoDate(-Math.floor(i / 2)),
-          reported_at: isoTimestamp(-Math.floor(i / 2), 8 + (i % 8), 15),
+          report_date: isoDate(dayOffset),
+          reported_at: isoTimestamp(dayOffset, 8 + (i % 8), 15),
         },
         '*'
       );
-      const photoCount = await one(client, 'SELECT COUNT(*)::int AS count FROM field_report_photos WHERE report_id = $1', [report.id]);
-      if (photoCount.count === 0) {
-        for (let p = 0; p < (i % 4 === 0 ? 3 : i % 3 === 0 ? 2 : 1); p++) {
-          await client.query(
-            `INSERT INTO field_report_photos (report_id, url, caption, media_type, size_bytes)
-             VALUES ($1,$2,$3,'photo',$4)`,
-            [
-              report.id,
-              `https://picsum.photos/seed/opsfloa-field-${i}-${p}/1100/825`,
-              ['Before view', 'Progress detail', 'Closeout photo', 'Material staging', 'Issue detail', 'Owner review'][p % 6],
-              180000 + (i * 1000),
-            ]
-          );
-        }
+      await client.query('DELETE FROM field_report_photos WHERE report_id = $1', [report.id]);
+      for (let p = 0; p < (i % 4 === 0 ? 3 : i % 3 === 0 ? 2 : 1); p++) {
+        await client.query(
+          `INSERT INTO field_report_photos (report_id, url, caption, media_type, size_bytes)
+           VALUES ($1,$2,$3,'photo',$4)`,
+          [
+            report.id,
+            `https://picsum.photos/seed/opsfloa-field-note-${i}-${p}/1100/825`,
+            ['Before view', 'Progress detail', 'Closeout photo', 'Material staging', 'Issue detail', 'Owner review'][p % 6],
+            180000 + (i * 1000),
+          ]
+        );
       }
     }
 
@@ -1081,23 +1152,23 @@ async function main() {
     }
 
     for (let i = 0; i < Math.min(3, workers.length); i++) {
-      await ensureBy(
-        client,
-        'active_clock',
-        { company_id: companyId, user_id: workers[i].id },
-        {
-          project_id: projectByIndex(i).id,
-          clock_in_time: isoTimestamp(0, 7 + i, 15),
-          work_date: isoDate(0),
-          notes: ['Route prep', 'Clinic turnover', 'Inventory staging'][i % 3],
-          timezone: 'America/Phoenix',
-          clock_source: 'worker',
-          current_lat: 33.45 + (i / 100),
-          current_lng: -112.07 - (i / 100),
-          location_updated_at: isoTimestamp(0, 10 + i, 5),
-        },
-        '*'
-      );
+      const lat = 33.45 + (i / 100);
+      const lng = -112.07 - (i / 100);
+      await upsertActiveClock(client, {
+        company_id: companyId,
+        user_id: workers[i].id,
+        project_id: projectByIndex(i).id,
+        clock_in_time: isoTimestamp(0, 7 + i, 15),
+        clock_in_lat: lat,
+        clock_in_lng: lng,
+        work_date: isoDate(0),
+        notes: ['Route prep', 'Clinic turnover', 'Inventory staging'][i % 3],
+        timezone: 'America/Phoenix',
+        clock_source: 'worker',
+        current_lat: lat,
+        current_lng: lng,
+        location_updated_at: isoTimestamp(0, 10 + i, 5),
+      });
     }
 
     for (let i = 0; i < 18; i++) {

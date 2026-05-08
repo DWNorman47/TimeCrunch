@@ -1,0 +1,43 @@
+name: Refresh Demo Operations
+
+# Keeps the public demo company centered around the current date.
+# This job only seeds the named fictional company and uses PROD_DATABASE_URL
+# from repository secrets; it does not run migrations or touch other companies.
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    inputs:
+      demo_seed_date:
+        description: 'Optional YYYY-MM-DD date to center demo data around'
+        required: false
+        type: string
+
+jobs:
+  refresh:
+    name: Seed Demo Operations
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - run: npm install
+
+      - name: Refresh demo data
+        run: npm run seed:demo
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DATABASE_SSL: 'true'
+          DEMO_COMPANY_NAME: Demo Operations
+          DEMO_ADMIN_USERNAME: Admin
+          DEMO_ADMIN_PASSWORD: Admin123
+          DEMO_SEED_DATE: ${{ github.event.inputs.demo_seed_date || '' }}
