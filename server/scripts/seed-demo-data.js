@@ -2,12 +2,18 @@ const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const { seedBuiltinRoles } = require('../permissions');
 
-// Manual or opt-in dev/stage seed for visual QA. It creates/fills only the
-// named fictional company and runs automatically only when DEMO_SEED_AUTO=true.
+// Manual or scheduled seed for visual QA. It creates/fills only the named
+// fictional company. Dates roll forward so Demo Operations stays useful as a
+// live demo; set DEMO_SEED_DATE=YYYY-MM-DD for a deterministic refresh.
 const TARGET_COMPANY = process.env.DEMO_COMPANY_NAME || 'Demo Operations';
 const DEMO_ADMIN_USERNAME = process.env.DEMO_ADMIN_USERNAME || 'Admin';
 const DEMO_ADMIN_PASSWORD = process.env.DEMO_ADMIN_PASSWORD || 'Admin123';
-const TODAY = new Date('2026-05-06T12:00:00Z');
+const DEMO_SEED_DATE = process.env.DEMO_SEED_DATE || new Date().toISOString().slice(0, 10);
+const TODAY = new Date(`${DEMO_SEED_DATE}T12:00:00Z`);
+
+if (Number.isNaN(TODAY.getTime())) {
+  throw new Error('DEMO_SEED_DATE must be in YYYY-MM-DD format when provided.');
+}
 
 function slugify(value) {
   return String(value || 'demo-workspace')
