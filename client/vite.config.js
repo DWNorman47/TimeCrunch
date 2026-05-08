@@ -40,13 +40,27 @@ export default defineConfig({
       injectManifest: {
         injectionPoint: 'self.__WB_MANIFEST',
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
+        globIgnores: [
+          '**/*.map',
+          '**/react-pdf.browser-*.js',
+          '**/ImportItemsModal-*.js',
+          '**/vendor-charts-*.js',
+          '**/vendor-leaflet-*.js',
+          '**/InventoryPage-*.js',
+          '**/AdministrationPage-*.js',
+          '**/AnalyticsPage-*.js',
+          '**/SuperAdmin-*.js',
+          '**/ProjectsPage-*.js',
+          '**/ManageSchedule-*.js',
+          '**/ManageWorkers-*.js',
+        ],
       },
     }),
   ],
   build: {
     // Required so Sentry can symbolicate — the plugin strips these from the
     // final bundle after upload, so they don't ship to users.
-    sourcemap: true,
+    sourcemap: sentryPlugins.length > 0,
     rollupOptions: {
       output: {
         manualChunks: {

@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
 require('dotenv').config();
+const logger = require('./logger');
 
 // Strip sslmode= from the connection string. Hosts like Neon and Render
 // include `?sslmode=require` in the URL they hand out; pg-connection-string
@@ -14,12 +15,21 @@ const { stripSslMode } = require('./utils/dbConnString');
 // option instead. Local Postgres without TLS can opt out via DATABASE_SSL=false.
 const ssl = process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false };
 
+function envInt(name, fallback) {
+  const value = parseInt(process.env[name], 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 const pool = new Pool({
   connectionString: stripSslMode(process.env.DATABASE_URL),
   ssl,
-  max: 20,                    // max concurrent connections (default is 10)
-  idleTimeoutMillis: 30000,   // close idle connections after 30s
-  connectionTimeoutMillis: 3000, // fail fast if no connection available within 3s
+  max: envInt('PG_POOL_MAX', 10),
+  idleTimeoutMillis: envInt('PG_IDLE_TIMEOUT_MS', 30000),
+  connectionTimeoutMillis: envInt('PG_CONNECTION_TIMEOUT_MS', 10000),
+});
+
+pool.on('error', err => {
+  logger.warn({ err }, 'postgres idle client error');
 });
 
 module.exports = pool;

@@ -339,7 +339,9 @@ button {
   margin: 0 auto;
 }
 .landing-header {
-  height: 72px;
+  height: calc(72px + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -427,7 +429,7 @@ button {
 .landing-hero {
   position: relative;
   min-height: 735px;
-  margin-top: -72px;
+  margin-top: calc(-72px - env(safe-area-inset-top));
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -1556,7 +1558,7 @@ input, select, textarea {
   }
   .landing-header {
     height: auto;
-    min-height: 68px;
+    min-height: calc(68px + env(safe-area-inset-top));
     align-items: center;
     gap: 12px;
     color: #f8fafc;
@@ -1580,7 +1582,7 @@ input, select, textarea {
   }
   .landing-hero {
     min-height: auto;
-    margin-top: -68px;
+    margin-top: calc(-68px - env(safe-area-inset-top));
   }
   .landing-hero-scrim {
     background:
@@ -1594,7 +1596,7 @@ input, select, textarea {
   .landing-hero-grid {
     grid-template-columns: 1fr;
     gap: 26px;
-    padding: 108px 0 44px;
+    padding: calc(108px + env(safe-area-inset-top)) 0 44px;
   }
   .landing-hero-grid > *,
   .landing-hero-copy {
@@ -1692,6 +1694,7 @@ input, select, textarea {
   .landing-header {
     padding-left: 16px !important;
     padding-right: 16px !important;
+    padding-top: env(safe-area-inset-top) !important;
   }
   .landing-cta {
     padding: 7px 12px !important;

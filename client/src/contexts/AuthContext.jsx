@@ -11,6 +11,31 @@ function clearOfflineQueue() {
     .catch(() => {});
 }
 
+function readCachedUser(tokenStore) {
+  const cached = tokenStore.getItem('tc_user');
+  if (!cached) return null;
+  try {
+    return JSON.parse(cached);
+  } catch {
+    return null;
+  }
+}
+
+function isAuthFailure(err) {
+  const status = err?.response?.status;
+  return status === 401 || status === 403;
+}
+
+function storeSession(tokenStore, token, user) {
+  tokenStore.setItem('tc_token', token);
+  if (user) tokenStore.setItem('tc_user', JSON.stringify(user));
+}
+
+function clearStoredSession(tokenStore) {
+  tokenStore.removeItem('tc_token');
+  tokenStore.removeItem('tc_user');
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,15 +52,22 @@ export function AuthProvider({ children }) {
 
     // If offline, use cached user so the app works without a network round-trip
     if (!navigator.onLine) {
-      const cached = tokenStore.getItem('tc_user');
-      if (cached) { try { setUser(JSON.parse(cached)); } catch {} }
+      const cached = readCachedUser(tokenStore);
+      if (cached) setUser(cached);
       setLoading(false);
       return;
     }
 
     api.get('/auth/me', { timeout: 10000 })
       .then(r => { setUser(r.data.user); tokenStore.setItem('tc_user', JSON.stringify(r.data.user)); })
-      .catch(() => tokenStore.removeItem('tc_token'))
+      .catch(err => {
+        if (isAuthFailure(err)) {
+          clearStoredSession(tokenStore);
+          return;
+        }
+        const cached = readCachedUser(tokenStore);
+        if (cached) setUser(cached);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -49,11 +81,10 @@ export function AuthProvider({ children }) {
     if (r.data.must_change_password) {
       return { must_change_password: true, setup_token: r.data.setup_token };
     }
-    localStorage.setItem('tc_token', r.data.token);
-    const me = await api.get('/auth/me');
-    setUser(me.data.user);
+    storeSession(localStorage, r.data.token, r.data.user);
+    setUser(r.data.user);
     if (r.data.first_login) setFirstLogin(true);
-    return me.data.user;
+    return r.data.user;
   };
 
   const loginWithToken = async token => {
@@ -61,6 +92,7 @@ export function AuthProvider({ children }) {
     clearOfflineQueue();
     localStorage.setItem('tc_token', token);
     const me = await api.get('/auth/me');
+    localStorage.setItem('tc_user', JSON.stringify(me.data.user));
     setUser(me.data.user);
     setFirstLogin(true); // registration always counts as first login
     return me.data.user;
@@ -70,10 +102,9 @@ export function AuthProvider({ children }) {
     await clearCache();
     clearOfflineQueue();
     const r = await api.post('/auth/mfa/confirm', { mfa_token, code });
-    localStorage.setItem('tc_token', r.data.token);
-    const me = await api.get('/auth/me');
-    setUser(me.data.user);
-    return me.data.user;
+    storeSession(localStorage, r.data.token, r.data.user);
+    setUser(r.data.user);
+    return r.data.user;
   };
 
   const logout = () => {

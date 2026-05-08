@@ -10,13 +10,20 @@ export default function NotificationBell() {
   const ref = useRef(null);
 
   const load = useCallback(() => {
+    if (document.visibilityState !== 'visible' || !navigator.onLine) return;
     api.get('/inbox').then(r => setItems(r.data)).catch(silentError('notificationbell'));
   }, []);
 
   useEffect(() => {
     load();
     const interval = setInterval(load, 60000);
-    return () => clearInterval(interval);
+    document.addEventListener('visibilitychange', load);
+    window.addEventListener('online', load);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', load);
+      window.removeEventListener('online', load);
+    };
   }, [load]);
 
   // Close when clicking outside
