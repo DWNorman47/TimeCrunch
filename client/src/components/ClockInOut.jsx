@@ -274,9 +274,10 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   const handleClockOut = async () => {
     setError('');
     setLoading(true);
+    const clockOutInstant = new Date();
     const { lat, lng } = geolocationEnabled ? await getLocation() : { lat: null, lng: null };
     const local_clock_in = status.clock_in_time ? toLocalTime(new Date(status.clock_in_time)) : toLocalTime(new Date());
-    const local_clock_out = toLocalTime(new Date());
+    const local_clock_out = toLocalTime(clockOutInstant);
     try {
       const r = await api.post('/clock/out', {
         lat, lng,
@@ -311,6 +312,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     if (!switchProject) { setError(`Select new ${workLabelLower}.`); return; }
     setError('');
     setLoading(true);
+    const switchInstant = new Date();
     const nextProject = projects?.find(p => String(p.id) === String(switchProject));
     const nextProjectHasGeofence = !!(nextProject?.geo_lat && nextProject?.geo_lng && nextProject?.geo_radius_ft);
     const { lat, lng } = (geolocationEnabled || nextProjectHasGeofence)
@@ -320,20 +322,35 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
           enableHighAccuracy: nextProjectHasGeofence,
         })
       : { lat: null, lng: null };
-    const local_clock_in = status.clock_in_time ? toLocalTime(new Date(status.clock_in_time)) : toLocalTime(new Date());
-    const local_clock_out = toLocalTime(new Date());
+    const local_clock_in = status.clock_in_time ? toLocalTime(new Date(status.clock_in_time)) : toLocalTime(switchInstant);
+    const local_clock_out = toLocalTime(switchInstant);
     try {
-      await api.post('/clock/out', {
+      const local_work_date = new Date().toLocaleDateString('en-CA');
+      const switch_clock_in_time = switchInstant.toISOString();
+      const r = await api.post('/clock/switch', {
+        project_id: switchProject,
         lat, lng,
         break_minutes: breakMinutes ? parseInt(breakMinutes) : 0,
         mileage: mileage ? parseFloat(mileage) : null,
         local_clock_in,
         local_clock_out,
+        local_work_date,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        clock_in_time: switch_clock_in_time,
       });
-      const local_work_date = new Date().toLocaleDateString('en-CA');
-      const switch_clock_in_time = new Date().toISOString();
-      const r = await api.post('/clock/in', { project_id: switchProject, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, clock_in_time: switch_clock_in_time });
-      setStatus(r.data);
+      if (r.data?.offline) {
+        setStatus(prev => ({
+          ...prev,
+          project_id: switchProject,
+          project_name: nextProject?.name || prev?.project_name,
+          wage_type: nextProject?.wage_type || prev?.wage_type,
+          clock_in_time: switch_clock_in_time,
+          clock_out_queued: true,
+        }));
+      } else {
+        if (r.data?.closed_entry) onEntryAdded(r.data.closed_entry);
+        setStatus(r.data);
+      }
       setSwitchingProject(false);
       setSwitchProject('');
       setBreakAdded(false);

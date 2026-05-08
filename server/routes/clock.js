@@ -226,6 +226,233 @@ router.post('/in', requireAuth, requirePerm('clock_self'), clockLimiter, coerceB
   }
 });
 
+// POST /api/clock/switch — close the current project and start the next one in one request
+router.post('/switch', requireAuth, requirePerm('clock_self'), clockLimiter, coerceBody({ int: ['project_id'], float: ['break_minutes', 'mileage'] }), async (req, res) => {
+  const { project_id, lat, lng, break_minutes, mileage, local_clock_in, local_clock_out, local_work_date, timezone, clock_in_time } = req.body;
+  if (!project_id) {
+    logFailure(req, 'clock.switch', 'project_required_not_supplied');
+    return res.status(400).json({ error: 'project_id required' });
+  }
+  if ((lat != null || lng != null) && !validCoords(lat, lng)) {
+    logFailure(req, 'clock.switch', 'invalid_coords', { lat, lng });
+    return res.status(400).json({ error: 'Invalid coordinates' });
+  }
+
+  const companyId = req.user.company_id;
+  try {
+    const settingsRows = await pool.query(
+      `SELECT key, value FROM settings
+       WHERE company_id=$1 AND key IN ('feature_project_integration','global_required_checklist_template_id')`,
+      [companyId]
+    );
+    const settingsMap = Object.fromEntries(settingsRows.rows.map(r => [r.key, r.value]));
+    const projectsEnabled = settingsMap['feature_project_integration'] !== '0';
+    const globalChecklistId = settingsMap['global_required_checklist_template_id'] ? parseInt(settingsMap['global_required_checklist_template_id']) : null;
+    if (!projectsEnabled) {
+      logFailure(req, 'clock.switch', 'projects_disabled');
+      return res.status(400).json({ error: 'Projects are not enabled for this company' });
+    }
+
+    const targetResult = await pool.query(
+      'SELECT id, name, wage_type, geo_lat, geo_lng, geo_radius_ft, required_checklist_template_id FROM projects WHERE id = $1 AND company_id = $2 AND active = true',
+      [project_id, companyId]
+    );
+    if (targetResult.rowCount === 0) {
+      logFailure(req, 'clock.switch', 'project_not_found', { project_id });
+      return res.status(400).json({ error: 'Project not found' });
+    }
+
+    const target = targetResult.rows[0];
+    if (target.geo_lat && target.geo_lng && target.geo_radius_ft) {
+      if (!lat || !lng) {
+        logFailure(req, 'clock.switch', 'geofence_missing_location', { project_id });
+        return res.status(403).json({ error: 'This job site requires location access to switch projects. Please enable GPS and try again.', geofence: true });
+      }
+      const distanceFt = Math.round(haversineDistanceFt(lat, lng, parseFloat(target.geo_lat), parseFloat(target.geo_lng)));
+      if (distanceFt > target.geo_radius_ft) {
+        logFailure(req, 'clock.switch', 'geofence_too_far', { project_id, distance_ft: distanceFt, radius_ft: target.geo_radius_ft });
+        return res.status(403).json({
+          error: `You are ${distanceFt.toLocaleString()} ft from the job site. Must be within ${target.geo_radius_ft.toLocaleString()} ft to switch projects.`,
+          geofence: true,
+          distance_ft: distanceFt,
+          radius_ft: target.geo_radius_ft,
+        });
+      }
+    }
+
+    const requiredChecklistId = target.required_checklist_template_id || globalChecklistId;
+    if (requiredChecklistId) {
+      const sub = await pool.query(
+        `SELECT id FROM safety_checklist_submissions
+         WHERE company_id=$1 AND template_id=$2 AND submitted_by=$3 AND check_date=CURRENT_DATE`,
+        [companyId, requiredChecklistId, req.user.id]
+      );
+      if (sub.rowCount === 0) {
+        logFailure(req, 'clock.switch', 'checklist_required', { template_id: requiredChecklistId, project_id });
+        return res.status(403).json({
+          error: 'Complete the required safety checklist before switching projects.',
+          checklist_required: true,
+          template_id: requiredChecklistId,
+        });
+      }
+    }
+
+    const switchInTs = (() => {
+      const parsed = clock_in_time ? new Date(clock_in_time) : null;
+      return parsed && !isNaN(parsed) ? parsed : new Date();
+    })();
+    const clockOutTime = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const end_time = local_clock_out || `${pad(clockOutTime.getUTCHours())}:${pad(clockOutTime.getUTCMinutes())}:${pad(clockOutTime.getUTCSeconds())}`;
+    const newStartTime = `${pad(switchInTs.getUTCHours())}:${pad(switchInTs.getUTCMinutes())}:${pad(switchInTs.getUTCSeconds())}`;
+
+    const txClient = await pool.connect();
+    let oldClock;
+    let oldProjectName = null;
+    let oldWageType = 'regular';
+    let entryResult;
+    let activeResult;
+    try {
+      await txClient.query('BEGIN');
+      const clockResult = await txClient.query(
+        'SELECT user_id, company_id, project_id, clock_in_time, clock_in_lat, clock_in_lng, work_date, notes, timezone, clock_source, clocked_in_by FROM active_clock WHERE user_id = $1 FOR UPDATE',
+        [req.user.id]
+      );
+      if (clockResult.rowCount === 0) {
+        await txClient.query('ROLLBACK');
+        logFailure(req, 'clock.switch', 'not_clocked_in');
+        return res.status(400).json({ error: 'Not clocked in' });
+      }
+
+      oldClock = clockResult.rows[0];
+      if (String(oldClock.project_id || '') === String(project_id)) {
+        await txClient.query('ROLLBACK');
+        logFailure(req, 'clock.switch', 'same_project', { project_id });
+        return res.status(400).json({ error: 'You are already clocked into that project' });
+      }
+
+      if (oldClock.project_id) {
+        const oldProjectResult = await txClient.query('SELECT wage_type, name FROM projects WHERE id = $1', [oldClock.project_id]);
+        if (oldProjectResult.rowCount === 0) {
+          await txClient.query('ROLLBACK');
+          logFailure(req, 'clock.switch', 'current_project_not_found', { project_id: oldClock.project_id });
+          return res.status(400).json({ error: 'Current project not found' });
+        }
+        oldWageType = oldProjectResult.rows[0].wage_type;
+        oldProjectName = oldProjectResult.rows[0].name;
+      }
+
+      const clockInTime = new Date(oldClock.clock_in_time);
+      const start_time = local_clock_in || `${pad(clockInTime.getUTCHours())}:${pad(clockInTime.getUTCMinutes())}:${pad(clockInTime.getUTCSeconds())}`;
+
+      entryResult = await txClient.query(
+        `INSERT INTO time_entries
+           (company_id, user_id, project_id, work_date, start_time, end_time, start_ts, end_ts, wage_type, notes,
+            clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng, break_minutes, mileage, timezone,
+            clock_source, clocked_in_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+         RETURNING *`,
+        [
+          companyId, req.user.id, oldClock.project_id, oldClock.work_date,
+          start_time, end_time, clockInTime, clockOutTime, oldWageType, oldClock.notes || null,
+          oldClock.clock_in_lat, oldClock.clock_in_lng, lat || null, lng || null,
+          parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
+          oldClock.timezone || null,
+          oldClock.clock_source, oldClock.clocked_in_by,
+        ]
+      );
+
+      activeResult = await txClient.query(
+        `UPDATE active_clock
+         SET project_id = $2,
+             clock_in_time = $3,
+             clock_in_lat = $4,
+             clock_in_lng = $5,
+             work_date = COALESCE($6::date, CURRENT_DATE),
+             notes = NULL,
+             timezone = $7,
+             clock_source = 'worker',
+             clocked_in_by = NULL,
+             current_lat = NULL,
+             current_lng = NULL,
+             location_updated_at = NULL
+         WHERE user_id = $1
+         RETURNING *`,
+        [req.user.id, project_id, switchInTs, lat || null, lng || null, local_work_date || null, timezone || oldClock.timezone || null]
+      );
+      await txClient.query('COMMIT');
+    } catch (err) {
+      await txClient.query('ROLLBACK');
+      throw err;
+    } finally {
+      txClient.release();
+    }
+
+    const closedEntry = entryResult.rows[0];
+    const activeClock = activeResult.rows[0];
+    res.status(201).json({
+      ...activeClock,
+      project_name: target.name,
+      wage_type: target.wage_type,
+      closed_entry: { ...closedEntry, project_name: oldProjectName },
+    });
+
+    setImmediate(async () => {
+      try {
+        const allSettings = await pool.query('SELECT key, value FROM settings WHERE company_id = $1', [companyId]);
+        const s = applySettingsRows(allSettings.rows, SETTINGS_DEFAULTS);
+        if (!s.feature_overtime || !s.feature_overtime_alerts) return;
+
+        const workDate = oldClock.work_date;
+        const threshold = parseFloat(s.overtime_threshold) || 8;
+        const rule = s.overtime_rule || 'daily';
+        const calcH = (start, end, brk = 0) => {
+          const startDate = new Date(`1970-01-01T${start}`);
+          const endDate = new Date(`1970-01-01T${end}`);
+          let hours = (endDate - startDate) / 3600000;
+          if (hours < 0) hours += 24;
+          return Math.max(0, hours - (brk || 0) / 60);
+        };
+
+        let prevHours = 0;
+        let totalHours = 0;
+        if (rule === 'weekly') {
+          const weekRows = await pool.query(
+            `SELECT start_time, end_time, break_minutes FROM time_entries
+             WHERE user_id = $1 AND wage_type = 'regular'
+               AND DATE_TRUNC('week', work_date::date) = DATE_TRUNC('week', $2::date)`,
+            [req.user.id, workDate]
+          );
+          const newEntryHours = calcH(closedEntry.start_time, closedEntry.end_time, closedEntry.break_minutes);
+          totalHours = weekRows.rows.reduce((sum, r) => sum + calcH(r.start_time, r.end_time, r.break_minutes), 0);
+          prevHours = totalHours - newEntryHours;
+          const weeklyThreshold = threshold <= 10 ? 40 : threshold;
+          if (prevHours < weeklyThreshold && totalHours >= weeklyThreshold && oldWageType === 'regular') {
+            await _sendOvertimeAlert(req.user, companyId, oldProjectName, totalHours, weeklyThreshold, 'weekly', s);
+          }
+        } else {
+          const dayRows = await pool.query(
+            `SELECT start_time, end_time, break_minutes FROM time_entries
+             WHERE user_id = $1 AND work_date = $2 AND wage_type = 'regular'`,
+            [req.user.id, workDate]
+          );
+          const newEntryHours = calcH(closedEntry.start_time, closedEntry.end_time, closedEntry.break_minutes);
+          totalHours = dayRows.rows.reduce((sum, r) => sum + calcH(r.start_time, r.end_time, r.break_minutes), 0);
+          prevHours = totalHours - newEntryHours;
+          if (prevHours < threshold && totalHours >= threshold && oldWageType === 'regular') {
+            await _sendOvertimeAlert(req.user, companyId, oldProjectName, totalHours, threshold, 'daily', s);
+          }
+        }
+      } catch (alertErr) {
+        logger.warn({ err: alertErr }, 'switch overtime alert error');
+      }
+    });
+  } catch (err) {
+    logger.error({ err }, 'catch block error');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/clock/out
 router.post('/out', requireAuth, requirePerm('clock_self'), clockLimiter, coerceBody({ float: ['break_minutes', 'mileage'] }), async (req, res) => {
   const { lat, lng, break_minutes, mileage, local_clock_in, local_clock_out } = req.body;
