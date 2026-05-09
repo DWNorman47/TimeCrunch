@@ -1925,34 +1925,28 @@ input, select, textarea {
   }
 
   .project-wheel-menu {
-    position: fixed !important;
-    left: 12px !important;
-    right: 12px !important;
-    top: auto !important;
-    bottom: calc(env(safe-area-inset-bottom) + 14px) !important;
-    border-radius: 14px !important;
-    max-height: min(360px, calc(100dvh - env(safe-area-inset-top) - 120px)) !important;
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: calc(100% + 6px) !important;
+    bottom: auto !important;
+    border-radius: 10px !important;
+    max-height: min(260px, calc(100dvh - env(safe-area-inset-top) - 160px)) !important;
   }
   .project-wheel-list {
-    max-height: min(330px, calc(100dvh - env(safe-area-inset-top) - 150px)) !important;
-    padding: 14px 10px !important;
-  }
-  .project-wheel-list::before,
-  .project-wheel-list::after {
-    content: "";
-    display: block;
-    height: 34px;
+    max-height: min(250px, calc(100dvh - env(safe-area-inset-top) - 174px)) !important;
+    padding: 8px !important;
   }
   .project-wheel-option {
-    min-height: 54px;
-    justify-content: center;
-    flex-direction: column;
-    gap: 2px;
-    text-align: center;
+    min-height: 48px;
+    justify-content: space-between;
+    flex-direction: row;
+    gap: 10px;
+    text-align: left;
   }
   .project-wheel-option-main {
     max-width: 100%;
-    font-size: 16px;
+    font-size: 14px;
   }
   /* Tab bar — scrollable on small screens */
   .tab-bar {
