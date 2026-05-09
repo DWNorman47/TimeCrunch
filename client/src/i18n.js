@@ -308,8 +308,8 @@ const translations = {
     mrModuleTeam: 'Team',
     mrModuleTeamDesc: 'Show the Team directory in the app switcher',
     // ManageRates — Features
-    mrFeatProjectIntegration: 'Project Selection',
-    mrFeatProjectIntegrationDesc: 'Require project selection on time entries and clock-in',
+    mrFeatProjectIntegration: 'Work/Project Clock-In',
+    mrFeatProjectIntegrationDesc: 'Require a work/project selection when clocking in and logging time',
     mrFeatBroadcast: 'Announce to All Team Members',
     mrFeatBroadcastDesc: 'Show broadcast message tool on the Live tab',
     mrFeatMediaGallery: 'Media Gallery',
@@ -3089,8 +3089,8 @@ const translations = {
     mrModuleTeam: 'Equipo',
     mrModuleTeamDesc: 'Mostrar el directorio del equipo en el selector',
     // ManageRates — Features
-    mrFeatProjectIntegration: 'Selección de trabajo',
-    mrFeatProjectIntegrationDesc: 'Requerir selección de trabajo en entradas de tiempo y al marcar entrada',
+    mrFeatProjectIntegration: 'Marcaje por trabajo/proyecto',
+    mrFeatProjectIntegrationDesc: 'Requerir selección de trabajo/proyecto al marcar entrada y registrar tiempo',
     mrFeatBroadcast: 'Anuncio a todo el equipo',
     mrFeatBroadcastDesc: 'Mostrar la herramienta de difusión en la pestaña En Vivo',
     mrFeatMediaGallery: 'Galería de medios',
