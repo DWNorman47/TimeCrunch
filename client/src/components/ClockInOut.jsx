@@ -173,9 +173,11 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   };
 
+  const projectClockLabel = workLabel?.trim().toLowerCase() === 'work' ? 'Project' : (workLabel || 'Project');
   const selectedProjectData = projects?.find(p => String(p.id) === String(selectedProject));
   const projectHasGeofence = !!(selectedProjectData?.geo_lat && selectedProjectData?.geo_lng && selectedProjectData?.geo_radius_ft);
-  const workLabelLower = workLabel.toLowerCase();
+  const workLabelLower = projectClockLabel.toLowerCase();
+  const switchProjects = projects?.filter(p => String(p.id) !== String(status?.project_id)) || [];
 
   const handleClockIn = async () => {
   // When work selection is on but the company has zero active work,
@@ -450,17 +452,28 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
 
             {switchingProject ? (
               <div style={styles.switchBox}>
-                <select
-                  style={styles.switchSelect}
-                  value={switchProject}
-                  onChange={e => setSwitchProject(e.target.value)}
-                  autoFocus
-                >
-                  <option value="">{`Select new ${workLabelLower}`}</option>
-                  {projects?.filter(p => String(p.id) !== String(status.project_id)).map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+                <div style={styles.switchBoxHeader}>{`Select new ${workLabelLower}`}</div>
+                <div style={styles.switchChoices} role="radiogroup" aria-label={`Select new ${workLabelLower}`}>
+                  {switchProjects.length === 0 ? (
+                    <div style={styles.switchEmpty}>{`No other ${workLabelLower}s available.`}</div>
+                  ) : (
+                    switchProjects.map((p, index) => {
+                      const selected = String(switchProject) === String(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          style={{ ...styles.switchChoice, ...(selected ? styles.switchChoiceSelected : {}) }}
+                          onClick={() => setSwitchProject(p.id)}
+                          aria-pressed={selected}
+                          autoFocus={!switchProject && index === 0}
+                        >
+                          {p.name}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
                 <div style={styles.switchActions}>
                   <button style={{ ...styles.switchConfirmBtn, ...(loading || !switchProject ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleSwitchProject} disabled={loading || !switchProject}>
                     {loading ? t.saving : t.confirmSwitch}
@@ -533,7 +546,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
       )}
       <div style={styles.form}>
         {projectsEnabled && hasProjects && <div>
-          <label htmlFor="clockin-project" style={styles.label}>{workLabel}</label>
+          <label htmlFor="clockin-project" style={styles.label}>{projectClockLabel}</label>
           <select
             id="clockin-project"
             style={styles.input}
@@ -759,7 +772,11 @@ const styles = {
   clockInBtn: { padding: '13px', background: '#1a56db', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 700 },
   switchProjectBtn: { width: '100%', padding: '11px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' },
   switchBox: { background: 'rgba(255,255,255,0.12)', borderRadius: 8, padding: '12px', display: 'flex', flexDirection: 'column', gap: 10 },
-  switchSelect: { padding: '9px 11px', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 7, fontSize: 14, background: 'rgba(255,255,255,0.15)', color: '#fff', width: '100%' },
+  switchBoxHeader: { fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.86)' },
+  switchChoices: { display: 'grid', gap: 8 },
+  switchChoice: { width: '100%', padding: '10px 12px', textAlign: 'left', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 8, background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  switchChoiceSelected: { background: '#fff', color: '#1a56db', borderColor: '#fff' },
+  switchEmpty: { padding: '10px 12px', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, color: 'rgba(255,255,255,0.78)', fontSize: 13 },
   switchActions: { display: 'flex', gap: 8 },
   switchConfirmBtn: { flex: 1, padding: '9px', background: '#fff', color: '#1a56db', border: 'none', borderRadius: 7, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
   switchCancelBtn: { padding: '9px 14px', background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: 'rgba(255,255,255,0.8)', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
