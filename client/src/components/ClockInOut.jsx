@@ -549,7 +549,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                       disabled={switchPage <= 0}
                       aria-label="Previous projects"
                     >
-                      {'<'}
+                      {'◀'}
                     </button>
                     <span style={styles.switchPageText}>{switchPage + 1} / {switchPageCount}</span>
                     <button
@@ -559,7 +559,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                       disabled={switchPage >= switchPageCount - 1}
                       aria-label="Next projects"
                     >
-                      {'>'}
+                      {'▶'}
                     </button>
                   </div>
                 )}
@@ -667,7 +667,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                 disabled={clockInPage <= 0}
                 aria-label="Previous projects"
               >
-                {'<'}
+                {'◀'}
               </button>
               <button
                 type="button"
@@ -676,7 +676,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                 disabled={clockInPage >= clockInPageCount - 1}
                 aria-label="Next projects"
               >
-                {'>'}
+                {'▶'}
               </button>
             </div>
           )}
