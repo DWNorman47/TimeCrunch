@@ -70,7 +70,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div style={styles.dropdown}>
+        <div style={styles.dropdown} className="notification-dropdown">
           <div style={styles.dropHeader}>
             <span style={styles.dropTitle}>{t.notifications}</span>
             {unread > 0 && (
