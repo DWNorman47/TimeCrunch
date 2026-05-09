@@ -31,6 +31,32 @@ function formatElapsed(seconds) {
 
 const HINT_DISMISSED_KEY = 'opsfloa_clockin_hint_dismissed';
 const SWITCH_PAGE_SIZE = 3;
+const CLOCK_IN_PAGE_SIZE = 3;
+
+function readProjectHistory(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || '{}') || {};
+  } catch {
+    return {};
+  }
+}
+
+function rememberProjectChoice(key, projectId) {
+  if (!projectId) return;
+  try {
+    const id = String(projectId);
+    const history = readProjectHistory(key);
+    const current = history[id] || {};
+    history[id] = {
+      count: (parseInt(current.count, 10) || 0) + 1,
+      lastUsed: Date.now(),
+    };
+    localStorage.setItem(key, JSON.stringify(history));
+    localStorage.setItem('lastProjectId', id);
+  } catch {
+    // Browser storage can be unavailable in private/restricted modes.
+  }
+}
 
 export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geolocationEnabled = true, projectsEnabled = true, workLabel = 'Project' }) {
   // Detect day-mark workers up front — the actual switch to the DayMark
@@ -67,6 +93,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   const [breakMinutes, setBreakMinutes] = useState('');
   const [mileage, setMileage] = useState('');
   const [locationDenied, setLocationDenied] = useState(false);
+  const [clockInPage, setClockInPage] = useState(0);
   const [switchingProject, setSwitchingProject] = useState(false);
   const [switchProject, setSwitchProject] = useState('');
   const [switchPage, setSwitchPage] = useState(0);
@@ -176,10 +203,34 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   };
 
   const projectClockLabel = workLabel?.trim().toLowerCase() === 'work' ? 'Project' : (workLabel || 'Project');
-  const selectedProjectData = projects?.find(p => String(p.id) === String(selectedProject));
+  const projectHistoryKey = `opsfloa_project_history_${user?.company_id || 'company'}_${user?.id || 'user'}`;
+  const projectHistory = readProjectHistory(projectHistoryKey);
+  let lastProjectId = '';
+  try { lastProjectId = localStorage.getItem('lastProjectId') || ''; } catch {}
+  const orderedProjects = [...(projects || [])].sort((a, b) => {
+    const ah = projectHistory[String(a.id)] || {};
+    const bh = projectHistory[String(b.id)] || {};
+    const aLast = parseInt(ah.lastUsed, 10) || 0;
+    const bLast = parseInt(bh.lastUsed, 10) || 0;
+    if (!aLast && !bLast && lastProjectId) {
+      if (String(a.id) === lastProjectId) return -1;
+      if (String(b.id) === lastProjectId) return 1;
+    }
+    if (aLast !== bLast) return bLast - aLast;
+    const aCount = parseInt(ah.count, 10) || 0;
+    const bCount = parseInt(bh.count, 10) || 0;
+    if (aCount !== bCount) return bCount - aCount;
+    return 0;
+  });
+  const selectedProjectData = orderedProjects.find(p => String(p.id) === String(selectedProject));
   const projectHasGeofence = !!(selectedProjectData?.geo_lat && selectedProjectData?.geo_lng && selectedProjectData?.geo_radius_ft);
   const workLabelLower = projectClockLabel.toLowerCase();
-  const switchProjects = projects?.filter(p => String(p.id) !== String(status?.project_id)) || [];
+  const clockInPageCount = Math.max(1, Math.ceil(orderedProjects.length / CLOCK_IN_PAGE_SIZE));
+  const visibleClockInProjects = orderedProjects.slice(
+    clockInPage * CLOCK_IN_PAGE_SIZE,
+    clockInPage * CLOCK_IN_PAGE_SIZE + CLOCK_IN_PAGE_SIZE
+  );
+  const switchProjects = orderedProjects.filter(p => String(p.id) !== String(status?.project_id));
   const switchPageCount = Math.max(1, Math.ceil(switchProjects.length / SWITCH_PAGE_SIZE));
   const visibleSwitchProjects = switchProjects.slice(
     switchPage * SWITCH_PAGE_SIZE,
@@ -187,8 +238,9 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   );
 
   useEffect(() => {
+    setClockInPage(page => Math.min(page, clockInPageCount - 1));
     setSwitchPage(page => Math.min(page, switchPageCount - 1));
-  }, [switchPageCount]);
+  }, [clockInPageCount, switchPageCount]);
 
   const handleClockIn = async () => {
   // When work selection is on but the company has zero active work,
@@ -214,13 +266,14 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
       const r = await api.post('/clock/in', { project_id: selectedProject, notes: notes || undefined, lat, lng, local_work_date, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, location_denied: loc.permissionDenied || false, clock_in_time });
       if (r.data?.offline) {
         // Queued offline — show a pending state
-        const offlineStatus = { offline_queued: true, project_name: projects.find(p => p.id == selectedProject)?.name };
+        const offlineStatus = { offline_queued: true, project_name: orderedProjects.find(p => p.id == selectedProject)?.name };
         setStatus(offlineStatus);
+        rememberProjectChoice(projectHistoryKey, selectedProject);
         setNotes('');
         clearClockInPersisted();
       } else {
         setStatus(r.data);
-        localStorage.setItem('lastProjectId', String(selectedProject));
+        rememberProjectChoice(projectHistoryKey, selectedProject);
         // Auto-dismiss the first-clock-in hint — they've figured it out.
         try { localStorage.setItem(HINT_DISMISSED_KEY, '1'); } catch {}
         onClockedIn?.(r.data);
@@ -326,7 +379,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
     setError('');
     setLoading(true);
     const switchInstant = new Date();
-    const nextProject = projects?.find(p => String(p.id) === String(switchProject));
+    const nextProject = orderedProjects.find(p => String(p.id) === String(switchProject));
     const nextProjectHasGeofence = !!(nextProject?.geo_lat && nextProject?.geo_lng && nextProject?.geo_radius_ft);
     const { lat, lng } = (geolocationEnabled || nextProjectHasGeofence)
       ? await getLocation({
@@ -364,8 +417,10 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
         if (r.data?.closed_entry) onEntryAdded(r.data.closed_entry);
         setStatus(r.data);
       }
+      rememberProjectChoice(projectHistoryKey, switchProject);
       setSwitchingProject(false);
       setSwitchProject('');
+      setSwitchPage(0);
       setBreakAdded(false);
       setMileageAdded(false);
       setBreakMinutes('');
@@ -580,20 +635,51 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
       )}
       <div style={styles.form}>
         {projectsEnabled && hasProjects && <div>
-          <label htmlFor="clockin-project" style={styles.label}>{projectClockLabel}</label>
-          <select
-            id="clockin-project"
-            style={styles.input}
-            value={selectedProject}
-            onChange={e => setSelectedProject(e.target.value)}
-          >
-            <option value="">{`Select ${workLabelLower}`}</option>
-            {projects.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.wage_type === 'prevailing' ? t.prevailing : t.regular})
-              </option>
-            ))}
-          </select>
+          <div style={styles.projectPickerHeader}>
+            <label style={styles.label}>{projectClockLabel}</label>
+            {clockInPageCount > 1 && <span style={styles.projectPickerCount}>{clockInPage + 1} / {clockInPageCount}</span>}
+          </div>
+          <div style={styles.projectChoices} role="radiogroup" aria-label={`Select ${workLabelLower}`}>
+            {visibleClockInProjects.map(p => {
+              const selected = String(selectedProject) === String(p.id);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  style={{ ...styles.projectChoice, ...(selected ? styles.projectChoiceSelected : {}) }}
+                  onClick={() => setSelectedProject(p.id)}
+                  aria-pressed={selected}
+                >
+                  <span>{p.name}</span>
+                  <span style={{ ...styles.projectChoiceMeta, ...(selected ? styles.projectChoiceMetaSelected : {}) }}>
+                    {p.wage_type === 'prevailing' ? t.prevailing : t.regular}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {clockInPageCount > 1 && (
+            <div style={styles.projectPager}>
+              <button
+                type="button"
+                style={{ ...styles.projectPageBtn, ...(clockInPage <= 0 ? styles.projectPageBtnDisabled : {}) }}
+                onClick={() => setClockInPage(page => Math.max(0, page - 1))}
+                disabled={clockInPage <= 0}
+                aria-label="Previous projects"
+              >
+                {'<'}
+              </button>
+              <button
+                type="button"
+                style={{ ...styles.projectPageBtn, ...(clockInPage >= clockInPageCount - 1 ? styles.projectPageBtnDisabled : {}) }}
+                onClick={() => setClockInPage(page => Math.min(clockInPageCount - 1, page + 1))}
+                disabled={clockInPage >= clockInPageCount - 1}
+                aria-label="Next projects"
+              >
+                {'>'}
+              </button>
+            </div>
+          )}
         </div>}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -796,6 +882,16 @@ const styles = {
   label: { fontSize: 13, fontWeight: 600, color: '#555', display: 'block', marginBottom: 4 },
   charCount: { fontSize: 11, color: '#6b7280' },
   input: { padding: '9px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, width: '100%' },
+  projectPickerHeader: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 6 },
+  projectPickerCount: { fontSize: 12, fontWeight: 800, color: '#64748b' },
+  projectChoices: { display: 'grid', gap: 8 },
+  projectChoice: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', textAlign: 'left', border: '1px solid #dbe3ef', borderRadius: 8, background: '#fff', color: '#0f172a', fontSize: 14, fontWeight: 800, cursor: 'pointer' },
+  projectChoiceSelected: { borderColor: '#1a56db', background: '#eff6ff', boxShadow: '0 0 0 1px #1a56db inset' },
+  projectChoiceMeta: { flexShrink: 0, fontSize: 11, fontWeight: 900, color: '#64748b', textTransform: 'uppercase' },
+  projectChoiceMetaSelected: { color: '#1d4ed8' },
+  projectPager: { display: 'flex', justifyContent: 'center', gap: 8, marginTop: 8 },
+  projectPageBtn: { width: 36, height: 32, borderRadius: 8, border: '1px solid #cbd5e1', background: '#f8fafc', color: '#334155', fontSize: 16, fontWeight: 900, lineHeight: 1, cursor: 'pointer' },
+  projectPageBtnDisabled: { opacity: 0.45, cursor: 'not-allowed' },
   locationDenied: { background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 },
   locationDeniedTitle: { fontSize: 14, fontWeight: 700, color: '#854d0e' },
   locationDeniedText: { fontSize: 12, color: '#713f12', margin: 0 },
