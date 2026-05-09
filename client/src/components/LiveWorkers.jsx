@@ -53,7 +53,7 @@ export default function LiveWorkers({ timezone = '', showInactiveAlerts = true, 
   const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
   const workerLabelLower = workerLabel.toLowerCase();
   const workerLabelPluralLower = workerLabelPlural.toLowerCase();
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelLower = workLabel.toLowerCase();
   const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
   const [workers, setWorkers] = useState([]);

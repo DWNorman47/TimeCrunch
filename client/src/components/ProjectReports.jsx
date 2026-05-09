@@ -31,7 +31,7 @@ export default function ProjectReports({ currency = 'USD', settings = null }) {
   const { user } = useAuth();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
   const workerLabel = settings?.label_worker || 'Team Member';
   const workerLabelLower = workerLabel.toLowerCase();

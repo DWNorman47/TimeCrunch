@@ -27,7 +27,7 @@ const STATUS_STYLES = {
 
 // ── RFI Form ──────────────────────────────────────────────────────────────────
 
-function RFIForm({ initial, projects, onSaved, onCancel, workLabel = 'Work' }) {
+function RFIForm({ initial, projects, onSaved, onCancel, workLabel = 'Project' }) {
   const t = useT();
   const STATUS_LABELS = useMemo(() => ({ open: t.statusOpen, answered: t.statusAnswered, closed: t.statusClosed }), [t]);
   const isEdit = !!initial?.id;
@@ -266,7 +266,7 @@ export default function RFITracking({ projects, settings = null }) {
   const t = useT();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
 
   const [rfis, setRfis] = useState([]);

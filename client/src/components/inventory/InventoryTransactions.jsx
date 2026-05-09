@@ -42,7 +42,7 @@ function formatQty(value) {
 
 function TransactionForm({ isAdmin, locations, projects, settings, onSave, onCancel, onConversionSaved }) {
   const t = useT();
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const TYPE_LABELS = {
     receive:  t.invTxTypeReceive,
     issue:    t.invTxTypeIssue,
@@ -465,7 +465,7 @@ function TransactionForm({ isAdmin, locations, projects, settings, onSave, onCan
 
 export default function InventoryTransactions({ isAdmin, locations, projects, settings, onTransaction, onConversionSaved }) {
   const t = useT();
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const TYPE_LABELS = {
     receive:  t.invTxTypeReceive,
     issue:    t.invTxTypeIssue,

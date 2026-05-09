@@ -155,7 +155,7 @@ export default function AdminDashboard() {
 
   const workerLabel = settings?.label_worker || 'Team Member';
   const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
 
   return (

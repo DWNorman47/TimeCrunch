@@ -243,7 +243,7 @@ function WorkspaceLabels({ settings, onUpdated }) {
   const labelFields = [
     {
       key: 'label_work',
-      label: 'Work',
+      label: 'Project',
       note: 'The general word for billable or trackable work.',
       examples: 'Jobs, routes, cases',
     },
@@ -267,7 +267,7 @@ function WorkspaceLabels({ settings, onUpdated }) {
     },
   ];
   const [form, setForm] = useState({
-    label_work: settings?.label_work || 'Work',
+    label_work: settings?.label_work || 'Project',
     label_client: settings?.label_client || 'Customer',
     label_worker: settings?.label_worker || 'Team Member',
     label_field: settings?.label_field || 'Field Work',
@@ -278,7 +278,7 @@ function WorkspaceLabels({ settings, onUpdated }) {
 
   useEffect(() => {
     setForm({
-      label_work: settings?.label_work || 'Work',
+      label_work: settings?.label_work || 'Project',
       label_client: settings?.label_client || 'Customer',
       label_worker: settings?.label_worker || 'Team Member',
       label_field: settings?.label_field || 'Field Work',

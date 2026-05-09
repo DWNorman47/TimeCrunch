@@ -287,7 +287,7 @@ const a = {
 
 function IssueModal({ item, projects, settings, onClose, onDone }) {
   const t = useT();
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const [qty, setQty]             = useState('');
   const [uomId, setUomId]         = useState(item.uom_id ? String(item.uom_id) : '');
   const [itemUoms, setItemUoms]   = useState([]);

@@ -35,7 +35,7 @@ const pdf = StyleSheet.create({
 
 export function PunchlistDocument({ items, companyName, t = {}, language, settings = null }) {
   const locale = langToLocale(language);
-  const workLabel = settings?.label_work || t.project || 'Work';
+  const workLabel = settings?.label_work || t.project || 'Project';
   const PRIORITY_LABEL = { high: t.priorityHigh, normal: t.priorityNormal, low: t.priorityLow };
   const STATUS_LABEL = {
     open: t.statusOpen,

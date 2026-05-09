@@ -122,7 +122,7 @@ export default function FieldDayLog({ projects, isAdmin, settings = null }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelPlural = /s$/i.test(workLabel) ? workLabel : `${workLabel}s`;
   const { onSync } = useOffline() || {};
 

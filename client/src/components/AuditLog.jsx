@@ -28,7 +28,7 @@ export default function AuditLog({ timezone = '', settings = null }) {
   const locale = langToLocale(user?.language);
   const workerLabel = settings?.label_worker || 'Team Member';
   const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
   const [entries, setEntries] = useState([]);
   const [total, setTotal] = useState(0);

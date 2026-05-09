@@ -179,7 +179,7 @@ function TemplateBuilder({ initial, onSaved, onCancel }) {
 
 // ── Inspection Form (fill out an inspection) ──────────────────────────────────
 
-function InspectionForm({ templates, projects, initial, onSaved, onCancel, workLabel = 'Work' }) {
+function InspectionForm({ templates, projects, initial, onSaved, onCancel, workLabel = 'Project' }) {
   const t = useT();
   const isEdit = !!initial?.id;
   const [form, setForm] = useState({
@@ -487,7 +487,7 @@ export default function InspectionChecklists({ projects, settings = null }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
 
   const [inspections, setInspections] = useState([]);

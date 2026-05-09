@@ -208,7 +208,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
     return new Intl.NumberFormat(locale, { style: 'currency', currency: settings?.currency || 'USD', maximumFractionDigits: 0 }).format(n);
   };
 
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelLower = workLabel.toLowerCase();
   const clientLabel = settings?.label_client || 'Customer';
   const workerLabel = settings?.label_worker || 'Team Member';
@@ -1387,7 +1387,7 @@ function ProjectDetail({ project, metrics, settings, companyInfo = {}, onClose, 
 // match the overview tab's other panels (budgetSection look). Collapsed by
 // default; header is clickable. Empty selection = visible to everyone.
 
-function ProjectVisibility({ project, onProjectUpdated, toggleStyle, countStyle, workLabel = 'Work', workerLabel = 'Worker' }) {
+function ProjectVisibility({ project, onProjectUpdated, toggleStyle, countStyle, workLabel = 'Project', workerLabel = 'Worker' }) {
   const t = useT();
   const workerLabelPlural = plural(workerLabel);
   const workLabelLower = workLabel.toLowerCase();
@@ -1602,7 +1602,7 @@ function ProjectCreateForm({ clients, settings, onSaved, onCancel, onClientCreat
   const [geoError, setGeoError] = useState('');
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const showPrevailing = (settings?.prevailing_wage_rate ?? 0) > 0;
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelLower = workLabel.toLowerCase();
   const clientLabel = settings?.label_client || 'Customer';
   const clientLabelLower = clientLabel.toLowerCase();
@@ -1927,7 +1927,7 @@ export default function ProjectsPage() {
 
   const activeProjects = projects.filter(p => p.active).length;
   const totalHours = Object.values(metrics).reduce((s, m) => s + parseFloat(m.total_hours || 0), 0);
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelLower = workLabel.toLowerCase();
   const workLabelPlural = plural(workLabel);
   const clientLabelPlural = plural(settings?.label_client || 'Customer');
@@ -2014,9 +2014,9 @@ export default function ProjectsPage() {
             ) : projects.length === 0 ? (
               <EmptyState
                 mark="W"
-                title={`No ${settings?.label_work?.toLowerCase() || 'work'} yet`}
+                title={`No ${settings?.label_work?.toLowerCase() || 'project'} yet`}
                 body={`Create your first ${settings?.label_work?.toLowerCase() || 'work item'} so time, notes, billing, and reports have somewhere to land.`}
-                actionLabel={`Add ${settings?.label_work || 'Work'}`}
+                actionLabel={`Add ${settings?.label_work || 'Project'}`}
                 onAction={() => setShowCreateForm(true)}
               />
             ) : viewMode === 'grid' ? (

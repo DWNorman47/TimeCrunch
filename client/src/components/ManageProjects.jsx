@@ -296,7 +296,7 @@ export default function ManageProjects({ projects, onProjectAdded, onProjectDele
     setError('');
   };
 
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelLower = workLabel.toLowerCase();
   const workLabelPlural = /s$/i.test(workLabel) ? workLabel : `${workLabel}s`;
   const clientLabel = settings?.label_client || 'Customer';

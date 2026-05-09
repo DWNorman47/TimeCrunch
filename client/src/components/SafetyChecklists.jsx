@@ -187,7 +187,7 @@ function TemplateForm({ initial, onSaved, onCancel }) {
 
 // ── Fill Out Form ─────────────────────────────────────────────────────────────
 
-function FillForm({ templates, projects, onSubmitted, onCancel, workLabel = 'Work' }) {
+function FillForm({ templates, projects, onSubmitted, onCancel, workLabel = 'Project' }) {
   const t = useT();
   const [templateId, setTemplateId] = useState('');
   const [projectId, setProjectId] = useState('');
@@ -402,7 +402,7 @@ export default function SafetyChecklists({ projects, settings = null }) {
   const t = useT();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
   const [view, setView] = useState('list'); // 'list' | 'fill' | 'templates'
   const [templates, setTemplates] = useState([]);
