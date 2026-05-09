@@ -1796,6 +1796,19 @@ input, select, textarea {
     display: block !important;
     color: #fff !important;
   }
+  .notification-dropdown {
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top) + 88px) !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: calc(100dvh - env(safe-area-inset-top) - 104px) !important;
+    overflow: hidden !important;
+  }
+  .notification-dropdown > div:last-child {
+    max-height: calc(100dvh - env(safe-area-inset-top) - 166px) !important;
+  }
 
   /* Tab bar — scrollable on small screens */
   .tab-bar {
