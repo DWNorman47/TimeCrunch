@@ -24,7 +24,7 @@ export default function TabBar({ tabs, active, onChange, breakpoint = 600 }) {
             <option key={t.id} value={t.id}>{t.label}</option>
           ))}
         </select>
-        <span className="ops-tab-select-chevron" aria-hidden="true">v</span>
+        <span className="ops-tab-select-chevron" aria-hidden="true">▼</span>
       </div>
     );
   }
