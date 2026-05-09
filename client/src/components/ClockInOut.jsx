@@ -30,8 +30,6 @@ function formatElapsed(seconds) {
 }
 
 const HINT_DISMISSED_KEY = 'opsfloa_clockin_hint_dismissed';
-const SWITCH_PAGE_SIZE = 3;
-const CLOCK_IN_PAGE_SIZE = 3;
 
 function readProjectHistory(key) {
   try {
@@ -56,6 +54,72 @@ function rememberProjectChoice(key, projectId) {
   } catch {
     // Browser storage can be unavailable in private/restricted modes.
   }
+}
+
+function ProjectWheelPicker({
+  label,
+  placeholder,
+  value,
+  options,
+  onChange,
+  getMeta,
+  tone = 'light',
+}) {
+  const [open, setOpen] = useState(false);
+  const pickerRef = useRef(null);
+  const selected = options.find(p => String(p.id) === String(value));
+  const isDark = tone === 'dark';
+
+  useEffect(() => {
+    const handler = e => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={pickerRef} className={`project-wheel-picker ${isDark ? 'project-wheel-picker-dark' : ''}`}>
+      {label && <label style={isDark ? styles.labelDark : styles.label}>{label}</label>}
+      <button
+        type="button"
+        className={`project-wheel-trigger ${isDark ? 'project-wheel-trigger-dark' : ''}`}
+        onClick={() => setOpen(o => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="project-wheel-trigger-text">{selected?.name || placeholder}</span>
+        <span className="project-wheel-chevron" aria-hidden="true">▼</span>
+      </button>
+      {open && (
+        <div className={`project-wheel-menu ${isDark ? 'project-wheel-menu-dark' : ''}`}>
+          <div className="project-wheel-list" role="listbox">
+            {options.length === 0 ? (
+              <div className="project-wheel-empty">{placeholder}</div>
+            ) : options.map(p => {
+              const selectedOption = String(p.id) === String(value);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`project-wheel-option ${selectedOption ? 'project-wheel-option-selected' : ''}`}
+                  onClick={() => {
+                    onChange(p.id);
+                    setOpen(false);
+                  }}
+                  role="option"
+                  aria-selected={selectedOption}
+                >
+                  <span className="project-wheel-option-main">{p.name}</span>
+                  {getMeta && <span className="project-wheel-option-meta">{getMeta(p)}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geolocationEnabled = true, projectsEnabled = true, workLabel = 'Project' }) {
@@ -93,10 +157,8 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   const [breakMinutes, setBreakMinutes] = useState('');
   const [mileage, setMileage] = useState('');
   const [locationDenied, setLocationDenied] = useState(false);
-  const [clockInPage, setClockInPage] = useState(0);
   const [switchingProject, setSwitchingProject] = useState(false);
   const [switchProject, setSwitchProject] = useState('');
-  const [switchPage, setSwitchPage] = useState(0);
   const [pendingChecklist, setPendingChecklist] = useState(null); // { template_id, items, name }
   const [checklistAnswers, setChecklistAnswers] = useState({});
   const [checklistSubmitting, setChecklistSubmitting] = useState(false);
@@ -225,22 +287,8 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   const selectedProjectData = orderedProjects.find(p => String(p.id) === String(selectedProject));
   const projectHasGeofence = !!(selectedProjectData?.geo_lat && selectedProjectData?.geo_lng && selectedProjectData?.geo_radius_ft);
   const workLabelLower = projectClockLabel.toLowerCase();
-  const clockInPageCount = Math.max(1, Math.ceil(orderedProjects.length / CLOCK_IN_PAGE_SIZE));
-  const visibleClockInProjects = orderedProjects.slice(
-    clockInPage * CLOCK_IN_PAGE_SIZE,
-    clockInPage * CLOCK_IN_PAGE_SIZE + CLOCK_IN_PAGE_SIZE
-  );
   const switchProjects = orderedProjects.filter(p => String(p.id) !== String(status?.project_id));
-  const switchPageCount = Math.max(1, Math.ceil(switchProjects.length / SWITCH_PAGE_SIZE));
-  const visibleSwitchProjects = switchProjects.slice(
-    switchPage * SWITCH_PAGE_SIZE,
-    switchPage * SWITCH_PAGE_SIZE + SWITCH_PAGE_SIZE
-  );
-
-  useEffect(() => {
-    setClockInPage(page => Math.min(page, clockInPageCount - 1));
-    setSwitchPage(page => Math.min(page, switchPageCount - 1));
-  }, [clockInPageCount, switchPageCount]);
+  const projectMeta = p => p.wage_type === 'prevailing' ? t.prevailing : t.regular;
 
   const handleClockIn = async () => {
   // When work selection is on but the company has zero active work,
@@ -420,7 +468,6 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
       rememberProjectChoice(projectHistoryKey, switchProject);
       setSwitchingProject(false);
       setSwitchProject('');
-      setSwitchPage(0);
       setBreakAdded(false);
       setMileageAdded(false);
       setBreakMinutes('');
@@ -518,63 +565,27 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
 
             {switchingProject ? (
               <div style={styles.switchBox}>
-                <div style={styles.switchBoxHeader}>{`Select new ${workLabelLower}`}</div>
-                <div style={styles.switchChoices} role="radiogroup" aria-label={`Select new ${workLabelLower}`}>
-                  {switchProjects.length === 0 ? (
-                    <div style={styles.switchEmpty}>{`No other ${workLabelLower}s available.`}</div>
-                  ) : (
-                    visibleSwitchProjects.map((p, index) => {
-                      const selected = String(switchProject) === String(p.id);
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          style={{ ...styles.switchChoice, ...(selected ? styles.switchChoiceSelected : {}) }}
-                          onClick={() => setSwitchProject(p.id)}
-                          aria-pressed={selected}
-                          autoFocus={!switchProject && index === 0}
-                        >
-                          {p.name}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-                {switchPageCount > 1 && (
-                  <div style={styles.switchPager}>
-                    <button
-                      type="button"
-                      style={{ ...styles.switchPageBtn, ...(switchPage <= 0 ? styles.switchPageBtnDisabled : {}) }}
-                      onClick={() => setSwitchPage(page => Math.max(0, page - 1))}
-                      disabled={switchPage <= 0}
-                      aria-label="Previous projects"
-                    >
-                      {'◀'}
-                    </button>
-                    <span style={styles.switchPageText}>{switchPage + 1} / {switchPageCount}</span>
-                    <button
-                      type="button"
-                      style={{ ...styles.switchPageBtn, ...(switchPage >= switchPageCount - 1 ? styles.switchPageBtnDisabled : {}) }}
-                      onClick={() => setSwitchPage(page => Math.min(switchPageCount - 1, page + 1))}
-                      disabled={switchPage >= switchPageCount - 1}
-                      aria-label="Next projects"
-                    >
-                      {'▶'}
-                    </button>
-                  </div>
-                )}
+                <ProjectWheelPicker
+                  label={`Select new ${workLabelLower}`}
+                  placeholder={`Choose ${workLabelLower}`}
+                  value={switchProject}
+                  options={switchProjects}
+                  onChange={setSwitchProject}
+                  getMeta={projectMeta}
+                  tone="dark"
+                />
                 <div style={styles.switchActions}>
                   <button style={{ ...styles.switchConfirmBtn, ...(loading || !switchProject ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleSwitchProject} disabled={loading || !switchProject}>
                     {loading ? t.saving : t.confirmSwitch}
                   </button>
-                  <button style={styles.switchCancelBtn} onClick={() => { setSwitchingProject(false); setSwitchProject(''); setSwitchPage(0); setError(''); }}>
+                  <button style={styles.switchCancelBtn} onClick={() => { setSwitchingProject(false); setSwitchProject(''); setError(''); }}>
                     {t.cancel}
                   </button>
                 </div>
               </div>
             ) : (
               projectsEnabled && projects?.length > 1 && (
-                <button style={{ ...styles.switchProjectBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => { setSwitchingProject(true); setSwitchPage(0); }} disabled={loading}>
+                <button style={{ ...styles.switchProjectBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setSwitchingProject(true)} disabled={loading}>
                   {`Switch ${workLabelLower}`}
                 </button>
               )
@@ -634,53 +645,16 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
         </div>
       )}
       <div style={styles.form}>
-        {projectsEnabled && hasProjects && <div>
-          <div style={styles.projectPickerHeader}>
-            <label style={styles.label}>{projectClockLabel}</label>
-            {clockInPageCount > 1 && <span style={styles.projectPickerCount}>{clockInPage + 1} / {clockInPageCount}</span>}
-          </div>
-          <div style={styles.projectChoices} role="radiogroup" aria-label={`Select ${workLabelLower}`}>
-            {visibleClockInProjects.map(p => {
-              const selected = String(selectedProject) === String(p.id);
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  style={{ ...styles.projectChoice, ...(selected ? styles.projectChoiceSelected : {}) }}
-                  onClick={() => setSelectedProject(p.id)}
-                  aria-pressed={selected}
-                >
-                  <span>{p.name}</span>
-                  <span style={{ ...styles.projectChoiceMeta, ...(selected ? styles.projectChoiceMetaSelected : {}) }}>
-                    {p.wage_type === 'prevailing' ? t.prevailing : t.regular}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {clockInPageCount > 1 && (
-            <div style={styles.projectPager}>
-              <button
-                type="button"
-                style={{ ...styles.projectPageBtn, ...(clockInPage <= 0 ? styles.projectPageBtnDisabled : {}) }}
-                onClick={() => setClockInPage(page => Math.max(0, page - 1))}
-                disabled={clockInPage <= 0}
-                aria-label="Previous projects"
-              >
-                {'◀'}
-              </button>
-              <button
-                type="button"
-                style={{ ...styles.projectPageBtn, ...(clockInPage >= clockInPageCount - 1 ? styles.projectPageBtnDisabled : {}) }}
-                onClick={() => setClockInPage(page => Math.min(clockInPageCount - 1, page + 1))}
-                disabled={clockInPage >= clockInPageCount - 1}
-                aria-label="Next projects"
-              >
-                {'▶'}
-              </button>
-            </div>
-          )}
-        </div>}
+        {projectsEnabled && hasProjects && (
+          <ProjectWheelPicker
+            label={projectClockLabel}
+            placeholder={`Choose ${workLabelLower}`}
+            value={selectedProject}
+            options={orderedProjects}
+            onChange={setSelectedProject}
+            getMeta={projectMeta}
+          />
+        )}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <label htmlFor="clockin-notes" style={styles.label}>{t.notesOptional}</label>
@@ -880,6 +854,7 @@ const styles = {
   heading: { marginBottom: 16, fontSize: 18, fontWeight: 700 },
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   label: { fontSize: 13, fontWeight: 600, color: '#555', display: 'block', marginBottom: 4 },
+  labelDark: { fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.86)', display: 'block', marginBottom: 6 },
   charCount: { fontSize: 11, color: '#6b7280' },
   input: { padding: '9px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, width: '100%' },
   projectPickerHeader: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 6 },
