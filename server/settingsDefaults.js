@@ -40,7 +40,7 @@ const SETTINGS_DEFAULTS = {
   media_retention_days: 0,
   week_start: 1, // 0=Sunday, 1=Monday, …, 6=Saturday (OpsFloa's default pay-period start)
   currency: 'USD', invoice_signature: 'optional', default_temp_password: '', global_required_checklist_template_id: '',
-  label_work: 'Work', label_client: 'Customer', label_worker: 'Team Member', label_field: 'Field Work',
+  label_work: 'Project', label_client: 'Customer', label_worker: 'Team Member', label_field: 'Field Work',
   setup_questionnaire_completed_at: '',
 };
 

@@ -74,7 +74,7 @@ function DroppableDay({ date, isToday, children }) {
   );
 }
 
-function exportCSV(shifts, days, workerLabel = 'Worker', workLabel = 'Work') {
+function exportCSV(shifts, days, workerLabel = 'Worker', workLabel = 'Project') {
   const header = ['Date', workerLabel, workLabel, 'Start', 'End', 'Notes', "Can't Make It", 'Reason', 'Series ID'];
   const rows = shifts.map(s => [
     s.shift_date.substring(0, 10),
@@ -190,7 +190,7 @@ export default function ManageSchedule({ workers, projects, weekStart: companyWe
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
   const workerLabel = settings?.label_worker || 'Team Member';
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workerLabelLower = workerLabel.toLowerCase();
   const workLabelLower = workLabel.toLowerCase();
   const [weekStart, setWeekStart] = useState(() => startOfWeekFor(new Date(), companyWeekStart));

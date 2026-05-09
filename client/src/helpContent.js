@@ -20,10 +20,10 @@ export const HELP_SECTIONS = [
         a: 'Open Team in the AppSwitcher. Click "Add team member" and enter their name and email. They will get an invite link to set their own password. You can also create them with a temporary password if email is not reliable in their environment.',
       },
       {
-        q: 'How do I create work people can clock in to?',
+        q: 'How do I create projects people can clock in to?',
         a: [
-          'Open Work in the AppSwitcher and click "New work". It only needs a name; everything else is optional.',
-          'If your business does not track work by job, route, case, or customer, create a single "General" work item and use it for everything. People need one work item available before they can clock in.',
+          'Open Projects in the AppSwitcher and click "New project". It only needs a name; everything else is optional.',
+          'If your business does not track projects by job, route, case, or customer, create a single "General" project and use it for everything. People need one project available before they can clock in.',
         ],
       },
       {
@@ -53,7 +53,7 @@ export const HELP_SECTIONS = [
       },
       {
         q: 'Someone clocked in but is not showing on Live',
-        a: 'Live polls every minute, so wait a moment or hit Refresh. If they still do not appear, check that they selected a work item on clock-in. If their browser blocked location access, the clock-in still goes through but you will get a "Location denied" alert in the bell.',
+        a: 'Live polls every minute, so wait a moment or hit Refresh. If they still do not appear, check that they selected a project on clock-in. If their browser blocked location access, the clock-in still goes through but you will get a "Location denied" alert in the bell.',
       },
       {
         q: 'Can people edit their own time after submitting?',
@@ -71,7 +71,7 @@ export const HELP_SECTIONS = [
     items: [
       {
         q: 'How do I approve time entries?',
-        a: 'Workforce > Approvals. Each entry has Approve and Reject buttons. You can also edit times before approving, or split an entry across multiple work items if someone worked on more than one job, route, case, or customer in a single shift.',
+        a: 'Workforce > Approvals. Each entry has Approve and Reject buttons. You can also edit times before approving, or split an entry across multiple projects if someone worked on more than one job, route, case, or customer in a single shift.',
       },
       {
         q: 'Someone clocked the wrong day. How do I fix it?',
@@ -95,7 +95,7 @@ export const HELP_SECTIONS = [
         q: "What's the difference between Team Member, Admin, and Owner?",
         a: [
           'Team Member is the default participating role. They clock themselves in, see their own entries, and may submit reports or checklists depending on what is enabled.',
-          'Admin includes oversight: approve entries, manage people and work, view reports, and run exports.',
+          'Admin includes oversight: approve entries, manage people and projects, view reports, and run exports.',
           'Owner includes billing, role management, and company-level control. Each company gets one Owner by default: the person who registered.',
         ],
       },
@@ -122,8 +122,8 @@ export const HELP_SECTIONS = [
         a: 'Certified Payroll, including federal form WH-347, is required for some prevailing-wage public work. Enable it under Administration > Workspace > Modules to get classification fields, fringe benefit tracking, signed weekly reports, and the WH-347 PDF generator.',
       },
       {
-        q: 'Can I see labor cost by work item?',
-        a: 'Workforce > Reports > Work Reports. Filter by date range and work item to see total hours and pay, if Show Wages is enabled.',
+        q: 'Can I see labor cost by project?',
+        a: 'Workforce > Reports > Project Reports. Filter by date range and project to see total hours and pay, if Show Wages is enabled.',
       },
     ],
   },

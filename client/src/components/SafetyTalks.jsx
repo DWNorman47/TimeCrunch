@@ -61,7 +61,7 @@ function fileIcon(contentType) {
   return '📎';
 }
 
-function NewTalkForm({ projects, onAdded, onCancel, workLabel = 'Work' }) {
+function NewTalkForm({ projects, onAdded, onCancel, workLabel = 'Project' }) {
   const t = useT();
   const today = new Date().toLocaleDateString('en-CA');
   const [form, setForm] = useState({ title: '', content: '', given_by: '', talk_date: today, project_id: '' });
@@ -517,7 +517,7 @@ export default function SafetyTalks({ projects, settings = null }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
   const workerLabel = settings?.label_worker || 'Team Member';
   const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;

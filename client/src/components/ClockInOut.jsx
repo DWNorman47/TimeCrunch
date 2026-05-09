@@ -31,7 +31,7 @@ function formatElapsed(seconds) {
 
 const HINT_DISMISSED_KEY = 'opsfloa_clockin_hint_dismissed';
 
-export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geolocationEnabled = true, projectsEnabled = true, workLabel = 'Work' }) {
+export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geolocationEnabled = true, projectsEnabled = true, workLabel = 'Project' }) {
   // Detect day-mark workers up front — the actual switch to the DayMark
   // UI happens at the return statement (after all hook calls) so React's
   // hook-order rule isn't violated when the same component renders the

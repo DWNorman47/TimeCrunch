@@ -48,7 +48,7 @@ export default function DayTimeline({ entries, projects, settings, onEntryAdded,
   const t = useT();
   const toast = useToast();
   const today = todayLocal();
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelLower = workLabel.toLowerCase();
 
   const [clockStatus, setClockStatus] = useState(undefined); // undefined=loading, null=not clocked in, obj=clocked in

@@ -57,7 +57,7 @@ export default function Dashboard() {
   const [entryView, setEntryView] = useState('list');
   const [shiftPrefill, setShiftPrefill] = useState(null);
   const [chatUnread, setChatUnread] = useState(false);
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
 
   const handleFillFromShift = shift => {
     setShiftPrefill(shift);

@@ -46,7 +46,7 @@ function RowInput({ value, onChange, type = 'text', placeholder, style, min, max
 
 // ── Report Editor ──────────────────────────────────────────────────────────────
 
-function ReportEditor({ report: initial, projects, onSaved, onCancel, companyName, fieldPhotos, settings = null, workLabel = 'Work', workerLabelPlural = 'Workers' }) {
+function ReportEditor({ report: initial, projects, onSaved, onCancel, companyName, fieldPhotos, settings = null, workLabel = 'Project', workerLabelPlural = 'Workers' }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
@@ -378,7 +378,7 @@ function ReportEditor({ report: initial, projects, onSaved, onCancel, companyNam
 
 // ── Report list row ────────────────────────────────────────────────────────────
 
-function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyName, fieldPhotos, settings = null, workLabel = 'Work' }) {
+function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyName, fieldPhotos, settings = null, workLabel = 'Project' }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
@@ -480,7 +480,7 @@ function ReportRow({ report: initialReport, onEdit, onDelete, isAdmin, companyNa
 export default function DailyReports({ projects, settings = null }) {
   const { user } = useAuth();
   const t = useT();
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workerLabel = settings?.label_worker || 'Team Member';
   const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;
   const locale = langToLocale(user?.language);

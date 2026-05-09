@@ -31,7 +31,7 @@ function statusLabel(status, t) {
   return t.statusOpen;
 }
 
-function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPhases, workLabel = 'Work', workerLabel = 'Worker' }) {
+function AddItemForm({ projects, workers, onAdded, onCancel, isAdmin, existingPhases, workLabel = 'Project', workerLabel = 'Worker' }) {
   const t = useT();
   const PRIORITIES = [
     { value: 'high', label: `🔴 ${t.priorityHigh}` },
@@ -338,7 +338,7 @@ export default function Punchlist({ projects, settings = null }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelPlural = /s$/i.test(workLabel) ? workLabel : `${workLabel}s`;
   const workerLabel = settings?.label_worker || 'Team Member';
   const [items, setItems] = useState([]);

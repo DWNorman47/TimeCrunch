@@ -114,7 +114,7 @@ export default function PhotoGallery({ projects, settings = null }) {
   const t = useT();
   const locale = langToLocale(user?.language);
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelPlural = /s$/i.test(workLabel) ? workLabel : `${workLabel}s`;
 
   const [media, setMedia] = useState([]);

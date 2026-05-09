@@ -87,7 +87,7 @@ function ItemForm({ initial, onSaved, onCancel }) {
 
 // ── Log Hours Form ─────────────────────────────────────────────────────────────
 
-function LogHoursForm({ item, projects, onLogged, onCancel, workLabel = 'Work' }) {
+function LogHoursForm({ item, projects, onLogged, onCancel, workLabel = 'Project' }) {
   const t = useT();
   const { user } = useAuth();
   const [form, setForm] = useState({
@@ -160,7 +160,7 @@ function LogHoursForm({ item, projects, onLogged, onCancel, workLabel = 'Work' }
 
 // ── Equipment Card ─────────────────────────────────────────────────────────────
 
-function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogged, workLabel = 'Work' }) {
+function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogged, workLabel = 'Project' }) {
   const t = useT();
   const { user } = useAuth();
   const locale = langToLocale(user?.language);
@@ -337,7 +337,7 @@ function EquipmentCard({ item, projects, isAdmin, onEdit, onDeleted, onHoursLogg
 export default function EquipmentLog({ projects, settings = null }) {
   const { user } = useAuth();
   const t = useT();
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
 
