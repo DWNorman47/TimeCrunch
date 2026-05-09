@@ -120,7 +120,7 @@ const pg = {
 function EntityForm({ level, item, parentId, parentOptions, onSave, onCancel, settings }) {
   const t = useT();
   const isLocation = level.key === 'locations';
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
 
   const LEVEL_SGl = {
     locations:    t.invSetupLocationSgl,

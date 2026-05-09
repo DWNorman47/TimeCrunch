@@ -47,7 +47,7 @@ export default function HomePage() {
   const [showPlaces, setShowPlaces] = useState(false);
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const terms = useMemo(() => ({
-    work: settings?.label_work || 'Work',
+    work: settings?.label_work || 'Project',
     client: settings?.label_client || 'Customer',
     worker: settings?.label_worker || 'Team Member',
     field: settings?.label_field || 'Field Work',

@@ -28,7 +28,7 @@ const BLANK = {
 
 // ── Form (create or edit) ─────────────────────────────────────────────────────
 
-function SubReportForm({ projects, initial = BLANK, onSaved, onCancel, workLabel = 'Work', workerLabelPluralLower = 'workers' }) {
+function SubReportForm({ projects, initial = BLANK, onSaved, onCancel, workLabel = 'Project', workerLabelPluralLower = 'workers' }) {
   const t = useT();
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -187,7 +187,7 @@ function SubCard({ report, onEdit, onDeleted }) {
 export default function SubReports({ projects, settings = null }) {
   const t = useT();
   const { onSync } = useOffline() || {};
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const workLabelPlural = workLabel.endsWith('s') ? workLabel : `${workLabel}s`;
   const workerLabel = settings?.label_worker || 'Team Member';
   const workerLabelPlural = workerLabel.endsWith('s') ? workerLabel : `${workerLabel}s`;

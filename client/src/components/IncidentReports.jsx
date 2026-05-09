@@ -23,7 +23,7 @@ function fmtIncidentDate(value, locale = 'en-US') {
 
 // ── Incident Form ─────────────────────────────────────────────────────────────
 
-function IncidentForm({ projects, onSubmitted, onCancel, workLabel = 'Work' }) {
+function IncidentForm({ projects, onSubmitted, onCancel, workLabel = 'Project' }) {
   const t = useT();
   const TYPE_LABELS = useMemo(() => ({
     'injury': `🤕 ${t.typeInjury}`,
@@ -292,7 +292,7 @@ function IncidentCard({ incident, isAdmin, onClosed, onDeleted }) {
 export default function IncidentReports({ projects, settings = null }) {
   const { user } = useAuth();
   const t = useT();
-  const workLabel = settings?.label_work || 'Work';
+  const workLabel = settings?.label_work || 'Project';
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const { onSync } = useOffline() || {};
   const TYPE_LABELS = useMemo(() => ({

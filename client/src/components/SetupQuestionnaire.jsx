@@ -86,7 +86,7 @@ const QUESTIONS = [
   {
     id: 'geolocation',
     question: 'Do you want to record where team members clock in from?',
-    explanation: "Tracking captures each team member's GPS coordinates at clock-in and clock-out so admins can see them on the Live tab and on time entries. This is separate from requiring someone to be at a specific spot - that's a per-work geofence you set up later under Work.",
+    explanation: "Tracking captures each team member's GPS coordinates at clock-in and clock-out so admins can see them on the Live tab and on time entries. This is separate from requiring someone to be at a specific spot - that's a per-project geofence you set up later under Projects.",
     options: [
       { value: 'yes',  label: 'Yes, record their location',  settings: { feature_geolocation: true } },
       { value: 'no',   label: "No, don't track location",    settings: { feature_geolocation: false } },

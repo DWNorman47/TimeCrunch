@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { useFormPersist } from '../hooks/useFormPersist';
 
-export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, projectsEnabled = true, workLabel = 'Work' }) {
+export default function TimeEntryForm({ projects, onEntryAdded, t, prefill, projectsEnabled = true, workLabel = 'Project' }) {
   const today = new Date().toLocaleDateString('en-CA');
   const workLabelLower = workLabel.toLowerCase();
   const [collapsed, setCollapsed] = useState(true);

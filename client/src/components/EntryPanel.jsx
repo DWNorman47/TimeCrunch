@@ -15,7 +15,7 @@ function midTime(start, end) {
   return `${String(Math.floor(mid / 60)).padStart(2, '0')}:${String(mid % 60).padStart(2, '0')}`;
 }
 
-export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted, onClose, workLabel = 'Work' }) {
+export default function EntryPanel({ entry, projects = [], onRefresh, onDeleted, onClose, workLabel = 'Project' }) {
   const t = useT();
   const toast = useToast();
   const editable = !entry.locked && isEditable(entry.work_date);
