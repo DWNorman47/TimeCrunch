@@ -472,15 +472,34 @@ router.post('/out', requireAuth, requirePerm('clock_self'), clockLimiter, coerce
     }
     const clock = clockResult.rows[0];
 
-    // Get project wage_type (project may be null if projects feature is off)
-    const projResult = clock.project_id
-      ? await pool.query('SELECT wage_type, name FROM projects WHERE id = $1', [clock.project_id])
-      : { rows: [{ wage_type: 'regular', name: null }] };
-    if (clock.project_id && projResult.rowCount === 0) {
-      logFailure(req, 'clock.out', 'project_not_found', { project_id: clock.project_id });
-      return res.status(400).json({ error: 'Project not found' });
+    // Clock-out must never strand a worker because projects were disabled,
+    // archived, or otherwise no longer resolve. Preserve the project when it
+    // still exists and projects are enabled; otherwise close the shift without it.
+    let wage_type = 'regular';
+    let project_name = null;
+    let entryProjectId = clock.project_id;
+    if (clock.project_id) {
+      const featureResult = await pool.query(
+        `SELECT value FROM settings
+         WHERE company_id = $1 AND key = 'feature_project_integration'`,
+        [companyId]
+      );
+      const projectsEnabled = featureResult.rowCount === 0 || featureResult.rows[0].value !== '0';
+      if (projectsEnabled) {
+        const projResult = await pool.query(
+          'SELECT wage_type, name FROM projects WHERE id = $1 AND company_id = $2',
+          [clock.project_id, companyId]
+        );
+        if (projResult.rowCount > 0) {
+          ({ wage_type, name: project_name } = projResult.rows[0]);
+        } else {
+          entryProjectId = null;
+          logger.warn({ project_id: clock.project_id, user_id: req.user.id }, 'clock out ignoring stale project');
+        }
+      } else {
+        entryProjectId = null;
+      }
     }
-    const { wage_type, name: project_name } = projResult.rows[0];
 
     // Use client-supplied local times if available (avoids UTC offset issues on server)
     // Fallback to UTC extraction for backwards compatibility
@@ -506,7 +525,7 @@ router.post('/out', requireAuth, requirePerm('clock_self'), clockLimiter, coerce
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
          RETURNING *`,
         [
-          companyId, req.user.id, clock.project_id, clock.work_date,
+          companyId, req.user.id, entryProjectId, clock.work_date,
           start_time, end_time, clockInTime, clockOutTime, wage_type, clock.notes || null,
           clock.clock_in_lat, clock.clock_in_lng, lat || null, lng || null,
           parseInt(break_minutes) || 0, mileage != null ? parseFloat(mileage) : null,
