@@ -219,7 +219,7 @@ export default function ServiceRequestsAdmin({ settings = null }) {
                   <div style={s.categoryPill}>{r.category || 'Request'}</div>
                   <div style={s.statusPill(r.status)}>{r.status.replace('_', ' ')}</div>
                   <div style={s.created}>{new Date(r.created_at).toLocaleString()}</div>
-                  <span style={s.chevron}>{open ? 'v' : '>'}</span>
+                  <span style={s.chevron}>{open ? '▼' : '▶'}</span>
                 </div>
                 {open && (
                   <div style={s.detail}>

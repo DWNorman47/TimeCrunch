@@ -218,7 +218,7 @@ self.addEventListener('fetch', event => {
   }
 
   if (event.request.method === 'POST') {
-    if (url.includes('/api/clock/in') || url.includes('/api/clock/out')) {
+    if (url.includes('/api/clock/in') || url.includes('/api/clock/out') || url.includes('/api/clock/switch')) {
       event.respondWith(handleOfflineableRequest(event, 'clock'));
       return;
     }
