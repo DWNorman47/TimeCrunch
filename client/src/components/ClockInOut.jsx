@@ -30,6 +30,7 @@ function formatElapsed(seconds) {
 }
 
 const HINT_DISMISSED_KEY = 'opsfloa_clockin_hint_dismissed';
+const SWITCH_PAGE_SIZE = 3;
 
 export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geolocationEnabled = true, projectsEnabled = true, workLabel = 'Project' }) {
   // Detect day-mark workers up front — the actual switch to the DayMark
@@ -68,6 +69,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   const [locationDenied, setLocationDenied] = useState(false);
   const [switchingProject, setSwitchingProject] = useState(false);
   const [switchProject, setSwitchProject] = useState('');
+  const [switchPage, setSwitchPage] = useState(0);
   const [pendingChecklist, setPendingChecklist] = useState(null); // { template_id, items, name }
   const [checklistAnswers, setChecklistAnswers] = useState({});
   const [checklistSubmitting, setChecklistSubmitting] = useState(false);
@@ -178,6 +180,15 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
   const projectHasGeofence = !!(selectedProjectData?.geo_lat && selectedProjectData?.geo_lng && selectedProjectData?.geo_radius_ft);
   const workLabelLower = projectClockLabel.toLowerCase();
   const switchProjects = projects?.filter(p => String(p.id) !== String(status?.project_id)) || [];
+  const switchPageCount = Math.max(1, Math.ceil(switchProjects.length / SWITCH_PAGE_SIZE));
+  const visibleSwitchProjects = switchProjects.slice(
+    switchPage * SWITCH_PAGE_SIZE,
+    switchPage * SWITCH_PAGE_SIZE + SWITCH_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setSwitchPage(page => Math.min(page, switchPageCount - 1));
+  }, [switchPageCount]);
 
   const handleClockIn = async () => {
   // When work selection is on but the company has zero active work,
@@ -457,7 +468,7 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                   {switchProjects.length === 0 ? (
                     <div style={styles.switchEmpty}>{`No other ${workLabelLower}s available.`}</div>
                   ) : (
-                    switchProjects.map((p, index) => {
+                    visibleSwitchProjects.map((p, index) => {
                       const selected = String(switchProject) === String(p.id);
                       return (
                         <button
@@ -474,18 +485,41 @@ export default function ClockInOut({ projects, onEntryAdded, onClockedIn, t, geo
                     })
                   )}
                 </div>
+                {switchPageCount > 1 && (
+                  <div style={styles.switchPager}>
+                    <button
+                      type="button"
+                      style={{ ...styles.switchPageBtn, ...(switchPage <= 0 ? styles.switchPageBtnDisabled : {}) }}
+                      onClick={() => setSwitchPage(page => Math.max(0, page - 1))}
+                      disabled={switchPage <= 0}
+                      aria-label="Previous projects"
+                    >
+                      {'<'}
+                    </button>
+                    <span style={styles.switchPageText}>{switchPage + 1} / {switchPageCount}</span>
+                    <button
+                      type="button"
+                      style={{ ...styles.switchPageBtn, ...(switchPage >= switchPageCount - 1 ? styles.switchPageBtnDisabled : {}) }}
+                      onClick={() => setSwitchPage(page => Math.min(switchPageCount - 1, page + 1))}
+                      disabled={switchPage >= switchPageCount - 1}
+                      aria-label="Next projects"
+                    >
+                      {'>'}
+                    </button>
+                  </div>
+                )}
                 <div style={styles.switchActions}>
                   <button style={{ ...styles.switchConfirmBtn, ...(loading || !switchProject ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={handleSwitchProject} disabled={loading || !switchProject}>
                     {loading ? t.saving : t.confirmSwitch}
                   </button>
-                  <button style={styles.switchCancelBtn} onClick={() => { setSwitchingProject(false); setSwitchProject(''); setError(''); }}>
+                  <button style={styles.switchCancelBtn} onClick={() => { setSwitchingProject(false); setSwitchProject(''); setSwitchPage(0); setError(''); }}>
                     {t.cancel}
                   </button>
                 </div>
               </div>
             ) : (
               projectsEnabled && projects?.length > 1 && (
-                <button style={{ ...styles.switchProjectBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => setSwitchingProject(true)} disabled={loading}>
+                <button style={{ ...styles.switchProjectBtn, ...(loading ? { opacity: 0.55, cursor: 'not-allowed' } : {}) }} onClick={() => { setSwitchingProject(true); setSwitchPage(0); }} disabled={loading}>
                   {`Switch ${workLabelLower}`}
                 </button>
               )
@@ -777,6 +811,10 @@ const styles = {
   switchChoice: { width: '100%', padding: '10px 12px', textAlign: 'left', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 8, background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
   switchChoiceSelected: { background: '#fff', color: '#1a56db', borderColor: '#fff' },
   switchEmpty: { padding: '10px 12px', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, color: 'rgba(255,255,255,0.78)', fontSize: 13 },
+  switchPager: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  switchPageBtn: { width: 34, height: 30, borderRadius: 7, border: '1px solid rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.14)', color: '#fff', fontSize: 16, fontWeight: 900, lineHeight: 1, cursor: 'pointer' },
+  switchPageBtnDisabled: { opacity: 0.35, cursor: 'not-allowed' },
+  switchPageText: { minWidth: 48, textAlign: 'center', color: 'rgba(255,255,255,0.86)', fontSize: 12, fontWeight: 800 },
   switchActions: { display: 'flex', gap: 8 },
   switchConfirmBtn: { flex: 1, padding: '9px', background: '#fff', color: '#1a56db', border: 'none', borderRadius: 7, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
   switchCancelBtn: { padding: '9px 14px', background: 'none', border: '1px solid rgba(255,255,255,0.4)', color: 'rgba(255,255,255,0.8)', borderRadius: 7, fontSize: 13, cursor: 'pointer' },
