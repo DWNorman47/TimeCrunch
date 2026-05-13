@@ -635,11 +635,13 @@ async function _sendOvertimeAlert(worker, companyId, projectName, totalHours, th
 }
 
 // DELETE /api/clock/cancel — discard an active clock-in without creating a time entry
-router.delete('/cancel', requireAuth, async (req, res) => {
+router.delete('/cancel', requireAuth, requirePerm('clock_self'), clockLimiter, async (req, res) => {
   try {
+    // Scope to the caller's company too — defensive against future
+    // user-id reuse / merge scenarios. user_id alone is unique today.
     const result = await pool.query(
-      'DELETE FROM active_clock WHERE user_id = $1 RETURNING id',
-      [req.user.id]
+      'DELETE FROM active_clock WHERE user_id = $1 AND company_id = $2 RETURNING id',
+      [req.user.id, req.user.company_id]
     );
     if (result.rowCount === 0) return res.status(400).json({ error: 'Not clocked in' });
     res.json({ cancelled: true });

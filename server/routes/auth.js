@@ -225,49 +225,6 @@ router.post('/login', loginLimiter, async (req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     return res.json({ user: await buildSessionUser(req.user) });
-    const { getUserPermissions } = require('../permissions');
-    const [companyRes, userRes] = await Promise.all([
-      pool.query('SELECT plan, subscription_status, addon_qbo, addon_certified_payroll, trial_ends_at, slug, accepts_service_requests, client_portal_pro_interest FROM companies WHERE id = $1', [req.user.company_id]),
-      pool.query('SELECT mfa_enabled, language, admin_permissions, role_id, hourly_rate, rate_type, day_mark_mode, guaranteed_weekly_hours FROM users WHERE id = $1', [req.user.id]),
-    ]);
-    const company = companyRes.rows[0] || {};
-    const userRow = userRes.rows[0] || {};
-    // Compute permissions from the FRESH DB role_id, not the JWT. The JWT
-    // can be stale: a user reassigned to a new role (or whose old role was
-    // deleted, FK SET NULL'd) is still walking around with the old role_id
-    // until their token expires. Using userRow.role_id always reflects truth.
-    const permissions = await getUserPermissions({
-      ...req.user,
-      role_id: userRow.role_id ?? null,
-      admin_permissions: userRow.admin_permissions ?? null,
-    });
-    const { effectiveSubscriptionStatus } = require('../utils/subscription');
-    res.json({
-      user: {
-        ...req.user,
-        language: userRow.language || req.user.language,
-        plan: company.plan || 'free',
-        subscription_status: effectiveSubscriptionStatus(company),
-        addon_qbo: company.addon_qbo || false,
-        addon_certified_payroll: company.addon_certified_payroll || false,
-        company_slug: company.slug || null,
-        accepts_service_requests: !!company.accepts_service_requests,
-        client_portal_pro_interest: !!company.client_portal_pro_interest,
-        trial_ends_at: company.trial_ends_at,
-        mfa_enabled: userRow.mfa_enabled || false,
-        admin_permissions: userRow.admin_permissions || null,
-        worker_access_ids: userRow.worker_access_ids || null,
-        role_id: userRow.role_id ?? null,
-        // Phase D: full permission set so the client can gate modules,
-        // tabs, and buttons. Server is still authoritative on every gated
-        // route — this is just for UI hide/show.
-        permissions: [...permissions],
-        hourly_rate: userRow.hourly_rate != null ? parseFloat(userRow.hourly_rate) : null,
-        rate_type: userRow.rate_type || 'hourly',
-        day_mark_mode: !!userRow.day_mark_mode,
-        guaranteed_weekly_hours: userRow.guaranteed_weekly_hours != null ? parseFloat(userRow.guaranteed_weekly_hours) : null,
-      },
-    });
   } catch (err) {
     logger.error({ err }, 'catch block error');
     res.status(500).json({ error: 'Server error' });
@@ -444,8 +401,6 @@ router.post('/complete-setup', async (req, res) => {
     return res.status(400).json({ error: 'Setup session expired. Please sign in again.' });
   }
   if (!payload.setup_pending) return res.status(400).json({ error: 'Invalid setup token' });
-  const pwErr = validatePassword(new_password);
-  if (pwErr) return res.status(400).json({ error: pwErr });
   try {
     const userRes = await pool.query(
       `SELECT u.*, c.name as company_name FROM users u
@@ -455,6 +410,10 @@ router.post('/complete-setup', async (req, res) => {
     );
     const user = userRes.rows[0];
     if (!user) return res.status(400).json({ error: 'User not found' });
+    // Validate after fetch so we can enforce the "password can't contain
+    // your username" rule that validatePassword applies when given a username.
+    const pwErr = validatePassword(new_password, user.username);
+    if (pwErr) return res.status(400).json({ error: pwErr });
     const hash = await bcrypt.hash(new_password, 10);
     // Bump token_version so any previously-issued tokens for this user
     // (e.g. from before a password was forced to be changed) are rejected.
@@ -574,14 +533,15 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
 router.post('/reset-password', authLimiter, async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'token and password required' });
-  const pwErr = validatePassword(password);
-  if (pwErr) return res.status(400).json({ error: pwErr });
   try {
     const result = await pool.query(
-      'SELECT id FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()',
+      'SELECT id, username FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()',
       [sha256(token)]
     );
     if (result.rowCount === 0) return res.status(400).json({ error: 'Reset link is invalid or has expired' });
+    // Validate after fetch so the "no username in password" rule applies.
+    const pwErr = validatePassword(password, result.rows[0].username);
+    if (pwErr) return res.status(400).json({ error: pwErr });
 
     const hash = await bcrypt.hash(password, 10);
     // Bump token_version — if an attacker had stolen a token before the
@@ -601,8 +561,6 @@ router.post('/reset-password', authLimiter, async (req, res) => {
 router.post('/accept-invite', authLimiter, async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'token and password required' });
-  const pwErr = validatePassword(password);
-  if (pwErr) return res.status(400).json({ error: pwErr });
   try {
     const result = await pool.query(
       `SELECT u.id, u.username, u.company_id, c.name as company_name FROM users u
@@ -612,6 +570,9 @@ router.post('/accept-invite', authLimiter, async (req, res) => {
     );
     if (result.rowCount === 0) return res.status(400).json({ error: 'Invite link is invalid or has expired' });
     const user = result.rows[0];
+    // Validate after fetch so the "no username in password" rule applies.
+    const pwErr = validatePassword(password, user.username);
+    if (pwErr) return res.status(400).json({ error: pwErr });
     const hash = await bcrypt.hash(password, 10);
     await pool.query(
       'UPDATE users SET password_hash = $1, invite_token = NULL, invite_token_expires = NULL, invite_pending = false, email_confirmed = true, must_change_password = false, token_version = token_version + 1 WHERE id = $2',

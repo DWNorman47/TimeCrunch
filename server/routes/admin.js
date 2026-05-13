@@ -157,7 +157,11 @@ router.get('/settings', requireAdmin, async (req, res) => {
 router.patch('/settings', requireAdmin, requirePerm('manage_settings'), async (req, res) => {
   const rateKeys = ['prevailing_wage_rate', 'default_hourly_rate', 'overtime_multiplier'];
   const notifKeys = ['notification_inactive_days', 'notification_start_hour', 'notification_end_hour', 'chat_retention_days'];
-  const numericKeys = [...rateKeys, ...notifKeys, 'overtime_threshold', 'media_retention_days', 'qbo_bill_terms_days', 'week_start'];
+  // shift_reminder_hour / pto_annual_days / cycle_count_* sat in
+  // ADMIN_SETTINGS_DEFAULTS without being in this allowlist, so the UI
+  // couldn't update them. Added during 2026-04-30 audit pass.
+  const adminNumericKeys = ['shift_reminder_hour', 'pto_annual_days', 'cycle_count_audit_pct', 'cycle_count_reconcile_threshold'];
+  const numericKeys = [...rateKeys, ...notifKeys, ...adminNumericKeys, 'overtime_threshold', 'media_retention_days', 'qbo_bill_terms_days', 'week_start'];
   const stringKeys = ['overtime_rule', 'currency', 'company_timezone', 'invoice_signature', 'default_temp_password', 'global_required_checklist_template_id', 'qbo_expense_account_id', 'qbo_bank_account_id', 'qbo_labor_item_id', 'setup_questionnaire_completed_at', 'label_work', 'label_client', 'label_worker', 'label_field'];
   const allowed = [...numericKeys, ...stringKeys, ...FEATURE_KEYS];
   const companyId = req.user.company_id;

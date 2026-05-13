@@ -117,7 +117,27 @@ written. The allow-list lives in `server/settingsDefaults.js`:
 
 No DB CHECK on `settings.key`. PATCH `/admin/settings` validates against
 the allowlist; raw INSERTs would not. Update `settingsDefaults.js`
-**and** this file when adding a new key.
+**and** the PATCH `numericKeys` / `stringKeys` arrays in
+`server/routes/admin.js` **and** this file when adding a new key. (We
+got bit twice by this: `shift_reminder_hour`, `pto_annual_days`,
+`cycle_count_audit_pct`, and `cycle_count_reconcile_threshold` sat in
+`ADMIN_SETTINGS_DEFAULTS` without being in the PATCH allowlist until the
+2026-04-30 audit; they're now wired through.)
+
+### Recently-added string settings (no DB CHECK; free-form)
+
+- `label_work`     (default `'Project'`) — what the company calls a project / job / engagement.
+- `label_client`   (default `'Customer'`) — what the company calls a client.
+- `label_worker`   (default `'Team Member'`) — what the company calls a worker.
+- `label_field`    (default `'Field Work'`) — what the company calls the field-work module.
+
+These are free-form display labels. Components read `settings.label_*`
+at render time and fall back to the default if missing. Migration 0102
+rewrote the old `label_work='Work'` rows to `'Project'` for companies
+that had the previous default.
+
+- `setup_questionnaire_completed_at` (ISO timestamp string) — set when
+  an admin finishes (or dismisses) the first-run setup questionnaire.
 
 ## Boolean-flag columns
 
