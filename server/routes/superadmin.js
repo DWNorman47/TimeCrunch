@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { requireSuperAdmin } = require('../middleware/auth');
 const { seedBuiltinRoles } = require('../permissions');
+const { COMPANY_SUBSCRIPTION_STATUSES, COMPANY_PLANS } = require('../constants/companyEnums');
 
 const DEMO_COMPANY_NAME = 'OpsFloa Demo Workspace';
 const DEMO_COMPANY_SLUG = 'opsfloa-demo-workspace';
@@ -311,8 +312,8 @@ router.patch('/companies/:id', requireSuperAdmin, async (req, res) => {
     addon_qbo === undefined && addon_certified_payroll === undefined
   ) return res.status(400).json({ error: 'No fields to update' });
 
-  const VALID_STATUSES = ['trial', 'active', 'past_due', 'canceled', 'trial_expired', 'exempt'];
-  const VALID_PLANS = ['free', 'starter', 'business'];
+  const VALID_STATUSES = COMPANY_SUBSCRIPTION_STATUSES;
+  const VALID_PLANS = COMPANY_PLANS;
   if (subscription_status !== undefined && !VALID_STATUSES.includes(subscription_status))
     return res.status(400).json({ error: 'Invalid subscription_status' });
   if (plan !== undefined && !VALID_PLANS.includes(plan))

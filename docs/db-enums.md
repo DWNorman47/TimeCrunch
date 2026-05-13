@@ -46,8 +46,8 @@ For each column we record:
 
 | Table.column | Allowed values | DB enforcement | App validation | Stakes |
 |---|---|---|---|---|
-| `companies.subscription_status` | `trial`, `active`, `past_due`, `canceled`, `trial_expired`, `exempt` | **app-only** | `server/routes/superadmin.js:74` | Billing gate. Stripe webhook (`stripe.js:166-197`) writes `obj.status` directly with no app-side validation, relying on Stripe's API to send only known values. A future Stripe-side change could land an unknown value; CHECK constraint would catch it. |
-| `companies.plan` | `free`, `starter`, `business` | **app-only** | `server/routes/superadmin.js:75` | Feature gating (worker limits, storage caps, plan-gated features). |
+| `companies.subscription_status` | `trial`, `active`, `past_due`, `canceled`, `trial_expired`, `exempt` | **enforced** (CHECK in `0103`) | `server/constants/companyEnums.js`, `server/routes/superadmin.js`, `server/routes/stripe.js` (via `mapStripeStatus`) | Billing gate. Stripe webhook now translates its enum (`trialing`, `incomplete`, `unpaid`, `paused`, etc.) onto the app set via `mapStripeStatus()` before writing — unknown values fall back to `past_due` so they're surfaced as "needs admin attention" rather than silently coerced to `active`. |
+| `companies.plan` | `free`, `starter`, `business` (nullable) | **enforced** (CHECK in `0103`) | `server/constants/companyEnums.js`, `server/routes/superadmin.js`, `server/routes/stripe.js` (`planFromPrice`) | Feature gating (worker limits, storage caps, plan-gated features). NULL allowed for trial/free companies pre-subscription. |
 | `users.role` | `worker`, `admin`, `super_admin` | **app-only** | `server/permissions.js`, scattered checks | Auth boundary. Permission system is allow-list, so a bad value can't escalate — but it can lock a user out of every module. |
 | `users.role_id` (FK) | references `roles.id` | enforced (FK) | n/a | The new permission system. FK is the constraint. |
 | `time_entries.status` | `pending`, `approved`, `rejected` | **enforced** (CHECK) | scattered UPDATEs in `server/routes/admin.js` | Approval workflow + payroll inclusion. |
@@ -152,28 +152,17 @@ Listed for completeness so they're not flagged as gaps:
 
 ## Open follow-ups
 
-Three columns remain on app-only protection, each blocked by a
+Two columns remain on app-only protection, each blocked by a
 non-trivial precondition:
 
-1. **`companies.subscription_status` + `companies.plan`.** Both are
-   driven by Stripe webhooks (`server/routes/stripe.js:180`,
-   `planFromPrice()`). Stripe sends statuses we don't model
-   (`incomplete`, `unpaid`, `paused`, etc) and price IDs that aren't in
-   our map. Adding a CHECK without first writing a Stripe-status →
-   app-status mapper would 500 the webhook on real Stripe events.
-   Right next step: a small mapper at the top of the webhook
-   (`STRIPE_TO_APP = { trialing: 'trial', ... }`) plus a fallback to
-   the closest "needs attention" value, then a CHECK once the mapping
-   is exhaustive.
-
-2. **`inbox.type`.** The doc lists ~19 distinct values seen across the
+1. **`inbox.type`.** The doc lists ~19 distinct values seen across the
    server, written via `createInboxItem(...)` calls scattered through
    every route file. Centralise the call sites (single
    `createInboxItem(type, ...)` wrapper that imports a constants
    array) BEFORE adding a CHECK — otherwise every new feature breaks
    the constraint.
 
-3. **`inventory_items.locations[].type`.** JSON-shaped column. PG can
+2. **`inventory_items.locations[].type`.** JSON-shaped column. PG can
    constrain JSON contents but it's brittle. Lower urgency given the
    small set and infrequent writes.
 
