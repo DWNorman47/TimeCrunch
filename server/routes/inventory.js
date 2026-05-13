@@ -138,7 +138,7 @@ async function maybeSendLowStockAlert(companyId, itemId) {
       await createInboxItemBatch(admins.rows.map(u => u.id), companyId, 'low_stock', title, body, '/inventory#stock');
     }
   } catch (err) {
-    console.error('maybeSendLowStockAlert error:', err);
+    logger.error({ err }, 'maybeSendLowStockAlert error');
   }
 }
 

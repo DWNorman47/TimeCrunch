@@ -1140,7 +1140,7 @@ router.post('/workers/invite', requireAdmin, requirePerm('manage_workers'), invi
         `,
       });
     } catch (emailErr) {
-      console.error('Invite email failed:', emailErr?.response?.body || emailErr.message);
+      logger.error({ err: emailErr?.response?.body || emailErr }, 'Invite email failed');
       emailSent = false;
     }
     res.status(201).json({ ...result.rows[0], email_sent: emailSent });
@@ -1187,7 +1187,7 @@ router.post('/workers/:id/send-invite', requireAdmin, requirePerm('manage_worker
         `,
       });
     } catch (emailErr) {
-      console.error('Send invite email failed:', emailErr?.response?.body || emailErr.message);
+      logger.error({ err: emailErr?.response?.body || emailErr }, 'Send invite email failed');
       emailSent = false;
     }
     res.json({ email_sent: emailSent });
@@ -1919,7 +1919,7 @@ router.post('/projects', requireAdmin, requirePerm('manage_projects'),
         if (customer?.Id) {
           await pool.query('UPDATE projects SET qbo_customer_id = $1 WHERE id = $2', [customer.Id, newProject.id]);
         }
-      } catch (err) { console.error('[QBO auto-create customer]', err.message); }
+      } catch (err) { logger.error({ err }, '[QBO auto-create customer]'); }
     });
   } catch (err) {
     if (err.code === '23505') {
@@ -2695,7 +2695,7 @@ router.patch('/entries/:id/approve', requireAdmin, requirePerm('approve_entries'
           [activity?.Id || 'synced', entry.id]
         );
       } catch (err) {
-        console.error('[QBO auto-sync]', err.message);
+        logger.error({ err }, '[QBO auto-sync]');
         pool.query(
           'INSERT INTO qbo_sync_errors (company_id, entity_type, entity_id, error_message) VALUES ($1, $2, $3, $4)',
           [companyId, 'time_entry', entry.id, err.message]
@@ -2754,7 +2754,7 @@ router.patch('/entries/:id/approve', requireAdmin, requirePerm('approve_entries'
             sendEmail(admin.email, subject, body);
           }
         } catch (alertErr) {
-          console.error('Budget alert error:', alertErr);
+          logger.error({ err: alertErr }, 'Budget alert error');
         }
       });
     }
@@ -2804,7 +2804,7 @@ router.patch('/entries/:id/reject', requireAdmin, requirePerm('approve_entries')
         try {
           await qbo.deleteTimeActivity(companyId, rejEntry.qbo_activity_id);
           await pool.query('UPDATE time_entries SET qbo_activity_id = NULL, qbo_synced_at = NULL WHERE id = $1 AND company_id = $2', [rejEntry.id, companyId]);
-        } catch (err) { console.error('[QBO delete on reject]', err.message); }
+        } catch (err) { logger.error({ err }, '[QBO delete on reject]'); }
       });
     }
   } catch (err) {
@@ -2840,7 +2840,7 @@ router.patch('/entries/:id/unapprove', requireAdmin, requirePerm('approve_entrie
     if (existingActivityId && existingActivityId !== 'synced') {
       setImmediate(async () => {
         try { await qbo.deleteTimeActivity(companyId, existingActivityId); }
-        catch (err) { console.error('[QBO delete on unapprove]', err.message); }
+        catch (err) { logger.error({ err }, '[QBO delete on unapprove]'); }
       });
     }
   } catch (err) {

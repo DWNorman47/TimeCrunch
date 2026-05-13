@@ -135,7 +135,7 @@ router.post('/login', loginLimiter, async (req, res) => {
   const logFailure = (reason) => pool.query(
     'INSERT INTO login_failures (attempted_company, attempted_username, failure_reason, ip) VALUES ($1, $2, $3, $4)',
     [company_name, username, reason, ip]
-  ).catch(err => console.error('Failed to log login failure:', err));
+  ).catch(err => logger.error({ err }, 'Failed to log login failure'));
   try {
     // Step 1: check company name
     const companyRes = await pool.query(
@@ -290,7 +290,7 @@ router.post('/register', authLimiter, async (req, res) => {
           <p style="color:#9ca3af;font-size:12px">Registration was allowed (limit is ${TRIAL_LIMIT}). You'll receive another alert if they register again.</p>
         </div>
       `,
-    }).catch(err => console.error('Trial abuse alert email failed:', err));
+    }).catch(err => logger.error({ err }, 'Trial abuse alert email failed'));
   }
   } // end if (!ipIsWhitelisted)
 
@@ -358,7 +358,7 @@ router.post('/register', authLimiter, async (req, res) => {
     await client.query('ROLLBACK');
     if (err.code === '23505') return res.status(409).json({ error: 'Username already taken at this company' });
     if (err.response) {
-      console.error('Confirmation email failed — account not created:', err.response.body);
+      logger.error({ err: err.response.body }, 'Confirmation email failed — account not created');
       return res.status(500).json({ error: 'Failed to send confirmation email. Please check your email address and try again.' });
     }
     logger.error({ err }, 'catch block error');
@@ -463,7 +463,7 @@ router.post('/resend-confirmation', async (req, res) => {
         `,
       });
     } catch (emailErr) {
-      console.error('Resend confirmation email failed:', emailErr?.response?.body || emailErr.message);
+      logger.error({ err: emailErr?.response?.body || emailErr }, 'Resend confirmation email failed');
     }
     res.json({ success: true });
   } catch (err) {

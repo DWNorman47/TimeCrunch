@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const pool = require('../db');
+const logger = require('../logger');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendEmail } = require('../email');
 const { sendPushToUser, sendPushToCompanyAdmins } = require('../push');
@@ -48,7 +49,7 @@ router.post('/', requireAuth, async (req, res) => {
           `Time off request: ${req.user.full_name}`,
           `${typeLabel} · ${start_date} – ${end_date}`,
           '/workforce#timeoff');
-      } catch (err) { console.error('Time off request notification error:', err); }
+      } catch (err) { logger.error({ err }, 'Time off request notification error'); }
     });
     res.status(201).json(result.rows[0]);
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
@@ -143,7 +144,7 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
             url: '/timeclock#manage',
           });
         }
-      } catch (err) { console.error('Time off approval notification error:', err); }
+      } catch (err) { logger.error({ err }, 'Time off approval notification error'); }
     });
     res.json(row);
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }
@@ -180,7 +181,7 @@ router.patch('/:id/deny', requireAdmin, async (req, res) => {
         });
         createInboxItem(row.user_id, companyId, 'timeoff_denied', 'Time off request denied',
           `${denyStartStr} – ${denyEndStr}${review_note ? ' · ' + review_note : ''}`, '/timeclock#timeoff');
-      } catch (err) { console.error('Time off denial notification error:', err); }
+      } catch (err) { logger.error({ err }, 'Time off denial notification error'); }
     });
     res.json(row);
   } catch (err) { req.log.error({ err }, 'route error'); res.status(500).json({ error: 'Server error' }); }

@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
+const logger = require('../logger');
 
 const router = express.Router();
 
@@ -58,7 +59,7 @@ router.post('/', async (req, res) => {
     // failing reporter should never block the user's crash-recovery flow.
     res.status(204).end();
   } catch (err) {
-    console.error('client-errors insert failed:', err.message);
+    logger.error({ err }, 'client-errors insert failed');
     // Swallow — reporting must never fail the caller.
     res.status(204).end();
   }
