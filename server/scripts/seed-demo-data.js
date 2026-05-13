@@ -306,12 +306,23 @@ async function main() {
     ];
 
     const users = [];
+    const skippedUsers = [];
     for (const [username, fullName, role, email, rate] of peopleSeed) {
-      // Scope the lookup by company_id too. Without this, a real
-      // customer happening to have a worker with one of the demo
-      // usernames (e.g. 'riley.brooks') would have their user row
-      // silently adopted into the demo workers[] array and rewritten
-      // by subsequent updates.
+      // Two-step lookup to handle username collisions with real customers
+      // gracefully. The (company_id, username) ensureBy below is correct
+      // for the common case, but if `username` already exists in ANOTHER
+      // company the global UNIQUE constraint on users.username would
+      // make our INSERT throw and abort the whole cron-driven seed run.
+      // Pre-check globally so we can skip + warn instead of dying.
+      const collision = await one(
+        client,
+        'SELECT company_id FROM users WHERE username = $1 LIMIT 1',
+        [username]
+      );
+      if (collision && collision.company_id !== companyId) {
+        skippedUsers.push(username);
+        continue;
+      }
       const row = await ensureBy(
         client,
         'users',
@@ -330,6 +341,12 @@ async function main() {
         'id, full_name, role'
       );
       users.push(row);
+    }
+    if (skippedUsers.length > 0) {
+      console.warn(
+        `[demo-seed] skipped ${skippedUsers.length} demo user(s) due to username collision with another company: ${skippedUsers.join(', ')}. ` +
+        'Demo will be missing these workers. Rename the demo usernames or move the colliding real account to clear.'
+      );
     }
     const existingUsers = await client.query(
       `SELECT id, full_name, role FROM users WHERE company_id = $1 AND active = true ORDER BY id`,
