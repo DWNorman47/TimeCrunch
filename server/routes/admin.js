@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const rateLimit = require('express-rate-limit');
 const { userOrIpKey } = require('../middleware/rateLimitKey');
-const { entryInstants, validLocalDate } = require('../utils/timeFormat');
+const { entryInstants, validLocalDate, wallClockInTZ } = require('../utils/timeFormat');
 const { PROJECT_STATUSES } = require('../constants/projectEnums');
 const pool = require('../db');
 
@@ -473,9 +473,12 @@ router.post('/clock-out/:user_id', requireAdmin, requirePerm('manage_workers'), 
 
     const clockInTime = new Date(clock.clock_in_time);
     const clockOutTime = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const start_time = `${pad(clockInTime.getUTCHours())}:${pad(clockInTime.getUTCMinutes())}:${pad(clockInTime.getUTCSeconds())}`;
-    const end_time = `${pad(clockOutTime.getUTCHours())}:${pad(clockOutTime.getUTCMinutes())}:${pad(clockOutTime.getUTCSeconds())}`;
+    // Use the worker's stored timezone for the wall-clock fallback — the
+    // server runs in UTC so a raw getUTCHours() would stamp the wrong
+    // wall-clock for any worker outside that zone. start_ts / end_ts
+    // below are real UTC instants and remain correct.
+    const start_time = wallClockInTZ(clockInTime,  clock.timezone);
+    const end_time   = wallClockInTZ(clockOutTime, clock.timezone);
 
     const client = await pool.connect();
     let entryResult;
@@ -1959,6 +1962,23 @@ router.get('/projects/:id/photos', requireAdmin, async (req, res) => {
 });
 
 // Project documents
+//
+// Both endpoints below verify project ownership before touching anything.
+// Without this check, an admin could mint upload URLs or attach document
+// rows against a project_id belonging to another tenant — project IDs are
+// sequential ints, so they're guessable. The read endpoints already
+// filter `WHERE project_id = $1 AND company_id = $2`, so cross-tenant rows
+// wouldn't be visible to the victim, but they would sit in the DB tied
+// to the wrong project and could leak through any future join that
+// forgets the company scope.
+async function assertProjectInCompany(projectId, companyId) {
+  const r = await pool.query(
+    'SELECT 1 FROM projects WHERE id = $1 AND company_id = $2 LIMIT 1',
+    [projectId, companyId]
+  );
+  return r.rowCount > 0;
+}
+
 router.get('/projects/:id/documents/upload-url', requireAdmin, async (req, res) => {
   const { filename, contentType } = req.query;
   if (!filename || !contentType) return res.status(400).json({ error: 'filename and contentType required' });
@@ -1969,6 +1989,9 @@ router.get('/projects/:id/documents/upload-url', requireAdmin, async (req, res) 
     'image/jpeg', 'image/png', 'image/webp', 'text/plain', 'text/csv'];
   if (!ALLOWED.includes(contentType)) return res.status(400).json({ error: 'File type not allowed' });
   try {
+    if (!(await assertProjectInCompany(req.params.id, req.user.company_id))) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
     const ext = filename.split('.').pop().toLowerCase();
     const { getPresignedUploadUrl } = require('../r2');
     const { uploadUrl, publicUrl } = await getPresignedUploadUrl('documents', ext, contentType);
@@ -1981,6 +2004,9 @@ router.post('/projects/:id/documents', requireAdmin, async (req, res) => {
   if (!name || !url) return res.status(400).json({ error: 'name and url required' });
   const companyId = req.user.company_id;
   try {
+    if (!(await assertProjectInCompany(req.params.id, companyId))) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
     const result = await pool.query(
       `INSERT INTO project_documents (company_id, project_id, name, url, size_bytes, uploaded_by)
        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
@@ -2203,30 +2229,50 @@ router.get('/projects/:id/media-zip', requireAdmin, async (req, res) => {
        WHERE t.company_id = $1 AND t.project_id = $2 AND a.url IS NOT NULL`,
       [companyId, req.params.id]
     );
-    const urls = [
+    // Bound the URLs we'll fetch to known R2 / CDN hosts. The URL column
+    // is populated from R2 upload responses today, but a bad row from a
+    // future import, raw SQL, or compromised endpoint could otherwise
+    // point this fetch at an internal address (169.254.169.254, RFC1918,
+    // metadata services) — classic SSRF. Reject anything that doesn't
+    // match the allow-list before we touch the network.
+    const r2Public = (process.env.R2_PUBLIC_URL || '').replace(/\/+$/, '');
+    const allowedHostnames = new Set();
+    try { if (r2Public) allowedHostnames.add(new URL(r2Public).hostname); } catch { /* env unset / malformed */ }
+    const isAllowedUrl = u => {
+      try {
+        const p = new URL(u);
+        if (p.protocol !== 'https:' && p.protocol !== 'http:') return false;
+        return allowedHostnames.size === 0 ? false : allowedHostnames.has(p.hostname);
+      } catch { return false; }
+    };
+    const allUrls = [
       ...photos.rows.map(r => r.url),
       ...attachments.rows.map(r => r.url),
     ];
+    const urls = allUrls.filter(isAllowedUrl);
+    const skipped = allUrls.length - urls.length;
+    if (skipped > 0) {
+      logger.warn({ project_id: req.params.id, skipped }, 'media-zip: dropped URLs not on allow-list');
+    }
 
     if (urls.length === 0) return res.status(404).json({ error: 'No media found for this project' });
 
     const archiver = require('archiver');
     const https = require('https');
-    const http = require('http');
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${projectName}_media.zip"`);
 
     const archive = archiver('zip', { zlib: { level: 6 } });
     archive.pipe(res);
-    archive.on('error', err => { console.error('[media-zip]', err); });
+    archive.on('error', err => { logger.error({ err }, 'media-zip archive error'); });
 
-    // Fetch and append each file; resolve once the http response stream begins
+    // Only https. The allow-list above rejected anything else, so we
+    // don't need the http module at all anymore.
     await Promise.all(urls.map((url, i) => new Promise(resolve => {
       const ext = url.split('?')[0].split('.').pop().toLowerCase() || 'bin';
       const filename = `${String(i + 1).padStart(4, '0')}.${ext}`;
-      const mod = url.startsWith('https') ? https : http;
-      mod.get(url, stream => {
+      https.get(url, stream => {
         archive.append(stream, { name: filename });
         resolve();
       }).on('error', resolve);

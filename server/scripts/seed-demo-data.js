@@ -154,8 +154,29 @@ async function ensureChildRows(client, table, keyName, keyValue, rows) {
 }
 
 async function ensureDemoCompany(client) {
-  const existing = await one(client, 'SELECT id, name FROM companies WHERE name = $1', [TARGET_COMPANY]);
+  // Hard-pin to a company whose subscription_status is 'exempt' — that's
+  // a sentinel only the superadmin tools set on intentional demo/internal
+  // tenants. Without this filter, a real customer happening to name their
+  // company "Demo Operations" would have every subsequent seed write land
+  // in their tenant. We'd rather fail loudly than touch real customer data.
+  const existing = await one(
+    client,
+    "SELECT id, name FROM companies WHERE name = $1 AND subscription_status = 'exempt'",
+    [TARGET_COMPANY]
+  );
   if (existing) return existing;
+
+  // Refuse to create the demo company if a non-exempt company by the same
+  // name already exists. Forces an admin to either rename theirs or pick a
+  // different DEMO_COMPANY_NAME for this environment.
+  const clash = await one(client, 'SELECT id FROM companies WHERE name = $1 LIMIT 1', [TARGET_COMPANY]);
+  if (clash) {
+    throw new Error(
+      `A non-demo company already exists with name "${TARGET_COMPANY}". ` +
+      'Set DEMO_COMPANY_NAME to a unique value for this environment, or mark ' +
+      'the existing company subscription_status = exempt if it really is the demo.'
+    );
+  }
 
   const baseSlug = slugify(TARGET_COMPANY);
   let slug = baseSlug;
@@ -286,17 +307,21 @@ async function main() {
 
     const users = [];
     for (const [username, fullName, role, email, rate] of peopleSeed) {
+      // Scope the lookup by company_id too. Without this, a real
+      // customer happening to have a worker with one of the demo
+      // usernames (e.g. 'riley.brooks') would have their user row
+      // silently adopted into the demo workers[] array and rewritten
+      // by subsequent updates.
       const row = await ensureBy(
         client,
         'users',
-        { username },
+        { company_id: companyId, username },
         {
           password_hash: 'demo-disabled-password',
           role,
           full_name: fullName,
           email,
           hourly_rate: rate,
-          company_id: companyId,
           active: true,
           first_name: fullName.split(' ')[0],
           last_name: fullName.split(' ').slice(1).join(' '),
